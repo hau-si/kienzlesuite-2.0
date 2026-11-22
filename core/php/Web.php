@@ -60,6 +60,7 @@ final class Web {
             case '/anmelden/passkey': return $this->passkeyLogin($r);
             case '/einrichten': return $get ? $this->setupPage($r->get('t', 60)) : $this->setup($r);
             case '/abmelden': if (!$get) return $this->logout($r); break;
+            case '/uhrzeit/korrigieren': if (!$get && $this->session) return $this->clockFix($r); break;
             case '/oidc/authorize': if ($get && $this->oidc && $stage !== 'full') return Response::redirect('/anmelden?weiter=/oidc/fortsetzen/' . $this->oidc->park($r->query)); break;
             case '/oidc/abmelden': if ($this->oidc && $stage !== 'full') return Response::redirect($this->oidc->logoutTarget($r->get('client_id', 100) ?: $this->oidc->clientFromIdToken($r->get('id_token_hint', 4000)), $r->get('post_logout_redirect_uri', 300)) ?? '/anmelden'); break;
         }
@@ -296,8 +297,28 @@ final class Web {
         return Response::redirect($target)->with('Set-Cookie', Auth::cookie($result['token'], $remember ? $this->auth->cookieTtl($remember) : null));
     }
 
-    private function codePage(?string $error = null): Response {
-        $body = V::error($error) . '<form method="post" action="/anmelden/code" class="box">'
+    /** Angebot, die Uhr des Servers zu stellen (nur nach einem Code, der zu einer anderen Uhrzeit passt). */
+    private function clockOffer(?\Throwable $e): string {
+        if (!$e instanceof ClockProblem || !$this->session) return '';
+        return '<form method="post" action="/uhrzeit/korrigieren" class="box notice">' . V::csrf($this->session['csrf'])
+            . '<p>Server-Zeit jetzt: <strong>' . date('d.m.Y H:i:s') . '</strong>, laut Ihrem Telefon etwa <strong>' . date('d.m.Y H:i:s', time() + $e->skew) . '</strong>.</p>'
+            . '<button>Uhrzeit des Servers korrigieren</button></form>';
+    }
+
+    private function clockFix(Request $r): Response {
+        $this->checkCsrf($r);
+        $skew = $this->auth->takeClockSkew($this->session);
+        $back = $this->session['stage'] === 'otp' ? '/anmelden/code' : '/konto/otp';
+        if ($skew === null) return Response::redirect($back);
+        $this->srv()->setClock($skew);
+        $this->audit->write((string)$this->session['login'], 'uhrzeit-korrigiert', ($skew > 0 ? '+' : '') . $skew . ' s');
+        $body = V::notice('Die Uhrzeit des Servers wird korrigiert. Danach bitte den aktuellen Code aus der App eingeben.')
+            . '<p><a class="button" href="' . $back . '">Weiter</a></p>';
+        return Response::html(V::page('Uhrzeit', $body, null, $this->config->practice))->with('Refresh', '4; url=' . $back);
+    }
+
+    private function codePage(?string $error = null, ?\Throwable $e = null): Response {
+        $body = V::error($error) . $this->clockOffer($e) . '<form method="post" action="/anmelden/code" class="box">'
             . V::input('code', 'Code aus der Authenticator-App (oder Wiederherstellungscode)', 'text', '', 'autocomplete="one-time-code" inputmode="text" required autofocus')
             . '<button>Weiter</button></form>'
             . '<form method="post" action="/abmelden"><button class="link">Abbrechen</button></form>';
@@ -309,7 +330,7 @@ final class Web {
             $token = $this->auth->otp($this->session, $r->field('code', 40));
         } catch (Problem $e) {
             if (!$this->auth->session($this->token, 'otp')) return Response::redirect('/anmelden')->with('Set-Cookie', Auth::clearCookie());
-            return $this->codePage($e->getMessage());
+            return $this->codePage($e->getMessage(), $e);
         }
         $next = $this->takeNext($this->token);
         return Response::redirect($next)->with('Set-Cookie', Auth::cookie($token, $this->auth->cookieTtl($this->session)));
@@ -363,7 +384,7 @@ final class Web {
     }
 
     // ---- OTP einrichten -----------------------------------------------------------------------------------------
-    private function enrollPage(?string $error = null): Response {
+    private function enrollPage(?string $error = null, ?\Throwable $e = null): Response {
         $session = $this->session;
         $user = $this->users->find((int)$session['user_id']);
         if ($session['stage'] === 'full' && $this->users->hasOtp($user) && !$this->auth->confirmedRecently($session)) return $this->needConfirm('/konto/otp');
@@ -371,7 +392,7 @@ final class Web {
         $svg = ($this->qr)($start['uri']);
         $body = ($session['stage'] === 'enroll' ? '<p>Dieses Konto hat Admin-Rechte. Admins melden sich mit Passwort <strong>und</strong> einem Code aus einer Authenticator-App an '
                 . '(z. B. Aegis, 2FAS, Google oder Microsoft Authenticator).</p>' : '<p>Neues Telefon oder neue App: Nach der Bestätigung gilt nur noch der neue Code; die Wiederherstellungscodes werden erneuert.</p>')
-            . V::error($error)
+            . V::error($error) . $this->clockOffer($e)
             . '<ol><li>App öffnen und den QR-Code scannen' . ($svg ? '' : ' (QR-Code nicht verfügbar)') . ' oder den Schlüssel eintippen.</li><li>Den angezeigten 6-stelligen Code eingeben.</li></ol>'
             . ($svg ? '<p><img class="qr" alt="QR-Code für die Authenticator-App" src="data:image/svg+xml;base64,' . base64_encode($svg) . '"></p>' : '')
             . '<p>Schlüssel: <code class="secret">' . V::h(Totp::grouped($start['secret'])) . '</code></p>'
@@ -389,7 +410,7 @@ final class Web {
         try {
             $result = $this->auth->enrollConfirm($session, $r->field('code', 20));
         } catch (Problem $e) {
-            return $this->enrollPage($e->getMessage());
+            return $this->enrollPage($e->getMessage(), $e);
         }
         $next = $session['stage'] === 'enroll' ? $this->takeNext($this->token) : '/konto';
         $this->token = $result['token'];

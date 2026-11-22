@@ -45,5 +45,18 @@ final class Server {
         }
     }
 
+    /** Uhr des Servers um $skew Sekunden stellen (Wert nur aus einem passenden Code abgeleitet, höchstens 24 Stunden). */
+    public function setClock(int $skew): void {
+        if (abs($skew) > 86400) throw new Problem('Abweichung zu groß.', 422);
+        if (!is_file(self::$unit)) throw new Problem('Der Dienst für die Uhrzeit ist nicht eingerichtet. Bitte den Installer ausführen.', 503);
+        $dir = dirname($this->request());
+        if (!is_dir($dir) && !mkdir($dir, 0700) && !is_dir($dir)) throw new Problem('Anfrage konnte nicht gespeichert werden.', 500);
+        $tmp = $dir . '/.servername.' . bin2hex(random_bytes(4));
+        if (file_put_contents($tmp, json_encode(['aktion' => 'uhrzeit', 'delta' => $skew])) === false || !rename($tmp, $this->request())) {
+            @unlink($tmp);
+            throw new Problem('Anfrage konnte nicht gespeichert werden.', 500);
+        }
+    }
+
     private function request(): string { return $this->db->directory . '/anfragen/servername.json'; }
 }

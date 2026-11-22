@@ -73,6 +73,7 @@ final class Auth {
                 throw new Problem('Zu viele falsche Codes. Bitte neu anmelden.', 401);
             }
             $this->db->query('UPDATE sessions SET otp_failures=? WHERE token_hash=?', [$failures, $session['token_hash']]);
+            if ($user && !$recovery && $this->users->hasOtp($user)) $this->clockCheck($session, $this->users->secret($user), $code);
             usleep(self::$failDelay);
             throw new Problem('Code falsch oder schon verwendet.', 401);
         }
@@ -107,7 +108,8 @@ final class Auth {
     public function enrollStart(array $session, string $issuer): array {
         if (!in_array($session['stage'], ['enroll', 'full'], true)) throw new Problem('Dieser Schritt ist nicht vorgesehen.', 409);
         $user = $this->users->find((int)$session['user_id']);
-        $secret = Totp::generateSecret();
+        // Begonnene Einrichtung behalten: Nach einem falschen Code muss niemand neu scannen.
+        $secret = $session['pending_secret'] !== '' ? $this->users->decryptPending((int)$user['id'], $session['pending_secret']) : Totp::generateSecret();
         $this->db->query('UPDATE sessions SET pending_secret=? WHERE token_hash=?', [$this->users->encryptPending((int)$user['id'], $secret), $session['token_hash']]);
         return ['secret' => $secret, 'uri' => Totp::uri($secret, $user['login'], $issuer)];
     }
@@ -121,6 +123,7 @@ final class Auth {
         $step = Totp::verify($secret, $code, 0, self::time());
         if ($step === null) {
             $this->failed('otp-einrichtung-fehlgeschlagen', '');
+            $this->clockCheck($session, $secret, $code);
             throw new Problem('Code stimmt nicht. Uhrzeit von Telefon und Server prüfen und den aktuellen Code eingeben.', 422);
         }
         $codes = $this->users->enableOtp($uid, $secret, $step);
@@ -261,6 +264,24 @@ final class Auth {
         $this->throttle->check('login');
         $until = (int)(json_decode((string)$this->db->setting('login_global_lock'), true)['until'] ?? 0);
         if ($until > time()) throw new Problem('Zu viele Anmeldeversuche. Bitte ' . max(1, (int)ceil(($until - time()) / 60)) . ' Minuten warten.', 429);
+    }
+
+    public const CLOCK_KEY = 'uhr_abweichung:';
+
+    /** Nach einem falschen Code: Passt er zu einer anderen Uhrzeit, Abweichung für diese Sitzung merken (5 Minuten). */
+    private function clockCheck(array $session, string $secret, string $code): void {
+        $skew = Totp::skew($secret, $code, self::time());
+        if ($skew === null || abs($skew) <= Totp::PERIOD * Totp::WINDOW) return;
+        $this->db->store(self::CLOCK_KEY . $session['token_hash'], json_encode(['delta' => $skew, 'bis' => self::time() + 300]));
+        throw new ClockProblem($skew);
+    }
+
+    /** Gemerkte Abweichung dieser Sitzung (Sekunden) oder null; wird beim Abholen gelöscht. */
+    public function takeClockSkew(array $session): ?int {
+        $key = self::CLOCK_KEY . $session['token_hash'];
+        $v = json_decode((string)$this->db->setting($key), true);
+        $this->db->query('DELETE FROM settings WHERE key=?', [$key]);
+        return is_array($v) && (int)($v['bis'] ?? 0) >= self::time() ? (int)$v['delta'] : null;
     }
 
     private function failed(string $event, string $login): void {

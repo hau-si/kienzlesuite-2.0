@@ -41,6 +41,21 @@ final class Totp {
         return $hit;
     }
 
+    /**
+     * Abweichung der Server-Uhr: Passt $input zu einem Zeitschritt innerhalb von ±24 Stunden, liefert das die Abweichung
+     * in Sekunden (Zeit des Telefons minus Zeit des Servers, auf 30 s genau), sonst null. Nur nach einem Fehlschlag aufrufen.
+     */
+    public static function skew(string $secret, string $input, ?int $time = null, int $hours = 24): ?int {
+        $input = (string)preg_replace('/\s+/', '', $input);
+        if (!preg_match('/^\d{' . self::DIGITS . '}$/D', $input)) return null;
+        $now = self::step($time);
+        $max = intdiv($hours * 3600, self::PERIOD);
+        for ($d = 0; $d <= $max; $d++) {
+            foreach ($d === 0 ? [0] : [$d, -$d] as $o) if (hash_equals(self::code($secret, $now + $o), $input)) return $o * self::PERIOD;
+        }
+        return null;
+    }
+
     /** otpauth-Adresse für den QR-Code der Authenticator-App. */
     public static function uri(string $secret, string $account, string $issuer): string {
         $label = rawurlencode($issuer) . ':' . rawurlencode($account);

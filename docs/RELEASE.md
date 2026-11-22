@@ -1,5 +1,16 @@
 # Basis – Release-Notizen
 
+## 0.13.0
+
+- **Uhrzeit des Servers** (Wunsch nach dem Test auf der VM): Der Installer schaltet die Zeitsynchronisation ein, stellt
+  die Zeitzone auf Europe/Berlin (wenn noch UTC) und meldet, ob die Uhr synchronisiert ist.
+- **Falsche Server-Uhr erkennen und stellen:** Passt ein Code der Authenticator-App (Einrichtung oder Anmeldung) zu einer
+  anderen Uhrzeit innerhalb von 24 Stunden, nennt die Suite die Abweichung und bietet „Uhrzeit des Servers korrigieren“
+  an. Die Abweichung kommt nur aus dem Code (nicht aus einer Eingabe), gilt einmal und 5 Minuten; gestellt wird über den
+  root-Dienst `kienzle-servername` (`timedatectl`), protokolliert.
+- Nach einem falschen Code bei der Einrichtung bleibt der Schlüssel derselbe – nicht neu scannen.
+- php-fpm mit Zeitzone Europe/Berlin (Uhrzeiten auf den Seiten).
+
 ## 0.12.3
 
 - **Formulare im echten Browser abgelehnt** („Anfrage von einer fremden Seite“, gefunden auf der Test-VM): Mit

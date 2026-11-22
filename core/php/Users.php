@@ -115,6 +115,8 @@ final class Users {
     public function decryptPending(int $id, string $stored): string { return $this->secrets->decrypt($stored, 'totp-pending:' . $id); }
 
     /** Code prüfen und verbrauchen. true nur bei einem gültigen, noch nicht verwendeten Code. */
+    public function secret(array $user): string { return $this->secrets->decrypt($user['totp_secret'], 'totp:' . $user['id']); }
+
     public function verifyOtp(array $user, string $code, ?int $time = null): bool {
         if (!$this->hasOtp($user)) return false;
         $secret = $this->secrets->decrypt($user['totp_secret'], 'totp:' . $user['id']);

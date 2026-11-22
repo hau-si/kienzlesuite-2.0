@@ -104,6 +104,15 @@ phpfpm=/usr/sbin/php-fpm$phpv
 [ -x "$phpfpm" ] || { echo "php-fpm für PHP $phpv fehlt."; exit 1; }
 php -r 'exit(function_exists("sodium_crypto_secretbox") && defined("PASSWORD_ARGON2ID") ? 0 : 1);' || { echo 'PHP ohne libsodium/Argon2.'; exit 1; }
 
+echo '== Uhrzeit'
+# Authenticator-Codes brauchen die richtige Uhrzeit. Zeitsynchronisation an, Zeitzone der Praxis (falls noch UTC).
+if [ -z "$nosystemd" ] && command -v timedatectl >/dev/null; then
+  case "$(timedatectl show -p Timezone --value 2>/dev/null)" in Etc/UTC|UTC|'') timedatectl set-timezone Europe/Berlin || true ;; esac
+  timedatectl set-ntp true >/dev/null 2>&1 || true
+  for _ in $(seq 1 20); do [ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" = yes ] && break; sleep 1; done
+  if [ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" = yes ]; then echo "Uhrzeit synchronisiert: $(date '+%d.%m.%Y %H:%M:%S')"
+  else echo "Hinweis: Uhrzeit nicht synchronisiert (Server: $(date '+%d.%m.%Y %H:%M:%S')). Bei der Einrichtung der Authenticator-App bietet die Suite an, die Uhr zu stellen."; fi
+fi
 echo '== Benutzer und Ordner'
 id ks-core >/dev/null 2>&1 || useradd --system --home-dir /var/lib/kienzle/core --no-create-home --shell /usr/sbin/nologin ks-core
 id ks-ablage >/dev/null 2>&1 || useradd --system --home-dir /var/lib/kienzle/ablage --no-create-home --shell /usr/sbin/nologin ks-ablage

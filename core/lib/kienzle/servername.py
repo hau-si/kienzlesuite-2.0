@@ -22,6 +22,7 @@ STATE = Path(E('KIENZLE_SERVERNAME_STATE', '/var/lib/kienzle/servername'))
 REQUEST = Path(E('KIENZLE_SERVERNAME_REQUEST', '/var/lib/kienzle/core/anfragen/servername.json'))
 CA_DIR = E('KIENZLE_CA_DIR', '/etc/kienzle/ca')
 BIN = Path(E('KIENZLE_SERVERNAME_BIN', str(Path(__file__).resolve().parents[2] / 'bin')))
+TIMEDATECTL = E('KIENZLE_TIMEDATECTL', '/usr/bin/timedatectl')
 HOST = re.compile(r'^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$')
 
 
@@ -103,6 +104,24 @@ def apply(names: list[str], practice: str | None, new_ca: bool = False) -> str:
             + ('. NEUE Zertifizierungsstelle: bitte auf allen Arbeitsplätzen /ca.crt neu einspielen.' if out and new_ca else ''))
 
 
+def set_clock(delta) -> str:
+    """Uhr um delta Sekunden stellen (abgeleitet aus einem Code der Authenticator-App, höchstens 24 Stunden).
+    Die Zeitsynchronisation bleibt danach eingeschaltet; klappt sie später, hält sie die Uhr richtig."""
+    if not isinstance(delta, int) or isinstance(delta, bool) or abs(delta) > 86400:
+        raise Fehler('Abweichung ungültig.')
+    last = (json.loads((STATE / 'status.json').read_text(encoding='utf-8')).get('uhr') or {}) if (STATE / 'status.json').is_file() else {}
+    if last.get('zeit', 0) > time.time() + delta - 120 and last.get('zeit', 0) < time.time() + 600:
+        raise Fehler('Die Uhr wurde eben erst gestellt. Bitte einen Moment warten.')
+    target = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time() + delta))
+    subprocess.run([TIMEDATECTL, 'set-ntp', 'false'], capture_output=True, timeout=30)
+    r = subprocess.run([TIMEDATECTL, 'set-time', target], capture_output=True, text=True, timeout=30)
+    subprocess.run([TIMEDATECTL, 'set-ntp', 'true'], capture_output=True, timeout=30)
+    if r.returncode != 0:
+        raise Fehler('Uhrzeit konnte nicht gestellt werden: ' + (r.stderr.strip()[:150] or '?'))
+    status(uhr={'zeit': int(time.time()), 'delta': delta})
+    return f'Uhrzeit um {delta:+d} Sekunden korrigiert.'
+
+
 def status(**changes) -> None:
     STATE.mkdir(mode=0o755, parents=True, exist_ok=True)
     p = STATE / 'status.json'
@@ -132,6 +151,10 @@ def handle() -> None:
         req = json.loads(raw) if raw else None
         if not isinstance(req, dict):
             raise Fehler('Anfrage ungültig.')
+        if req.get('aktion') == 'uhrzeit':
+            msg = set_clock(req.get('delta'))
+            status(letzte={'ok': True, 'meldung': msg, 'zeit': int(time.time())})
+            return
         practice = req.get('praxis')
         msg = apply(req.get('namen'), str(practice) if practice is not None else None, req.get('neue_ca') is True)
         status(letzte={'ok': True, 'meldung': msg, 'zeit': int(time.time())})
