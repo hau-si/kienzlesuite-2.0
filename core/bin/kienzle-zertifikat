@@ -4,6 +4,7 @@
   kienzle-zertifikat einrichten     CA anlegen (einmalig) und Server-Zertifikat ausstellen
   kienzle-zertifikat erneuern       Server-Zertifikat erneuern, wenn es in 60 Tagen abläuft oder die Namen sich geändert haben
   kienzle-zertifikat status         Fingerabdruck der CA, Namen und Ablauf des Server-Zertifikats
+  kienzle-zertifikat neue-ca        neue CA (die alte bleibt als *.alt-…); alle Arbeitsplätze müssen sie neu einspielen
 
 Namen und Praxisname kommen aus /etc/kienzle/core/core.json (hostnames, practice).
 Rückgabe: 0 = in Ordnung, 1 = Fehler, 2 = falscher Aufruf, 3 = erneuert (nginx neu laden).
@@ -21,7 +22,7 @@ FOLDER = os.environ.get('KIENZLE_CA_DIR', '/etc/kienzle/ca')
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) != 1 or argv[0] not in ('einrichten', 'erneuern', 'status'):
+    if len(argv) != 1 or argv[0] not in ('einrichten', 'erneuern', 'status', 'neue-ca'):
         print(__doc__.strip(), file=sys.stderr)
         return 2
     if os.geteuid() != 0 and os.environ.get('KIENZLE_ZERTIFIKAT_TEST') != '1':
@@ -41,6 +42,10 @@ def main(argv: list[str]) -> int:
                 z.issue(names)
                 print('Server-Zertifikat ausgestellt.')
             print('Fingerabdruck der CA (SHA-256), zum Vergleich auf den Arbeitsplätzen:\n  ' + z.fingerprint())
+            return 0
+        if argv[0] == 'neue-ca':
+            z.replace_ca(str(config.get('practice') or 'Praxis'), names)
+            print('Neue Zertifizierungsstelle angelegt. Alle Arbeitsplätze müssen sie neu einspielen.\n  ' + z.fingerprint())
             return 0
         if argv[0] == 'erneuern':
             if not z.needs_renewal(names):

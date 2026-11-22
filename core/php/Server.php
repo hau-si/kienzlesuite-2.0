@@ -24,7 +24,7 @@ final class Server {
         return false;
     }
 
-    public function save(string $names, string $practice): void {
+    public function save(string $names, string $practice, bool $newCa = false): void {
         $list = array_values(array_unique(array_filter(array_map(fn($n) => strtolower(trim($n)), preg_split('/[\s,;]+/', $names) ?: []))));
         if (!$list || count($list) > 10) throw new Problem('Bitte 1 bis 10 Namen bzw. Adressen angeben.', 422);
         foreach ($list as $n) {
@@ -39,7 +39,7 @@ final class Server {
         $dir = dirname($this->request());
         if (!is_dir($dir) && !mkdir($dir, 0700) && !is_dir($dir)) throw new Problem('Anfrage konnte nicht gespeichert werden.', 500);
         $tmp = $dir . '/.servername.' . bin2hex(random_bytes(4));
-        if (file_put_contents($tmp, json_encode(['namen' => $list, 'praxis' => $practice], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)) === false || !rename($tmp, $this->request())) {
+        if (file_put_contents($tmp, json_encode(['namen' => $list, 'praxis' => $practice] + ($newCa ? ['neue_ca' => true] : []), JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)) === false || !rename($tmp, $this->request())) {
             @unlink($tmp);
             throw new Problem('Anfrage konnte nicht gespeichert werden.', 500);
         }

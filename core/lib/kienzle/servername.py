@@ -20,6 +20,7 @@ E = os.environ.get
 CONFIG = Path(E('KIENZLE_CORE_CONFIG', '/etc/kienzle/core/core.json'))
 STATE = Path(E('KIENZLE_SERVERNAME_STATE', '/var/lib/kienzle/servername'))
 REQUEST = Path(E('KIENZLE_SERVERNAME_REQUEST', '/var/lib/kienzle/core/anfragen/servername.json'))
+CA_DIR = E('KIENZLE_CA_DIR', '/etc/kienzle/ca')
 BIN = Path(E('KIENZLE_SERVERNAME_BIN', str(Path(__file__).resolve().parents[2] / 'bin')))
 HOST = re.compile(r'^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$')
 
@@ -70,8 +71,19 @@ def _run(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run([str(BIN / args[0]), *args[1:]], capture_output=True, text=True, timeout=120, env=env)
 
 
-def apply(names: list[str], practice: str | None) -> str:
+def outside(names: list[str]) -> list[str]:
+    from .zertifikat import Zertifikate
+    z = Zertifikate(CA_DIR)
+    return z.outside(names) if z.exists() else []
+
+
+def apply(names: list[str], practice: str | None, new_ca: bool = False) -> str:
     names = check_names(names)
+    out = outside(names)
+    if out and not new_ca:
+        raise Fehler(f'{", ".join(out)} liegt außerhalb der Namen, für die die Zertifizierungsstelle der Suite Zertifikate ausstellen darf '
+                     '(z. B. *.internal, *.local, *.lan, *.home.arpa, *.fritz.box). Anderen Namen wählen – oder „neue Zertifizierungsstelle“ '
+                     'ankreuzen; dann müssen alle Arbeitsplätze sie neu einspielen.')
     if practice is not None and (len(practice) > 60 or re.search(r'[\x00-\x1f<>]', practice)):
         raise Fehler('Praxisname: höchstens 60 Zeichen, ohne < und >.')
     old = json.loads(CONFIG.read_text(encoding='utf-8'))
@@ -79,7 +91,7 @@ def apply(names: list[str], practice: str | None) -> str:
     if new == old:
         return 'Keine Änderung.'
     _write(CONFIG, new, 0o640)
-    cert = _run('kienzle-zertifikat', 'erneuern')
+    cert = _run('kienzle-zertifikat', 'neue-ca' if out and new_ca else 'erneuern')
     web = _run('kienzle-web', 'neu') if cert.returncode in (0, 3) else None
     if web is None or web.returncode != 0:
         _write(CONFIG, old, 0o640)
@@ -87,7 +99,8 @@ def apply(names: list[str], practice: str | None) -> str:
         _run('kienzle-web', 'neu')
         reason = (cert.stderr if web is None else web.stderr).strip().splitlines()
         raise Fehler('Nicht übernommen: ' + (reason[-1][:200] if reason else 'unbekannter Fehler') + '. Der vorige Stand ist wieder aktiv.')
-    return 'Gespeichert. Die Suite ist jetzt erreichbar unter: ' + ', '.join(f'https://{n}/' for n in names)
+    return ('Gespeichert. Die Suite ist jetzt erreichbar unter: ' + ', '.join(f'https://{n}/' for n in names)
+            + ('. NEUE Zertifizierungsstelle: bitte auf allen Arbeitsplätzen /ca.crt neu einspielen.' if out and new_ca else ''))
 
 
 def status(**changes) -> None:
@@ -120,7 +133,7 @@ def handle() -> None:
         if not isinstance(req, dict):
             raise Fehler('Anfrage ungültig.')
         practice = req.get('praxis')
-        msg = apply(req.get('namen'), str(practice) if practice is not None else None)
+        msg = apply(req.get('namen'), str(practice) if practice is not None else None, req.get('neue_ca') is True)
         status(letzte={'ok': True, 'meldung': msg, 'zeit': int(time.time())})
     except (Fehler, ValueError, OSError, subprocess.SubprocessError) as e:
         status(letzte={'ok': False, 'meldung': str(e)[:300] if isinstance(e, Fehler) else 'Vorgang fehlgeschlagen.', 'zeit': int(time.time())})

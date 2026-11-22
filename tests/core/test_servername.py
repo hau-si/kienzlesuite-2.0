@@ -49,6 +49,14 @@ class Servername(unittest.TestCase):
             self.s.apply(['kaputt.example.org'], None)
         self.assertEqual(self.config()['hostnames'], ['192.0.2.10', 'kienzle'])
 
+    def test_name_ausserhalb_der_ca(self):
+        with mock.patch.object(self.s, 'outside', return_value=['bank.example.net']):
+            with self.assertRaisesRegex(self.s.Fehler, 'außerhalb'):
+                self.s.apply(['bank.example.net'], None)
+            self.assertEqual(self.config()['hostnames'], ['192.0.2.10', 'kienzle'])
+            self.assertIn('NEUE Zertifizierungsstelle', self.s.apply(['bank.example.net'], None, True))
+        self.assertIn('kienzle-zertifikat neue-ca', (self.t / 'aufrufe').read_text())
+
     def test_eingaben(self):
         for bad in ([], ['a b'], ['127.0.0.1'], ['-x.example.org'], ['1.2.3'], ['x' * 254], ['a'] * 11, 'kienzle', ['ok.example.org\nevil']):
             with self.subTest(bad), self.assertRaises(self.s.Fehler):

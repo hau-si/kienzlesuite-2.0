@@ -1,8 +1,10 @@
 """Lokale Zertifizierungsstelle der Praxis (root-Werkzeug, Aufruf über core/bin/kienzle-zertifikat).
 
 - Stamm-CA: ECDSA P-256, 30 Jahre, nur zum Ausstellen von Server-Zertifikaten (pathlen 0).
-- Namensbeschränkung (nameConstraints, kritisch): nur die Servernamen der Praxis und private IP-Bereiche. Selbst mit
-  gestohlenem CA-Schlüssel lassen sich damit keine gültigen Zertifikate für fremde Seiten (z. B. Banken) ausstellen.
+- Namensbeschränkung (nameConstraints, kritisch): nur die Servernamen der Praxis, übliche interne Namensräume
+  (z. B. .internal, .local, .lan, .home.arpa, .fritz.box) und private IP-Bereiche. Selbst mit gestohlenem CA-Schlüssel
+  lassen sich damit keine gültigen Zertifikate für fremde Seiten (z. B. Banken) ausstellen. Der endgültige Name kann so
+  nach der Installation im Webinterface festgelegt werden, ohne die Zertifizierungsstelle zu tauschen.
 - Server-Zertifikat: ECDSA P-256, höchstens 825 Tage (Vorgabe von macOS/iOS), wird 60 Tage vor Ablauf erneuert.
 - Alle Aufrufe von openssl ohne Shell, Eingaben vorher geprüft; private Schlüssel nur für root (0600).
 """
@@ -24,6 +26,8 @@ SERVER_DAYS = 825
 RENEW_DAYS = 60
 PRIVATE_V4 = ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '100.64.0.0/10')
 PRIVATE_V6 = ('fc00::/7',)
+# Interne Namensräume (nicht im öffentlichen DNS vergeben bzw. für private Netze reserviert oder üblich).
+INTERNAL = ('internal', 'local', 'lan', 'home.arpa', 'intranet', 'localdomain', 'fritz.box', 'corp', 'home', 'praxis')
 HOST = re.compile(r'^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$')
 PRACTICE = re.compile(r'^[\w .,&()/+-]{1,60}$')
 
@@ -84,7 +88,8 @@ def _mask(net: str) -> str:
 
 
 def ca_extensions(dns: list[str]) -> str:
-    permitted = [f'permitted;DNS:{d}' for d in dns] + [f'permitted;IP:{_mask(n)}' for n in PRIVATE_V4 + PRIVATE_V6]
+    domains = list(dict.fromkeys([*dns, *INTERNAL]))
+    permitted = [f'permitted;DNS:{d}' for d in domains] + [f'permitted;IP:{_mask(n)}' for n in PRIVATE_V4 + PRIVATE_V6]
     return ('[v3]\nbasicConstraints = critical, CA:TRUE, pathlen:0\nkeyUsage = critical, keyCertSign, cRLSign\n'
             'subjectKeyIdentifier = hash\nnameConstraints = critical, ' + ', '.join(permitted) + '\n')
 
@@ -152,6 +157,26 @@ class Zertifikate:
             crt = _openssl('x509', '-req', '-in', str(csr), '-CA', str(self.ca_crt), '-CAkey', str(self.ca_key), '-sha256',
                            '-days', str(days), '-extfile', str(ext), '-extensions', 'v3', '-set_serial', '0x' + secrets.token_hex(16))
         _write_public(out or self.server_crt, crt)
+
+    def permitted(self) -> list[str]:
+        """DNS-Namensräume, die die Zertifizierungsstelle erlaubt."""
+        out = _openssl('x509', '-in', str(self.ca_crt), '-noout', '-ext', 'nameConstraints').decode()
+        return [d.lower().lstrip('.') for d in re.findall(r'DNS:([^,\s]+)', out)]
+
+    def outside(self, names: list[str]) -> list[str]:
+        """Namen, für die diese Zertifizierungsstelle kein gültiges Zertifikat ausstellen kann (IP-Adressen sind privat geprüft)."""
+        dns, _ = split_names(names)
+        allowed = self.permitted()
+        return [d for d in dns if not any(d == a or d.endswith('.' + a) for a in allowed)]
+
+    def replace_ca(self, practice: str, names: list[str]) -> None:
+        """Neue Zertifizierungsstelle (nur auf ausdrücklichen Wunsch): Alle Arbeitsplätze müssen sie neu einspielen."""
+        stamp = dt.datetime.now().strftime('%Y%m%d-%H%M%S')
+        for f in (self.ca_crt, self.ca_key):
+            if f.exists():
+                f.rename(f.with_name(f'{f.name}.alt-{stamp}'))
+        self.create_ca(practice, names)
+        self.issue(names)
 
     def fingerprint(self, path: Path | None = None) -> str:
         """SHA-256-Fingerabdruck (wie Browser und Windows ihn anzeigen), Bytes mit Doppelpunkt getrennt."""

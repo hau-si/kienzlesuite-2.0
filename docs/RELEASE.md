@@ -1,5 +1,15 @@
 # Basis – Release-Notizen
 
+## 0.12.1
+
+- **Zertifizierungsstelle erlaubt interne Namensräume:** Neben den Namen bei der Installation auch `*.internal`, `*.local`,
+  `*.lan`, `*.home.arpa`, `*.intranet`, `*.localdomain`, `*.fritz.box`, `*.corp`, `*.home`, `*.praxis` (und private IPs).
+  So lässt sich der endgültige Name nach der einfachen Installation unter Verwaltung → Server festlegen, ohne die
+  Zertifizierungsstelle zu tauschen. Gefunden von der Ende-zu-Ende-Prüfung (die Namensbeschränkung lehnte neue Namen ab).
+- Namen außerhalb davon werden abgelehnt, außer ein Admin kreuzt „neue Zertifizierungsstelle“ an
+  (`kienzle-zertifikat neue-ca`, alte bleibt als Kopie; alle Arbeitsplätze müssen sie neu einspielen).
+- Gilt für neu angelegte Zertifizierungsstellen. Bestehende Test-VMs: bei Bedarf neu installieren.
+
 ## 0.12.0
 
 - **Einfache Erstinstallation:** `sudo bash installer/install.sh` ohne Angaben. Der Installer nimmt die IPv4-Adressen und

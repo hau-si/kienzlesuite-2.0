@@ -2,7 +2,8 @@
 """Servernamen und Praxisname der Kienzle-Suite ändern (nur root).
 
   kienzle-servername anwenden              Anfrage des Webinterfaces verarbeiten (kienzle-servername.path)
-  kienzle-servername setzen NAME [NAME …]  von Hand an der Konsole (z. B. kienzle-servername setzen kienzle.praxis.internal 192.0.2.10)
+  kienzle-servername setzen [--neue-ca] NAME [NAME …]
+                                           von Hand an der Konsole (z. B. kienzle-servername setzen kienzle.praxis.internal 192.0.2.10)
 """
 import sys
 from pathlib import Path
@@ -15,7 +16,8 @@ if __name__ == '__main__':
         if sys.argv[1:] == ['anwenden']:
             s.handle()
         elif len(sys.argv) >= 3 and sys.argv[1] == 'setzen':
-            print(s.apply(sys.argv[2:], None))
+            args = sys.argv[2:]
+            print(s.apply([a for a in args if a != '--neue-ca'], None, '--neue-ca' in args))
         else:
             print(__doc__.strip(), file=sys.stderr)
             sys.exit(2)

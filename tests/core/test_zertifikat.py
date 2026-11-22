@@ -73,6 +73,19 @@ class Zertifizierungsstelle(unittest.TestCase):
                 self.assertFalse(self.ca.verify(out))
                 self.assertIn('permitted subtree violation', self.openssl('verify', '-CAfile', str(self.ca.ca_crt), str(out)).stdout
                               + self.openssl('verify', '-CAfile', str(self.ca.ca_crt), str(out)).stderr)
+        # Interne Namensräume sind erlaubt: Der endgültige Name kann später gewählt werden.
+        for name in ('kienzle.praxis.internal', 'server.fritz.box', 'kienzle.home.arpa'):
+            out = Path(self.tmp.name) / 'intern.crt'
+            self.ca._sign(key, [name], [], 30, name, out)
+            self.assertTrue(self.ca.verify(out), name)
+        self.assertEqual(self.ca.outside(['kienzle.praxis.internal', 'bank.example.net', '192.0.2.5']), ['bank.example.net'])
+        # Neue Zertifizierungsstelle auf Wunsch, die alte bleibt als Kopie.
+        old = self.ca.fingerprint()
+        self.ca.replace_ca('Praxis Beispiel', ['kienzle.example.org', 'praxis.example.net'])
+        self.assertNotEqual(self.ca.fingerprint(), old)
+        self.assertEqual(self.ca.outside(['praxis.example.net']), [])
+        self.assertTrue(list(self.ca.ca_crt.parent.glob('ca.crt.alt-*')))
+        self.ca = z.Zertifikate(self.ca.ca_crt.parent)
         # Unterhalb des eigenen Namens ist erlaubt (z. B. für spätere Dienste).
         out = Path(self.tmp.name) / 'unter.crt'
         self.ca._sign(key, ['dienst.kienzle.example.org'], [], 30, 'dienst', out)

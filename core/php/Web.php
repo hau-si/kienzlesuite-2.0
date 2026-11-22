@@ -112,6 +112,9 @@ final class Web {
             . '(neu anlegen unter „Mein Konto“); Dienste mit Anmeldung über die Suite brauchen dann die neue Anbieter-Adresse.</p>'
             . ($here !== '' ? '<p>Sie sehen diese Seite gerade unter <code>' . V::h($here) . '</code>. Bleibt diese Adresse nicht in der Liste, '
                 . 'danach die neue Adresse aufrufen.</p>' : '')
+            . '<p>Erlaubt sind Namen in internen Namensräumen (z. B. <code>kienzle.praxis.internal</code>, <code>.local</code>, <code>.lan</code>, '
+            . '<code>.home.arpa</code>, <code>.fritz.box</code>) und private IP-Adressen. Für andere Namen braucht es eine neue Zertifizierungsstelle:</p>'
+            . V::checkbox('neue_ca', '1', 'Falls nötig: neue Zertifizierungsstelle erstellen (alle Arbeitsplätze müssen sie neu einspielen)', false)
             . '<button' . ($st['pending'] ? ' disabled' : '') . '>Speichern</button></form>';
         $response = Response::html(V::page('Server', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
         return $st['pending'] ? $response->with('Refresh', '3') : $response;
@@ -119,7 +122,7 @@ final class Web {
 
     private function serverSave(Request $r, string $admin): Response {
         try {
-            $this->srv()->save($r->field('namen', 3000), $r->field('praxis', 200));
+            $this->srv()->save($r->field('namen', 3000), $r->field('praxis', 200), $r->field('neue_ca') === '1');
         } catch (Problem $e) {
             if (in_array($e->http, [409, 422, 503], true)) return $this->serverPage($e->getMessage());
             throw $e;
