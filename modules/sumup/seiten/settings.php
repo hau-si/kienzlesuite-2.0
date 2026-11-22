@@ -2,7 +2,7 @@
 declare(strict_types=1);
 // Einstellungen und Abrechnung der Kasse. Anmeldung über die Suite; Admins des Moduls sehen alles, Mitarbeiter ihre Bereiche.
 use KienzleSumup\Suite;
-if (!Suite::rights()) {
+if (!array_diff(Suite::rights(), ['kassieren'])) {
     http_response_code(403);
     header('Content-Type: text/plain; charset=utf-8');
     exit("Für die Einstellungen der Kasse fehlt das Recht. Bitte den Admin fragen (Verwaltung → Benutzer der Suite).\n");
