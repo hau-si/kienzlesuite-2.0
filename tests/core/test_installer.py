@@ -61,6 +61,18 @@ class Vorlagen(unittest.TestCase):
         self.assertEqual(data['autoinstall']['version'], 1)
         self.assertEqual(data['autoinstall']['timezone'], 'Europe/Berlin')
 
+    def test_release_schluessel(self):
+        import subprocess
+        readme = (ROOT / 'README.md').read_text()
+        keys = sorted((ROOT / 'installer' / 'release-keys').glob('*.pem'))
+        self.assertEqual([k.name for k in keys], ['kienzle-release-2026.pub.pem', 'kienzle-reserve-2026.pub.pem'])
+        for k in keys:
+            text = k.read_text()
+            self.assertNotIn('PRIVATE', text, f'{k.name}: privater Schlüssel im Repository')
+            der = subprocess.run(['openssl', 'pkey', '-pubin', '-in', str(k), '-outform', 'DER'], capture_output=True, check=True).stdout
+            import hashlib
+            self.assertIn(hashlib.sha256(der).hexdigest(), readme, f'{k.name}: Fingerabdruck fehlt in README.md')
+
     def test_keine_echten_adressen(self):
         for f in [ROOT / 'installer' / 'autoinstall.yaml', *VORLAGEN.iterdir()]:
             for ip in re.findall(r'\b(\d{1,3}(?:\.\d{1,3}){3})\b', f.read_text()):

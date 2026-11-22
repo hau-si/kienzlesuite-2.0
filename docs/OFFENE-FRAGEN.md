@@ -15,7 +15,7 @@ Wo eine Entscheidung nötig war, steht dabei, was umgesetzt wurde; das lässt si
 
 1. **SSO für Dienste mit eigener Anmeldung** (z. B. Kienzlefon-Oberfläche, NAS): Basis als OpenID-Connect-Anbieter als M9?
    Bisher nur vorgemerkt (`docs/PLAN.md`).
-2. **Release-Schlüssel:** Der öffentliche Schlüssel des Herausgebers fehlt noch (`docs/RELEASE-ABLAUF.md`). Bis dahin
+2. ~~Release-Schlüssel~~ eingetragen am 22.11.2026 (Basis 0.11.2). Früherer Stand: Der öffentliche Schlüssel des Herausgebers fehlte noch (`docs/RELEASE-ABLAUF.md`). Bis dahin
    nehmen echte Server nur unsignierte Beta-Versionen nach ausdrücklicher Freigabe an.
 3. **Google-Sprachausgabe im Telefon-Modul:** Auftragsverarbeitung und übertragene Inhalte mit Thomas klären (`docs/ARCHITEKTUR.md`).
 4. **Prüfliste auf der Test-VM** (`docs/VM-TEST.md`) für M2–M4 steht noch aus.

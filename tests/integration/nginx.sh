@@ -184,7 +184,7 @@ install -d -m 0755 /opt/kienzle/beispiel && ln -sfn "$repo/modules/beispiel" /op
 install -d -m 0750 -o ks-beispiel -g ks-beispiel /var/lib/kienzle/beispiel
 [ "$(stat -c '%a %U' /usr/lib/cups/backend/kienzle-leer)" = '755 root' ] || fail 'Backend kienzle-leer fehlt'
 grep -q 'include = /etc/samba/kienzle-netz.conf' /etc/samba/smb.conf || fail 'smb.conf ohne Windows-Netz'
-testparm -s --suppress-prompt 2>/dev/null | grep -qi 'workgroup = WORKGROUP' || fail 'Arbeitsgruppe fehlt'
+[ "$(testparm -s --suppress-prompt --parameter-name=workgroup 2>/dev/null)" = WORKGROUP ] || fail 'Arbeitsgruppe fehlt'
 # Der zweite Lauf des Installers hat das Modulverzeichnis geleert; kienzle-web schreiben gleicht die Drucker mit ab.
 KIENZLE_NGINX_RELOAD='' /opt/kienzle/core/current/bin/kienzle-web schreiben "$repo/modules" || fail 'kienzle-web mit Modul'
 lpstat -v Beispiel-Drucker | grep -q 'kienzle-beispiel-beispiel-drucker:/Beispiel-Drucker' || fail 'virtueller Drucker fehlt'
@@ -198,7 +198,7 @@ for _ in $(seq 1 30); do [ -s /var/lib/kienzle/beispiel/letzter-auftrag ] && bre
 [ -s /var/lib/kienzle/beispiel/letzter-auftrag ] && echo "IPP-Drucker hat den Auftrag erhalten ($(cat /var/lib/kienzle/beispiel/letzter-auftrag) Byte)." \
   || echo 'Hinweis: Der Auftrag kam (noch) nicht beim Programm des Moduls an (Filter von CUPS im Container?).'
 drucker '{"action":"arbeitsgruppe","arbeitsgruppe":"PRAXIS"}'
-testparm -s --suppress-prompt 2>/dev/null | grep -qi 'workgroup = PRAXIS' || fail 'Arbeitsgruppe nicht übernommen'
+[ "$(testparm -s --suppress-prompt --parameter-name=workgroup 2>/dev/null)" = PRAXIS ] || fail 'Arbeitsgruppe nicht übernommen'
 runuser -u ks-beispiel -- php -r 'require "/opt/kienzle/core/current/php/modul/Kienzle.php"; $k = new KienzleModul("beispiel", ["X" => "1"]);
   echo $k->drucken("Beispiel-Drucker", "%PDF-1.4 erfunden", "Test"), "\n";' | grep -q '^Beispiel-Drucker-' || fail 'Modul druckt nicht'
 c -b "$T/dora" "https://$host/verwaltung/drucker" | grep -q 'Bon-Test' || fail 'Druckerseite'

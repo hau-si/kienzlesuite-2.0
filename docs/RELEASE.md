@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.11.2
+
+- **Release-Schlüssel des Herausgebers eingetragen** (`installer/release-keys/`): Hauptschlüssel `kienzle-release-2026`
+  (`06dcb35f70c31d6f…`) und Reserve `kienzle-reserve-2026` (`ddacb5541655b3aa…`); volle Fingerabdrücke in `README.md`. Ab dieser Version
+  nehmen neu installierte Server signierte Releases an.
+
 ## 0.11.1
 
 - **Domänenbeitritt (Active Directory) wieder entfernt** (Entscheidung vom 22.11.2026). Unter Verwaltung → Drucker →
