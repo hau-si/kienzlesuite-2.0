@@ -1,0 +1,13 @@
+# Kienzle-Suite: Wurde eine Aktualisierung unterbrochen (Absturz, Stromausfall), beim Start auf den vorherigen Stand zurück.
+[Unit]
+Description=Kienzle-Suite unterbrochene Aktualisierung zurücknehmen
+After=network-online.target kienzle-core-php.service nginx.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/kienzle/core/current/bin/kienzle-update start
+TimeoutStartSec=1800
+
+[Install]
+WantedBy=multi-user.target

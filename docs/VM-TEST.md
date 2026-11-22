@@ -46,3 +46,18 @@ Zweites Gerät bereithalten, das **nicht** im freigegebenen Netz liegt (z. B. Te
 5. [ ] `sudo nft list table inet kienzle` zeigt nur 443 (+ 22) für das Praxisnetz; `ping` geht weiter.
 6. [ ] Neustart der VM: Firewall ist sofort wieder aktiv (`systemctl status kienzle-firewall`).
 7. [ ] Firewall ausschalten: Tabelle verschwindet, alles wieder erreichbar.
+
+## Meilenstein 4 – Updater (Basis 0.4.0)
+
+Vorbereitung: Test-Schlüssel erzeugen (`scripts/schluessel-erzeugen kienzle-test`), öffentlichen Teil auf der VM nach
+`/etc/kienzle/release-keys/` legen, eine Basis 0.4.1 bauen, signieren und als Release in einem **Test-Fork** veröffentlichen;
+auf der VM `KIENZLE_UPDATE_QUELLE=github:<fork>` in `kienzle-update-anwenden.service` und `kienzle-update-pruefen.service` setzen
+(`systemctl edit`).
+
+1. [ ] Verwaltung → Updates → „Jetzt nach Updates sehen“: 0.4.1 erscheint mit Notizen, im Menü steht eine 1.
+2. [ ] Installieren: Seite ist kurz weg, danach „Aktualisiert auf 0.4.1“; `readlink /opt/kienzle/core/current` zeigt 0.4.1.
+3. [ ] Eine 0.4.2 veröffentlichen, deren Signatur von einem fremden Schlüssel stammt: „Signatur ungültig“, nichts geändert.
+4. [ ] Eine 0.4.3 mit absichtlich kaputtem Webinterface (z. B. Syntaxfehler in `index.php`): Rücksprung auf 0.4.1, Daten unverändert.
+5. [ ] Während einer Installation die VM hart ausschalten; nach dem Start ist der vorherige Stand aktiv (`journalctl -u kienzle-update-start`).
+6. [ ] „Zurück auf eine frühere Version“ 0.4.0: läuft, Hinweis auf Datenstand.
+7. [ ] Beta-Kanal ohne Freigabe: unsignierte Vorabversion wird nicht angeboten; mit Freigabe angeboten und mit „nicht signiert“ markiert.

@@ -1,0 +1,10 @@
+# Kienzle-Suite: Update-Anfrage des Webinterfaces abarbeiten (Anfragedatei von ks-core).
+[Unit]
+Description=Kienzle-Suite Update-Anfragen
+
+[Path]
+PathExists=/var/lib/kienzle/core/anfragen/update.json
+Unit=kienzle-update-anwenden.service
+
+[Install]
+WantedBy=multi-user.target

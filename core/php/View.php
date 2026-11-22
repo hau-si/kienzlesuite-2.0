@@ -11,7 +11,8 @@ final class View {
         $menu = '';
         if ($nav) {
             $menu = '<nav class="menu"><a href="/">Start</a><a href="/konto">Mein Konto</a>'
-                . ($nav['admin'] ? '<a href="/verwaltung/benutzer">Benutzer</a><a href="/verwaltung/firewall">Firewall</a><a href="/verwaltung/zugang">Zugang</a><a href="/verwaltung/protokoll">Protokoll</a>' : '')
+                . ($nav['admin'] ? '<a href="/verwaltung/benutzer">Benutzer</a><a href="/verwaltung/firewall">Firewall</a><a href="/verwaltung/updates">Updates'
+                    . (($nav['updates'] ?? 0) > 0 ? ' <span class="badge" title="Neue Version verfügbar">' . (int)$nav['updates'] . '</span>' : '') . '</a><a href="/verwaltung/zugang">Zugang</a><a href="/verwaltung/protokoll">Protokoll</a>' : '')
                 . '<form method="post" action="/abmelden" class="inline">' . self::csrf($nav['csrf']) . '<button class="link">Abmelden (' . self::h($nav['login']) . ')</button></form></nav>';
         }
         return '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'

@@ -9,15 +9,18 @@
 set -euo pipefail
 
 here=$(cd -- "$(dirname -- "$0")/.." && pwd)
-version=$(tr -dc '0-9A-Za-z.+-' < "$here/core/VERSION")
+# Aus dem Repository: Programm in core/. Aus einem installierten Versionsordner (Rücksprung): Programm direkt in $here.
+if [ -f "$here/core/VERSION" ]; then src=$here/core; else src=$here; fi
+version=$(tr -dc '0-9A-Za-z.+-' < "$src/VERSION")
 nosystemd=${KIENZLE_OHNE_SYSTEMD:-}      # nur für Tests im Container ohne systemd
-names=(); practice=''
+names=(); practice=''; update=''
 
 usage() { echo 'Aufruf: sudo bash installer/install.sh --name SERVERNAME [--name IP] [--praxis "Name"]'; exit 2; }
 while [ $# -gt 0 ]; do
   case "$1" in
     --name) [ $# -ge 2 ] || usage; names+=("$(printf '%s' "$2" | tr 'A-Z' 'a-z')"); shift 2 ;;
     --praxis) [ $# -ge 2 ] || usage; practice=$2; shift 2 ;;
+    --aktualisieren) update=1; shift ;;   # vom Updater: ohne Rückfragen, ohne Einrichtungslink
     -h|--hilfe) usage ;;
     *) echo "Unbekannte Option: $1"; usage ;;
   esac
@@ -75,17 +78,19 @@ id ks-core >/dev/null 2>&1 || useradd --system --home-dir /var/lib/kienzle/core 
 install -d -m 0755 -o root -g root /etc/kienzle /var/lib/kienzle /opt/kienzle /opt/kienzle/core /opt/kienzle/core/releases
 install -d -m 0750 -o root -g ks-core /etc/kienzle/core
 install -d -m 0700 -o ks-core -g ks-core /var/lib/kienzle/core /var/lib/kienzle/core/anfragen
-install -d -m 0755 -o root -g root /var/lib/kienzle/firewall
+install -d -m 0755 -o root -g root /var/lib/kienzle/firewall /var/lib/kienzle/update
 
 # Programm in den Versionsordner kopieren (nur root beschreibbar) und „current“ atomar umsetzen.
 release=/opt/kienzle/core/releases/$version
 tmp=$(mktemp -d /opt/kienzle/core/releases/.neu.XXXXXX)
-cp -r -- "$here/core/." "$tmp/"
+cp -r -- "$src/." "$tmp/"
+# Installer mit ablegen: Damit kann der Updater später auf genau diese Version zurückspringen.
+rm -rf -- "$tmp/installer"; mkdir "$tmp/installer"; cp -r -- "$here/installer/." "$tmp/installer/"
 chown -R root:root "$tmp"; chmod -R u=rwX,go=rX "$tmp"
 rm -rf -- "$release.alt"; [ -e "$release" ] && mv -- "$release" "$release.alt"
 mv -- "$tmp" "$release"; rm -rf -- "$release.alt"
 ln -sfn "releases/$version" /opt/kienzle/core/.current.neu && mv -Tf /opt/kienzle/core/.current.neu /opt/kienzle/core/current
-for tool in kienzle-admin kienzle-zertifikat kienzle-web kienzle-modul-pruefen; do ln -sfn "/opt/kienzle/core/current/bin/$tool" "/usr/local/sbin/$tool"; done
+for tool in kienzle-admin kienzle-zertifikat kienzle-web kienzle-modul-pruefen kienzle-update; do ln -sfn "/opt/kienzle/core/current/bin/$tool" "/usr/local/sbin/$tool"; done
 
 echo '== Einstellungen und Schlüssel'
 python3 - "$conf" "$practice" "${names[@]}" <<'PY'
@@ -108,11 +113,16 @@ if [ ! -s /etc/kienzle/core/secret.key ]; then
 fi
 chown root:ks-core /etc/kienzle/core/secret.key; chmod 0640 /etc/kienzle/core/secret.key
 
+# Öffentliche Release-Schlüssel (nur *.pem). Ohne Schlüssel bleiben Updates gesperrt.
+install -d -m 0755 -o root -g root /etc/kienzle/release-keys
+find /etc/kienzle/release-keys -maxdepth 1 -name '*.pem' -delete
+for key in "$here"/installer/release-keys/*.pem; do [ -f "$key" ] && install -m 0644 -o root -g root "$key" /etc/kienzle/release-keys/; done
+
 echo '== Zertifikat'
 /opt/kienzle/core/current/bin/kienzle-zertifikat einrichten
 
 echo '== Dienste'
-vorlagen=$here/installer/vorlagen
+vorlagen=/opt/kienzle/core/current/installer/vorlagen
 install -m 0644 "$vorlagen/tmpfiles-kienzle.conf" /etc/tmpfiles.d/kienzle.conf
 if [ -n "$nosystemd" ]; then
   install -d -m 0755 -o root -g root /run/kienzle; install -d -m 0750 -o ks-core -g www-data /run/kienzle/core
@@ -122,7 +132,9 @@ fi
 install -m 0640 -o root -g ks-core "$vorlagen/php-fpm-core.conf" /etc/kienzle/core/php-fpm.conf
 sed "s#@PHPFPM@#$phpfpm#" "$vorlagen/kienzle-core-php.service" > /etc/systemd/system/kienzle-core-php.service
 install -m 0644 "$vorlagen/kienzle-zertifikat.service" "$vorlagen/kienzle-zertifikat.timer" \
-  "$vorlagen/kienzle-firewall.path" "$vorlagen/kienzle-firewall-anwenden.service" "$vorlagen/kienzle-firewall.service" /etc/systemd/system/
+  "$vorlagen/kienzle-firewall.path" "$vorlagen/kienzle-firewall-anwenden.service" "$vorlagen/kienzle-firewall.service" \
+  "$vorlagen/kienzle-update.path" "$vorlagen/kienzle-update-anwenden.service" "$vorlagen/kienzle-update-pruefen.service" \
+  "$vorlagen/kienzle-update-pruefen.timer" "$vorlagen/kienzle-update-start.service" /etc/systemd/system/
 chmod 0644 /etc/systemd/system/kienzle-core-php.service
 
 # nginx: nur die Suite. Die Beispielseite der Distribution wird abgeschaltet (nur der mitgelieferte Verweis).
@@ -135,7 +147,8 @@ if [ -z "$nosystemd" ]; then
   # Der php-fpm-Dienst der Distribution (Pool www-data) wird nicht gebraucht.
   systemctl disable --now "php$phpv-fpm.service" >/dev/null 2>&1 || true
   systemctl enable --now kienzle-core-php.service kienzle-zertifikat.timer kienzle-firewall.path
-  systemctl enable kienzle-firewall.service
+  systemctl enable kienzle-firewall.service kienzle-update-start.service
+  systemctl enable --now kienzle-update.path kienzle-update-pruefen.timer
   if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q 'Status: active'; then
     echo 'Hinweis: ufw ist aktiv. Die Firewall der Suite (Verwaltung → Firewall) arbeitet unabhängig davon; bitte nur eine von beiden verwenden.'
   fi
@@ -155,7 +168,7 @@ echo
 echo "Kienzle-Suite Basis $version ist installiert: https://${names[0]}/"
 echo 'Zertifizierungsstelle für die Arbeitsplätze: https://'"${names[0]}"'/ca.crt'
 echo "Fingerabdruck zum Vergleich: $(/opt/kienzle/core/current/bin/kienzle-zertifikat status | sed -n 's/^CA (SHA-256): //p')"
-if [ -n "$nosystemd" ]; then exit 0; fi
+if [ -n "$nosystemd" ] || [ -n "$update" ]; then exit 0; fi
 if ! /opt/kienzle/core/current/bin/kienzle-admin benutzer 2>/dev/null | grep -q 'Basis-Admin'; then
   echo; /opt/kienzle/core/current/bin/kienzle-admin einrichtungslink
 else

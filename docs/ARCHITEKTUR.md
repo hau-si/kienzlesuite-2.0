@@ -168,7 +168,7 @@ Freigegeben am 22.11.2026. Ablauf je Teil (Basis oder Modul):
 1. **Signierte Releases:** je Teil ein Archiv mit `manifest.json` (Teil, Version, Kanal, `core_api` bzw. Mindestversion
    der Basis, SHA-256 jeder Datei) und Signatur, veröffentlicht als GitHub-Release (`core-v…`, `<modul>-v…`;
    Beta = Vorabversion).
-   - Signiert wird mit einem eigenen Ed25519-Schlüssel (`ssh-keygen -Y sign`), **ohne externe Zertifizierungsstelle**:
+   - Signiert wird mit einem eigenen Ed25519-Schlüssel (OpenSSL), **ohne externe Zertifizierungsstelle**:
      Der Installer bringt den öffentlichen Schlüssel mit, sein Fingerabdruck steht in der Dokumentation.
    - Der private Schlüssel bleibt offline beim Herausgeber, nicht in GitHub Actions. Ein Reserveschlüssel liegt im Tresor.
    - Ein Schlüsselwechsel geht nur über ein Release, das mit einem vertrauten Schlüssel signiert ist.
@@ -182,6 +182,10 @@ Freigegeben am 22.11.2026. Ablauf je Teil (Basis oder Modul):
 6. **Prüfung nach dem Start:** Dienste aktiv und Gesundheitsprüfung (`/_health` bzw. `hooks.health`) binnen 60 Sekunden.
 7. **Rücksprung** bei Fehler oder abgebrochenem Update: alter Verweis, Daten-Schnappschuss zurück, Start, Meldung in der Glocke.
    Von Hand ist der Rückweg auf eine der aufbewahrten Versionen möglich, mit Hinweis auf möglichen Datenverlust.
+8. **Unsignierte Beta-Versionen** nur, wenn ein Basis-Admin sie im Beta-Kanal ausdrücklich zulässt (Wunsch vom 22.11.2026):
+   Prüfsummen bleiben, eine vorhandene falsche Signatur wird immer abgelehnt, stabile Versionen immer nur signiert.
+
+Ablauf für den Herausgeber: `docs/RELEASE-ABLAUF.md`.
 
 ## Sicherheitskonzept
 

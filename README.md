@@ -4,8 +4,8 @@ Praxis-Appliance für Hausarztpraxen mit T2med: **eine Basis**, einmal auf einer
 einzeln dazukommen – Kartenzahlung (SumUp), Terminzettel, Fax, Telefon, Kienzlezeit. Verwaltung komplett im
 Webinterface; Firewall, Benutzer, Admin-Zugang mit OTP, Updates und verschlüsselte Sicherung gibt es nur einmal, in der Basis.
 
-Stand: **Basis 0.3.0**, Meilenstein 3 von 8 ([docs/PLAN.md](docs/PLAN.md)): Anmeldung für alle Module, Benutzer und
-Rechte, Admin-OTP, Passkeys, lokale Zertifizierungsstelle, Firewall. Installierbar nur auf einer Test-VM ([docs/VM-TEST.md](docs/VM-TEST.md)).
+Stand: **Basis 0.4.0**, Meilenstein 4 von 8 ([docs/PLAN.md](docs/PLAN.md)): Anmeldung für alle Module, Benutzer und
+Rechte, Admin-OTP, Passkeys, lokale Zertifizierungsstelle, Firewall, Updater mit signierten Releases. Installierbar nur auf einer Test-VM ([docs/VM-TEST.md](docs/VM-TEST.md)).
 
 ![Basis und Module](docs/architektur-whiteboard.png)
 
@@ -19,3 +19,5 @@ Rechte, Admin-OTP, Passkeys, lokale Zertifizierungsstelle, Firewall. Installierb
 Plattform: Ubuntu Server 26.04 LTS (aktuelles Abbild, derzeit 26.04.1), VM mit mindestens 2 Kernen und 100 GB Speicher.
 
 Lizenz: [MIT](LICENSE), wie die SumUp-Suite, aus der die Basis hervorgeht.
+
+Release-Schlüssel (Fingerabdruck SHA-256): noch keiner eingetragen – siehe [docs/RELEASE-ABLAUF.md](docs/RELEASE-ABLAUF.md).

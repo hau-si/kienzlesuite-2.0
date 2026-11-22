@@ -86,5 +86,22 @@ KIENZLE_OHNE_SYSTEMD=1 bash "$repo/installer/install.sh" > "$T/zweiter-lauf.log"
 [ "$(stat -c '%a %U' /var/lib/kienzle/core/anfragen)" = '700 ks-core' ] || fail 'Anfrageordner'
 for u in kienzle-firewall.path kienzle-firewall-anwenden.service kienzle-firewall.service; do [ -f "/etc/systemd/system/$u" ] || fail "$u fehlt"; done
 /opt/kienzle/core/current/bin/kienzle-firewall laden || fail 'Firewall laden ohne Regeln'
+for u in kienzle-update.path kienzle-update-anwenden.service kienzle-update-pruefen.service kienzle-update-pruefen.timer kienzle-update-start.service; do
+  [ -f "/etc/systemd/system/$u" ] || fail "$u fehlt"; done
+[ -f /opt/kienzle/core/current/installer/install.sh ] || fail 'Installer nicht im Versionsordner'
+[ -d /etc/kienzle/release-keys ] || fail 'Schlüsselordner fehlt'
+/opt/kienzle/core/current/bin/kienzle-update start || fail 'kienzle-update start'
+
+echo '== Update-Seite'
+runuser -u ks-core -- php -r '
+require "/opt/kienzle/core/current/php/bootstrap.php";
+$c = Kienzle\Core\Config::load("/etc/kienzle/core/core.json"); $db = new Kienzle\Core\Database($c->dataDir);
+$u = new Kienzle\Core\Users($db, Kienzle\Core\Secrets::fromFile($c->secretKey), new Kienzle\Core\Modules($c->modules));
+$id = $u->create("dora", "", true); $u->setPassword($id, "Sonnen-Uhr-Garten-3"); $u->enableOtp($id, "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP", 0);' || fail 'Admin für Update-Test'
+code=$(php -r 'require "/opt/kienzle/core/current/php/bootstrap.php"; echo Kienzle\Core\Totp::code("JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP", Kienzle\Core\Totp::step());')
+[ "$(code -c "$T/dora" -b "$T/dora" -H "Origin: https://$host" -d login=dora -d 'password=Sonnen-Uhr-Garten-3' "https://$host/anmelden")" = "303 https://$host/anmelden/code" ] || fail 'Admin-Anmeldung'
+[ "$(code -c "$T/dora" -b "$T/dora" -H "Origin: https://$host" -d "code=$code" "https://$host/anmelden/code")" = "303 https://$host/" ] || fail 'Admin-Code'
+c -b "$T/dora" "https://$host/verwaltung/updates" | grep -q 'Installiert: <strong>Basis' || fail 'Update-Seite'
+c -b "$T/dora" "https://$host/verwaltung/firewall" | grep -q 'Freigegebene Netze' || fail 'Firewall-Seite'
 
 echo 'Ende-zu-Ende-Prüfung bestanden.'

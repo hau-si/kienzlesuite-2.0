@@ -203,7 +203,7 @@ Richtlinie `drop`, und `nft -c` gegen die erzeugten Regeln im CI-Container (mit 
 
 ---
 
-## M4 – Updater: signierte Releases, Versionsordner, Rücksprung 🖥
+## M4 – Updater: signierte Releases, Versionsordner, Rücksprung 🖥 ✅
 
 Freigegeben am 22.11.2026; steht auch in `ARCHITEKTUR.md`, Abschnitt „Updates“.
 
@@ -263,6 +263,14 @@ landen, nach dem Start geprüft werden und bei Fehlern automatisch auf den vorhe
 - Alle Tests mit einem Testschlüssel, der nur in `tests/fixtures/` liegt.
 
 **VM:** Update der Basis von 0.4.0 auf eine Test-0.4.1, absichtlich kaputte 0.4.2 → Rücksprung prüfen.
+
+**Stand:** umgesetzt mit Basis 0.4.0 (22.11.2026) für die Basis. Abweichungen:
+- Signatur mit OpenSSL (Ed25519) statt `ssh-keygen -Y`: gleiches Verfahren, testbar ohne openssh, OpenSSL ist für die CA ohnehin da.
+- Der neue Release bringt seinen Installer mit; der Updater führt ihn aus (dieselben Schritte wie bei der Erstinstallation)
+  und für den Rücksprung den Installer der vorherigen Version.
+- Unsignierte Beta-Versionen auf ausdrücklichen Wunsch eines Admins (Wunsch vom 22.11.2026).
+- Updates der Module nutzen denselben Ablauf, sobald Module installierbar sind (Schritt 2); `hooks.busy` wird schon geprüft.
+- Noch offen: öffentlicher Release-Schlüssel des Herausgebers (`docs/RELEASE-ABLAUF.md`).
 
 ---
 

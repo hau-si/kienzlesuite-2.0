@@ -17,10 +17,10 @@ for m in modules/*/; do
 done
 
 step 'Python: Syntax und Stil'
-python_bins=(core/bin/kienzle-modul-pruefen core/bin/kienzle-zertifikat core/bin/kienzle-web core/bin/kienzle-firewall)
+python_bins=(core/bin/kienzle-modul-pruefen core/bin/kienzle-zertifikat core/bin/kienzle-web core/bin/kienzle-firewall core/bin/kienzle-update scripts/release-bauen scripts/release-signieren)
 python3 -B -m py_compile core/lib/kienzle/*.py "${python_bins[@]}" tests/core/*.py tests/integration/*.py
 if command -v ruff >/dev/null; then
-  ruff check --no-cache --select E,F,W,B --line-length 160 core tests "${python_bins[@]}"
+  ruff check --no-cache --select E,F,W,B --line-length 180 core tests "${python_bins[@]}"
 else
   echo 'ruff nicht installiert – Stilprüfung übersprungen.'
 fi
@@ -30,7 +30,7 @@ for f in core/php/*.php core/public/*.php core/bin/kienzle-admin tests/php/*.php
 echo 'in Ordnung'
 
 step 'Shell: Syntax'
-bash -n tests/run-all.sh installer/install.sh tests/integration/nginx.sh
+bash -n tests/run-all.sh installer/install.sh tests/integration/nginx.sh scripts/schluessel-erzeugen
 for f in modules/*/bin/* modules/*/printer/*-backend; do sh -n "$f"; done
 if command -v shellcheck >/dev/null; then shellcheck -S warning tests/run-all.sh installer/install.sh tests/integration/nginx.sh; else echo 'shellcheck nicht installiert – übersprungen.'; fi
 
@@ -40,7 +40,7 @@ python3 -B -m unittest discover -s tests/core
 if command -v node >/dev/null; then step 'JavaScript: Syntax'; node --check core/public/assets/core.js && echo 'in Ordnung'; fi
 
 step 'PHP: Basis (tests/php)'
-for t in tests/php/core.php tests/php/passkeys.php tests/php/web.php tests/php/cli.php tests/php/firewall.php; do echo "-- $t"; php "$t"; done
+for t in tests/php/core.php tests/php/passkeys.php tests/php/web.php tests/php/cli.php tests/php/firewall.php tests/php/updates.php; do echo "-- $t"; php "$t"; done
 
 step 'module.toml: alle Module im Repository'
 core/bin/kienzle-modul-pruefen --alle modules

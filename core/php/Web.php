@@ -17,7 +17,7 @@ final class Web {
 
     public function __construct(
         private Config $config, private Database $db, private Users $users, private Auth $auth, private ?Passkeys $passkeys,
-        private Modules $modules, private AuditLog $audit, ?callable $qr = null, private ?Firewall $firewall = null,
+        private Modules $modules, private AuditLog $audit, ?callable $qr = null, private ?Firewall $firewall = null, private ?Updates $updates = null,
     ) {
         $this->qr = $qr ?? static function (string $uri): ?string {
             if (!is_executable('/usr/bin/qrencode')) return null;
@@ -432,6 +432,7 @@ final class Web {
         if ($r->path === '/verwaltung/firewall') return $get ? $this->firewallPage() : $this->firewallApply($r, $admin);
         if ($r->path === '/verwaltung/firewall/bestaetigen' && !$get) return $this->firewallConfirm($admin);
         if ($r->path === '/verwaltung/firewall/aus' && !$get) return $this->firewallOff($admin);
+        if ($r->path === '/verwaltung/updates') return $get ? $this->updatesPage() : $this->updatesAction($r, $admin);
         throw new Problem('Seite nicht gefunden.', 404);
     }
 
@@ -643,10 +644,79 @@ final class Web {
         return Response::redirect('/verwaltung/firewall');
     }
 
+    // ---- Updates ------------------------------------------------------------------------------------------------
+    private function up(): Updates {
+        if (!$this->updates) throw new Problem('Updates sind auf diesem Server nicht verfügbar.', 503);
+        return $this->updates;
+    }
+
+    private function updatesPage(?string $error = null, ?string $notice = null): Response {
+        $st = $this->up()->status();
+        $csrf = V::csrf($this->session['csrf']);
+        $busy = in_array($st['state'], ['running', 'requested'], true);
+        $labels = ['idle' => 'bereit', 'requested' => 'Auftrag wird übernommen …', 'running' => 'Aktualisierung läuft (' . $st['step'] . ') …', 'done' => 'fertig', 'failed' => 'nicht erfolgreich'];
+        $body = V::error($error) . V::notice($notice)
+            . '<p>Installiert: <strong>Basis ' . V::h($st['installed']) . '</strong>. Zustand: ' . V::h($labels[$st['state']] ?? $st['state'])
+            . ($st['message'] !== '' ? ' – ' . V::h($st['message']) : '') . '</p>'
+            . (!$st['service'] ? '<p class="error">Der Update-Dienst ist nicht eingerichtet. Bitte den Installer ausführen.</p>' : '')
+            . '<p>Zuletzt geprüft: ' . V::date($st['checked_at']) . ($st['error'] ? ' – <span class="error">' . V::h($st['error']) . '</span>' : '') . '</p>'
+            . '<form method="post" action="/verwaltung/updates" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="pruefen"><button' . ($busy ? ' disabled' : '') . '>Jetzt nach Updates sehen</button></form>';
+        $rows = '';
+        foreach ($st['available'] as $a) {
+            $rows .= '<div class="box wide"><h2>Basis ' . V::h($a['version']) . ($a['prerelease'] ? ' <span class="tag">beta</span>' : '')
+                . (!$a['signed'] ? ' <span class="tag warn">nicht signiert</span>' : '') . '</h2>'
+                . ($a['published'] !== '' ? '<p>Veröffentlicht: ' . V::h($a['published']) . '</p>' : '') . '<pre class="notes">' . V::h($a['notes']) . '</pre>'
+                . '<form method="post" action="/verwaltung/updates">' . $csrf . '<input type="hidden" name="aktion" value="installieren"><input type="hidden" name="version" value="' . V::h($a['version']) . '">'
+                . '<p>Vorher wird ein Schnappschuss der Daten angelegt. Schlägt etwas fehl, springt die Suite automatisch zurück. Die Seite ist einige Minuten nicht erreichbar.</p>'
+                . '<button' . ($busy ? ' disabled' : '') . '>Jetzt installieren</button></form></div>';
+        }
+        $body .= '<h2>Verfügbar</h2>' . ($rows !== '' ? $rows : '<p>Keine neuere Version.</p>');
+        $body .= '<h2>Kanal</h2><form method="post" action="/verwaltung/updates" class="box">' . $csrf . '<input type="hidden" name="aktion" value="kanal">'
+            . '<label class="check"><input type="radio" name="kanal" value="stabil"' . ($st['channel'] === 'stabil' ? ' checked' : '') . '> Stabil (empfohlen)</label>'
+            . '<label class="check"><input type="radio" name="kanal" value="beta"' . ($st['channel'] === 'beta' ? ' checked' : '') . '> Beta (Vorabversionen zum Testen)</label>'
+            . V::checkbox('unsigniert', '1', 'Im Beta-Kanal auch unsignierte Versionen zulassen (nicht empfohlen)', $st['unsigned'])
+            . '<p>Ohne Signatur ist nicht gesichert, dass eine Version vom Herausgeber stammt: Wer das Repository auf GitHub verändern kann, '
+            . 'könnte dann Programme mit root-Rechten auf diesen Server bringen. Geprüft wird weiter gegen Beschädigung, und eine vorhandene, aber falsche '
+            . 'Signatur wird immer abgelehnt. Nur für Test-Server.</p>'
+            . '<button' . ($busy ? ' disabled' : '') . '>Kanal speichern</button></form>';
+        $older = array_filter($st['local'], fn($v) => $v !== $st['installed']);
+        if ($older) {
+            $body .= '<h2>Zurück auf eine frühere Version</h2><form method="post" action="/verwaltung/updates" class="box">' . $csrf . '<input type="hidden" name="aktion" value="zurueck">'
+                . '<p><strong>Achtung:</strong> Die Daten werden auf den Stand beim damaligen Update zurückgesetzt; spätere Änderungen gehen verloren.</p>';
+            foreach ($older as $v) $body .= '<label class="check"><input type="radio" name="version" value="' . V::h($v) . '"> Basis ' . V::h($v) . '</label>';
+            $body .= '<button class="danger"' . ($busy ? ' disabled' : '') . '>Zurück auf diese Version</button></form>';
+        }
+        if ($st['log']) $body .= '<h2>Protokoll</h2><pre class="notes">' . V::h(implode("\n", $st['log'])) . '</pre>';
+        $response = Response::html(V::page('Updates', $body, $this->nav(), $this->config->practice), $error ? 409 : 200);
+        return $busy ? $response->with('Refresh', '5') : $response;
+    }
+
+    private function updatesAction(Request $r, string $admin): Response {
+        $up = $this->up();
+        try {
+            switch ($r->field('aktion', 20)) {
+                case 'pruefen': $up->check(); $this->audit->write($admin, 'update-pruefen'); break;
+                case 'kanal':
+                    $unsigned = $r->field('unsigniert') === '1';
+                    $up->setChannel($r->field('kanal', 10), $unsigned);
+                    $this->audit->write($admin, 'update-kanal', $r->field('kanal', 10) . ($unsigned ? ' unsigniert-erlaubt' : ''));
+                    break;
+                case 'installieren': $up->install($r->field('version', 40)); $this->audit->write($admin, 'update-installieren', $r->field('version', 40)); break;
+                case 'zurueck': $up->rollback($r->field('version', 40)); $this->audit->write($admin, 'update-zurueck', $r->field('version', 40)); break;
+                default: throw new Problem('Unbekannte Aktion.', 422);
+            }
+        } catch (Problem $e) {
+            return $this->updatesPage($e->getMessage());
+        }
+        return Response::redirect('/verwaltung/updates');
+    }
+
     // ---- Hilfen -------------------------------------------------------------------------------------------------
     private function nav(): ?array {
         if (($this->session['stage'] ?? '') !== 'full') return null;
-        return ['login' => $this->session['login'], 'admin' => (int)$this->session['user_admin'] === 1, 'csrf' => $this->session['csrf']];
+        $admin = (int)$this->session['user_admin'] === 1;
+        return ['login' => $this->session['login'], 'admin' => $admin, 'csrf' => $this->session['csrf'],
+            'updates' => $admin && $this->updates ? $this->updates->count() : 0];
     }
 
     private function issuer(): string { return $this->config->practice !== '' ? 'Kienzle-Suite ' . $this->config->practice : 'Kienzle-Suite'; }

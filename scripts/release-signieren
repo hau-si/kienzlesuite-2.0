@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+"""Manifest eines Releases signieren (nur beim Herausgeber, mit dem offline aufbewahrten privaten Schlüssel).
+
+  scripts/release-signieren dist/core-0.4.0.manifest.json --schluessel /pfad/kienzle-release.pem
+
+OpenSSL fragt nach dem Passwort des Schlüssels. Ergebnis: <manifest>.sig neben dem Manifest; die Signatur wird mit
+den öffentlichen Schlüsseln aus installer/release-keys/ gegengeprüft.
+"""
+import argparse
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'core' / 'lib'))
+from kienzle import release  # noqa: E402
+
+
+def main() -> int:
+    p = argparse.ArgumentParser(description='Release signieren')
+    p.add_argument('manifest')
+    p.add_argument('--schluessel', required=True)
+    p.add_argument('--schluessel-ordner', default=str(ROOT / 'installer' / 'release-keys'))
+    a = p.parse_args()
+    manifest = Path(a.manifest)
+    try:
+        sig = release.sign(manifest, Path(a.schluessel))
+        key = release.verify_signature(manifest.read_bytes(), sig, release.trusted_keys(Path(a.schluessel_ordner)))
+    except release.Fehler as e:
+        print(f'Fehler: {e}', file=sys.stderr)
+        return 1
+    out = manifest.with_name(manifest.name + '.sig')
+    out.write_bytes(sig)
+    print(f'Signiert: {out} (passt zu {key.name})')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

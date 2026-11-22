@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Release-Schlüssel erzeugen (einmalig, beim Herausgeber, möglichst auf einem Rechner ohne Netz).
+#
+#   scripts/schluessel-erzeugen NAME          z. B. kienzle-release-2026 bzw. kienzle-reserve-2026
+#
+# Ergebnis: NAME.pem (privat, mit Passwort, AES-256) und NAME.pub.pem (öffentlich). Den öffentlichen Teil nach
+# installer/release-keys/ legen und committen; den privaten offline aufbewahren (USB-Stick im Tresor, zweite Kopie).
+set -euo pipefail
+[ $# -eq 1 ] && [[ $1 =~ ^[a-z0-9-]{3,40}$ ]] || { echo 'Aufruf: scripts/schluessel-erzeugen NAME (Kleinbuchstaben, Ziffern, Bindestrich)'; exit 2; }
+[ ! -e "$1.pem" ] || { echo "$1.pem gibt es schon."; exit 1; }
+umask 077
+openssl genpkey -algorithm ed25519 -aes-256-cbc -out "$1.pem"
+openssl pkey -in "$1.pem" -pubout -out "$1.pub.pem"
+chmod 644 "$1.pub.pem"
+echo "Privat (offline aufbewahren): $1.pem"
+echo "Öffentlich (nach installer/release-keys/): $1.pub.pem"
+echo "Fingerabdruck (SHA-256) für README und Installationsanleitung:"
+openssl pkey -pubin -in "$1.pub.pem" -outform DER | sha256sum | cut -d' ' -f1

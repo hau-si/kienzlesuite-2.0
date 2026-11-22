@@ -1,5 +1,31 @@
 # Basis – Release-Notizen
 
+## 0.4.0
+
+Meilenstein 4 aus `docs/PLAN.md`: Updater mit signierten Releases, Versionsordnern und Rücksprung.
+
+- **Verwaltung → Updates:** installierte Version, verfügbare Versionen mit Notizen, Kanal stabil/beta, „Jetzt nach Updates
+  sehen“, Installieren, Rücksprung von Hand auf eine aufbewahrte Version. Hinweis im Menü bei neuer Version.
+- **Signierte Releases:** eigener Ed25519-Schlüssel (OpenSSL), keine externe Stelle. Geprüft werden Signatur, Manifest,
+  Archiv und jede Datei; nur neuere Versionen; Archiv nur mit normalen Dateien.
+- **Ablauf:** Schnappschuss der Daten und Einstellungen, Installer des neuen Releases (Versionsordner, Verweis `current`),
+  Prüfung nach dem Start über `/_health` mit der neuen Version, sonst Rücksprung samt Daten. Unterbrochene Aktualisierung
+  (z. B. Stromausfall) wird beim nächsten Start zurückgenommen. Die letzten 3 Versionen und 5 Schnappschüsse bleiben.
+- **Unsignierte Beta-Versionen** nur nach ausdrücklicher Freigabe eines Admins im Beta-Kanal; falsche Signaturen werden
+  immer abgelehnt, stabile Versionen brauchen immer eine Signatur.
+- **Herausgeber:** `scripts/schluessel-erzeugen`, `scripts/release-bauen` (reproduzierbar, nur eingecheckte Dateien),
+  `scripts/release-signieren`; Ablauf in `docs/RELEASE-ABLAUF.md`.
+- root-Dienst `kienzle-update` mit `kienzle-update.path`, täglichem `kienzle-update-pruefen.timer` und
+  `kienzle-update-start.service`; der Installer legt sich selbst im Versionsordner ab (für den Rücksprung) und kennt
+  `--aktualisieren`.
+- Übernommen aus der Beta: Anfragedatei, Status und bereinigtes Protokoll, nur HTTPS, Größenbegrenzung, Rücksicherung,
+  Sperre während einer Zahlung (jetzt `hooks.busy`) aus `src/Updater.php` und `scripts/self-update.sh`.
+- Tests: 26 Python-Tests mit echten Testschlüsseln, nachgebautem Installer und Ordner-Quelle, 4 PHP-Tests.
+
+Nicht geprüft: Update über GitHub auf einer echten VM (es gibt noch keinen Release-Schlüssel und kein veröffentlichtes
+Release), Rücksprung mit echtem systemd. Ohne Schlüssel sind Updates auf echten Servern gesperrt, außer unsignierten
+Beta-Versionen nach Freigabe.
+
 ## 0.3.0
 
 Meilenstein 3 aus `docs/PLAN.md`: Firewall.
