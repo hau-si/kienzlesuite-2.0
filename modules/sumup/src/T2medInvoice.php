@@ -175,7 +175,7 @@ final class T2medInvoice {
     }
 
     private static function single(string $text, string $pattern, string $label, string $hint): string {
-        preg_match_all($pattern, $text, $m);
+        if (preg_match_all($pattern, $text, $m) === false) throw new Problem($label . ': Auswertung fehlgeschlagen (' . preg_last_error_msg() . ').', 422);
         $values = array_values(array_unique($m[1] ?? []));
         if (count($values) === 0) throw new Problem($label . ' der Rechnung nicht gefunden (im PDF-Text fehlt die Bezeichnung „' . $hint . '“).', 422);
         if (count($values) > 1) throw new Problem($label . ' der Rechnung ist nicht eindeutig (' . count($values) . ' verschiedene Werte).', 422);

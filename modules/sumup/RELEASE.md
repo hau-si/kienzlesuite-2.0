@@ -3,6 +3,7 @@
 ## 2.0.1
 
 - Test der Barzahlung unabhängig von der Reihenfolge gleichzeitiger Zahlungen (schlug gelegentlich fehl).
+- Rechnungseingang: Fehler der Textauswertung werden als solche gemeldet statt als „Bezeichnung fehlt“.
 
 ## 2.0.0
 
