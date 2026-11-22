@@ -1,6 +1,6 @@
 # Umsetzungsplan Schritt 1: Basis aus kienzle-suite-beta herauslösen
 
-Stand: Entwurf zur Freigabe, noch kein Code. Grundlage: `docs/ARCHITEKTUR.md`, `AGENTS.md`.
+Stand: abgestimmt am 22.11.2026 (Entscheidungen siehe unten), noch kein Code. Grundlage: `docs/ARCHITEKTUR.md`, `AGENTS.md`.
 
 Quelle für übernommenen Code: `hau-si/kienzle-suite-beta`, **Branch `rechnungseingang`**, Commit `50daac0`
 (Version 1.4.1-rechnung.57). Der Branch `main` (1.4.1) enthält Admin, Firewall, Updater und Netzwerkordner
@@ -11,7 +11,11 @@ Dateipfade unten ohne Präfix beziehen sich auf diesen Stand.
 Der Code steht unter MIT (© Dr. Thomas Kienzle und Mitwirkende). Übernommene Dateien behalten den Hinweis;
 die Lizenz der Suite 2.0 ist noch offen (siehe `ARCHITEKTUR.md`, Offene Fragen).
 
-## Grundentscheidungen (vor Meilenstein 1 bestätigen)
+## Grundentscheidungen
+
+Bestätigt am 22.11.2026: nginx (E2), Updater-Konzept (M4), CUPS und Samba in der Basis (E10).
+Arbeitsplatz-Starter und Einrichtungs-Überblicke kommen aus den Modulen (E11).
+Restic auf SMB: die robusteste und sicherste Lösung wählen; Ergebnis siehe M6.
 
 | Nr. | Entscheidung | Vorschlag | Begründung |
 |---|---|---|---|
@@ -22,7 +26,10 @@ die Lizenz der Suite 2.0 ist noch offen (siehe `ARCHITEKTUR.md`, Offene Fragen).
 | E5 | Ein Leser für `module.toml` | Nur das Python-Prüfprogramm liest `module.toml`. Es schreibt ein geprüftes Verzeichnis `/var/lib/kienzle/core/modules.json`, und der PHP-Teil liest nur diese Datei. | keine zwei TOML-Leser, die sich auseinanderentwickeln |
 | E6 | Tests | PHP-Testskripte im Stil der Beta (`php tests/…php`, ohne PHPUnit), Python mit `unittest`, ein gemeinsamer Aufruf `tests/run-all.sh`. Dazu GitHub Actions mit einem Job im Container `ubuntu:26.04`. | gleiche Arbeitsweise wie bisher; der Container prüft Paketnamen und Programmversionen von 26.04 |
 | E7 | root-Aktionen | Wie in der Beta: Das Webinterface legt eine kleine Anfragedatei ab, eine systemd-`.path`-Einheit startet den root-Dienst, und der prüft Eigentümer, Größe und Inhalt streng. **Kein sudo.** | bewährt; umgeht die sudoers-Eigenheiten von sudo-rs ganz |
-| E8 | Versionen | `core/VERSION` beginnt bei `0.1.0`, `core_api = "1"`. Jeder Meilenstein erhöht die Basis-Version (0.1 → 0.7). `1.0.0` erst, wenn Basis und SumUp-Modul auf der Test-VM laufen. | `AGENTS.md`: jede Änderung erhöht die Version |
+| E8 | Versionen | `core/VERSION` beginnt bei `0.1.0`, `core_api = "1"`. Jeder Meilenstein erhöht die Basis-Version (0.1 → 0.8). `1.0.0` erst, wenn Basis und SumUp-Modul auf der Test-VM laufen. | `AGENTS.md`: jede Änderung erhöht die Version |
+| E9 | TLS im Praxisnetz | **Lokale Zertifizierungsstelle auf dem Server**, ohne externe Stelle (Details in M2) | Browser ohne Warnung auf allen Arbeitsplätzen; nichts muss aus dem Internet erreichbar sein |
+| E10 | Drucken | CUPS und Samba installiert und konfiguriert die Basis. Module drucken über die lokalen Warteschlangen und melden eigene virtuelle Drucker in `module.toml` an (`[[printers]]`). Anlegen und Entfernen übernimmt ein root-Dienst der Basis (M8). | ein Druckdienst für alle Module; kein Modul braucht die Gruppe `lpadmin` (in der Beta war der PHP-Dienst Mitglied) |
+| E11 | Starter und Überblick | Arbeitsplatz-Starter gehören zum SumUp-Modul (Schritt 2). Jedes Modul liefert seinen eigenen Einrichtungs-Überblick über einen Haken; die Basis zeigt ihren eigenen und die der Module auf einer Seite. | Starter und Überblick stammen aus der SumUp-Suite und sind modulspezifisch |
 
 ## Prüfung je Meilenstein
 
@@ -59,6 +66,13 @@ Der Installer (M7) wächst ab M2 mit, damit jeder Stand auf der VM installierbar
   - Haken (`hooks.*`, `backup.snapshot`): relative Pfade im Modulordner, ohne `..` und Verweise, ausführbar.
   - `hooks.apparmor` nur aus einer Freigabeliste (vorerst `gs`, `qpdf`).
   - Paket- und Dienstnamen per Muster geprüft, Dienste nur `kienzle-<id>-*.service`.
+- Zusätzliche Felder gegenüber dem Beispiel in `ARCHITEKTUR.md` (Ergebnis der Abstimmung):
+  - `hooks.busy`: meldet „gerade beschäftigt“, zum Beispiel bei einer laufenden Kartenzahlung; sperrt Updates (M4).
+  - `hooks.health`: Gesundheitsprüfung nach dem Start (M4).
+  - `[setup] overview`: Haken, der den Einrichtungs-Überblick des Moduls als JSON liefert
+    (Punkte mit Titel, Zustand erledigt/offen/Fehler, Hinweis, Link). Die Basis zeigt ihn an (E11).
+  - `[[printers]]`: virtuelle Drucker des Moduls mit Name, Beschreibung, PPD, CUPS-Backend und Freigabe per Samba
+    bzw. IPP. Name nach dem Muster `[A-Za-z0-9_-]{1,40}`, Dateien im Modulordner (E10, M8).
 - Prüfung über alle Module hinweg (`--alle modules/`): keine doppelten IDs, Pfade, Benutzer oder Ports.
 - `modules/beispiel/`: ein minimales Testmodul ohne Funktion, nur für Tests.
 - `tests/run-all.sh` und `.github/workflows/pruefung.yml`.
@@ -100,6 +114,20 @@ ungültigen Datei (`tests/fixtures/manifest/`), dazu Konflikte zwischen zwei Mod
   `X-Kienzle-Benutzer`, `X-Kienzle-Rollen`, `X-Kienzle-Rechte`. nginx entfernt diese Kopfzeilen aus jeder Anfrage von außen.
   Module prüfen die Rechte noch einmal; dafür gibt es eine kleine PHP-Hilfsdatei.
 - nginx-Vorlage und php-fpm-Pool `ks-core`, systemd-Einheiten gehärtet (`NoNewPrivileges`, `ProtectSystem=strict`, …).
+- **Lokale Zertifizierungsstelle (E9).** Sie gehört schon in M2, damit HTTPS von Anfang an mit dem endgültigen Zertifikat läuft.
+  - Der Installer erzeugt auf dem Server eine Stamm-CA „Kienzle-Suite <Praxisname>“ (ECDSA P-256, 10 Jahre).
+    Ihr privater Schlüssel liegt nur für root lesbar unter `/etc/kienzle/ca/` und wird nur zum Ausstellen benutzt.
+  - Die CA trägt eine **Namensbeschränkung** (`nameConstraints`) auf die Namen und Adressen der Praxis
+    (Servername, `*.praxis.internal` o. Ä., die privaten Netze aus der Firewall). Selbst mit gestohlenem CA-Schlüssel
+    lassen sich damit keine gültigen Zertifikate für fremde Seiten wie Banken ausstellen.
+  - Daraus ein Server-Zertifikat für nginx (Servername, IP-Adressen), höchstens 825 Tage gültig, wie macOS und iOS
+    es verlangen. Ein Timer erneuert es 60 Tage vor Ablauf automatisch.
+  - Die Arbeitsplätze vertrauen der CA einmal. Das CA-Zertifikat steht unter `/ca.crt` zum Herunterladen, mit
+    SHA-256-Fingerabdruck zum Vergleich auf der Server-Konsole. Später verteilt es der Starter des SumUp-Moduls mit.
+  - Die Beta pinnt heute den Fingerabdruck des Server-Zertifikats (`client/main.go`, `tests/tls-pin.py`).
+    Mit der CA pinnt der Starter stattdessen die CA, sodass ein erneuertes Server-Zertifikat den Starter nicht bricht.
+  - Die CA ist Teil der Sicherung (M6), damit nach einem Totalausfall die Arbeitsplätze nicht neu eingerichtet werden müssen.
+  - Werkzeug: `openssl` aus Ubuntu, Aufruf nur über den root-Dienst `kienzle-zertifikat`.
 
 **Übernahme aus der Beta:**
 
@@ -121,7 +149,14 @@ ungültigen Datei (`tests/fixtures/manifest/`), dazu Konflikte zwischen zwei Mod
 - Gefälschte `X-Kienzle-*`-Kopfzeilen werden verworfen: Test mit echtem nginx im CI-Container.
 - Geheimnisse erscheinen nie in Antworten oder Protokollen.
 
-**VM:** Installation, Ersteinrichtung mit OTP-App, Anmeldung, Mitarbeiterkonto, Zurücksetzen an der Konsole.
+Zusätzliche Tests für die CA:
+
+- erzeugtes Server-Zertifikat wird gegen die CA geprüft (`openssl verify`),
+- ein Zertifikat für einen Namen außerhalb der Namensbeschränkung wird abgelehnt,
+- Erneuerung vor Ablauf, Rechte auf den Schlüsseldateien.
+
+**VM:** Installation, CA auf einem Windows- und einem macOS-Arbeitsplatz einspielen (Browser ohne Warnung, auch
+Prüfung der Namensbeschränkung), Ersteinrichtung mit OTP-App, Anmeldung, Mitarbeiterkonto, Zurücksetzen an der Konsole.
 
 ---
 
@@ -159,9 +194,7 @@ Richtlinie `drop`, und `nft -c` gegen die erzeugten Regeln im CI-Container (mit 
 
 ## M4 – Updater: signierte Releases, Versionsordner, Rücksprung 🖥
 
-> **Hinweis:** Die Einzelheiten dieses Konzepts stehen bisher nicht in `ARCHITEKTUR.md`. Der folgende Ablauf ist
-> mein Vorschlag aus den Stichworten „signierte Releases, Versionsordner, Prüfung nach dem Start, Rücksprung“.
-> Bitte gegen das im Chat Besprochene prüfen. Nach der Freigabe kommt er als Abschnitt „Updates“ in `ARCHITEKTUR.md`.
+Freigegeben am 22.11.2026; steht auch in `ARCHITEKTUR.md`, Abschnitt „Updates“.
 
 **Ziel:** Updates je Teil (Basis oder Modul), die nur aus signierten Releases kommen, in einem eigenen Versionsordner
 landen, nach dem Start geprüft werden und bei Fehlern automatisch auf den vorherigen Stand zurückspringen.
@@ -172,10 +205,19 @@ landen, nach dem Start geprüft werden und bei Fehlern automatisch auf den vorhe
    Kanal, `core_api` bzw. die nötige Mindestversion der Basis und SHA-256 jeder Datei. Dazu eine Signatur
    `manifest.json.sig`. Veröffentlicht als GitHub-Release in `hau-si/kienzlesuite-2.0`; Tags `core-v0.4.0`,
    `sumup-v2.0.0`; Beta = Vorabversion.
-2. **Signatur:** Ed25519 mit `ssh-keygen -Y sign/verify` (Namensraum `kienzle-release`). openssh ist auf jedem
-   Ubuntu Server vorhanden. Der öffentliche Schlüssel kommt mit dem Installer nach `/etc/kienzle/release-keys/`.
-   Der private Schlüssel bleibt **offline beim Herausgeber**, nicht in GitHub Actions.
-   Ein Schlüsselwechsel geht nur über ein Release, das mit dem alten Schlüssel signiert ist.
+2. **Signatur ohne externe Zertifizierungsstelle:** ein eigenes Ed25519-Schlüsselpaar, erzeugt mit `ssh-keygen -t ed25519`.
+   Signiert und geprüft wird mit `ssh-keygen -Y sign/verify` (Namensraum `kienzle-release`); openssh ist auf jedem Ubuntu Server vorhanden.
+   - Das Vertrauen entsteht **durch den Installer**: Er bringt den öffentlichen Schlüssel mit nach
+     `/etc/kienzle/release-keys/allowed_signers`. Danach nimmt der Server nur Releases an, die mit dem
+     zugehörigen privaten Schlüssel signiert sind. Eine CA oder ein Dienst von außen ist nicht nötig.
+   - Den Installer selbst prüft man einmal von Hand: Der Fingerabdruck des Schlüssels steht in `README.md` und
+     `docs/INSTALLATION.md`. Der Installer gibt ihn aus, damit man beide vergleichen kann.
+   - Der private Schlüssel bleibt **offline beim Herausgeber**, passwortgeschützt, mit einer Sicherungskopie im Tresor;
+     er liegt nicht in GitHub Actions. GitHub Actions baut und prüft das Archiv. Der Herausgeber lädt es herunter,
+     signiert es mit `scripts/release-signieren.sh` und lädt die Signatur hoch.
+   - Ein **zweiter Schlüssel als Reserve** steht von Anfang an in `allowed_signers` (privat nur im Tresor).
+     Bei Verlust oder Diebstahl des ersten signiert der Reserveschlüssel ein Release, das den ersten entfernt.
+   - Ein Schlüsselwechsel geht nur über ein Release, das mit einem bereits vertrauten Schlüssel signiert ist.
 3. **Prüfen vor dem Auspacken:** Signatur, Teil und Kanal, Version neuer als die installierte (kein Zurückstufen
    von außen), Prüfsummen, `module.toml` mit dem Prüfprogramm aus M1, API-Verträglichkeit.
 4. **Versionsordner:** Auspacken nach `/opt/kienzle/<teil>/releases/<version>/` (root, nur lesbar für den Dienst).
@@ -190,8 +232,7 @@ landen, nach dem Start geprüft werden und bei Fehlern automatisch auf den vorhe
    Bricht ein Update mitten im Ablauf ab (Stromausfall), erkennt der Dienst den halben Zustand beim nächsten Start und springt zurück.
 9. **Aufräumen:** Die letzten 3 Versionen bleiben. Der Admin kann von Hand auf eine davon zurückgehen,
    mit dem Hinweis, dass Daten seit dem Update verloren gehen, wenn die Datenbank zurückgespielt werden muss.
-10. **Sperren:** kein Update, solange ein Modul „beschäftigt“ meldet (Beispiel Beta: laufende Kartenzahlung).
-    Dafür bekommt `module.toml` einen optionalen Haken `hooks.busy`; das ändert das Format aus M1, deshalb wird er schon dort aufgenommen.
+10. **Sperren:** kein Update, solange ein Modul über `hooks.busy` (M1) „beschäftigt“ meldet, zum Beispiel bei einer laufenden Kartenzahlung.
 
 **Übernahme aus der Beta:**
 
@@ -269,11 +310,25 @@ Im CI-Container zusätzlich ein Durchlauf mit einem echten Samba- und SSH-Server
   Die Glocke meldet auch eine zu alte letzte Sicherung; E-Mail optional, folgt später.
 - **Wiederherstellung im Webinterface:** einzelne Dateien oder ein ganzes Modul (Dienste stoppen, zurückspielen, starten).
 - **Totalausfall:** `installer/install.sh --wiederherstellen` (M7) mit den Angaben vom Blatt.
-- Nicht Teil von M6, nur beschrieben: NAS-Schnappschüsse und restic-REST-Server im Nur-Anfügen-Modus (Einstellung am NAS), zweite Kopie außer Haus.
+- Nicht Teil von M6, nur beschrieben: Einrichtung der NAS-Schnappschüsse und des REST-Servers am NAS selbst, zweite Kopie außer Haus.
 
-**Zu klären in M6:** restic kann SFTP direkt, SMB aber nicht. Vorschlag: SFTP als Empfehlung.
-Für SMB das restic-Ziel `rclone:` mit dem SMB-Treiber von rclone (Ubuntu-Paket `rclone`, ab 1.62) statt eines
-`mount.cifs` als root. Ob die rclone-Version in 26.04 passt, prüfe ich zu Beginn von M6.
+**Ziel-Arten (entschieden: robusteste und sicherste Lösung):**
+
+1. **Empfohlen: SFTP.** restic spricht SFTP selbst, das ist sein ältester und meistgetesteter Weg.
+   Die Anmeldung läuft mit einem eigenen SSH-Schlüssel ohne Passwort im Netz. Der Server-Schlüssel des NAS wird bei
+   der Einrichtung einmal bestätigt und danach fest geprüft (`known_hosts` je Ziel). Synology, QNAP und andere übliche NAS bieten SFTP an.
+2. **Optional: restic-REST-Server im Nur-Anfügen-Modus** (`--append-only`, z. B. als Container auf dem NAS).
+   Er ist der stärkste Schutz vor Erpressungstrojanern, weil der Praxisserver selbst keine Sicherungen löschen kann.
+3. **Nur wenn das NAS kein SFTP kann: SMB über ein Kernel-Mount nur während der Sicherung.**
+   - Der root-Dienst hängt die Freigabe mit `mount.cifs` ein (`vers=3.1.1`, `seal` für Verschlüsselung, `sec=ntlmssp`,
+     Zugangsdatei 0600, Einhängepunkt 0700 unter `/run/kienzle/sicherung/`).
+   - restic arbeitet dann auf das lokale Verzeichnis; danach wird die Freigabe sofort wieder ausgehängt.
+   - Außerhalb der Sicherungszeit ist die Freigabe also nicht erreichbar, auch nicht für einen Angreifer auf dem Server.
+   - Verworfen: der SMB-Treiber von rclone. Er ist deutlich jünger als der CIFS-Treiber des Kernels und in Verbindung mit restic wenig erprobt.
+
+Bei SMB und SFTP gilt: Löschschutz nur über die schreibgeschützten Schnappschüsse am NAS (`ARCHITEKTUR.md`, Backup Punkt 4).
+Ein **Wartungshinweis** in der Glocke erscheint, solange sie nicht als eingerichtet bestätigt sind.
+Der Einrichtungs-Überblick der Basis führt sie als eigenen Punkt.
 
 **Übernahme aus kienzlezeit (`kienzlezeit-backup-und-restore.sh`, `tests/test_backup_restore.py`):**
 
@@ -294,7 +349,10 @@ Die verschlüsselte ZIP-Ausgabe bleibt dem späteren Kienzlezeit-Modul als Expor
 
 In dieser Arbeitsumgebung ist restic nicht installiert und das Netz für Paketinstallationen gesperrt. Lokal laufen nur die Tests ohne restic; die vollständigen Tests laufen in GitHub Actions.
 
-**VM:** Einrichtung auf das Test-NAS, Blatt drucken, eine Datei und ein Modul wiederherstellen.
+Im CI-Container zusätzlich: SFTP gegen einen lokalen SSH-Server und restic-REST-Server mit `--append-only`, bei dem Löschen scheitern muss.
+SMB per `mount.cifs` braucht Kernel-Rechte; das prüft nur die Test-VM.
+
+**VM:** Einrichtung auf das Test-NAS (SFTP und SMB), Blatt drucken, eine Datei und ein Modul wiederherstellen.
 
 ---
 
@@ -308,7 +366,11 @@ In dieser Arbeitsumgebung ist restic nicht installiert und das Netz für Paketin
 - Wartet bis zu 10 Minuten auf die Paketsperre, installiert Pakete und richtet ein:
   - Benutzer `ks-core`, `ks-ablage`,
   - Ordner mit Rechten nach E3,
-  - nginx, php-fpm-Pool, Zertifikat,
+  - nginx, php-fpm-Pool, lokale CA und Zertifikat (M2),
+  - **CUPS und Samba (E10):** CUPS lauscht auf dem Server und ist aus den Praxisnetzen nur über die Firewall-Freigabe
+    IPP (631) erreichbar. Samba nur als Druckserver ohne Dateifreigaben und ohne Gastzugriff auf Dateien, nur SMB 3,
+    Freigabe 445 ebenfalls über die Firewall. Konfiguration aus festen Vorlagen der Basis; Module ändern `smb.conf` und
+    `cupsd.conf` nicht selbst,
   - systemd-Einheiten mit Härtung, root-Dienste mit `.path`-Einheiten, unattended-upgrades,
   - Release-Schlüssel.
 - Am Ende: einmaliger Einrichtungslink.
@@ -329,7 +391,16 @@ In dieser Arbeitsumgebung ist restic nicht installiert und das Netz für Paketin
 - systemd-Einheiten für Update und Firewall (Zeilen 363–433) als Vorlage,
 - einmaliger Einrichtungslink am Ende.
 
+Aus `terminzettel/install.py` und `terminzettel/setup_config.py`: Prüfen der Samba- und CUPS-Konfiguration vor dem
+Übernehmen (`testparm`, `cupsd -t`), Sicherung und Rücknahme der alten Dateien bei Fehlern, Zwischenspeicher im RAM.
+
 Entfällt: der eigene Apache auf Port 7868 und die Parallelbetrieb-Sonderwege.
+
+**Einrichtungs-Überblick (E11):** Am Ende von M7 bekommt die Basis ihre Überblicksseite. Sie zeigt zuerst die Punkte
+der Basis: Admin mit OTP, Wiederherstellungscodes gedruckt, CA auf Arbeitsplätzen, Firewall bestätigt, Updates,
+Netzwerkspeicher, Sicherung eingerichtet, NAS-Schnappschüsse, Probe-Wiederherstellung. Darunter folgen die Überblicke
+der Module über `[setup] overview`. Das SumUp-Modul überträgt seinen heutigen Überblick (Beta: `src/SettingsPage.php`)
+in Schritt 2 in dieses Format.
 
 **Tests:**
 
@@ -340,19 +411,53 @@ Entfällt: der eigene Apache auf Port 7868 und die Parallelbetrieb-Sonderwege.
 
 ---
 
-## Nicht in M1–M7, Einordnung offen
+---
 
-Aus `ARCHITEKTUR.md` (Abschnitte „Die Basis“ und „Vorgehen“ 1) fehlen in der Reihenfolge noch:
+## M8 – Druckerverwaltung in der Basis 🖥
 
-1. **Zertifikat und Zugang:** eigene Zertifizierungsstelle statt selbstsigniertem Zertifikat. M2 braucht HTTPS;
-   Vorschlag: in M2 zunächst ein selbstsigniertes Zertifikat wie in der Beta, die eigene CA als M8.
-2. **Arbeitsplätze:** Starter-Paket, Zertifikat, Drucker je Arbeitsplatz (Beta: `src/ClientPackage.php`, `client/`). Vorschlag: zusammen mit M8.
-3. **Einrichtungs-Überblick** (Beta: Teil von `src/SettingsPage.php`). Vorschlag: als Abschluss von M7, sobald alle Bereiche da sind.
-4. **CUPS und Samba als gemeinsame Dienste.** Vorschlag: mit dem SumUp-Modul (Schritt 2), weil sie dort zuerst gebraucht werden.
+**Ziel:** Drucker werden einmal in der Basis eingerichtet, und alle Module nutzen sie (E10).
+Danach ist die Basis bereit für das SumUp- und das Terminzettel-Modul (Schritt 2).
 
-## Offene Punkte zur Freigabe
+**Ergebnis (prüfbar):**
 
-1. Grundentscheidungen E1–E8, besonders **nginx statt Apache** (E2).
-2. Updater-Konzept in M4, und wo der private Signaturschlüssel liegen soll.
-3. SMB für restic über rclone oder nur SFTP (M6).
-4. Einordnung der vier Punkte oben.
+- Verwaltung „Drucker“: Drucker im Netz und an USB suchen, Warteschlange anlegen und entfernen.
+  Bondrucker als RAW, A4-Drucker über IPP Everywhere, Testseite.
+- Root-Dienst `kienzle-drucker` über eine Anfragedatei (E7). Nur er ruft `lpadmin` auf;
+  kein Modul und auch nicht der PHP-Dienst der Basis ist Mitglied der Gruppe `lpadmin`.
+- **Virtuelle Drucker der Module** aus `[[printers]]`:
+  - Bei Installation und Update des Moduls legt der Dienst Backend und PPD aus dem Modulordner an (root, 0755 bzw. 0644).
+  - Die Warteschlange wird angelegt und je nach Angabe per Samba und/oder IPP freigegeben.
+  - Beim Entfernen des Moduls wird beides wieder entfernt.
+  - Entfernt werden nur Warteschlangen mit der Kennung der Suite.
+- **Für Module:** Auswahlliste der Warteschlangen im Webinterface des Moduls über eine Abfrage an die Basis,
+  Drucken mit `lp` als Modul-Benutzer.
+
+**Übernahme aus der Beta:**
+
+| Datei | Verwendung |
+|---|---|
+| `src/PrinterAdmin.php` | Suche, Druckerarten (TM-m10, TM-m30III, A4 über IPP), URI-Prüfung, nur selbst angelegte Warteschlangen entfernen. Die Aufrufe von `lpadmin` wandern in den root-Dienst. |
+| `src/Cups.php`, `src/OfficePrinter.php` | `lp`-Aufruf mit Auswertung der Auftragsnummer, als Hilfsdatei für Module |
+| `scripts/install-invoice-printer.sh`, `scripts/invoice-printer/` | Muster für Backend und PPD eines virtuellen Druckers (wird in Schritt 2 zum `[[printers]]`-Eintrag des SumUp-Moduls) |
+| `tests/printer-admin.php` | Muster für die Tests |
+
+**Tests:**
+
+- Anfragen mit ungültigen Namen, URIs oder Pfaden werden abgewiesen.
+- `lpadmin`-Aufrufe werden mit nachgebildeten Programmen geprüft.
+- Anlegen und Entfernen virtueller Drucker beim Installieren und Entfernen von `modules/beispiel/`.
+- Im CI-Container mit echtem CUPS: Warteschlange anlegen, Auftrag an einen Datei-Drucker senden.
+
+**VM:** Bondrucker und A4-Drucker einrichten, vom Windows-Arbeitsplatz über Samba und IPP auf einen virtuellen Drucker des Beispielmoduls drucken.
+
+---
+
+## Zuordnung der übrigen Punkte aus `ARCHITEKTUR.md`
+
+| Punkt | Wo |
+|---|---|
+| Eigene Zertifizierungsstelle | M2 (lokal auf dem Server, E9) |
+| Arbeitsplatz-Starter | SumUp-Modul, Schritt 2 (E11) |
+| Einrichtungs-Überblick | Basis: Ende M7; je Modul über `[setup] overview` (E11) |
+| CUPS und Samba | Installation in M7, Verwaltung in M8 (E10) |
+| Ausgehende Freigabeliste der Firewall | nach Schritt 2 |

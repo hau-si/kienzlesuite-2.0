@@ -1,6 +1,6 @@
 # Kienzle-Suite 2.0 – Architektur
 
-Stand: Konzept, noch kein Code. Übersicht als Whiteboard:
+Stand: Konzept, noch kein Code. Entscheidungen vom 22.11.2026 eingearbeitet (nginx, Updates, Zertifikat, Drucken, Backup-Ziele). Übersicht als Whiteboard:
 https://claude.ai/artifact/EGTAPzMGVFBYbxCBUzGjsh (nur mit Freigabe sichtbar)
 
 ## Ziel
@@ -53,13 +53,14 @@ die Basis eine API-Version, gegen die Module geprüft werden.
 | Webinterface und Anmeldung | eine Anmeldung für alle Module, Menü aus den installierten Modulen |
 | Benutzer, Rollen, Rechte | Admin und Mitarbeiter; Rechte kommen aus den Modulen (Kästchen) |
 | Admin-Zugang | Passwort **und** OTP (TOTP, RFC 6238), Wiederherstellungscodes |
-| Arbeitsplätze (PCs) | Starter-Paket, Zertifikat, Drucker-Einrichtung je Arbeitsplatz |
+| Arbeitsplätze (PCs) | CA-Zertifikat zum Herunterladen; Starter-Paket und Drucker-Einrichtung je Arbeitsplatz kommen aus dem SumUp-Modul |
 | Firewall und Netzwerk | nftables, nur Praxisnetz/VPN; Ports kommen aus den Modulen |
-| Zertifikat und Zugang | eigene Zertifizierungsstelle, ein Zugang über Port 443 mit Pfaden je Modul |
+| Zertifikat und Zugang | lokale Zertifizierungsstelle auf dem Server (siehe unten), ein Zugang über Port 443 (nginx) mit Pfaden je Modul |
+| Einrichtungs-Überblick | eigener Überblick der Basis, darunter die Überblicke der Module |
 | Updates | je Modul, Kanal stabil/beta, Sicherung vor dem Update, Rücksprung |
 | Netzwerkspeicher | gemeinsamer Dienst für SMB-Ziele (aus der Rechnungsablage der SumUp-Suite) |
 | Backup | verschlüsselte Sicherung aller Module auf den Netzwerkspeicher |
-| CUPS, Samba, Protokolle | gemeinsame Dienste |
+| CUPS, Samba, Protokolle | gemeinsame Dienste; Basis installiert und verwaltet Drucker, Module drucken darauf und melden eigene virtuelle Drucker an |
 
 ### Modul-Beschreibung (`module.toml`)
 
@@ -95,12 +96,66 @@ label = "Bezahlt-Liste abhaken"
 paths = ["/var/lib/kienzle/sumup"]
 snapshot = "bin/backup-snapshot"  # erzeugt eine konsistente Kopie der Datenbank
 
+[[printers]]
+name = "SumUp-Rechnung"
+label = "T2med-Rechnung an SumUp-Terminal"
+ppd = "printer/sumup-rechnung.ppd"
+backend = "printer/kienzle-sumup-backend"
+share = ["samba", "ipp"]
+
+[setup]
+overview = "bin/setup-overview"   # Einrichtungs-Überblick des Moduls als JSON
+
 [hooks]
 install = "bin/install"
 update = "bin/update"
 remove = "bin/remove"
+busy = "bin/busy"                 # „gerade beschäftigt“ (z. B. laufende Kartenzahlung): kein Update
+health = "bin/health"             # Prüfung nach dem Start
 apparmor = ["gs", "qpdf"]         # Programme, die Zugriff auf den Datenordner brauchen
 ```
+
+Das vollständige Format mit allen Prüfregeln steht in `docs/MODULE-TOML.md` (entsteht in Meilenstein 1, `docs/PLAN.md`).
+Gelesen wird `module.toml` nur vom Prüfprogramm der Basis; das Webinterface liest dessen geprüfte Ausgabe.
+
+## Zugang, Zertifikat und Drucken
+
+- **nginx** auf Port 443 vor allen Modulen. Jede Anfrage wird per `auth_request` von der Basis geprüft; die Basis
+  reicht Benutzer und Rechte als Kopfzeilen `X-Kienzle-*` an das Modul (Unix-Socket) weiter. Gleichnamige Kopfzeilen
+  von außen verwirft nginx immer.
+- **Lokale Zertifizierungsstelle** ohne externe Stelle:
+  - Der Installer erzeugt auf dem Server eine Stamm-CA (ECDSA P-256, 10 Jahre). Ihr Schlüssel liegt nur für root lesbar.
+  - Die CA hat eine **Namensbeschränkung** auf die Namen und privaten Netze der Praxis; selbst mit gestohlenem Schlüssel
+    lassen sich keine Zertifikate für fremde Seiten ausstellen.
+  - Das Server-Zertifikat gilt höchstens 825 Tage (Vorgabe von macOS/iOS) und wird automatisch erneuert.
+  - Arbeitsplätze vertrauen der CA einmal (Download mit Fingerabdruck, später über den Starter). Starter pinnen die
+    CA statt des Server-Zertifikats.
+  - Die CA ist Teil der Sicherung.
+- **Drucken:** CUPS und Samba installiert und konfiguriert die Basis aus festen Vorlagen. Samba nur als Druckserver,
+  nur SMB 3, ohne Dateifreigaben. Warteschlangen legt nur ein root-Dienst der Basis an; kein Modul ist in der Gruppe `lpadmin`.
+  Module drucken mit `lp` und melden virtuelle Drucker über `[[printers]]` an.
+
+## Updates
+
+Freigegeben am 22.11.2026. Ablauf je Teil (Basis oder Modul):
+
+1. **Signierte Releases:** je Teil ein Archiv mit `manifest.json` (Teil, Version, Kanal, `core_api` bzw. Mindestversion
+   der Basis, SHA-256 jeder Datei) und Signatur, veröffentlicht als GitHub-Release (`core-v…`, `<modul>-v…`;
+   Beta = Vorabversion).
+   - Signiert wird mit einem eigenen Ed25519-Schlüssel (`ssh-keygen -Y sign`), **ohne externe Zertifizierungsstelle**:
+     Der Installer bringt den öffentlichen Schlüssel mit, sein Fingerabdruck steht in der Dokumentation.
+   - Der private Schlüssel bleibt offline beim Herausgeber, nicht in GitHub Actions. Ein Reserveschlüssel liegt im Tresor.
+   - Ein Schlüsselwechsel geht nur über ein Release, das mit einem vertrauten Schlüssel signiert ist.
+2. **Prüfung vor dem Auspacken:** Signatur, Teil, Kanal, nur neuere Versionen, Prüfsummen, `module.toml`,
+   API-Verträglichkeit.
+3. **Versionsordner:** `/opt/kienzle/<teil>/releases/<version>/`, aktiv über den Verweis `current`.
+   Die letzten drei Versionen bleiben erhalten.
+4. **Sicherung vorher:** restic-Sicherung, falls eingerichtet, und immer ein lokaler Daten-Schnappschuss des Teils.
+   Kein Update, solange ein Modul über `hooks.busy` „beschäftigt“ meldet.
+5. **Umschalten:** Dienste stoppen, Migration, Verweis atomar umsetzen, starten.
+6. **Prüfung nach dem Start:** Dienste aktiv und Gesundheitsprüfung (`/_health` bzw. `hooks.health`) binnen 60 Sekunden.
+7. **Rücksprung** bei Fehler oder abgebrochenem Update: alter Verweis, Daten-Schnappschuss zurück, Start, Meldung in der Glocke.
+   Von Hand ist der Rückweg auf eine der aufbewahrten Versionen möglich, mit Hinweis auf möglichen Datenverlust.
 
 ## Sicherheitskonzept
 
@@ -153,8 +208,8 @@ Grundsatz: **so wenig Daten wie möglich, so wenig Rechte wie möglich, nichts a
 
 ### Updates und Lieferkette
 
-- Updates nur aus dem eigenen Repository, mit Prüfsummen bzw. signierten Releases; Sicherung vor jedem Update,
-  Rücksprung bei Fehler.
+- Updates nur aus dem eigenen Repository als signierte Releases; Sicherung vor jedem Update, Prüfung nach dem
+  Start, Rücksprung bei Fehler (Abschnitt „Updates“).
 - Automatische Sicherheitsupdates des Systems (unattended-upgrades), mit Warten auf die Paketsperre.
 - Feste Versionen für Python- und PHP-Abhängigkeiten der Module.
 
@@ -192,7 +247,11 @@ für Steuerberatung oder Prüfung), nicht als Datensicherung.
 2. **Verschlüsselung auf dem Server:** Repository-Passwort wird bei der Einrichtung zufällig erzeugt (mindestens
    32 Zeichen), liegt nur für root lesbar auf dem Server und auf dem ausgedruckten **Wiederherstellungsblatt**
    (Praxistresor). Nie auf dem NAS, nie im Webinterface nach der Einrichtung.
-3. **Ziel:** NAS über SFTP oder SMB mit eigenem Benutzer, der nur den Backup-Ordner sieht. Kein Gastzugriff.
+3. **Ziel:** NAS mit eigenem Benutzer, der nur den Backup-Ordner sieht. Kein Gastzugriff.
+   - **Empfohlen: SFTP** mit eigenem SSH-Schlüssel und fest geprüftem Server-Schlüssel des NAS.
+   - Optional: restic-REST-Server im Nur-Anfügen-Modus.
+   - Nur wenn das NAS kein SFTP kann: SMB 3.1.1 mit Verschlüsselung über `mount.cifs`, eingehängt nur für die Dauer
+     der Sicherung. Den SMB-Treiber von rclone verwenden wir bewusst nicht, weil er weniger erprobt ist.
 4. **Schutz vor Erpressungstrojanern:** schreibgeschützte Schnappschüsse des Backup-Ordners **auf dem NAS**
    (z. B. täglich, 30 Tage); wo möglich zusätzlich restic-REST-Server im Nur-Anfügen-Modus. Ein Angreifer auf dem
    Praxisserver kann dann Sicherungen nicht endgültig löschen.
@@ -213,10 +272,11 @@ Löschen der Sicherung durch einen Angreifer wird durch die NAS-Schnappschüsse 
 
 ## Vorgehen
 
-1. Basis aus `hau-si/kienzle-suite-beta` herauslösen: Admin und Benutzer (mit OTP neu), Firewall, Updater,
-   Einrichtungs-Überblick, Netzwerkspeicher aus der Rechnungsablage, Backup neu.
-2. SumUp und Terminzettel als erste Module umstellen (`module.toml`, eigener Benutzer, eigener Datenordner).
-   Übernahme bestehender Installationen per Migration.
+1. Basis aus `hau-si/kienzle-suite-beta` (Branch `rechnungseingang`) herauslösen: Admin und Benutzer (mit OTP neu),
+   Zertifikat, Firewall, Updater, Netzwerkspeicher aus der Rechnungsablage, Backup neu, Installer mit CUPS und Samba,
+   Druckerverwaltung, Einrichtungs-Überblick der Basis. Meilensteine: `docs/PLAN.md`.
+2. SumUp und Terminzettel als erste Module umstellen (`module.toml`, eigener Benutzer, eigener Datenordner,
+   Einrichtungs-Überblick je Modul, Arbeitsplatz-Starter im SumUp-Modul). Übernahme bestehender Installationen per Migration.
 3. Fax, Telefon und Kienzlezeit als Module aufnehmen – nach Abstimmung mit Thomas.
 
 ## Hinweise zur Integration von Kienzlezeit
