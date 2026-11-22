@@ -9,16 +9,18 @@ jobs:
   tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - uses: actions/checkout@v5
+      - run: sudo apt-get update && sudo apt-get install -y shellcheck php-cli php-sqlite3 php-mbstring openssl
       - run: python3 -m pip install --user --break-system-packages ruff
       - run: bash tests/run-all.sh
-  # Gleiche Tests mit Python und Werkzeugen aus Ubuntu 26.04 (Zielplattform).
+  # Zielplattform: dieselben Tests mit Python, PHP und OpenSSL aus Ubuntu 26.04, dazu die Ende-zu-Ende-Prüfung
+  # mit echtem nginx und php-fpm (ohne systemd, Dienste werden von Hand gestartet).
   ubuntu-26-04:
     runs-on: ubuntu-latest
     container: ubuntu:26.04
     steps:
-      - run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git ca-certificates python3 shellcheck
-      - uses: actions/checkout@v4
-      # Im Container läuft alles als root; die Tests prüfen Dateirechte trotzdem über die Modusbits.
+      - run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git ca-certificates python3 shellcheck php-cli php-sqlite3 php-mbstring openssl
+      - uses: actions/checkout@v5
+      # Im Container läuft alles als root; die Tests prüfen Dateirechte über die Modusbits.
       - run: bash tests/run-all.sh
+      - run: bash tests/integration/nginx.sh

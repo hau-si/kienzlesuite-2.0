@@ -1,0 +1,61 @@
+#!/usr/bin/python3 -IB
+"""Lokale Zertifizierungsstelle der Kienzle-Suite (nur root).
+
+  kienzle-zertifikat einrichten     CA anlegen (einmalig) und Server-Zertifikat ausstellen
+  kienzle-zertifikat erneuern       Server-Zertifikat erneuern, wenn es in 60 Tagen abläuft oder die Namen sich geändert haben
+  kienzle-zertifikat status         Fingerabdruck der CA, Namen und Ablauf des Server-Zertifikats
+
+Namen und Praxisname kommen aus /etc/kienzle/core/core.json (hostnames, practice).
+Rückgabe: 0 = in Ordnung, 1 = Fehler, 2 = falscher Aufruf, 3 = erneuert (nginx neu laden).
+"""
+import json
+import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'lib'))
+from kienzle.zertifikat import Fehler, Zertifikate  # noqa: E402
+
+CONFIG = os.environ.get('KIENZLE_CORE_CONFIG', '/etc/kienzle/core/core.json')
+FOLDER = os.environ.get('KIENZLE_CA_DIR', '/etc/kienzle/ca')
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) != 1 or argv[0] not in ('einrichten', 'erneuern', 'status'):
+        print(__doc__.strip(), file=sys.stderr)
+        return 2
+    if os.geteuid() != 0 and os.environ.get('KIENZLE_ZERTIFIKAT_TEST') != '1':
+        print('Bitte mit sudo ausführen.', file=sys.stderr)
+        return 1
+    try:
+        config = json.loads(Path(CONFIG).read_text(encoding='utf-8'))
+        names = config.get('hostnames')
+        if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
+            raise Fehler(f'{CONFIG}: hostnames fehlt.')
+        z = Zertifikate(FOLDER)
+        if argv[0] == 'einrichten':
+            if not z.exists():
+                z.create_ca(str(config.get('practice') or 'Praxis'), names)
+                print('Zertifizierungsstelle angelegt.')
+            if z.needs_renewal(names):
+                z.issue(names)
+                print('Server-Zertifikat ausgestellt.')
+            print('Fingerabdruck der CA (SHA-256), zum Vergleich auf den Arbeitsplätzen:\n  ' + z.fingerprint())
+            return 0
+        if argv[0] == 'erneuern':
+            if not z.needs_renewal(names):
+                return 0
+            z.issue(names)
+            print('Server-Zertifikat erneuert.')
+            return 3
+        print('CA (SHA-256): ' + z.fingerprint())
+        print('Server-Zertifikat für: ' + ', '.join(z.names()))
+        print('Gültig bis: ' + z.expires().strftime('%d.%m.%Y'))
+        return 0
+    except (Fehler, OSError, ValueError) as e:
+        print(f'Fehler: {e}', file=sys.stderr)
+        return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

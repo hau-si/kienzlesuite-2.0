@@ -1,5 +1,9 @@
 # Beispielmodul – Release-Notizen
 
+## 0.1.2
+
+- Socket im eigenen Ordner: `upstream = "unix:/run/kienzle/beispiel/web.sock"` (Format der Basis 0.2.0).
+
 ## 0.1.1
 
 - Zeigt das neue Feld `[[connections]]` (T2med als Pflicht, E-Mail optional).

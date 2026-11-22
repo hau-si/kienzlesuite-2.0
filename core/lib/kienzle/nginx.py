@@ -1,0 +1,115 @@
+"""nginx-Konfiguration der Suite aus festen Vorlagen erzeugen.
+
+Eingaben sind nur geprüfte Werte: Servernamen (wie im Zertifikat) und das Modulverzeichnis aus manifest.check_all.
+Grundsätze:
+- Ein Zugang über Port 443; kein Port 80.
+- Jede Anfrage an ein Modul wird vorher per auth_request von der Basis geprüft (/_auth/<id>).
+- Benutzer und Rechte gehen nur aus der Antwort der Basis an das Modul. Kopfzeilen gleichen Namens vom Browser werden
+  bei HTTP durch proxy_set_header ersetzt; bei FastCGI heißen die Werte KIENZLE_* (ohne HTTP_-Vorsilbe), die ein
+  Browser nicht erzeugen kann.
+- /_auth/ ist nur intern, /_health nur von localhost erreichbar.
+"""
+from __future__ import annotations
+
+import ipaddress
+import re
+
+CORE_ROOT = '/opt/kienzle/core/current'
+MODULE_ROOT = '/opt/kienzle/{id}/current'
+CORE_SOCKET = '/run/kienzle/core/web.sock'
+CA_DIR = '/etc/kienzle/ca'
+HOST = re.compile(r'^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$')
+FORWARD = (('benutzer', 'Benutzer'), ('name', 'Name'), ('rolle', 'Rolle'), ('rechte', 'Rechte'), ('csrf', 'Csrf'), ('bestaetigt', 'Bestaetigt'))
+SAFE = re.compile(r'^[A-Za-z0-9_./:-]+$')
+
+
+class Fehler(Exception):
+    pass
+
+
+def _safe(value: str) -> str:
+    """Zusätzliche Absicherung: nur einfache Zeichen in die Konfiguration (die Werte sind ohnehin geprüft)."""
+    if not isinstance(value, str) or not SAFE.match(value) or '..' in value:
+        raise Fehler(f'Unzulässiger Wert für nginx: {str(value)[:60]}')
+    return value
+
+
+def server_names(hostnames: list[str]) -> list[str]:
+    out = []
+    for h in hostnames:
+        try:
+            out.append(str(ipaddress.ip_address(h)))
+        except ValueError:
+            if not HOST.match(h):
+                raise Fehler(f'Ungültiger Servername: {h[:60]}') from None
+            out.append(h)
+    if not out:
+        raise Fehler('Mindestens ein Servername nötig.')
+    return out
+
+
+def _fastcgi_common() -> list[str]:
+    return ['        include fastcgi_params;', '        fastcgi_param HTTPS on;', '        fastcgi_param HTTP_PROXY "";',
+            '        fastcgi_read_timeout 120s;']
+
+
+def _module(m: dict) -> list[str]:
+    mid = _safe(m['module']['id'])
+    web = m['web']
+    path = _safe(web['path'])
+    socket = _safe(web['upstream'].removeprefix('unix:'))
+    if socket != f'/run/kienzle/{mid}/web.sock':
+        raise Fehler(f'{mid}: Socket {socket} unzulässig.')
+    lines = [f'    # Modul {mid}', f'    location = {path} {{ return 301 {path}/; }}', f'    location ^~ {path}/ {{',
+             f'        auth_request /_auth/{mid};']
+    for var, _ in FORWARD:
+        lines.append(f'        auth_request_set $kienzle_{var} $upstream_http_x_kienzle_{var};')
+    lines += ['        error_page 401 = @anmelden;', '        client_max_body_size 25m;']
+    if web['protocol'] == 'fastcgi':
+        entry = _safe(web['entry'])
+        lines += _fastcgi_common()
+        lines.append(f'        fastcgi_param SCRIPT_FILENAME {MODULE_ROOT.format(id=mid)}/{entry};')
+        lines.append(f'        fastcgi_param SCRIPT_NAME {path};')
+        for var, _ in FORWARD:
+            lines.append(f'        fastcgi_param KIENZLE_{var.upper()} $kienzle_{var};')
+        lines.append(f'        fastcgi_param KIENZLE_PFAD {path};')
+        lines.append(f'        fastcgi_pass unix:{socket};')
+    else:
+        lines += ['        proxy_http_version 1.1;', '        proxy_set_header Host $host;', '        proxy_set_header Connection "";',
+                  '        proxy_set_header X-Forwarded-Proto https;', '        proxy_set_header X-Forwarded-For $remote_addr;',
+                  '        proxy_set_header X-Real-IP $remote_addr;', f'        proxy_set_header X-Kienzle-Pfad {path};',
+                  '        proxy_read_timeout 120s;', '        proxy_redirect off;']
+        for var, header in FORWARD:
+            lines.append(f'        proxy_set_header X-Kienzle-{header} $kienzle_{var};')
+        lines.append(f'        proxy_pass http://unix:{socket}:;')
+    lines.append('    }')
+    return lines
+
+
+def render(hostnames: list[str], registry: dict) -> str:
+    names = server_names(hostnames)
+    out = ['# Kienzle-Suite – erzeugt von kienzle-web. Nicht von Hand ändern: Änderungen gehen beim nächsten Erzeugen verloren.',
+           'server_tokens off;', '', 'server {', '    listen 443 ssl default_server;', '    listen [::]:443 ssl default_server;',
+           '    ssl_reject_handshake on;', f'    ssl_certificate {CA_DIR}/server.crt;', f'    ssl_certificate_key {CA_DIR}/server.key;', '}', '',
+           'server {', '    listen 443 ssl;', '    listen [::]:443 ssl;', '    http2 on;', '    server_name ' + ' '.join(names) + ';',
+           f'    ssl_certificate {CA_DIR}/server.crt;', f'    ssl_certificate_key {CA_DIR}/server.key;',
+           '    ssl_protocols TLSv1.2 TLSv1.3;', '    ssl_prefer_server_ciphers off;', '    ssl_session_tickets off;',
+           '    ssl_session_cache shared:kienzle:10m;', '    ignore_invalid_headers on;', '    underscores_in_headers off;',
+           '    client_max_body_size 1m;', '    access_log off;  # keine Adressen mit Vorgangs- oder Patientenbezug protokollieren',
+           '    add_header Strict-Transport-Security "max-age=31536000" always;', '',
+           '    location @anmelden { return 303 /anmelden?weiter=$uri; }', '',
+           '    # Prüfung für Module (nur intern über auth_request)', '    location ^~ /_auth/ {', '        internal;',
+           '        fastcgi_pass_request_body off;', '        fastcgi_param CONTENT_LENGTH "";'] + _fastcgi_common() + [
+           '        fastcgi_param REQUEST_URI $uri;  # sonst stünde hier die ursprüngliche Adresse',
+           f'        fastcgi_param SCRIPT_FILENAME {CORE_ROOT}/public/index.php;', f'        fastcgi_pass unix:{CORE_SOCKET};', '    }', '',
+           '    location = /_health {', '        allow 127.0.0.1;', '        allow ::1;', '        deny all;'] + _fastcgi_common() + [
+           f'        fastcgi_param SCRIPT_FILENAME {CORE_ROOT}/public/index.php;', f'        fastcgi_pass unix:{CORE_SOCKET};', '    }', '',
+           '    location = /ca.crt {', f'        alias {CA_DIR}/ca.crt;', '        default_type application/x-x509-ca-cert;',
+           '        add_header Content-Disposition "attachment; filename=kienzle-suite-ca.crt" always;', '    }', '',
+           '    location ^~ /assets/ {', f'        alias {CORE_ROOT}/public/assets/;', '        add_header X-Content-Type-Options nosniff always;', '    }', '']
+    for m in registry.get('modules', []):
+        if m.get('web'):
+            out += _module(m) + ['']
+    out += ['    # Basis: alle übrigen Pfade', '    location / {'] + _fastcgi_common() + [
+            f'        fastcgi_param SCRIPT_FILENAME {CORE_ROOT}/public/index.php;', f'        fastcgi_pass unix:{CORE_SOCKET};', '    }', '}', '']
+    return '\n'.join(out)

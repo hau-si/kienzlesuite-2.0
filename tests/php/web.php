@@ -1,0 +1,401 @@
+<?php
+declare(strict_types=1);
+// Webinterface der Basis über simulierte Anfragen: Einrichtung, Anmeldung mit OTP und Passkey, Rechte, /_auth, Schutz.
+require __DIR__ . '/lib.php';
+
+use Kienzle\Core\{Auth, Request, Response, Totp, Web};
+
+/** Browser-Nachbildung: hält das Cookie, sendet Host und Origin, liest CSRF-Marken aus Seiten. */
+final class Browser {
+    public ?string $cookie = null; public string $csrf = ''; public ?Response $last = null; public string $host = 'kienzle.example.org';
+    public function __construct(public Env $env, public string $ip = '192.0.2.10', public ?Web $web = null) {}
+    public function web(): Web {
+        $auth = new Auth($this->env->db, $this->env->users, $this->env->audit, $this->ip);
+        return new Web($this->env->config, $this->env->db, $this->env->users, $auth, $this->env->passkeys, $this->env->modules, $this->env->audit,
+            static fn(string $uri) => '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"/>');
+    }
+    public function req(string $method, string $uri, array $post = [], array $headers = []): Response {
+        $path = (string)parse_url($uri, PHP_URL_PATH); parse_str((string)parse_url($uri, PHP_URL_QUERY), $query);
+        $h = ['host' => $this->host, 'user-agent' => 'Mozilla/5.0 (Windows NT 10.0) Chrome/130.0'] + ($method === 'POST' ? ['origin' => 'https://' . $this->host] : []);
+        foreach ($headers as $k => $v) { if ($v === null) unset($h[strtolower($k)]); else $h[strtolower($k)] = $v; }
+        $r = $this->web()->handle(new Request($method, $path, $query, $post, $this->cookie ? [Auth::COOKIE => $this->cookie] : [], $h, $this->ip));
+        $set = $r->header('Set-Cookie');
+        if ($set !== null && preg_match('/^' . Auth::COOKIE . '=([^;]*)/', $set, $m)) $this->cookie = $m[1] !== '' ? $m[1] : null;
+        if (preg_match('/name="csrf" value="([a-f0-9]+)"/', $r->body, $m)) $this->csrf = $m[1];
+        return $this->last = $r;
+    }
+    public function get(string $uri, array $headers = []): Response { return $this->req('GET', $uri, [], $headers); }
+    public function post(string $uri, array $post = [], array $headers = []): Response { return $this->req('POST', $uri, $post + ['csrf' => $this->csrf], $headers); }
+    public function follow(): Response { return $this->get((string)$this->last->header('Location')); }
+}
+
+function code_now(string $secret, int $offset = 0): string { return Totp::code($secret, Totp::step() + $offset); }
+
+/** Basis-Admin mit OTP, angemeldet und bestätigt. */
+function admin_browser(Env $env, string $login = 'anna'): array {
+    [$id, $secret] = $env->user($login, true, otp: true);
+    $b = new Browser($env);
+    $b->post('/anmelden', ['login' => $login, 'password' => 'Wiesen-Blume-Fahrrad-7']);
+    $b->follow();
+    $b->post('/anmelden/code', ['code' => code_now($secret)]);
+    check($b->last->status === 303 && $b->last->header('Location') === '/', 'Admin nicht angemeldet: ' . $b->last->status);
+    $b->get('/');
+    return [$b, $id, $secret];
+}
+
+function test_ersteinrichtung_mit_link_und_otp(): void {
+    $env = new Env();
+    $token = $env->users->setupToken(null);
+    $b = new Browser($env);
+    check($b->get('/einrichten?t=' . $token)->status === 200, 'Einrichtungsseite fehlt');
+    $b->post('/einrichten', ['t' => $token, 'login' => 'anna', 'display' => 'Anna Beispiel', 'password' => 'Kurz-1', 'password2' => 'Kurz-1']);
+    check($b->last->status === 422 && str_contains($b->last->body, 'mindestens 10'), 'zu kurzes Passwort angenommen');
+    $b->post('/einrichten', ['t' => $token, 'login' => 'anna', 'display' => 'Anna Beispiel', 'password' => 'Wiesen-Blume-Fahrrad-7', 'password2' => 'Wiesen-Blume-Fahrrad-7']);
+    check($b->last->header('Location') === '/konto/otp', 'Erster Admin nicht zur OTP-Einrichtung geschickt');
+    // Ohne OTP ist nichts anderes erreichbar.
+    check($b->get('/')->header('Location') === '/konto/otp', 'Startseite ohne OTP erreichbar');
+    check($b->get('/verwaltung/benutzer')->header('Location') === '/konto/otp', 'Verwaltung ohne OTP erreichbar');
+    $page = $b->get('/konto/otp');
+    check(preg_match('/<code class="secret">([A-Z2-7 ]+)<\/code>/', $page->body, $m) === 1, 'Schlüssel nicht angezeigt');
+    $secret = str_replace(' ', '', $m[1]);
+    $b->post('/konto/otp', ['code' => '000000']);
+    check($b->last->status === 422, 'falscher Einrichtungscode angenommen');
+    $b->get('/konto/otp');
+    preg_match('/<code class="secret">([A-Z2-7 ]+)<\/code>/', $b->last->body, $m);
+    $secret = str_replace(' ', '', $m[1]);
+    $r = $b->post('/konto/otp', ['code' => code_now($secret)]);
+    check($r->status === 200 && substr_count($r->body, '<li><code>') === 10, 'Wiederherstellungscodes nicht angezeigt');
+    check($b->get('/')->status === 200 && str_contains($b->last->body, 'Anna Beispiel'), 'nach Einrichtung nicht angemeldet');
+    // Link ist verbraucht, und es gibt jetzt einen Admin.
+    check($b->get('/einrichten?t=' . $token)->status === 404, 'Einrichtungslink zweimal nutzbar');
+    problem(fn() => $env->users->setupToken(null), 409, 'zweiter Erst-Admin-Link möglich');
+}
+
+function test_anmelden_mit_code_und_wiederherstellungscode(): void {
+    $env = new Env();
+    [$id, $secret] = $env->user('anna', true, otp: true);
+    $codes = $env->users->newRecoveryCodes($id);
+    $b = new Browser($env);
+    $b->post('/anmelden', ['login' => 'anna', 'password' => 'falsch-falsch-falsch']);
+    check($b->last->status === 401 && $b->cookie === null, 'falsches Passwort angenommen');
+    $b->post('/anmelden', ['login' => 'Anna', 'password' => 'Wiesen-Blume-Fahrrad-7']);
+    check($b->last->header('Location') === '/anmelden/code', 'Code-Schritt fehlt');
+    check($b->get('/konto')->header('Location') === '/anmelden/code', 'Konto ohne Code erreichbar');
+    check($b->get('/_auth/kasse')->status === 401, '/_auth ohne Code erfolgreich');
+    $b->post('/anmelden/code', ['code' => $codes[0]]);
+    check($b->last->header('Location') === '/', 'Wiederherstellungscode nicht angenommen');
+    check($env->users->recoveryLeft($id) === 9, 'Wiederherstellungscode nicht verbraucht');
+    // Derselbe Code ein zweites Mal: nein.
+    $c = new Browser($env);
+    $c->post('/anmelden', ['login' => 'anna', 'password' => 'Wiesen-Blume-Fahrrad-7']);
+    $c->post('/anmelden/code', ['code' => $codes[0]]);
+    check($c->last->status === 401, 'Wiederherstellungscode zweimal angenommen');
+    $c->post('/anmelden/code', ['code' => code_now($secret)]);
+    check($c->last->header('Location') === '/', 'gültiger Code nach Fehlversuch abgelehnt');
+}
+
+function test_otp_wiederverwendung_und_fehlversuche(): void {
+    $env = new Env();
+    [, $secret] = $env->user('anna', true, otp: true);
+    $a = new Browser($env);
+    $a->post('/anmelden', ['login' => 'anna', 'password' => 'Wiesen-Blume-Fahrrad-7']);
+    $code = code_now($secret);
+    $a->post('/anmelden/code', ['code' => $code]);
+    $b = new Browser($env, '192.0.2.11');
+    $b->post('/anmelden', ['login' => 'anna', 'password' => 'Wiesen-Blume-Fahrrad-7']);
+    $b->post('/anmelden/code', ['code' => $code]);
+    check($b->last->status === 401, 'OTP-Code zweimal angenommen');
+    $c = new Browser($env, '192.0.2.12');
+    $c->post('/anmelden', ['login' => 'anna', 'password' => 'Wiesen-Blume-Fahrrad-7']);
+    for ($i = 0; $i < Auth::OTP_TRIES; $i++) $c->post('/anmelden/code', ['code' => '123456']);
+    check($c->cookie === null && $c->last->header('Location') === '/anmelden', 'Sitzung nach 5 falschen Codes nicht beendet');
+}
+
+function test_sperre_nach_fehlversuchen(): void {
+    $env = new Env();
+    $env->user('anna', true, otp: true);
+    $b = new Browser($env, '192.0.2.20');
+    for ($i = 0; $i < 5; $i++) $b->post('/anmelden', ['login' => 'anna', 'password' => 'falsch-falsch-' . $i]);
+    $b->post('/anmelden', ['login' => 'anna', 'password' => 'Wiesen-Blume-Fahrrad-7']);
+    check($b->last->status === 401 && str_contains($b->last->body, 'Zu viele'), 'keine Sperre nach 5 Fehlversuchen');
+    $other = new Browser($env, '192.0.2.21');
+    $other->post('/anmelden', ['login' => 'anna', 'password' => 'Wiesen-Blume-Fahrrad-7']);
+    check($other->last->header('Location') === '/anmelden/code', 'Sperre trifft auch andere Absender');
+    check(str_contains(implode("\n", $env->audit->recent()), 'anmelden-fehlgeschlagen'), 'Fehlversuch nicht protokolliert');
+    check(!str_contains(implode("\n", $env->audit->recent()), 'falsch-falsch'), 'Passwort im Protokoll');
+}
+
+function test_unbekanntes_konto_gleiche_meldung(): void {
+    $env = new Env();
+    $env->user('anna');
+    $b = new Browser($env);
+    $x = $b->post('/anmelden', ['login' => 'niemand', 'password' => 'Wiesen-Blume-Fahrrad-7'])->body;
+    $y = $b->post('/anmelden', ['login' => 'anna', 'password' => 'falsch-falsch-falsch'])->body;
+    check(str_contains($x, 'Anmeldename oder Passwort falsch') && str_contains($y, 'Anmeldename oder Passwort falsch'), 'Meldungen verraten gültige Konten');
+}
+
+function test_mitarbeiter_ohne_otp_und_rechte_je_modul(): void {
+    $env = new Env();
+    [$id] = $env->user('bert');
+    $env->users->setAccess($id, 'kasse', false, ['paid']);
+    $b = new Browser($env);
+    $b->post('/anmelden', ['login' => 'bert', 'password' => 'Wiesen-Blume-Fahrrad-7']);
+    check($b->last->header('Location') === '/', 'Mitarbeiter braucht kein OTP');
+    $auth = $b->get('/_auth/kasse');
+    check($auth->status === 204 && $auth->header('X-Kienzle-Benutzer') === 'bert' && $auth->header('X-Kienzle-Rolle') === 'mitarbeiter'
+        && $auth->header('X-Kienzle-Rechte') === 'paid', 'Weitergabe an Modul falsch');
+    check(strlen((string)$auth->header('X-Kienzle-Csrf')) === 64, 'Modul-CSRF fehlt');
+    check($b->get('/_auth/beispiel')->status === 403, 'Zugang zu nicht freigegebenem Modul');
+    check($b->get('/_auth/unbekannt')->status === 404, 'unbekanntes Modul nicht abgewiesen');
+    check($b->get('/verwaltung/benutzer')->status === 403, 'Mitarbeiter in der Verwaltung');
+    check(str_contains($b->get('/')->body, 'href="/kasse/"') && !str_contains($b->last->body, 'href="/beispiel/"'), 'Menü zeigt falsche Module');
+}
+
+function test_basis_admin_sieht_module_nicht_automatisch(): void {
+    $env = new Env();
+    [$b, $id] = admin_browser($env);
+    check($b->get('/_auth/kasse')->status === 403, 'Basis-Admin hat automatisch Modulzugang');
+    $env->users->setAccess($id, 'kasse', true, []);
+    $r = $b->get('/_auth/kasse');
+    check($r->status === 204 && $r->header('X-Kienzle-Rolle') === 'admin', 'Modul-Admin nicht weitergegeben');
+}
+
+function test_modul_admin_braucht_otp(): void {
+    $env = new Env();
+    [$id] = $env->user('bert');
+    $env->users->setAccess($id, 'kasse', true, []);
+    $b = new Browser($env);
+    $b->post('/anmelden', ['login' => 'bert', 'password' => 'Wiesen-Blume-Fahrrad-7']);
+    check($b->last->header('Location') === '/konto/otp', 'Modul-Admin ohne OTP angemeldet');
+    check($b->get('/_auth/kasse')->status === 401, 'Modul-Admin ohne OTP an Modul weitergereicht');
+}
+
+function test_verwaltung_braucht_bestaetigung_und_csrf(): void {
+    $env = new Env();
+    [$b, , $secret] = admin_browser($env);
+    check($b->get('/verwaltung/benutzer')->status === 200, 'Verwaltung direkt nach Anmeldung nicht erreichbar');
+    $env->db->query('UPDATE sessions SET confirmed_at=?', [time() - Auth::CONFIRM_SECONDS - 1]);
+    check(str_starts_with((string)$b->get('/verwaltung/benutzer')->header('Location'), '/bestaetigen'), 'Verwaltung ohne erneute Bestätigung');
+    $b->get('/bestaetigen?weiter=/verwaltung/benutzer');
+    $b->post('/bestaetigen', ['password' => 'Wiesen-Blume-Fahrrad-7', 'code' => '000000', 'weiter' => '/verwaltung/benutzer']);
+    check($b->last->status === 403, 'Bestätigung mit falschem Code');
+    $b->post('/bestaetigen', ['password' => 'Wiesen-Blume-Fahrrad-7', 'code' => code_now($secret, 1), 'weiter' => '/verwaltung/benutzer']);
+    check($b->last->header('Location') === '/verwaltung/benutzer', 'Bestätigung nicht angenommen: ' . $b->last->status);
+    $b->get('/verwaltung/benutzer/neu');
+    $r = $b->req('POST', '/verwaltung/benutzer', ['login' => 'carla', 'csrf' => 'falsch']);
+    check($r->status === 403 && !$env->users->byLogin('carla'), 'Anlegen ohne gültige CSRF-Marke');
+}
+
+function test_benutzer_anlegen_rechte_und_link(): void {
+    $env = new Env();
+    [$b] = admin_browser($env);
+    $b->get('/verwaltung/benutzer/neu');
+    $r = $b->post('/verwaltung/benutzer', ['login' => 'carla', 'display' => 'Carla']);
+    check(preg_match('#/einrichten\?t=([A-Za-z0-9_-]{43})#', $r->body, $m) === 1, 'Einrichtungslink nicht angezeigt');
+    $carla = $env->users->byLogin('carla');
+    $b->post('/verwaltung/benutzer/' . $carla['id'], ['display' => 'Carla', 'active' => '1', 'recht' => ['kasse:paid', 'kasse:catalog', 'beispiel:ansehen']]);
+    check($env->users->access((int)$carla['id']) === ['beispiel' => ['admin' => false, 'rights' => ['ansehen']], 'kasse' => ['admin' => false, 'rights' => ['paid', 'catalog']]],
+        'Rechte nicht gespeichert: ' . json_encode($env->users->access((int)$carla['id'])));
+    $b->post('/verwaltung/benutzer/' . $carla['id'], ['display' => 'Carla', 'active' => '1', 'recht' => ['kasse:loeschen']]);
+    check($b->last->status === 422, 'unbekanntes Recht angenommen');
+    $b->post('/verwaltung/benutzer/' . $carla['id'], ['display' => 'Carla', 'active' => '1', 'recht' => ['fremd:x']]);
+    check($b->last->status === 422, 'unbekanntes Modul angenommen');
+    // Carla richtet ihr Passwort über den Link ein.
+    $c = new Browser($env, '192.0.2.30');
+    $c->post('/einrichten', ['t' => $m[1], 'password' => 'Sonnen-Uhr-Garten-3', 'password2' => 'Sonnen-Uhr-Garten-3']);
+    check($c->last->header('Location') === '/', 'Mitarbeiterin nach Einrichtung nicht angemeldet');
+    check(str_contains(implode("\n", $env->audit->recent()), 'benutzer-geaendert carla'), 'Rechteänderung nicht protokolliert');
+}
+
+function test_admin_konten_nur_an_der_konsole_zuruecksetzen(): void {
+    $env = new Env();
+    [$b] = admin_browser($env);
+    [$bert] = $env->user('bert', true, otp: true);
+    $b->get('/verwaltung/benutzer/' . $bert);
+    check(!str_contains($b->last->body, '/link"'), 'Link-Knopf für Admin-Konto angeboten');
+    check($b->post('/verwaltung/benutzer/' . $bert . '/link')->status === 403, 'Admin-Konto über das Webinterface zurückgesetzt');
+}
+
+function test_letzter_admin_und_eigenes_konto(): void {
+    $env = new Env();
+    [$b, $id] = admin_browser($env);
+    $b->get('/verwaltung/benutzer/' . $id);
+    $b->post('/verwaltung/benutzer/' . $id, ['display' => 'Anna']);   // ohne admin/active: bleibt trotzdem Admin
+    $me = $env->users->find($id);
+    check((int)$me['admin'] === 1 && (int)$me['active'] === 1, 'eigenes Konto entmachtet');
+    check($b->post('/verwaltung/benutzer/' . $id . '/loeschen')->status === 409, 'eigenes Konto gelöscht');
+    problem(fn() => $env->users->delete($id), 409, 'letzter Admin löschbar');
+    problem(fn() => $env->users->update($id, 'Anna', false, true), 409, 'letztem Admin die Rolle entzogen');
+}
+
+function test_herkunft_und_servername(): void {
+    $env = new Env();
+    $env->user('anna');
+    $b = new Browser($env);
+    check($b->post('/anmelden', ['login' => 'anna', 'password' => 'Wiesen-Blume-Fahrrad-7'], ['origin' => 'https://evil.example'])->status === 403, 'fremde Herkunft angenommen');
+    check($b->post('/anmelden', ['login' => 'anna', 'password' => 'Wiesen-Blume-Fahrrad-7'], ['origin' => null])->status === 403, 'POST ohne Herkunft angenommen');
+    check($b->post('/anmelden', ['login' => 'anna', 'password' => 'Wiesen-Blume-Fahrrad-7'], ['origin' => null, 'sec-fetch-site' => 'same-origin'])->status === 303, 'Sec-Fetch-Site same-origin abgelehnt');
+    check($b->get('/anmelden', ['host' => 'evil.example'])->status === 421, 'fremder Servername angenommen');
+    $ip = new Browser($env); $ip->host = '192.0.2.5';
+    check($ip->get('/anmelden')->status === 200, 'Zugriff über die IP-Adresse aus der Konfiguration gesperrt');
+}
+
+function test_weiterleitung_nur_auf_eigene_pfade(): void {
+    $env = new Env();
+    $env->user('bert');
+    foreach (['https://evil.example/', '//evil.example', '/\\evil.example', '/_auth/kasse', '/../x', 'javascript:alert(1)'] as $bad) {
+        $b = new Browser($env);
+        $b->req('POST', '/anmelden?weiter=' . rawurlencode($bad), ['login' => 'bert', 'password' => 'Wiesen-Blume-Fahrrad-7']);
+        check($b->last->header('Location') === '/', "Weiterleitung auf $bad");
+    }
+    $b = new Browser($env);
+    $b->req('POST', '/anmelden?weiter=' . rawurlencode('/kasse/liste'), ['login' => 'bert', 'password' => 'Wiesen-Blume-Fahrrad-7']);
+    check($b->last->header('Location') === '/kasse/liste', 'eigener Pfad nicht übernommen');
+}
+
+function test_schutz_kopfzeilen_und_cookie(): void {
+    $env = new Env();
+    $env->user('bert');
+    $b = new Browser($env);
+    $r = $b->get('/anmelden');
+    check(str_contains((string)$r->header('Content-Security-Policy'), "frame-ancestors 'none'") && $r->header('Cache-Control') === 'no-store'
+        && $r->header('X-Content-Type-Options') === 'nosniff', 'Schutz-Kopfzeilen fehlen');
+    $r = $b->post('/anmelden', ['login' => 'bert', 'password' => 'Wiesen-Blume-Fahrrad-7']);
+    $cookie = (string)$r->header('Set-Cookie');
+    check(str_contains($cookie, 'Secure') && str_contains($cookie, 'HttpOnly') && str_contains($cookie, 'SameSite=Strict') && !str_contains($cookie, 'Max-Age'), 'Cookie unsicher: ' . $cookie);
+    $r = (new Browser($env))->post('/anmelden', ['login' => 'bert', 'password' => 'Wiesen-Blume-Fahrrad-7', 'remember' => '1']);
+    check(str_contains((string)$r->header('Set-Cookie'), 'Max-Age=15811200'), 'gemerktes Gerät ohne Laufzeit');
+}
+
+function test_gemerktes_geraet_nur_aus_dem_netz(): void {
+    $env = new Env();
+    $env->user('bert');
+    $b = new Browser($env, '192.0.2.40');
+    $b->post('/anmelden', ['login' => 'bert', 'password' => 'Wiesen-Blume-Fahrrad-7', 'remember' => '1']);
+    check($b->get('/')->status === 200, 'gemerktes Gerät nicht angemeldet');
+    $b->ip = '198.51.100.7';
+    check($b->get('/')->status === 303, 'gemerktes Cookie aus fremdem Netz gültig');
+    $b->ip = '192.0.2.99';
+    check($b->get('/')->status === 200, 'gleiches /24-Netz abgelehnt');
+}
+
+function test_sitzung_laeuft_ab(): void {
+    $env = new Env();
+    $env->user('bert');
+    $b = new Browser($env);
+    $b->post('/anmelden', ['login' => 'bert', 'password' => 'Wiesen-Blume-Fahrrad-7']);
+    $env->db->query('UPDATE sessions SET expires_at=?', [time() - 1]);
+    check($b->get('/')->status === 303, 'abgelaufene Sitzung gültig');
+    $b->post('/anmelden', ['login' => 'bert', 'password' => 'Wiesen-Blume-Fahrrad-7']);
+    $env->db->query('UPDATE sessions SET created_at=?', [time() - 13 * 3600]);
+    check($b->get('/')->status === 303, 'Höchstdauer überschritten, Sitzung gültig');
+}
+
+function test_neuer_sitzungsschluessel_nach_code(): void {
+    $env = new Env();
+    [, $secret] = $env->user('anna', true, otp: true);
+    $b = new Browser($env);
+    $b->post('/anmelden', ['login' => 'anna', 'password' => 'Wiesen-Blume-Fahrrad-7']);
+    $before = $b->cookie;
+    $b->post('/anmelden/code', ['code' => code_now($secret)]);
+    check($b->cookie !== null && $b->cookie !== $before, 'Sitzungsschlüssel nach Code nicht erneuert');
+    $old = new Browser($env); $old->cookie = $before;
+    check($old->get('/')->status === 303, 'alter Schlüssel nach Code noch gültig');
+}
+
+function test_passwort_aendern_meldet_andere_geraete_ab(): void {
+    $env = new Env();
+    $env->user('bert');
+    $a = new Browser($env); $a->post('/anmelden', ['login' => 'bert', 'password' => 'Wiesen-Blume-Fahrrad-7']); $a->get('/konto');
+    $c = new Browser($env, '192.0.2.50'); $c->post('/anmelden', ['login' => 'bert', 'password' => 'Wiesen-Blume-Fahrrad-7']);
+    $a->post('/konto/passwort', ['current' => 'falsch-falsch-falsch', 'password' => 'Sonnen-Uhr-Garten-3', 'password2' => 'Sonnen-Uhr-Garten-3']);
+    check($a->last->status === 422, 'falsches bisheriges Passwort angenommen');
+    $a->post('/konto/passwort', ['current' => 'Wiesen-Blume-Fahrrad-7', 'password' => 'Sonnen-Uhr-Garten-3', 'password2' => 'Sonnen-Uhr-Garten-3']);
+    check($a->last->status === 200 && $a->get('/')->status === 200, 'eigene Sitzung nach Passwortwechsel weg');
+    check($c->get('/')->status === 303, 'anderes Gerät nach Passwortwechsel noch angemeldet');
+}
+
+function test_passkey_anmelden_ersetzt_passwort_und_code(): void {
+    $env = new Env();
+    [$b, $id] = admin_browser($env);
+    $b->get('/konto');
+    $opt = $b->post('/konto/passkey/optionen', [], ['x-kienzle-csrf' => $b->csrf]);
+    check($opt->status === 200, 'Passkey-Optionen: ' . $opt->body);
+    $device = new SoftAuthenticator();
+    $reg = $b->post('/konto/passkey', ['json' => json_encode($device->create(json_decode($opt->body, true)) + ['label' => 'Laptop Empfang'])]);
+    check($reg->status === 200 && $env->passkeys->count($id) === 1, 'Passkey nicht registriert: ' . $reg->body);
+    // Neuer Browser: nur mit Passkey, ohne Passwort und Code.
+    $n = new Browser($env, '192.0.2.60');
+    $o = json_decode($n->post('/anmelden/passkey/optionen')->body, true);
+    $r = $n->post('/anmelden/passkey', ['json' => json_encode($device->get($o) + ['weiter' => '/konto'])]);
+    check($r->status === 200 && json_decode($r->body, true)['weiter'] === '/konto' && $n->cookie !== null, 'Passkey-Anmeldung fehlgeschlagen: ' . $r->body);
+    check($n->get('/konto')->status === 200, 'nach Passkey nicht angemeldet');
+    check(str_contains(implode("\n", $env->audit->recent()), 'passkey-ok'), 'Passkey-Anmeldung nicht protokolliert');
+}
+
+function test_passkey_nur_unter_dem_servernamen(): void {
+    $env = new Env();
+    $env->user('bert');
+    $b = new Browser($env); $b->host = '192.0.2.5';
+    $r = $b->post('/anmelden/passkey/optionen');
+    check($r->status === 409 && str_contains($r->body, 'https://kienzle.example.org'), 'Passkey über IP-Adresse angeboten');
+}
+
+function test_passkey_hinzufuegen_braucht_bestaetigung(): void {
+    $env = new Env();
+    [$b] = admin_browser($env);
+    $b->get('/konto');
+    $env->db->query('UPDATE sessions SET confirmed_at=0');
+    check($b->post('/konto/passkey/optionen', [], ['x-kienzle-csrf' => $b->csrf])->status === 403, 'Passkey ohne frische Bestätigung hinzufügbar');
+    check($b->req('POST', '/konto/passkey/optionen', [], ['x-kienzle-csrf' => 'falsch'])->status === 403, 'Passkey-Optionen ohne CSRF');
+}
+
+function test_passkey_bestaetigt_heikle_aktion(): void {
+    $env = new Env();
+    [$b, $id] = admin_browser($env);
+    $b->get('/konto');
+    $device = new SoftAuthenticator();
+    $opt = json_decode($b->post('/konto/passkey/optionen', [], ['x-kienzle-csrf' => $b->csrf])->body, true);
+    $b->post('/konto/passkey', ['json' => json_encode($device->create($opt))]);
+    $env->db->query('UPDATE sessions SET confirmed_at=0');
+    $b->get('/bestaetigen?weiter=/verwaltung/benutzer');
+    check(str_contains($b->last->body, 'data-passkey-confirm'), 'Passkey-Bestätigung nicht angeboten');
+    $o = json_decode($b->post('/bestaetigen/passkey/optionen', [], ['x-kienzle-csrf' => $b->csrf])->body, true);
+    $r = $b->post('/bestaetigen/passkey', ['json' => json_encode($device->get($o) + ['weiter' => '/verwaltung/benutzer'])], ['x-kienzle-csrf' => $b->csrf]);
+    check($r->status === 200 && $b->get('/verwaltung/benutzer')->status === 200, 'Passkey-Bestätigung wirkt nicht: ' . $r->body);
+}
+
+function test_admin_mit_passkey_ohne_otp_muss_otp_einrichten(): void {
+    $env = new Env();
+    [$id] = $env->user('dora', true);
+    $user = $env->users->find($id);
+    $device = new SoftAuthenticator();
+    $env->passkeys->finishRegistration($user, $device->create($env->passkeys->registrationOptions($user, $env->passkeys->handle($user))), 'x');
+    $b = new Browser($env);
+    $o = json_decode($b->post('/anmelden/passkey/optionen')->body, true);
+    $r = $b->post('/anmelden/passkey', ['json' => json_encode($device->get($o))]);
+    check(json_decode($r->body, true)['weiter'] === '/konto/otp', 'Admin ohne OTP per Passkey voll angemeldet');
+}
+
+function test_health(): void {
+    $env = new Env();
+    $r = (new Browser($env))->get('/_health', ['host' => 'localhost']);
+    check($r->status === 200 && json_decode($r->body, true)['status'] === 'ok', 'Gesundheitsprüfung fehlgeschlagen');
+}
+
+function test_keine_geheimnisse_in_seiten_und_protokoll(): void {
+    $env = new Env();
+    [$b, $id, $secret] = admin_browser($env);
+    $env->users->newRecoveryCodes($id);
+    $pages = '';
+    foreach (['/', '/konto', '/verwaltung/benutzer', '/verwaltung/benutzer/' . $id, '/verwaltung/protokoll'] as $p) $pages .= $b->get($p)->body;
+    $hash = $env->users->find($id)['password_hash'];
+    check(!str_contains($pages, $secret) && !str_contains($pages, $hash) && !str_contains($pages, 'Wiesen-Blume-Fahrrad-7'), 'Geheimnis in einer Seite');
+    $log = (string)file_get_contents($env->audit->path());
+    check(!str_contains($log, 'Wiesen') && !str_contains($log, $secret), 'Geheimnis im Protokoll');
+    $stored = $env->users->find($id)['totp_secret'];
+    check(str_starts_with($stored, 'v1:') && !str_contains($stored, $secret), 'OTP-Geheimnis unverschlüsselt gespeichert');
+    check(substr(sprintf('%o', fileperms($env->audit->path())), -3) === '600', 'Protokoll nicht 0600');
+}
+
+run_tests();

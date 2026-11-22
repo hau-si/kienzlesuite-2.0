@@ -1,0 +1,75 @@
+#!/usr/bin/php
+<?php
+declare(strict_types=1);
+// Verwaltung an der Server-Konsole (nur root). Hier – und nur hier – werden Admin-Konten zurückgesetzt.
+//
+//   sudo kienzle-admin einrichtungslink          Link zum Anlegen des ersten Admins (solange es keinen gibt)
+//   sudo kienzle-admin zuruecksetzen NAME        Passwort, Authenticator-App, Codes und Passkeys löschen, neuer Link
+//   sudo kienzle-admin entsperren                Anmeldesperren nach Fehlversuchen aufheben
+//   sudo kienzle-admin benutzer                  Konten auflisten
+require dirname(__DIR__) . '/php/bootstrap.php';
+
+use Kienzle\Core\{AuditLog, Config, Database, Modules, Problem, Secrets, Throttle, Users};
+
+const USAGE = "Aufruf: sudo kienzle-admin einrichtungslink | zuruecksetzen NAME | entsperren | benutzer\n";
+
+function fail(string $message, int $code = 1): never { fwrite(STDERR, $message . "\n"); exit($code); }
+
+if (PHP_SAPI !== 'cli') fail('Nur an der Konsole.');
+$args = array_slice($argv, 1);
+if (!$args || !in_array($args[0], ['einrichtungslink', 'zuruecksetzen', 'entsperren', 'benutzer'], true) || ($args[0] === 'zuruecksetzen') !== (count($args) === 2) || count($args) > 2) {
+    fwrite(STDERR, USAGE);
+    exit(2);
+}
+$test = getenv('KIENZLE_ADMIN_TEST') === '1';
+if (!$test && posix_geteuid() !== 0) fail('Bitte mit sudo ausführen.');
+
+try {
+    $config = Config::load(getenv('KIENZLE_CORE_CONFIG') ?: Config::FILE);
+    // Als Eigentümer des Datenordners arbeiten (ks-core), damit Datenbankdateien nicht root gehören.
+    if (!$test) {
+        $owner = @stat($config->dataDir);
+        if (!$owner) fail('Datenordner ' . $config->dataDir . ' fehlt. Bitte den Installer ausführen.');
+        if (!posix_setgid($owner['gid']) || !posix_setuid($owner['uid'])) fail('Benutzerwechsel fehlgeschlagen.');
+    }
+    $db = new Database($config->dataDir);
+    $db->migrate();
+    $users = new Users($db, Secrets::fromFile($config->secretKey), new Modules($config->modules));
+    $audit = new AuditLog($config->dataDir);
+    $base = 'https://' . $config->hostnames[0] . '/einrichten?t=';
+
+    switch ($args[0]) {
+        case 'einrichtungslink':
+            if ($users->activeAdmins() > 0) fail('Es gibt schon einen Admin. Zugang verloren? sudo kienzle-admin zuruecksetzen NAME');
+            echo "Ersten Admin einrichten – Link im Browser eines Arbeitsplatzes öffnen (3 Tage gültig, einmal verwendbar):\n\n  "
+                . $base . $users->setupToken(null) . "\n\n";
+            $audit->write('konsole', 'einrichtungslink-erzeugt', 'erster admin');
+            break;
+        case 'zuruecksetzen':
+            $user = $users->byLogin($args[1]);
+            if (!$user) fail('Unbekannter Benutzer. Liste: sudo kienzle-admin benutzer');
+            $users->resetCredentials((int)$user['id']);
+            Throttle::clearAll($db);
+            $audit->write('konsole', 'zurueckgesetzt', $user['login']);
+            echo "Passwort, Authenticator-App, Wiederherstellungscodes und Passkeys von {$user['login']} gelöscht, alle Geräte abgemeldet.\n"
+                . "Neuen Zugang einrichten (3 Tage gültig, einmal verwendbar):\n\n  " . $base . $users->setupToken((int)$user['id']) . "\n\n";
+            break;
+        case 'entsperren':
+            Throttle::clearAll($db);
+            $db->query("DELETE FROM settings WHERE key IN ('login_global_lock','login_global_failures')");
+            $audit->write('konsole', 'entsperrt');
+            echo "Anmeldesperren aufgehoben.\n";
+            break;
+        case 'benutzer':
+            foreach ($users->all() as $u) {
+                $roles = $u['admin'] ? ['Basis-Admin'] : [];
+                foreach ($u['access'] as $m => $a) $roles[] = $m . ($a['admin'] ? ' (Admin)' : '');
+                printf("%-24s %-10s %s\n", $u['login'], $u['active'] ? ($u['otp'] ? 'App' : ($u['password'] ? 'Passwort' : 'offen')) : 'gesperrt', implode(', ', $roles) ?: '–');
+            }
+            break;
+    }
+} catch (Problem $e) {
+    fail($e->getMessage());
+} catch (Throwable $e) {
+    fail('Fehler: ' . get_class($e) . ' (' . basename($e->getFile()) . ':' . $e->getLine() . ')');
+}

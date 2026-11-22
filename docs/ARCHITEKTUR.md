@@ -81,7 +81,9 @@ data = "/var/lib/kienzle/sumup"   # eigener Datenordner, 0700
 
 [web]
 path = "/kasse"
-upstream = "unix:/run/kienzle/sumup.sock"
+upstream = "unix:/run/kienzle/sumup/web.sock"
+protocol = "fastcgi"                # PHP-Modul über php-fpm
+entry = "public/index.php"
 
 # [[firewall]]: Ports, die das Modul selbst anbietet (Beispiel Kienzlefon: port = 8766, proto = "tcp").
 # Die Drucker unten erreichen die Arbeitsplätze über Samba/CUPS der Basis, ohne eigenen Eintrag.
@@ -203,9 +205,12 @@ Grundsatz: **so wenig Daten wie möglich, so wenig Rechte wie möglich, nichts a
 
 - Eine Anmeldung in der Basis; die Basis prüft die Sitzung und reicht Benutzer und Rechte an das Modul weiter
   (Reverse-Proxy). Module prüfen Rechte selbst noch einmal.
-- **Admin nur mit Passwort und OTP.** Wiederherstellungscodes werden einmal angezeigt und zum Ausdrucken angeboten.
+- **Admin nur mit Passwort und OTP oder mit Passkey.** Ein Passkey (WebAuthn, nur mit Nutzerprüfung am Gerät) ersetzt
+  Passwort und OTP; OTP bleibt für Admins als Rückfall Pflicht. Wiederherstellungscodes werden einmal angezeigt und zum Ausdrucken angeboten.
   Zurücksetzen nur lokal an der Server-Konsole (root).
 - Mitarbeiter mit eigenen Konten und Rechten je Modul, ohne Zugriff auf Schlüssel und Einstellungen.
+- **Eine Anmeldung (SSO) für alle Module:** Module haben keine eigene Anmeldung; Schnittstelle in `docs/MODUL-SCHNITTSTELLE.md`.
+  Für Dienste mit eigener Anmeldung ist die Basis als OpenID-Connect-Anbieter vorgeschlagen.
 - Admin-Rechte je Modul: wer die Kasse verwaltet, sieht nicht automatisch Arbeitszeiten und umgekehrt.
 - Kienzlezeit kennt den passwortlosen Mitarbeiter-Login per RFID-Karte am Terminal. Dieser bleibt auf
   Kienzlezeit beschränkt und gibt keinen Zugang zu anderen Modulen.
@@ -216,6 +221,8 @@ Grundsatz: **so wenig Daten wie möglich, so wenig Rechte wie möglich, nichts a
 ### Trennung der Module
 
 - Jedes Modul läuft als eigener Systembenutzer, mit eigenem Datenordner (0700) und eigener Datenbank.
+- Jedes Modul hat einen eigenen Socket-Ordner `/run/kienzle/<id>/` (0750, Gruppe `www-data`): nur das Modul und nginx kommen
+  hinein, kein anderes Modul kann es an der Anmeldung vorbei ansprechen.
 - systemd-Härtung je Dienst (`NoNewPrivileges`, `ProtectSystem=strict`, `ReadWritePaths` nur auf den Datenordner,
   `PrivateTmp`, eingeschränkte Adressfamilien).
 - Ein Modul bekommt nur seine eigenen Geheimnisse. Root-Aktionen (Firewall, Drucker, Updates) laufen nur über

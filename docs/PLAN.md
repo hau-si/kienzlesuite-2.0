@@ -88,7 +88,7 @@ Die Musterprüfungen (Portbereiche, Namen) folgen `scripts/firewall-apply.py` (`
 
 ---
 
-## M2 – Anmeldung, Benutzer und Rechte inkl. Admin-OTP 🖥
+## M2 – Anmeldung, Benutzer und Rechte inkl. Admin-OTP und Passkeys 🖥
 
 **Ziel:** Eine Anmeldung für alle Module, mehrere Benutzerkonten, Rechte je Modul. Admins melden sich nur mit Passwort **und** TOTP an.
 
@@ -157,6 +157,12 @@ Zusätzliche Tests für die CA:
 - erzeugtes Server-Zertifikat wird gegen die CA geprüft (`openssl verify`),
 - ein Zertifikat für einen Namen außerhalb der Namensbeschränkung wird abgelehnt,
 - Erneuerung vor Ablauf, Rechte auf den Schlüsseldateien.
+
+**Passkeys** (Wunsch vom 22.11.2026): WebAuthn ohne Fremdbibliothek, nur mit Nutzerprüfung am Gerät; ersetzt Passwort und
+OTP bei Anmeldung und Bestätigung; Admins behalten OTP als Rückfall; nur über den Servernamen.
+
+**Stand:** umgesetzt mit Basis 0.2.0 (22.11.2026). Abweichungen vom Plan: eigene php-fpm-Instanz je Teil statt des
+php-fpm-Dienstes der Distribution (Härtung je Dienst); Socket-Ordner je Teil; Konsole `kienzle-admin`.
 
 **VM:** Installation, CA auf einem Windows- und einem macOS-Arbeitsplatz einspielen (Browser ohne Warnung, auch
 Prüfung der Namensbeschränkung), Ersteinrichtung mit OTP-App, Anmeldung, Mitarbeiterkonto, Zurücksetzen an der Konsole.
@@ -477,3 +483,4 @@ Danach ist die Basis bereit für das SumUp- und das Terminzettel-Modul (Schritt 
 | Einrichtungs-Überblick | Basis: Ende M7; je Modul über `[setup] overview` (E11) |
 | CUPS und Samba | Installation in M7, Verwaltung in M8 (E10) |
 | Ausgehende Freigabeliste der Firewall | nach Schritt 2 |
+| SSO für Dienste mit eigener Anmeldung (OpenID Connect, Basis als Anbieter) | Vorschlag M9, noch abzustimmen |

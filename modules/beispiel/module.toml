@@ -4,7 +4,7 @@
 [module]
 id = "beispiel"
 name = "Beispielmodul"
-version = "0.1.1"
+version = "0.1.2"
 core_api = "1"
 description = "Zeigt alle Felder der Modul-Beschreibung; nur für Tests."
 
@@ -16,7 +16,7 @@ data = "/var/lib/kienzle/beispiel"
 
 [web]
 path = "/beispiel"
-upstream = "unix:/run/kienzle/beispiel.sock"
+upstream = "unix:/run/kienzle/beispiel/web.sock"
 
 [[firewall]]
 name = "Beispiel-Schnittstelle für Geräte im Praxisnetz"

@@ -1,0 +1,74 @@
+#!/usr/bin/python3 -IB
+"""Modulverzeichnis und nginx-Konfiguration schreiben (nur root).
+
+  kienzle-web schreiben [MODULORDNER]
+
+Prüft alle Module in MODULORDNER (Vorgabe: keine Module) mit dem Prüfprogramm, schreibt das Modulverzeichnis
+für das Webinterface und die nginx-Konfiguration, prüft sie mit „nginx -t“ und lädt nginx neu.
+Bei einem Fehler bleibt die bisherige Konfiguration aktiv.
+Rückgabe: 0 = geschrieben, 1 = Fehler, 2 = falscher Aufruf.
+"""
+import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'lib'))
+from kienzle import manifest, nginx  # noqa: E402
+
+E = os.environ.get
+CONFIG = E('KIENZLE_CORE_CONFIG', '/etc/kienzle/core/core.json')
+REGISTRY = E('KIENZLE_MODULES_JSON', '/var/lib/kienzle/core/modules.json')
+SITE = E('KIENZLE_NGINX_SITE', '/etc/nginx/conf.d/kienzle.conf')
+NGINX = E('KIENZLE_NGINX', '/usr/sbin/nginx')
+RELOAD = E('KIENZLE_NGINX_RELOAD', 'systemctl reload nginx.service')
+OWNER = E('KIENZLE_CORE_USER', 'ks-core')
+
+
+def write(path: Path, text: str, mode: int, group: str | None = None) -> None:
+    tmp = path.with_name('.' + path.name + '.neu')
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, mode)
+    with os.fdopen(fd, 'w', encoding='utf-8') as f:
+        f.write(text)
+    os.chmod(tmp, mode)
+    if group and os.geteuid() == 0:
+        shutil.chown(tmp, 'root', group)
+    os.replace(tmp, path)
+
+
+def main(argv: list[str]) -> int:
+    if not argv or argv[0] != 'schreiben' or len(argv) > 2:
+        print(__doc__.strip(), file=sys.stderr)
+        return 2
+    try:
+        config = json.loads(Path(CONFIG).read_text(encoding='utf-8'))
+        registry = manifest.check_all(argv[1]) if len(argv) == 2 else {'core_api': sorted(manifest.supported_api()), 'modules': []}
+        site = nginx.render(config.get('hostnames') or [], registry)
+    except manifest.Invalid as e:
+        print('Module ungültig, nichts geändert:\n  - ' + '\n  - '.join(e.errors), file=sys.stderr)
+        return 1
+    except (nginx.Fehler, OSError, ValueError) as e:
+        print(f'Fehler: {e}', file=sys.stderr)
+        return 1
+    site_path = Path(SITE)
+    backup = site_path.read_text(encoding='utf-8') if site_path.is_file() else None
+    write(site_path, site, 0o644)
+    test = subprocess.run([NGINX, '-t', '-q'], capture_output=True, text=True, timeout=30)
+    if test.returncode != 0:
+        if backup is None:
+            site_path.unlink()
+        else:
+            write(site_path, backup, 0o644)
+        print('nginx lehnt die Konfiguration ab, alte bleibt aktiv: ' + test.stderr.strip()[:300], file=sys.stderr)
+        return 1
+    write(Path(REGISTRY), json.dumps(registry, ensure_ascii=False, indent=1, sort_keys=True) + '\n', 0o640, OWNER)
+    if RELOAD:
+        subprocess.run(RELOAD.split(), check=False, timeout=30)
+    print(f'Geschrieben: {len(registry["modules"])} Module, {site_path}')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

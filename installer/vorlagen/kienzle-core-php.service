@@ -1,0 +1,36 @@
+# Kienzle-Suite, Basis: Webinterface (php-fpm als ks-core). Vom Installer geschrieben.
+[Unit]
+Description=Kienzle-Suite Basis (Webinterface)
+After=network.target
+
+[Service]
+Type=notify
+User=ks-core
+Group=ks-core
+ExecStart=@PHPFPM@ --nodaemonize --fpm-config /etc/kienzle/core/php-fpm.conf
+ExecReload=/bin/kill -USR2 $MAINPID
+Restart=on-failure
+UMask=0077
+# Härtung: nur der eigene Datenordner und der Socket-Ordner sind beschreibbar; kein Netz außer Unix-Sockets.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/kienzle/core /run/kienzle/core
+
+[Install]
+WantedBy=multi-user.target

@@ -56,7 +56,7 @@ LIMITS = {'packages': 50, 'services': 20, 'firewall': 20, 'rights': 30, 'printer
 SCHEMA_SECTIONS = {
     'module': {'id', 'name', 'version', 'core_api', 'description'},
     'system': {'packages', 'services', 'user', 'data'},
-    'web': {'path', 'upstream'},
+    'web': {'path', 'upstream', 'protocol', 'entry'},
     'firewall': {'name', 'port', 'proto', 'scope'},
     'rights': {'id', 'label'},
     'backup': {'paths', 'snapshot'},
@@ -239,9 +239,20 @@ class _Checker:
         if path in RESERVED_PATHS:
             self.error('web.path', f'„{path}“ ist für die Basis reserviert.')
         upstream = self.text(t, 'upstream', 'web', limit=100)
-        if upstream is not None and mid and upstream != f'unix:{BASE_RUN}/{mid}.sock':
-            self.error('web.upstream', f'muss „unix:{BASE_RUN}/{mid}.sock“ sein.')
-        return {'path': path, 'upstream': upstream}
+        if upstream is not None and mid and upstream != f'unix:{BASE_RUN}/{mid}/web.sock':
+            self.error('web.upstream', f'muss „unix:{BASE_RUN}/{mid}/web.sock“ sein.')
+        protocol = t.get('protocol', 'http')
+        if protocol not in ('http', 'fastcgi'):
+            self.error('web.protocol', 'muss „http“ oder „fastcgi“ sein.')
+        entry = None
+        if protocol == 'fastcgi':
+            if 'entry' not in t:
+                self.error('web', '„entry“ fehlt (Einstiegsdatei für FastCGI, z. B. public/index.php).')
+            else:
+                entry = self.rel_path(t['entry'], 'web.entry')
+        elif 'entry' in t:
+            self.error('web.entry', 'nur mit protocol = "fastcgi".')
+        return {'path': path, 'upstream': upstream, 'protocol': protocol, 'entry': entry}
 
     def firewall(self, items: list) -> list:
         if len(items) > LIMITS['firewall']:
@@ -398,6 +409,8 @@ def _referenced(manifest: dict) -> list[tuple[str, str, bool]]:
         refs.append(('backup.snapshot', manifest['backup']['snapshot'], True))
     if manifest['setup']['overview']:
         refs.append(('setup.overview', manifest['setup']['overview'], True))
+    if manifest['web'] and manifest['web']['entry']:
+        refs.append(('web.entry', manifest['web']['entry'], False))
     for n, p in enumerate(manifest['printers'], 1):
         refs.append((f'printers[{n}].ppd', p['ppd'], False))
         if p['backend']:

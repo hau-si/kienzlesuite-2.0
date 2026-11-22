@@ -1,0 +1,7 @@
+# Kienzle-Suite: Server-Zertifikat erneuern (60 Tage vor Ablauf oder bei geänderten Namen), danach nginx neu laden.
+[Unit]
+Description=Kienzle-Suite Server-Zertifikat prüfen und erneuern
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c '/opt/kienzle/core/current/bin/kienzle-zertifikat erneuern; rc=$?; if [ "$rc" -eq 3 ]; then systemctl reload nginx.service; exit 0; fi; exit "$rc"'

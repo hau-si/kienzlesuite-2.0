@@ -1,6 +1,6 @@
 # Modul-Beschreibung `module.toml`
 
-Gilt für `core_api = "1"` (Basis ab 0.1.1). Jedes Modul liegt in `modules/<id>/` und bringt dort eine `module.toml` mit.
+Gilt für `core_api = "1"` (Basis ab 0.2.0). Jedes Modul liegt in `modules/<id>/` und bringt dort eine `module.toml` mit.
 Geprüft wird sie mit
 
 ```
@@ -52,7 +52,9 @@ Ohne `[web]` erscheint das Modul nicht im Menü (z. B. ein reines Druckmodul).
 | Schlüssel | Pflicht | Regel |
 |---|---|---|
 | `path` | ja | `/` und 1–31 Zeichen aus `a–z 0–9 -`. Reserviert: `/anmelden`, `/abmelden`, `/verwaltung`, `/einrichtung`, `/konto`, `/hilfe`, `/assets`, `/api`, `/_auth`, `/_health`, `/core`, `/kienzle` |
-| `upstream` | ja | genau `unix:/run/kienzle/<id>.sock` |
+| `upstream` | ja | genau `unix:/run/kienzle/<id>/web.sock`. Der Ordner gehört `ks-<id>`, Gruppe `www-data`, Rechte 0750: nur das Modul und nginx kommen hinein, andere Module nicht |
+| `protocol` | nein | `"http"` (Vorgabe: das Modul spricht HTTP über den Socket) oder `"fastcgi"` (PHP über php-fpm) |
+| `entry` | bei `fastcgi` | Einstiegsdatei im Modulordner, z. B. `public/index.php`; alle Anfragen unter `path` gehen an sie |
 
 ### `[[firewall]]` – optional, höchstens 20
 
@@ -149,7 +151,7 @@ Entspricht `modules/beispiel/module.toml`; die Tests prüfen, dass dieses Beispi
 [module]
 id = "beispiel"
 name = "Beispielmodul"
-version = "0.1.1"
+version = "0.1.2"
 core_api = "1"
 description = "Zeigt alle Felder der Modul-Beschreibung; nur für Tests."
 
@@ -161,7 +163,7 @@ data = "/var/lib/kienzle/beispiel"
 
 [web]
 path = "/beispiel"
-upstream = "unix:/run/kienzle/beispiel.sock"
+upstream = "unix:/run/kienzle/beispiel/web.sock"
 
 [[firewall]]
 name = "Beispiel-Schnittstelle für Geräte im Praxisnetz"

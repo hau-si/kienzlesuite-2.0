@@ -17,21 +17,30 @@ for m in modules/*/; do
 done
 
 step 'Python: Syntax und Stil'
-python3 -B -m py_compile core/lib/kienzle/*.py core/bin/kienzle-modul-pruefen tests/core/*.py
+python_bins=(core/bin/kienzle-modul-pruefen core/bin/kienzle-zertifikat core/bin/kienzle-web)
+python3 -B -m py_compile core/lib/kienzle/*.py "${python_bins[@]}" tests/core/*.py tests/integration/*.py
 if command -v ruff >/dev/null; then
-  ruff check --no-cache --select E,F,W,B --line-length 130 core tests
-  ruff check --no-cache --select E,F,W,B --line-length 130 core/bin/kienzle-modul-pruefen
+  ruff check --no-cache --select E,F,W,B --line-length 160 core tests "${python_bins[@]}"
 else
   echo 'ruff nicht installiert – Stilprüfung übersprungen.'
 fi
 
-step 'Shell: Syntax'
-bash -n tests/run-all.sh
-for f in modules/*/bin/* modules/*/printer/*-backend; do sh -n "$f"; done
-if command -v shellcheck >/dev/null; then shellcheck tests/run-all.sh; else echo 'shellcheck nicht installiert – übersprungen.'; fi
+step 'PHP: Syntax'
+for f in core/php/*.php core/public/*.php core/bin/kienzle-admin tests/php/*.php; do php -l "$f" >/dev/null || { php -l "$f"; exit 1; }; done
+echo 'in Ordnung'
 
-step 'module.toml: Prüfprogramm (tests/core)'
+step 'Shell: Syntax'
+bash -n tests/run-all.sh installer/install.sh tests/integration/nginx.sh
+for f in modules/*/bin/* modules/*/printer/*-backend; do sh -n "$f"; done
+if command -v shellcheck >/dev/null; then shellcheck -S warning tests/run-all.sh installer/install.sh tests/integration/nginx.sh; else echo 'shellcheck nicht installiert – übersprungen.'; fi
+
+step 'Python: Prüfprogramm, Zertifikate, nginx-Vorlage (tests/core)'
 python3 -B -m unittest discover -s tests/core
+
+if command -v node >/dev/null; then step 'JavaScript: Syntax'; node --check core/public/assets/core.js && echo 'in Ordnung'; fi
+
+step 'PHP: Basis (tests/php)'
+for t in tests/php/core.php tests/php/passkeys.php tests/php/web.php tests/php/cli.php; do echo "-- $t"; php "$t"; done
 
 step 'module.toml: alle Module im Repository'
 core/bin/kienzle-modul-pruefen --alle modules
