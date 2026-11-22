@@ -1,0 +1,235 @@
+# Kienzle-Suite 2.0 – Architektur
+
+Stand: Konzept, noch kein Code. Übersicht als Whiteboard:
+https://claude.ai/artifact/EGTAPzMGVFBYbxCBUzGjsh (nur mit Freigabe sichtbar)
+
+## Ziel
+
+Eine Praxis-Appliance für Hausarztpraxen mit T2med: **eine Basis**, die einmal installiert wird, und **Module**,
+die einzeln dazukommen. Alles wird im Webinterface verwaltet; Firewall, Benutzer, Updates und Sicherung gibt es nur
+einmal, in der Basis.
+
+Module (erste Planung): SumUp (Kasse, Rechnungseingang, Post, Ablage), Terminzettel, Fax (Kienzlefax),
+Telefon (Kienzlefon), Kienzlezeit (RFID-Zeiterfassung mit Auslagenverwaltung,
+[thomaskien/kienzlezeit](https://github.com/thomaskien/kienzlezeit)).
+
+Fax, Telefon und Kienzlezeit sind Projekte von Dr. Thomas Kienzle. Ihre Aufnahme wird mit ihm abgestimmt, bevor
+Code dafür entsteht.
+
+## Plattform
+
+- **Ubuntu Server 26.04 LTS** (aktuelles Abbild, derzeit 26.04.1) als einzige unterstützte Basis,
+  Sicherheitsupdates bis Mai 2031. Debian 13 wäre technisch gleichwertig; wegen der vorhandenen Installationen bleibt es bei Ubuntu.
+- VM auf dem Praxisserver: mindestens 2 Kerne, 4 GB RAM, 100 GB Speicher. Mit Telefon-Transkription mehr RAM einplanen.
+- Bekannte Eigenheiten von 26.04, die der Installer bzw. die Modul-Haken einmal lösen:
+  - AppArmor sperrt `gs` und `qpdf` außerhalb erwarteter Pfade: lokale Regeln unter `/etc/apparmor.d/local/` je Datenordner.
+  - sudo-rs statt sudo: in sudoers keine Platzhalter in Befehlsargumenten verwenden.
+  - Python 3.14: jedes Python-Modul bekommt eine eigene virtuelle Umgebung mit festen Versionen (z. B. Obergrenze für `av`).
+- Installation: Standard-ISO, optional mit einer `autoinstall`-Datei, die am Ende den Suite-Installer startet.
+  Keine eigene ISO.
+
+## Aufbau
+
+```
+kienzlesuite-2.0/
+  core/                 Basis: Webinterface, Benutzer, Firewall, Updates, Backup, Netzwerkspeicher, Zertifikate
+  modules/
+    sumup/
+    terminzettel/
+    fax/
+    telefon/
+    kienzlezeit/
+  installer/            Erstinstallation, autoinstall-Vorlage
+  docs/
+```
+
+Ein Repository mit Ordnern (kein Branch je Projekt). Branches nur für stabil/beta. Jedes Modul hat eine eigene Version,
+die Basis eine API-Version, gegen die Module geprüft werden.
+
+### Die Basis
+
+| Bereich | Aufgabe |
+|---|---|
+| Webinterface und Anmeldung | eine Anmeldung für alle Module, Menü aus den installierten Modulen |
+| Benutzer, Rollen, Rechte | Admin und Mitarbeiter; Rechte kommen aus den Modulen (Kästchen) |
+| Admin-Zugang | Passwort **und** OTP (TOTP, RFC 6238), Wiederherstellungscodes |
+| Arbeitsplätze (PCs) | Starter-Paket, Zertifikat, Drucker-Einrichtung je Arbeitsplatz |
+| Firewall und Netzwerk | nftables, nur Praxisnetz/VPN; Ports kommen aus den Modulen |
+| Zertifikat und Zugang | eigene Zertifizierungsstelle, ein Zugang über Port 443 mit Pfaden je Modul |
+| Updates | je Modul, Kanal stabil/beta, Sicherung vor dem Update, Rücksprung |
+| Netzwerkspeicher | gemeinsamer Dienst für SMB-Ziele (aus der Rechnungsablage der SumUp-Suite) |
+| Backup | verschlüsselte Sicherung aller Module auf den Netzwerkspeicher |
+| CUPS, Samba, Protokolle | gemeinsame Dienste |
+
+### Modul-Beschreibung (`module.toml`)
+
+Jedes Modul bringt eine Datei mit, die die Basis liest. Beispiel:
+
+```toml
+[module]
+id = "sumup"
+name = "Kartenzahlung und Rechnungen"
+version = "2.0.0"
+core_api = "1"
+
+[system]
+packages = ["php-fpm", "php-sqlite3", "qpdf", "poppler-utils"]
+services = ["kienzle-sumup-worker.service"]
+user = "ks-sumup"                 # eigener Systembenutzer
+data = "/var/lib/kienzle/sumup"   # eigener Datenordner, 0700
+
+[web]
+path = "/kasse"
+upstream = "unix:/run/kienzle/sumup.sock"
+
+[[firewall]]
+name = "SumUp-Rechnungsdrucker (IPP)"
+port = 631
+proto = "tcp"
+
+[[rights]]
+id = "paid"
+label = "Bezahlt-Liste abhaken"
+
+[backup]
+paths = ["/var/lib/kienzle/sumup"]
+snapshot = "bin/backup-snapshot"  # erzeugt eine konsistente Kopie der Datenbank
+
+[hooks]
+install = "bin/install"
+update = "bin/update"
+remove = "bin/remove"
+apparmor = ["gs", "qpdf"]         # Programme, die Zugriff auf den Datenordner brauchen
+```
+
+## Sicherheitskonzept
+
+Die Suite verarbeitet Gesundheitsdaten (Art. 9 DSGVO): Namen, Geburtsdaten, Rechnungen mit Leistungen, Faxe,
+Anrufe und Transkripte, dazu Zugangsdaten zu Zahlungs- und Postdiensten. Kienzlezeit verarbeitet Beschäftigtendaten
+(Arbeitszeiten, Urlaub, Krankheit, Auslagen mit Bankverbindung für GiroCodes); diese sind nur für Admins von Kienzlezeit
+sichtbar, nicht für Admins anderer Module.
+Grundsatz: **so wenig Daten wie möglich, so wenig Rechte wie möglich, nichts aus dem Internet erreichbar.**
+
+### Netz
+
+- Kein Dienst aus dem Internet erreichbar. Zugriff nur aus dem Praxisnetz und optional aus dem VPN.
+- Firewall standardmäßig zu; Module melden ihre Ports an, der Admin schaltet sie frei. Schutz vor Aussperren
+  (das anfragende Gerät muss freigegeben sein).
+- Geräte im Praxisnetz, die die Suite ansprechen (RFID-Terminals von Kienzlezeit, Drucker), bekommen nur ihren
+  Endpunkt frei; Terminals sprechen HTTPS mit Zertifikatsprüfung, HTTP nur als bewusst gewählte Ausnahme.
+- Ausgehend nur, was ein Modul braucht (SumUp-API, Letterxpress, Paketquellen); optional als Freigabeliste.
+- TLS für alles, auch intern. Die Starter auf den Arbeitsplätzen prüfen das Zertifikat fest (kein Vertrauen auf Zuruf).
+
+### Anmeldung und Rechte
+
+- Eine Anmeldung in der Basis; die Basis prüft die Sitzung und reicht Benutzer und Rechte an das Modul weiter
+  (Reverse-Proxy). Module prüfen Rechte selbst noch einmal.
+- **Admin nur mit Passwort und OTP.** Wiederherstellungscodes werden einmal angezeigt und zum Ausdrucken angeboten.
+  Zurücksetzen nur lokal an der Server-Konsole (root).
+- Mitarbeiter mit eigenen Konten und Rechten je Modul, ohne Zugriff auf Schlüssel und Einstellungen.
+- Admin-Rechte je Modul: wer die Kasse verwaltet, sieht nicht automatisch Arbeitszeiten und umgekehrt.
+- Kienzlezeit kennt den passwortlosen Mitarbeiter-Login per RFID-Karte am Terminal. Dieser bleibt auf
+  Kienzlezeit beschränkt und gibt keinen Zugang zu anderen Modulen.
+- Sitzungen mit einstellbarer Abmeldezeit, „Gerät merken“ nur aus dem Netz der Anmeldung, widerrufbar.
+  Heikle Aktionen fragen einmal je 24 Stunden erneut nach Passwort und OTP.
+- Sperre nach Fehlversuchen je Absender, wachsend; CSRF-Schutz, Origin-Prüfung, sichere Cookies.
+
+### Trennung der Module
+
+- Jedes Modul läuft als eigener Systembenutzer, mit eigenem Datenordner (0700) und eigener Datenbank.
+- systemd-Härtung je Dienst (`NoNewPrivileges`, `ProtectSystem=strict`, `ReadWritePaths` nur auf den Datenordner,
+  `PrivateTmp`, eingeschränkte Adressfamilien).
+- Ein Modul bekommt nur seine eigenen Geheimnisse. Root-Aktionen (Firewall, Drucker, Updates) laufen nur über
+  geprüfte Anfragedateien an kleine root-Dienste, wie heute bei Firewall und Update.
+
+### Geheimnisse und Daten
+
+- Zugangsdaten verschlüsselt gespeichert, Schlüssel nur für root und den Modul-Benutzer lesbar, nie im Webinterface angezeigt.
+- Optional Festplattenverschlüsselung der VM (Ubuntu 26.04 unterstützt TPM-gestützte Verschlüsselung; in der VM über vTPM).
+- Datensparsamkeit: an externe Dienste nur, was nötig ist (SumUp: Betrag und Referenz, keine Patientendaten).
+  Für Letterxpress und Netzwerkspeicher sind Auftragsverarbeitungsverträge nötig.
+- Löschfristen je Modul einstellbar (Rechnungen: steuerliche Aufbewahrung; Faxe, Aufnahmen, Transkripte: kurz).
+- Protokolle ohne Patientendaten; ein Änderungsprotokoll hält fest, wer wann welche Einstellung geändert hat.
+
+### Updates und Lieferkette
+
+- Updates nur aus dem eigenen Repository, mit Prüfsummen bzw. signierten Releases; Sicherung vor jedem Update,
+  Rücksprung bei Fehler.
+- Automatische Sicherheitsupdates des Systems (unattended-upgrades), mit Warten auf die Paketsperre.
+- Feste Versionen für Python- und PHP-Abhängigkeiten der Module.
+
+### Tests und Screenshots
+
+- Nur erfundene Testdaten. Keine echten Namen, IP-Adressen oder Zugangsdaten in Code, Tests, Screenshots, Videos.
+- Sicherheitstests je Modul (Rechte, CSRF, Pfade, Eingaben) laufen vor jeder Version.
+
+## Backup
+
+**Entscheidung: restic** als Grundlage der Datensicherung für alle Module, Ziel Netzwerkspeicher (NAS).
+
+### Warum restic
+
+- Alle Daten im Repository werden mit AES-256 (CTR) verschlüsselt und mit Poly1305-AES gegen Veränderung
+  gesichert; der Schlüssel wird aus dem Passwort mit scrypt abgeleitet. Verschlüsselt sind auch Datei- und
+  Ordnernamen (wichtig, weil Dateinamen z. B. abgelegter Rechnungen Patientennamen enthalten können). Bei
+  AES-verschlüsselten ZIP-Archiven bleiben die Dateinamen lesbar.
+- Jeder Block ist über seine SHA-256-Prüfsumme adressiert; `restic check` (mit `--read-data-subset` bzw.
+  `--read-data`) erkennt Beschädigung oder Manipulation. Seit 0.16.4 prüft restic Daten zusätzlich vor dem Hochladen.
+- Inkrementell mit Deduplizierung und Kompression: viele Versionen bei wenig Platz.
+- Seit Jahren verbreitet, quelloffen, reproduzierbare Programmdateien, in Ubuntu enthalten, auch für Windows und
+  macOS verfügbar (Notfall-Wiederherstellung ohne die Suite).
+- Es gibt kein formales Sicherheitsaudit; eine Durchsicht der Kryptografie durch Filippo Valsorda (2017) fand
+  das Design gut, mit der Anmerkung, dass die Kombination AES-CTR + Poly1305-AES ungewöhnlich ist.
+
+Von Kienzlezeit (`kienzlezeit-backup-und-restore.sh`) werden übernommen: geprüfte Wiederherstellung,
+zeitgesteuerter Ablauf, SSH/SMB-Anbindung. Die verschlüsselte ZIP-Ausgabe bleibt als **Export** (z. B. Monatsstand
+für Steuerberatung oder Prüfung), nicht als Datensicherung.
+
+### Ablauf
+
+1. **Konsistenter Schnappschuss:** Jedes Modul liefert über seinen `backup.snapshot`-Haken eine stimmige Kopie
+   seiner Daten (SQLite z. B. per `VACUUM INTO`). Gesichert werden Datenordner und Konfiguration, keine Programme.
+2. **Verschlüsselung auf dem Server:** Repository-Passwort wird bei der Einrichtung zufällig erzeugt (mindestens
+   32 Zeichen), liegt nur für root lesbar auf dem Server und auf dem ausgedruckten **Wiederherstellungsblatt**
+   (Praxistresor). Nie auf dem NAS, nie im Webinterface nach der Einrichtung.
+3. **Ziel:** NAS über SFTP oder SMB mit eigenem Benutzer, der nur den Backup-Ordner sieht. Kein Gastzugriff.
+4. **Schutz vor Erpressungstrojanern:** schreibgeschützte Schnappschüsse des Backup-Ordners **auf dem NAS**
+   (z. B. täglich, 30 Tage); wo möglich zusätzlich restic-REST-Server im Nur-Anfügen-Modus. Ein Angreifer auf dem
+   Praxisserver kann dann Sicherungen nicht endgültig löschen.
+5. **Zweite Kopie außer Haus** (3-2-1-Regel), optional: wechselnde USB-Platte oder Speicher mit Löschsperre in der
+   EU. Auch dort nur verschlüsselte Daten.
+6. **Zeitplan:** täglich nachts; Aufbewahrung einstellbar, Vorgabe 7 täglich, 4 wöchentlich, 12 monatlich,
+   3 jährlich; Aufräumen (`forget --prune`) wöchentlich.
+7. **Prüfen:** wöchentlich `restic check`, monatlich zusätzlich Lesetest eines Teils der Daten und eine
+   **automatische Probe-Wiederherstellung** der Datenbanken in einen Testordner mit Unversehrtheitsprüfung.
+   Fehler oder eine zu alte letzte Sicherung meldet die Glocke, optional per E-Mail.
+8. **Wiederherstellung:** einzelne Dateien oder ein Modul im Webinterface; Totalausfall: neue VM, Basis
+   installieren, „Aus Sicherung wiederherstellen“ mit dem Wiederherstellungsblatt. Das Blatt beschreibt auch die
+   Wiederherstellung von Hand mit restic.
+
+**Abwägung:** Das Passwort muss auf dem Server liegen, damit die Sicherung nachts ohne Eingabe läuft. Wer den
+Server übernimmt, kann die Sicherungen lesen, hat die Daten dann aber ohnehin. Deshalb ist Punkt 4 entscheidend:
+Löschen der Sicherung durch einen Angreifer wird durch die NAS-Schnappschüsse aufgefangen.
+
+## Vorgehen
+
+1. Basis aus `hau-si/kienzle-suite-beta` herauslösen: Admin und Benutzer (mit OTP neu), Firewall, Updater,
+   Einrichtungs-Überblick, Netzwerkspeicher aus der Rechnungsablage, Backup neu.
+2. SumUp und Terminzettel als erste Module umstellen (`module.toml`, eigener Benutzer, eigener Datenordner).
+   Übernahme bestehender Installationen per Migration.
+3. Fax, Telefon und Kienzlezeit als Module aufnehmen – nach Abstimmung mit Thomas.
+
+## Hinweise zur Integration von Kienzlezeit
+
+- Kienzlezeit richtet heute Apache mit `mod_php` und einen eigenen HTTPS-VirtualHost auf Port 443 ein. In der Suite
+  gehört Port 443 der Basis; Kienzlezeit läuft dahinter als Modul (eigener Pfad, PHP-FPM, eigener Systembenutzer).
+- Die M5Dial-Terminals brauchen einen festen, erreichbaren Endpunkt (`rfid-scan.php`); der Pfad muss beim Umzug
+  gleich bleiben oder die Firmware-Einstellung angepasst werden.
+- Eigene Admin-Konten, Auditprotokoll und verschlüsselte Terminal-Geheimnisse von Kienzlezeit werden auf die
+  zentrale Benutzerverwaltung abgebildet, ohne das Auditprotokoll zu verlieren.
+
+## Offene Fragen
+
+- Wie Thomas seine Projekte künftig pflegen möchte (in diesem Repository oder eigene Repositories, die als Module eingebunden werden).
+- Lizenz der Module (die SumUp-Suite steht unter MIT).
+- Telefonie: welche Dienste Port-Freigaben ins VPN brauchen und ob Telefonie in derselben VM bleiben soll.
