@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Seite „Sicherung“ (ohne root-Dienst): Anfragen, Anzeige, Wiederherstellungsblatt, Rechte.
+// Seite „Sicherung“ (ohne root-Dienst): Anfragen, Anzeige, Schlüsselblatt, Rechte.
 require __DIR__ . '/lib.php';
 require __DIR__ . '/browser.php';
 
@@ -48,7 +48,7 @@ function test_seite(): void {
     [$b] = admin_browser($env);
     $b->web = fn() => $b->defaultWeb(null, null, null, $bk);
     $p = $b->get('/verwaltung/sicherung');
-    check($p->status === 200 && str_contains($p->body, 'Wiederherstellungsblatt jetzt drucken') && str_contains($p->body, '5 MB geprüft, 1 MB neu'), 'Seite unvollständig');
+    check($p->status === 200 && str_contains($p->body, 'Schlüsselblatt jetzt drucken') && str_contains($p->body, '5 MB geprüft, 1 MB neu'), 'Seite unvollständig');
     check(!str_contains($p->body, '<script>') && !str_contains($p->body, '<b>kaputt') && str_contains($p->body, 'pack &lt;b&gt;kaputt'), 'nicht maskiert');
     check(str_contains($p->body, '<code>abcdef12</code>') && !str_contains($p->body, '&lt;x&gt;'), 'Liste der Sicherungen falsch gefiltert');
     check(!str_contains($p->body, 'abcde-fghij'), 'Passwort auf der Übersichtsseite');
@@ -90,7 +90,7 @@ function test_export(): void {
     check($b->post('/verwaltung/sicherung', ['aktion' => 'export', 'export_passwort' => 'kurz', 'export_wiederholung' => 'kurz'])->status === 422, 'kurzes Passwort angenommen');
     check($b->post('/verwaltung/sicherung', ['aktion' => 'export', 'export_passwort' => 'Ein-langes-Passwort-1', 'export_wiederholung' => 'Ein-langes-Passwort-2'])->status === 422, 'ungleiche Passwörter');
     $r = $b->post('/verwaltung/sicherung', ['aktion' => 'export', 'export_passwort' => 'Ein-langes-Passwort-1', 'export_wiederholung' => 'Ein-langes-Passwort-1', 'mit_sicherungspasswort' => '1']);
-    check($r->status === 303 && req_b($env) === ['action' => 'export', 'passwort' => 'Ein-langes-Passwort-1', 'mit_sicherungspasswort' => true], 'Export-Anfrage');
+    check($r->status === 303 && req_b($env) === ['action' => 'export', 'passwort' => 'Ein-langes-Passwort-1', 'mit_sicherungspasswort' => true, 'mit_benutzern' => false], 'Export-Anfrage');
     check(!str_contains((string)file_get_contents($env->audit->path()), 'Ein-langes-Passwort'), 'Passwort im Protokoll');
     check($b->get('/verwaltung/sicherung/export')->status === 404, 'Download ohne Export');
     mkdir(Backup::$state . '/export');
@@ -102,6 +102,25 @@ function test_export(): void {
     check(str_contains(implode("\n", $env->audit->recent()), 'einstellungen-export-heruntergeladen'), 'Download nicht protokolliert');
     file_put_contents(Backup::$state . '/status.json', json_encode(['export' => ['datei' => '../../etc/passwd']]));
     check($b->get('/verwaltung/sicherung/export')->status === 404, 'Pfad aus dem Status nicht geprüft');
+}
+
+function test_zeitplan_und_mail(): void {
+    [$env, $bk] = bk_env(['eingerichtet' => time(), 'zeitplan' => ['haeufigkeit' => 'woechentlich', 'uhrzeit' => '23:15', 'wochentag' => 2, 'tag' => 1], 'mail_an' => ['it@example.org']]);
+    [$b] = admin_browser($env);
+    $b->web = fn() => $b->defaultWeb(null, null, null, $bk);
+    $p = $b->get('/verwaltung/sicherung')->body;
+    check(str_contains($p, '<option value="woechentlich" selected>') && str_contains($p, 'value="23:15"') && str_contains($p, '<option value="2" selected>Mittwoch'), 'Zeitplan nicht angezeigt');
+    check(str_contains($p, 'value="it@example.org"') && str_contains($p, 'Schlüsselblatt neu erzeugen'), 'Empfänger oder Blatt fehlt');
+    $b->post('/verwaltung/sicherung', ['aktion' => 'zeitplan', 'haeufigkeit' => 'monatlich', 'uhrzeit' => '01:05', 'wochentag' => '6', 'tag' => '15']);
+    check(req_b($env) === ['action' => 'zeitplan', 'zeitplan' => ['haeufigkeit' => 'monatlich', 'uhrzeit' => '01:05', 'wochentag' => 6, 'tag' => 15]], 'Zeitplan-Anfrage');
+    foreach ([['haeufigkeit' => 'stuendlich', 'uhrzeit' => '01:00'], ['haeufigkeit' => 'taeglich', 'uhrzeit' => '25:00'], ['haeufigkeit' => 'monatlich', 'uhrzeit' => '01:00', 'tag' => '31']] as $bad) {
+        check($b->post('/verwaltung/sicherung', ['aktion' => 'zeitplan'] + $bad)->status === 422, 'ungültiger Zeitplan: ' . json_encode($bad));
+    }
+    $b->post('/verwaltung/sicherung', ['aktion' => 'mail-an', 'an' => 'a@example.org; b@example.org']);
+    check(req_b($env) === ['action' => 'mail-an', 'an' => ['a@example.org', 'b@example.org']], 'Empfänger-Anfrage');
+    check($b->post('/verwaltung/sicherung', ['aktion' => 'mail-an', 'an' => 'kein-mail'])->status === 422, 'ungültige Adresse');
+    $b->post('/verwaltung/sicherung', ['aktion' => 'blatt-neu']);
+    check(req_b($env) === ['action' => 'blatt-neu', 'praxis' => 'Praxis Beispiel'], 'Blatt-Anfrage');
 }
 
 run_tests();

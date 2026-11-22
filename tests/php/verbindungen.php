@@ -107,4 +107,15 @@ function test_ablegen(): void {
     try { (new KienzleModul('zeit', ['X' => '1'], $dir, $dir))->ablegen('steuerbuero', 'x', 'a.pdf'); throw new LogicException('ohne Verbindung abgelegt'); } catch (RuntimeException) {}
 }
 
+function test_testnachricht(): void {
+    [$env, $c] = con_env(['mail' => ['host' => 'smtp.example.org', 'port' => 587, 'sicherheit' => 'starttls', 'benutzer' => 'p@example.org', 'absender' => 'p@example.org', 'passwort_gesetzt' => true]]);
+    [$b] = admin_browser($env);
+    $b->web = fn() => $b->defaultWeb(null, null, $c);
+    check(str_contains($b->get('/verwaltung/verbindungen')->body, 'Testnachricht senden'), 'Testnachricht fehlt');
+    $r = $b->post('/verwaltung/verbindungen', ['aktion' => 'testmail', 'an' => 'it@example.org']);
+    check($r->status === 303 && req_v($env) === ['action' => 'pruefen', 'art' => 'testmail', 'an' => 'it@example.org'], 'Testnachricht-Anfrage');
+    $page = $b->post('/verwaltung/verbindungen', ['aktion' => 'testmail', 'an' => 'kein-mail']);
+    check(str_contains($page->body, 'gültige Empfängeradresse'), 'ungültiger Empfänger');
+}
+
 run_tests();

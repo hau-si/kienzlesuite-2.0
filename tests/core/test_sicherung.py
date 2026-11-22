@@ -42,6 +42,8 @@ class Umgebung(unittest.TestCase):
                'KIENZLE_SICHERUNG_STATE': self.t / 'data/sicherung', 'KIENZLE_SICHERUNG_CACHE': self.t / 'cache', 'KIENZLE_SICHERUNG_REQUEST': self.t / 'anfragen/sicherung.json',
                'KIENZLE_SICHERUNG_KIENZLE_ETC': self.t / 'etc/kienzle', 'KIENZLE_SICHERUNG_DATA': self.t / 'data', 'KIENZLE_SICHERUNG_MODULES': self.t / 'data/core/modules.json',
                'KIENZLE_SICHERUNG_ZIELE': self.t / 'etc/kienzle/verbindungen/konfiguration.json', 'KIENZLE_SICHERUNG_MNT': self.t / 'mnt',
+               'KIENZLE_SICHERUNG_TIMER': self.t / 'timer.d/zeitplan.conf', 'KIENZLE_SYSTEMCTL': self.t / 'fehlt', 'KIENZLE_SICHERUNG_CA': self.t / 'etc/kienzle/ca/ca.crt',
+               'KIENZLE_ABLAGE_SCHLUESSEL': self.t / 'data/ablage/.ssh/id_ed25519',
                'KIENZLE_SICHERUNG_UID': os.getuid(), 'KIENZLE_SICHERUNG_CHOWN': '0', 'FAKE_MOUNT_LOG': self.t / 'mount.log'}
         patcher = mock.patch.dict(os.environ, {k: str(v) for k, v in env.items()})
         patcher.start()
@@ -182,13 +184,83 @@ class Sichern(Umgebung):
             self.s.probe()
         self.assertFalse(self.status()['letzte_probe']['ok'])
 
-    def test_taeglicher_ablauf(self):
+    def test_ablauf_nach_alter(self):
         self.ready()
-        monday = time.struct_time((2026, 11, 23, 2, 30, 0, 0, 327, 0))
-        first_sunday = time.struct_time((2026, 11, 1, 2, 30, 0, 6, 305, 0))
-        self.assertEqual(self.s.daily(monday), ['gesichert'])
-        self.assertEqual(self.s.daily(first_sunday), ['gesichert', 'aufgeräumt', 'geprüft', 'Probe'])
+        now = time.time()
+        self.assertEqual(self.s.daily(now), ['gesichert', 'aufgeräumt', 'geprüft', 'Probe'])     # erster Lauf: alles
         self.assertEqual(self.status()['letzte_pruefung']['umfang'], '5%')
+        self.assertEqual(self.s.daily(now + 86400), ['gesichert'])
+        self.assertEqual(self.s.daily(now + 7 * 86400), ['gesichert', 'aufgeräumt', 'geprüft'])
+        self.assertEqual(self.status()['letzte_pruefung']['umfang'], 'Struktur')
+        self.assertEqual(self.s.daily(now + 28 * 86400), ['gesichert', 'aufgeräumt', 'geprüft', 'Probe'])
+
+    def test_zeitplan(self):
+        self.ready()
+        self.assertIn('wöchentlich (Mi) um 23:15', self.s.set_schedule({'haeufigkeit': 'woechentlich', 'uhrzeit': '23:15', 'wochentag': 2}))
+        self.assertIn('OnCalendar=\nOnCalendar=Wed *-*-* 23:15:00\n', (self.t / 'timer.d/zeitplan.conf').read_text())
+        self.s.set_schedule({'haeufigkeit': 'monatlich', 'uhrzeit': '01:05', 'tag': 3})
+        self.assertIn('OnCalendar=*-*-03 01:05:00', (self.t / 'timer.d/zeitplan.conf').read_text())
+        st = self.s.set_status()
+        self.assertEqual(st['zeitplan']['haeufigkeit'], 'monatlich')
+        # Warnung „zu alt“ richtet sich nach dem Zeitplan.
+        self.s.set_status(letzte_sicherung={'ok': True, 'zeit': int(time.time()) - 5 * 86400})
+        self.assertFalse(any('älter' in w for w in self.status()['warnungen']))
+        self.s.set_schedule({'haeufigkeit': 'taeglich', 'uhrzeit': '02:30'})
+        self.assertTrue(any('älter als 36 Stunden' in w for w in self.s.set_status()['warnungen']))
+        for bad in ({'haeufigkeit': 'stuendlich', 'uhrzeit': '01:00'}, {'haeufigkeit': 'taeglich', 'uhrzeit': '24:00'}, {'haeufigkeit': 'monatlich', 'uhrzeit': '01:00', 'tag': 29},
+                    {'haeufigkeit': 'woechentlich', 'uhrzeit': '01:00', 'wochentag': 7}, {'haeufigkeit': 'taeglich', 'uhrzeit': '1:00\nOnCalendar=x'}):
+            with self.subTest(bad), self.assertRaises(self.s.Fehler):
+                self.s.set_schedule(bad)
+
+    def test_benachrichtigung(self):
+        (self.t / 'etc/kienzle/verbindungen').mkdir(parents=True, exist_ok=True)
+        (self.t / 'etc/kienzle/verbindungen/konfiguration.json').write_text(json.dumps({'mail': {
+            'host': 'smtp.example.org', 'port': 587, 'sicherheit': 'starttls', 'benutzer': 'p@example.org', 'passwort': 'x', 'absender': 'p@example.org'}, 'ablage': []}))
+        self.ready()
+        self.assertIn('Empfänger gespeichert', self.s.set_recipients(['it@example.org']))
+        with self.assertRaises(self.s.Fehler):
+            self.s.set_recipients(['kein-mail'])
+        sent = []
+        from kienzle import verbindungen
+        with mock.patch.object(verbindungen, '_smtp', lambda c, action: sent.append(c['host'])), \
+                mock.patch.object(verbindungen, 'ETC', self.t / 'etc/kienzle/verbindungen'):
+            self.s.daily()
+            self.assertEqual(sent, [], 'Mail ohne Fehler')
+            (self.t / 'etc/kienzle/sicherung/passwort').write_text('falsch\n')
+            with self.assertRaises(self.s.Fehler):
+                self.s.daily()
+        self.assertEqual(sent, ['smtp.example.org'])
+        self.assertTrue(self.status()['letzte_mail']['ok'])
+
+
+class Schluesselblatt(Umgebung):
+    KEY = '-----BEGIN OPENSSH PRIVATE KEY-----\n' + ('QUJD' * 40 + '\n') * 3 + '-----END OPENSSH PRIVATE KEY-----'
+
+    def test_blatt_mit_ssh_schluessel(self):
+        (self.t / 'data/ablage/.ssh').mkdir(parents=True)
+        (self.t / 'data/ablage/.ssh/id_ed25519').write_text(self.KEY + '\n')
+        (self.t / 'data/ablage/.ssh/id_ed25519.pub').write_text('ssh-ed25519 AAAAerfunden ks-ablage\n')
+        (self.t / 'etc/kienzle/verbindungen').mkdir(parents=True)
+        hostkey = 'nas.example.org ssh-ed25519 ' + 'A' * 68
+        (self.t / 'etc/kienzle/verbindungen/konfiguration.json').write_text(json.dumps({'ablage': [
+            {'id': 'nas', 'name': 'NAS', 'art': 'sftp', 'host': 'nas.example.org', 'port': 22, 'ordner': 'k', 'benutzer': 'kienzle', 'hostkey': hostkey}]}))
+        self.s.check_target = lambda z: z                      # Ziel ohne echten SFTP-Server
+        self.s.settings = lambda: {'ziel': {'art': 'ziel', 'id': 'nas', 'ordner': 'restic'}, 'repository_id': 'abc123'}
+        (self.t / 'etc/kienzle/sicherung').mkdir(parents=True)
+        (self.t / 'etc/kienzle/sicherung/passwort').write_text('aaaaa-bbbbb\n')
+        self.assertIn('Schlüsselblatt erzeugt', self.s.new_sheet('Praxis Beispiel'))
+        html = (self.t / 'data/sicherung/blatt.html').read_text()
+        for part in ('aaaaa-bbbbb', 'BEGIN OPENSSH PRIVATE KEY', 'ssh-ed25519 AAAAerfunden', 'abc123', 'Fingerabdruck des NAS', 'Schlüsselblatt für den Admin'):
+            self.assertIn(part, html)
+
+    def test_schluessel_vom_blatt_einsetzen(self):
+        with self.assertRaises(self.s.Fehler):
+            self.s.install_ssh_key('kein Schlüssel')
+        with mock.patch.object(self.s.shutil, 'which', lambda n: None):
+            self.s.install_ssh_key('  ' + self.KEY.replace('\n', '\r\n') + '\n')
+        key = self.t / 'data/ablage/.ssh/id_ed25519'
+        self.assertEqual(key.read_text(), self.KEY + '\n')
+        self.assertEqual(stat.S_IMODE(key.stat().st_mode), 0o600)
 
     def test_modul_mit_sicherung(self):
         (self.t / 'data/beispiel').mkdir()
@@ -277,6 +349,8 @@ class Einstellungen(Umgebung):
         self.assertFalse((out / str(self.t / 'etc/kienzle/sicherung/passwort').lstrip('/')).exists(), 'Sicherungspasswort ohne Auswahl exportiert')
         info = json.loads((out / 'kienzle-einstellungen.json').read_text())
         self.assertEqual(len(info['dateien']), len(files) - 1)
+        users = out / 'benutzer/core.sqlite'
+        self.assertEqual(sqlite3.connect(users).execute('SELECT v FROM t').fetchone()[0], 'erste Fassung')
         # Mit Sicherungspasswort; der vorige Export wird ersetzt.
         self.s.export_settings('Ein-sehr-langes-Export-Passwort', True)
         self.assertEqual(len(list((self.t / 'data/sicherung/export').glob('*.kse'))), 1)

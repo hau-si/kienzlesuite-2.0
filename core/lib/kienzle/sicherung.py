@@ -1,7 +1,7 @@
 """Datensicherung mit restic (root-Dienst, Aufruf über core/bin/kienzle-sicherung). Konzept: docs/ARCHITEKTUR.md, „Backup“.
 
 - Verschlüsselt auf dem Server (AES-256, Schlüssel aus einem zufälligen Passwort, nur root lesbar). Das Passwort steht
-  außerdem auf dem Wiederherstellungsblatt; nie auf dem NAS, nach der Einrichtung nie mehr im Webinterface.
+  außerdem auf dem Schlüsselblatt; nie auf dem NAS, nach der Einrichtung nie mehr im Webinterface.
 - Ziele: SFTP (empfohlen, eigener SSH-Schlüssel, fester Serverschlüssel), restic-REST-Server (Nur-Anfügen möglich),
   SMB nur über ein Kernel-Mount für die Dauer der Sicherung (SMB 3.1.1, verschlüsselt), lokaler Ordner (z. B. USB-Platte).
 - Gesichert werden ein stimmiger Stand der Datenbanken (SQLite per „VACUUM INTO“, Module über backup.snapshot), die
@@ -39,6 +39,12 @@ DATA = Path(E('KIENZLE_SICHERUNG_DATA', '/var/lib/kienzle'))
 MODULES = Path(E('KIENZLE_SICHERUNG_MODULES', '/var/lib/kienzle/core/modules.json'))
 TARGETS = Path(E('KIENZLE_SICHERUNG_ZIELE', '/etc/kienzle/verbindungen/konfiguration.json'))
 MNT = Path(E('KIENZLE_SICHERUNG_MNT', '/run/kienzle/sicherung'))
+TIMER_DROPIN = Path(E('KIENZLE_SICHERUNG_TIMER', '/etc/systemd/system/kienzle-sicherung.timer.d/zeitplan.conf'))
+SYSTEMCTL = E('KIENZLE_SYSTEMCTL', '/usr/bin/systemctl')
+CA_CERT = Path(E('KIENZLE_SICHERUNG_CA', '/etc/kienzle/ca/ca.crt'))
+QRENCODE = E('KIENZLE_QRENCODE', '/usr/bin/qrencode')
+FREQ = {'taeglich': 36, 'woechentlich': 8 * 24 + 12, 'monatlich': 32 * 24}      # Stunden bis zur Warnung „zu alt“
+DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 TRESOR = E('KIENZLE_TRESOR', str(Path(__file__).resolve().parents[2] / 'bin' / 'kienzle-tresor'))
 EXPORT_HOURS = 24
 IDENTITY = Path(E('KIENZLE_ABLAGE_SCHLUESSEL', '/var/lib/kienzle/ablage/.ssh/id_ed25519'))
@@ -91,6 +97,7 @@ def set_status(**changes) -> dict:
     s.update(changes)
     s['zeit'] = int(time.time())
     s['warnungen'] = warnings(s)
+    s['zeitplan'], s['mail_an'] = schedule(), settings().get('mail_an') or []   # für die Anzeige (Einstellungen sind nur root lesbar)
     _write(STATE / 'status.json', s, 0o644)
     return s
 
@@ -100,15 +107,16 @@ def warnings(s: dict) -> list[str]:
     if not settings().get('ziel'):
         return ['Die Datensicherung ist noch nicht eingerichtet.']
     last = s.get('letzte_sicherung') or {}
-    if not last.get('ok') or last.get('zeit', 0) < time.time() - STALE_HOURS * 3600:
-        out.append('Die letzte erfolgreiche Sicherung ist älter als 36 Stunden.' if last.get('ok') else 'Die letzte Sicherung ist fehlgeschlagen oder fehlt.')
+    hours = FREQ[schedule()['haeufigkeit']]
+    if not last.get('ok') or last.get('zeit', 0) < time.time() - hours * 3600:
+        out.append(f'Die letzte erfolgreiche Sicherung ist älter als {hours} Stunden.' if last.get('ok') else 'Die letzte Sicherung ist fehlgeschlagen oder fehlt.')
     for key, label in (('letzte_pruefung', 'Prüfung'), ('letzte_probe', 'Probe-Wiederherstellung')):
         if s.get(key) and not s[key].get('ok'):
             out.append(f'Die letzte {label} der Sicherung ist fehlgeschlagen.')
     if not settings().get('nas_schnappschuesse'):
         out.append('Schreibgeschützte Schnappschüsse am NAS sind nicht als eingerichtet bestätigt (Schutz vor Erpressungstrojanern).')
     if (STATE / 'blatt.html').exists():
-        out.append('Das Wiederherstellungsblatt wurde noch nicht als gedruckt bestätigt.')
+        out.append('Das Schlüsselblatt wurde noch nicht als gedruckt bestätigt.')
     return out
 
 
@@ -227,17 +235,63 @@ def new_password() -> str:
     return '-'.join(raw[i:i + 5] for i in range(0, 40, 5))
 
 
+def _fingerprint_cert(path: Path) -> str:
+    import hashlib
+    import ssl
+    try:
+        der = ssl.PEM_cert_to_DER_cert(path.read_text(encoding='ascii'))
+    except (OSError, ValueError):
+        return ''
+    d = hashlib.sha256(der).hexdigest().upper()
+    return ':'.join(d[i:i + 2] for i in range(0, len(d), 2))
+
+
+def _qr(text: str) -> str:
+    if not Path(QRENCODE).is_file():
+        return ''
+    r = subprocess.run([QRENCODE, '-t', 'SVG', '-l', 'M', '-m', '1', '-o', '-', text], capture_output=True, text=True, timeout=10)
+    return r.stdout if r.returncode == 0 and r.stdout.lstrip().startswith('<?xml') else ''
+
+
+def key_section(ziel: dict) -> str:
+    """Abschnitt „Schlüssel“ des Blatts: SSH-Schlüssel für das NAS (mit QR-Code), Fingerabdrücke von NAS und Zertifizierungsstelle."""
+    from html import escape as h
+    out = ''
+    target = None
+    if ziel.get('art') == 'ziel':
+        try:
+            target = _ablage_target(ziel.get('id', ''), ziel.get('direkt'))
+        except (Fehler, ablage.Fehler):
+            target = None
+    if target and target['art'] == 'sftp' and IDENTITY.is_file():
+        private = IDENTITY.read_text(encoding='ascii').strip()
+        pub = Path(str(IDENTITY) + '.pub').read_text(encoding='ascii').strip() if Path(str(IDENTITY) + '.pub').is_file() else ''
+        out += ('<h2>SSH-Schlüssel für den Netzwerkspeicher</h2><p>Privater Schlüssel des Servers (für die Wiederherstellung auf einer neuen VM: '
+                '<code>sudo bash installer/install.sh --wiederherstellen</code> fragt danach). Der QR-Code enthält denselben Text.</p>'
+                f'<pre style="font-size:9pt;white-space:pre-wrap;word-break:break-all">{h(private)}</pre>{_qr(private)}'
+                + (f'<p>Öffentlicher Teil (steht am NAS beim Benutzer): <code style="font-size:9pt;word-break:break-all">{h(pub)}</code></p>' if pub else ''))
+        if target.get('hostkey'):
+            out += f'<p>Fingerabdruck des NAS ({h(target["host"])}): <code>{h(ablage.fingerprint(target["hostkey"]))}</code></p>'
+    fp = _fingerprint_cert(CA_CERT)
+    if fp:
+        out += f'<h2>Zertifizierungsstelle der Suite</h2><p>Fingerabdruck (SHA-256): <code style="font-size:10pt;word-break:break-all">{fp}</code></p>'
+    return out
+
+
 def sheet(password: str, ziel: dict, repo_id: str, practice: str) -> str:
-    """Wiederherstellungsblatt (HTML zum Drucken). Enthält das Passwort; wird nach der Bestätigung gelöscht."""
+    """Schlüsselblatt für den Admin (HTML zum Drucken): Passwort der Sicherung, Ablage, SSH-Schlüssel, Fingerabdrücke.
+    Wird nach der Bestätigung „gedruckt“ vom Server gelöscht."""
     from html import escape as h
     where = {'ziel': f'Netzwerkspeicher „{ziel.get("id")}“, Ordner {ziel.get("ordner")}', 'rest': f'REST-Server {ziel.get("url")}',
              'lokal': f'Ordner {ziel.get("pfad")}'}[ziel['art']]
-    return ('<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Wiederherstellungsblatt</title>'
+    return ('<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Schlüsselblatt</title>'
             '<style>body{font:12pt/1.5 sans-serif;max-width:42rem;margin:2rem auto}code{font-size:14pt}td{padding:.3rem .6rem;vertical-align:top}</style></head><body>'
-            f'<h1>Wiederherstellungsblatt – Kienzle-Suite</h1><p>{h(practice)} · erstellt {time.strftime("%d.%m.%Y %H:%M")}</p>'
-            '<p><strong>Im Praxistresor aufbewahren.</strong> Ohne dieses Passwort lässt sich die Sicherung nicht lesen – auch nicht vom Hersteller.</p>'
+            f'<h1>Schlüsselblatt für den Admin – Kienzle-Suite</h1><p>{h(practice)} · erstellt {time.strftime("%d.%m.%Y %H:%M")}</p>'
+            '<p><strong>Im Praxistresor aufbewahren.</strong> Ohne dieses Passwort lässt sich die Sicherung nicht lesen – auch nicht vom Hersteller. '
+            'Wer dieses Blatt hat, kann die Sicherung lesen.</p>'
             f'<table><tr><td>Passwort</td><td><code>{h(password)}</code></td></tr><tr><td>Ablage</td><td>{h(where)}</td></tr>'
             f'<tr><td>Repository-ID</td><td><code>{h(repo_id)}</code></td></tr><tr><td>Programm</td><td>restic (https://restic.net)</td></tr></table>'
+            + key_section(ziel) +
             '<h2>Nach einem Totalausfall</h2><ol><li>Neue VM mit Ubuntu Server 26.04 anlegen, Kienzle-Suite herunterladen.</li>'
             '<li><code>sudo bash installer/install.sh --wiederherstellen</code> und die Angaben von diesem Blatt eingeben.</li></ol>'
             '<h2>Von Hand (ohne Suite)</h2><p>Auf einem Rechner mit restic: <code>restic -r &lt;Ablage&gt; snapshots</code>, Passwort von oben eingeben, '
@@ -261,7 +315,73 @@ def setup(ziel: dict, practice: str) -> str:
     _write(ETC / 'einstellungen.json', {**current, 'ziel': z, 'aufbewahren': current.get('aufbewahren', KEEP_DEFAULT), 'repository_id': cfg.get('id', '')}, 0o600)
     _write(STATE / 'blatt.html', sheet(password, z, cfg.get('id', ''), practice), 0o640, 'ks-core')
     set_status(eingerichtet=int(time.time()))
-    return 'Sicherung eingerichtet. Bitte jetzt das Wiederherstellungsblatt drucken.'
+    return 'Sicherung eingerichtet. Bitte jetzt das Schlüsselblatt drucken.'
+
+
+def new_sheet(practice: str) -> str:
+    """Schlüsselblatt erneut erzeugen (z. B. nach neuem SSH-Schlüssel oder für eine zweite Ausfertigung)."""
+    s = settings()
+    if not s.get('ziel') or not (ETC / 'passwort').is_file():
+        raise Fehler('Die Sicherung ist noch nicht eingerichtet.')
+    password = (ETC / 'passwort').read_text(encoding='utf-8').strip()
+    _write(STATE / 'blatt.html', sheet(password, s['ziel'], s.get('repository_id', ''), practice), 0o640, 'ks-core')
+    return 'Schlüsselblatt erzeugt. Bitte drucken und danach als gedruckt bestätigen.'
+
+
+# ---- Zeitplan und Benachrichtigung -------------------------------------------------------------------------------
+def schedule() -> dict:
+    z = settings().get('zeitplan') or {}
+    return {'haeufigkeit': z.get('haeufigkeit') if z.get('haeufigkeit') in FREQ else 'taeglich', 'uhrzeit': z.get('uhrzeit', '02:30'),
+            'wochentag': z.get('wochentag', 6), 'tag': z.get('tag', 1)}
+
+
+def calendar(z: dict) -> str:
+    """systemd-OnCalendar für den Zeitplan."""
+    if z['haeufigkeit'] == 'woechentlich':
+        return f'{DAYS[z["wochentag"]]} *-*-* {z["uhrzeit"]}:00'
+    if z['haeufigkeit'] == 'monatlich':
+        return f'*-*-{z["tag"]:02d} {z["uhrzeit"]}:00'
+    return f'*-*-* {z["uhrzeit"]}:00'
+
+
+def set_schedule(z: dict) -> str:
+    if not isinstance(z, dict) or z.get('haeufigkeit') not in FREQ or not re.fullmatch(r'([01]\d|2[0-3]):[0-5]\d', str(z.get('uhrzeit', ''))) \
+            or not isinstance(z.get('wochentag', 6), int) or not 0 <= z.get('wochentag', 6) <= 6 or not isinstance(z.get('tag', 1), int) or not 1 <= z.get('tag', 1) <= 28:
+        raise Fehler('Zeitplan ungültig (Uhrzeit HH:MM, Wochentag 0–6, Tag 1–28).')
+    clean = {'haeufigkeit': z['haeufigkeit'], 'uhrzeit': z['uhrzeit'], 'wochentag': z.get('wochentag', 6), 'tag': z.get('tag', 1)}
+    _write(ETC / 'einstellungen.json', {**settings(), 'zeitplan': clean}, 0o600)
+    _write(TIMER_DROPIN, f'# Kienzle-Suite: Zeitplan der Sicherung (Verwaltung → Sicherung)\n[Timer]\nOnCalendar=\nOnCalendar={calendar(clean)}\n', 0o644)
+    if Path(SYSTEMCTL).is_file():
+        subprocess.run([SYSTEMCTL, 'daemon-reload'], capture_output=True, timeout=60)
+        subprocess.run([SYSTEMCTL, 'restart', 'kienzle-sicherung.timer'], capture_output=True, timeout=60)
+    label = {'taeglich': 'täglich', 'woechentlich': 'wöchentlich (' + ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'][clean['wochentag']] + ')',
+             'monatlich': f'monatlich (am {clean["tag"]}.)'}[clean['haeufigkeit']]
+    return f'Zeitplan gespeichert: {label} um {clean["uhrzeit"]} Uhr.'
+
+
+def set_recipients(addrs) -> str:
+    from .verbindungen import EMAIL
+    if not isinstance(addrs, list) or len(addrs) > 5 or not all(isinstance(a, str) and EMAIL.match(a) for a in addrs):
+        raise Fehler('Empfänger: bis zu 5 E-Mail-Adressen.')
+    _write(ETC / 'einstellungen.json', {**settings(), 'mail_an': addrs}, 0o600)
+    return 'Empfänger gespeichert.' if addrs else 'Keine Benachrichtigung per E-Mail.'
+
+
+def notify(problems: list[str]) -> None:
+    """Fehler der Sicherung an die eingetragenen Empfänger melden (zentrale E-Mail-Verbindung). Fehler beim Versand nur im Status."""
+    to = settings().get('mail_an') or []
+    if not problems or not to:
+        return
+    from . import verbindungen
+    conf = KIENZLE_ETC / 'core' / 'core.json'
+    host = (json.loads(conf.read_text(encoding='utf-8')).get('hostnames') or ['?'])[0] if conf.is_file() else '?'
+    body = ('Bei der Datensicherung der Kienzle-Suite ist ein Fehler aufgetreten:\n\n' + '\n'.join('- ' + p for p in problems)
+            + f'\n\nDetails: https://{host}/verwaltung/sicherung\n\nDiese Nachricht wurde automatisch verschickt.\n')
+    try:
+        verbindungen.send_mail(verbindungen.load().get('mail'), to, 'Kienzle-Suite: Fehler bei der Datensicherung', body)
+        set_status(letzte_mail={'ok': True, 'zeit': int(time.time())})
+    except (verbindungen.Fehler, OSError, ValueError) as e:
+        set_status(letzte_mail={'ok': False, 'zeit': int(time.time()), 'meldung': _clean(str(e))})
 
 
 # ---- Sichern -----------------------------------------------------------------------------------------------------
@@ -386,30 +506,41 @@ def snapshots() -> list[dict]:
     return out
 
 
-def daily(now: time.struct_time | None = None) -> list[str]:
-    """Täglicher Lauf (Timer): sichern; sonntags aufräumen und prüfen; am ersten Sonntag im Monat lesen und Probe."""
-    now = now or time.localtime()
+def daily(now: float | None = None) -> list[str]:
+    """Lauf nach Zeitplan (Timer): sichern; höchstens wöchentlich aufräumen und prüfen; höchstens monatlich
+    zusätzlich 5 % der Daten lesen und die Datenbanken probeweise wiederherstellen. Fehler gehen per E-Mail raus."""
+    now = now or time.time()
     clean_exports()
-    done = []
-    backup()
-    done.append('gesichert')
-    if now.tm_wday == 6:
-        for step, fn in (('aufgeräumt', forget), ('geprüft', lambda: check('5%' if now.tm_mday <= 7 else None))):
+    done, problems = [], []
+    try:
+        backup()
+        done.append('gesichert')
+    except Fehler as e:
+        notify([f'Sicherung fehlgeschlagen: {e}'])
+        raise
+    st = read_status()
+    week = (st.get('letztes_aufraeumen') or {}).get('zeit', 0) < now - 6.5 * 86400
+    month = (st.get('letzte_probe') or {}).get('zeit', 0) < now - 27 * 86400
+    if week:
+        for step, fn in (('aufgeräumt', forget), ('geprüft', lambda: check('5%' if month else None))):
             try:
                 fn()
                 done.append(step)
-            except Fehler:
+            except Fehler as e:
                 done.append(step + ' (Fehler)')
-        if now.tm_mday <= 7:
-            try:
-                probe()
-                done.append('Probe')
-            except Fehler:
-                done.append('Probe (Fehler)')
+                problems.append(f'{step.capitalize()}: {e}')
+    if month:
+        try:
+            probe()
+            done.append('Probe')
+        except Fehler as e:
+            done.append('Probe (Fehler)')
+            problems.append(f'Probe-Wiederherstellung: {e}')
     try:
         snapshots()
     except Fehler:
         pass
+    notify(problems)
     return done
 
 
@@ -483,7 +614,24 @@ def _fix_owner(part: str) -> None:
             shutil.chown(p, user, user)
 
 
-def full_restore(ziel: dict, password: str) -> list[str]:
+def install_ssh_key(text: str) -> None:
+    """Privaten SSH-Schlüssel vom Schlüsselblatt als Schlüssel des Netzwerkspeichers (ks-ablage) einsetzen."""
+    text = text.strip().replace('\r', '')
+    if not re.fullmatch(r'-----BEGIN OPENSSH PRIVATE KEY-----\n[A-Za-z0-9+/=\n]{100,5000}\n-----END OPENSSH PRIVATE KEY-----', text):
+        raise Fehler('Das ist kein privater SSH-Schlüssel im OpenSSH-Format.')
+    IDENTITY.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    _write(IDENTITY, text + '\n', 0o600)
+    if E('KIENZLE_SICHERUNG_CHOWN', '1') == '1':
+        shutil.chown(IDENTITY, 'ks-ablage', 'ks-ablage')
+    keygen = shutil.which('ssh-keygen')
+    if keygen:
+        r = subprocess.run([keygen, '-y', '-f', str(IDENTITY)], capture_output=True, text=True, timeout=30)
+        if r.returncode != 0:
+            raise Fehler('Der SSH-Schlüssel lässt sich nicht lesen (abgeschrieben? Passwort-geschützt?).')
+        _write(Path(str(IDENTITY) + '.pub'), r.stdout.strip() + ' ks-ablage\n', 0o644)
+
+
+def full_restore(ziel: dict, password: str, ssh_key: str | None = None) -> list[str]:
     """Nach einem Totalausfall (installer/install.sh --wiederherstellen): letzte Sicherung vollständig zurückholen.
 
     ziel: {"art": "lokal", "pfad"} | {"art": "rest", …} | {"art": "ziel", "direkt": <Netzwerkspeicher wie unter Verbindungen>, "ordner"}.
@@ -498,6 +646,8 @@ def full_restore(ziel: dict, password: str) -> list[str]:
     if (DATA / 'core' / 'core.sqlite').exists():
         raise Fehler('Auf diesem Server gibt es schon Daten der Suite. Wiederherstellen nur auf einer frischen Installation.')
     ETC.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if ssh_key:
+        install_ssh_key(ssh_key)
     _write(ETC / 'passwort', password.strip() + '\n', 0o600)
     tmp = Path(tempfile.mkdtemp(prefix='kienzle-komplett-'))
     done = []
@@ -550,6 +700,9 @@ def _settings_paths(existing: bool = True) -> list[tuple[Path, str]]:
     return out
 
 
+USERS_ARC = 'benutzer/core.sqlite'
+
+
 def clean_exports(max_age: float = EXPORT_HOURS * 3600) -> None:
     d = STATE / 'export'
     for f in d.glob('*.kse') if d.is_dir() else []:
@@ -560,7 +713,7 @@ def clean_exports(max_age: float = EXPORT_HOURS * 3600) -> None:
         set_status(export=None)
 
 
-def export_settings(password: str, with_backup_password: bool = False) -> str:
+def export_settings(password: str, with_backup_password: bool = False, with_users: bool = True) -> str:
     """Alle Einstellungen (Basis und Module) als eine mit dem Passwort verschlüsselte Datei (Argon2id + XChaCha20-Poly1305)."""
     import io
     import tarfile
@@ -577,7 +730,22 @@ def export_settings(password: str, with_backup_password: bool = False) -> str:
                     continue
                 tar.add(f, arcname=str(f).lstrip('/'), recursive=False)
                 listing.append({'pfad': str(f), 'teil': part})
-        info = json.dumps({'format': 1, 'zeit': int(time.time()), 'dateien': listing, 'mit_sicherungspasswort': with_backup_password}, ensure_ascii=False).encode()
+        db = DATA / 'core' / 'core.sqlite'
+        if with_users and db.is_file():
+            # Benutzerkonten, Rechte, Passkeys und Einstellungen der Basis: stimmiger Stand der Datenbank.
+            snap = Path(tempfile.mkdtemp(prefix='kienzle-export-')) / 'core.sqlite'
+            try:
+                con = sqlite3.connect(f'file:{db}?mode=ro', uri=True, timeout=30)
+                try:
+                    con.execute('VACUUM INTO ?', (str(snap),))
+                finally:
+                    con.close()
+                tar.add(snap, arcname=USERS_ARC, recursive=False)
+                listing.append({'pfad': str(db), 'teil': 'benutzer'})
+            finally:
+                shutil.rmtree(snap.parent, ignore_errors=True)
+        info = json.dumps({'format': 1, 'zeit': int(time.time()), 'dateien': listing, 'mit_sicherungspasswort': with_backup_password,
+                           'mit_benutzern': with_users}, ensure_ascii=False).encode()
         ti = tarfile.TarInfo('kienzle-einstellungen.json')
         ti.size, ti.mtime = len(info), int(time.time())
         tar.addfile(ti, io.BytesIO(info))
@@ -598,6 +766,31 @@ def export_settings(password: str, with_backup_password: bool = False) -> str:
         shutil.chown(target, 'root', 'ks-core')
     set_status(export={'datei': name, 'zeit': int(time.time()), 'groesse': target.stat().st_size, 'dateien': len(listing), 'mit_sicherungspasswort': with_backup_password})
     return f'Einstellungen exportiert ({len(listing)} Dateien). Die Datei liegt {EXPORT_HOURS} Stunden zum Herunterladen bereit.'
+
+
+def _restore_users(src) -> None:
+    """Datenbank der Basis aus dem Export einsetzen (nach Prüfung). Der Installer startet die Dienste danach neu."""
+    tmp = DATA / 'core' / '.core.sqlite.import'
+    (DATA / 'core').mkdir(parents=True, exist_ok=True)
+    with open(tmp, 'wb') as f:
+        shutil.copyfileobj(src, f)
+    try:
+        con = sqlite3.connect(f'file:{tmp}?mode=ro', uri=True)
+        try:
+            ok = con.execute('PRAGMA integrity_check').fetchone()[0] == 'ok' and con.execute("SELECT count(*) FROM sqlite_master WHERE name='users'").fetchone()[0] == 1
+        finally:
+            con.close()
+    except sqlite3.DatabaseError:
+        ok = False
+    if not ok:
+        tmp.unlink(missing_ok=True)
+        raise Fehler('Die Benutzerdatenbank im Export ist beschädigt.')
+    for side in ('-wal', '-shm'):
+        (DATA / 'core' / ('core.sqlite' + side)).unlink(missing_ok=True)
+    os.chmod(tmp, 0o600)
+    if E('KIENZLE_SICHERUNG_CHOWN', '1') == '1':
+        shutil.chown(tmp, 'ks-core', 'ks-core')
+    os.replace(tmp, DATA / 'core' / 'core.sqlite')
 
 
 def _exists(fn, name: str) -> bool:
@@ -624,7 +817,7 @@ def import_settings(path: Path, password: str, apply: bool, target: Path | None 
             members = tar.getmembers()
             for m in members:
                 n = m.name
-                if n == 'kienzle-einstellungen.json':
+                if n in ('kienzle-einstellungen.json', USERS_ARC) and m.isfile():
                     continue
                 if not m.isfile() or n.startswith('/') or '..' in n.split('/') or not any(n == a or n.startswith(a.rstrip('/') + '/') for a in allowed):
                     raise Fehler(f'Unerwarteter Eintrag in der Datei: {n[:80]}')
@@ -633,6 +826,10 @@ def import_settings(path: Path, password: str, apply: bool, target: Path | None 
                 raise Fehler('Zielordner fehlt.')
             for m in members:
                 if m.name == 'kienzle-einstellungen.json' and apply:
+                    continue
+                if m.name == USERS_ARC and apply:
+                    _restore_users(tar.extractfile(m))
+                    done.append(str(DATA / 'core' / 'core.sqlite'))
                     continue
                 dest = (dest_root / m.name)
                 dest.parent.mkdir(parents=True, exist_ok=True)
@@ -707,9 +904,15 @@ def dispatch(req: dict) -> str:
     if a == 'nas-schnappschuesse':
         _write(ETC / 'einstellungen.json', {**settings(), 'nas_schnappschuesse': req.get('bestaetigt') is True}, 0o600)
         return 'Gespeichert.'
+    if a == 'zeitplan':
+        return set_schedule(req.get('zeitplan'))
+    if a == 'mail-an':
+        return set_recipients(req.get('an'))
+    if a == 'blatt-neu':
+        return new_sheet(str(req.get('praxis', ''))[:80])
     if a == 'blatt-gedruckt':
         (STATE / 'blatt.html').unlink(missing_ok=True)
-        return 'Wiederherstellungsblatt entfernt. Das Passwort steht nur noch auf dem Ausdruck und auf dem Server (nur root).'
+        return 'Schlüsselblatt entfernt. Das Passwort steht nur noch auf dem Ausdruck und auf dem Server (nur root).'
     if a == 'wiederherstellen':
         part = str(req.get('teil', ''))
         if part != 'core' and not re.fullmatch(r'[a-z][a-z0-9-]{1,28}', part):
@@ -718,7 +921,7 @@ def dispatch(req: dict) -> str:
         return restore_part(str(req.get('snapshot', '')), part, STOP.get(part, [f'systemctl stop {units}'] if units else []),
                             START.get(part, [f'systemctl start {units}'] if units else []))
     if a == 'export':
-        return export_settings(str(req.get('passwort', '')), req.get('mit_sicherungspasswort') is True)
+        return export_settings(str(req.get('passwort', '')), req.get('mit_sicherungspasswort') is True, req.get('mit_benutzern', True) is not False)
     if a == 'export-loeschen':
         clean_exports(-1)
         return 'Export-Datei gelöscht.'

@@ -1,5 +1,26 @@
 # Basis – Release-Notizen
 
+## 0.9.0
+
+Umsetzung der Antworten vom 22.11.2026 (`docs/OFFENE-FRAGEN.md`), Teil 1: Sicherung, E-Mail, Export.
+
+- **Testnachricht** (Verwaltung → Verbindungen → E-Mail): echte Nachricht an eine eingegebene Adresse.
+- **E-Mail bei Fehlern der Sicherung:** bis zu 5 Empfänger; verschickt über die zentrale E-Mail-Verbindung, wenn
+  Sicherung, Prüfung oder Probe-Wiederherstellung fehlschlagen. Ergebnis des Versands auf der Seite Sicherung.
+- **Zeitplan der Sicherung wählbar:** täglich, wöchentlich (Wochentag) oder monatlich (Tag 1–28), mit Uhrzeit
+  (systemd-Timer mit Ergänzungsdatei). Aufräumen und Prüfen höchstens wöchentlich, Lesen und Probe-Wiederherstellung
+  höchstens monatlich, jeweils nach Alter statt nach Wochentag. Die Warnung „zu alt“ richtet sich nach dem Zeitplan.
+- **Schlüsselblatt für den Admin** (bisher Wiederherstellungsblatt): zusätzlich der private SSH-Schlüssel für das NAS
+  (Text und QR-Code), dessen öffentlicher Teil, Fingerabdruck des NAS und der Zertifizierungsstelle. Jederzeit neu
+  erzeugbar; nach „gedruckt“ wird es gelöscht. `install.sh --wiederherstellen` fragt nach dem SSH-Schlüssel vom Blatt
+  (Datei), dann muss am NAS nichts geändert werden.
+- **Export der Einstellungen mit Benutzerkonten** (Vorgabe an): stimmiger Stand der Datenbank der Basis (Benutzer, Rechte,
+  Authenticator-Apps, Passkeys); beim Einspielen geprüft (`PRAGMA integrity_check`) und eingesetzt.
+- Google-Sprachausgabe nur für Ansagen festgehalten (`docs/ARCHITEKTUR.md`).
+
+Nicht geprüft: Versand über einen echten SMTP-Server, geänderter Timer unter systemd, QR-Code des SSH-Schlüssels mit einem
+echten Lesegerät, Wiederherstellung mit dem Schlüssel vom Blatt auf einer frischen VM.
+
 ## 0.8.1
 
 - `cupsd.conf`: Die Vorlage aus 0.7.0 beschränkte alle IPP-Abfragen auf @SYSTEM. Damit sahen Module (und Arbeitsplätze)

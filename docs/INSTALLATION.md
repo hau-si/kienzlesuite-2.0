@@ -32,7 +32,7 @@ Prüfliste für die Test-VM: `docs/VM-TEST.md`.
    „Vertrauenswürdige Stammzertifizierungsstellen“). Fingerabdruck vergleichen.
 5. Einrichtungslink öffnen, Passwort setzen, Authenticator-App einrichten, Wiederherstellungscodes ausdrucken.
 6. **Verwaltung → Einrichtung** zeigt, was noch fehlt: zweiter Admin, Firewall, Netzwerkspeicher, Sicherung,
-   Wiederherstellungsblatt, Schnappschüsse am NAS, Probe-Wiederherstellung – und darunter die Punkte der Module.
+   Schlüsselblatt, Schnappschüsse am NAS, Probe-Wiederherstellung – und darunter die Punkte der Module.
 
 ## Unbeaufsichtigt (autoinstall)
 
@@ -63,12 +63,12 @@ Mehrfaches Ausführen ist erlaubt; Schlüssel, Zertifizierungsstelle, Daten und 
 |---|---|
 | `sudo bash installer/install.sh --admin-reset NAME` | Admin-Zugang an der Konsole zurücksetzen (neuer Einrichtungslink) |
 | `sudo bash installer/install.sh --kanal beta` | Update-Kanal festlegen (`stabil` oder `beta`) |
-| `sudo bash installer/install.sh --wiederherstellen` | Neue VM nach Totalausfall: Angaben vom Wiederherstellungsblatt eingeben, alles kommt zurück |
+| `sudo bash installer/install.sh --wiederherstellen` | Neue VM nach Totalausfall: Angaben vom Schlüsselblatt eingeben, alles kommt zurück |
 | `sudo kienzle-sicherung einstellungen-einspielen DATEI` | Export der Einstellungen zurücklegen, danach Installer erneut ausführen |
 
 ## Nach einem Totalausfall
 
 1. Neue VM wie oben, Suite herunterladen.
-2. `sudo bash installer/install.sh --wiederherstellen` und die Angaben vom Wiederherstellungsblatt eingeben
+2. `sudo bash installer/install.sh --wiederherstellen` und die Angaben vom Schlüsselblatt eingeben
    (Ablage, Passwort). Bei SFTP zeigt der Installer den neuen SSH-Schlüssel des Servers; ihn kurz am NAS erlauben.
 3. Servername und Zertifizierungsstelle sind die alten: Die Arbeitsplätze müssen nichts neu einrichten.

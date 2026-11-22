@@ -59,6 +59,12 @@ final class Connections {
         $this->write(['action' => $what, 'loeschen' => true]);
     }
 
+    public function testMail(string $to): void {
+        $to = trim($to);
+        if (!filter_var($to, FILTER_VALIDATE_EMAIL) || strlen($to) > 254) throw new Problem('Bitte eine gültige Empfängeradresse eingeben.', 422);
+        $this->write(['action' => 'pruefen', 'art' => 'testmail', 'an' => $to]);
+    }
+
     public function test(string $art, string $id = ''): void {
         if (!in_array($art, ['t2med', 'mail', 'ziel'], true)) throw new Problem('Unbekannte Prüfung.', 422);
         $this->write(['action' => 'pruefen', 'art' => $art, 'id' => $id]);

@@ -1,5 +1,13 @@
 # Offene Fragen und Entscheidungen zur Durchsicht
 
+**Antworten vom 22.11.2026** (Thomas): 1 ja (M9), 2 Anleitung geschickt, 3 nur Ansagen, 4 Test-VM folgt, 5 ja,
+6 bleibt (siehe unten), 7 ja, 8 ja (Schlüsselblatt), 9 erst einmal nicht, 10 ja, 11 Zeitplan wählbar, 12 ja, 13 nein,
+14 nein, 15 wählbar mit Domäne, 16 öffentlich, 17 ja, 18 umstellen, 19 ja. Umsetzung: Basis 0.9.0 ff. (`docs/RELEASE.md`).
+
+Zu 6 (SFTP mit Passwort): Die sichere und übliche Lösung ist der Schlüssel, wie eingebaut. SFTP mit Passwort braucht ein
+Passwort im Prozess bzw. ein Hilfsprogramm und hat keinen Vorteil. Kann ein NAS kein SFTP mit Schlüssel, ist SMB 3 mit
+Verschlüsselung (schon eingebaut) die übliche sichere Alternative. Deshalb nichts Weiteres eingebaut.
+
 Gesammelt während M5–M8 (Auftrag vom 22.11.2026: „bis M8 ohne Rückfragen, Fragen für später aufheben“).
 Wo eine Entscheidung nötig war, steht dabei, was umgesetzt wurde; das lässt sich ändern.
 

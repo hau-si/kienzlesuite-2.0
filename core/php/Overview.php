@@ -70,7 +70,7 @@ final class Overview {
             $b = $this->backup->status();
             $last = $b['letzte_sicherung'];
             $out[] = self::item('Datensicherung eingerichtet', $b['eingerichtet'] ? 'done' : 'open', '', '/verwaltung/sicherung');
-            $out[] = self::item('Wiederherstellungsblatt gedruckt', $b['eingerichtet'] && !$b['blatt'] ? 'done' : 'open', '', '/verwaltung/sicherung');
+            $out[] = self::item('Schlüsselblatt gedruckt', $b['eingerichtet'] && !$b['blatt'] ? 'done' : 'open', '', '/verwaltung/sicherung');
             $out[] = self::item('Letzte Sicherung erfolgreich (höchstens 36 Stunden alt)', $last && ($last['ok'] ?? false) && (int)($last['zeit'] ?? 0) > time() - 36 * 3600 ? 'done' : ($last && !($last['ok'] ?? false) ? 'error' : 'open'),
                 $last ? View::date((int)($last['zeit'] ?? 0)) : 'Noch keine', '/verwaltung/sicherung');
             $snap = !in_array('Schreibgeschützte Schnappschüsse am NAS sind nicht als eingerichtet bestätigt (Schutz vor Erpressungstrojanern).', $b['warnungen'], true) && $b['eingerichtet'];

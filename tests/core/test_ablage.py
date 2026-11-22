@@ -372,6 +372,31 @@ class Verbindungen(Umgebung):
             with self.assertRaisesRegex(self.vb.Fehler, 'fehlgeschlagen'):
                 self.vb.test_mail({**self.MAIL, 'passwort': 'falsch'})
 
+    def test_testnachricht(self):
+        sent = []
+
+        class Smtp:
+            def __init__(self, *a, **kw): pass
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def starttls(self, context=None): pass
+            def login(self, u, p): pass
+            def send_message(self, msg): sent.append(msg)
+        self.registry()
+        with mock.patch.object(self.vb.smtplib, 'SMTP', Smtp):
+            self.request({'action': 'mail', 'daten': self.MAIL})
+            s = self.request({'action': 'pruefen', 'art': 'testmail', 'an': 'it@example.org'})
+            self.assertTrue(s['letzte']['ok'], s)
+            self.assertEqual(sent[0]['To'], 'it@example.org')
+            self.assertEqual(sent[0]['From'], self.MAIL['absender'])
+            self.assertIn('Testnachricht', sent[0]['Subject'])
+            for bad in ('kein-mail', 'a@example.org\nBcc: x@example.org', None):
+                with self.subTest(bad):
+                    self.assertFalse(self.request({'action': 'pruefen', 'art': 'testmail', 'an': bad})['letzte']['ok'])
+            self.assertEqual(len(sent), 1)
+            with self.assertRaises(self.vb.Fehler):
+                self.vb.send_mail(None, ['it@example.org'], 'x', 'y')
+
     def test_anfragen_absichern(self):
         self.registry()
         s = self.request({'action': 'loeschen-alles'})

@@ -141,7 +141,7 @@ sicher '{"action":"einrichten","ziel":{"art":"lokal","pfad":"/srv/test-sicherung
 [ "$(stat -c '%a %U' /etc/kienzle/sicherung/passwort)" = '600 root' ] || fail 'Sicherungspasswort falsch geschützt'
 if runuser -u ks-core -- cat /etc/kienzle/sicherung/passwort >/dev/null 2>&1; then fail 'ks-core liest das Sicherungspasswort'; fi
 blatt=$(c -b "$T/dora" "https://$host/verwaltung/sicherung/blatt")
-grep -qF "$(cat /etc/kienzle/sicherung/passwort)" <<< "$blatt" || fail "Wiederherstellungsblatt: $(head -c 300 <<< "$blatt")"
+grep -qF "$(cat /etc/kienzle/sicherung/passwort)" <<< "$blatt" || fail "Schlüsselblatt: $(head -c 300 <<< "$blatt")"
 sicher '{"action":"jetzt"}'
 sicher '{"action":"probe"}'
 sicher '{"action":"pruefen","lesen":true}'

@@ -496,6 +496,11 @@ Danach ist die Basis bereit für das SumUp- und das Terminzettel-Modul (Schritt 
 
 ---
 
+## Vorgaben für Schritt 2 (aus den Antworten vom 22.11.2026)
+
+- SumUp: Der Unterordner der Rechnungsablage (mit `{jahr}`/`{monat}`) wird eine Einstellung des Moduls; der Basisordner gehört zum Ziel.
+- Telefon: Google-Sprachausgabe nur für Ansagen (`docs/ARCHITEKTUR.md`).
+
 ## Zuordnung der übrigen Punkte aus `ARCHITEKTUR.md`
 
 | Punkt | Wo |

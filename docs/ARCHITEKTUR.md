@@ -332,6 +332,6 @@ Aus der Beta übernommener Code behält damit seinen Lizenzhinweis.
 
 - Wie Thomas seine Projekte künftig pflegen möchte (in diesem Repository oder eigene Repositories, die als Module eingebunden werden).
 - Telefonie: welche Dienste Port-Freigaben ins VPN brauchen und ob Telefonie in derselben VM bleiben soll.
-- Google-Sprachausgabe (Telefon): Gehen Patientennamen oder Gesprächsinhalte an Google, sind das Gesundheitsdaten an
-  einen US-Anbieter. Nötig sind ein Auftragsverarbeitungsvertrag und die Prüfung, was genau übertragen wird; mit Thomas
-  bei der Aufnahme des Telefon-Moduls klären.
+- Google-Sprachausgabe (Telefon): **entschieden am 22.11.2026** – nur für die Erzeugung der Ansagen (feste Texte der
+  Praxis, z. B. Öffnungszeiten, Menü). Keine Patientennamen, keine Gesprächsinhalte, keine Rufnummern an Google; die fertigen
+  Ansagen liegen als Dateien im Modul. Das Telefon-Modul prüft das beim Einbau (Schritt 2).

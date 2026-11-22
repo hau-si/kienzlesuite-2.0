@@ -786,6 +786,7 @@ final class Web {
             . V::input('absender', 'Absender', 'email', (string)($mail['absender'] ?? ''), 'placeholder="praxis@example.org"')
             . '<button>Speichern</button></form>'
             . ($mail ? $this->testLine($st['tests'], 'mail') . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'mail']) . '<button>Anmeldung prüfen</button></form> '
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('testmail') . '<input type="email" name="an" placeholder="empfaenger@example.org" required maxlength="254" aria-label="Empfänger der Testnachricht"> <button>Testnachricht senden</button></form> '
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'mail']) . '<button class="danger">Entfernen</button></form>' : '')
             . '</section>';
         // Netzwerkspeicher
@@ -846,6 +847,7 @@ final class Web {
                 case 'ziel-loeschen': $c->removeTarget($f('id', 40)); $what = 'ziel-entfernt ' . $f('id', 40); break;
                 case 'entfernen': $c->remove($f('was', 10)); $what = 'entfernt ' . $f('was', 10); break;
                 case 'pruefen': $c->test($f('art', 10), $f('id', 40)); $what = 'pruefen ' . $f('art', 10) . ' ' . $f('id', 40); break;
+                case 'testmail': $c->testMail($f('an', 300)); $what = 'testmail'; break;
                 case 'hostkey-holen': $c->fetchHostkey($f('id', 40)); $what = 'hostkey-holen ' . $f('id', 40); break;
                 case 'hostkey-uebernehmen': $c->acceptHostkey($f('id', 40), $f('fingerprint', 100)); $what = 'hostkey-uebernommen ' . $f('id', 40); break;
                 default: throw new Problem('Unbekannte Aktion.', 422);
@@ -1008,7 +1010,7 @@ final class Web {
         if (!$st['eingerichtet']) {
             $targets = $this->connections ? $this->connections->status()['ablage'] : [];
             $opts = implode('', array_map(fn($t) => '<option value="' . V::h((string)$t['id']) . '">' . V::h((string)$t['name']) . ' (' . V::h(strtoupper((string)$t['art'])) . ')</option>', $targets));
-            $body .= '<p>Die Sicherung wird auf dem Server verschlüsselt (restic). Das Passwort wird zufällig erzeugt und einmal auf einem Wiederherstellungsblatt '
+            $body .= '<p>Die Sicherung wird auf dem Server verschlüsselt (restic). Das Passwort wird zufällig erzeugt und einmal auf einem Schlüsselblatt '
                 . 'ausgegeben – ohne dieses Blatt lässt sich die Sicherung nach einem Totalausfall nicht lesen.</p>'
                 . '<form method="post" action="/verwaltung/sicherung" class="box wide">' . $this->hidden('einrichten')
                 . '<label class="check"><input type="radio" name="art" value="ziel" checked> Netzwerkspeicher aus „Verbindungen“ (SFTP empfohlen)</label>'
@@ -1025,7 +1027,7 @@ final class Web {
             return $busy ? $response->with('Refresh', '3') : $response;
         }
         if ($st['blatt']) {
-            $body .= '<div class="box wide notice"><p><strong>Wiederherstellungsblatt jetzt drucken</strong> und im Praxistresor aufbewahren. Es enthält das Passwort der Sicherung.</p>'
+            $body .= '<div class="box wide notice"><p><strong>Schlüsselblatt jetzt drucken</strong> und im Praxistresor aufbewahren. Es enthält das Passwort der Sicherung.</p>'
                 . '<p><a class="button" href="/verwaltung/sicherung/blatt" target="_blank" rel="noopener">Blatt anzeigen und drucken</a></p>'
                 . $form('blatt-gedruckt', 'Blatt ist gedruckt – vom Server löschen') . '</div>';
         }
@@ -1039,6 +1041,24 @@ final class Web {
             . '(z. B. täglich, 30 Tage) oder ein REST-Server im Nur-Anfügen-Modus. Das wird am NAS eingerichtet, nicht hier.</p>'
             . V::checkbox('bestaetigt', '1', 'Am NAS sind schreibgeschützte Schnappschüsse eingerichtet', !in_array('Schreibgeschützte Schnappschüsse am NAS sind nicht als eingerichtet bestätigt (Schutz vor Erpressungstrojanern).', $st['warnungen'], true))
             . '<button' . $dis . '>Speichern</button></form>';
+        $z = $st['zeitplan'];
+        $sel = fn(string $v, string $cur) => $v === $cur ? ' selected' : '';
+        $days = '';
+        foreach (['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'] as $i => $d) $days .= '<option value="' . $i . '"' . $sel((string)$i, (string)$z['wochentag']) . '>' . $d . '</option>';
+        $body .= '<h2>Zeitplan</h2><form method="post" action="/verwaltung/sicherung" class="box">' . $this->hidden('zeitplan')
+            . '<label>Häufigkeit<select name="haeufigkeit"><option value="taeglich"' . $sel('taeglich', $z['haeufigkeit']) . '>täglich</option>'
+            . '<option value="woechentlich"' . $sel('woechentlich', $z['haeufigkeit']) . '>wöchentlich</option><option value="monatlich"' . $sel('monatlich', $z['haeufigkeit']) . '>monatlich</option></select></label>'
+            . V::input('uhrzeit', 'Uhrzeit', 'time', $z['uhrzeit'], 'required') . '<label>Wochentag (bei wöchentlich)<select name="wochentag">' . $days . '</select></label>'
+            . V::input('tag', 'Tag im Monat (bei monatlich, 1–28)', 'number', (string)$z['tag'], 'min="1" max="28"')
+            . '<p>Aufräumen und Prüfen laufen höchstens wöchentlich, Lesen und Probe-Wiederherstellung höchstens monatlich – jeweils im Anschluss an eine Sicherung.</p>'
+            . '<button' . $dis . '>Zeitplan speichern</button></form>';
+        $body .= '<h2>Benachrichtigung bei Fehlern</h2><form method="post" action="/verwaltung/sicherung" class="box">' . $this->hidden('mail-an')
+            . V::input('an', 'E-Mail-Empfänger (bis zu 5, durch Komma getrennt; leer = keine)', 'text', implode(', ', $st['mail_an']), 'maxlength="1300"')
+            . '<p>Verschickt über die <a href="/verwaltung/verbindungen">zentrale E-Mail-Verbindung</a>, wenn Sicherung, Prüfung oder Probe fehlschlagen.</p>'
+            . ($st['letzte_mail'] && !($st['letzte_mail']['ok'] ?? false) ? '<p class="error">Letzter Versand fehlgeschlagen: ' . V::h((string)($st['letzte_mail']['meldung'] ?? '')) . '</p>' : '')
+            . '<button' . $dis . '>Speichern</button></form>';
+        $body .= '<h2>Schlüsselblatt</h2><p>Passwort der Sicherung, SSH-Schlüssel für das NAS und Fingerabdrücke zum Ausdrucken für den Tresor.</p>'
+            . $form('blatt-neu', 'Schlüsselblatt neu erzeugen');
         $body .= '<h2>Aufbewahrung</h2><form method="post" action="/verwaltung/sicherung" class="box">' . $this->hidden('aufbewahren')
             . V::input('daily', 'Tägliche', 'number', '7', 'min="0" max="1000"') . V::input('weekly', 'Wöchentliche', 'number', '4', 'min="0" max="1000"')
             . V::input('monthly', 'Monatliche', 'number', '12', 'min="0" max="1000"') . V::input('yearly', 'Jährliche', 'number', '3', 'min="0" max="1000"')
@@ -1062,7 +1082,7 @@ final class Web {
     private function exportSection(array $st, string $dis): string {
         $e = $st['export'];
         $out = '<h2>Einstellungen exportieren</h2><p>Alle Einstellungen der Basis und der Module (Zertifizierungsstelle, Schlüssel, Verbindungen, '
-            . 'Firewall, Einstellungen der Module) in einer Datei, verschlüsselt mit einem Passwort Ihrer Wahl (Argon2id, XChaCha20-Poly1305). '
+            . 'Firewall, Einstellungen der Module, auf Wunsch die Benutzerkonten) in einer Datei, verschlüsselt mit einem Passwort Ihrer Wahl (Argon2id, XChaCha20-Poly1305). '
             . 'Ohne das Passwort ist die Datei wertlos – es wird nirgends gespeichert. Einspielen an der Konsole: '
             . '<code>sudo kienzle-sicherung einstellungen-einspielen DATEI</code>.</p>';
         if ($e) {
@@ -1074,6 +1094,7 @@ final class Web {
         return $out . '<form method="post" action="/verwaltung/sicherung" class="box">' . $this->hidden('export')
             . V::input('export_passwort', 'Passwort (mindestens 12 Zeichen)', 'password', '', 'autocomplete="new-password" minlength="12" required')
             . V::input('export_wiederholung', 'Passwort wiederholen', 'password', '', 'autocomplete="new-password" minlength="12" required')
+            . V::checkbox('mit_benutzern', '1', 'Benutzerkonten mit Rechten, Authenticator-Apps und Passkeys mit exportieren', true)
             . V::checkbox('mit_sicherungspasswort', '1', 'Passwort der Datensicherung mit exportieren', false)
             . '<button' . $dis . '>Exportieren</button></form>';
     }
@@ -1092,8 +1113,14 @@ final class Web {
                     $keep[$k] = (int)$r->field($k, 5);
                 }
                 $b->action('aufbewahren', ['aufbewahren' => $keep]);
+            } elseif ($a === 'zeitplan') {
+                $b->setSchedule($r->field('haeufigkeit', 20), $r->field('uhrzeit', 5), $r->field('wochentag', 2) ?: '6', $r->field('tag', 2) ?: '1');
+            } elseif ($a === 'mail-an') {
+                $b->setRecipients($r->field('an', 1300));
+            } elseif ($a === 'blatt-neu') {
+                $b->action('blatt-neu', ['praxis' => $this->config->practice]);
             } elseif ($a === 'export') {
-                $b->export($r->field('export_passwort', 300), $r->field('export_wiederholung', 300), $r->field('mit_sicherungspasswort') === '1');
+                $b->export($r->field('export_passwort', 300), $r->field('export_wiederholung', 300), $r->field('mit_sicherungspasswort') === '1', $r->field('mit_benutzern') === '1');
             } elseif ($a === 'nas-schnappschuesse') {
                 $b->action($a, ['bestaetigt' => $r->field('bestaetigt') === '1']);
             } elseif ($a === 'pruefen') {

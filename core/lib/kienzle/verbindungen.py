@@ -260,20 +260,53 @@ def test_t2med(c: dict) -> str:
     return 'FHIR-Server antwortet (CapabilityStatement).'
 
 
+def _smtp(c: dict, action) -> None:
+    ctx = ssl.create_default_context()
+    if E('KIENZLE_SMTP_CAFILE'):                       # nur Tests: eigener Test-Server
+        ctx.load_verify_locations(E('KIENZLE_SMTP_CAFILE'))
+    smtp = smtplib.SMTP_SSL(c['host'], c['port'], timeout=15, context=ctx) if c['sicherheit'] == 'smtps' else smtplib.SMTP(c['host'], c['port'], timeout=15)
+    with smtp:
+        if c['sicherheit'] == 'starttls':
+            smtp.starttls(context=ctx)
+        if c.get('benutzer'):
+            smtp.login(c['benutzer'], c.get('passwort', ''))
+        action(smtp)
+
+
 def test_mail(c: dict) -> str:
     if not c:
         raise Fehler('E-Mail ist nicht eingerichtet.')
-    ctx = ssl.create_default_context()
     try:
-        smtp = smtplib.SMTP_SSL(c['host'], c['port'], timeout=15, context=ctx) if c['sicherheit'] == 'smtps' else smtplib.SMTP(c['host'], c['port'], timeout=15)
-        with smtp:
-            if c['sicherheit'] == 'starttls':
-                smtp.starttls(context=ctx)
-            if c.get('benutzer'):
-                smtp.login(c['benutzer'], c.get('passwort', ''))
+        _smtp(c, lambda smtp: None)
     except (OSError, smtplib.SMTPException, ssl.SSLError) as e:
         raise Fehler(f'Anmeldung am SMTP-Server fehlgeschlagen: {str(e)[:120]}') from None
     return 'Anmeldung am SMTP-Server erfolgreich (keine Nachricht gesendet).'
+
+
+def send_mail(c: dict | None, to: list[str], subject: str, body: str) -> None:
+    """Nachricht der Suite über die zentrale E-Mail-Verbindung (nur Text, keine Patientendaten)."""
+    from email.message import EmailMessage
+    if not c:
+        raise Fehler('E-Mail ist nicht eingerichtet.')
+    to = [a for a in to if isinstance(a, str) and EMAIL.match(a)][:10]
+    if not to:
+        raise Fehler('Keine gültige Empfängeradresse.')
+    msg = EmailMessage()
+    msg['From'], msg['To'], msg['Subject'] = c['absender'], ', '.join(to), CONTROL.sub('', subject)[:150]
+    msg['Auto-Submitted'] = 'auto-generated'
+    msg.set_content(body[:20000])
+    try:
+        _smtp(c, lambda smtp: smtp.send_message(msg))
+    except (OSError, smtplib.SMTPException, ssl.SSLError) as e:
+        raise Fehler(f'Versand fehlgeschlagen: {str(e)[:120]}') from None
+
+
+def test_mail_send(c: dict | None, to: str) -> str:
+    if not isinstance(to, str) or not EMAIL.match(to):
+        raise Fehler('Bitte eine gültige Empfängeradresse eingeben.')
+    send_mail(c, [to], 'Kienzle-Suite: Testnachricht', 'Diese Nachricht wurde von der Kienzle-Suite verschickt, um die E-Mail-Verbindung zu prüfen.\n'
+              'Es ist nichts weiter zu tun.\n')
+    return f'Testnachricht an {to} verschickt.'
 
 
 # ---- Status ohne Geheimnisse -------------------------------------------------------------------------------------
@@ -389,6 +422,9 @@ def dispatch(config: dict, req: dict) -> str:
                 msg = test_t2med(config['t2med'])
             elif art == 'mail':
                 msg = test_mail(config['mail'])
+            elif art == 'testmail':
+                key = 'mail'
+                msg = test_mail_send(config['mail'], req.get('an'))
             elif art == 'ziel':
                 target = next((t for t in config['ablage'] if t['id'] == tid), None)
                 if not target:

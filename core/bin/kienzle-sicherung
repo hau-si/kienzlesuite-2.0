@@ -7,7 +7,7 @@
   kienzle-sicherung status      Stand und Warnungen anzeigen
   kienzle-sicherung komplett [--json DATEI]
                                 Nach Totalausfall alles aus der letzten Sicherung holen (ruft der Installer mit
-                                --wiederherstellen auf; fragt Ablage und Passwort vom Wiederherstellungsblatt ab)
+                                --wiederherstellen auf; fragt Ablage und Passwort vom Schlüsselblatt ab)
   kienzle-sicherung einstellungen-pruefen DATEI ORDNER
                                 Export der Einstellungen entschlüsseln und zur Ansicht nach ORDNER auspacken
   kienzle-sicherung einstellungen-einspielen DATEI
@@ -28,8 +28,11 @@ def ask(prompt: str, default: str = '') -> str:
     return value or default
 
 
+key_text: list = [None]
+
+
 def interactive() -> tuple[dict, str]:
-    """Angaben vom Wiederherstellungsblatt abfragen."""
+    """Angaben vom Schlüsselblatt abfragen."""
     from kienzle import ablage
     print('Wo liegt die Sicherung?  1) SFTP  2) SMB-Freigabe  3) restic-REST-Server  4) Ordner auf diesem Server')
     art = ask('Auswahl', '1')
@@ -50,15 +53,21 @@ def interactive() -> tuple[dict, str]:
             if ask('Stimmt er mit dem am NAS angezeigten überein? (ja/nein)', 'nein') != 'ja':
                 raise s.Fehler('Abgebrochen.')
             t['hostkey'] = keys[0]
-            print('Der SSH-Schlüssel dieses Servers muss am NAS erlaubt sein (steht nach der Wiederherstellung wieder unter Verbindungen):')
-            print(Path('/var/lib/kienzle/ablage/.ssh/id_ed25519.pub').read_text().strip() if Path('/var/lib/kienzle/ablage/.ssh/id_ed25519.pub').exists() else '(noch keiner)')
+            path = ask('Datei mit dem privaten SSH-Schlüssel vom Schlüsselblatt (leer = neuen Schlüssel dieses Servers am NAS erlauben)')
+            if path:
+                key_text[0] = Path(path).read_text(encoding='ascii')
+            else:
+                print('Diesen Schlüssel am NAS beim Benutzer erlauben:')
+                pub = Path('/var/lib/kienzle/ablage/.ssh/id_ed25519.pub')
+                print(pub.read_text().strip() if pub.exists() else '(noch keiner)')
+                input('Weiter mit der Eingabetaste … ')
         else:
             t['freigabe'] = ask('Freigabe')
             t['passwort'] = getpass.getpass('Passwort der Freigabe: ')
         ziel = {'art': 'ziel', 'direkt': t, 'ordner': ask('Unterordner der Sicherung', 'kienzle-sicherung')}
     else:
         raise s.Fehler('Unbekannte Auswahl.')
-    return ziel, getpass.getpass('Passwort vom Wiederherstellungsblatt: ').replace(' ', '')
+    return ziel, getpass.getpass('Passwort vom Schlüsselblatt: ').replace(' ', '')
 
 
 if __name__ == '__main__':
@@ -75,9 +84,10 @@ if __name__ == '__main__':
             if len(cmd) == 3:
                 data = json.loads(Path(cmd[2]).read_text(encoding='utf-8'))
                 ziel, password = data['ziel'], data['passwort']
+                key_text[0] = data.get('ssh_schluessel')
             else:
                 ziel, password = interactive()
-            parts = s.full_restore(ziel, password)
+            parts = s.full_restore(ziel, password, key_text[0])
             print(f'Wiederhergestellt: {len(parts)} Teile aus der letzten Sicherung.')
         elif len(cmd) == 3 and cmd[0] == 'einstellungen-pruefen':
             files = s.import_settings(Path(cmd[1]), getpass.getpass('Passwort des Exports: '), False, Path(cmd[2]))
