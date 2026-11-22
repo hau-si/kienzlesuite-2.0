@@ -60,6 +60,7 @@ final class Web {
             case '/anmelden/passkey': return $this->passkeyLogin($r);
             case '/einrichten': return $get ? $this->setupPage($r->get('t', 60)) : $this->setup($r);
             case '/abmelden': if (!$get) return $this->logout($r); break;
+            case '/hilfe/arbeitsplatz': if ($get) return $this->workstationHelp(); break;
             case '/uhrzeit/korrigieren': if (!$get && $this->session) return $this->clockFix($r); break;
             case '/oidc/authorize': if ($get && $this->oidc && $stage !== 'full') return Response::redirect('/anmelden?weiter=/oidc/fortsetzen/' . $this->oidc->park($r->query)); break;
             case '/oidc/abmelden': if ($this->oidc && $stage !== 'full') return Response::redirect($this->oidc->logoutTarget($r->get('client_id', 100) ?: $this->oidc->clientFromIdToken($r->get('id_token_hint', 4000)), $r->get('post_logout_redirect_uri', 300)) ?? '/anmelden'); break;
@@ -97,38 +98,110 @@ final class Web {
     // ---- Servername ---------------------------------------------------------------------------------------------
     private function srv(): Server { return $this->server ?? new Server($this->db, $this->config); }
 
+    public static string $caFile = '/etc/kienzle/ca/ca.crt';
+
+    /** Anleitung für die Arbeitsplätze: Zertifizierungsstelle und Servername. Ohne Anmeldung erreichbar (vorher vertraut der Browser der Suite noch nicht). */
+    private function workstationHelp(): Response {
+        $pem = @file_get_contents(self::$caFile);
+        $fp = '';
+        if (is_string($pem) && preg_match('/-----BEGIN CERTIFICATE-----(.+?)-----END CERTIFICATE-----/s', $pem, $m)) {
+            $der = (string)base64_decode((string)preg_replace('/\s+/', '', $m[1]));
+            $fp = implode(':', str_split(strtoupper(hash('sha256', $der)), 2));
+        }
+        $ips = array_values(array_filter($this->config->hostnames, fn($n) => filter_var($n, FILTER_VALIDATE_IP)));
+        $name = array_values(array_filter($this->config->hostnames, fn($n) => !filter_var($n, FILTER_VALIDATE_IP)))[0] ?? 'kienzle.praxis.internal';
+        $ip = $ips[0] ?? '192.0.2.10';
+        $body = '<p class="lead">Zwei Dinge braucht jeder PC der Praxis einmal: Er muss der Suite vertrauen (Zertifikat) und ihren Namen kennen.</p>'
+            . '<h2 id="zertifikat">1. Der Suite vertrauen (Zertifikat)</h2>'
+            . '<p>Ohne diesen Schritt zeigt der Browser „Nicht sicher“. Die Datei ist kein Programm, sondern der Ausweis der Suite.</p>'
+            . '<p class="row-buttons"><a class="button" href="/ca.crt">Zertifikat herunterladen</a></p>'
+            . ($fp !== '' ? '<p class="muted">Zum Vergleich – so muss der Fingerabdruck (SHA-256) lauten:<br><code>' . V::h($fp) . '</code></p>' : '')
+            . '<details class="how" open><summary>Windows</summary><ol class="steps"><li>Die heruntergeladene Datei <strong>kienzle-suite-ca.crt</strong> doppelklicken.</li>'
+            . '<li>„Zertifikat installieren …“ → <strong>Lokaler Computer</strong> → Weiter (Admin-Bestätigung).</li>'
+            . '<li>„Alle Zertifikate in folgendem Speicher speichern“ → Durchsuchen → <strong>Vertrauenswürdige Stammzertifizierungsstellen</strong> → OK → Weiter → Fertig stellen.</li>'
+            . '<li>Browser ganz schließen und neu öffnen.</li></ol>'
+            . '<p class="muted">Schneller für IT: PowerShell als Administrator: <code>Import-Certificate -FilePath "$HOME\Downloads\kienzle-suite-ca.crt" -CertStoreLocation Cert:\LocalMachine\Root</code></p></details>'
+            . '<details class="how"><summary>Mac</summary><ol class="steps"><li>Datei doppelklicken – die Schlüsselbundverwaltung öffnet sich, Schlüsselbund <strong>System</strong> wählen.</li>'
+            . '<li>Das Zertifikat „Kienzle-Suite …“ doppelklicken → Vertrauen → „Bei Verwendung dieses Zertifikats“: <strong>Immer vertrauen</strong>.</li></ol></details>'
+            . '<details class="how"><summary>iPhone und iPad</summary><ol class="steps"><li>Diese Seite in Safari öffnen und das Zertifikat laden → „Zulassen“.</li>'
+            . '<li>Einstellungen → Profil geladen → Installieren.</li><li>Einstellungen → Allgemein → Info → Zertifikatsvertrauenseinstellungen → „Kienzle-Suite …“ einschalten.</li></ol></details>'
+            . '<details class="how"><summary>Android</summary><ol class="steps"><li>Zertifikat laden.</li><li>Einstellungen → Sicherheit → Weitere Einstellungen → Verschlüsselung und Anmeldedaten → '
+            . 'Zertifikat installieren → <strong>CA-Zertifikat</strong> (Namen der Menüs je nach Hersteller etwas anders).</li></ol></details>'
+            . '<details class="how"><summary>Firefox (eigener Zertifikatsspeicher)</summary><ol class="steps"><li>Einstellungen → Datenschutz &amp; Sicherheit → Zertifikate → Zertifikate anzeigen → '
+            . 'Zertifizierungsstellen → Importieren → „Dieser CA vertrauen, um Websites zu identifizieren“.</li></ol></details>'
+            . '<h2 id="name">2. Den Namen der Suite bekannt machen</h2>'
+            . '<p>Die Suite heißt <strong>' . V::h($name) . '</strong> und hat die Adresse <strong>' . V::h($ip) . '</strong>. Damit der Name funktioniert, gibt es zwei Wege:</p>'
+            . '<details class="how" open><summary>Einmal im Router (empfohlen, gilt für alle PCs)</summary><p>Viele Router kennen Geräte im Netz automatisch unter ihrem Rechnernamen, '
+            . 'eine FRITZ!Box z. B. als <code>rechnername.fritz.box</code>. Dann unter „Server und Name“ genau diesen Namen mit der Endung „.fritz.box“ wählen. '
+            . 'Andere Router oder ein eigener DNS-Server: den Namen <code>' . V::h($name) . '</code> mit der Adresse <code>' . V::h($ip) . '</code> eintragen (meist die IT).</p></details>'
+            . '<details class="how"><summary>Oder auf jedem PC in der Datei hosts</summary><ol class="steps">'
+            . '<li>Windows: Startmenü → „Editor“ mit der rechten Maustaste → <strong>Als Administrator ausführen</strong>.</li>'
+            . '<li>Datei → Öffnen → <code>C:\Windows\System32\drivers\etc\hosts</code> (unten „Alle Dateien“ wählen).</li>'
+            . '<li>Am Ende diese Zeile einfügen und speichern:<br><code>' . V::h($ip . '   ' . $name) . '</code></li>'
+            . '<li>Mac: im Terminal <code>sudo nano /etc/hosts</code>, dieselbe Zeile ergänzen, speichern.</li></ol></details>'
+            . '<p>Danach die Suite unter <a href="https://' . V::h($name) . '/">https://' . V::h($name) . '/</a> öffnen.</p>';
+        return Response::html(V::page('Arbeitsplätze einrichten', $body, $this->nav(), $this->config->practice, 'Einrichten'));
+    }
+
+    /** Endungen für den Servernamen, die die Zertifizierungsstelle erlaubt (verständlich beschriftet). */
+    private const SUFFIXES = ['.praxis.internal' => '.praxis.internal (empfohlen)', '.fritz.box' => '.fritz.box (FRITZ!Box)', '.local' => '.local', '.lan' => '.lan'];
+
     private function serverPage(?string $error = null): Response {
         $st = $this->srv()->status();
-        $here = strtolower((string)preg_replace('/:\d+$/', '', $this->req?->header('host') ?? ''));
+        $ips = array_values(array_filter($st['names'], fn($n) => filter_var($n, FILTER_VALIDATE_IP)));
+        $dns = array_values(array_filter($st['names'], fn($n) => !filter_var($n, FILTER_VALIDATE_IP)));
+        // Erster Name mit bekannter Endung → Feld „Name“ und Auswahl der Endung; alles andere steht unter „Weitere Namen“.
+        [$short, $suffix, $extra] = ['kienzle', '.praxis.internal', []];
+        foreach ($dns as $i => $n) {
+            foreach (self::SUFFIXES as $suf => $_) {
+                if (str_ends_with($n, $suf) && strlen($n) > strlen($suf)) { [$short, $suffix] = [substr($n, 0, -strlen($suf)), $suf]; unset($dns[$i]); break 2; }
+            }
+        }
+        $extra = array_values($dns);
+        if (!$this->srv()->named() && $extra) $short = explode('.', $extra[0])[0];
+        $options = '';
+        foreach (self::SUFFIXES as $suf => $label) $options .= '<option value="' . V::h($suf) . '"' . ($suf === $suffix ? ' selected' : '') . '>' . V::h($label) . '</option>';
+        $address = 'https://' . $short . $suffix . '/';
         $body = V::error($error) . ($st['last'] ? '<p class="' . (($st['last']['ok'] ?? false) ? 'notice' : 'error') . '">' . V::h((string)($st['last']['meldung'] ?? '')) . '</p>' : '')
             . ($st['pending'] ? '<p class="notice">Wird übernommen …</p>' : '')
-            . (!$this->srv()->named() ? '<p class="error">Noch kein Servername festgelegt. Passkeys funktionieren nur über einen Namen (z. B. kienzle.praxis.internal), '
-                . 'den die Arbeitsplätze über DNS bzw. den Router auflösen.</p>' : '')
-            . '<form method="post" action="/verwaltung/server" class="box wide">' . $this->hidden('speichern')
-            . '<label>Namen und Adressen, unter denen die Arbeitsplätze die Suite erreichen (einer je Zeile; der erste Name ohne IP gilt für Passkeys)'
-            . '<textarea name="namen" rows="4" required>' . V::h(implode("\n", $st['names'])) . '</textarea></label>'
-            . V::input('praxis', 'Praxisname (erscheint auf den Seiten und auf dem Schlüsselblatt)', 'text', $st['practice'], 'maxlength="60"')
-            . '<p>Beim Speichern stellt die Suite das Server-Zertifikat für die neuen Namen aus; die Zertifizierungsstelle bleibt, die Arbeitsplätze '
-            . 'müssen nichts neu einrichten. <strong>Achtung:</strong> Wird der erste Name geändert, gelten bisherige Passkeys nicht mehr '
-            . '(neu anlegen unter „Mein Konto“); Dienste mit Anmeldung über die Suite brauchen dann die neue Anbieter-Adresse.</p>'
-            . ($here !== '' ? '<p>Sie sehen diese Seite gerade unter <code>' . V::h($here) . '</code>. Bleibt diese Adresse nicht in der Liste, '
-                . 'danach die neue Adresse aufrufen.</p>' : '')
-            . '<p>Erlaubt sind Namen in internen Namensräumen (z. B. <code>kienzle.praxis.internal</code>, <code>.local</code>, <code>.lan</code>, '
-            . '<code>.home.arpa</code>, <code>.fritz.box</code>) und private IP-Adressen. Für andere Namen braucht es eine neue Zertifizierungsstelle:</p>'
-            . V::checkbox('neue_ca', '1', 'Falls nötig: neue Zertifizierungsstelle erstellen (alle Arbeitsplätze müssen sie neu einspielen)', false)
-            . '<button' . ($st['pending'] ? ' disabled' : '') . '>Speichern</button></form>';
-        $response = Response::html(V::page('Server', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+            . '<h2>Name der Praxis und des Servers</h2>'
+            . '<form method="post" action="/verwaltung/server">' . $this->hidden('speichern')
+            . V::input('praxis', 'Name der Praxis', 'text', $st['practice'], 'maxlength="60" placeholder="Praxis Dr. Beispiel"')
+            . '<label>Name des Servers<span class="name-row">'
+            . '<input type="text" name="kurzname" value="' . V::h($short) . '" required maxlength="40" pattern="[A-Za-z0-9][A-Za-z0-9-]*" aria-label="Name">'
+            . '<select name="endung" aria-label="Endung">' . $options . '</select></span></label>'
+            . '<p class="muted">Unter diesem Namen öffnen die Arbeitsplätze die Suite, z. B. <strong>' . V::h($address) . '</strong>. '
+            . 'Nur Buchstaben, Ziffern und Bindestrich. Wer nicht sicher ist: „kienzle“ und „.praxis.internal“ lassen.</p>'
+            . ($ips ? '<p class="muted">Zusätzlich bleibt die Suite über ' . V::h(implode(', ', $ips)) . ' erreichbar.</p>' : '')
+            . '<details class="how"><summary>Weitere Namen und Fachleute-Einstellungen</summary>'
+            . '<label>Weitere Namen oder Adressen (einer je Zeile)<textarea name="weitere" rows="3">' . V::h(implode("\n", $extra)) . '</textarea></label>'
+            . '<p class="muted">Erlaubt sind interne Namen (.internal, .local, .lan, .home.arpa, .fritz.box …) und private IP-Adressen. '
+            . 'Für andere Namen braucht es eine neue Zertifizierungsstelle – dann müssen alle Arbeitsplätze sie neu einspielen.</p>'
+            . V::checkbox('neue_ca', '1', 'Falls nötig: neue Zertifizierungsstelle erstellen', false)
+            . V::checkbox('ohne_ip', '1', 'Nicht mehr über die IP-Adresse erreichbar', false) . '</details>'
+            . '<button' . ($st['pending'] ? ' disabled' : '') . '>Speichern</button></form>'
+            . '<h2>Danach</h2><ol class="steps"><li>Den Namen im Router eintragen – oder auf jedem PC in der Datei hosts: '
+            . '<a href="/hilfe/arbeitsplatz#name">Anleitung</a>.</li><li>Die Suite unter <strong>' . V::h($address) . '</strong> öffnen und dort neu anmelden.</li>'
+            . '<li>Falls schon Passkeys eingerichtet sind: unter „Mein Konto“ neu anlegen (sie gelten für den alten Namen).</li></ol>';
+        $response = Response::html(V::page('Server und Name', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
         return $st['pending'] ? $response->with('Refresh', '3') : $response;
     }
 
     private function serverSave(Request $r, string $admin): Response {
+        $short = strtolower(trim($r->field('kurzname', 60)));
+        $suffix = $r->field('endung', 30);
+        $names = '';
         try {
-            $this->srv()->save($r->field('namen', 3000), $r->field('praxis', 200), $r->field('neue_ca') === '1');
+            if (!preg_match('/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/D', $short)) throw new Problem('Name des Servers: nur Buchstaben, Ziffern und Bindestrich, z. B. kienzle.', 422);
+            if (!isset(self::SUFFIXES[$suffix])) throw new Problem('Bitte eine Endung wählen.', 422);
+            $ips = $r->field('ohne_ip') === '1' ? [] : array_filter($this->config->hostnames, fn($n) => filter_var($n, FILTER_VALIDATE_IP));
+            $names = implode("\n", array_merge([$short . $suffix], preg_split('/\R/', trim($r->field('weitere', 3000))) ?: [], $ips));
+            $this->srv()->save($names, $r->field('praxis', 200), $r->field('neue_ca') === '1');
         } catch (Problem $e) {
             if (in_array($e->http, [409, 422, 503], true)) return $this->serverPage($e->getMessage());
             throw $e;
         }
-        $this->audit->write($admin, 'servername', strtolower(implode(' ', array_slice(preg_split('/[\s,;]+/', trim($r->field('namen', 3000))) ?: [], 0, 10))));
+        $this->audit->write($admin, 'servername', strtolower(implode(' ', array_slice(preg_split('/[\s,;]+/', trim($names)) ?: [], 0, 10))));
         return Response::redirect('/verwaltung/server');
     }
 
@@ -1133,33 +1206,42 @@ final class Web {
     }
 
     private function overviewList(array $items): string {
-        $label = ['done' => '✓ erledigt', 'open' => 'offen', 'error' => 'Fehler'];
         $rows = '';
         foreach ($items as $i) {
+            $class = ['done' => 'done', 'open' => 'open', 'error' => 'error', 'info' => 'info'][$i['state']] ?? 'open';
+            $icon = ['done' => '✓', 'error' => '!', 'info' => 'i'][$i['state']] ?? '○';
             $title = $i['link'] !== '' ? '<a href="' . V::h($i['link']) . '">' . V::h($i['title']) . '</a>' : V::h($i['title']);
-            $manual = '';
-            if (!empty($i['manuell'])) {
-                $manual = '<form method="post" action="/verwaltung/einrichtung" class="inline">' . $this->hidden('bestaetigen', ['punkt' => $i['manuell'], 'erledigt' => $i['state'] === 'done' ? '0' : '1'])
-                    . '<button>' . ($i['state'] === 'done' ? 'Zurücknehmen' : 'Erledigt') . '</button></form>';
-            }
-            $rows .= '<tr><td class="' . ($i['state'] === 'done' ? 'ok' : ($i['state'] === 'error' ? 'error' : '')) . '">' . $label[$i['state']] . '</td><td>' . $title
-                . ($i['hint'] !== '' ? '<br><small>' . V::h($i['hint']) . '</small>' : '') . '</td><td>' . $manual . '</td></tr>';
+            $manual = !empty($i['manuell']) ? '<form method="post" action="/verwaltung/einrichtung" class="inline">'
+                . $this->hidden('bestaetigen', ['punkt' => $i['manuell'], 'erledigt' => $i['state'] === 'done' ? '0' : '1'])
+                . '<button class="secondary">' . ($i['state'] === 'done' ? 'Zurücknehmen' : 'Erledigt') . '</button></form>' : '';
+            $rows .= '<li class="' . $class . '"><span class="mark-icon" aria-hidden="true">' . $icon . '</span><span class="text">' . $title
+                . ($i['hint'] !== '' ? '<small>' . V::h($i['hint']) . '</small>' : '') . '</span>' . $manual . '</li>';
         }
-        return '<table>' . $rows . '</table>';
+        return '<ul class="checklist">' . $rows . '</ul>';
     }
 
     private function overviewPage(): Response {
         $o = $this->ov();
         $core = $o->core();
-        $open = count(array_filter($core, fn($i) => $i['state'] !== 'done'));
-        $body = '<p>Was für einen sicheren Betrieb noch fehlt. ' . ($open ? '<strong>' . $open . ' Punkte der Basis offen.</strong>' : 'Die Basis ist vollständig eingerichtet.') . '</p>'
-            . '<h2>Basis</h2>' . $this->overviewList($core);
-        foreach ($o->modules() as $m) {
-            $body .= '<h2>' . V::h($m['name']) . '</h2>' . ($m['fehler'] !== '' ? '<p class="error">Überblick nicht lesbar: ' . V::h($m['fehler']) . '</p>' : '')
-                . ($m['items'] ? $this->overviewList($m['items']) : '') . ($m['zeit'] ? '<p><small>Stand ' . V::date($m['zeit']) . '</small></p>' : '');
+        $modules = $o->modules();
+        $all = array_merge($core, ...array_map(fn($m) => $m['items'], $modules));
+        $done = count(array_filter($all, fn($i) => $i['state'] === 'done'));
+        $pct = $all ? (int)round(100 * $done / count($all)) : 100;
+        $body = '<p class="lead">' . $done . ' von ' . count($all) . ' Schritten erledigt</p>'
+            . '<progress class="progress" value="' . $pct . '" max="100" aria-label="Fortschritt der Einrichtung">' . $pct . ' %</progress>'
+            . '<section class="card"><h2>Basis</h2><p class="muted">Diese Schritte sind nur einmal nötig, geordnet nach dem Ort, an dem sie erledigt werden. '
+            . 'Ein Klick auf einen Punkt öffnet die passende Seite.</p>';
+        foreach (Overview::PLACES as $place => [$label, $hint]) {
+            $items = array_values(array_filter($core, fn($i) => ($i['ort'] ?? 'web') === $place));
+            if ($items) $body .= '<h3 class="check-group">' . V::h($label) . ' <small>· ' . V::h($hint) . '</small></h3>' . $this->overviewList($items);
         }
-        $body .= '<form method="post" action="/verwaltung/einrichtung">' . $this->hidden('neu') . '<button>Module neu prüfen</button></form>';
-        return Response::html(V::page('Einrichtung', $body, $this->nav(), $this->config->practice));
+        $body .= '</section>';
+        foreach ($modules as $m) {
+            $body .= '<section class="card"><h2>' . V::h($m['name']) . '</h2>' . ($m['fehler'] !== '' ? '<p class="error">Überblick nicht lesbar: ' . V::h($m['fehler']) . '</p>' : '')
+                . ($m['items'] ? $this->overviewList($m['items']) : '') . ($m['zeit'] ? '<p class="muted">Stand ' . V::date($m['zeit']) . '</p>' : '') . '</section>';
+        }
+        if ($modules) $body .= '<form method="post" action="/verwaltung/einrichtung">' . $this->hidden('neu') . '<button class="secondary">Module neu prüfen</button></form>';
+        return Response::html(V::page('Überblick', $body, $this->nav(), $this->config->practice));
     }
 
     private function overviewAction(Request $r, string $admin): Response {
@@ -1330,11 +1412,20 @@ final class Web {
     }
 
     // ---- Hilfen -------------------------------------------------------------------------------------------------
+    private function openSteps(): int {
+        try {
+            return count(array_filter($this->ov()->core(), fn($i) => in_array($i['state'], ['open', 'error'], true)));
+        } catch (\Throwable) {
+            return 0;
+        }
+    }
+
     private function nav(): ?array {
         if (($this->session['stage'] ?? '') !== 'full') return null;
         $admin = (int)$this->session['user_admin'] === 1;
         return ['login' => $this->session['login'], 'admin' => $admin, 'csrf' => $this->session['csrf'],
-            'updates' => $admin && $this->updates ? $this->updates->count() : 0, 'sicherung' => $admin && $this->backup ? $this->backup->count() : 0];
+            'updates' => $admin && $this->updates ? $this->updates->count() : 0, 'sicherung' => $admin && $this->backup ? $this->backup->count() : 0,
+            'pfad' => $this->req?->path ?? '', 'einrichtung' => $admin ? $this->openSteps() : 0];
     }
 
     private function issuer(): string { return $this->config->practice !== '' ? 'Kienzle-Suite ' . $this->config->practice : 'Kienzle-Suite'; }

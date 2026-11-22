@@ -6,20 +6,59 @@ namespace Kienzle\Core;
 final class View {
     public static function h(string|int|null $s): string { return htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 
-    /** Ganze Seite. $nav: null = ohne Menü (Anmeldung), sonst ['login', 'admin' => bool, 'csrf', 'practice']. */
-    public static function page(string $title, string $body, ?array $nav = null, string $practice = ''): string {
-        $menu = '';
-        if ($nav) {
-            $menu = '<nav class="menu"><a href="/">Start</a><a href="/konto">Mein Konto</a>'
-                . ($nav['admin'] ? '<a href="/verwaltung/einrichtung">Einrichtung</a><a href="/verwaltung/server">Server</a><a href="/verwaltung/benutzer">Benutzer</a><a href="/verwaltung/verbindungen">Verbindungen</a><a href="/verwaltung/drucker">Drucker</a><a href="/verwaltung/sso">Dienste</a><a href="/verwaltung/sicherung">Sicherung'
-                    . (($nav['sicherung'] ?? 0) > 0 ? ' <span class="badge" title="Hinweise zur Sicherung">' . (int)$nav['sicherung'] . '</span>' : '') . '</a><a href="/verwaltung/firewall">Firewall</a><a href="/verwaltung/updates">Updates'
-                    . (($nav['updates'] ?? 0) > 0 ? ' <span class="badge" title="Neue Version verfügbar">' . (int)$nav['updates'] . '</span>' : '') . '</a><a href="/verwaltung/zugang">Zugang</a><a href="/verwaltung/protokoll">Protokoll</a>' : '')
-                . '<form method="post" action="/abmelden" class="inline">' . self::csrf($nav['csrf']) . '<button class="link">Abmelden (' . self::h($nav['login']) . ')</button></form></nav>';
+    /** Menü der Seitenleiste: Gruppe => [Pfad => Bezeichnung]. Nur Admins sehen die Gruppen ab „Einrichten“. */
+    public const MENU = [
+        'Einrichten' => ['/verwaltung/einrichtung' => 'Überblick', '/verwaltung/server' => 'Server und Name', '/hilfe/arbeitsplatz' => 'Arbeitsplätze'],
+        'Praxis' => ['/verwaltung/benutzer' => 'Benutzer', '/verwaltung/drucker' => 'Drucker', '/verwaltung/verbindungen' => 'Verbindungen', '/verwaltung/sso' => 'Dienste'],
+        'Betrieb' => ['/verwaltung/sicherung' => 'Sicherung', '/verwaltung/updates' => 'Updates', '/verwaltung/firewall' => 'Firewall',
+            '/verwaltung/zugang' => 'Zugang', '/verwaltung/protokoll' => 'Protokoll'],
+    ];
+
+    /** Ganze Seite. $nav: null = ohne Menü (Anmeldung), sonst ['login', 'admin' => bool, 'csrf', 'pfad', Zähler]. $eyebrow: Gruppe über dem Titel. */
+    public static function page(string $title, string $body, ?array $nav = null, string $practice = '', ?string $eyebrow = null): string {
+        $brand = '<a class="brand" href="/"><span class="mark" aria-hidden="true">K</span><span><strong>Kienzle-Suite</strong>'
+            . '<span class="sub">' . self::h($practice !== '' ? $practice : 'Praxis') . '</span></span></a>';
+        $head = '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
+            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=3"><script src="/assets/core.js" defer></script></head><body>';
+        if (!$nav) {
+            return $head . '<div class="solo">' . $brand . '<main><h1>' . self::h($title) . '</h1>' . self::cards($body) . '</main></div></body></html>';
         }
-        return '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css"><script src="/assets/core.js" defer></script></head>'
-            . '<body><header><strong>Kienzle-Suite</strong>' . ($practice !== '' ? ' <span class="practice">' . self::h($practice) . '</span>' : '') . $menu . '</header>'
-            . '<main><h1>' . self::h($title) . '</h1>' . $body . '</main></body></html>';
+        $path = (string)($nav['pfad'] ?? '');
+        $badges = ['/verwaltung/einrichtung' => [(int)($nav['einrichtung'] ?? 0), 'Offene Punkte'], '/verwaltung/sicherung' => [(int)($nav['sicherung'] ?? 0), 'Hinweise zur Sicherung'],
+            '/verwaltung/updates' => [(int)($nav['updates'] ?? 0), 'Neue Version verfügbar']];
+        $link = function (string $href, string $label) use ($path, $badges): string {
+            $current = $path === $href || ($href !== '/' && str_starts_with($path, $href . '/'));
+            [$n, $hint] = $badges[$href] ?? [0, ''];
+            return '<a href="' . $href . '"' . ($current ? ' class="current" aria-current="page"' : '') . '><span>' . self::h($label) . '</span>'
+                . ($n > 0 ? '<span class="badge" title="' . self::h($hint) . '">' . $n . '</span>' : '') . '</a>';
+        };
+        $menu = '<nav class="menu" aria-label="Menü"><div class="menu-group">' . $link('/', 'Start') . $link('/konto', 'Mein Konto') . '</div>';
+        $group = null;
+        if ($nav['admin']) {
+            foreach (self::MENU as $title2 => $items) {
+                if (isset($items[$path]) || array_filter(array_keys($items), fn($h) => str_starts_with($path, $h . '/'))) $group = $title2;
+                $menu .= '<div class="menu-group"><span class="menu-title">' . self::h($title2) . '</span>';
+                foreach ($items as $href => $label) $menu .= $link($href, $label);
+                $menu .= '</div>';
+            }
+        }
+        $menu .= '</nav>';
+        $foot = '<div class="side-foot"><form method="post" action="/abmelden" class="inline">' . self::csrf($nav['csrf'])
+            . '<button class="link">Abmelden (' . self::h($nav['login']) . ')</button></form></div>';
+        $eyebrow ??= $group;
+        return $head . '<div class="layout"><aside class="side">' . $brand . $menu . $foot . '</aside><main>'
+            . ($eyebrow ? '<p class="eyebrow">' . self::h($eyebrow) . '</p>' : '') . '<h1>' . self::h($title) . '</h1>' . self::cards($body) . '</main></div></body></html>';
+    }
+
+    /** Inhalt in Karten aufteilen: Jede Überschrift h2 beginnt eine neue Karte; Meldungen am Anfang bleiben darüber. */
+    public static function cards(string $body): string {
+        if (str_contains($body, 'class="card')) return $body;
+        $lead = '';
+        while (preg_match('#^\s*(<p class="(?:error|notice)"[^>]*>.*?</p>)#s', $body, $m)) { $lead .= $m[1]; $body = substr($body, strlen($m[0])); }
+        $parts = preg_split('#(?=<h2[ >])#', $body) ?: [$body];
+        $out = $lead;
+        foreach ($parts as $part) if (trim($part) !== '') $out .= '<section class="card">' . $part . '</section>';
+        return $out;
     }
 
     public static function csrf(string $token): string { return '<input type="hidden" name="csrf" value="' . self::h($token) . '">'; }

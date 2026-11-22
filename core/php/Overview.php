@@ -9,7 +9,11 @@ namespace Kienzle\Core;
  */
 final class Overview {
     public static string $state = '/var/lib/kienzle/ueberblick';
-    public const MANUAL = ['ca' => 'Zertifizierungsstelle auf allen Arbeitsplätzen eingerichtet', 'codes' => 'Wiederherstellungscodes der Admins ausgedruckt und verwahrt'];
+    public const MANUAL = ['ca' => 'Zertifizierungsstelle auf allen Arbeitsplätzen eingerichtet', 'codes' => 'Wiederherstellungscodes der Admins ausgedruckt und verwahrt',
+        'name' => 'Servername auf den Arbeitsplätzen bekannt (Router/DNS oder hosts-Datei)'];
+    /** Wo ein Punkt erledigt wird (wie im Einrichtungs-Überblick von kienzle-sumup). */
+    public const PLACES = ['web' => ['In diesem Webfenster', 'Einstellungen dieses Servers'], 'pc' => ['Auf den Arbeitsplätzen', 'jeder PC der Praxis'],
+        'nas' => ['Am NAS und im Router', 'Geräte im Praxisnetz']];
     private const KEY = 'ueberblick_manuell';
 
     public function __construct(private Database $db, private Users $users, private Modules $modules, private ?Firewall $firewall = null,
@@ -34,7 +38,7 @@ final class Overview {
     }
 
     private static function item(string $title, string $state, string $hint, string $link, ?string $manual = null): array {
-        return ['title' => $title, 'state' => $state, 'hint' => $hint, 'link' => $link, 'manuell' => $manual];
+        return ['title' => $title, 'state' => $state, 'hint' => $hint, 'link' => $link, 'manuell' => $manual, 'ort' => 'web'];
     }
 
     /** Punkte der Basis. */
@@ -52,7 +56,8 @@ final class Overview {
         $out[] = self::item('Mindestens zwei Admins (Vertretung)', count($admins) >= 2 ? 'done' : 'open', 'Fällt ein Admin aus, kommt sonst nur noch die Konsole weiter.', '/verwaltung/benutzer');
         $out[] = self::item('Wiederherstellungscodes für jeden Admin', $admins && count($codes) === count($admins) ? 'done' : 'open', 'Unter „Mein Zugang“ neu erzeugen', '/verwaltung/zugang');
         $out[] = self::item(self::MANUAL['codes'], isset($manual['codes']) ? 'done' : 'open', 'Bitte von Hand bestätigen', '/verwaltung/einrichtung', 'codes');
-        $out[] = self::item(self::MANUAL['ca'], isset($manual['ca']) ? 'done' : 'open', 'Datei /ca.crt auf jedem Arbeitsplatz als vertrauenswürdige Stammzertifizierungsstelle eintragen', '/ca.crt', 'ca');
+        $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['ca'], isset($manual['ca']) ? 'done' : 'open', 'Datei ca.crt als vertrauenswürdige Stammzertifizierungsstelle eintragen – Anleitung für Windows, Mac, iPhone und Android', '/hilfe/arbeitsplatz#zertifikat', 'ca');
+        $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['name'], isset($manual['name']) ? 'done' : 'open', 'Einmal im Router bzw. DNS eintragen – oder auf jedem PC in der Datei hosts', '/hilfe/arbeitsplatz#name', 'name');
         if ($this->firewall) {
             $fw = $this->firewall->status()['state'];
             $out[] = self::item('Firewall eingeschaltet und bestätigt', $fw === 'active' ? 'done' : ($fw === 'failed' ? 'error' : 'open'),
@@ -77,7 +82,7 @@ final class Overview {
             $out[] = self::item('Letzte Sicherung erfolgreich (höchstens 36 Stunden alt)', $last && ($last['ok'] ?? false) && (int)($last['zeit'] ?? 0) > time() - 36 * 3600 ? 'done' : ($last && !($last['ok'] ?? false) ? 'error' : 'open'),
                 $last ? View::date((int)($last['zeit'] ?? 0)) : 'Noch keine', '/verwaltung/sicherung');
             $snap = !in_array('Schreibgeschützte Schnappschüsse am NAS sind nicht als eingerichtet bestätigt (Schutz vor Erpressungstrojanern).', $b['warnungen'], true) && $b['eingerichtet'];
-            $out[] = self::item('Schreibgeschützte Schnappschüsse am NAS', $snap ? 'done' : 'open', 'Am NAS einrichten, dann auf der Seite Sicherung bestätigen', '/verwaltung/sicherung');
+            $out[] = ['ort' => 'nas'] + self::item('Schreibgeschützte Schnappschüsse am NAS', $snap ? 'done' : 'open', 'Am NAS einrichten, dann auf der Seite Sicherung bestätigen', '/verwaltung/sicherung');
             $probe = $b['letzte_probe'];
             $out[] = self::item('Probe-Wiederherstellung erfolgreich', $probe && ($probe['ok'] ?? false) ? 'done' : ($probe ? 'error' : 'open'),
                 $probe ? View::date((int)($probe['zeit'] ?? 0)) : 'Noch keine – auf der Seite Sicherung starten', '/verwaltung/sicherung');

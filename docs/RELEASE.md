@@ -1,5 +1,23 @@
 # Basis – Release-Notizen
 
+## 0.14.0
+
+Neue Gestaltung nach Entwurf B (Rückmeldung von der Test-VM): Farben, Schrift, Karten und Einrichtungsliste wie im
+Sumup-Zweig `rechnungseingang`.
+
+- **Seitenleiste** mit gegliedertem Menü: Einrichten (Überblick, Server und Name, Arbeitsplätze), Praxis (Benutzer,
+  Drucker, Verbindungen, Dienste), Betrieb (Sicherung, Updates, Firewall, Zugang, Protokoll); Zähler für offene Punkte,
+  Sicherungshinweise und neue Versionen. Auf dem Telefon wird sie zur Leiste oben.
+- **Karten:** Jeder Abschnitt einer Seite steht in einer Karte; Knöpfe stehen links in Reihen statt verstreut.
+- **Überblick:** Fortschritt („x von y Schritten“), Punkte nach Ort gruppiert (In diesem Webfenster · Auf den
+  Arbeitsplätzen · Am NAS und im Router) mit ✓/○-Zeichen; Module darunter je in einer Karte.
+- **Server und Name einfacher:** Praxisname, ein Feld „Name des Servers“ (Vorgabe „kienzle“) und eine Endung zur Auswahl
+  (.praxis.internal, .fritz.box, .local, .lan); die IP-Adresse bleibt automatisch erhalten. Weitere Namen und die neue
+  Zertifizierungsstelle stehen aufgeklappt unter „Fachleute“. Danach-Schritte mit Anleitung.
+- **Neue Seite „Arbeitsplätze einrichten“** (`/hilfe/arbeitsplatz`, auch ohne Anmeldung): Zertifikat herunterladen,
+  Fingerabdruck, Anleitung für Windows (auch PowerShell), Mac, iPhone/iPad, Android, Firefox; Servername über den Router
+  oder die hosts-Datei. Neuer Punkt im Überblick „Servername auf den Arbeitsplätzen bekannt“.
+
 ## 0.13.0
 
 - **Uhrzeit des Servers** (Wunsch nach dem Test auf der VM): Der Installer schaltet die Zeitsynchronisation ein, stellt

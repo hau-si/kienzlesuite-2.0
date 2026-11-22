@@ -12,19 +12,25 @@ function test_server(): void {
     Server::$unit = $env->dir . '/kienzle-servername.path'; touch(Server::$unit);
     [$b] = admin_browser($env);
     $p = $b->get('/verwaltung/server');
-    check($p->status === 200 && str_contains($p->body, "kienzle.example.org\n192.0.2.5") && str_contains($p->body, 'value="Praxis Beispiel"'), 'Seite Server');
-    check(!str_contains($p->body, 'Noch kein Servername'), 'Name gilt als nicht festgelegt');
-    $r = $b->post('/verwaltung/server', ['aktion' => 'speichern', 'namen' => " Kienzle.Praxis.Internal \n192.0.2.5\n", 'praxis' => 'Praxis Dr. Beispiel']);
+    check($p->status === 200 && str_contains($p->body, 'name="kurzname" value="kienzle"') && str_contains($p->body, 'value="Praxis Beispiel"'), 'Seite Server');
+    check(str_contains($p->body, 'kienzle.example.org</textarea>') && str_contains($p->body, 'über 192.0.2.5 erreichbar'), 'weitere Namen oder IP fehlen');
+    $r = $b->post('/verwaltung/server', ['aktion' => 'speichern', 'kurzname' => ' Kienzle ', 'endung' => '.praxis.internal', 'weitere' => '', 'praxis' => 'Praxis Dr. Beispiel']);
     check($r->status === 303, 'Speichern');
     $f = $env->dir . '/anfragen/servername.json';
-    check(json_decode((string)file_get_contents($f), true) === ['namen' => ['kienzle.praxis.internal', '192.0.2.5'], 'praxis' => 'Praxis Dr. Beispiel'], 'Anfrage');
-    check($b->post('/verwaltung/server', ['aktion' => 'speichern', 'namen' => 'b.example.org', 'praxis' => ''])->status === 422, 'zweite Anfrage, solange die erste wartet');
+    check(json_decode((string)file_get_contents($f), true) === ['namen' => ['kienzle.praxis.internal', '192.0.2.5'], 'praxis' => 'Praxis Dr. Beispiel'], 'Anfrage: ' . file_get_contents($f));
+    $ok = ['aktion' => 'speichern', 'kurzname' => 'kienzle', 'endung' => '.fritz.box', 'weitere' => '', 'praxis' => ''];
+    check($b->post('/verwaltung/server', $ok)->status === 422, 'zweite Anfrage, solange die erste wartet');
     unlink($f);
-    foreach (['', 'a b!', str_repeat('x', 254), "ok.example.org\n" . str_repeat("b.example.org\n", 0) . implode("\n", array_map(fn($i) => "n$i.example.org", range(1, 11)))] as $bad) {
-        check($b->post('/verwaltung/server', ['aktion' => 'speichern', 'namen' => $bad, 'praxis' => ''])->status === 422, 'ungültige Namen: ' . mb_substr($bad, 0, 30));
+    foreach ([['kurzname' => ''], ['kurzname' => 'a b'], ['kurzname' => '-x'], ['endung' => '.example.org'], ['weitere' => 'a b!'],
+              ['weitere' => implode("\n", array_map(fn($i) => "n$i.example.org", range(1, 11)))], ['praxis' => '<b>']] as $bad) {
+        check($b->post('/verwaltung/server', $bad + $ok)->status === 422, 'ungültig angenommen: ' . json_encode($bad));
     }
-    check($b->post('/verwaltung/server', ['aktion' => 'speichern', 'namen' => 'ok.example.org', 'praxis' => '<b>'])->status === 422, 'Praxisname mit <');
+    $b->post('/verwaltung/server', ['ohne_ip' => '1', 'weitere' => "kienzle.example.org"] + $ok);
+    check(json_decode((string)file_get_contents($f), true)['namen'] === ['kienzle.fritz.box', 'kienzle.example.org'], 'ohne IP / weitere Namen');
+    unlink($f);
     check(str_contains(implode("\n", $env->audit->recent()), 'servername kienzle.praxis.internal'), 'nicht protokolliert');
+    $h = (new Browser($env))->get('/hilfe/arbeitsplatz');
+    check($h->status === 200 && str_contains($h->body, 'id="zertifikat"') && str_contains($h->body, '192.0.2.5   kienzle.example.org'), 'Hilfe ohne Anmeldung');
     $env->user('bert');
     $m = new Browser($env);
     $m->post('/anmelden', ['login' => 'bert', 'password' => 'Wiesen-Blume-Fahrrad-7']);

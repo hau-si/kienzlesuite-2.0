@@ -130,6 +130,7 @@ c "https://$host/.well-known/openid-configuration" | grep -qF "\"issuer\":\"http
 c "https://$host/oidc/jwks" | grep -q '"crv":"P-256"' || fail 'OIDC-JWKS über nginx'
 [ "$(code -X POST "https://$host/oidc/token" -d grant_type=authorization_code -d code=x -d client_id=unbekannt)" = '401 ' ] || fail 'OIDC-Token ohne Client nicht 401'
 c -b "$T/dora" "https://$host/verwaltung/sso" | grep -q 'Dienst hinzufügen' || fail 'Seite Dienste'
+c "https://$host/hilfe/arbeitsplatz" | grep -q "$(openssl x509 -in /etc/kienzle/ca/ca.crt -noout -fingerprint -sha256 | cut -d= -f2)" || fail 'Hilfe Arbeitsplätze ohne Fingerabdruck'
 # Die Seiten müssen Status und Einheiten der root-Dienste sehen (open_basedir von php-fpm).
 for p in firewall updates verbindungen sicherung einrichtung drucker sso; do
   if c -b "$T/dora" "https://$host/verwaltung/$p" | grep -q 'Bitte den Installer ausführen'; then fail "Seite $p sieht ihren Dienst nicht"; fi
@@ -172,7 +173,7 @@ sicher '{"action":"blatt-gedruckt"}'
 
 echo '== Servername ändern (Verwaltung → Server)'
 [ -f /etc/systemd/system/kienzle-servername.path ] || fail 'kienzle-servername.path fehlt'
-c -b "$T/dora" -H "Origin: https://$host" "https://$host/verwaltung/server" | grep -q 'Namen und Adressen' || fail 'Seite Server'
+c -b "$T/dora" -H "Origin: https://$host" "https://$host/verwaltung/server" | grep -q 'Name des Servers' || fail 'Seite Server'
 runuser -u ks-core -- sh -c "umask 077; printf '%s' '{\"namen\":[\"$host\",\"kienzle.praxis.internal\",\"10.11.12.13\"],\"praxis\":\"Praxis Test\"}' > /var/lib/kienzle/core/anfragen/servername.json"
 KIENZLE_NGINX_RELOAD='nginx -s reload' /opt/kienzle/core/current/bin/kienzle-servername anwenden
 python3 -c 'import json,sys; s=json.load(open("/var/lib/kienzle/servername/status.json"))["letzte"]; print(s["meldung"]); sys.exit(0 if s["ok"] else 1)' || fail 'Servername nicht übernommen'
