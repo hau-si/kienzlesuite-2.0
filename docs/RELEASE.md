@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.2.1
+
+- Test der Zertifizierungsstelle unabhängig von der Schreibweise des Zertifikatsnamens (OpenSSL 3.0 und 3.5).
+
 ## 0.2.0
 
 Meilenstein 2 aus `docs/PLAN.md`: Anmeldung, Benutzer und Rechte, Admin-OTP, Passkeys, lokale Zertifizierungsstelle.
