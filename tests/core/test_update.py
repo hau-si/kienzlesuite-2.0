@@ -376,7 +376,10 @@ class Updater(Umgebung):
 class Skripte(unittest.TestCase):
     def test_bauen_und_signieren(self):
         """scripts/release-bauen mit dem echten Repository (nur wenn core/ und installer/ eingecheckt sind)."""
-        if subprocess.run(['git', '-C', str(ROOT), 'status', '--porcelain', 'core', 'installer'], capture_output=True, text=True).stdout.strip():
+        st = subprocess.run(['git', '-C', str(ROOT), 'status', '--porcelain', 'core', 'installer'], capture_output=True, text=True)
+        if st.returncode != 0:
+            self.skipTest('git nicht nutzbar: ' + st.stderr.strip()[:80])
+        if st.stdout.strip():
             self.skipTest('nicht eingecheckte Änderungen')
         with tempfile.TemporaryDirectory() as tmp:
             r = subprocess.run([sys.executable, str(ROOT / 'scripts' / 'release-bauen'), 'core', '--ziel', tmp], capture_output=True, text=True)

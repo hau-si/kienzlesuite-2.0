@@ -23,6 +23,8 @@ jobs:
     steps:
       - run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git ca-certificates python3 shellcheck php-cli php-sqlite3 php-mbstring openssl
       - uses: actions/checkout@v5
+      # Im Container gehört der Arbeitsordner einem anderen Benutzer; git braucht die ausdrückliche Freigabe.
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       # Im Container läuft alles als root; die Tests prüfen Dateirechte über die Modusbits.
       - run: bash tests/run-all.sh
       - run: bash tests/integration/nginx.sh

@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.4.1
+
+- `scripts/release-bauen` bricht ab, wenn der git-Status nicht lesbar ist (bisher galt das als „alles eingecheckt“).
+- GitHub Actions: git im Container für den Arbeitsordner freigegeben.
+
 ## 0.4.0
 
 Meilenstein 4 aus `docs/PLAN.md`: Updater mit signierten Releases, Versionsordnern und Rücksprung.

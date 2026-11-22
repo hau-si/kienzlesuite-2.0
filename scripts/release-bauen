@@ -25,7 +25,11 @@ def main() -> int:
     if a.teil != 'core':
         print('Bisher kann nur die Basis (core) als Release gebaut werden.', file=sys.stderr)
         return 2
-    if subprocess.run(['git', '-C', str(ROOT), 'status', '--porcelain', 'core', 'installer'], capture_output=True, text=True).stdout.strip():
+    status = subprocess.run(['git', '-C', str(ROOT), 'status', '--porcelain', 'core', 'installer'], capture_output=True, text=True)
+    if status.returncode != 0:
+        print('git-Status nicht lesbar: ' + status.stderr.strip()[:200], file=sys.stderr)
+        return 1
+    if status.stdout.strip():
         print('core/ oder installer/ hat nicht eingecheckte Änderungen. Erst committen.', file=sys.stderr)
         return 1
     version = (ROOT / 'core' / 'VERSION').read_text().strip()
