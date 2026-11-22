@@ -114,6 +114,13 @@ code=$(php -r 'require "/opt/kienzle/core/current/php/bootstrap.php"; echo Kienz
 c -b "$T/dora" "https://$host/verwaltung/updates" | grep -q 'Installiert: <strong>Basis' || fail 'Update-Seite'
 c -b "$T/dora" "https://$host/verwaltung/firewall" | grep -q 'Freigegebene Netze' || fail 'Firewall-Seite'
 c -b "$T/dora" "https://$host/verwaltung/verbindungen" | grep -q 'T2med (FHIR)' || fail 'Verbindungsseite'
+# Die Seiten müssen Status und Einheiten der root-Dienste sehen (open_basedir von php-fpm).
+for p in firewall updates verbindungen sicherung; do
+  if c -b "$T/dora" "https://$host/verwaltung/$p" | grep -q 'Bitte den Installer ausführen'; then fail "Seite $p sieht ihren Dienst nicht"; fi
+done
+c -b "$T/dora" "https://$host/verwaltung/verbindungen" | grep -q 'ssh-ed25519 ' || fail 'Verbindungsseite zeigt den SSH-Schlüssel nicht (Status unlesbar)'
+runuser -u ks-core -- php -d open_basedir="$(sed -n 's/^php_admin_value\[open_basedir\] = //p' /etc/kienzle/core/php-fpm.conf)" -r 'exit(is_executable("/usr/bin/qrencode") ? 0 : 1);' \
+  || fail 'qrencode unter open_basedir nicht erreichbar (QR-Code für OTP)'
 
 echo '== Sicherung (echtes restic, Ziel: lokaler Ordner)'
 for u in kienzle-sicherung.path kienzle-sicherung-anwenden.service kienzle-sicherung.service kienzle-sicherung.timer; do [ -f "/etc/systemd/system/$u" ] || fail "$u fehlt"; done
@@ -122,7 +129,8 @@ sicher() { runuser -u ks-core -- sh -c "umask 077; printf '%s' '$1' > /var/lib/k
 sicher '{"action":"einrichten","ziel":{"art":"lokal","pfad":"/srv/test-sicherung"},"praxis":"Praxis Beispiel"}'
 [ "$(stat -c '%a %U' /etc/kienzle/sicherung/passwort)" = '600 root' ] || fail 'Sicherungspasswort falsch geschützt'
 if runuser -u ks-core -- cat /etc/kienzle/sicherung/passwort >/dev/null 2>&1; then fail 'ks-core liest das Sicherungspasswort'; fi
-c -b "$T/dora" "https://$host/verwaltung/sicherung/blatt" | grep -q "$(cat /etc/kienzle/sicherung/passwort)" || fail 'Wiederherstellungsblatt'
+blatt=$(c -b "$T/dora" "https://$host/verwaltung/sicherung/blatt")
+grep -qF "$(cat /etc/kienzle/sicherung/passwort)" <<< "$blatt" || fail "Wiederherstellungsblatt: $(head -c 300 <<< "$blatt")"
 sicher '{"action":"jetzt"}'
 sicher '{"action":"probe"}'
 sicher '{"action":"pruefen","lesen":true}'

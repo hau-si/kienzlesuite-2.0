@@ -28,6 +28,10 @@ Meilenstein 6 aus `docs/PLAN.md`: verschlüsselte Datensicherung mit restic.
 - Tests: 13 Python-Tests (in GitHub Actions mit echtem restic, lokal mit nachgebautem), 3 PHP-Tests, Ende-zu-Ende im
   Container mit echtem restic: einrichten, Blatt, sichern, Probe, Prüfung mit Lesen, Wiederherstellen der Basis.
 
+**Fehlerbehebung aus M3–M5:** php-fpm durfte wegen `open_basedir` die Statusdateien der root-Dienste, deren Einheiten
+und `qrencode`/`ip`/`ss` nicht lesen. Auf einem echten Server zeigten Firewall, Updates und Verbindungen deshalb „Dienst nicht
+eingerichtet“, und der QR-Code für die OTP-Einrichtung fehlte. Jetzt sind genau diese Pfade lesbar; die Ende-zu-Ende-Prüfung deckt das ab.
+
 Abweichend vom Plan: ein gemeinsamer Schnappschuss mit Tag `kienzle` statt Tags je Teil (Wiederherstellung je Teil über
 die Pfade); SFTP- und REST-Server im CI-Container noch nicht.
 Nicht geprüft: echtes NAS über SFTP und SMB (`mount.cifs` braucht Kernel-Rechte), REST-Server im Nur-Anfügen-Modus,
