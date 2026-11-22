@@ -107,8 +107,12 @@ class Praxisdrucker(Umgebung):
         self.assertIn('raw', jobs[0]['args'])
         self.assertNotIn('raw', jobs[1]['args'])
         os.environ['FAKE_CUPS_FAIL'] = 'Kaputt'
-        with self.assertRaisesRegex(self.d.Fehler, 'CUPS'):
+        # „Unable to query printer: Connection refused“ kommt vom Drucker, nicht von CUPS.
+        with self.assertRaisesRegex(self.d.Fehler, 'IPP Everywhere'):
             self.d.add('office', 'Kaputt', '192.0.2.91', [])
+        self.assertIn('CUPS', self.d.explain('lpadmin: Unable to connect to server: Connection refused'))
+        self.assertIn('CUPS', self.d.explain('lpstat: scheduler is not running'))
+        self.assertIn('IPP Everywhere', self.d.explain('lpadmin: Unable to connect to printer; please try again in a few moments.'))
         self.assertEqual(self.d.print_job('A4', b'%PDF-1.4', 'Rechnung <42>', []), 'A4-3')
 
 

@@ -1,5 +1,13 @@
 # Basis – Release-Notizen
 
+## 0.16.1
+
+- **Drucker anlegen:** Die Meldung „Der Druckdienst (CUPS) läuft nicht“ kam auch, wenn der *Drucker* die automatische
+  Einrichtung ablehnte („Unable to query printer: Connection refused“). Jetzt steht dort, dass IPP Everywhere/AirPrint am
+  Drucker fehlt. Vorher startet die Basis CUPS, falls er im Leerlauf beendet war. Für A4-Drucker probiert sie danach
+  `ipps://…/ipp/print` und `ipp://…/ipp` und zuletzt, wenn Port 9100 offen ist, einen allgemeinen PCL- bzw. PostScript-Treiber.
+- Nicht mit echten Druckern geprüft (Brother, HP …); nur mit nachgestelltem CUPS.
+
 ## 0.16.0
 
 - **Module über das Webinterface installieren** (Verwaltung → Module): installieren, aktualisieren und entfernen, ohne Konsole.

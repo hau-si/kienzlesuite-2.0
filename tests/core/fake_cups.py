@@ -37,6 +37,9 @@ if prog == 'lpadmin':
     save()
 elif prog == 'lpstat':
     save()
+    if args == ['-r']:
+        print('scheduler is running')
+        sys.exit(0)
     if not data['queues']:
         print('lpstat: No destinations added.', file=sys.stderr)
         sys.exit(1)

@@ -62,21 +62,37 @@ final class T2medInvoice {
 
     /** Ohne Textebene oder ohne die erwarteten Beschriftungen lohnt sich die Texterkennung. */
     private static function needsOcr(string $text, array $labels): bool {
-        return trim($text) === '' || !preg_match(self::labelRegex('number', $labels), $text) || !preg_match(self::labelRegex('total', $labels), $text);
+        return trim($text) === '' || !self::all('number', $labels, '', $text) || !self::all('total', $labels, '', $text);
     }
 
     /** Alternativen für ein Feld: eingebaute plus eigene Textschnipsel (wörtlich, Leerraum flexibel, Doppelpunkt optional). */
-    private static function labelRegex(string $field, array $labels): string {
+    private static function labelRegex(string $field, array $labels, string $glue = '|'): string {
         $parts = self::BUILTIN[$field];
         foreach ((array)($labels[self::LABEL_KEYS[$field]] ?? []) as $custom) {
             $custom = trim(rtrim(trim((string)$custom), ':'));
             if ($custom === '' || mb_strlen($custom) > 60) continue;
             $parts[] = implode('[ \t]+', array_map(fn($w) => preg_quote($w, '/'), preg_split('/\s+/u', $custom))) . ':?';
         }
-        return '/(?:' . implode('|', $parts) . ')/u';
+        return '/(?:' . implode($glue, $parts) . ')/u';
     }
-    private static function labelPrefix(string $field, array $labels): string {
-        return substr(self::labelRegex($field, $labels), 1, -2);   // ohne Begrenzer und Modifikator
+    /** Beschriftungen eines Felds einzeln (eingebaute und eigene), als Regex-Teile ohne Begrenzer. */
+    private static function labelParts(string $field, array $labels): array {
+        return explode("\x00", substr(self::labelRegex($field, $labels, "\x00"), 4, -3));
+    }
+
+    /**
+     * Alle Treffer von „Beschriftung + $suffix“, je Beschriftung ein eigener Ausdruck. Eine Alternation (a|b) vor dem
+     * Wert findet mit PCRE2 10.46 (Ubuntu 26.04, PHP 8.5) Werte hinter der zweiten Beschriftung nicht immer.
+     * PREG_PATTERN_ORDER: Liste der ersten Gruppe; PREG_SET_ORDER: Liste der Treffer.
+     */
+    private static function all(string $field, array $labels, string $suffix, string $text, int $flags = PREG_PATTERN_ORDER): array {
+        $out = [];
+        foreach (self::labelParts($field, $labels) as $part) {
+            if (preg_match_all('/' . $part . $suffix . '/u', $text, $m, $flags) === false) throw new Problem('Auswertung der Rechnung fehlgeschlagen (' . preg_last_error_msg() . ').', 422);
+            if ($flags === PREG_SET_ORDER) array_push($out, ...$m);
+            else array_push($out, ...($suffix === '' ? $m[0] : $m[1]));
+        }
+        return $out;
     }
 
     /** Texterkennung der ersten Seiten; null, wenn die Werkzeuge fehlen. */
@@ -119,19 +135,20 @@ final class T2medInvoice {
         $gap = $loose ? '[ \t]*\n?[ \t]*' : '[ \t]*';
         $eur = '[ \t]*(?:€|EUR)';
 
-        $number = self::single($text, '/' . self::labelPrefix('number', $labels) . $gap . '((?=[A-Za-z0-9\/._-]*\d)[A-Za-z0-9][A-Za-z0-9\/._-]{0,39})/u', 'Rechnungsnummer', 'Re.-Nr.:');
-        $date = self::date(self::single($text, '/' . self::labelPrefix('date', $labels) . $gap . '(\d{2}\.\d{2}\.\d{4})/u', 'Rechnungsdatum', 'Re.-Datum:'));
-        $total = self::cents(self::single($text, '/' . self::labelPrefix('total', $labels) . $gap . '(-?[\d.]+,\d{2})' . $eur . '/u', 'Gesamtsumme', 'Gesamtsumme: … €'));
+        $number = self::single(self::all('number', $labels, $gap . '((?=[A-Za-z0-9\/._-]*\d)[A-Za-z0-9][A-Za-z0-9\/._-]{0,39})', $text), 'Rechnungsnummer', 'Re.-Nr.:');
+        $date = self::date(self::single(self::all('date', $labels, $gap . '(\d{2}\.\d{2}\.\d{4})', $text), 'Rechnungsdatum', 'Re.-Datum:'));
+        $total = self::cents(self::single(self::all('total', $labels, $gap . '(-?[\d.]+,\d{2})' . $eur, $text), 'Gesamtsumme', 'Gesamtsumme: … €'));
         // Gegenprobe mit dem Überweisungssatz, falls vorhanden.
-        $found = (bool)preg_match_all('/' . self::labelPrefix('transfer', $labels) . $gap . '(-?[\d.]+,\d{2})' . $eur . '/u', $text, $m);
+        $transfers = self::all('transfer', $labels, $gap . '(-?[\d.]+,\d{2})' . $eur, $text);
+        $found = $transfers !== [];
         if ($requireTransfer && !$found) throw new Problem('Der Zahlbetrag der Rechnung konnte nicht bestätigt werden.', 422);
         if ($found) {
-            foreach ($m[1] as $value) if (self::cents($value) !== $total) throw new Problem('Gesamtsumme und Zahlbetrag der Rechnung widersprechen sich.', 422);
+            foreach ($transfers as $value) if (self::cents($value) !== $total) throw new Problem('Gesamtsumme und Zahlbetrag der Rechnung widersprechen sich.', 422);
         }
         if ($total < 1 || $total > $maxCents) throw new Problem('Der Rechnungsbetrag liegt außerhalb des erlaubten Bereichs.', 422);
 
         // Erste Seite: „Patient: Vorname Nachname , TT.MM.JJJJ“ (auch „(geb. TT.MM.JJJJ)“). Folgeseiten ohne Geburtsdatum.
-        preg_match_all('/' . self::labelPrefix('patient', $labels) . '[ \t]*([^\n,;(]{1,160}?)[ \t]*[,;(][ \t]*(?:geb(?:oren)?\.?[ \t]*(?:am)?[ \t]*)?(\d{2}\.\d{2}\.\d{4})/u', $text, $p, PREG_SET_ORDER);
+        $p = self::all('patient', $labels, '[ \t]*([^\n,;(]{1,160}?)[ \t]*[,;(][ \t]*(?:geb(?:oren)?\.?[ \t]*(?:am)?[ \t]*)?(\d{2}\.\d{2}\.\d{4})', $text, PREG_SET_ORDER);
         $patients = [];
         foreach ($p as $match) $patients[self::name($match[1]) . '|' . $match[2]] = [trim($match[1]), $match[2]];
         if (count($patients) !== 1) throw new Problem('Patient und Geburtsdatum der Rechnung sind nicht eindeutig.', 422);
@@ -174,9 +191,8 @@ final class T2medInvoice {
         return $fhir !== '' && ($pdf === $fhir || str_ends_with($pdf, ' ' . $fhir));
     }
 
-    private static function single(string $text, string $pattern, string $label, string $hint): string {
-        if (preg_match_all($pattern, $text, $m) === false) throw new Problem($label . ': Auswertung fehlgeschlagen (' . preg_last_error_msg() . ').', 422);
-        $values = array_values(array_unique($m[1] ?? []));
+    private static function single(array $found, string $label, string $hint): string {
+        $values = array_values(array_unique($found));
         if (count($values) === 0) throw new Problem($label . ' der Rechnung nicht gefunden (im PDF-Text fehlt die Bezeichnung „' . $hint . '“).', 422);
         if (count($values) > 1) throw new Problem($label . ' der Rechnung ist nicht eindeutig (' . count($values) . ' verschiedene Werte).', 422);
         return $values[0];

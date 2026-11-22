@@ -97,12 +97,18 @@ def run(name: str, *args: str, timeout: int = 60, allow_empty: bool = False, dat
     raise Fehler(explain(msg))
 
 
+PRINTER_SIDE = ('unable to query printer', 'unable to connect to printer', 'everywhere', 'unable to get printer attributes', 'not found')
+
+
 def explain(error: str) -> str:
     e = error.lower()
-    if any(x in e for x in ('unable to connect', 'connection refused', 'scheduler is not running')):
+    # Zuerst Meldungen über den Drucker selbst: „lpadmin: Unable to query printer: Connection refused“ heißt, der *Drucker*
+    # nimmt die automatische Einrichtung nicht an – CUPS läuft dann sehr wohl.
+    if any(x in e for x in PRINTER_SIDE):
+        return ('Der Drucker antwortet nicht auf die automatische Einrichtung (IPP Everywhere/AirPrint). Im Webmenü des Druckers '
+                '„IPP“ bzw. „AirPrint“ einschalten, oder die vollständige Adresse aus der Suche bzw. vom Drucker eintragen (z. B. ipp://192.0.2.80/ipp/print).')
+    if any(x in e for x in ('scheduler is not running', 'unable to connect to server', 'cups.sock', 'connection refused')):
         return 'Der Druckdienst (CUPS) läuft nicht. Bitte den Installer erneut ausführen.'
-    if any(x in e for x in ('everywhere', 'unable to query')):
-        return 'Der Drucker hat die automatische Einrichtung (IPP Everywhere/AirPrint) abgelehnt. Im Webmenü des Druckers „IPP“ bzw. „AirPrint“ einschalten.'
     return 'Druckereinrichtung fehlgeschlagen: ' + (re.sub(r'\s+', ' ', error)[:200] if error else 'unbekannter Fehler') + '.'
 
 
@@ -221,6 +227,36 @@ def discover() -> list[dict]:
 
 
 # ---- Drucker der Praxis ------------------------------------------------------------------------------------------
+def ensure_cups() -> None:
+    """CUPS starten, falls er gerade nicht läuft (Ubuntu startet ihn bei Bedarf und beendet ihn im Leerlauf)."""
+    try:
+        if 'scheduler is running' in run('lpstat', '-r', timeout=15, allow_empty=True):
+            return
+    except Fehler:
+        pass
+    if not without_systemd() and SYSTEMCTL and Path(SYSTEMCTL).is_file():
+        subprocess.run([SYSTEMCTL, 'start', 'cups.socket', 'cups.service'], capture_output=True, timeout=60)
+        for _ in range(20):
+            try:
+                if 'scheduler is running' in run('lpstat', '-r', timeout=15, allow_empty=True):
+                    return
+            except Fehler:
+                pass
+            time.sleep(0.5)
+
+
+def generic_driver() -> str | None:
+    """Treiber für A4-Drucker ohne IPP Everywhere (viele Laserdrucker sprechen PCL bzw. PostScript über Port 9100)."""
+    try:
+        models = run('lpinfo', '-m', timeout=60)
+    except Fehler:
+        return None
+    for want in ('drv:///sample.drv/generpcl.ppd', 'drv:///sample.drv/generic.ppd'):
+        if any(line.split(' ', 1)[0] == want for line in models.splitlines()):
+            return want
+    return None
+
+
 def add(kind: str, name: str, addr: str, share: list[str]) -> str:
     spec = KINDS.get(kind)
     if not spec:
@@ -241,6 +277,7 @@ def add(kind: str, name: str, addr: str, share: list[str]) -> str:
                          + '. Ist der Drucker eingeschaltet, im Netzwerk und die Adresse richtig?')
         uri = f'ipp://{bracket(addr)}/ipp/print' if kind == 'office' else f'socket://{bracket(addr)}:9100'
     _check_share(share)
+    ensure_cups()
     existing = {q['name'].lower(): q for q in queues()}
     if name.lower() in existing and not existing[name.lower()]['managed']:
         raise Fehler(f'Es gibt bereits einen Drucker „{name}“, der nicht von der Suite angelegt wurde. Bitte einen anderen Namen wählen.')
@@ -250,9 +287,33 @@ def add(kind: str, name: str, addr: str, share: list[str]) -> str:
             '-L', spec['label'], '-o', f'printer-is-shared={"true" if "ipp" in share else "false"}', '-E']
     if kind == 'office':
         args += ['-o', 'media-default=iso_a4_210x297mm']
-    run('lpadmin', *args, timeout=90)
+    note = ''
+    try:
+        run('lpadmin', *args, timeout=90)
+    except Fehler as first:
+        # A4-Drucker ohne IPP Everywhere (oder mit anderem Pfad): andere übliche Adressen, zuletzt ein allgemeiner Treiber über Port 9100.
+        if kind != 'office' or re.match(r'^[a-z]+://', addr) and not addr.startswith('ipp://'):
+            raise
+        host = addr if not re.match(r'^[a-z]+://', addr) else re.sub(r'^ipp://\[?([^\]/:]+).*$', r'\1', addr)
+        tries = [(f'ipps://{bracket(host)}/ipp/print', 'everywhere'), (f'ipp://{bracket(host)}/ipp', 'everywhere')]
+        driver = generic_driver() if probe(host, 9100) else None
+        if driver:
+            tries.append((f'socket://{bracket(host)}:9100', driver))
+        for try_uri, model in tries:
+            if try_uri == uri:
+                continue
+            try:
+                run('lpadmin', *[try_uri if a == uri else model if a == 'everywhere' else a for a in args], timeout=90)
+                uri = try_uri
+                if not model.startswith('everywhere'):
+                    note = ' Ohne IPP Everywhere, mit allgemeinem Treiber über Port 9100: bitte eine Testseite drucken.'
+                break
+            except Fehler:
+                continue
+        else:
+            raise first from None
     _set_share(name, share)
-    return f'Drucker „{name}“ angelegt ({address(uri)}).'
+    return f'Drucker „{name}“ angelegt ({address(uri)}).{note}'
 
 
 def _check_share(share) -> None:
