@@ -288,8 +288,12 @@ Löschen der Sicherung durch einen Angreifer wird durch die NAS-Schnappschüsse 
 - Eigene Admin-Konten, Auditprotokoll und verschlüsselte Terminal-Geheimnisse von Kienzlezeit werden auf die
   zentrale Benutzerverwaltung abgebildet, ohne das Auditprotokoll zu verlieren.
 
+## Lizenz
+
+MIT (`LICENSE`), übernommen aus der SumUp-Suite, für Basis und Module dieses Repositorys.
+Aus der Beta übernommener Code behält damit seinen Lizenzhinweis.
+
 ## Offene Fragen
 
 - Wie Thomas seine Projekte künftig pflegen möchte (in diesem Repository oder eigene Repositories, die als Module eingebunden werden).
-- Lizenz der Module (die SumUp-Suite steht unter MIT).
 - Telefonie: welche Dienste Port-Freigaben ins VPN brauchen und ob Telefonie in derselben VM bleiben soll.

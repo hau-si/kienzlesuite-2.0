@@ -8,8 +8,8 @@ noch nicht. Die Tests `tests/firewall.php`, `tests/updater.php`, `tests/security
 `tests/firewall-apply.sh` dieses Stands laufen grün (PHP 8.3, geprüft am 22.11.2026).
 Dateipfade unten ohne Präfix beziehen sich auf diesen Stand.
 
-Der Code steht unter MIT (© Dr. Thomas Kienzle und Mitwirkende). Übernommene Dateien behalten den Hinweis;
-die Lizenz der Suite 2.0 ist noch offen (siehe `ARCHITEKTUR.md`, Offene Fragen).
+Der Code steht unter MIT (© Dr. Thomas Kienzle und Mitwirkende). Die Suite 2.0 übernimmt diese Lizenz (`LICENSE`),
+übernommene Dateien bleiben damit unter demselben Hinweis.
 
 ## Grundentscheidungen
 

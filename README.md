@@ -9,8 +9,11 @@ Stand: **Konzept**, noch kein Code.
 ![Basis und Module](docs/architektur-whiteboard.png)
 
 - Architektur und Sicherheitskonzept: [docs/ARCHITEKTUR.md](docs/ARCHITEKTUR.md)
+- Umsetzungsplan Schritt 1: [docs/PLAN.md](docs/PLAN.md)
 - Arbeitsregeln (auch für Claude Code): [AGENTS.md](AGENTS.md)
 - Grundlage: [hau-si/kienzle-suite-beta](https://github.com/hau-si/kienzle-suite-beta), Fork von
   [thomaskien/t2med-sumup](https://github.com/thomaskien/t2med-sumup)
 
 Plattform: Ubuntu Server 26.04 LTS (aktuelles Abbild, derzeit 26.04.1), VM mit mindestens 2 Kernen und 100 GB Speicher.
+
+Lizenz: [MIT](LICENSE), wie die SumUp-Suite, aus der die Basis hervorgeht.
