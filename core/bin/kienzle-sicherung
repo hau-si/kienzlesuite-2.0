@@ -8,6 +8,10 @@
   kienzle-sicherung komplett [--json DATEI]
                                 Nach Totalausfall alles aus der letzten Sicherung holen (ruft der Installer mit
                                 --wiederherstellen auf; fragt Ablage und Passwort vom Wiederherstellungsblatt ab)
+  kienzle-sicherung einstellungen-pruefen DATEI ORDNER
+                                Export der Einstellungen entschlüsseln und zur Ansicht nach ORDNER auspacken
+  kienzle-sicherung einstellungen-einspielen DATEI
+                                Export der Einstellungen an die ursprünglichen Stellen zurücklegen (danach Installer erneut ausführen)
 """
 import getpass
 import json
@@ -75,6 +79,12 @@ if __name__ == '__main__':
                 ziel, password = interactive()
             parts = s.full_restore(ziel, password)
             print(f'Wiederhergestellt: {len(parts)} Teile aus der letzten Sicherung.')
+        elif len(cmd) == 3 and cmd[0] == 'einstellungen-pruefen':
+            files = s.import_settings(Path(cmd[1]), getpass.getpass('Passwort des Exports: '), False, Path(cmd[2]))
+            print(f'{len(files)} Dateien nach {cmd[2]} ausgepackt.')
+        elif len(cmd) == 2 and cmd[0] == 'einstellungen-einspielen':
+            files = s.import_settings(Path(cmd[1]), getpass.getpass('Passwort des Exports: '), True)
+            print(f'{len(files)} Dateien zurückgelegt. Bitte jetzt den Installer erneut ausführen: sudo bash /opt/kienzle/core/current/installer/install.sh')
         elif cmd == ['status']:
             st = s.set_status()
             print(json.dumps({k: st.get(k) for k in ('letzte_sicherung', 'letzte_pruefung', 'letzte_probe', 'warnungen')}, ensure_ascii=False, indent=1))

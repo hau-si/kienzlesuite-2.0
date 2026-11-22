@@ -1,0 +1,90 @@
+#!/usr/bin/php
+<?php
+declare(strict_types=1);
+// Verschlüsselung für den Export der Einstellungen (Verwaltung → Sicherung → Einstellungen exportieren).
+//
+//   kienzle-tresor verschluesseln AUSGABE     stdin: erste Zeile Passwort, danach die Daten (tar.gz)
+//   kienzle-tresor entschluesseln DATEI AUSGABE    stdin: erste Zeile Passwort
+//
+// Verfahren (libsodium): Schlüssel aus dem Passwort mit Argon2id (4 Durchläufe, 256 MiB, zufälliges Salz),
+// Daten mit XChaCha20-Poly1305 als secretstream in Blöcken zu 64 KiB; jeder Block ist authentisiert, das Ende markiert.
+// Format: Kopfzeile „KIENZLE-EINSTELLUNGEN 1 <JSON>\n“, dann je Block 4 Byte Länge (big endian) und Chiffrat.
+
+const MAGIC = 'KIENZLE-EINSTELLUNGEN 1 ';
+const CHUNK = 65536;
+const OPS = 4;
+const MEM = 268435456;
+
+function fail(string $m, int $code = 1): never { fwrite(STDERR, $m . "\n"); exit($code); }
+
+function password_from_stdin(): string {
+    $line = fgets(STDIN, 1024);
+    $pw = $line === false ? '' : rtrim($line, "\r\n");
+    if (mb_strlen($pw) < 12) fail('Passwort zu kurz (mindestens 12 Zeichen).', 2);
+    return $pw;
+}
+
+function derive(string $pw, string $salt, int $ops, int $mem): string {
+    if ($ops < 3 || $ops > 20 || $mem < 67108864 || $mem > 2147483648) fail('Datei ungültig (Parameter).', 3);
+    $key = sodium_crypto_pwhash(SODIUM_CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_KEYBYTES, $pw, $salt, $ops, $mem, SODIUM_CRYPTO_PWHASH_ALG_ARGON2ID13);
+    sodium_memzero($pw);
+    return $key;
+}
+
+if (PHP_SAPI !== 'cli') fail('Nur an der Konsole.');
+$a = array_slice($argv, 1);
+if ($a && $a[0] === 'verschluesseln' && count($a) === 2) {
+    $pw = password_from_stdin();
+    $salt = random_bytes(SODIUM_CRYPTO_PWHASH_SALTBYTES);
+    $key = derive($pw, $salt, OPS, MEM);
+    [$state, $header] = sodium_crypto_secretstream_xchacha20poly1305_init_push($key);
+    sodium_memzero($key);
+    $out = fopen($a[1], 'xb') ?: fail('Ausgabe kann nicht angelegt werden.');
+    $head = json_encode(['kdf' => 'argon2id13', 'ops' => OPS, 'mem' => MEM, 'salt' => bin2hex($salt), 'header' => bin2hex($header),
+        'cipher' => 'xchacha20poly1305-secretstream', 'chunk' => CHUNK, 'zeit' => date('c')]);
+    fwrite($out, MAGIC . $head . "\n");
+    $buf = (string)fread(STDIN, CHUNK);
+    while (true) {
+        $next = feof(STDIN) ? '' : (string)fread(STDIN, CHUNK);
+        $last = $next === '' && feof(STDIN);
+        $c = sodium_crypto_secretstream_xchacha20poly1305_push($state, $buf, MAGIC,
+            $last ? SODIUM_CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_TAG_FINAL : SODIUM_CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_TAG_MESSAGE);
+        fwrite($out, pack('N', strlen($c)) . $c);
+        if ($last) break;
+        $buf = $next;
+    }
+    fclose($out);
+    exit(0);
+}
+if ($a && $a[0] === 'entschluesseln' && count($a) === 3) {
+    $pw = password_from_stdin();
+    $in = fopen($a[1], 'rb') ?: fail('Datei nicht lesbar.');
+    $line = (string)fgets($in, 4096);
+    if (!str_starts_with($line, MAGIC)) fail('Keine Export-Datei der Kienzle-Suite.', 3);
+    $h = json_decode(substr($line, strlen(MAGIC)), true);
+    if (!is_array($h) || ($h['kdf'] ?? '') !== 'argon2id13' || !preg_match('/^[0-9a-f]{32}$/', (string)($h['salt'] ?? '')) || !preg_match('/^[0-9a-f]{48}$/', (string)($h['header'] ?? ''))) {
+        fail('Datei ungültig (Kopf).', 3);
+    }
+    $key = derive($pw, hex2bin($h['salt']), (int)$h['ops'], (int)$h['mem']);
+    $state = sodium_crypto_secretstream_xchacha20poly1305_init_pull(hex2bin($h['header']), $key);
+    sodium_memzero($key);
+    $tmp = $a[2] . '.teil';
+    $out = fopen($tmp, 'xb') ?: fail('Ausgabe kann nicht angelegt werden.');
+    $final = false;
+    while (!$final) {
+        $len = fread($in, 4);
+        if ($len === false || strlen($len) !== 4) break;
+        $n = unpack('N', $len)[1];
+        if ($n < 17 || $n > CHUNK + 17) break;
+        $c = (string)fread($in, $n);
+        $r = sodium_crypto_secretstream_xchacha20poly1305_pull($state, $c, MAGIC);
+        if ($r === false) { fclose($out); unlink($tmp); fail('Falsches Passwort oder Datei verändert.', 4); }
+        fwrite($out, $r[0]);
+        $final = $r[1] === SODIUM_CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_TAG_FINAL;
+    }
+    fclose($out);
+    if (!$final || fread($in, 1) !== '') { unlink($tmp); fail('Datei unvollständig oder verändert.', 4); }
+    rename($tmp, $a[2]);
+    exit(0);
+}
+fail("Aufruf: kienzle-tresor verschluesseln AUSGABE | entschluesseln DATEI AUSGABE (Passwort als erste Zeile auf stdin)", 2);

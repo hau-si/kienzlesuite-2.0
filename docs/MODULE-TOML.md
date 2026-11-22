@@ -86,6 +86,7 @@ Rechte, die der Admin Mitarbeitern als Kästchen zuweist. Admin-Rechte je Modul 
 |---|---|---|
 | `paths` | ja | 1–20 absolute Pfade innerhalb von `/var/lib/kienzle/<id>` |
 | `snapshot` | nein | Haken, der vor der Sicherung eine stimmige Kopie erzeugt (z. B. SQLite per `VACUUM INTO`) |
+| `settings` | nein | 0–20 Dateien oder Ordner mit den Einstellungen des Moduls (innerhalb von `/var/lib/kienzle/<id>`); kommen in den verschlüsselten Export der Einstellungen (Verwaltung → Sicherung) |
 
 ### `[[printers]]` – optional, höchstens 10
 
@@ -151,7 +152,7 @@ Entspricht `modules/beispiel/module.toml`; die Tests prüfen, dass dieses Beispi
 [module]
 id = "beispiel"
 name = "Beispielmodul"
-version = "0.1.2"
+version = "0.1.3"
 core_api = "1"
 description = "Zeigt alle Felder der Modul-Beschreibung; nur für Tests."
 
@@ -186,6 +187,7 @@ label = "Beispiel-Einträge bearbeiten"
 [backup]
 paths = ["/var/lib/kienzle/beispiel"]
 snapshot = "bin/backup-snapshot"
+settings = ["/var/lib/kienzle/beispiel/einstellungen.json"]
 
 [[printers]]
 name = "Beispiel-Drucker"

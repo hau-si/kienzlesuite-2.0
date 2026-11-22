@@ -43,7 +43,11 @@ function test_anfragen(): void {
     problem(fn() => $up->setChannel('nacht'), 422, 'unbekannter Kanal');
     problem(fn() => $up->setChannel('stabil', true), 422, 'unsigniert im stabilen Kanal');
     $up->setChannel('beta', true);
-    check(req($env) === ['action' => 'kanal', 'kanal' => 'beta', 'unsigniert' => true], 'Kanal-Anfrage falsch');
+    check(req($env) === ['action' => 'kanal', 'kanal' => 'beta', 'signatur' => 'beta'], 'Kanal-Anfrage falsch');
+    unlink($env->dir . '/anfragen/update.json');
+    $up->setChannel('stabil', 'aus');
+    check(req($env) === ['action' => 'kanal', 'kanal' => 'stabil', 'signatur' => 'aus'], 'Signaturprüfung aus');
+    problem(fn() => $up->setChannel('stabil', 'egal'), 422, 'unbekannte Stufe');
     unlink($env->dir . '/anfragen/update.json');
     file_put_contents(Updates::$state . '/status.json', json_encode(['state' => 'running', 'step' => 'installieren']));
     problem(fn() => $up->check(), 409, 'Anfrage während einer Aktualisierung');
@@ -65,7 +69,10 @@ function test_seite_und_menue(): void {
     check(str_contains(implode("\n", $env->audit->recent()), 'update-installieren 9.0.0'), 'nicht protokolliert');
     unlink($env->dir . '/anfragen/update.json');
     $b->post('/verwaltung/updates', ['aktion' => 'kanal', 'kanal' => 'beta', 'unsigniert' => '1']);
-    check(req($env) === ['action' => 'kanal', 'kanal' => 'beta', 'unsigniert' => true] && str_contains(implode("\n", $env->audit->recent()), 'unsigniert-erlaubt'), 'Freigabe unsignierter Versionen');
+    check(req($env) === ['action' => 'kanal', 'kanal' => 'beta', 'signatur' => 'beta'] && str_contains(implode("\n", $env->audit->recent()), 'signatur-beta'), 'Freigabe unsignierter Versionen');
+    unlink($env->dir . '/anfragen/update.json');
+    $b->post('/verwaltung/updates', ['aktion' => 'kanal', 'kanal' => 'stabil', 'signatur' => 'aus']);
+    check(req($env) === ['action' => 'kanal', 'kanal' => 'stabil', 'signatur' => 'aus'] && str_contains(implode("\n", $env->audit->recent()), 'signatur-aus'), 'Signaturprüfung abschalten');
     $env->db->query('UPDATE sessions SET confirmed_at=0');
     check(str_starts_with((string)$b->post('/verwaltung/updates', ['aktion' => 'pruefen'])->header('Location'), '/bestaetigen'), 'Update ohne Bestätigung');
     $env->user('bert');
@@ -79,7 +86,7 @@ function test_unsignierte_kennzeichnung(): void {
     [$b] = admin_browser($env);
     $b->web = fn() => $b->defaultWeb(null, $up);
     $page = $b->get('/verwaltung/updates')->body;
-    check(str_contains($page, 'nicht signiert') && str_contains($page, 'name="unsigniert" value="1" checked'), 'unsignierte Version nicht gekennzeichnet');
+    check(str_contains($page, 'nicht signiert') && str_contains($page, 'name="signatur" value="beta" checked'), 'unsignierte Version nicht gekennzeichnet');
 }
 
 run_tests();

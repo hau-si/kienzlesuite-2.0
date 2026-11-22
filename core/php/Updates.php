@@ -31,7 +31,7 @@ final class Updates {
         $lines = is_string($log) ? array_slice(preg_split('/\R/', rtrim($log)), -25) : [];
         return ['state' => $state, 'step' => (string)($s['step'] ?? ''), 'message' => mb_substr((string)($s['message'] ?? ''), 0, 500),
             'installed' => $this->config->version(), 'channel' => in_array($s['channel'] ?? '', ['stabil', 'beta'], true) ? $s['channel'] : 'stabil',
-            'unsigned' => ($s['unsigned'] ?? false) === true, 'checked_at' => (int)($s['checked_at'] ?? 0), 'error' => isset($s['error']) ? mb_substr((string)$s['error'], 0, 300) : null,
+            'unsigned' => ($s['unsigned'] ?? false) === true, 'signatur' => in_array($s['signatur'] ?? '', ['pflicht', 'beta', 'aus'], true) ? $s['signatur'] : ((($s['unsigned'] ?? false) === true) ? 'beta' : 'pflicht'), 'checked_at' => (int)($s['checked_at'] ?? 0), 'error' => isset($s['error']) ? mb_substr((string)$s['error'], 0, 300) : null,
             'available' => $available, 'local' => $local, 'service' => is_file(self::$unit),
             'log' => array_map(static fn($l) => mb_substr((string)preg_replace('/[\x00-\x08\x0b-\x1f\x7f]/', '', $l), 0, 300), $lines)];
     }
@@ -41,11 +41,16 @@ final class Updates {
 
     public function check(): void { $this->write(['action' => 'pruefen']); }
 
-    /** Kanal wählen; $unsigned erlaubt unsignierte Vorabversionen (nur Beta, ausdrücklich). */
-    public function setChannel(string $channel, bool $unsigned = false): void {
+    /**
+     * Kanal und Signaturprüfung: pflicht | beta (unsignierte Vorabversionen im Beta-Kanal) | aus (alle Versionen ohne Signatur).
+     * Für Aufrufer aus M4 bleibt $mode als bool erlaubt (true = beta).
+     */
+    public function setChannel(string $channel, bool|string $mode = 'pflicht'): void {
         if (!in_array($channel, ['stabil', 'beta'], true)) throw new Problem('Unbekannter Kanal.', 422);
-        if ($unsigned && $channel !== 'beta') throw new Problem('Unsignierte Versionen gibt es nur im Beta-Kanal.', 422);
-        $this->write(['action' => 'kanal', 'kanal' => $channel, 'unsigniert' => $unsigned]);
+        $mode = is_bool($mode) ? ($mode ? 'beta' : 'pflicht') : $mode;
+        if (!in_array($mode, ['pflicht', 'beta', 'aus'], true)) throw new Problem('Unbekannte Stufe der Signaturprüfung.', 422);
+        if ($mode === 'beta' && $channel !== 'beta') throw new Problem('„Nur Beta ohne Signatur“ gibt es nur im Beta-Kanal.', 422);
+        $this->write(['action' => 'kanal', 'kanal' => $channel, 'signatur' => $mode]);
     }
 
     public function install(string $version): void {

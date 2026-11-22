@@ -59,7 +59,7 @@ die Basis eine API-Version, gegen die Module geprüft werden.
 | Einrichtungs-Überblick | eigener Überblick der Basis, darunter die Überblicke der Module |
 | Updates | je Modul, Kanal stabil/beta, Sicherung vor dem Update, Rücksprung |
 | Netzwerkspeicher | gemeinsamer Dienst für SMB-Ziele (aus der Rechnungsablage der SumUp-Suite) |
-| Backup | verschlüsselte Sicherung aller Module auf den Netzwerkspeicher |
+| Backup | verschlüsselte Sicherung aller Module auf den Netzwerkspeicher; Export aller Einstellungen als passwortverschlüsselte Datei |
 | CUPS, Samba, Protokolle | gemeinsame Dienste; Basis installiert und verwaltet Drucker, Module drucken darauf und melden eigene virtuelle Drucker an |
 
 ### Modul-Beschreibung (`module.toml`)
@@ -182,8 +182,8 @@ Freigegeben am 22.11.2026. Ablauf je Teil (Basis oder Modul):
 6. **Prüfung nach dem Start:** Dienste aktiv und Gesundheitsprüfung (`/_health` bzw. `hooks.health`) binnen 60 Sekunden.
 7. **Rücksprung** bei Fehler oder abgebrochenem Update: alter Verweis, Daten-Schnappschuss zurück, Start, Meldung in der Glocke.
    Von Hand ist der Rückweg auf eine der aufbewahrten Versionen möglich, mit Hinweis auf möglichen Datenverlust.
-8. **Unsignierte Beta-Versionen** nur, wenn ein Basis-Admin sie im Beta-Kanal ausdrücklich zulässt (Wunsch vom 22.11.2026):
-   Prüfsummen bleiben, eine vorhandene falsche Signatur wird immer abgelehnt, stabile Versionen immer nur signiert.
+8. **Signaturprüfung wählbar** (Wünsche vom 22.11.2026): Vorgabe „immer prüfen“; ein Basis-Admin kann unsignierte
+   Beta-Versionen zulassen oder die Prüfung ganz abschalten. Prüfsummen bleiben, eine vorhandene falsche Signatur wird immer abgelehnt.
 
 Ablauf für den Herausgeber: `docs/RELEASE-ABLAUF.md`.
 

@@ -436,6 +436,14 @@ final class Web {
         if ($r->path === '/verwaltung/updates') return $get ? $this->updatesPage() : $this->updatesAction($r, $admin);
         if ($r->path === '/verwaltung/verbindungen') return $get ? $this->connectionsPage() : $this->connectionsAction($r, $admin);
         if ($r->path === '/verwaltung/sicherung') return $get ? $this->backupPage() : $this->backupAction($r, $admin);
+        if ($r->path === '/verwaltung/sicherung/export' && $get) {
+            [$file, $name] = $this->bk()->exportFile();
+            $data = @file_get_contents($file);
+            if (!is_string($data)) throw new Problem('Export nicht lesbar.', 500);
+            $this->audit->write($admin, 'einstellungen-export-heruntergeladen');
+            return (new Response(200, $data, [['Content-Type', 'application/octet-stream']]))->with('Content-Disposition', 'attachment; filename="' . $name . '"')
+                ->with('Cache-Control', 'no-store')->with('X-Content-Type-Options', 'nosniff');
+        }
         if ($r->path === '/verwaltung/sicherung/blatt' && $get) {
             $this->audit->write($admin, 'sicherung-blatt-angezeigt');
             return Response::html($this->bk()->sheet())->with('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'")
@@ -682,10 +690,13 @@ final class Web {
         $body .= '<h2>Kanal</h2><form method="post" action="/verwaltung/updates" class="box">' . $csrf . '<input type="hidden" name="aktion" value="kanal">'
             . '<label class="check"><input type="radio" name="kanal" value="stabil"' . ($st['channel'] === 'stabil' ? ' checked' : '') . '> Stabil (empfohlen)</label>'
             . '<label class="check"><input type="radio" name="kanal" value="beta"' . ($st['channel'] === 'beta' ? ' checked' : '') . '> Beta (Vorabversionen zum Testen)</label>'
-            . V::checkbox('unsigniert', '1', 'Im Beta-Kanal auch unsignierte Versionen zulassen (nicht empfohlen)', $st['unsigned'])
+            . '<h3>Signaturprüfung</h3>'
+            . '<label class="check"><input type="radio" name="signatur" value="pflicht"' . ($st['signatur'] === 'pflicht' ? ' checked' : '') . '> Immer prüfen (empfohlen)</label>'
+            . '<label class="check"><input type="radio" name="signatur" value="beta"' . ($st['signatur'] === 'beta' ? ' checked' : '') . '> Im Beta-Kanal auch unsignierte Versionen zulassen</label>'
+            . '<label class="check"><input type="radio" name="signatur" value="aus"' . ($st['signatur'] === 'aus' ? ' checked' : '') . '> Ohne Signaturprüfung – alle Versionen (nicht empfohlen)</label>'
             . '<p>Ohne Signatur ist nicht gesichert, dass eine Version vom Herausgeber stammt: Wer das Repository auf GitHub verändern kann, '
-            . 'könnte dann Programme mit root-Rechten auf diesen Server bringen. Geprüft wird weiter gegen Beschädigung, und eine vorhandene, aber falsche '
-            . 'Signatur wird immer abgelehnt. Nur für Test-Server.</p>'
+            . 'könnte dann Programme mit root-Rechten auf diesen Server bringen. Geprüft wird weiter gegen Beschädigung (Manifest, SHA-256), und eine '
+            . 'vorhandene, aber falsche Signatur wird immer abgelehnt.</p>'
             . '<button' . ($busy ? ' disabled' : '') . '>Kanal speichern</button></form>';
         $older = array_filter($st['local'], fn($v) => $v !== $st['installed']);
         if ($older) {
@@ -705,9 +716,9 @@ final class Web {
             switch ($r->field('aktion', 20)) {
                 case 'pruefen': $up->check(); $this->audit->write($admin, 'update-pruefen'); break;
                 case 'kanal':
-                    $unsigned = $r->field('unsigniert') === '1';
-                    $up->setChannel($r->field('kanal', 10), $unsigned);
-                    $this->audit->write($admin, 'update-kanal', $r->field('kanal', 10) . ($unsigned ? ' unsigniert-erlaubt' : ''));
+                    $mode = $r->field('signatur', 10) ?: ($r->field('unsigniert') === '1' ? 'beta' : 'pflicht');
+                    $up->setChannel($r->field('kanal', 10), $mode);
+                    $this->audit->write($admin, 'update-kanal', $r->field('kanal', 10) . ' signatur-' . $mode);
                     break;
                 case 'installieren': $up->install($r->field('version', 40)); $this->audit->write($admin, 'update-installieren', $r->field('version', 40)); break;
                 case 'zurueck': $up->rollback($r->field('version', 40)); $this->audit->write($admin, 'update-zurueck', $r->field('version', 40)); break;
@@ -883,6 +894,7 @@ final class Web {
                 . '<label class="check"><input type="radio" name="art" value="lokal"> Ordner auf diesem Server (z. B. eingehängte USB-Platte)</label>'
                 . V::input('pfad', 'Ordner', 'text', '', 'placeholder="/media/sicherung"')
                 . '<button' . $dis . '>Sicherung einrichten</button></form>';
+            $body .= $this->exportSection($st, $dis);
             $response = Response::html(V::page('Sicherung', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
             return $busy ? $response->with('Refresh', '3') : $response;
         }
@@ -916,8 +928,28 @@ final class Web {
         $body .= '<h2>Vorhandene Sicherungen</h2>' . $form('schnappschuesse', 'Liste aktualisieren')
             . ($rows !== '' ? '<p><strong>Achtung:</strong> Wiederherstellen ersetzt die Daten des gewählten Teils durch den Stand der Sicherung; spätere Änderungen gehen verloren.</p>'
                 . '<table><tr><th>Sicherung</th><th>Zeit</th><th></th></tr>' . $rows . '</table>' : '<p>Noch keine.</p>');
+        $body .= $this->exportSection($st, $dis);
         $response = Response::html(V::page('Sicherung', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
         return $busy ? $response->with('Refresh', '3') : $response;
+    }
+
+    private function exportSection(array $st, string $dis): string {
+        $e = $st['export'];
+        $out = '<h2>Einstellungen exportieren</h2><p>Alle Einstellungen der Basis und der Module (Zertifizierungsstelle, Schlüssel, Verbindungen, '
+            . 'Firewall, Einstellungen der Module) in einer Datei, verschlüsselt mit einem Passwort Ihrer Wahl (Argon2id, XChaCha20-Poly1305). '
+            . 'Ohne das Passwort ist die Datei wertlos – es wird nirgends gespeichert. Einspielen an der Konsole: '
+            . '<code>sudo kienzle-sicherung einstellungen-einspielen DATEI</code>.</p>';
+        if ($e) {
+            $out .= '<div class="box wide notice"><p>Bereit: <strong>' . V::h($e['datei']) . '</strong> (' . V::date($e['zeit']) . ', ' . $e['dateien'] . ' Dateien, '
+                . max(1, (int)($e['groesse'] / 1024)) . ' KB' . ($e['mit_sicherungspasswort'] ? ', mit Sicherungspasswort' : '') . '). Wird nach 24 Stunden gelöscht.</p>'
+                . '<p><a class="button" href="/verwaltung/sicherung/export">Herunterladen</a> '
+                . '<form method="post" action="/verwaltung/sicherung" class="inline">' . $this->hidden('export-loeschen') . '<button' . $dis . '>Jetzt löschen</button></form></p></div>';
+        }
+        return $out . '<form method="post" action="/verwaltung/sicherung" class="box">' . $this->hidden('export')
+            . V::input('export_passwort', 'Passwort (mindestens 12 Zeichen)', 'password', '', 'autocomplete="new-password" minlength="12" required')
+            . V::input('export_wiederholung', 'Passwort wiederholen', 'password', '', 'autocomplete="new-password" minlength="12" required')
+            . V::checkbox('mit_sicherungspasswort', '1', 'Passwort der Datensicherung mit exportieren', false)
+            . '<button' . $dis . '>Exportieren</button></form>';
     }
 
     private function backupAction(Request $r, string $admin): Response {
@@ -934,6 +966,8 @@ final class Web {
                     $keep[$k] = (int)$r->field($k, 5);
                 }
                 $b->action('aufbewahren', ['aufbewahren' => $keep]);
+            } elseif ($a === 'export') {
+                $b->export($r->field('export_passwort', 300), $r->field('export_wiederholung', 300), $r->field('mit_sicherungspasswort') === '1');
             } elseif ($a === 'nas-schnappschuesse') {
                 $b->action($a, ['bestaetigt' => $r->field('bestaetigt') === '1']);
             } elseif ($a === 'pruefen') {

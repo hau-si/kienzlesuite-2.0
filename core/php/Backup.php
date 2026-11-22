@@ -23,7 +23,28 @@ final class Backup {
             'letzte_probe' => is_array($s['letzte_probe'] ?? null) ? $s['letzte_probe'] : null, 'letztes_aufraeumen' => is_array($s['letztes_aufraeumen'] ?? null) ? $s['letztes_aufraeumen'] : null,
             'letzte' => is_array($s['letzte'] ?? null) ? $s['letzte'] : null, 'laeuft' => (string)($s['laeuft'] ?? ''),
             'schnappschuesse' => array_values(array_filter((array)($s['schnappschuesse'] ?? []), fn($x) => is_array($x) && preg_match('/^[0-9a-f]{8,16}$/', (string)($x['id'] ?? '')))),
-            'blatt' => is_file(self::$state . '/blatt.html'), 'teile' => $parts, 'pending' => is_file($this->request()), 'service' => is_file(self::$unit)];
+            'blatt' => is_file(self::$state . '/blatt.html'), 'export' => $this->exportInfo($s['export'] ?? null), 'teile' => $parts, 'pending' => is_file($this->request()), 'service' => is_file(self::$unit)];
+    }
+
+    private function exportInfo(mixed $e): ?array {
+        if (!is_array($e) || !preg_match('/^kienzle-einstellungen-\d{8}-\d{6}\.kse$/D', (string)($e['datei'] ?? '')) || !is_file(self::$state . '/export/' . $e['datei'])) return null;
+        return ['datei' => (string)$e['datei'], 'zeit' => (int)($e['zeit'] ?? 0), 'groesse' => (int)($e['groesse'] ?? 0), 'dateien' => (int)($e['dateien'] ?? 0),
+            'mit_sicherungspasswort' => ($e['mit_sicherungspasswort'] ?? false) === true];
+    }
+
+    /** Export der Einstellungen anstoßen. Das Passwort geht nur in die Anfragedatei (0600) an den root-Dienst. */
+    public function export(string $password, string $repeat, bool $withBackupPassword): void {
+        if (mb_strlen($password) < 12) throw new Problem('Das Passwort für den Export braucht mindestens 12 Zeichen.', 422);
+        if (mb_strlen($password) > 200 || preg_match('/[\x00-\x1f]/', $password)) throw new Problem('Passwort ungültig.', 422);
+        if (!hash_equals($password, $repeat)) throw new Problem('Die beiden Passwörter stimmen nicht überein.', 422);
+        $this->write(['action' => 'export', 'passwort' => $password, 'mit_sicherungspasswort' => $withBackupPassword]);
+    }
+
+    /** Pfad der fertigen Export-Datei (zum Herunterladen). */
+    public function exportFile(): array {
+        $e = $this->status()['export'];
+        if (!$e) throw new Problem('Es liegt kein Export bereit.', 404);
+        return [self::$state . '/export/' . $e['datei'], $e['datei']];
     }
 
     public function count(): int { return count($this->status()['warnungen']); }
@@ -47,7 +68,7 @@ final class Backup {
     }
 
     public function action(string $action, array $extra = []): void {
-        if (!in_array($action, ['jetzt', 'pruefen', 'probe', 'aufraeumen', 'blatt-gedruckt', 'nas-schnappschuesse', 'aufbewahren', 'wiederherstellen', 'schnappschuesse'], true)) {
+        if (!in_array($action, ['jetzt', 'pruefen', 'probe', 'aufraeumen', 'blatt-gedruckt', 'nas-schnappschuesse', 'aufbewahren', 'wiederherstellen', 'schnappschuesse', 'export-loeschen'], true)) {
             throw new Problem('Unbekannte Aktion.', 422);
         }
         if ($action === 'wiederherstellen') {

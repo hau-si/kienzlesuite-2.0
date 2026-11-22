@@ -29,3 +29,10 @@ Wo eine Entscheidung nötig war, steht dabei, was umgesetzt wurde; das lässt si
 9. **Zweite Kopie außer Haus** (z. B. USB-Platte im Wechsel oder ein zweites Ziel): bisher nur ein Ziel je Server. Bedarf?
 10. **E-Mail bei Fehlern der Sicherung:** bisher nur die Warnung im Webinterface. Über die zentrale E-Mail-Verbindung nachrüsten?
 11. **Uhrzeit:** täglich 02:30 (± 20 Min.). Laufen die Server in den Praxen nachts?
+
+## Nachträge vom 22.11.2026 (Export, Signatur)
+
+12. **Export und Datenbank:** Der Export enthält die Einstellungen als Dateien (`/etc/kienzle`, `[backup] settings` der Module),
+    nicht die Benutzerkonten (die stehen in der Datenbank und kommen über die Datensicherung zurück). Sollen Benutzer mit?
+13. **Signaturprüfung „aus“:** gilt für alle Versionen und auch, wenn kein Release-Schlüssel hinterlegt ist. Eine vorhandene,
+    aber falsche Signatur lehne ich trotzdem ab (Hinweis auf Manipulation). Soll „aus“ auch das übergehen?

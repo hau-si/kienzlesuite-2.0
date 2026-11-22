@@ -297,6 +297,25 @@ class Updater(Umgebung):
         self.assertEqual(self.current(), '0.5.0-beta.1')
         self.assertIn('OHNE Signatur', (self.t / 'state' / 'update.log').read_text())
 
+    def test_signaturpruefung_aus(self):
+        self.publish('0.4.0', signed=False)
+        self.request({'action': 'kanal', 'kanal': 'stabil'})
+        self.assertEqual(self.status()['available']['core'], [])
+        self.request({'action': 'kanal', 'kanal': 'stabil', 'signatur': 'beta'})   # gilt nur im Beta-Kanal
+        self.assertEqual(self.status()['signatur'], 'pflicht')
+        self.request({'action': 'kanal', 'kanal': 'stabil', 'signatur': 'aus'})
+        self.assertEqual(self.status()['signatur'], 'aus')
+        self.assertEqual([(a['version'], a['signed']) for a in self.status()['available']['core']], [('0.4.0', False)])
+        self.request({'action': 'installieren', 'version': '0.4.0'})
+        self.assertEqual(self.current(), '0.4.0')
+        self.assertIn('OHNE Signatur (vom Admin zugelassen: alle Versionen)', (self.t / 'state' / 'update.log').read_text())
+
+    def test_signatur_aus_aber_falsche_signatur_bleibt_verboten(self):
+        self.publish('0.4.0', key='fremd.pem')
+        self.request({'action': 'kanal', 'kanal': 'stabil', 'signatur': 'aus'})
+        self.request({'action': 'installieren', 'version': '0.4.0'})
+        self.assertEqual(self.current(), '0.3.0')
+
     def test_unsigniert_aber_falsche_signatur_bleibt_verboten(self):
         self.publish('0.5.0-beta.1', prerelease=True, key='fremd.pem')
         self.request({'action': 'kanal', 'kanal': 'beta', 'unsigniert': True})

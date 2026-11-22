@@ -106,9 +106,20 @@ def channel() -> str:
     return c if c in release.CHANNELS else 'stabil'
 
 
-def allow_unsigned() -> bool:
-    """Unsignierte Vorabversionen nur, wenn ein Admin es für den Beta-Kanal ausdrücklich eingeschaltet hat."""
-    return channel() == 'beta' and _settings().get('unsigniert') is True
+SIGNATUR = ('pflicht', 'beta', 'aus')
+
+
+def signature_mode() -> str:
+    """Signaturprüfung: pflicht (Vorgabe) | beta (unsignierte Vorabversionen im Beta-Kanal erlaubt) | aus (jede Version
+    darf unsigniert sein). Eine vorhandene, aber falsche Signatur wird in jeder Stufe abgelehnt."""
+    s = _settings()
+    mode = s.get('signatur') if s.get('signatur') in SIGNATUR else ('beta' if s.get('unsigniert') is True else 'pflicht')
+    return 'pflicht' if mode == 'beta' and channel() != 'beta' else mode
+
+
+def allow_unsigned(prerelease: bool = True) -> bool:
+    mode = signature_mode()
+    return mode == 'aus' or (mode == 'beta' and prerelease)
 
 
 # ---- Quellen -----------------------------------------------------------------------------------------------------
@@ -224,8 +235,8 @@ def check() -> dict:
     def entry(r):
         return {**{k: r[k] for k in ('version', 'prerelease', 'notes', 'published')}, 'signed': any(a.endswith(sig) for a in r['assets'])}
     # Ohne Signatur nur anzeigen, was sich auch installieren ließe.
-    shown = [r for r in found if entry(r)['signed'] or (r['prerelease'] and allow_unsigned())]
-    return set_status(installed={'core': current}, channel=channel(), unsigned=allow_unsigned(), checked_at=int(time.time()), error=error,
+    shown = [r for r in found if entry(r)['signed'] or allow_unsigned(r['prerelease'])]
+    return set_status(installed={'core': current}, channel=channel(), unsigned=signature_mode() != 'pflicht', signatur=signature_mode(), checked_at=int(time.time()), error=error,
                       local=local_releases(), available={'core': [entry(r) for r in shown[:10]]})
 
 
@@ -387,14 +398,14 @@ def install(version: str, rollback_to_local: bool = False) -> None:
                 # Vorhandene Signatur muss immer stimmen – auch wenn unsignierte Versionen zugelassen sind.
                 release.verify_signature(manifest_raw, s.fetch(entry['assets'][n['signature']], 1024), release.trusted_keys(KEYS))
                 signed = True
-            elif entry['prerelease'] and allow_unsigned():
+            elif allow_unsigned(entry['prerelease']):
                 signed = False
             else:
-                raise Fehler('Release ist nicht signiert. Unsignierte Versionen sind nur im Beta-Kanal und nur nach ausdrücklicher Freigabe möglich.')
+                raise Fehler('Release ist nicht signiert. Unsignierte Versionen nur nach ausdrücklicher Freigabe (Verwaltung → Updates → Signaturprüfung).')
             manifest = release.parse_manifest(manifest_raw, 'core')
             if manifest['version'] != version or (manifest['channel'] == 'beta' and channel() != 'beta'):
                 raise Fehler('Manifest passt nicht zur angeforderten Version bzw. zum Kanal.')
-            if not signed and manifest['channel'] != 'beta':
+            if not signed and manifest['channel'] != 'beta' and signature_mode() != 'aus':
                 raise Fehler('Unsigniert sind nur Beta-Versionen erlaubt.')
             archive = s.fetch(entry['assets'][n['archive']], release.MAX_ARCHIVE)
             release.check_archive(archive, manifest)
@@ -402,7 +413,7 @@ def install(version: str, rollback_to_local: bool = False) -> None:
             release.extract(archive, manifest, work)
             src = work
             log('Signatur, Manifest und alle Dateien geprüft.' if signed else
-                'OHNE Signatur (vom Admin für Beta-Versionen zugelassen); Manifest und alle Dateien geprüft.')
+                f'OHNE Signatur (vom Admin zugelassen: {"alle Versionen" if signature_mode() == "aus" else "Beta-Versionen"}); Manifest und alle Dateien geprüft.')
         busy = busy_modules()
         if busy:
             raise Fehler('Gerade beschäftigt: ' + ', '.join(busy) + '. Bitte später erneut versuchen.')
@@ -490,9 +501,12 @@ def _dispatch(req: dict) -> None:
     action = req.get('action')
     if action == 'pruefen':
         check()
-    elif action == 'kanal' and req.get('kanal') in release.CHANNELS and isinstance(req.get('unsigniert', False), bool):
-        _write_json(STATE / 'einstellungen.json', {'kanal': req['kanal'], 'unsigniert': req['kanal'] == 'beta' and req.get('unsigniert') is True})
-        log(f'Kanal {req["kanal"]}' + (', unsignierte Beta-Versionen zugelassen' if req['kanal'] == 'beta' and req.get('unsigniert') else ''))
+    elif action == 'kanal' and req.get('kanal') in release.CHANNELS and isinstance(req.get('unsigniert', False), bool) and req.get('signatur', 'pflicht') in SIGNATUR:
+        mode = req.get('signatur') if 'signatur' in req else ('beta' if req.get('unsigniert') is True else 'pflicht')
+        if mode == 'beta' and req['kanal'] != 'beta':
+            mode = 'pflicht'
+        _write_json(STATE / 'einstellungen.json', {'kanal': req['kanal'], 'signatur': mode})
+        log(f'Kanal {req["kanal"]}, Signaturprüfung ' + {'pflicht': 'Pflicht', 'beta': 'für Beta-Versionen abgeschaltet', 'aus': 'ABGESCHALTET'}[mode])
         check()
     elif action in ('installieren', 'zurueck') and isinstance(req.get('version'), str) and release.VERSION.match(req['version']):
         install(req['version'], rollback_to_local=action == 'zurueck')

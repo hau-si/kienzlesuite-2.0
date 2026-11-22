@@ -1,5 +1,9 @@
 # Beispielmodul – Release-Notizen
 
+## 0.1.3
+
+- `[backup] settings`: `einstellungen.json` kommt in den verschlüsselten Export der Einstellungen (Basis 0.6.1).
+
 ## 0.1.2
 
 - Socket im eigenen Ordner: `upstream = "unix:/run/kienzle/beispiel/web.sock"` (Format der Basis 0.2.0).

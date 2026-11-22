@@ -248,6 +248,65 @@ class Totalausfall(Umgebung):
             self.s.full_restore(ziel, pw.strip())
 
 
+class Einstellungen(Umgebung):
+    def test_export_und_einspielen(self):
+        (self.t / 'data/beispiel').mkdir()
+        (self.t / 'data/beispiel/einstellungen.json').write_text('{"drucker": "Empfang"}')
+        (self.t / 'data/beispiel/daten.sqlite').write_text('keine Einstellung')
+        (self.t / 'data/core/modules.json').write_text(json.dumps({'modules': [{'module': {'id': 'beispiel'},
+                                                                               'backup': {'paths': [], 'settings': [str(self.t / 'data/beispiel/einstellungen.json')]}}]}))
+        self.ready()
+        with self.assertRaises(self.s.Fehler):
+            self.s.export_settings('zu-kurz')
+        msg = self.s.export_settings('Ein-sehr-langes-Export-Passwort')
+        self.assertIn('exportiert', msg)
+        e = self.status()['export']
+        f = self.t / 'data/sicherung/export' / e['datei']
+        self.assertEqual(stat.S_IMODE(f.stat().st_mode), 0o640)
+        raw = f.read_bytes()
+        self.assertTrue(raw.startswith(b'KIENZLE-EINSTELLUNGEN 1 '))
+        for secret in (b'erfundener-ca-schluessel', b'Empfang', b'hostnames'):
+            self.assertNotIn(secret, raw)
+        with self.assertRaises(self.s.Fehler):
+            self.s.import_settings(f, 'Falsches-Passwort-123', False, self.t / 'ansicht')
+        files = self.s.import_settings(f, 'Ein-sehr-langes-Export-Passwort', False, self.t / 'ansicht')
+        out = self.t / 'ansicht'
+        self.assertEqual((out / str(self.t / 'etc/kienzle/ca/ca.key').lstrip('/')).read_text(), 'erfundener-ca-schluessel')
+        self.assertEqual((out / str(self.t / 'data/beispiel/einstellungen.json').lstrip('/')).read_text(), '{"drucker": "Empfang"}')
+        self.assertFalse((out / str(self.t / 'data/beispiel/daten.sqlite').lstrip('/')).exists(), 'Daten statt Einstellungen exportiert')
+        self.assertFalse((out / str(self.t / 'etc/kienzle/sicherung/passwort').lstrip('/')).exists(), 'Sicherungspasswort ohne Auswahl exportiert')
+        info = json.loads((out / 'kienzle-einstellungen.json').read_text())
+        self.assertEqual(len(info['dateien']), len(files) - 1)
+        # Mit Sicherungspasswort; der vorige Export wird ersetzt.
+        self.s.export_settings('Ein-sehr-langes-Export-Passwort', True)
+        self.assertEqual(len(list((self.t / 'data/sicherung/export').glob('*.kse'))), 1)
+        g = self.t / 'data/sicherung/export' / self.status()['export']['datei']
+        files = self.s.import_settings(g, 'Ein-sehr-langes-Export-Passwort', False, self.t / 'ansicht2')
+        self.assertIn('/' + str(self.t / 'etc/kienzle/sicherung/passwort').lstrip('/'), files)
+        # Veränderte Datei wird abgelehnt.
+        bad = bytearray(g.read_bytes())
+        bad[-20] ^= 1
+        g.write_bytes(bytes(bad))
+        with self.assertRaisesRegex(self.s.Fehler, 'verändert'):
+            self.s.import_settings(g, 'Ein-sehr-langes-Export-Passwort', False, self.t / 'ansicht3')
+        self.s.clean_exports(-1)
+        self.assertIsNone(self.status()['export'])
+
+    def test_unerwartete_eintraege(self):
+        import io
+        import subprocess
+        import tarfile
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode='w:gz') as tar:
+            ti = tarfile.TarInfo('etc/passwd')
+            ti.size = 1
+            tar.addfile(ti, io.BytesIO(b'x'))
+        f = self.t / 'boese.kse'
+        subprocess.run([self.s.TRESOR, 'verschluesseln', str(f)], input=b'Ein-sehr-langes-Export-Passwort\n' + buf.getvalue(), check=True)
+        with self.assertRaisesRegex(self.s.Fehler, 'Unerwarteter Eintrag'):
+            self.s.import_settings(f, 'Ein-sehr-langes-Export-Passwort', False, self.t / 'x')
+
+
 class Anfragen(Umgebung):
     def request(self, data):
         (self.t / 'anfragen/sicherung.json').write_text(json.dumps(data) if not isinstance(data, str) else data)

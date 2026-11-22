@@ -1,5 +1,22 @@
 # Basis – Release-Notizen
 
+## 0.6.1
+
+- **Einstellungen exportieren** (Verwaltung → Sicherung): alle Einstellungen der Basis (`/etc/kienzle`: Zertifizierungsstelle,
+  Schlüssel, Verbindungen, Firewall, Updates) und der Module (neu: `[backup] settings` in `module.toml`) in einer Datei,
+  verschlüsselt mit einem frei gewählten Passwort (mindestens 12 Zeichen): Schlüssel per Argon2id (4 Durchläufe, 256 MiB),
+  Daten mit XChaCha20-Poly1305 (libsodium secretstream, jeder Block authentisiert). Das Passwort der Datensicherung nur auf Wunsch.
+  Die Datei liegt 24 Stunden zum Herunterladen bereit (Download protokolliert), dann wird sie gelöscht.
+  Einspielen an der Konsole: `sudo kienzle-sicherung einstellungen-pruefen DATEI ORDNER` (zur Ansicht) bzw.
+  `einstellungen-einspielen DATEI`; nur Pfade unter `/etc/kienzle` und die angemeldeten Einstellungen der Module, Eigentümer nach Namen.
+- **Signaturprüfung der Updates wählbar** (Verwaltung → Updates): „Immer prüfen“ (Vorgabe), „im Beta-Kanal auch unsignierte
+  Versionen“ oder „ohne Signaturprüfung – alle Versionen“. Auch ohne Prüfung bleiben Manifest und SHA-256 jeder Datei Pflicht,
+  und eine vorhandene, aber falsche Signatur wird abgelehnt. Die Wahl steht im Protokoll.
+- php-fpm: `open_basedir` mit einzelnen Einheiten statt einer Vorsilbe (PHP kennt keine Vorsilben; CI-Fehler von 0.6.0).
+- Neues Hilfsprogramm `core/bin/kienzle-tresor` (Ver- und Entschlüsseln).
+
+Nicht geprüft: Einspielen eines Exports auf einer frischen VM; Export mit vielen Modulen.
+
 ## 0.6.0
 
 Meilenstein 6 aus `docs/PLAN.md`: verschlüsselte Datensicherung mit restic.

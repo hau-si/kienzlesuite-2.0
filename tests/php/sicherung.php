@@ -82,4 +82,26 @@ function test_einrichtungsformular(): void {
     check($r->status === 303 && req_b($env)['ziel'] === ['art' => 'lokal', 'pfad' => '/media/sicherung'], 'Einrichten über die Seite');
 }
 
+function test_export(): void {
+    [$env, $bk] = bk_env(['eingerichtet' => time()]);
+    [$b] = admin_browser($env);
+    $b->web = fn() => $b->defaultWeb(null, null, null, $bk);
+    check(str_contains($b->get('/verwaltung/sicherung')->body, 'Einstellungen exportieren'), 'Export-Abschnitt fehlt');
+    check($b->post('/verwaltung/sicherung', ['aktion' => 'export', 'export_passwort' => 'kurz', 'export_wiederholung' => 'kurz'])->status === 422, 'kurzes Passwort angenommen');
+    check($b->post('/verwaltung/sicherung', ['aktion' => 'export', 'export_passwort' => 'Ein-langes-Passwort-1', 'export_wiederholung' => 'Ein-langes-Passwort-2'])->status === 422, 'ungleiche Passwörter');
+    $r = $b->post('/verwaltung/sicherung', ['aktion' => 'export', 'export_passwort' => 'Ein-langes-Passwort-1', 'export_wiederholung' => 'Ein-langes-Passwort-1', 'mit_sicherungspasswort' => '1']);
+    check($r->status === 303 && req_b($env) === ['action' => 'export', 'passwort' => 'Ein-langes-Passwort-1', 'mit_sicherungspasswort' => true], 'Export-Anfrage');
+    check(!str_contains((string)file_get_contents($env->audit->path()), 'Ein-langes-Passwort'), 'Passwort im Protokoll');
+    check($b->get('/verwaltung/sicherung/export')->status === 404, 'Download ohne Export');
+    mkdir(Backup::$state . '/export');
+    file_put_contents(Backup::$state . '/export/kienzle-einstellungen-20261122-170000.kse', 'KIENZLE-EINSTELLUNGEN 1 {}');
+    file_put_contents(Backup::$state . '/status.json', json_encode(['eingerichtet' => time(), 'export' => ['datei' => 'kienzle-einstellungen-20261122-170000.kse', 'zeit' => time(), 'groesse' => 30, 'dateien' => 7]]));
+    check(str_contains($b->get('/verwaltung/sicherung')->body, 'Herunterladen'), 'Download-Knopf fehlt');
+    $d = $b->get('/verwaltung/sicherung/export');
+    check($d->status === 200 && $d->body === 'KIENZLE-EINSTELLUNGEN 1 {}' && str_contains((string)$d->header('Content-Disposition'), 'kienzle-einstellungen-20261122-170000.kse'), 'Download');
+    check(str_contains(implode("\n", $env->audit->recent()), 'einstellungen-export-heruntergeladen'), 'Download nicht protokolliert');
+    file_put_contents(Backup::$state . '/status.json', json_encode(['export' => ['datei' => '../../etc/passwd']]));
+    check($b->get('/verwaltung/sicherung/export')->status === 404, 'Pfad aus dem Status nicht geprüft');
+}
+
 run_tests();

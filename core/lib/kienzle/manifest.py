@@ -59,7 +59,7 @@ SCHEMA_SECTIONS = {
     'web': {'path', 'upstream', 'protocol', 'entry'},
     'firewall': {'name', 'port', 'proto', 'scope'},
     'rights': {'id', 'label'},
-    'backup': {'paths', 'snapshot'},
+    'backup': {'paths', 'snapshot', 'settings'},
     'printers': {'name', 'label', 'ppd', 'backend', 'share'},
     'connections': {'id', 'purpose', 'required'},
     'setup': {'overview'},
@@ -312,18 +312,24 @@ class _Checker:
         raw = self.string_list(t, 'paths', 'backup', LIMITS['paths'])
         if 'paths' in t and t['paths'] == []:
             self.error('backup.paths', 'mindestens ein Pfad.')
-        paths = []
+        paths = self.data_paths(raw, mid, 'backup.paths')
+        # Einstellungen des Moduls (Dateien oder Ordner): gehen in den zentralen, verschlüsselten Export der Einstellungen.
+        settings = self.data_paths(self.string_list(t, 'settings', 'backup', LIMITS['paths']), mid, 'backup.settings') if 'settings' in t else []
+        snapshot = self.rel_path(t['snapshot'], 'backup.snapshot') if 'snapshot' in t else None
+        return {'paths': paths, 'snapshot': snapshot, 'settings': settings}
+
+    def data_paths(self, raw: list, mid: str | None, where: str) -> list:
+        out = []
         if mid:
             base = f'{BASE_DATA}/{mid}'
             for p in raw:
                 parts = p.split('/')
                 if not p.startswith('/') or '..' in parts or '.' in parts or '' in parts[1:] \
                         or not (p == base or p.startswith(base + '/')) or CONTROL.search(p):
-                    self.error('backup.paths', f'„{shown(p)}“ liegt nicht im Datenordner {base}.')
+                    self.error(where, f'„{shown(p)}“ liegt nicht im Datenordner {base}.')
                 else:
-                    paths.append(p)
-        snapshot = self.rel_path(t['snapshot'], 'backup.snapshot') if 'snapshot' in t else None
-        return {'paths': paths, 'snapshot': snapshot}
+                    out.append(p)
+        return out
 
     def printers(self, items: list) -> list:
         if len(items) > LIMITS['printers']:

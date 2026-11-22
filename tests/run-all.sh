@@ -26,7 +26,7 @@ else
 fi
 
 step 'PHP: Syntax'
-for f in core/php/*.php core/php/modul/*.php core/public/*.php core/bin/kienzle-admin tests/php/*.php; do php -l "$f" >/dev/null || { php -l "$f"; exit 1; }; done
+for f in core/php/*.php core/php/modul/*.php core/public/*.php core/bin/kienzle-admin core/bin/kienzle-tresor tests/php/*.php; do php -l "$f" >/dev/null || { php -l "$f"; exit 1; }; done
 echo 'in Ordnung'
 
 step 'Shell: Syntax'

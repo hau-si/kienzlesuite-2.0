@@ -4,7 +4,7 @@
 [module]
 id = "beispiel"
 name = "Beispielmodul"
-version = "0.1.2"
+version = "0.1.3"
 core_api = "1"
 description = "Zeigt alle Felder der Modul-Beschreibung; nur für Tests."
 
@@ -39,6 +39,7 @@ label = "Beispiel-Einträge bearbeiten"
 [backup]
 paths = ["/var/lib/kienzle/beispiel"]
 snapshot = "bin/backup-snapshot"
+settings = ["/var/lib/kienzle/beispiel/einstellungen.json"]
 
 [[printers]]
 name = "Beispiel-Drucker"

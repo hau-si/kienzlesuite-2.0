@@ -39,6 +39,8 @@ DATA = Path(E('KIENZLE_SICHERUNG_DATA', '/var/lib/kienzle'))
 MODULES = Path(E('KIENZLE_SICHERUNG_MODULES', '/var/lib/kienzle/core/modules.json'))
 TARGETS = Path(E('KIENZLE_SICHERUNG_ZIELE', '/etc/kienzle/verbindungen/konfiguration.json'))
 MNT = Path(E('KIENZLE_SICHERUNG_MNT', '/run/kienzle/sicherung'))
+TRESOR = E('KIENZLE_TRESOR', str(Path(__file__).resolve().parents[2] / 'bin' / 'kienzle-tresor'))
+EXPORT_HOURS = 24
 IDENTITY = Path(E('KIENZLE_ABLAGE_SCHLUESSEL', '/var/lib/kienzle/ablage/.ssh/id_ed25519'))
 HOST = 'kienzle-suite'
 KEEP_DEFAULT = {'daily': 7, 'weekly': 4, 'monthly': 12, 'yearly': 3}
@@ -387,6 +389,7 @@ def snapshots() -> list[dict]:
 def daily(now: time.struct_time | None = None) -> list[str]:
     """Täglicher Lauf (Timer): sichern; sonntags aufräumen und prüfen; am ersten Sonntag im Monat lesen und Probe."""
     now = now or time.localtime()
+    clean_exports()
     done = []
     backup()
     done.append('gesichert')
@@ -536,6 +539,122 @@ def full_restore(ziel: dict, password: str) -> list[str]:
     return done
 
 
+# ---- Export der Einstellungen ------------------------------------------------------------------------------------
+def _settings_paths(existing: bool = True) -> list[tuple[Path, str]]:
+    """(Pfad, Teil): /etc/kienzle der Basis und die [backup] settings der Module."""
+    out = [(KIENZLE_ETC, 'core')]
+    for m in _registry():
+        for p in (m.get('backup') or {}).get('settings', []):
+            if Path(p).exists() or not existing:
+                out.append((Path(p), m['module']['id']))
+    return out
+
+
+def clean_exports(max_age: float = EXPORT_HOURS * 3600) -> None:
+    d = STATE / 'export'
+    for f in d.glob('*.kse') if d.is_dir() else []:
+        if f.stat().st_mtime < time.time() - max_age:
+            f.unlink(missing_ok=True)
+    s = read_status().get('export')
+    if s and not (d / str(s.get('datei', ''))).is_file():
+        set_status(export=None)
+
+
+def export_settings(password: str, with_backup_password: bool = False) -> str:
+    """Alle Einstellungen (Basis und Module) als eine mit dem Passwort verschlüsselte Datei (Argon2id + XChaCha20-Poly1305)."""
+    import io
+    import tarfile
+    if not isinstance(password, str) or len(password) < 12 or len(password) > 200 or re.search(r'[\x00-\x1f]', password):
+        raise Fehler('Passwort: mindestens 12 Zeichen, keine Steuerzeichen.')
+    skip = set() if with_backup_password else {str(ETC / 'passwort')}
+    skip.add(str(ETC / 'blatt.html'))
+    buf = io.BytesIO()
+    listing = []
+    with tarfile.open(fileobj=buf, mode='w:gz') as tar:
+        for path, part in _settings_paths():
+            for f in [path] if path.is_file() else sorted(x for x in path.rglob('*') if x.is_file() and not x.is_symlink()):
+                if str(f) in skip or f.name.endswith(('.neu', '.teil')):
+                    continue
+                tar.add(f, arcname=str(f).lstrip('/'), recursive=False)
+                listing.append({'pfad': str(f), 'teil': part})
+        info = json.dumps({'format': 1, 'zeit': int(time.time()), 'dateien': listing, 'mit_sicherungspasswort': with_backup_password}, ensure_ascii=False).encode()
+        ti = tarfile.TarInfo('kienzle-einstellungen.json')
+        ti.size, ti.mtime = len(info), int(time.time())
+        tar.addfile(ti, io.BytesIO(info))
+    out_dir = STATE / 'export'
+    out_dir.mkdir(mode=0o750, parents=True, exist_ok=True)
+    if E('KIENZLE_SICHERUNG_CHOWN', '1') == '1':
+        shutil.chown(out_dir, 'root', 'ks-core')
+    for old in out_dir.glob('*.kse'):
+        old.unlink()
+    name = time.strftime('kienzle-einstellungen-%Y%m%d-%H%M%S.kse')
+    target = out_dir / name
+    r = subprocess.run([TRESOR, 'verschluesseln', str(target)], input=password.encode() + b'\n' + buf.getvalue(), capture_output=True, timeout=300)
+    if r.returncode != 0:
+        target.unlink(missing_ok=True)
+        raise Fehler('Verschlüsseln fehlgeschlagen: ' + _clean(r.stderr.decode(errors='replace').strip()))
+    os.chmod(target, 0o640)
+    if E('KIENZLE_SICHERUNG_CHOWN', '1') == '1':
+        shutil.chown(target, 'root', 'ks-core')
+    set_status(export={'datei': name, 'zeit': int(time.time()), 'groesse': target.stat().st_size, 'dateien': len(listing), 'mit_sicherungspasswort': with_backup_password})
+    return f'Einstellungen exportiert ({len(listing)} Dateien). Die Datei liegt {EXPORT_HOURS} Stunden zum Herunterladen bereit.'
+
+
+def _exists(fn, name: str) -> bool:
+    try:
+        fn(name)
+        return True
+    except KeyError:
+        return False
+
+
+def import_settings(path: Path, password: str, apply: bool, target: Path | None = None) -> list[str]:
+    """Export entschlüsseln und prüfen; mit apply=True die Dateien an ihren Platz zurücklegen, sonst nach target auspacken."""
+    import tarfile
+    tmp = Path(tempfile.mkdtemp(prefix='kienzle-import-'))
+    try:
+        plain = tmp / 'daten.tar.gz'
+        r = subprocess.run([TRESOR, 'entschluesseln', str(path), str(plain)], input=password.encode() + b'\n', capture_output=True, timeout=300)
+        if r.returncode != 0:
+            raise Fehler(_clean(r.stderr.decode(errors='replace').strip()) or 'Entschlüsseln fehlgeschlagen.')
+        # Nur /etc/kienzle und die angemeldeten Einstellungen der hier installierten Module – nichts sonst unter /var/lib.
+        allowed = [str(KIENZLE_ETC).lstrip('/')] + [str(p).lstrip('/') for p, part in _settings_paths(existing=False) if part != 'core']
+        done = []
+        with tarfile.open(plain, 'r:gz') as tar:
+            members = tar.getmembers()
+            for m in members:
+                n = m.name
+                if n == 'kienzle-einstellungen.json':
+                    continue
+                if not m.isfile() or n.startswith('/') or '..' in n.split('/') or not any(n == a or n.startswith(a.rstrip('/') + '/') for a in allowed):
+                    raise Fehler(f'Unerwarteter Eintrag in der Datei: {n[:80]}')
+            dest_root = Path('/') if apply else target
+            if dest_root is None:
+                raise Fehler('Zielordner fehlt.')
+            for m in members:
+                if m.name == 'kienzle-einstellungen.json' and apply:
+                    continue
+                dest = (dest_root / m.name)
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                src = tar.extractfile(m)
+                tmpfile = dest.with_name('.' + dest.name + '.neu')
+                with open(tmpfile, 'wb') as f:
+                    shutil.copyfileobj(src, f)
+                os.chmod(tmpfile, m.mode & 0o777)
+                if apply and E('KIENZLE_SICHERUNG_CHOWN', '1') == '1':
+                    # Nach Namen, nicht nach Nummer: Auf einer neuen VM haben die Benutzer andere Nummern.
+                    import grp
+                    import pwd
+                    user = m.uname if m.uname and _exists(pwd.getpwnam, m.uname) else 'root'
+                    group = m.gname if m.gname and _exists(grp.getgrnam, m.gname) else 'root'
+                    shutil.chown(tmpfile, user, group)
+                os.replace(tmpfile, dest)
+                done.append('/' + m.name)
+        return done
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # ---- Anfragen des Webinterfaces ----------------------------------------------------------------------------------
 STOP = {'core': ['systemctl stop kienzle-core-php.service']}
 START = {'core': ['systemctl start kienzle-core-php.service']}
@@ -598,6 +717,11 @@ def dispatch(req: dict) -> str:
         units = ' '.join(_module_units(part)) if part != 'core' else ''
         return restore_part(str(req.get('snapshot', '')), part, STOP.get(part, [f'systemctl stop {units}'] if units else []),
                             START.get(part, [f'systemctl start {units}'] if units else []))
+    if a == 'export':
+        return export_settings(str(req.get('passwort', '')), req.get('mit_sicherungspasswort') is True)
+    if a == 'export-loeschen':
+        clean_exports(-1)
+        return 'Export-Datei gelöscht.'
     if a == 'schnappschuesse':
         return f'{len(snapshots())} Sicherungen vorhanden.'
     raise Fehler('Anfrage ungültig.')

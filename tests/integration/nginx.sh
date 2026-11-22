@@ -143,6 +143,14 @@ sicher "{\"action\":\"wiederherstellen\",\"teil\":\"core\",\"snapshot\":\"$snap\
 [ "$(sql "SELECT count(*) FROM users WHERE login = 'dora'")" = 1 ] || fail 'Benutzer nach Wiederherstellung fehlt'
 [ "$(stat -c '%U' /var/lib/kienzle/core/core.sqlite)" = ks-core ] || fail 'Datenbank nach Wiederherstellung nicht ks-core'
 c -b "$T/dora" "https://$host/verwaltung/sicherung" | grep -q 'Letzte Sicherung' || fail 'Sicherungsseite'
+sicher '{"action":"export","passwort":"Ein-langes-Export-Passwort"}'
+c -b "$T/dora" -o "$T/export.kse" "https://$host/verwaltung/sicherung/export" || fail 'Export herunterladen'
+head -c 24 "$T/export.kse" | grep -q '^KIENZLE-EINSTELLUNGEN 1 ' || fail 'Export-Datei falsch'
+if grep -qa 'BEGIN' "$T/export.kse"; then fail 'Export enthält Klartext'; fi
+python3 -I -c 'import sys; sys.path.insert(0, "/opt/kienzle/core/current/lib"); from pathlib import Path; from kienzle import sicherung as s
+f = s.import_settings(Path(sys.argv[1]), "Ein-langes-Export-Passwort", False, Path(sys.argv[2])); sys.exit(0 if f else 1)' "$T/export.kse" "$T/ansicht" || fail 'Export entschlüsseln'
+cmp -s "$T/ansicht/etc/kienzle/ca/ca.crt" /etc/kienzle/ca/ca.crt || fail 'CA fehlt im Export'
+[ ! -e "$T/ansicht/etc/kienzle/sicherung/passwort" ] || fail 'Sicherungspasswort ohne Auswahl im Export'
 sicher '{"action":"blatt-gedruckt"}'
 [ ! -e /var/lib/kienzle/sicherung/blatt.html ] || fail 'Blatt nicht gelöscht'
 
