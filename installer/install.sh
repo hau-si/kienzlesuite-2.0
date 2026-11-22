@@ -90,7 +90,7 @@ DEBIAN_FRONTEND=noninteractive apt-get update -q
 wait_apt
 DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends \
   nginx php-fpm php-cli php-sqlite3 php-mbstring openssl qrencode python3 ca-certificates psmisc curl nftables iproute2 smbclient openssh-client restic cifs-utils \
-  cups cups-bsd cups-ipp-utils samba winbind unattended-upgrades
+  cups cups-bsd cups-ipp-utils samba unattended-upgrades
 
 phpv=$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')
 phpfpm=/usr/sbin/php-fpm$phpv
@@ -261,8 +261,6 @@ if [ -z "$nosystemd" ]; then
   systemctl enable --now kienzle-update.path kienzle-update-pruefen.timer kienzle-verbindungen.path kienzle-ablage.timer kienzle-sicherung.path kienzle-sicherung.timer kienzle-ueberblick.path kienzle-ueberblick.timer kienzle-drucker.path kienzle-drucker.timer
   # Druckserver: CUPS und smbd; nmbd (NetBIOS) und der AD-Dienst werden nicht gebraucht.
   systemctl disable --now nmbd.service samba-ad-dc.service >/dev/null 2>&1 || true
-  # winbind nur im Domänenbetrieb (Verwaltung → Drucker → Windows-Netz).
-  if ! grep -q 'security = ads' /etc/samba/kienzle-netz.conf 2>/dev/null; then systemctl disable --now winbind.service >/dev/null 2>&1 || true; fi
   systemctl enable cups.service smbd.service >/dev/null 2>&1 || true
   for entry in "${conf_changed[@]}"; do
     unit=${entry%%:*}; dest=${entry#*:}

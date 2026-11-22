@@ -35,11 +35,10 @@ DATA = Path(E('KIENZLE_DRUCKER_DATA', '/var/lib/kienzle'))
 PORTS = range(47100, 47200)                     # IPP-Everywhere-Drucker der Module, nur localhost
 BIN = {k: E(f'KIENZLE_{k.upper()}', v) for k, v in {'lpadmin': '/usr/sbin/lpadmin', 'lpinfo': '/usr/sbin/lpinfo', 'lpstat': '/usr/bin/lpstat',
                                                      'lp': '/usr/bin/lp', 'cupsenable': '/usr/sbin/cupsenable', 'cupsaccept': '/usr/sbin/cupsaccept',
-                                                     'smbcontrol': '/usr/bin/smbcontrol', 'cancel': '/usr/bin/cancel', 'net': '/usr/bin/net',
+                                                     'smbcontrol': '/usr/bin/smbcontrol', 'cancel': '/usr/bin/cancel',
                                                      'testparm': '/usr/bin/testparm', 'ippeveprinter': '/usr/sbin/ippeveprinter', 'runuser': '/usr/sbin/runuser'}.items()}
 JOB = re.compile(r'^[A-Za-z0-9_-]{1,40}-\d{1,9}$')
 WORKGROUP = re.compile(r'^[A-Za-z0-9][A-Za-z0-9-]{0,14}$')
-REALM = re.compile(r'^(?=.{3,253}$)[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$')
 MARK = 'Kienzle-Suite'
 KINDS = {
     'tm-m10': {'label': 'Bondrucker Epson TM-m10 (58 mm)', 'port': 9100, 'name': 'TM-m10'},
@@ -79,8 +78,8 @@ def _read(path: Path, default):
         return default
 
 
-def run(name: str, *args: str, timeout: int = 60, allow_empty: bool = False, data: bytes | None = None, extra_env: dict | None = None) -> str:
-    env = {'PATH': '/usr/bin:/bin:/usr/sbin:/sbin', 'LANG': 'C', **{k: v for k, v in os.environ.items() if k.startswith('FAKE_')}, **(extra_env or {})}   # FAKE_: nur Tests
+def run(name: str, *args: str, timeout: int = 60, allow_empty: bool = False, data: bytes | None = None) -> str:
+    env = {'PATH': '/usr/bin:/bin:/usr/sbin:/sbin', 'LANG': 'C', **{k: v for k, v in os.environ.items() if k.startswith('FAKE_')}}   # FAKE_: nur Tests
     r = subprocess.run([BIN[name], *args], capture_output=True, timeout=timeout, input=data, env=env)
     out, err = r.stdout.decode(errors='replace'), r.stderr.decode(errors='replace')
     if r.returncode == 0:
@@ -494,21 +493,14 @@ def samba() -> bool:
     return True
 
 
-# ---- Windows-Netz: Arbeitsgruppe oder Domäne ----------------------------------------------------------------------
+# ---- Windows-Netz: Arbeitsgruppe ---------------------------------------------------------------------------------
 def network() -> dict:
     n = _read(STATE / 'netz.json', {})
-    return {'modus': n.get('modus') if n.get('modus') in ('arbeitsgruppe', 'domaene') else 'arbeitsgruppe',
-            'arbeitsgruppe': n.get('arbeitsgruppe', 'WORKGROUP'), 'realm': n.get('realm', ''), 'beigetreten': n.get('beigetreten', 0)}
+    return {'arbeitsgruppe': n.get('arbeitsgruppe', 'WORKGROUP')}
 
 
 def network_conf(n: dict) -> str:
     head = '# Kienzle-Suite: von kienzle-drucker erzeugt (Verwaltung → Drucker → Windows-Netz), nicht von Hand ändern.\n'
-    if n['modus'] == 'domaene':
-        wg = n['arbeitsgruppe'].upper()
-        return (head + f'   workgroup = {wg}\n   realm = {n["realm"].upper()}\n   security = ads\n   server role = member server\n'
-                '   kerberos method = secrets and keytab\n   winbind use default domain = yes\n   winbind refresh tickets = yes\n'
-                '   idmap config * : backend = tdb\n   idmap config * : range = 3000-7999\n'
-                f'   idmap config {wg} : backend = rid\n   idmap config {wg} : range = 10000-999999\n')
     return head + f'   workgroup = {n["arbeitsgruppe"].upper()}\n   server role = standalone server\n'
 
 
@@ -534,49 +526,11 @@ def _restart(*units: str) -> None:
 def set_workgroup(name: str) -> str:
     if not WORKGROUP.match(name or ''):
         raise Fehler('Arbeitsgruppe: 1–15 Buchstaben, Ziffern oder Bindestrich.')
-    if network()['modus'] == 'domaene':
-        raise Fehler('Der Server ist Mitglied einer Domäne. Bitte zuerst die Domäne verlassen.')
-    n = {'modus': 'arbeitsgruppe', 'arbeitsgruppe': name.upper()}
+    n = {'arbeitsgruppe': name.upper()}
     _apply_network(n)
     _write(STATE / 'netz.json', n, 0o644)
     _restart('smbd.service')
     return f'Arbeitsgruppe {name.upper()} gespeichert.'
-
-
-def join_domain(realm: str, workgroup: str, user: str, password: str) -> str:
-    """Der Domäne beitreten (net ads join). Das Passwort geht nur über die Umgebung an net, nie in Argumente oder Protokolle."""
-    if not REALM.match(realm or '') or not WORKGROUP.match(workgroup or ''):
-        raise Fehler('Domäne (z. B. PRAXIS.EXAMPLE.ORG) und NetBIOS-Name der Domäne (z. B. PRAXIS) angeben.')
-    if not re.fullmatch(r'[A-Za-z0-9._@-]{1,64}', user or '') or not isinstance(password, str) or not 1 <= len(password) <= 200 or re.search(r'[\x00-\x1f]', password):
-        raise Fehler('Benutzer und Passwort eines Domänen-Admins angeben.')
-    n = {'modus': 'domaene', 'arbeitsgruppe': workgroup.upper(), 'realm': realm.upper()}
-    before = network()
-    _apply_network(n)
-    try:
-        run('net', 'ads', 'join', '-U', user, timeout=120, extra_env={'PASSWD': password})
-    except Fehler as e:
-        _apply_network(before)
-        raise Fehler('Beitritt fehlgeschlagen: ' + str(e).removeprefix('Druckereinrichtung fehlgeschlagen: ')) from None
-    _write(STATE / 'netz.json', {**n, 'beigetreten': int(time.time())}, 0o644)
-    _restart('winbind.service', 'smbd.service')
-    return f'Der Server ist der Domäne {realm.upper()} beigetreten.'
-
-
-def leave_domain(user: str, password: str) -> str:
-    n = network()
-    if n['modus'] != 'domaene':
-        raise Fehler('Der Server ist keiner Domäne beigetreten.')
-    if not re.fullmatch(r'[A-Za-z0-9._@-]{1,64}', user or '') or not isinstance(password, str) or not 1 <= len(password) <= 200:
-        raise Fehler('Benutzer und Passwort eines Domänen-Admins angeben.')
-    try:
-        run('net', 'ads', 'leave', '-U', user, timeout=120, extra_env={'PASSWD': password})
-    except Fehler as e:
-        raise Fehler('Verlassen fehlgeschlagen: ' + str(e).removeprefix('Druckereinrichtung fehlgeschlagen: ')) from None
-    w = {'modus': 'arbeitsgruppe', 'arbeitsgruppe': n['arbeitsgruppe']}
-    _apply_network(w)
-    _write(STATE / 'netz.json', w, 0o644)
-    _restart('smbd.service', 'winbind.service')
-    return 'Domäne verlassen; der Server arbeitet wieder in der Arbeitsgruppe.'
 
 
 # ---- Status und Anfragen -----------------------------------------------------------------------------------------
@@ -626,10 +580,6 @@ def dispatch(req: dict) -> str:
     if a == 'arbeitsgruppe':
         msg = set_workgroup(str(req.get('arbeitsgruppe', '')))
         return msg
-    if a == 'domaene-beitreten':
-        return join_domain(str(req.get('realm', '')), str(req.get('arbeitsgruppe', '')), str(req.get('benutzer', '')), str(req.get('passwort', '')))
-    if a == 'domaene-verlassen':
-        return leave_domain(str(req.get('benutzer', '')), str(req.get('passwort', '')))
     if a == 'abgleichen':
         notes = sync()
         return 'Virtuelle Drucker abgeglichen.' + (' ' + ' '.join(notes) if notes else '')

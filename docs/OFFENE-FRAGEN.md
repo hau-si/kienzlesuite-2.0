@@ -2,7 +2,7 @@
 
 **Antworten vom 22.11.2026** (Thomas): 1 ja (M9), 2 Anleitung geschickt, 3 nur Ansagen, 4 Test-VM folgt, 5 ja,
 6 bleibt (siehe unten), 7 ja, 8 ja (Schlüsselblatt), 9 erst einmal nicht, 10 ja, 11 Zeitplan wählbar, 12 ja, 13 nein,
-14 nein, 15 wählbar mit Domäne, 16 öffentlich, 17 ja, 18 umstellen, 19 ja. Umsetzung: Basis 0.9.0 ff. (`docs/RELEASE.md`).
+14 nein, 15 Arbeitsgruppe wählbar (Active Directory später verworfen), 16 öffentlich, 17 ja, 18 umstellen, 19 ja. Umsetzung: Basis 0.9.0 ff. (`docs/RELEASE.md`).
 
 Zu 6 (SFTP mit Passwort): Die sichere und übliche Lösung ist der Schlüssel, wie eingebaut. SFTP mit Passwort braucht ein
 Passwort im Prozess bzw. ein Hilfsprogramm und hat keinen Vorteil. Kann ein NAS kein SFTP mit Schlüssel, ist SMB 3 mit
@@ -70,6 +70,5 @@ Als Nächstes: Prüflisten auf der Test-VM, dann Schritt 2 (SumUp- und Terminzet
 
 20. **Anmeldung für Dienste:** Welche Dienste sollen zuerst angebunden werden (Telefonanlage, NAS, Router)? Brauchen sie
     Refresh-Token (lange Sitzungen ohne erneute Anmeldung) oder Browser-Apps mit CORS? Beides ist bisher nicht eingebaut.
-21. **Domäne:** Gibt es eine Praxis mit Active Directory zum Testen des Beitritts? Ohne echte Domäne ist er nur nachgebaut geprüft.
-22. **Schlüsselblatt:** Enthält jetzt den privaten SSH-Schlüssel für das NAS. Wer das Blatt hat, kann die Sicherung lesen und
-    sich am NAS anmelden – der Tresor ist Pflicht. Passt das so?
+21. ~~Domäne~~: entfällt, Active Directory wird nicht unterstützt (22.11.2026).
+22. **Schlüsselblatt** mit privatem SSH-Schlüssel: bestätigt (22.11.2026). Aufbewahrung im Tresor ist Pflicht.

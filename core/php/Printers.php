@@ -38,8 +38,7 @@ final class Printers {
                 'groesse' => (int)($j['groesse'] ?? 0), 'zeit' => mb_substr((string)($j['zeit'] ?? ''), 0, 40)];
         }
         $n = is_array($s['netz'] ?? null) ? $s['netz'] : [];
-        $net = ['modus' => ($n['modus'] ?? '') === 'domaene' ? 'domaene' : 'arbeitsgruppe', 'arbeitsgruppe' => mb_substr((string)($n['arbeitsgruppe'] ?? 'WORKGROUP'), 0, 15),
-            'realm' => mb_substr((string)($n['realm'] ?? ''), 0, 253)];
+        $net = ['arbeitsgruppe' => mb_substr((string)($n['arbeitsgruppe'] ?? 'WORKGROUP'), 0, 15)];
         return ['queues' => $queues, 'found' => $found, 'jobs' => $jobs, 'net' => $net, 'searched' => (int)($s['gesucht'] ?? 0), 'error' => mb_substr((string)($s['fehler'] ?? ''), 0, 300),
             'last' => is_array($s['letzte'] ?? null) ? $s['letzte'] : null, 'pending' => is_file($this->request()), 'service' => is_file(self::$unit)];
     }
@@ -70,20 +69,6 @@ final class Printers {
     public function setWorkgroup(string $name): void {
         if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9-]{0,14}$/D', $name)) throw new Problem('Arbeitsgruppe: 1–15 Buchstaben, Ziffern oder Bindestrich.', 422);
         $this->write(['action' => 'arbeitsgruppe', 'arbeitsgruppe' => $name]);
-    }
-
-    /** Domänenbeitritt; Benutzer und Passwort eines Domänen-Admins gehen nur in die Anfragedatei (0600) an den root-Dienst. */
-    public function joinDomain(string $realm, string $workgroup, string $user, string $password): void {
-        if (!preg_match('/^(?=.{3,253}$)[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/D', $realm) || !preg_match('/^[A-Za-z0-9][A-Za-z0-9-]{0,14}$/D', $workgroup)) {
-            throw new Problem('Bitte die Domäne (z. B. PRAXIS.EXAMPLE.ORG) und ihren NetBIOS-Namen (z. B. PRAXIS) angeben.', 422);
-        }
-        if (!preg_match('/^[A-Za-z0-9._@-]{1,64}$/D', $user) || $password === '' || strlen($password) > 200) throw new Problem('Benutzer und Passwort eines Domänen-Admins angeben.', 422);
-        $this->write(['action' => 'domaene-beitreten', 'realm' => $realm, 'arbeitsgruppe' => $workgroup, 'benutzer' => $user, 'passwort' => $password]);
-    }
-
-    public function leaveDomain(string $user, string $password): void {
-        if (!preg_match('/^[A-Za-z0-9._@-]{1,64}$/D', $user) || $password === '' || strlen($password) > 200) throw new Problem('Benutzer und Passwort eines Domänen-Admins angeben.', 422);
-        $this->write(['action' => 'domaene-verlassen', 'benutzer' => $user, 'passwort' => $password]);
     }
 
     private static function shares(array $share): array { return array_values(array_intersect(['samba', 'ipp'], $share)); }

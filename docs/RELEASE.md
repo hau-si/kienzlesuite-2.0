@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.11.1
+
+- **Domänenbeitritt (Active Directory) wieder entfernt** (Entscheidung vom 22.11.2026). Unter Verwaltung → Drucker →
+  Windows-Netz bleibt die wählbare Arbeitsgruppe; Paket `winbind` wird nicht mehr installiert.
+- Privater SSH-Schlüssel auf dem Schlüsselblatt bestätigt (Frage 22).
+
 ## 0.11.0
 
 Meilenstein 9 (`docs/PLAN.md`): Basis als OpenID-Connect-Anbieter für Dienste mit eigener Anmeldung.

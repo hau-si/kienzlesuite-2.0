@@ -1,5 +1,5 @@
-# Kienzle-Suite: Drucker suchen, anlegen, entfernen, freigeben, Domänenbeitritt (root; einziger Aufrufer von lpadmin).
-# Ohne ProtectSystem: Der Dienst schreibt Einheiten der virtuellen Drucker und beim Domänenbeitritt Samba-/Kerberos-Dateien.
+# Kienzle-Suite: Drucker suchen, anlegen, entfernen, freigeben (root; einziger Aufrufer von lpadmin).
+# Ohne ProtectSystem: Der Dienst schreibt Einheiten der virtuellen Drucker und die Samba-Einstellungen.
 [Unit]
 Description=Kienzle-Suite Drucker anwenden
 After=cups.service

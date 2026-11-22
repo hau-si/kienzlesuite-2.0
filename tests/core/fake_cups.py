@@ -68,12 +68,6 @@ elif prog == 'cancel':
         if j['id'] in args or ('-a' in args and j['id'].rsplit('-', 1)[0] == args[-1]):
             j['fertig'] = True
     save()
-elif prog == 'net':
-    data.setdefault('net', []).append({'args': args, 'passwd': os.environ.get('PASSWD')})
-    save()
-    if os.environ.get('PASSWD') != 'Domaenen-Passwort-1':
-        print('Failed to join domain: Logon failure', file=sys.stderr)
-        sys.exit(255)
 elif prog == 'testparm':
     save()
     sys.exit(0)

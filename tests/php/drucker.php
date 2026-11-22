@@ -17,7 +17,7 @@ function pr_env(array $status = []): array {
         ['name' => 'Fremd', 'address' => '192.0.2.7', 'state' => 'bereit', 'description' => 'Von <b>Hand', 'managed' => false, 'modul' => '', 'share' => []],
         ['name' => '../boese', 'address' => '', 'state' => '', 'description' => '', 'managed' => true]],
         'auftraege' => [['id' => 'Bon-12', 'drucker' => 'Bon', 'benutzer' => 'ks-kasse', 'groesse' => 2048, 'zeit' => 'Sun 22 Nov'], ['id' => 'x; rm', 'drucker' => 'Bon']],
-        'netz' => ['modus' => 'arbeitsgruppe', 'arbeitsgruppe' => 'WORKGROUP'],
+        'netz' => ['arbeitsgruppe' => 'WORKGROUP'],
         'gefunden' => [['uri' => 'ipp://192.0.2.90/ipp/print', 'name' => 'A4 <i>Empfang', 'kind' => 'office', 'connection' => 'Netzwerk'], ['uri' => 'file:///etc/passwd', 'name' => 'x', 'kind' => null]]]));
     return [$env, new Printers($env->db)];
 }
@@ -85,19 +85,13 @@ function test_auftraege_und_netz(): void {
     $b->web = fn() => $b->defaultWeb(null, null, null, null, $p);
     $page = $b->get('/verwaltung/drucker')->body;
     check(str_contains($page, '<code>Bon-12</code>') && !str_contains($page, 'x; rm') && str_contains($page, 'Alle Aufträge von Bon abbrechen'), 'Aufträge');
-    check(str_contains($page, 'Arbeitsgruppe: <strong>WORKGROUP') && str_contains($page, 'Der Domäne beitreten'), 'Windows-Netz');
+    check(str_contains($page, 'Arbeitsgruppe: <strong>WORKGROUP') && !str_contains($page, 'Domäne'), 'Windows-Netz');
     $b->post('/verwaltung/drucker', ['aktion' => 'abbrechen', 'auftrag' => 'Bon-12']);
     check(req_p($env) === ['action' => 'abbrechen', 'auftrag' => 'Bon-12'], 'Abbrechen');
     check($b->post('/verwaltung/drucker', ['aktion' => 'abbrechen', 'auftrag' => 'Bon-99'])->status === 422, 'unbekannter Auftrag');
     $b->post('/verwaltung/drucker', ['aktion' => 'arbeitsgruppe', 'arbeitsgruppe' => 'PRAXIS']);
     check(req_p($env) === ['action' => 'arbeitsgruppe', 'arbeitsgruppe' => 'PRAXIS'], 'Arbeitsgruppe');
-    $b->post('/verwaltung/drucker', ['aktion' => 'domaene-beitreten', 'realm' => 'praxis.example.org', 'arbeitsgruppe' => 'PRAXIS', 'benutzer' => 'admin', 'passwort' => 'Domaenen-Passwort-1']);
-    $f = $env->dir . '/anfragen/drucker.json';
-    check(substr(sprintf('%o', fileperms($f)), -3) === '600', 'Anfrage mit Passwort nicht 0600');
-    check(req_p($env)['passwort'] === 'Domaenen-Passwort-1', 'Beitritt');
-    check(!str_contains((string)file_get_contents($env->audit->path()), 'Domaenen-Passwort'), 'Passwort im Protokoll');
-    check(str_contains(implode("\n", $env->audit->recent()), 'drucker-domaene-beitreten praxis.example.org'), 'Beitritt nicht protokolliert');
-    check($b->post('/verwaltung/drucker', ['aktion' => 'domaene-beitreten', 'realm' => 'x', 'arbeitsgruppe' => 'P', 'benutzer' => 'a', 'passwort' => 'p'])->status === 422, 'ungültige Domäne');
+    check(str_contains(implode("\n", $env->audit->recent()), 'drucker-arbeitsgruppe PRAXIS'), 'Arbeitsgruppe nicht protokolliert');
 }
 
 run_tests();

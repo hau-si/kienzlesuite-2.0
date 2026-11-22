@@ -20,7 +20,7 @@ class Umgebung(unittest.TestCase):
         self.t = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.t)
         (self.t / 'bin').mkdir()
-        for p in ('lpadmin', 'lpstat', 'lpinfo', 'lp', 'cancel', 'net', 'testparm', 'systemctl'):
+        for p in ('lpadmin', 'lpstat', 'lpinfo', 'lp', 'cancel', 'testparm', 'systemctl'):
             (self.t / 'bin' / p).symlink_to(FAKE)
         env = {'FAKE_CUPS': self.t / 'cups.json', 'KIENZLE_DRUCKER_STATE': self.t / 'state', 'KIENZLE_DRUCKER_REQUEST': self.t / 'anfrage.json',
                'KIENZLE_DRUCKER_MODULES': self.t / 'modules.json', 'KIENZLE_DRUCKER_PROGRAMME': self.t / 'opt', 'KIENZLE_DRUCKER_BACKENDS': self.t / 'backend',
@@ -28,7 +28,7 @@ class Umgebung(unittest.TestCase):
                'KIENZLE_DRUCKER_CHOWN': '0', 'KIENZLE_DRUCKER_PROBE': 'ja', 'KIENZLE_SMBCONTROL': self.t / 'fehlt',
                'KIENZLE_DRUCKER_SAMBA_NETZ': self.t / 'kienzle-netz.conf', 'KIENZLE_DRUCKER_UNITS': self.t / 'units', 'KIENZLE_DRUCKER_SYSTEMCTL': self.t / 'bin/systemctl',
                'KIENZLE_DRUCKER_DATA': self.t / 'data', 'KIENZLE_DRUCKER_WARTEN': '1'}
-        env.update({f'KIENZLE_{p.upper()}': self.t / 'bin' / p for p in ('lpadmin', 'lpstat', 'lpinfo', 'lp', 'cancel', 'net', 'testparm')})
+        env.update({f'KIENZLE_{p.upper()}': self.t / 'bin' / p for p in ('lpadmin', 'lpstat', 'lpinfo', 'lp', 'cancel', 'testparm')})
         p = mock.patch.dict(os.environ, {k: str(v) for k, v in env.items()})
         p.start()
         self.addCleanup(p.stop)
@@ -175,26 +175,6 @@ class WindowsNetz(Umgebung):
         for bad in ('', 'mit leer', 'x' * 16, 'A\nsecurity = user'):
             with self.subTest(bad), self.assertRaises(self.d.Fehler):
                 self.d.set_workgroup(bad)
-
-    def test_domaene(self):
-        with self.assertRaisesRegex(self.d.Fehler, 'Beitritt fehlgeschlagen'):
-            self.d.join_domain('praxis.example.org', 'PRAXIS', 'admin', 'falsch')
-        self.assertIn('standalone', (self.t / 'kienzle-netz.conf').read_text(), 'Einstellung nach Fehlschlag nicht zurückgenommen')
-        self.assertIn('PRAXIS.EXAMPLE.ORG', self.d.join_domain('praxis.example.org', 'praxis', 'admin', 'Domaenen-Passwort-1'))
-        conf = (self.t / 'kienzle-netz.conf').read_text()
-        for line in ('realm = PRAXIS.EXAMPLE.ORG', 'security = ads', 'idmap config PRAXIS : backend = rid'):
-            self.assertIn(line, conf)
-        net = self.cups()['net'][-1]
-        self.assertEqual(net['args'], ['ads', 'join', '-U', 'admin'])
-        self.assertNotIn('Domaenen-Passwort-1', json.dumps(self.cups()['calls']), 'Passwort in den Argumenten')
-        self.assertEqual(self.d.network()['modus'], 'domaene')
-        with self.assertRaisesRegex(self.d.Fehler, 'Domäne verlassen'):
-            self.d.set_workgroup('ANDERS')
-        self.assertIn('wieder in der Arbeitsgruppe', self.d.leave_domain('admin', 'Domaenen-Passwort-1'))
-        self.assertIn('workgroup = PRAXIS', (self.t / 'kienzle-netz.conf').read_text())
-        for args in (('x', 'PRAXIS', 'admin', 'p'), ('praxis.example.org', 'PRAXIS', 'ad min', 'p'), ('praxis.example.org', 'PRAXIS', 'admin', '')):
-            with self.subTest(args), self.assertRaises(self.d.Fehler):
-                self.d.join_domain(*args)
 
 
 class IppEverywhere(Umgebung):
