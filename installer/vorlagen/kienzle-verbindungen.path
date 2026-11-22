@@ -1,0 +1,10 @@
+# Kienzle-Suite: Änderungen an zentralen Verbindungen übernehmen (Anfragedatei von ks-core).
+[Unit]
+Description=Kienzle-Suite Verbindungen
+
+[Path]
+PathExists=/var/lib/kienzle/core/anfragen/verbindungen.json
+Unit=kienzle-verbindungen-anwenden.service
+
+[Install]
+WantedBy=multi-user.target

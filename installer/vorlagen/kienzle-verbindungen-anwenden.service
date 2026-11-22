@@ -1,0 +1,14 @@
+# Kienzle-Suite: Verbindungen speichern, prüfen und an die Module verteilen (root, Zugangsdaten bleiben root-eigen).
+[Unit]
+Description=Kienzle-Suite Verbindungen anwenden
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/kienzle/core/current/bin/kienzle-verbindungen anwenden
+TimeoutStartSec=300
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/etc/kienzle /var/lib/kienzle/verbindungen /var/lib/kienzle/core/anfragen /var/spool/kienzle

@@ -66,7 +66,7 @@ wait_apt
 DEBIAN_FRONTEND=noninteractive apt-get update -q
 wait_apt
 DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends \
-  nginx php-fpm php-cli php-sqlite3 php-mbstring openssl qrencode python3 ca-certificates psmisc curl nftables iproute2
+  nginx php-fpm php-cli php-sqlite3 php-mbstring openssl qrencode python3 ca-certificates psmisc curl nftables iproute2 smbclient openssh-client
 
 phpv=$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')
 phpfpm=/usr/sbin/php-fpm$phpv
@@ -75,10 +75,18 @@ php -r 'exit(function_exists("sodium_crypto_secretbox") && defined("PASSWORD_ARG
 
 echo '== Benutzer und Ordner'
 id ks-core >/dev/null 2>&1 || useradd --system --home-dir /var/lib/kienzle/core --no-create-home --shell /usr/sbin/nologin ks-core
+id ks-ablage >/dev/null 2>&1 || useradd --system --home-dir /var/lib/kienzle/ablage --no-create-home --shell /usr/sbin/nologin ks-ablage
 install -d -m 0755 -o root -g root /etc/kienzle /var/lib/kienzle /opt/kienzle /opt/kienzle/core /opt/kienzle/core/releases
 install -d -m 0750 -o root -g ks-core /etc/kienzle/core
 install -d -m 0700 -o ks-core -g ks-core /var/lib/kienzle/core /var/lib/kienzle/core/anfragen
-install -d -m 0755 -o root -g root /var/lib/kienzle/firewall /var/lib/kienzle/update
+install -d -m 0755 -o root -g root /var/lib/kienzle/firewall /var/lib/kienzle/update /var/lib/kienzle/verbindungen
+install -d -m 0755 -o root -g root /etc/kienzle/verbindungen /etc/kienzle/verbindungen/module /etc/kienzle/schluessel /var/spool/kienzle /var/spool/kienzle/ablage
+install -d -m 0755 -o ks-ablage -g ks-ablage /var/lib/kienzle/ablage
+install -d -m 0700 -o ks-ablage -g ks-ablage /var/lib/kienzle/ablage/.ssh
+# Eigener SSH-Schlüssel des Netzwerkspeicher-Dienstes (für SFTP-Ziele; der öffentliche Teil steht unter Verwaltung → Verbindungen).
+if [ ! -f /var/lib/kienzle/ablage/.ssh/id_ed25519 ] && command -v ssh-keygen >/dev/null; then
+  runuser -u ks-ablage -- ssh-keygen -q -t ed25519 -N '' -C "ks-ablage@$(hostname)" -f /var/lib/kienzle/ablage/.ssh/id_ed25519
+fi
 
 # Programm in den Versionsordner kopieren (nur root beschreibbar) und „current“ atomar umsetzen.
 release=/opt/kienzle/core/releases/$version
@@ -90,7 +98,7 @@ chown -R root:root "$tmp"; chmod -R u=rwX,go=rX "$tmp"
 rm -rf -- "$release.alt"; [ -e "$release" ] && mv -- "$release" "$release.alt"
 mv -- "$tmp" "$release"; rm -rf -- "$release.alt"
 ln -sfn "releases/$version" /opt/kienzle/core/.current.neu && mv -Tf /opt/kienzle/core/.current.neu /opt/kienzle/core/current
-for tool in kienzle-admin kienzle-zertifikat kienzle-web kienzle-modul-pruefen kienzle-update; do ln -sfn "/opt/kienzle/core/current/bin/$tool" "/usr/local/sbin/$tool"; done
+for tool in kienzle-admin kienzle-zertifikat kienzle-web kienzle-modul-pruefen kienzle-update kienzle-verbindungen; do ln -sfn "/opt/kienzle/core/current/bin/$tool" "/usr/local/sbin/$tool"; done
 
 echo '== Einstellungen und Schlüssel'
 python3 - "$conf" "$practice" "${names[@]}" <<'PY'
@@ -134,7 +142,9 @@ sed "s#@PHPFPM@#$phpfpm#" "$vorlagen/kienzle-core-php.service" > /etc/systemd/sy
 install -m 0644 "$vorlagen/kienzle-zertifikat.service" "$vorlagen/kienzle-zertifikat.timer" \
   "$vorlagen/kienzle-firewall.path" "$vorlagen/kienzle-firewall-anwenden.service" "$vorlagen/kienzle-firewall.service" \
   "$vorlagen/kienzle-update.path" "$vorlagen/kienzle-update-anwenden.service" "$vorlagen/kienzle-update-pruefen.service" \
-  "$vorlagen/kienzle-update-pruefen.timer" "$vorlagen/kienzle-update-start.service" /etc/systemd/system/
+  "$vorlagen/kienzle-update-pruefen.timer" "$vorlagen/kienzle-update-start.service" \
+  "$vorlagen/kienzle-verbindungen.path" "$vorlagen/kienzle-verbindungen-anwenden.service" "$vorlagen/kienzle-ablage.service" "$vorlagen/kienzle-ablage.timer" \
+  /etc/systemd/system/
 chmod 0644 /etc/systemd/system/kienzle-core-php.service
 
 # nginx: nur die Suite. Die Beispielseite der Distribution wird abgeschaltet (nur der mitgelieferte Verweis).
@@ -142,13 +152,14 @@ if [ -L /etc/nginx/sites-enabled/default ] && [ "$(readlink /etc/nginx/sites-ena
   rm -f /etc/nginx/sites-enabled/default
 fi
 KIENZLE_NGINX_RELOAD='' /opt/kienzle/core/current/bin/kienzle-web schreiben
+/opt/kienzle/core/current/bin/kienzle-verbindungen verteilen
 if [ -z "$nosystemd" ]; then
   systemctl daemon-reload
   # Der php-fpm-Dienst der Distribution (Pool www-data) wird nicht gebraucht.
   systemctl disable --now "php$phpv-fpm.service" >/dev/null 2>&1 || true
   systemctl enable --now kienzle-core-php.service kienzle-zertifikat.timer kienzle-firewall.path
   systemctl enable kienzle-firewall.service kienzle-update-start.service
-  systemctl enable --now kienzle-update.path kienzle-update-pruefen.timer
+  systemctl enable --now kienzle-update.path kienzle-update-pruefen.timer kienzle-verbindungen.path kienzle-ablage.timer
   if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q 'Status: active'; then
     echo 'Hinweis: ufw ist aktiv. Die Firewall der Suite (Verwaltung → Firewall) arbeitet unabhängig davon; bitte nur eine von beiden verwenden.'
   fi

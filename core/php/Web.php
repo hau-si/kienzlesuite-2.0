@@ -18,6 +18,7 @@ final class Web {
     public function __construct(
         private Config $config, private Database $db, private Users $users, private Auth $auth, private ?Passkeys $passkeys,
         private Modules $modules, private AuditLog $audit, ?callable $qr = null, private ?Firewall $firewall = null, private ?Updates $updates = null,
+        private ?Connections $connections = null,
     ) {
         $this->qr = $qr ?? static function (string $uri): ?string {
             if (!is_executable('/usr/bin/qrencode')) return null;
@@ -433,6 +434,7 @@ final class Web {
         if ($r->path === '/verwaltung/firewall/bestaetigen' && !$get) return $this->firewallConfirm($admin);
         if ($r->path === '/verwaltung/firewall/aus' && !$get) return $this->firewallOff($admin);
         if ($r->path === '/verwaltung/updates') return $get ? $this->updatesPage() : $this->updatesAction($r, $admin);
+        if ($r->path === '/verwaltung/verbindungen') return $get ? $this->connectionsPage() : $this->connectionsAction($r, $admin);
         throw new Problem('Seite nicht gefunden.', 404);
     }
 
@@ -709,6 +711,131 @@ final class Web {
             return $this->updatesPage($e->getMessage());
         }
         return Response::redirect('/verwaltung/updates');
+    }
+
+    // ---- Verbindungen -------------------------------------------------------------------------------------------
+    private function con(): Connections {
+        if (!$this->connections) throw new Problem('Verbindungen sind auf diesem Server nicht verfügbar.', 503);
+        return $this->connections;
+    }
+
+    private function testLine(array $tests, string $key): string {
+        $t = $tests[$key] ?? null;
+        if (!is_array($t)) return '<p>Noch nicht geprüft.</p>';
+        return '<p class="' . (($t['ok'] ?? false) ? 'ok' : 'error') . '">Prüfung ' . V::date((int)($t['zeit'] ?? 0)) . ': ' . V::h((string)($t['meldung'] ?? '')) . '</p>';
+    }
+
+    private function hidden(string $action, array $extra = []): string {
+        $out = V::csrf($this->session['csrf']) . '<input type="hidden" name="aktion" value="' . V::h($action) . '">';
+        foreach ($extra as $k => $v) $out .= '<input type="hidden" name="' . V::h($k) . '" value="' . V::h($v) . '">';
+        return $out;
+    }
+
+    private function connectionsPage(?string $error = null): Response {
+        $st = $this->con()->status();
+        $t2 = $st['t2med'] ?? [];
+        $mail = $st['mail'] ?? [];
+        $set = static fn(bool $on) => $on ? 'gespeichert – leer lassen für unverändert' : '';
+        $body = V::error($error)
+            . ($st['letzte'] ? '<p class="' . ($st['letzte']['ok'] ? 'notice' : 'error') . '">' . V::h((string)$st['letzte']['meldung']) . '</p>' : '')
+            . implode('', array_map(fn($n) => '<p class="error">' . V::h($n) . '</p>', $st['hinweise']))
+            . (!$st['service'] ? '<p class="error">Der Dienst für Verbindungen ist nicht eingerichtet. Bitte den Installer ausführen.</p>' : '')
+            . '<p>Zugänge, die mehrere Module brauchen, werden hier einmal eingetragen. Ein Modul bekommt nur die Verbindungen, die es anmeldet; '
+            . 'Passwörter und Schlüssel werden nach dem Speichern nie wieder angezeigt.</p>';
+        // T2med
+        $body .= '<section><h2>T2med (FHIR)</h2><form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('t2med')
+            . V::input('base_url', 'Adresse des FHIR-Servers', 'url', (string)($t2['base_url'] ?? ''), 'placeholder="https://t2med-server:16567/aps/fhir/api/r4"')
+            . '<label>Weitere erlaubte Start-Adressen (eine je Zeile)<textarea name="launch_urls" rows="2">' . V::h(implode("\n", array_diff((array)($t2['launch_urls'] ?? []), [(string)($t2['base_url'] ?? '')]))) . '</textarea></label>'
+            . V::input('api_key', 'API-Schlüssel', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($t2['api_key_gesetzt'] ?? false))) . '"')
+            . '<label>Zertifikat des T2med-Servers (PEM, optional)' . (($t2['zertifikat'] ?? '') !== '' ? ' – gespeichert, SHA-256 <code>' . V::h(substr((string)$t2['zertifikat'], 0, 16)) . '…</code>' : '')
+            . '<textarea name="ca_pem" rows="3" placeholder="-----BEGIN CERTIFICATE-----"></textarea></label>'
+            . V::checkbox('ca_entfernen', '1', 'Gespeichertes Zertifikat entfernen', false)
+            . V::checkbox('pin', '1', 'Nur genau dieses Zertifikat annehmen (Pinning)', (bool)($t2['pin'] ?? false))
+            . '<button>Speichern</button></form>'
+            . ($t2 ? $this->testLine($st['tests'], 't2med') . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 't2med']) . '<button>Verbindung prüfen</button></form> '
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 't2med']) . '<button class="danger">Entfernen</button></form>' : '')
+            . '</section>';
+        // E-Mail
+        $sec = (string)($mail['sicherheit'] ?? 'starttls');
+        $body .= '<section><h2>E-Mail-Versand (SMTP)</h2><form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('mail')
+            . V::input('host', 'SMTP-Server', 'text', (string)($mail['host'] ?? ''), 'placeholder="smtp.example.org"')
+            . V::input('port', 'Port', 'number', (string)($mail['port'] ?? '587'), 'min="1" max="65535"')
+            . '<label>Verschlüsselung<select name="sicherheit"><option value="starttls"' . ($sec === 'starttls' ? ' selected' : '') . '>STARTTLS (meist 587)</option>'
+            . '<option value="smtps"' . ($sec === 'smtps' ? ' selected' : '') . '>SMTPS (meist 465)</option></select></label>'
+            . V::input('benutzer', 'Benutzername', 'text', (string)($mail['benutzer'] ?? ''), 'autocomplete="off"')
+            . V::input('passwort', 'Passwort', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($mail['passwort_gesetzt'] ?? false))) . '"')
+            . V::input('absender', 'Absender', 'email', (string)($mail['absender'] ?? ''), 'placeholder="praxis@example.org"')
+            . '<button>Speichern</button></form>'
+            . ($mail ? $this->testLine($st['tests'], 'mail') . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'mail']) . '<button>Anmeldung prüfen</button></form> '
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'mail']) . '<button class="danger">Entfernen</button></form>' : '')
+            . '</section>';
+        // Netzwerkspeicher
+        $body .= '<section><h2>Netzwerkspeicher</h2>';
+        foreach ($st['ablage'] as $t) {
+            $id = (string)$t['id'];
+            $body .= '<div class="box wide"><h3>' . V::h((string)$t['name']) . ' <span class="tag">' . V::h(strtoupper((string)$t['art'])) . '</span></h3><p><code>'
+                . V::h(($t['art'] === 'smb' ? '//' . $t['host'] . '/' . ($t['freigabe'] ?? '') : 'sftp://' . ($t['benutzer'] ?? '') . '@' . $t['host'] . ':' . ($t['port'] ?? 22)) . '/' . $t['ordner'])
+                . '</code></p>' . $this->testLine($st['tests'], 'ziel:' . $id);
+            if ($t['art'] === 'sftp') {
+                $body .= '<p>Schlüssel des Servers: ' . (($t['fingerprint'] ?? '') !== '' ? '<code>' . V::h((string)$t['fingerprint']) . '</code>' : '<strong>noch nicht bestätigt</strong>') . '</p>'
+                    . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('hostkey-holen', ['id' => $id]) . '<button>Schlüssel des Servers abrufen</button></form> ';
+                foreach ((array)($st['hostkeys'][$id] ?? []) as $k) {
+                    $body .= '<form method="post" action="/verwaltung/verbindungen" class="box">' . $this->hidden('hostkey-uebernehmen', ['id' => $id, 'fingerprint' => (string)$k['fingerprint']])
+                        . '<p>Abgerufen: ' . V::h((string)$k['art']) . ' <code>' . V::h((string)$k['fingerprint']) . '</code>. Nur übernehmen, wenn der Fingerabdruck mit der Anzeige des NAS übereinstimmt.</p>'
+                        . '<button>Übernehmen</button></form>';
+                }
+            }
+            $body .= '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'ziel', 'id' => $id]) . '<button>Verbindung prüfen</button></form> '
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('ziel-loeschen', ['id' => $id]) . '<button class="danger">Entfernen</button></form></div>';
+        }
+        $body .= '<form method="post" action="/verwaltung/verbindungen" class="box wide"><h3>Ziel anlegen oder ändern</h3>' . $this->hidden('ziel')
+            . '<p>Gleiche Kennung = vorhandenes Ziel ändern (leeres Passwort = unverändert).</p>'
+            . V::input('id', 'Kennung (z. B. steuerbuero)', 'text', '', 'pattern="[a-z][a-z0-9-]{1,30}" required')
+            . V::input('name', 'Bezeichnung', 'text', '', 'required')
+            . '<label>Art<select name="art"><option value="smb">SMB (Windows-Freigabe)</option><option value="sftp">SFTP (empfohlen, falls das NAS es kann)</option></select></label>'
+            . V::input('host', 'Server (Name oder IP)', 'text', '', 'required') . V::input('freigabe', 'Freigabe (nur SMB)', 'text')
+            . V::input('port', 'Port (nur SFTP)', 'number', '22', 'min="1" max="65535"') . V::input('ordner', 'Basisordner (ohne Platzhalter)', 'text', '', 'placeholder="Kienzle"')
+            . V::input('benutzer', 'Benutzer', 'text', '', 'autocomplete="off"') . V::input('passwort', 'Passwort (nur SMB)', 'password', '', 'autocomplete="new-password"')
+            . V::input('domaene', 'Domäne (nur SMB, optional)', 'text') . V::checkbox('gast', '1', 'Gastzugang (nur SMB, nicht empfohlen)', false)
+            . '<button>Ziel speichern</button></form>'
+            . ($st['sftp_schluessel'] !== '' ? '<p>Für SFTP diesen öffentlichen Schlüssel beim NAS-Benutzer eintragen (z. B. <code>~/.ssh/authorized_keys</code>):</p><pre class="notes">' . V::h($st['sftp_schluessel']) . '</pre>' : '')
+            . '</section>';
+        // Nutzung
+        $rows = '';
+        foreach ($st['nutzung'] as $u) $rows .= '<tr><td>' . V::h((string)$u['name']) . '</td><td>' . V::h((string)$u['verbindung']) . '</td><td>' . V::h((string)$u['zweck']) . '</td><td>' . (($u['pflicht'] ?? false) ? 'ja' : 'nein') . '</td></tr>';
+        $body .= '<section><h2>Wer nutzt was</h2>' . ($rows !== '' ? '<table><tr><th>Modul</th><th>Verbindung</th><th>Wofür</th><th>Nötig</th></tr>' . $rows . '</table>' : '<p>Kein installiertes Modul nutzt eine zentrale Verbindung.</p>') . '</section>';
+        $response = Response::html(V::page('Verbindungen', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+        return $st['pending'] ? $response->with('Refresh', '2') : $response;
+    }
+
+    private function connectionsAction(Request $r, string $admin): Response {
+        $c = $this->con();
+        $f = fn(string $k, int $n = 300) => $r->field($k, $n);
+        try {
+            switch ($f('aktion', 30)) {
+                case 't2med':
+                    $c->saveT2med(['base_url' => $f('base_url'), 'launch_urls' => $f('launch_urls', 3000), 'api_key' => $f('api_key'), 'ca_pem' => $f('ca_pem', 20000),
+                        'ca_entfernen' => $f('ca_entfernen') === '1', 'pin' => $f('pin') === '1']);
+                    $what = 't2med'; break;
+                case 'mail':
+                    $c->saveMail(['host' => $f('host'), 'port' => $f('port', 10), 'sicherheit' => $f('sicherheit', 20), 'benutzer' => $f('benutzer'), 'passwort' => $f('passwort'), 'absender' => $f('absender')]);
+                    $what = 'mail'; break;
+                case 'ziel':
+                    $c->saveTarget(['id' => $f('id', 40), 'name' => $f('name', 80), 'art' => $f('art', 10), 'host' => $f('host'), 'freigabe' => $f('freigabe', 100), 'port' => $f('port', 10),
+                        'ordner' => $f('ordner'), 'benutzer' => $f('benutzer', 100), 'passwort' => $f('passwort'), 'domaene' => $f('domaene', 100), 'gast' => $f('gast') === '1']);
+                    $what = 'ziel ' . $f('id', 40); break;
+                case 'ziel-loeschen': $c->removeTarget($f('id', 40)); $what = 'ziel-entfernt ' . $f('id', 40); break;
+                case 'entfernen': $c->remove($f('was', 10)); $what = 'entfernt ' . $f('was', 10); break;
+                case 'pruefen': $c->test($f('art', 10), $f('id', 40)); $what = 'pruefen ' . $f('art', 10) . ' ' . $f('id', 40); break;
+                case 'hostkey-holen': $c->fetchHostkey($f('id', 40)); $what = 'hostkey-holen ' . $f('id', 40); break;
+                case 'hostkey-uebernehmen': $c->acceptHostkey($f('id', 40), $f('fingerprint', 100)); $what = 'hostkey-uebernommen ' . $f('id', 40); break;
+                default: throw new Problem('Unbekannte Aktion.', 422);
+            }
+        } catch (Problem $e) {
+            return $this->connectionsPage($e->getMessage());
+        }
+        $this->audit->write($admin, 'verbindung', $what);
+        return Response::redirect('/verwaltung/verbindungen');
     }
 
     // ---- Hilfen -------------------------------------------------------------------------------------------------

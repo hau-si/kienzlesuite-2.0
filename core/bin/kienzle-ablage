@@ -1,0 +1,18 @@
+#!/usr/bin/python3 -IB
+"""Netzwerkspeicher der Kienzle-Suite (als ks-ablage, gestartet von systemd).
+
+  kienzle-ablage abarbeiten    Aufträge der Module übertragen (kienzle-ablage.path und stündlich)
+"""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'lib'))
+from kienzle import ablage  # noqa: E402
+
+if __name__ == '__main__':
+    if sys.argv[1:] == ['abarbeiten']:
+        jobs = ablage.process()
+        failed = [k for k, j in jobs.items() if j['zustand'] == 'fehler']
+        sys.exit(1 if failed else 0)
+    print(__doc__.strip(), file=sys.stderr)
+    sys.exit(2)

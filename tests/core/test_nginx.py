@@ -106,7 +106,7 @@ class Befehl(unittest.TestCase):
         fake.write_text('#!/bin/sh\nexit %d\n' % (0 if nginx_ok else 1))
         fake.chmod(0o755)
         env = dict(os.environ, KIENZLE_CORE_CONFIG=str(cfg), KIENZLE_MODULES_JSON=str(Path(tmp) / 'modules.json'),
-                   KIENZLE_NGINX_SITE=str(Path(tmp) / 'kienzle.conf'), KIENZLE_NGINX=str(fake), KIENZLE_NGINX_RELOAD='', KIENZLE_CORE_USER='')
+                   KIENZLE_NGINX_SITE=str(Path(tmp) / 'kienzle.conf'), KIENZLE_NGINX=str(fake), KIENZLE_NGINX_RELOAD='', KIENZLE_CORE_USER='', KIENZLE_VERTEILEN='')
         return subprocess.run([sys.executable, '-IB', str(ROOT / 'core' / 'bin' / 'kienzle-web'), *args], capture_output=True, text=True, env=env, timeout=60)
 
     def test_schreiben(self):

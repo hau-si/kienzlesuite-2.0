@@ -23,6 +23,9 @@ button.link { background: none; color: var(--accent); padding: 0; text-decoratio
 button.danger { background: var(--error); }
 button:disabled { opacity: .5; cursor: default; }
 form.inline { display: inline; }
+p.ok { color: var(--ok); }
+select { display: block; margin-top: .25rem; padding: .45rem; font: inherit; border: 1px solid var(--line); border-radius: 6px; }
+h3 { font-size: 1.05rem; margin: 0 0 .5rem; }
 .error { color: var(--error); font-weight: 600; }
 .notice { border-left: 4px solid var(--ok); background: #fff; padding: .5rem 1rem; }
 .badge { display: inline-block; min-width: 1.3em; padding: 0 .35em; border-radius: 1em; background: var(--error); color: #fff; font-size: .8rem; text-align: center; }

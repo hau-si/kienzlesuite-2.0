@@ -1,5 +1,30 @@
 # Basis – Release-Notizen
 
+## 0.5.0
+
+Meilenstein 5 aus `docs/PLAN.md`: Netzwerkspeicher und zentrale Verbindungen.
+
+- **Verwaltung → Verbindungen:** T2med (FHIR-Adresse, erlaubte Start-Adressen, API-Schlüssel, Zertifikat, Pinning), E-Mail
+  (SMTP), Ziele auf dem Netzwerkspeicher (SMB oder SFTP), je mit „Verbindung prüfen“, dazu „Wer nutzt was“.
+- **Geheimnisse bleiben root-eigen** (`/etc/kienzle/verbindungen/konfiguration.json`, 0600). Das Webinterface sieht sie nach dem
+  Speichern nie wieder; ein leeres Passwortfeld heißt „unverändert“.
+- **Verteilung nur an anmeldende Module** (`[[connections]]`): `/etc/kienzle/verbindungen/module/<id>.json`, nur für `ks-<id>`
+  lesbar. Jedes Modul bekommt einen eigenen Schlüssel für seine eigenen Geheimnisse.
+- **Netzwerkspeicher ohne Mount:** Dienst `ks-ablage` überträgt Aufträge der Module per `smbclient` bzw. `sftp`, als `.part`,
+  liest zurück, vergleicht SHA-256, benennt dann um; Wiederholung alle 5 Minuten, Aufgabe nach zwei Tagen.
+  SFTP nur mit eigenem SSH-Schlüssel und bestätigtem Serverschlüssel (Fingerabdruck), nie mit Passwort.
+- **Prüfungen:** T2med über `/metadata` (CapabilityStatement), mit eigenem Zertifikat bzw. Pinning; E-Mail nur Anmeldung, ohne
+  Versand; NAS mit Testdatei (schreiben, zurücklesen, löschen).
+- **Hilfsdatei für PHP-Module** `core/php/modul/Kienzle.php`: Benutzer und Rechte, CSRF, Bestätigung, Verbindungen, Ablage,
+  eigene Geheimnisse (`docs/MODUL-SCHNITTSTELLE.md`).
+- root-Dienst `kienzle-verbindungen` (`.path`), Dienst `kienzle-ablage` mit Timer; Installer legt `ks-ablage` mit SSH-Schlüssel an.
+- Übernommen: Pfad- und Zeichenprüfung, SFTP-/SMB-Aufrufe und geprüftes Hochladen aus Kienzlezeit
+  (`kienzlezeit-backup-und-restore.sh`), Zugangsdatei und NT_STATUS-Auswertung aus der Beta (`src/InvoiceExport.php`),
+  Prüfung der FHIR-Adressen und Pinning aus der Beta (`src/Config.php`, `src/HttpClient.php`).
+- Tests: 17 Python-Tests mit nachgebautem NAS und echtem HTTPS-Server, 4 PHP-Tests, Ende-zu-Ende-Prüfung der Dateirechte.
+
+Nicht geprüft: echtes NAS (Synology/QNAP) über SMB und SFTP, echter T2med-Server, echter SMTP-Server.
+
 ## 0.4.1
 
 - `scripts/release-bauen` bricht ab, wenn der git-Status nicht lesbar ist (bisher galt das als „alles eingecheckt“).

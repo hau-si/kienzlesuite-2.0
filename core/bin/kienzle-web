@@ -66,6 +66,10 @@ def main(argv: list[str]) -> int:
     write(Path(REGISTRY), json.dumps(registry, ensure_ascii=False, indent=1, sort_keys=True) + '\n', 0o640, OWNER)
     if RELOAD:
         subprocess.run(RELOAD.split(), check=False, timeout=30)
+    # Verbindungen und Modulschlüssel an den neuen Stand der Module anpassen.
+    verteilen = E('KIENZLE_VERTEILEN', str(Path(__file__).resolve().parent / 'kienzle-verbindungen'))
+    if verteilen:
+        subprocess.run([verteilen, 'verteilen'], check=False, timeout=60)
     print(f'Geschrieben: {len(registry["modules"])} Module, {site_path}')
     return 0
 

@@ -2,7 +2,7 @@
 declare(strict_types=1);
 // Browser-Nachbildung und Hilfen für die Tests des Webinterfaces (gemeinsam für web.php, firewall.php).
 
-use Kienzle\Core\{Auth, Firewall, Request, Response, Totp, Updates, Web};
+use Kienzle\Core\{Auth, Connections, Firewall, Request, Response, Totp, Updates, Web};
 
 /** Browser-Nachbildung: hält das Cookie, sendet Host und Origin, liest CSRF-Marken aus Seiten. */
 final class Browser {
@@ -10,10 +10,10 @@ final class Browser {
     /** @var ?Closure(): Web eigene Zusammenstellung (z. B. mit Firewall) */
     public ?Closure $web = null;
     public function __construct(public Env $env, public string $ip = '192.0.2.10') {}
-    public function defaultWeb(?Firewall $firewall = null, ?Updates $updates = null): Web {
+    public function defaultWeb(?Firewall $firewall = null, ?Updates $updates = null, ?Connections $connections = null): Web {
         $auth = new Auth($this->env->db, $this->env->users, $this->env->audit, $this->ip);
         return new Web($this->env->config, $this->env->db, $this->env->users, $auth, $this->env->passkeys, $this->env->modules, $this->env->audit,
-            static fn(string $uri) => '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"/>', $firewall, $updates);
+            static fn(string $uri) => '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"/>', $firewall, $updates, $connections);
     }
     private function make(): Web { return $this->web ? ($this->web)() : $this->defaultWeb(); }
     public function req(string $method, string $uri, array $post = [], array $headers = []): Response {

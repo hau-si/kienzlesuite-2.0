@@ -1,0 +1,86 @@
+<?php
+declare(strict_types=1);
+namespace Kienzle\Core;
+
+/**
+ * Zentrale Verbindungen im Webinterface (T2med, E-Mail, Netzwerkspeicher). Gespeichert, geprüft und an die Module
+ * verteilt wird vom root-Dienst kienzle-verbindungen (core/lib/kienzle/verbindungen.py); das Webinterface hat kein Netz
+ * und sieht nur eine Fassung ohne Geheimnisse. Ein leeres Passwortfeld heißt „unverändert“.
+ */
+final class Connections {
+    public static string $state = '/var/lib/kienzle/verbindungen';
+    public static string $unit = '/etc/systemd/system/kienzle-verbindungen.path';
+
+    public function __construct(private Database $db) {}
+
+    public function status(): array {
+        $s = json_decode((string)@file_get_contents(self::$state . '/status.json'), true);
+        $s = is_array($s) ? $s : [];
+        return ['t2med' => is_array($s['t2med'] ?? null) ? $s['t2med'] : null, 'mail' => is_array($s['mail'] ?? null) ? $s['mail'] : null,
+            'ablage' => array_values(array_filter((array)($s['ablage'] ?? []), 'is_array')), 'tests' => (array)($s['tests'] ?? []),
+            'hostkeys' => (array)($s['hostkeys'] ?? []), 'nutzung' => array_values(array_filter((array)($s['nutzung'] ?? []), 'is_array')),
+            'hinweise' => array_values(array_filter((array)($s['hinweise'] ?? []), 'is_string')), 'letzte' => is_array($s['letzte'] ?? null) ? $s['letzte'] : null,
+            'sftp_schluessel' => (string)($s['sftp_schluessel'] ?? ''), 'pending' => is_file($this->request()), 'service' => is_file(self::$unit)];
+    }
+
+    public function saveT2med(array $in): void {
+        $launch = array_values(array_filter(array_map('trim', preg_split('/\R/', (string)($in['launch_urls'] ?? ''))), fn($u) => $u !== ''));
+        $d = ['base_url' => trim((string)($in['base_url'] ?? '')), 'launch_urls' => $launch, 'api_key' => (string)($in['api_key'] ?? ''), 'pin' => ($in['pin'] ?? false) === true];
+        if (trim((string)($in['ca_pem'] ?? '')) !== '' || ($in['ca_entfernen'] ?? false) === true) $d['ca_pem'] = trim((string)($in['ca_pem'] ?? ''));
+        if (!preg_match('#^https://#', $d['base_url'])) throw new Problem('Adresse des FHIR-Servers: bitte mit https:// angeben.', 422);
+        $this->write(['action' => 't2med', 'daten' => $d]);
+    }
+
+    public function saveMail(array $in): void {
+        $port = (string)($in['port'] ?? '');
+        if (!ctype_digit($port)) throw new Problem('Port: bitte eine Zahl angeben (meist 587 oder 465).', 422);
+        $this->write(['action' => 'mail', 'daten' => ['host' => trim((string)($in['host'] ?? '')), 'port' => (int)$port, 'sicherheit' => (string)($in['sicherheit'] ?? ''),
+            'benutzer' => trim((string)($in['benutzer'] ?? '')), 'passwort' => (string)($in['passwort'] ?? ''), 'absender' => trim((string)($in['absender'] ?? ''))]]);
+    }
+
+    public function saveTarget(array $in): void {
+        $art = (string)($in['art'] ?? '');
+        $d = ['id' => trim((string)($in['id'] ?? '')), 'name' => trim((string)($in['name'] ?? '')), 'art' => $art, 'host' => trim((string)($in['host'] ?? '')),
+            'ordner' => trim((string)($in['ordner'] ?? '')), 'benutzer' => trim((string)($in['benutzer'] ?? ''))];
+        if ($art === 'smb') $d += ['freigabe' => trim((string)($in['freigabe'] ?? '')), 'passwort' => (string)($in['passwort'] ?? ''),
+            'domaene' => trim((string)($in['domaene'] ?? '')), 'gast' => ($in['gast'] ?? false) === true];
+        elseif ($art === 'sftp') {
+            $port = (string)($in['port'] ?? '22');
+            if (!ctype_digit($port)) throw new Problem('Port: bitte eine Zahl angeben.', 422);
+            $d['port'] = (int)$port;
+        } else throw new Problem('Art: SMB oder SFTP.', 422);
+        $this->write(['action' => 'ziel', 'daten' => $d]);
+    }
+
+    public function removeTarget(string $id): void { $this->write(['action' => 'ziel-loeschen', 'id' => $id]); }
+
+    public function remove(string $what): void {
+        if (!in_array($what, ['t2med', 'mail'], true)) throw new Problem('Unbekannte Verbindung.', 422);
+        $this->write(['action' => $what, 'loeschen' => true]);
+    }
+
+    public function test(string $art, string $id = ''): void {
+        if (!in_array($art, ['t2med', 'mail', 'ziel'], true)) throw new Problem('Unbekannte Prüfung.', 422);
+        $this->write(['action' => 'pruefen', 'art' => $art, 'id' => $id]);
+    }
+
+    public function fetchHostkey(string $id): void { $this->write(['action' => 'hostkey-holen', 'id' => $id]); }
+
+    public function acceptHostkey(string $id, string $fingerprint): void { $this->write(['action' => 'hostkey-uebernehmen', 'id' => $id, 'fingerprint' => $fingerprint]); }
+
+    private function request(): string { return $this->db->directory . '/anfragen/verbindungen.json'; }
+
+    private function write(array $request): void {
+        if (!is_file(self::$unit)) throw new Problem('Der Dienst für Verbindungen ist nicht eingerichtet. Bitte den Installer ausführen.', 503);
+        if (is_file($this->request())) throw new Problem('Eine Änderung wird gerade übernommen. Bitte kurz warten.', 409);
+        $dir = dirname($this->request());
+        if (!is_dir($dir) && !mkdir($dir, 0700) && !is_dir($dir)) throw new Problem('Anfrage konnte nicht gespeichert werden.', 500);
+        $tmp = $dir . '/.verbindungen.' . bin2hex(random_bytes(4));
+        $fh = fopen($tmp, 'x');
+        if (!$fh) throw new Problem('Anfrage konnte nicht gespeichert werden.', 500);
+        chmod($tmp, 0600);   // enthält ggf. Passwörter: nur ks-core und root
+        fwrite($fh, json_encode($request, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
+        fclose($fh);
+        if (!rename($tmp, $this->request())) { @unlink($tmp); throw new Problem('Anfrage konnte nicht gespeichert werden.', 500); }
+    }
+}

@@ -1,6 +1,6 @@
 # Schnittstelle zwischen Basis und Modulen
 
-Gilt für `core_api = "1"` (Basis ab 0.2.0). Das Format von `module.toml` steht in `docs/MODULE-TOML.md`.
+Gilt für `core_api = "1"` (Basis ab 0.5.0). Das Format von `module.toml` steht in `docs/MODULE-TOML.md`.
 
 ## Eine Anmeldung für alle Module
 
@@ -50,3 +50,54 @@ selbst und nginx kommen hinein; ein anderes Modul kann den Socket nicht an nginx
 
 Die Basis antwortet auf `GET https://<server>/_health` (nur von localhost) mit `{"status":"ok","version":"…"}`.
 Module melden ihren Zustand über `hooks.health` (Meilenstein 4).
+
+## Hilfsdatei für PHP-Module
+
+```php
+require '/opt/kienzle/core/current/php/modul/Kienzle.php';
+$k = new KienzleModul('kasse');
+if (!$k->recht('paid')) $k->verweigern();
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$k->csrfGueltig($_POST['csrf'] ?? null)) $k->verweigern();
+```
+
+`benutzer()`, `name()`, `istAdmin()`, `rechte()`, `recht()`, `csrf()`, `csrfGueltig()`, `frischBestaetigt()`, `bestaetigenAdresse()`,
+dazu die folgenden Abschnitte.
+
+## Zentrale Verbindungen
+
+Angemeldet in `[[connections]]` (`docs/MODULE-TOML.md`), eingetragen vom Admin unter **Verwaltung → Verbindungen**.
+Die Basis schreibt sie nach `/etc/kienzle/verbindungen/module/<id>.json` (root:ks-<id>, 0640), nur mit den angemeldeten
+Verbindungen. Ändert der Admin etwas, wird die Datei neu geschrieben; Module lesen sie bei Bedarf neu.
+
+| Verbindung | Inhalt |
+|---|---|
+| `t2med` | `base_url`, `launch_urls` (Liste), `api_key`, `ca_pem` (leer = Zertifikate des Systems), `pin` (nur genau dieses Zertifikat) |
+| `mail` | `host`, `port`, `sicherheit` (`starttls`/`smtps`), `benutzer`, `passwort`, `absender` |
+| `ablage` | `ausgang` (Ordner für Aufträge), `ziele` (Liste mit `id` und `name`, **ohne** Zugangsdaten) |
+
+```php
+$fhir = $k->verbindung('t2med');      // null, wenn nicht eingerichtet
+```
+
+## Netzwerkspeicher
+
+Das Modul kennt die Zugangsdaten zum NAS nicht. Es legt einen Auftrag ab; der Dienst `ks-ablage` überträgt ihn per SMB oder
+SFTP, liest die Datei zur Kontrolle zurück und löscht den Auftrag erst danach. Fehlgeschlagene Aufträge werden alle
+5 Minuten erneut versucht, nach zwei Tagen in `fehlgeschlagen/` verschoben.
+
+```php
+$k->ablegen('steuerbuero', $pdf, '2026-03-15_RE-42_42,50EUR.pdf', 'Rechnungen/{jahr}/{monat}', $rechnungsdatum);
+```
+
+Dateinamen: Buchstaben, Ziffern, `_ . , -` und Leerzeichen, mit Endung, **ohne Patientendaten**.
+Der Unterordner liegt unter dem Basisordner des Ziels; `{jahr}`/`{monat}` kommen aus dem Datum.
+
+## Eigene Geheimnisse
+
+Zugänge, die nur das Modul nutzt (z. B. Letterxpress, SumUp, Google), verschlüsselt das Modul selbst mit seinem eigenen
+Schlüssel (`/etc/kienzle/schluessel/<id>.key`, root:ks-<id>, 0640). Die Basis und andere Module können sie nicht lesen.
+
+```php
+$gespeichert = $k->verschluesseln($apiKey, 'letterxpress');
+$apiKey = $k->entschluesseln($gespeichert, 'letterxpress');
+```

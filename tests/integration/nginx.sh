@@ -50,6 +50,10 @@ runuser -u ks-beispiel -- python3 -I "$repo/tests/integration/echo-modul.py" /ru
 for _ in $(seq 1 50); do [ -S /run/kienzle/beispiel/web.sock ] && break; sleep 0.2; done
 KIENZLE_NGINX_RELOAD='' /opt/kienzle/core/current/bin/kienzle-web schreiben "$repo/modules" || fail 'kienzle-web'
 nginx -s reload; sleep 1
+[ "$(stat -c '%a %U %G' /etc/kienzle/schluessel/beispiel.key)" = '640 root ks-beispiel' ] || fail 'Modulschlüssel falsch geschützt'
+[ "$(stat -c '%a %U %G' /etc/kienzle/verbindungen/module/beispiel.json)" = '640 root ks-beispiel' ] || fail 'Verbindungsdatei des Moduls falsch geschützt'
+if runuser -u ks-core -- cat /etc/kienzle/schluessel/beispiel.key >/dev/null 2>&1; then fail 'ks-core liest den Modulschlüssel'; fi
+
 runuser -u ks-core -- php -r '
 require "/opt/kienzle/core/current/php/bootstrap.php";
 use Kienzle\Core\{Config, Database, Modules, Secrets, Users};
@@ -90,6 +94,12 @@ for u in kienzle-update.path kienzle-update-anwenden.service kienzle-update-prue
   [ -f "/etc/systemd/system/$u" ] || fail "$u fehlt"; done
 [ -f /opt/kienzle/core/current/installer/install.sh ] || fail 'Installer nicht im Versionsordner'
 [ -d /etc/kienzle/release-keys ] || fail 'Schlüsselordner fehlt'
+id ks-ablage >/dev/null || fail 'Benutzer ks-ablage fehlt'
+[ -f /var/lib/kienzle/ablage/.ssh/id_ed25519.pub ] || fail 'SSH-Schlüssel des Netzwerkspeichers fehlt'
+[ "$(stat -c '%a %U %G' /etc/kienzle/verbindungen/ablage.json)" = '640 root ks-ablage' ] || fail 'ablage.json falsch geschützt'
+runuser -u ks-ablage -- /opt/kienzle/core/current/bin/kienzle-ablage abarbeiten || fail 'kienzle-ablage ohne Aufträge'
+if runuser -u ks-core -- cat /etc/kienzle/verbindungen/ablage.json >/dev/null 2>&1; then fail 'ks-core liest die NAS-Zugangsdaten'; fi
+
 /opt/kienzle/core/current/bin/kienzle-update start || fail 'kienzle-update start'
 
 echo '== Update-Seite'
@@ -103,5 +113,6 @@ code=$(php -r 'require "/opt/kienzle/core/current/php/bootstrap.php"; echo Kienz
 [ "$(code -c "$T/dora" -b "$T/dora" -H "Origin: https://$host" -d "code=$code" "https://$host/anmelden/code")" = "303 https://$host/" ] || fail 'Admin-Code'
 c -b "$T/dora" "https://$host/verwaltung/updates" | grep -q 'Installiert: <strong>Basis' || fail 'Update-Seite'
 c -b "$T/dora" "https://$host/verwaltung/firewall" | grep -q 'Freigegebene Netze' || fail 'Firewall-Seite'
+c -b "$T/dora" "https://$host/verwaltung/verbindungen" | grep -q 'T2med (FHIR)' || fail 'Verbindungsseite'
 
 echo 'Ende-zu-Ende-Prüfung bestanden.'

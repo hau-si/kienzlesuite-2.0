@@ -274,7 +274,7 @@ landen, nach dem Start geprüft werden und bei Fehlern automatisch auf den vorhe
 
 ---
 
-## M5 – Netzwerkspeicher und Verbindungen 🖥
+## M5 – Netzwerkspeicher und Verbindungen 🖥 ✅
 
 **Ziel:** Ein gemeinsamer Dienst für Ziele auf dem NAS, dazu die zentralen Verbindungen zu T2med und E-Mail (E12).
 Module legen Dateien ab, ohne die NAS-Zugangsdaten zu kennen; T2med- und E-Mail-Zugang bekommen nur Module, die sie anmelden.
@@ -317,6 +317,9 @@ keine Geheimnisse in Antworten und Protokollen, Prüfung der FHIR-Adressen. Für
 Im CI-Container zusätzlich ein Durchlauf mit einem echten Samba- und SSH-Server auf `127.0.0.1`.
 
 **VM:** Ablage auf ein Test-NAS bzw. eine Samba-Freigabe auf einer zweiten VM.
+
+**Stand:** umgesetzt mit Basis 0.5.0 (22.11.2026). Festgelegt: Das Ziel hat einen festen Basisordner, das Modul bestimmt den
+Unterordner (`{jahr}`/`{monat}`); SFTP nur mit Schlüssel; Prüfungen laufen im root-Dienst, weil das Webinterface kein Netz hat.
 
 ---
 

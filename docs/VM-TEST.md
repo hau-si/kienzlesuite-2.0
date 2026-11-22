@@ -61,3 +61,17 @@ auf der VM `KIENZLE_UPDATE_QUELLE=github:<fork>` in `kienzle-update-anwenden.ser
 5. [ ] Während einer Installation die VM hart ausschalten; nach dem Start ist der vorherige Stand aktiv (`journalctl -u kienzle-update-start`).
 6. [ ] „Zurück auf eine frühere Version“ 0.4.0: läuft, Hinweis auf Datenstand.
 7. [ ] Beta-Kanal ohne Freigabe: unsignierte Vorabversion wird nicht angeboten; mit Freigabe angeboten und mit „nicht signiert“ markiert.
+
+## Meilenstein 5 – Netzwerkspeicher und Verbindungen (Basis 0.5.0)
+
+Test-NAS oder zweite VM mit Samba-Freigabe und SFTP; ein Test-SMTP-Konto; wenn möglich ein T2med-Testserver.
+
+1. [ ] Verwaltung → Verbindungen → Ziel (SMB) anlegen, „Verbindung prüfen“: erfolgreich, auf dem NAS bleibt nichts liegen.
+2. [ ] Falsches Passwort: verständliche Meldung (z. B. `NT_STATUS_LOGON_FAILURE`).
+3. [ ] Ziel (SFTP): öffentlichen Schlüssel von der Seite beim NAS-Benutzer eintragen, „Schlüssel des Servers abrufen“,
+       Fingerabdruck mit dem NAS vergleichen, übernehmen, prüfen.
+4. [ ] Testauftrag als Modul: `sudo -u ks-beispiel` eine Datei nach `/var/spool/kienzle/ablage/beispiel/` legen (siehe
+       `docs/MODUL-SCHNITTSTELLE.md`), nach höchstens 5 Minuten liegt sie auf dem NAS.
+5. [ ] E-Mail eintragen, „Anmeldung prüfen“: erfolgreich, es wird keine Nachricht verschickt.
+6. [ ] T2med eintragen (mit Zertifikat), „Verbindung prüfen“: CapabilityStatement.
+7. [ ] `sudo -u ks-core cat /etc/kienzle/verbindungen/ablage.json` wird verweigert.
