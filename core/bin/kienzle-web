@@ -73,6 +73,10 @@ def main(argv: list[str]) -> int:
     verteilen = E('KIENZLE_VERTEILEN', str(Path(__file__).resolve().parent / 'kienzle-verbindungen'))
     if verteilen:
         subprocess.run([verteilen, 'verteilen'], check=False, timeout=60)
+    # Virtuelle Drucker der Module anlegen bzw. entfernen.
+    drucker = E('KIENZLE_DRUCKER_ABGLEICH', str(Path(__file__).resolve().parent / 'kienzle-drucker'))
+    if drucker:
+        subprocess.run([drucker, 'abgleichen'], check=False, timeout=300)
     print(f'Geschrieben: {len(registry["modules"])} Module, {site_path}')
     return 0
 

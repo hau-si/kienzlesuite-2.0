@@ -1,0 +1,10 @@
+# Kienzle-Suite: Aufträge der Seite „Drucker“ übernehmen (Anfragedatei von ks-core).
+[Unit]
+Description=Kienzle-Suite Drucker (Anfragen)
+
+[Path]
+PathExists=/var/lib/kienzle/core/anfragen/drucker.json
+Unit=kienzle-drucker-anwenden.service
+
+[Install]
+WantedBy=multi-user.target

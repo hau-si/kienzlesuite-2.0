@@ -101,3 +101,19 @@ Schlüssel (`/etc/kienzle/schluessel/<id>.key`, root:ks-<id>, 0640). Die Basis u
 $gespeichert = $k->verschluesseln($apiKey, 'letterxpress');
 $apiKey = $k->entschluesseln($gespeichert, 'letterxpress');
 ```
+
+## Drucken
+
+Drucker richtet nur die Basis ein (Verwaltung → Drucker, root-Dienst `kienzle-drucker`); kein Modul ist Mitglied der
+Gruppe `lpadmin`. Die eingerichteten Warteschlangen stehen in `/var/lib/kienzle/drucker/status.json` (für alle lesbar).
+
+```php
+$k = new KienzleModul('kasse');
+$liste = $k->drucker();                                   // [['name' => 'Praxisdrucker', 'description' => …, 'state' => 'bereit'], …]
+$auftrag = $k->drucken('Praxisdrucker', $pdf, 'Rechnung RE-42', ['media=A4', 'sides=two-sided-long-edge']);
+$k->drucken('TM-m30III', $escpos, 'Bon', ['raw']);
+```
+
+`drucken()` ruft `lp` als Modul-Benutzer auf und liefert die Auftragsnummer; der Titel darf keine Patientendaten enthalten.
+Virtuelle Drucker des Moduls (`[[printers]]` in `module.toml`) legt die Basis beim Installieren bzw. Aktualisieren an
+(Backend 0755 und PPD 0644 aus dem Programmordner, Adresse `kienzle-<id>-<name>:/<name>`) und entfernt sie mit dem Modul.

@@ -1,5 +1,30 @@
 # Basis – Release-Notizen
 
+## 0.8.0
+
+Meilenstein 8 aus `docs/PLAN.md`: Druckerverwaltung in der Basis. Damit ist Schritt 1 (Basis) vollständig.
+
+- **Verwaltung → Drucker:** Netzwerk und USB durchsuchen (`lpinfo`), Bondrucker (TM-m10, TM-m30III, allgemein ESC/POS) als RAW
+  über `socket://…:9100`, A4-Drucker über IPP Everywhere, von Hand oder aus der Suche; Testseite (Bon bzw. PDF);
+  Freigabe je Drucker für Windows (Samba) und/oder macOS (IPP); Entfernen nur von Druckern der Suite.
+- **root-Dienst `kienzle-drucker`** (`.path`, Timer alle 5 Minuten für die Liste): einziger Aufrufer von `lpadmin`; weder
+  ks-core noch ein Modul ist in der Gruppe `lpadmin`.
+- **Virtuelle Drucker der Module** aus `[[printers]]`: Backend (root, 0755) und PPD (0644) aus dem Programmordner,
+  Warteschlange mit Kennung der Suite, Freigaben laut `share`; `kienzle-web schreiben` gleicht nach jeder Änderung der
+  Module ab und entfernt Warteschlangen, Backends und PPDs entfernter Module. Symbolische Verweise werden abgelehnt.
+- **Samba gibt nur markierte Drucker frei:** `smb.conf` lädt keine Drucker mehr selbst (`load printers = no`), sondern
+  bindet die erzeugte `/etc/samba/kienzle-drucker.conf` ein.
+- **Für Module:** `KienzleModul::drucker()` (Auswahlliste) und `drucken()` (lp als Modul-Benutzer, geprüfte Optionen,
+  Auftragsnummer) in `core/php/modul/Kienzle.php`; `docs/MODUL-SCHNITTSTELLE.md`, Abschnitt Drucken.
+- Übernommen aus der Beta: `src/PrinterAdmin.php` (Druckerarten, Suche, URI-Prüfung, nur eigene entfernen, Fehlertexte),
+  `src/Cups.php`/`src/OfficePrinter.php` (lp mit Auswertung der Auftragsnummer), `tests/printer-admin.php` als Muster.
+- Tests: 7 Python-Tests mit nachgebautem CUPS, 3 PHP-Tests, Ende-zu-Ende im Container mit echtem cupsd: Bondrucker
+  anlegen und entfernen, Samba-Freigabe per `testparm`, virtueller Drucker des Beispielmoduls anlegen, als Modul drucken,
+  nach Entfernen des Moduls wieder weg.
+
+Nicht geprüft: echte Bondrucker und A4-Drucker, Suche im echten Netz, Drucken von Windows über Samba und von macOS über IPP
+(nur Test-VM), CUPS unter systemd mit AppArmor.
+
 ## 0.7.0
 
 Meilenstein 7 aus `docs/PLAN.md`: Installer für Ubuntu Server 26.04.

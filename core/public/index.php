@@ -3,7 +3,7 @@ declare(strict_types=1);
 // Einstieg für alle Anfragen an die Basis (nginx → php-fpm, Pool ks-core).
 require dirname(__DIR__) . '/php/bootstrap.php';
 
-use Kienzle\Core\{AuditLog, Auth, Backup, Config, Connections, Database, Firewall, Modules, Network, Passkeys, Request, Secrets, Updates, Users, Web};
+use Kienzle\Core\{AuditLog, Auth, Backup, Printers, Config, Connections, Database, Firewall, Modules, Network, Passkeys, Request, Secrets, Updates, Users, Web};
 
 try {
     $config = Config::load(getenv('KIENZLE_CORE_CONFIG') ?: Config::FILE);
@@ -15,7 +15,7 @@ try {
     $request = Request::fromGlobals();
     $rpId = Passkeys::rpIdFrom($config);
     $web = new Web($config, $db, $users, new Auth($db, $users, $audit, $request->remote), $rpId ? new Passkeys($db, $rpId, 'Kienzle-Suite') : null, $modules, $audit,
-        null, new Firewall($db, new Network(), $modules), new Updates($db, $config), new Connections($db), new Backup($db, $modules));
+        null, new Firewall($db, new Network(), $modules), new Updates($db, $config), new Connections($db), new Backup($db, $modules), null, new Printers($db));
     $web->handle($request)->send();
 } catch (Throwable $e) {
     // Keine Einzelheiten an den Browser; ins Protokoll nur Art und Ort, keine Eingaben.

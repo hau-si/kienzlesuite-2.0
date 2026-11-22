@@ -1,0 +1,14 @@
+# Kienzle-Suite: Drucker suchen, anlegen, entfernen, freigeben (root; einziger Aufrufer von lpadmin).
+[Unit]
+Description=Kienzle-Suite Drucker anwenden
+After=cups.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/kienzle/core/current/bin/kienzle-drucker anwenden
+TimeoutStartSec=300
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/var/lib/kienzle/drucker /var/lib/kienzle/core/anfragen /etc/samba /usr/lib/cups/backend /usr/share/ppd /run/cups /run/samba /var/lib/samba

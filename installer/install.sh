@@ -124,7 +124,7 @@ chown -R root:root "$tmp"; chmod -R u=rwX,go=rX "$tmp"
 rm -rf -- "$release.alt"; [ -e "$release" ] && mv -- "$release" "$release.alt"
 mv -- "$tmp" "$release"; rm -rf -- "$release.alt"
 ln -sfn "releases/$version" /opt/kienzle/core/.current.neu && mv -Tf /opt/kienzle/core/.current.neu /opt/kienzle/core/current
-for tool in kienzle-admin kienzle-zertifikat kienzle-web kienzle-modul-pruefen kienzle-update kienzle-verbindungen kienzle-sicherung kienzle-ueberblick; do ln -sfn "/opt/kienzle/core/current/bin/$tool" "/usr/local/sbin/$tool"; done
+for tool in kienzle-admin kienzle-zertifikat kienzle-web kienzle-modul-pruefen kienzle-update kienzle-verbindungen kienzle-sicherung kienzle-ueberblick kienzle-drucker; do ln -sfn "/opt/kienzle/core/current/bin/$tool" "/usr/local/sbin/$tool"; done
 
 if [ -n "$restore" ]; then
   echo '== Wiederherstellung aus der Sicherung'
@@ -191,6 +191,8 @@ put_conf() {   # Vorlage Ziel Dienst Prüfbefehl…
   conf_changed+=("$unit:$dest")
 }
 cups_check() { cupsd -t -c "$1" -s /etc/cups/cups-files.conf; }
+install -d -m 0755 /var/lib/kienzle/drucker /usr/share/ppd/kienzle
+[ -f /etc/samba/kienzle-drucker.conf ] || install -m 0644 /dev/null /etc/samba/kienzle-drucker.conf
 put_conf "$vorlagen/cupsd.conf" /etc/cups/cupsd.conf cups.service cups_check || true
 put_conf "$vorlagen/smb.conf" /etc/samba/smb.conf smbd.service testparm -s --suppress-prompt || true
 install -d -m 1777 /var/spool/samba
@@ -238,6 +240,7 @@ install -m 0644 "$vorlagen/kienzle-zertifikat.service" "$vorlagen/kienzle-zertif
   "$vorlagen/kienzle-verbindungen.path" "$vorlagen/kienzle-verbindungen-anwenden.service" "$vorlagen/kienzle-ablage.service" "$vorlagen/kienzle-ablage.timer" \
   "$vorlagen/kienzle-sicherung.path" "$vorlagen/kienzle-sicherung-anwenden.service" "$vorlagen/kienzle-sicherung.service" "$vorlagen/kienzle-sicherung.timer" \
   "$vorlagen/kienzle-ueberblick.path" "$vorlagen/kienzle-ueberblick.service" "$vorlagen/kienzle-ueberblick.timer" \
+  "$vorlagen/kienzle-drucker.path" "$vorlagen/kienzle-drucker-anwenden.service" "$vorlagen/kienzle-drucker.timer" \
   /etc/systemd/system/
 chmod 0644 /etc/systemd/system/kienzle-core-php.service
 
@@ -253,7 +256,7 @@ if [ -z "$nosystemd" ]; then
   systemctl disable --now "php$phpv-fpm.service" >/dev/null 2>&1 || true
   systemctl enable --now kienzle-core-php.service kienzle-zertifikat.timer kienzle-firewall.path
   systemctl enable kienzle-firewall.service kienzle-update-start.service
-  systemctl enable --now kienzle-update.path kienzle-update-pruefen.timer kienzle-verbindungen.path kienzle-ablage.timer kienzle-sicherung.path kienzle-sicherung.timer kienzle-ueberblick.path kienzle-ueberblick.timer
+  systemctl enable --now kienzle-update.path kienzle-update-pruefen.timer kienzle-verbindungen.path kienzle-ablage.timer kienzle-sicherung.path kienzle-sicherung.timer kienzle-ueberblick.path kienzle-ueberblick.timer kienzle-drucker.path kienzle-drucker.timer
   # Druckserver: CUPS und smbd; nmbd (NetBIOS) und der AD-Dienst werden nicht gebraucht.
   systemctl disable --now nmbd.service samba-ad-dc.service >/dev/null 2>&1 || true
   systemctl enable cups.service smbd.service >/dev/null 2>&1 || true

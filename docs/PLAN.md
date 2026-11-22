@@ -454,7 +454,10 @@ in Schritt 2 in dieses Format.
 
 ---
 
-## M8 – Druckerverwaltung in der Basis 🖥
+## M8 – Druckerverwaltung in der Basis 🖥 ✅
+
+**Stand:** umgesetzt in Basis 0.8.0 (`docs/RELEASE.md`). Samba gibt nur ausdrücklich markierte Warteschlangen frei
+(`/etc/samba/kienzle-drucker.conf`); das ersetzt `load printers = yes` aus M7.
 
 **Ziel:** Drucker werden einmal in der Basis eingerichtet, und alle Module nutzen sie (E10).
 Danach ist die Basis bereit für das SumUp- und das Terminzettel-Modul (Schritt 2).

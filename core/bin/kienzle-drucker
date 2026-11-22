@@ -1,0 +1,30 @@
+#!/usr/bin/python3 -IB
+"""Druckerverwaltung der Kienzle-Suite (nur root, gestartet von systemd).
+
+  kienzle-drucker anwenden     Anfrage des Webinterfaces verarbeiten (kienzle-drucker.path)
+  kienzle-drucker abgleichen   Virtuelle Drucker an die installierten Module angleichen (nach kienzle-web schreiben)
+  kienzle-drucker liste        Warteschlangen anzeigen
+"""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'lib'))
+from kienzle import drucker as d  # noqa: E402
+
+if __name__ == '__main__':
+    try:
+        if sys.argv[1:] == ['anwenden']:
+            d.handle()
+        elif sys.argv[1:] == ['abgleichen']:
+            for n in d.sync():
+                print(n)
+            d.refresh()
+        elif sys.argv[1:] == ['liste']:
+            for q in d.queues():
+                print(f'{q["name"]:30} {q["state"]:9} {q["address"]:28} {q["description"]}')
+        else:
+            print(__doc__.strip(), file=sys.stderr)
+            sys.exit(2)
+    except d.Fehler as e:
+        print(f'Fehler: {e}', file=sys.stderr)
+        sys.exit(1)

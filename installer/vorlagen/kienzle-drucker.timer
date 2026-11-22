@@ -1,0 +1,11 @@
+[Unit]
+Description=Kienzle-Suite Druckerliste alle 5 Minuten auffrischen
+
+[Timer]
+OnBootSec=2min
+OnCalendar=*:0/5
+Persistent=true
+Unit=kienzle-drucker-anwenden.service
+
+[Install]
+WantedBy=timers.target

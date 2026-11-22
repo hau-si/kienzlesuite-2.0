@@ -44,3 +44,16 @@ Wo eine Entscheidung nötig war, steht dabei, was umgesetzt wurde; das lässt si
 15. **Arbeitsgruppe:** `WORKGROUP` fest. Nutzen die Praxen eine andere Arbeitsgruppe oder eine Domäne?
 16. **autoinstall** holt die Suite per `git clone` aus dem öffentlichen Repository. Bei privatem Repository bräuchte es
     einen Token oder das Release-Archiv; welcher Weg?
+
+## Aus M8 (Drucker)
+
+17. **Virtuelle Drucker ohne Backend:** Module ohne `backend` bekommen keine Warteschlange (Hinweis im Abgleich). Gibt es
+    einen Fall, der nur mit PPD/Filter auskommen soll?
+18. **PPD-Dateien:** CUPS behandelt PPDs als veraltet. Für die virtuellen Drucker von SumUp und Terminzettel reicht es noch;
+    langfristig wäre ein IPP-Everywhere-Druckerprogramm (z. B. `ippeveprinter`) der Weg. Später angehen?
+19. **Druckaufträge sehen und abbrechen** auf der Seite Drucker: bisher nicht. Bedarf?
+
+## Stand nach M8
+
+Schritt 1 (Basis) ist bis auf die Prüfungen auf der Test-VM (`docs/VM-TEST.md`, M2–M8) und den Release-Schlüssel fertig.
+Als Nächstes: Prüflisten auf der Test-VM, dann Schritt 2 (SumUp- und Terminzettel-Modul auf die Basis umstellen).

@@ -18,7 +18,7 @@ final class Web {
     public function __construct(
         private Config $config, private Database $db, private Users $users, private Auth $auth, private ?Passkeys $passkeys,
         private Modules $modules, private AuditLog $audit, ?callable $qr = null, private ?Firewall $firewall = null, private ?Updates $updates = null,
-        private ?Connections $connections = null, private ?Backup $backup = null, private ?Overview $overview = null,
+        private ?Connections $connections = null, private ?Backup $backup = null, private ?Overview $overview = null, private ?Printers $printers = null,
     ) {
         $this->qr = $qr ?? static function (string $uri): ?string {
             if (!is_executable('/usr/bin/qrencode')) return null;
@@ -435,6 +435,7 @@ final class Web {
         if ($r->path === '/verwaltung/firewall/aus' && !$get) return $this->firewallOff($admin);
         if ($r->path === '/verwaltung/updates') return $get ? $this->updatesPage() : $this->updatesAction($r, $admin);
         if ($r->path === '/verwaltung/verbindungen') return $get ? $this->connectionsPage() : $this->connectionsAction($r, $admin);
+        if ($r->path === '/verwaltung/drucker') return $get ? $this->printersPage() : $this->printersAction($r, $admin);
         if ($r->path === '/verwaltung/einrichtung') return $get ? $this->overviewPage() : $this->overviewAction($r, $admin);
         if ($r->path === '/verwaltung/sicherung') return $get ? $this->backupPage() : $this->backupAction($r, $admin);
         if ($r->path === '/verwaltung/sicherung/export' && $get) {
@@ -854,6 +855,82 @@ final class Web {
         }
         $this->audit->write($admin, 'verbindung', $what);
         return Response::redirect('/verwaltung/verbindungen');
+    }
+
+    // ---- Drucker ------------------------------------------------------------------------------------------------
+    private function pr(): Printers {
+        if (!$this->printers) throw new Problem('Die Druckerverwaltung ist auf diesem Server nicht verfügbar.', 503);
+        return $this->printers;
+    }
+
+    private function shareBoxes(array $share): string {
+        return V::checkbox('samba', '1', 'für Windows freigeben (Samba)', in_array('samba', $share, true))
+            . V::checkbox('ipp', '1', 'für macOS und andere freigeben (IPP)', in_array('ipp', $share, true));
+    }
+
+    private function printersPage(?string $error = null): Response {
+        $st = $this->pr()->status();
+        $busy = $st['pending'];
+        $dis = $busy ? ' disabled' : '';
+        $body = V::error($error) . ($st['last'] ? '<p class="' . (($st['last']['ok'] ?? false) ? 'notice' : 'error') . '">' . V::h((string)($st['last']['meldung'] ?? '')) . '</p>' : '')
+            . ($busy ? '<p class="notice">Vorgang läuft …</p>' : '') . ($st['error'] !== '' ? '<p class="error">' . V::h($st['error']) . '</p>' : '')
+            . (!$st['service'] ? '<p class="error">Der Druckerdienst ist nicht eingerichtet. Bitte den Installer ausführen.</p>' : '')
+            . '<p>Drucker werden einmal hier eingerichtet; alle Module können sie nutzen. Freigaben für die Arbeitsplätze wirken erst, '
+            . 'wenn die <a href="/verwaltung/firewall">Firewall</a> Drucken (IPP 631 bzw. Windows-Freigabe 445) aus den Praxisnetzen zulässt.</p>';
+        $rows = '';
+        foreach ($st['queues'] as $q) {
+            $actions = '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('testseite', ['name' => $q['name']]) . '<button' . $dis . '>Testseite</button></form> ';
+            if ($q['managed']) {
+                $actions .= '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('freigabe', ['name' => $q['name']]) . $this->shareBoxes($q['share'])
+                    . '<button' . $dis . '>Freigabe speichern</button></form> ';
+                if ($q['modul'] === '') $actions .= '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('entfernen', ['name' => $q['name']])
+                    . '<button class="danger"' . $dis . '>Entfernen</button></form>';
+            }
+            $rows .= '<tr><td><strong>' . V::h($q['name']) . '</strong><br><small>' . V::h($q['description']) . '</small></td><td>' . V::h($q['address']) . '</td><td>'
+                . V::h($q['state']) . '</td><td>' . ($q['modul'] !== '' ? 'Modul ' . V::h($this->modules->name($q['modul'])) : ($q['managed'] ? 'Suite' : 'fremd')) . '</td><td>' . $actions . '</td></tr>';
+        }
+        $body .= '<h2>Eingerichtete Drucker</h2>' . ($rows !== '' ? '<table><tr><th>Name</th><th>Adresse</th><th>Zustand</th><th>Von</th><th></th></tr>' . $rows . '</table>' : '<p>Noch keine.</p>');
+        $kinds = implode('', array_map(fn($k, $l) => '<option value="' . V::h($k) . '">' . V::h($l) . '</option>', array_keys(Printers::KINDS), Printers::KINDS));
+        $found = '';
+        foreach ($st['found'] as $f) {
+            $found .= '<tr><td>' . V::h($f['name']) . '</td><td>' . V::h($f['connection']) . '</td><td><form method="post" action="/verwaltung/drucker" class="inline">'
+                . $this->hidden('anlegen', ['adresse' => $f['uri']]) . '<select name="art">'
+                . implode('', array_map(fn($k, $l) => '<option value="' . V::h($k) . '"' . ($f['kind'] === $k ? ' selected' : '') . '>' . V::h($l) . '</option>', array_keys(Printers::KINDS), Printers::KINDS))
+                . '</select> ' . V::input('name', 'Name', 'text', '', 'maxlength="40" pattern="[A-Za-z0-9][A-Za-z0-9_\-]*"') . '<button' . $dis . '>Übernehmen</button></form></td></tr>';
+        }
+        $body .= '<h2>Drucker suchen</h2><form method="post" action="/verwaltung/drucker">' . $this->hidden('suchen') . '<button' . $dis . '>Netzwerk und USB durchsuchen</button></form>'
+            . ($st['searched'] ? '<p><small>Zuletzt gesucht: ' . V::date($st['searched']) . '</small></p>' : '')
+            . ($found !== '' ? '<table><tr><th>Gefunden</th><th>Anschluss</th><th></th></tr>' . $found . '</table>' : '');
+        $body .= '<h2>Drucker von Hand eintragen</h2><form method="post" action="/verwaltung/drucker" class="box">' . $this->hidden('anlegen')
+            . '<label>Art<select name="art">' . $kinds . '</select></label>'
+            . V::input('adresse', 'IP-Adresse oder Name des Druckers', 'text', '', 'placeholder="192.0.2.80" required maxlength="300"')
+            . V::input('name', 'Name der Warteschlange (leer = Vorschlag)', 'text', '', 'maxlength="40"') . $this->shareBoxes([])
+            . '<button' . $dis . '>Anlegen</button></form>'
+            . '<form method="post" action="/verwaltung/drucker">' . $this->hidden('abgleichen') . '<button' . $dis . '>Virtuelle Drucker der Module abgleichen</button></form>';
+        $response = Response::html(V::page('Drucker', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+        return $busy ? $response->with('Refresh', '3') : $response;
+    }
+
+    private function printersAction(Request $r, string $admin): Response {
+        $p = $this->pr();
+        $a = $r->field('aktion', 20);
+        $share = array_keys(array_filter(['samba' => $r->field('samba') === '1', 'ipp' => $r->field('ipp') === '1']));
+        try {
+            match ($a) {
+                'suchen' => $p->search(),
+                'anlegen' => $p->add($r->field('art', 20), $r->field('name', 60), $r->field('adresse', 400), $share),
+                'entfernen' => $p->remove($r->field('name', 60)),
+                'testseite' => $p->testPage($r->field('name', 60)),
+                'freigabe' => $p->share($r->field('name', 60), $share),
+                'abgleichen' => $p->sync(),
+                default => throw new Problem('Unbekannte Aktion.', 422),
+            };
+        } catch (Problem $e) {
+            if ($e->http === 422 || $e->http === 409 || $e->http === 404) return $this->printersPage($e->getMessage());
+            throw $e;
+        }
+        $this->audit->write($admin, 'drucker-' . $a, $r->field('name', 60));
+        return Response::redirect('/verwaltung/drucker');
     }
 
     // ---- Einrichtungs-Überblick ----------------------------------------------------------------------------------

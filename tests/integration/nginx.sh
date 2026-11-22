@@ -107,8 +107,7 @@ cmp -s /etc/cups/cupsd.conf /opt/kienzle/core/current/installer/vorlagen/cupsd.c
 cmp -s /etc/samba/smb.conf /opt/kienzle/core/current/installer/vorlagen/smb.conf || fail 'smb.conf nicht aus der Vorlage'
 [ -f /etc/kienzle/original/smb.conf ] || fail 'ursprüngliche smb.conf nicht gesichert'
 ls /etc/cups/cupsd.conf.kienzle-vorher /etc/samba/smb.conf.kienzle-vorher >/dev/null 2>&1 && fail 'Zwischenkopien bleiben liegen'
-testparm -s --suppress-prompt /etc/samba/smb.conf 2>/dev/null | grep -q '\[printers\]' || fail 'Samba ohne Druckerfreigabe'
-if testparm -s --suppress-prompt /etc/samba/smb.conf 2>/dev/null | grep -E '^\[' | grep -qv '^\[\(global\|printers\)\]'; then fail 'Samba hat Dateifreigaben'; fi
+if testparm -s --suppress-prompt /etc/samba/smb.conf 2>/dev/null | grep -E '^\[' | grep -qv '^\[global\]'; then fail 'Samba hat Freigaben ohne Auftrag'; fi
 grep -q 'Automatic-Reboot "false"' /etc/apt/apt.conf.d/52kienzle-unattended || fail 'unattended-upgrades ohne Neustart-Sperre'
 [ -d /var/lib/kienzle/ueberblick ] || fail 'Ordner für Überblicke fehlt'
 for u in kienzle-ueberblick.path kienzle-ueberblick.service kienzle-ueberblick.timer; do [ -f "/etc/systemd/system/$u" ] || fail "$u fehlt"; done
@@ -165,5 +164,30 @@ cmp -s "$T/ansicht/etc/kienzle/ca/ca.crt" /etc/kienzle/ca/ca.crt || fail 'CA feh
 [ ! -e "$T/ansicht/etc/kienzle/sicherung/passwort" ] || fail 'Sicherungspasswort ohne Auswahl im Export'
 sicher '{"action":"blatt-gedruckt"}'
 [ ! -e /var/lib/kienzle/sicherung/blatt.html ] || fail 'Blatt nicht gelöscht'
+
+echo '== Drucker (echtes CUPS ohne systemd)'
+for u in kienzle-drucker.path kienzle-drucker-anwenden.service kienzle-drucker.timer; do [ -f "/etc/systemd/system/$u" ] || fail "$u fehlt"; done
+/usr/sbin/cupsd || fail 'cupsd startet nicht'
+for _ in $(seq 1 50); do [ -S /run/cups/cups.sock ] && break; sleep 0.2; done
+if id -nG ks-core | grep -qw lpadmin; then fail 'ks-core ist in der Gruppe lpadmin'; fi
+drucker() { runuser -u ks-core -- sh -c "umask 077; printf '%s' '$1' > /var/lib/kienzle/core/anfragen/drucker.json"; /opt/kienzle/core/current/bin/kienzle-drucker anwenden
+  python3 -c 'import json,sys; s=json.load(open("/var/lib/kienzle/drucker/status.json"))["letzte"]; print(s["meldung"]); sys.exit(0 if s["ok"] else 1)' || fail "Drucker: $1"; }
+drucker '{"action":"anlegen","art":"bon","name":"Bon-Test","adresse":"socket://192.0.2.50:9100","freigabe":["samba"]}'
+lpstat -v Bon-Test | grep -q 'socket://192.0.2.50:9100' || fail 'Warteschlange fehlt in CUPS'
+testparm -s --suppress-prompt 2>/dev/null | grep -q '^\[Bon-Test\]' || fail 'Samba-Freigabe fehlt'
+install -d -m 0755 /opt/kienzle/beispiel && ln -sfn "$repo/modules/beispiel" /opt/kienzle/beispiel/current
+/opt/kienzle/core/current/bin/kienzle-drucker abgleichen || fail 'Abgleich der virtuellen Drucker'
+lpstat -v Beispiel-Drucker | grep -q 'kienzle-beispiel-beispiel-drucker:/Beispiel-Drucker' || fail 'virtueller Drucker fehlt'
+[ "$(stat -c '%a %U' /usr/lib/cups/backend/kienzle-beispiel-beispiel-drucker)" = '755 root' ] || fail 'Backend falsch geschützt'
+runuser -u ks-beispiel -- php -r 'require "/opt/kienzle/core/current/php/modul/Kienzle.php"; $k = new KienzleModul("beispiel", ["X" => "1"]);
+  echo $k->drucken("Beispiel-Drucker", "%PDF-1.4 erfunden", "Test"), "\n";' | grep -q '^Beispiel-Drucker-' || fail 'Modul druckt nicht'
+c -b "$T/dora" "https://$host/verwaltung/drucker" | grep -q 'Bon-Test' || fail 'Druckerseite'
+drucker '{"action":"entfernen","name":"Bon-Test"}'
+if lpstat -v Bon-Test >/dev/null 2>&1; then fail 'Warteschlange nicht entfernt'; fi
+rm /opt/kienzle/beispiel/current
+python3 -c 'import json; p="/var/lib/kienzle/core/modules.json"; d=json.load(open(p)); d["modules"]=[]; json.dump(d, open(p,"w"))'
+/opt/kienzle/core/current/bin/kienzle-drucker abgleichen || fail 'Abgleich nach Entfernen'
+if lpstat -v Beispiel-Drucker >/dev/null 2>&1; then fail 'virtueller Drucker nach Entfernen des Moduls noch da'; fi
+[ ! -e /usr/lib/cups/backend/kienzle-beispiel-beispiel-drucker ] || fail 'Backend nach Entfernen noch da'
 
 echo 'Ende-zu-Ende-Prüfung bestanden.'

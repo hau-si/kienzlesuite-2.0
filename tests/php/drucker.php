@@ -1,0 +1,80 @@
+<?php
+declare(strict_types=1);
+// Seite „Drucker“ (ohne root-Dienst) und Druck-Hilfen für Module.
+require __DIR__ . '/lib.php';
+require __DIR__ . '/browser.php';
+require dirname(__DIR__, 2) . '/core/php/modul/Kienzle.php';
+
+use Kienzle\Core\Printers;
+
+function pr_env(array $status = []): array {
+    $env = new Env();
+    Printers::$state = $env->dir . '/drucker'; mkdir(Printers::$state);
+    Printers::$unit = $env->dir . '/kienzle-drucker.path'; touch(Printers::$unit);
+    file_put_contents(Printers::$state . '/status.json', json_encode($status + ['warteschlangen' => [
+        ['name' => 'Bon', 'address' => '192.0.2.80', 'state' => 'bereit', 'description' => 'Kienzle-Suite Bondrucker', 'managed' => true, 'modul' => '', 'share' => ['samba']],
+        ['name' => 'Beispiel-Drucker', 'address' => 'auf diesem Server', 'state' => 'bereit', 'description' => 'Kienzle-Suite Modul beispiel: x', 'managed' => true, 'modul' => 'beispiel', 'share' => []],
+        ['name' => 'Fremd', 'address' => '192.0.2.7', 'state' => 'bereit', 'description' => 'Von <b>Hand', 'managed' => false, 'modul' => '', 'share' => []],
+        ['name' => '../boese', 'address' => '', 'state' => '', 'description' => '', 'managed' => true]],
+        'gefunden' => [['uri' => 'ipp://192.0.2.90/ipp/print', 'name' => 'A4 <i>Empfang', 'kind' => 'office', 'connection' => 'Netzwerk'], ['uri' => 'file:///etc/passwd', 'name' => 'x', 'kind' => null]]]));
+    return [$env, new Printers($env->db)];
+}
+
+function req_p(Env $env): array {
+    $f = $env->dir . '/anfragen/drucker.json';
+    $r = json_decode((string)file_get_contents($f), true);
+    unlink($f);
+    return $r;
+}
+
+function test_anfragen(): void {
+    [$env, $p] = pr_env();
+    check(array_column($p->status()['queues'], 'name') === ['Bon', 'Beispiel-Drucker', 'Fremd'], 'ungültiger Name aus dem Status übernommen');
+    check(count($p->status()['found']) === 1, 'ungültige Adresse aus der Suche übernommen');
+    $p->add('office', ' A4 ', 'ipp://192.0.2.90/ipp/print', ['ipp', 'nfs']);
+    check(req_p($env) === ['action' => 'anlegen', 'art' => 'office', 'name' => 'A4', 'adresse' => 'ipp://192.0.2.90/ipp/print', 'freigabe' => ['ipp']], 'Anlegen');
+    problem(fn() => $p->add('laser', '', '192.0.2.1', []), 422, 'unbekannte Art');
+    problem(fn() => $p->add('bon', 'mit leer', '192.0.2.1', []), 422, 'Name mit Leerzeichen');
+    problem(fn() => $p->add('bon', '', "192.0.2.1\n-x", []), 422, 'Adresse mit Zeilenumbruch');
+    problem(fn() => $p->remove('Unbekannt'), 404, 'unbekannter Drucker');
+    $p->testPage('Bon');
+    problem(fn() => $p->search(), 409, 'zweite Anfrage');
+    check(req_p($env) === ['action' => 'testseite', 'name' => 'Bon'], 'Testseite');
+}
+
+function test_seite(): void {
+    [$env, $p] = pr_env(['letzte' => ['ok' => false, 'meldung' => 'Fehler <script>']]);
+    [$b] = admin_browser($env);
+    $b->web = fn() => $b->defaultWeb(null, null, null, null, $p);
+    $page = $b->get('/verwaltung/drucker');
+    check($page->status === 200 && str_contains($page->body, 'Eingerichtete Drucker') && str_contains($page->body, 'Modul Beispielmodul'), 'Seite unvollständig');
+    check(!str_contains($page->body, '<script>') && !str_contains($page->body, 'Von <b>') && !str_contains($page->body, 'A4 <i>'), 'nicht maskiert');
+    check(substr_count($page->body, '>Entfernen<') === 1, 'Entfernen nur für eigene Drucker der Suite');
+    $r = $b->post('/verwaltung/drucker', ['aktion' => 'freigabe', 'name' => 'Bon', 'samba' => '1', 'ipp' => '1']);
+    check($r->status === 303 && req_p($env) === ['action' => 'freigabe', 'name' => 'Bon', 'freigabe' => ['samba', 'ipp']], 'Freigabe');
+    check(str_contains(implode("\n", $env->audit->recent()), 'drucker-freigabe Bon'), 'nicht protokolliert');
+    check($b->post('/verwaltung/drucker', ['aktion' => 'anlegen', 'art' => 'bon', 'adresse' => ''])->status === 422, 'leere Adresse');
+    $env->user('bert');
+    $m = new Browser($env); $m->web = fn() => $m->defaultWeb(null, null, null, null, $p);
+    $m->post('/anmelden', ['login' => 'bert', 'password' => 'Wiesen-Blume-Fahrrad-7']);
+    check($m->get('/verwaltung/drucker')->status === 403, 'Mitarbeiter auf der Druckerseite');
+}
+
+function test_modul_drucken(): void {
+    $dir = tmpdir();
+    file_put_contents("$dir/status.json", json_encode(['warteschlangen' => [['name' => 'A4', 'description' => 'Kienzle-Suite Praxisdrucker', 'state' => 'bereit'], ['name' => 'x y']]]));
+    $calls = [];
+    $k = new KienzleModul('kasse', ['X' => '1'], drucker: "$dir/status.json", lp: function (array $args, string $data) use (&$calls) {
+        $calls[] = [$args, strlen($data)];
+        return ['code' => 0, 'output' => 'request id is A4-7 (1 file(s))', 'stderr' => ''];
+    });
+    check(array_column($k->drucker(), 'name') === ['A4'], 'Druckerliste für Module');
+    check($k->drucken('A4', '%PDF-1.4 erfunden', 'Rechnung RE-42 <x>', ['media=A4']) === 'A4-7', 'Auftragsnummer');
+    check($calls[0][0] === ['/usr/bin/lp', '-d', 'A4', '-t', 'Rechnung RE-42 x', '-o', 'media=A4'], 'lp-Aufruf: ' . json_encode($calls[0][0]));
+    try { $k->drucken('Fremd', 'x', 't'); throw new LogicException('unbekannter Drucker angenommen'); } catch (RuntimeException) {}
+    try { $k->drucken('A4', 'x', 't', ['-h evil']); throw new LogicException('Option angenommen'); } catch (RuntimeException) {}
+    $f = new KienzleModul('kasse', ['X' => '1'], drucker: "$dir/status.json", lp: fn() => ['code' => 1, 'output' => '', 'stderr' => 'lp: The printer or class does not exist.']);
+    try { $f->drucken('A4', 'x', 't'); throw new LogicException('Fehler von lp verschluckt'); } catch (RuntimeException $e) { check(str_contains($e->getMessage(), 'does not exist'), 'Meldung von lp fehlt'); }
+}
+
+run_tests();

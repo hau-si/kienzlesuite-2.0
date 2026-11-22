@@ -8,9 +8,14 @@ declare(strict_types=1);
  * Keine Abhängigkeit von den übrigen Klassen der Basis.
  */
 final class KienzleModul {
-    /** $server: Vorgabe $_SERVER; die Ordner nur für Tests ändern. */
+    /** @var callable|null */
+    private $lp;
+
+    /** $server: Vorgabe $_SERVER; die Ordner und $lp nur für Tests ändern. */
     public function __construct(public readonly string $id, private array $server = [],
-        private string $verbindungen = '/etc/kienzle/verbindungen/module', private string $schluessel = '/etc/kienzle/schluessel') {
+        private string $verbindungen = '/etc/kienzle/verbindungen/module', private string $schluessel = '/etc/kienzle/schluessel',
+        private string $drucker = '/var/lib/kienzle/drucker/status.json', ?callable $lp = null) {
+        $this->lp = $lp;
         if (!preg_match('/^[a-z][a-z0-9-]{1,28}$/D', $id)) throw new InvalidArgumentException('Modul-ID ungültig.');
         $this->server = $server ?: $_SERVER;
     }
@@ -82,5 +87,46 @@ final class KienzleModul {
         $hex = trim((string)@file_get_contents($this->schluessel . '/' . $this->id . '.key'));
         if (strlen($hex) !== 64) throw new RuntimeException('Schlüssel des Moduls fehlt.');
         return sodium_crypto_generichash('modul:' . $this->id . ':' . $zweck, sodium_hex2bin($hex), SODIUM_CRYPTO_SECRETBOX_KEYBYTES);
+    }
+
+    // ---- Drucken (Druckerverwaltung der Basis, Verwaltung → Drucker) ------------------------------------------------
+
+    /** Warteschlangen der Suite zur Auswahl im Modul: Liste aus name, description, state. */
+    public function drucker(): array {
+        $s = json_decode((string)@file_get_contents($this->drucker), true);
+        $out = [];
+        foreach ((array)($s['warteschlangen'] ?? []) as $q) {
+            if (!is_array($q) || !preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/D', (string)($q['name'] ?? ''))) continue;
+            $out[] = ['name' => (string)$q['name'], 'description' => mb_substr((string)($q['description'] ?? ''), 0, 130), 'state' => (string)($q['state'] ?? '')];
+        }
+        return $out;
+    }
+
+    /**
+     * Auftrag mit lp als Modul-Benutzer abgeben; liefert die Auftragsnummer. Der Titel darf keine Patientendaten enthalten.
+     * $optionen: CUPS-Optionen „name=wert“ (z. B. media=A4, sides=two-sided-long-edge, raw).
+     */
+    public function drucken(string $drucker, string $daten, string $titel, array $optionen = []): string {
+        if (!in_array($drucker, array_column($this->drucker(), 'name'), true)) throw new RuntimeException('Drucker „' . $drucker . '“ ist in der Suite nicht eingerichtet.');
+        $args = ['/usr/bin/lp', '-d', $drucker, '-t', mb_substr((string)preg_replace('/[^A-Za-z0-9 ._\/-]/', '', $titel), 0, 60) ?: 'Kienzle-Suite'];
+        foreach ($optionen as $o) {
+            if (!is_string($o) || !preg_match('/^[a-z][a-z0-9-]{0,40}(=[A-Za-z0-9_.,-]{1,60})?$/D', $o)) throw new RuntimeException('Druckoption ungültig.');
+            array_push($args, '-o', $o);
+        }
+        $r = $this->lp ? ($this->lp)($args, $daten) : self::run($args, $daten);
+        if (($r['code'] ?? 1) !== 0 || !preg_match('/request id is (\S+)/', (string)($r['output'] ?? ''), $m)) {
+            $reason = trim((string)preg_replace('/\s+/', ' ', mb_substr((string)(($r['stderr'] ?? '') ?: ($r['output'] ?? '')), 0, 200)));
+            throw new RuntimeException('Drucker „' . $drucker . '“: ' . ($reason !== '' ? $reason : 'Fehler ' . (int)($r['code'] ?? 1)) . '.');
+        }
+        return $m[1];
+    }
+
+    private static function run(array $args, string $input): array {
+        $p = proc_open($args, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        if (!is_resource($p)) return ['code' => 127, 'output' => '', 'stderr' => 'lp nicht startbar'];
+        fwrite($pipes[0], $input); fclose($pipes[0]);
+        $out = (string)stream_get_contents($pipes[1]); $err = (string)stream_get_contents($pipes[2]);
+        fclose($pipes[1]); fclose($pipes[2]);
+        return ['code' => proc_close($p), 'output' => $out, 'stderr' => $err];
     }
 }

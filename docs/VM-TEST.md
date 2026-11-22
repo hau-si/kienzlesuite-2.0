@@ -104,3 +104,14 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
 8. [ ] autoinstall: zweite VM mit `installer/autoinstall.yaml` (angepasst) und Standard-ISO, nach dem ersten Start
        ist die Suite erreichbar, Link über `journalctl -u kienzle-erstinstallation`.
 9. [ ] `--admin-reset NAME` und `--kanal beta` ausprobieren.
+
+## Meilenstein 8 – Drucker (Basis 0.8.0)
+
+1. [ ] Verwaltung → Drucker → „Netzwerk und USB durchsuchen“: Bondrucker und A4-Drucker erscheinen mit passender Art.
+2. [ ] Bondrucker übernehmen, Testseite: Bon kommt mit Schnitt.
+3. [ ] A4-Drucker (IPP Everywhere) anlegen, Testseite: A4-Seite.
+4. [ ] Freigabe „Windows“ für den A4-Drucker, Firewall „Windows-Freigabe 445“ an: Drucker erscheint unter `\\kienzle.praxis.internal\`
+       und druckt von Windows. Ohne Freigabe nicht sichtbar.
+5. [ ] Freigabe „IPP“: Drucker auf einem Mac über `ipp://kienzle.praxis.internal/printers/<Name>` hinzufügen und drucken.
+6. [ ] Beispielmodul installieren: „Beispiel-Drucker“ erscheint (Modul), lässt sich nicht entfernen; Modul entfernen: Drucker weg.
+7. [ ] `id ks-core` zeigt keine Gruppe `lpadmin`; ein von Hand angelegter Drucker lässt sich in der Suite nicht entfernen.

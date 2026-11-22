@@ -20,7 +20,9 @@ class Vorlagen(unittest.TestCase):
 
     def test_samba_nur_drucker(self):
         text = (VORLAGEN / 'smb.conf').read_text()
-        self.assertEqual(re.findall(r'^\[(\w+)\]', text, re.M), ['global', 'printers'])
+        self.assertEqual(re.findall(r'^\[(\w+)\]', text, re.M), ['global'])
+        self.assertIn('load printers = no', text)
+        self.assertTrue(text.rstrip().endswith('include = /etc/samba/kienzle-drucker.conf'))
         self.assertIn('server min protocol = SMB3', text)
         self.assertIn('disable netbios = yes', text)
 
