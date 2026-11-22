@@ -28,9 +28,18 @@ PROGRAMS = Path(E('KIENZLE_DRUCKER_PROGRAMME', '/opt/kienzle'))
 BACKENDS = Path(E('KIENZLE_DRUCKER_BACKENDS', '/usr/lib/cups/backend'))
 PPDS = Path(E('KIENZLE_DRUCKER_PPDS', '/usr/share/ppd/kienzle'))
 SAMBA = Path(E('KIENZLE_DRUCKER_SAMBA', '/etc/samba/kienzle-drucker.conf'))
+SAMBA_NET = Path(E('KIENZLE_DRUCKER_SAMBA_NETZ', '/etc/samba/kienzle-netz.conf'))
+UNITS = Path(E('KIENZLE_DRUCKER_UNITS', '/etc/systemd/system'))
+SYSTEMCTL = E('KIENZLE_DRUCKER_SYSTEMCTL', '/usr/bin/systemctl')
+DATA = Path(E('KIENZLE_DRUCKER_DATA', '/var/lib/kienzle'))
+PORTS = range(47100, 47200)                     # IPP-Everywhere-Drucker der Module, nur localhost
 BIN = {k: E(f'KIENZLE_{k.upper()}', v) for k, v in {'lpadmin': '/usr/sbin/lpadmin', 'lpinfo': '/usr/sbin/lpinfo', 'lpstat': '/usr/bin/lpstat',
                                                      'lp': '/usr/bin/lp', 'cupsenable': '/usr/sbin/cupsenable', 'cupsaccept': '/usr/sbin/cupsaccept',
-                                                     'smbcontrol': '/usr/bin/smbcontrol'}.items()}
+                                                     'smbcontrol': '/usr/bin/smbcontrol', 'cancel': '/usr/bin/cancel', 'net': '/usr/bin/net',
+                                                     'testparm': '/usr/bin/testparm', 'ippeveprinter': '/usr/sbin/ippeveprinter', 'runuser': '/usr/sbin/runuser'}.items()}
+JOB = re.compile(r'^[A-Za-z0-9_-]{1,40}-\d{1,9}$')
+WORKGROUP = re.compile(r'^[A-Za-z0-9][A-Za-z0-9-]{0,14}$')
+REALM = re.compile(r'^(?=.{3,253}$)[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$')
 MARK = 'Kienzle-Suite'
 KINDS = {
     'tm-m10': {'label': 'Bondrucker Epson TM-m10 (58 mm)', 'port': 9100, 'name': 'TM-m10'},
@@ -70,8 +79,8 @@ def _read(path: Path, default):
         return default
 
 
-def run(name: str, *args: str, timeout: int = 60, allow_empty: bool = False, data: bytes | None = None) -> str:
-    env = {'PATH': '/usr/bin:/bin:/usr/sbin:/sbin', 'LANG': 'C', **{k: v for k, v in os.environ.items() if k.startswith('FAKE_')}}   # FAKE_: nur Tests
+def run(name: str, *args: str, timeout: int = 60, allow_empty: bool = False, data: bytes | None = None, extra_env: dict | None = None) -> str:
+    env = {'PATH': '/usr/bin:/bin:/usr/sbin:/sbin', 'LANG': 'C', **{k: v for k, v in os.environ.items() if k.startswith('FAKE_')}, **(extra_env or {})}   # FAKE_: nur Tests
     r = subprocess.run([BIN[name], *args], capture_output=True, timeout=timeout, input=data, env=env)
     out, err = r.stdout.decode(errors='replace'), r.stderr.decode(errors='replace')
     if r.returncode == 0:
@@ -165,6 +174,30 @@ def queues() -> list[dict]:
         q['address'] = address(q['uri'])
         q['share'] = [s for s in shares.get(q['name'], []) if s in SHARES]
     return sorted(found.values(), key=lambda q: q['name'].lower())
+
+
+def jobs() -> list[dict]:
+    """Offene Aufträge aller Warteschlangen (ohne Titel: der könnte Namen enthalten)."""
+    out = []
+    for line in run('lpstat', '-o', timeout=15, allow_empty=True).splitlines():
+        m = re.match(r'^(\S+)\s+(\S+)\s+(\d+)\s+(.+)$', line.strip())
+        if m and JOB.match(m.group(1)):
+            out.append({'id': m.group(1), 'drucker': m.group(1).rsplit('-', 1)[0], 'benutzer': m.group(2)[:40], 'groesse': int(m.group(3)), 'zeit': m.group(4)[:40]})
+    return out
+
+
+def cancel(job: str) -> str:
+    if not JOB.match(job) or job not in {j['id'] for j in jobs()}:
+        raise Fehler('Auftrag nicht gefunden (schon gedruckt?).')
+    run('cancel', job, timeout=30)
+    return f'Auftrag {job} abgebrochen.'
+
+
+def cancel_all(name: str) -> str:
+    if name not in {q['name'] for q in queues()}:
+        raise Fehler('Drucker nicht gefunden.')
+    run('cancel', '-a', name, timeout=30)
+    return f'Alle Aufträge von „{name}“ abgebrochen.'
 
 
 def discover() -> list[dict]:
@@ -301,38 +334,126 @@ def _install_file(src: Path, dest: Path, mode: int) -> bool:
     return True
 
 
+def unit_name(sch: str) -> str:
+    return f'kienzle-drucker-{sch.removeprefix("kienzle-")}.service'
+
+
+def unit_text(p: dict, port: int) -> str:
+    """systemd-Einheit für einen IPP-Everywhere-Drucker eines Moduls: ippeveprinter als Modul-Benutzer, nur localhost."""
+    mid = p['modul']
+    spool = DATA / mid / 'druckauftraege'
+    cmd = PROGRAMS / mid / 'current' / p['command']
+    return (f'# Kienzle-Suite: virtueller Drucker „{p["name"]}“ des Moduls {mid} (von kienzle-drucker erzeugt).\n[Unit]\n'
+            f'Description=Kienzle-Suite Drucker {p["name"]} ({mid})\nAfter=network.target\n\n[Service]\nUser=ks-{mid}\nGroup=ks-{mid}\n'
+            f'ExecStartPre=/usr/bin/mkdir -p {spool}\n'
+            f'ExecStart={BIN["ippeveprinter"]} -p {port} -n localhost -r off -c {cmd} -f {",".join(p["formats"])} -d {spool} {p["scheme"]}\n'
+            'Restart=on-failure\nNoNewPrivileges=yes\nProtectSystem=strict\nProtectHome=yes\nPrivateTmp=yes\n'
+            f'ReadWritePaths={DATA / mid}\nRestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX\nCapabilityBoundingSet=\n\n[Install]\nWantedBy=multi-user.target\n')
+
+
+def _port_open(port: int) -> bool:
+    try:
+        with socket.create_connection(('127.0.0.1', port), timeout=1):
+            return True
+    except OSError:
+        return False
+
+
+def _start_unit(unit: str, p: dict, port: int) -> None:
+    if E('KIENZLE_OHNE_SYSTEMD') == '1':             # nur Container-Tests ohne systemd: Drucker direkt starten
+        spool = DATA / p['modul'] / 'druckauftraege'
+        subprocess.run([BIN['runuser'], '-u', f'ks-{p["modul"]}', '--', 'mkdir', '-p', str(spool)], capture_output=True, timeout=30)
+        subprocess.Popen([BIN['runuser'], '-u', f'ks-{p["modul"]}', '--', BIN['ippeveprinter'], '-p', str(port), '-n', 'localhost', '-r', 'off',
+                          '-c', str(PROGRAMS / p['modul'] / 'current' / p['command']), '-f', ','.join(p['formats']), '-d', str(spool), p['scheme']],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    elif SYSTEMCTL and Path(SYSTEMCTL).is_file():
+        subprocess.run([SYSTEMCTL, 'daemon-reload'], capture_output=True, timeout=60)
+        subprocess.run([SYSTEMCTL, 'enable', unit], capture_output=True, timeout=60)
+        subprocess.run([SYSTEMCTL, 'restart', unit], capture_output=True, timeout=60)
+    for _ in range(int(E('KIENZLE_DRUCKER_WARTEN', '40'))):
+        if _port_open(port):
+            return
+        time.sleep(0.25)
+    raise Fehler(f'Der Drucker antwortet nicht auf Port {port}.')
+
+
+def _stop_unit(unit: str) -> None:
+    path = UNITS / unit
+    if SYSTEMCTL and Path(SYSTEMCTL).is_file() and E('KIENZLE_OHNE_SYSTEMD') != '1':
+        subprocess.run([SYSTEMCTL, 'disable', '--now', unit], capture_output=True, timeout=60)
+    path.unlink(missing_ok=True)
+    if SYSTEMCTL and Path(SYSTEMCTL).is_file() and E('KIENZLE_OHNE_SYSTEMD') != '1':
+        subprocess.run([SYSTEMCTL, 'daemon-reload'], capture_output=True, timeout=60)
+
+
 def sync() -> list[str]:
-    """Virtuelle Drucker an modules.json angleichen: fehlende anlegen, veraltete und verwaiste entfernen."""
+    """Virtuelle Drucker an modules.json angleichen: fehlende anlegen, veraltete und verwaiste entfernen.
+
+    Drei Arten: command → IPP-Everywhere-Drucker (ippeveprinter als ks-<id> auf localhost) mit CUPS-Warteschlange
+    „everywhere“; ppd mit backend → Backend und PPD aus dem Modulordner; ppd ohne backend → Ausgabe der Filter verwerfen
+    (Backend kienzle-leer der Basis)."""
     registry = _read(MODULES, {}).get('modules', [])
     wanted = {}
     for m in registry:
         mid = m['module']['id']
         for p in m.get('printers') or []:
-            wanted[p['name']] = {**p, 'modul': mid, 'scheme': scheme(mid, p['name'])}
+            wanted[p['name']] = {**p, 'command': p.get('command'), 'formats': p.get('formats') or ['application/pdf'], 'modul': mid, 'scheme': scheme(mid, p['name'])}
     installed = _read(STATE / 'installiert.json', {})
     notes = []
     current = {q['name']: q for q in queues()}
+    used_ports = {i.get('port') for n, i in installed.items() if n in wanted}
     for name, p in wanted.items():
         base = PROGRAMS / p['modul'] / 'current'
         q = current.get(name)
         if q and not q['managed']:
             notes.append(f'{name}: Name schon von einem fremden Drucker belegt, nicht angelegt.')
             continue
-        if not p.get('backend'):
-            notes.append(f'{name}: ohne Backend nicht angelegt.')
-            continue
+        old = installed.get(name, {})
         try:
-            changed = _install_file(base / p['backend'], BACKENDS / p['scheme'], 0o755)
-            changed |= _install_file(base / p['ppd'], PPDS / f'{p["scheme"]}.ppd', 0o644)
+            if p['command']:
+                cmd = base / p['command']
+                info = cmd.lstat()
+                if not stat.S_ISREG(info.st_mode):
+                    raise Fehler(f'{p["command"]}: keine reguläre Datei.')
+                port = old.get('port') if old.get('art') == 'ipp' else None
+                if port is None:
+                    port = next((x for x in PORTS if x not in used_ports and not _port_open(x)), None)
+                    if port is None:
+                        raise Fehler('kein freier Port mehr.')
+                    used_ports.add(port)
+                unit = unit_name(p['scheme'])
+                text = unit_text(p, port)
+                changed = not (UNITS / unit).is_file() or (UNITS / unit).read_text(encoding='utf-8') != text
+                if changed:
+                    _write(UNITS / unit, text, 0o644)
+                if changed or not _port_open(port):
+                    _start_unit(unit, p, port)
+                uri, model = f'ipp://localhost:{port}/ipp/print', ['-m', 'everywhere']
+                for f in (old.get('backend'), old.get('ppd')):
+                    if f:
+                        Path(f).unlink(missing_ok=True)
+                entry = {'modul': p['modul'], 'scheme': p['scheme'], 'art': 'ipp', 'port': port, 'unit': unit}
+            else:
+                ppd = PPDS / f'{p["scheme"]}.ppd'
+                changed = _install_file(base / p['ppd'], ppd, 0o644)
+                if p.get('backend'):
+                    changed |= _install_file(base / p['backend'], BACKENDS / p['scheme'], 0o755)
+                    uri = f'{p["scheme"]}:/{name}'
+                else:
+                    (BACKENDS / p['scheme']).unlink(missing_ok=True)
+                    uri = f'kienzle-leer:/{name}'
+                if old.get('unit'):
+                    _stop_unit(old['unit'])
+                model = ['-P', str(ppd)]
+                entry = {'modul': p['modul'], 'scheme': p['scheme'], 'art': 'ppd', 'ppd': str(ppd), 'backend': str(BACKENDS / p['scheme']) if p.get('backend') else ''}
         except (OSError, Fehler) as e:
             notes.append(f'{name}: {e}')
             continue
-        uri = f'{p["scheme"]}:/{name}'
         if not q or changed or q['uri'] != uri:
-            run('lpadmin', '-p', name, '-v', uri, '-P', str(PPDS / f'{p["scheme"]}.ppd'), '-D', f'{MARK} Modul {p["modul"]}: {p["label"]}'[:127],
-                '-L', 'auf diesem Server', '-o', f'printer-is-shared={"true" if "ipp" in p["share"] else "false"}', '-E', timeout=60)
+            run('lpadmin', '-p', name, '-v', uri, *model, '-D', f'{MARK} Modul {p["modul"]}: {p["label"]}'[:127],
+                '-L', 'auf diesem Server', '-o', f'printer-is-shared={"true" if "ipp" in p["share"] else "false"}', '-E', timeout=90)
             notes.append(f'{name}: angelegt bzw. aktualisiert.')
-        installed[name] = {'modul': p['modul'], 'scheme': p['scheme']}
+        installed[name] = entry
         _set_share(name, p['share'])
     for name, q in current.items():
         if q['modul'] and name not in wanted:
@@ -343,6 +464,8 @@ def sync() -> list[str]:
         if name not in wanted:
             (BACKENDS / info['scheme']).unlink(missing_ok=True)
             (PPDS / f'{info["scheme"]}.ppd').unlink(missing_ok=True)
+            if info.get('unit'):
+                _stop_unit(info['unit'])
             installed.pop(name)
     _write(STATE / 'installiert.json', installed, 0o644)
     samba()
@@ -371,6 +494,91 @@ def samba() -> bool:
     return True
 
 
+# ---- Windows-Netz: Arbeitsgruppe oder Domäne ----------------------------------------------------------------------
+def network() -> dict:
+    n = _read(STATE / 'netz.json', {})
+    return {'modus': n.get('modus') if n.get('modus') in ('arbeitsgruppe', 'domaene') else 'arbeitsgruppe',
+            'arbeitsgruppe': n.get('arbeitsgruppe', 'WORKGROUP'), 'realm': n.get('realm', ''), 'beigetreten': n.get('beigetreten', 0)}
+
+
+def network_conf(n: dict) -> str:
+    head = '# Kienzle-Suite: von kienzle-drucker erzeugt (Verwaltung → Drucker → Windows-Netz), nicht von Hand ändern.\n'
+    if n['modus'] == 'domaene':
+        wg = n['arbeitsgruppe'].upper()
+        return (head + f'   workgroup = {wg}\n   realm = {n["realm"].upper()}\n   security = ads\n   server role = member server\n'
+                '   kerberos method = secrets and keytab\n   winbind use default domain = yes\n   winbind refresh tickets = yes\n'
+                '   idmap config * : backend = tdb\n   idmap config * : range = 3000-7999\n'
+                f'   idmap config {wg} : backend = rid\n   idmap config {wg} : range = 10000-999999\n')
+    return head + f'   workgroup = {n["arbeitsgruppe"].upper()}\n   server role = standalone server\n'
+
+
+def _apply_network(n: dict) -> None:
+    old = SAMBA_NET.read_text(encoding='utf-8') if SAMBA_NET.is_file() else None
+    _write(SAMBA_NET, network_conf(n), 0o644)
+    if Path(BIN['testparm']).is_file():
+        r = subprocess.run([BIN['testparm'], '-s', '--suppress-prompt'], capture_output=True, text=True, timeout=30)
+        if r.returncode != 0:
+            if old is None:
+                SAMBA_NET.unlink()
+            else:
+                _write(SAMBA_NET, old, 0o644)
+            raise Fehler('Samba lehnt die Einstellung ab: ' + (r.stderr.strip().splitlines() or ['?'])[-1][:150])
+
+
+def _restart(*units: str) -> None:
+    if SYSTEMCTL and Path(SYSTEMCTL).is_file():
+        for u in units:
+            subprocess.run([SYSTEMCTL, 'restart', u], capture_output=True, timeout=120)
+
+
+def set_workgroup(name: str) -> str:
+    if not WORKGROUP.match(name or ''):
+        raise Fehler('Arbeitsgruppe: 1–15 Buchstaben, Ziffern oder Bindestrich.')
+    if network()['modus'] == 'domaene':
+        raise Fehler('Der Server ist Mitglied einer Domäne. Bitte zuerst die Domäne verlassen.')
+    n = {'modus': 'arbeitsgruppe', 'arbeitsgruppe': name.upper()}
+    _apply_network(n)
+    _write(STATE / 'netz.json', n, 0o644)
+    _restart('smbd.service')
+    return f'Arbeitsgruppe {name.upper()} gespeichert.'
+
+
+def join_domain(realm: str, workgroup: str, user: str, password: str) -> str:
+    """Der Domäne beitreten (net ads join). Das Passwort geht nur über die Umgebung an net, nie in Argumente oder Protokolle."""
+    if not REALM.match(realm or '') or not WORKGROUP.match(workgroup or ''):
+        raise Fehler('Domäne (z. B. PRAXIS.EXAMPLE.ORG) und NetBIOS-Name der Domäne (z. B. PRAXIS) angeben.')
+    if not re.fullmatch(r'[A-Za-z0-9._@-]{1,64}', user or '') or not isinstance(password, str) or not 1 <= len(password) <= 200 or re.search(r'[\x00-\x1f]', password):
+        raise Fehler('Benutzer und Passwort eines Domänen-Admins angeben.')
+    n = {'modus': 'domaene', 'arbeitsgruppe': workgroup.upper(), 'realm': realm.upper()}
+    before = network()
+    _apply_network(n)
+    try:
+        run('net', 'ads', 'join', '-U', user, timeout=120, extra_env={'PASSWD': password})
+    except Fehler as e:
+        _apply_network(before)
+        raise Fehler('Beitritt fehlgeschlagen: ' + str(e).removeprefix('Druckereinrichtung fehlgeschlagen: ')) from None
+    _write(STATE / 'netz.json', {**n, 'beigetreten': int(time.time())}, 0o644)
+    _restart('winbind.service', 'smbd.service')
+    return f'Der Server ist der Domäne {realm.upper()} beigetreten.'
+
+
+def leave_domain(user: str, password: str) -> str:
+    n = network()
+    if n['modus'] != 'domaene':
+        raise Fehler('Der Server ist keiner Domäne beigetreten.')
+    if not re.fullmatch(r'[A-Za-z0-9._@-]{1,64}', user or '') or not isinstance(password, str) or not 1 <= len(password) <= 200:
+        raise Fehler('Benutzer und Passwort eines Domänen-Admins angeben.')
+    try:
+        run('net', 'ads', 'leave', '-U', user, timeout=120, extra_env={'PASSWD': password})
+    except Fehler as e:
+        raise Fehler('Verlassen fehlgeschlagen: ' + str(e).removeprefix('Druckereinrichtung fehlgeschlagen: ')) from None
+    w = {'modus': 'arbeitsgruppe', 'arbeitsgruppe': n['arbeitsgruppe']}
+    _apply_network(w)
+    _write(STATE / 'netz.json', w, 0o644)
+    _restart('smbd.service', 'winbind.service')
+    return 'Domäne verlassen; der Server arbeitet wieder in der Arbeitsgruppe.'
+
+
 # ---- Status und Anfragen -----------------------------------------------------------------------------------------
 def set_status(**changes) -> dict:
     s = _read(STATE / 'status.json', {})
@@ -382,7 +590,8 @@ def set_status(**changes) -> dict:
 
 def refresh() -> None:
     try:
-        set_status(warteschlangen=[{k: q[k] for k in ('name', 'address', 'state', 'description', 'managed', 'modul', 'share')} for q in queues()], fehler='')
+        set_status(warteschlangen=[{k: q[k] for k in ('name', 'address', 'state', 'description', 'managed', 'modul', 'share')} for q in queues()],
+                   auftraege=jobs()[:200], netz=network(), fehler='')
     except Fehler as e:
         set_status(warteschlangen=[], fehler=str(e))
 
@@ -390,7 +599,7 @@ def refresh() -> None:
 def dispatch(req: dict) -> str:
     a = req.get('action')
     name = str(req.get('name', ''))
-    if a in ('entfernen', 'testseite', 'freigabe') and not NAME.match(name):
+    if a in ('entfernen', 'testseite', 'freigabe', 'alle-abbrechen') and not NAME.match(name):
         raise Fehler('Name ungültig.')
     if a == 'suchen':
         found = discover()
@@ -410,6 +619,17 @@ def dispatch(req: dict) -> str:
         return msg
     if a == 'testseite':
         return test_page(name)
+    if a == 'abbrechen':
+        return cancel(str(req.get('auftrag', '')))
+    if a == 'alle-abbrechen':
+        return cancel_all(name)
+    if a == 'arbeitsgruppe':
+        msg = set_workgroup(str(req.get('arbeitsgruppe', '')))
+        return msg
+    if a == 'domaene-beitreten':
+        return join_domain(str(req.get('realm', '')), str(req.get('arbeitsgruppe', '')), str(req.get('benutzer', '')), str(req.get('passwort', '')))
+    if a == 'domaene-verlassen':
+        return leave_domain(str(req.get('benutzer', '')), str(req.get('passwort', '')))
     if a == 'abgleichen':
         notes = sync()
         return 'Virtuelle Drucker abgeglichen.' + (' ' + ' '.join(notes) if notes else '')

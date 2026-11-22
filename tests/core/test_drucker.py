@@ -20,13 +20,15 @@ class Umgebung(unittest.TestCase):
         self.t = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.t)
         (self.t / 'bin').mkdir()
-        for p in ('lpadmin', 'lpstat', 'lpinfo', 'lp'):
+        for p in ('lpadmin', 'lpstat', 'lpinfo', 'lp', 'cancel', 'net', 'testparm', 'systemctl'):
             (self.t / 'bin' / p).symlink_to(FAKE)
         env = {'FAKE_CUPS': self.t / 'cups.json', 'KIENZLE_DRUCKER_STATE': self.t / 'state', 'KIENZLE_DRUCKER_REQUEST': self.t / 'anfrage.json',
                'KIENZLE_DRUCKER_MODULES': self.t / 'modules.json', 'KIENZLE_DRUCKER_PROGRAMME': self.t / 'opt', 'KIENZLE_DRUCKER_BACKENDS': self.t / 'backend',
                'KIENZLE_DRUCKER_PPDS': self.t / 'ppd', 'KIENZLE_DRUCKER_SAMBA': self.t / 'kienzle-drucker.conf', 'KIENZLE_DRUCKER_UID': os.getuid(),
-               'KIENZLE_DRUCKER_CHOWN': '0', 'KIENZLE_DRUCKER_PROBE': 'ja', 'KIENZLE_SMBCONTROL': self.t / 'fehlt'}
-        env.update({f'KIENZLE_{p.upper()}': self.t / 'bin' / p for p in ('lpadmin', 'lpstat', 'lpinfo', 'lp')})
+               'KIENZLE_DRUCKER_CHOWN': '0', 'KIENZLE_DRUCKER_PROBE': 'ja', 'KIENZLE_SMBCONTROL': self.t / 'fehlt',
+               'KIENZLE_DRUCKER_SAMBA_NETZ': self.t / 'kienzle-netz.conf', 'KIENZLE_DRUCKER_UNITS': self.t / 'units', 'KIENZLE_DRUCKER_SYSTEMCTL': self.t / 'bin/systemctl',
+               'KIENZLE_DRUCKER_DATA': self.t / 'data', 'KIENZLE_DRUCKER_WARTEN': '1'}
+        env.update({f'KIENZLE_{p.upper()}': self.t / 'bin' / p for p in ('lpadmin', 'lpstat', 'lpinfo', 'lp', 'cancel', 'net', 'testparm')})
         p = mock.patch.dict(os.environ, {k: str(v) for k, v in env.items()})
         p.start()
         self.addCleanup(p.stop)
@@ -145,6 +147,100 @@ class Virtuell(Umgebung):
         self.registry(m)
         self.assertIn('keine reguläre Datei', ' '.join(self.d.sync()))
         self.assertNotIn('Fax', self.cups()['queues'])
+
+
+class Auftraege(Umgebung):
+    def test_anzeigen_und_abbrechen(self):
+        self.d.add('bon', 'Bon', '192.0.2.80', [])
+        self.d.add('office', 'A4', '192.0.2.90', [])
+        for q in ('Bon', 'A4', 'A4'):
+            self.d.print_job(q, b'x' * 10, 'Rechnung', [])
+        jobs = self.d.jobs()
+        self.assertEqual([(j['id'], j['drucker'], j['groesse']) for j in jobs], [('Bon-1', 'Bon', 10), ('A4-2', 'A4', 10), ('A4-3', 'A4', 10)])
+        self.assertIn('abgebrochen', self.d.cancel('Bon-1'))
+        with self.assertRaises(self.d.Fehler):
+            self.d.cancel('Bon-1')
+        for bad in ('-a', 'A4-2; rm', '../x-1'):
+            with self.subTest(bad), self.assertRaises(self.d.Fehler):
+                self.d.cancel(bad)
+        self.d.cancel_all('A4')
+        self.assertEqual(self.d.jobs(), [])
+
+
+class WindowsNetz(Umgebung):
+    def test_arbeitsgruppe(self):
+        self.assertEqual(self.d.network()['arbeitsgruppe'], 'WORKGROUP')
+        self.assertIn('PRAXIS', self.d.set_workgroup('praxis'))
+        self.assertIn('workgroup = PRAXIS\n   server role = standalone server', (self.t / 'kienzle-netz.conf').read_text())
+        for bad in ('', 'mit leer', 'x' * 16, 'A\nsecurity = user'):
+            with self.subTest(bad), self.assertRaises(self.d.Fehler):
+                self.d.set_workgroup(bad)
+
+    def test_domaene(self):
+        with self.assertRaisesRegex(self.d.Fehler, 'Beitritt fehlgeschlagen'):
+            self.d.join_domain('praxis.example.org', 'PRAXIS', 'admin', 'falsch')
+        self.assertIn('standalone', (self.t / 'kienzle-netz.conf').read_text(), 'Einstellung nach Fehlschlag nicht zurückgenommen')
+        self.assertIn('PRAXIS.EXAMPLE.ORG', self.d.join_domain('praxis.example.org', 'praxis', 'admin', 'Domaenen-Passwort-1'))
+        conf = (self.t / 'kienzle-netz.conf').read_text()
+        for line in ('realm = PRAXIS.EXAMPLE.ORG', 'security = ads', 'idmap config PRAXIS : backend = rid'):
+            self.assertIn(line, conf)
+        net = self.cups()['net'][-1]
+        self.assertEqual(net['args'], ['ads', 'join', '-U', 'admin'])
+        self.assertNotIn('Domaenen-Passwort-1', json.dumps(self.cups()['calls']), 'Passwort in den Argumenten')
+        self.assertEqual(self.d.network()['modus'], 'domaene')
+        with self.assertRaisesRegex(self.d.Fehler, 'Domäne verlassen'):
+            self.d.set_workgroup('ANDERS')
+        self.assertIn('wieder in der Arbeitsgruppe', self.d.leave_domain('admin', 'Domaenen-Passwort-1'))
+        self.assertIn('workgroup = PRAXIS', (self.t / 'kienzle-netz.conf').read_text())
+        for args in (('x', 'PRAXIS', 'admin', 'p'), ('praxis.example.org', 'PRAXIS', 'ad min', 'p'), ('praxis.example.org', 'PRAXIS', 'admin', '')):
+            with self.subTest(args), self.assertRaises(self.d.Fehler):
+                self.d.join_domain(*args)
+
+
+class IppEverywhere(Umgebung):
+    def printer(self):
+        m = self.module()
+        cmd = self.t / 'opt/beispiel/current/printer/druck'
+        cmd.write_text('#!/bin/sh\nexit 0\n')
+        cmd.chmod(0o755)
+        m['printers'] = [{'name': 'Beispiel-PDF', 'label': 'PDF', 'command': 'printer/druck', 'formats': ['application/pdf'], 'share': ['ipp']}]
+        return m
+
+    def test_anlegen_und_entfernen(self):
+        self.registry(self.printer())
+        with mock.patch.object(self.d, '_port_open', side_effect=lambda port: port == 47100 and (self.t / 'units').exists()):
+            notes = self.d.sync()
+        self.assertIn('Beispiel-PDF: angelegt bzw. aktualisiert.', notes)
+        unit = (self.t / 'units' / 'kienzle-drucker-beispiel-beispiel-pdf.service').read_text()
+        for part in ('User=ks-beispiel', '-p 47100 -n localhost -r off', f'-c {self.t}/opt/beispiel/current/printer/druck', '-f application/pdf',
+                     'NoNewPrivileges=yes', f'ReadWritePaths={self.t}/data/beispiel'):
+            self.assertIn(part, unit)
+        q = self.cups()['queues']['Beispiel-PDF']
+        self.assertEqual(q['uri'], 'ipp://localhost:47100/ipp/print')
+        call = next(c for c in self.cups()['calls'] if c[0] == 'lpadmin' and 'Beispiel-PDF' in c)
+        self.assertEqual(call[call.index('-m') + 1], 'everywhere')
+        self.assertIn(['restart', 'kienzle-drucker-beispiel-beispiel-pdf.service'], self.cups()['systemctl'])
+        with mock.patch.object(self.d, '_port_open', return_value=True):
+            self.assertEqual(self.d.sync(), [], 'zweiter Abgleich ändert etwas')
+        self.registry()
+        self.d.sync()
+        self.assertNotIn('Beispiel-PDF', self.cups()['queues'])
+        self.assertFalse((self.t / 'units' / 'kienzle-drucker-beispiel-beispiel-pdf.service').exists())
+        self.assertIn(['disable', '--now', 'kienzle-drucker-beispiel-beispiel-pdf.service'], self.cups()['systemctl'])
+
+    def test_antwortet_nicht(self):
+        self.registry(self.printer())
+        with mock.patch.object(self.d, '_port_open', return_value=False):
+            self.assertIn('antwortet nicht', ' '.join(self.d.sync()))
+        self.assertNotIn('Beispiel-PDF', self.cups().get('queues', {}))
+
+    def test_ohne_backend(self):
+        m = self.module()
+        m['printers'][0].pop('backend')
+        self.registry(m)
+        self.d.sync()
+        self.assertEqual(self.cups()['queues']['Beispiel-Drucker']['uri'], 'kienzle-leer:/Beispiel-Drucker')
+        self.assertFalse((self.t / 'backend' / 'kienzle-beispiel-beispiel-drucker').exists())
 
 
 class Anfragen(Umgebung):

@@ -31,7 +31,16 @@ final class Printers {
             $found[] = ['uri' => (string)$f['uri'], 'name' => mb_substr((string)($f['name'] ?? ''), 0, 80), 'kind' => isset(self::KINDS[$f['kind'] ?? '']) ? $f['kind'] : null,
                 'connection' => ($f['connection'] ?? '') === 'USB' ? 'USB' : 'Netzwerk'];
         }
-        return ['queues' => $queues, 'found' => $found, 'searched' => (int)($s['gesucht'] ?? 0), 'error' => mb_substr((string)($s['fehler'] ?? ''), 0, 300),
+        $jobs = [];
+        foreach ((array)($s['auftraege'] ?? []) as $j) {
+            if (!is_array($j) || !preg_match('/^[A-Za-z0-9_-]{1,40}-\d{1,9}$/D', (string)($j['id'] ?? ''))) continue;
+            $jobs[] = ['id' => (string)$j['id'], 'drucker' => (string)($j['drucker'] ?? ''), 'benutzer' => mb_substr((string)($j['benutzer'] ?? ''), 0, 40),
+                'groesse' => (int)($j['groesse'] ?? 0), 'zeit' => mb_substr((string)($j['zeit'] ?? ''), 0, 40)];
+        }
+        $n = is_array($s['netz'] ?? null) ? $s['netz'] : [];
+        $net = ['modus' => ($n['modus'] ?? '') === 'domaene' ? 'domaene' : 'arbeitsgruppe', 'arbeitsgruppe' => mb_substr((string)($n['arbeitsgruppe'] ?? 'WORKGROUP'), 0, 15),
+            'realm' => mb_substr((string)($n['realm'] ?? ''), 0, 253)];
+        return ['queues' => $queues, 'found' => $found, 'jobs' => $jobs, 'net' => $net, 'searched' => (int)($s['gesucht'] ?? 0), 'error' => mb_substr((string)($s['fehler'] ?? ''), 0, 300),
             'last' => is_array($s['letzte'] ?? null) ? $s['letzte'] : null, 'pending' => is_file($this->request()), 'service' => is_file(self::$unit)];
     }
 
@@ -51,6 +60,32 @@ final class Printers {
     public function share(string $name, array $share): void { $this->write(['action' => 'freigabe', 'name' => $this->known($name), 'freigabe' => self::shares($share)]); }
     public function sync(): void { $this->write(['action' => 'abgleichen']); }
 
+    public function cancelJob(string $id): void {
+        if (!in_array($id, array_column($this->status()['jobs'], 'id'), true)) throw new Problem('Auftrag nicht gefunden (schon gedruckt?).', 404);
+        $this->write(['action' => 'abbrechen', 'auftrag' => $id]);
+    }
+
+    public function cancelAll(string $name): void { $this->write(['action' => 'alle-abbrechen', 'name' => $this->known($name)]); }
+
+    public function setWorkgroup(string $name): void {
+        if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9-]{0,14}$/D', $name)) throw new Problem('Arbeitsgruppe: 1–15 Buchstaben, Ziffern oder Bindestrich.', 422);
+        $this->write(['action' => 'arbeitsgruppe', 'arbeitsgruppe' => $name]);
+    }
+
+    /** Domänenbeitritt; Benutzer und Passwort eines Domänen-Admins gehen nur in die Anfragedatei (0600) an den root-Dienst. */
+    public function joinDomain(string $realm, string $workgroup, string $user, string $password): void {
+        if (!preg_match('/^(?=.{3,253}$)[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/D', $realm) || !preg_match('/^[A-Za-z0-9][A-Za-z0-9-]{0,14}$/D', $workgroup)) {
+            throw new Problem('Bitte die Domäne (z. B. PRAXIS.EXAMPLE.ORG) und ihren NetBIOS-Namen (z. B. PRAXIS) angeben.', 422);
+        }
+        if (!preg_match('/^[A-Za-z0-9._@-]{1,64}$/D', $user) || $password === '' || strlen($password) > 200) throw new Problem('Benutzer und Passwort eines Domänen-Admins angeben.', 422);
+        $this->write(['action' => 'domaene-beitreten', 'realm' => $realm, 'arbeitsgruppe' => $workgroup, 'benutzer' => $user, 'passwort' => $password]);
+    }
+
+    public function leaveDomain(string $user, string $password): void {
+        if (!preg_match('/^[A-Za-z0-9._@-]{1,64}$/D', $user) || $password === '' || strlen($password) > 200) throw new Problem('Benutzer und Passwort eines Domänen-Admins angeben.', 422);
+        $this->write(['action' => 'domaene-verlassen', 'benutzer' => $user, 'passwort' => $password]);
+    }
+
     private static function shares(array $share): array { return array_values(array_intersect(['samba', 'ipp'], $share)); }
 
     private function known(string $name): string {
@@ -66,7 +101,9 @@ final class Printers {
         $dir = dirname($this->request());
         if (!is_dir($dir) && !mkdir($dir, 0700) && !is_dir($dir)) throw new Problem('Anfrage konnte nicht gespeichert werden.', 500);
         $tmp = $dir . '/.drucker.' . bin2hex(random_bytes(4));
-        if (file_put_contents($tmp, json_encode($request, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)) === false || !rename($tmp, $this->request())) {
+        $fh = fopen($tmp, 'x');
+        if ($fh) { chmod($tmp, 0600); fclose($fh); }
+        if (!$fh || file_put_contents($tmp, json_encode($request, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)) === false || !rename($tmp, $this->request())) {
             @unlink($tmp);
             throw new Problem('Anfrage konnte nicht gespeichert werden.', 500);
         }

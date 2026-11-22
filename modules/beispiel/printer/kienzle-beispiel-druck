@@ -1,0 +1,5 @@
+#!/bin/sh
+# Beispielmodul: nimmt einen Druckauftrag entgegen (Pfad als $1) und legt die Größe im Datenordner ab.
+# Läuft als ks-beispiel (gestartet von ippeveprinter der Basis).
+wc -c < "$1" > /var/lib/kienzle/beispiel/letzter-auftrag 2>/dev/null || true
+exit 0

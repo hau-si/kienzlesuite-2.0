@@ -116,4 +116,10 @@ $k->drucken('TM-m30III', $escpos, 'Bon', ['raw']);
 
 `drucken()` ruft `lp` als Modul-Benutzer auf und liefert die Auftragsnummer; der Titel darf keine Patientendaten enthalten.
 Virtuelle Drucker des Moduls (`[[printers]]` in `module.toml`) legt die Basis beim Installieren bzw. Aktualisieren an
-(Backend 0755 und PPD 0644 aus dem Programmordner, Adresse `kienzle-<id>-<name>:/<name>`) und entfernt sie mit dem Modul.
+und entfernt sie mit dem Modul:
+
+- **Empfohlen, `command`:** IPP-Everywhere-Drucker (`ippeveprinter`) als Dienst `kienzle-drucker-<id>-<name>.service`, läuft als
+  `ks-<id>` nur auf localhost. Jeder Auftrag landet als Datei unter `/var/lib/kienzle/<id>/druckauftraege/`, das Programm
+  bekommt ihren Pfad als erstes Argument und läuft als Modul-Benutzer. Arbeitsplätze sehen eine normale Warteschlange.
+- Ältere Art, `ppd` (+ `backend`): Backend 0755 und PPD 0644 aus dem Programmordner, Adresse `kienzle-<id>-<name>:/<name>`;
+  ohne `backend` verwirft das Backend `kienzle-leer` der Basis die Ausgabe der Filter.

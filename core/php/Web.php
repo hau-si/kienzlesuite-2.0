@@ -892,6 +892,15 @@ final class Web {
                 . V::h($q['state']) . '</td><td>' . ($q['modul'] !== '' ? 'Modul ' . V::h($this->modules->name($q['modul'])) : ($q['managed'] ? 'Suite' : 'fremd')) . '</td><td>' . $actions . '</td></tr>';
         }
         $body .= '<h2>Eingerichtete Drucker</h2>' . ($rows !== '' ? '<table><tr><th>Name</th><th>Adresse</th><th>Zustand</th><th>Von</th><th></th></tr>' . $rows . '</table>' : '<p>Noch keine.</p>');
+        $jobRows = '';
+        foreach ($st['jobs'] as $j) {
+            $jobRows .= '<tr><td><code>' . V::h($j['id']) . '</code></td><td>' . V::h($j['drucker']) . '</td><td>' . V::h($j['benutzer']) . '</td><td>' . max(1, (int)($j['groesse'] / 1024)) . ' KB</td><td>'
+                . V::h($j['zeit']) . '</td><td><form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('abbrechen', ['auftrag' => $j['id']])
+                . '<button class="danger"' . $dis . '>Abbrechen</button></form></td></tr>';
+        }
+        $body .= '<h2>Druckaufträge</h2>' . ($jobRows !== '' ? '<table><tr><th>Auftrag</th><th>Drucker</th><th>Von</th><th>Größe</th><th>Seit</th><th></th></tr>' . $jobRows . '</table>'
+            . implode('', array_map(fn($q) => '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('alle-abbrechen', ['name' => $q])
+                . '<button' . $dis . '>Alle Aufträge von ' . V::h($q) . ' abbrechen</button></form> ', array_values(array_unique(array_column($st['jobs'], 'drucker'))))) : '<p>Keine offenen Aufträge.</p>');
         $kinds = implode('', array_map(fn($k, $l) => '<option value="' . V::h($k) . '">' . V::h($l) . '</option>', array_keys(Printers::KINDS), Printers::KINDS));
         $found = '';
         foreach ($st['found'] as $f) {
@@ -909,6 +918,25 @@ final class Web {
             . V::input('name', 'Name der Warteschlange (leer = Vorschlag)', 'text', '', 'maxlength="40"') . $this->shareBoxes([])
             . '<button' . $dis . '>Anlegen</button></form>'
             . '<form method="post" action="/verwaltung/drucker">' . $this->hidden('abgleichen') . '<button' . $dis . '>Virtuelle Drucker der Module abgleichen</button></form>';
+        $net = $st['net'];
+        $body .= '<h2>Windows-Netz</h2>';
+        if ($net['modus'] === 'domaene') {
+            $body .= '<p>Der Server ist Mitglied der Domäne <strong>' . V::h($net['realm']) . '</strong> (' . V::h($net['arbeitsgruppe']) . '). Domänen-Rechner drucken mit ihrer Anmeldung.</p>'
+                . '<form method="post" action="/verwaltung/drucker" class="box">' . $this->hidden('domaene-verlassen')
+                . V::input('benutzer', 'Domänen-Admin', 'text', '', 'required maxlength="64" autocomplete="off"') . V::input('passwort', 'Passwort', 'password', '', 'required autocomplete="off"')
+                . '<button class="danger"' . $dis . '>Domäne verlassen</button></form>';
+        } else {
+            $body .= '<p>Arbeitsgruppe: <strong>' . V::h($net['arbeitsgruppe']) . '</strong>. Hinweis: Windows 11 Pro lässt Gastzugriff auf Windows-Freigaben ab 24H2 '
+                . 'nicht mehr zu; dort besser über IPP drucken oder den Server der Domäne beitreten lassen.</p>'
+                . '<form method="post" action="/verwaltung/drucker" class="box">' . $this->hidden('arbeitsgruppe')
+                . V::input('arbeitsgruppe', 'Arbeitsgruppe', 'text', $net['arbeitsgruppe'], 'required maxlength="15" pattern="[A-Za-z0-9][A-Za-z0-9\-]*"')
+                . '<button' . $dis . '>Speichern</button></form>'
+                . '<form method="post" action="/verwaltung/drucker" class="box">' . $this->hidden('domaene-beitreten') . '<p><strong>Der Domäne beitreten</strong> (Active Directory)</p>'
+                . V::input('realm', 'Domäne', 'text', '', 'required placeholder="PRAXIS.EXAMPLE.ORG" maxlength="253"') . V::input('arbeitsgruppe', 'NetBIOS-Name der Domäne', 'text', '', 'required placeholder="PRAXIS" maxlength="15"')
+                . V::input('benutzer', 'Domänen-Admin', 'text', '', 'required maxlength="64" autocomplete="off"') . V::input('passwort', 'Passwort', 'password', '', 'required autocomplete="off"')
+                . '<p>Der Server muss die Domänen-Controller über DNS finden. Das Passwort wird nur für den Beitritt verwendet und nicht gespeichert.</p>'
+                . '<button' . $dis . '>Beitreten</button></form>';
+        }
         $response = Response::html(V::page('Drucker', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
         return $busy ? $response->with('Refresh', '3') : $response;
     }
@@ -925,13 +953,18 @@ final class Web {
                 'testseite' => $p->testPage($r->field('name', 60)),
                 'freigabe' => $p->share($r->field('name', 60), $share),
                 'abgleichen' => $p->sync(),
+                'abbrechen' => $p->cancelJob($r->field('auftrag', 60)),
+                'alle-abbrechen' => $p->cancelAll($r->field('name', 60)),
+                'arbeitsgruppe' => $p->setWorkgroup($r->field('arbeitsgruppe', 20)),
+                'domaene-beitreten' => $p->joinDomain($r->field('realm', 260), $r->field('arbeitsgruppe', 20), $r->field('benutzer', 70), $r->field('passwort', 300)),
+                'domaene-verlassen' => $p->leaveDomain($r->field('benutzer', 70), $r->field('passwort', 300)),
                 default => throw new Problem('Unbekannte Aktion.', 422),
             };
         } catch (Problem $e) {
             if ($e->http === 422 || $e->http === 409 || $e->http === 404) return $this->printersPage($e->getMessage());
             throw $e;
         }
-        $this->audit->write($admin, 'drucker-' . $a, $r->field('name', 60));
+        $this->audit->write($admin, 'drucker-' . $a, $a === 'abbrechen' ? $r->field('auftrag', 60) : (in_array($a, ['domaene-beitreten', 'domaene-verlassen'], true) ? $r->field('realm', 260) : $r->field('name', 60)));
         return Response::redirect('/verwaltung/drucker');
     }
 

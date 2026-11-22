@@ -52,6 +52,8 @@ Prüfliste für die Test-VM: `docs/VM-TEST.md`.
 - **CUPS und Samba als Druckserver** aus festen Vorlagen. Vorher werden die Vorlagen geprüft (`cupsd -t`, `testparm`),
   die ursprünglichen Dateien liegen unter `/etc/kienzle/original/`. Samba hat keine Dateifreigaben, nur SMB 3, kein NetBIOS.
   Aus dem Praxisnetz erreichbar erst nach Freigabe in **Verwaltung → Firewall** (IPP 631, Windows-Freigabe 445).
+  Arbeitsgruppe oder Domänenbeitritt: **Verwaltung → Drucker → Windows-Netz**. Windows 11 Pro (ab 24H2) lässt Gastzugriff
+  auf Windows-Freigaben nicht mehr zu: dort über IPP drucken oder den Server der Domäne beitreten lassen.
 - Automatische Sicherheitsupdates der Distribution **ohne automatischen Neustart**.
 - AppArmor-Ergänzungen für Programme, die Module anmelden (`gs`, `qpdf`).
 

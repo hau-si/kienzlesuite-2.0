@@ -49,6 +49,7 @@ HOOKS = ('install', 'update', 'remove', 'busy', 'health')
 # Zentrale Verbindungen der Basis, die ein Modul anmelden kann (Zugangsdaten bekommen nur anmeldende Module).
 CONNECTIONS = ('t2med', 'mail', 'ablage')
 SHARES = ('samba', 'ipp')
+FORMAT = re.compile(r'^[a-z]+/[a-z0-9.+-]{1,60}$')
 
 LIMITS = {'packages': 50, 'services': 20, 'firewall': 20, 'rights': 30, 'printers': 10, 'paths': 20,
           'connections': len(CONNECTIONS)}
@@ -60,7 +61,7 @@ SCHEMA_SECTIONS = {
     'firewall': {'name', 'port', 'proto', 'scope'},
     'rights': {'id', 'label'},
     'backup': {'paths', 'snapshot', 'settings'},
-    'printers': {'name', 'label', 'ppd', 'backend', 'share'},
+    'printers': {'name', 'label', 'ppd', 'backend', 'command', 'formats', 'share'},
     'connections': {'id', 'purpose', 'required'},
     'setup': {'overview'},
     'hooks': {*HOOKS, 'apparmor'},
@@ -343,17 +344,30 @@ class _Checker:
                 self.error(f'{where}.name', f'„{name}“ ist doppelt.')
             seen.add((name or '').lower())
             label = self.text(t, 'label', where)
-            ppd = None
-            if 'ppd' in t:
+            # Zwei Arten: IPP-Everywhere-Drucker (command, empfohlen) oder CUPS-Warteschlange mit PPD (ppd, optional backend).
+            ppd = command = None
+            if 'command' in t and 'ppd' in t:
+                self.error(where, 'entweder „command“ (IPP Everywhere) oder „ppd“, nicht beides.')
+            elif 'command' in t:
+                command = self.rel_path(t['command'], f'{where}.command')
+                if 'backend' in t:
+                    self.error(f'{where}.backend', 'nur zusammen mit „ppd“.')
+            elif 'ppd' in t:
                 ppd = self.rel_path(t['ppd'], f'{where}.ppd')
             else:
-                self.error(where, '„ppd“ fehlt.')
-            backend = self.rel_path(t['backend'], f'{where}.backend') if 'backend' in t else None
+                self.error(where, '„command“ oder „ppd“ fehlt.')
+            formats = self.string_list(t, 'formats', where, 5) if 'formats' in t else (['application/pdf'] if command else [])
+            for f in formats:
+                if not FORMAT.match(f):
+                    self.error(f'{where}.formats', f'„{shown(f)}“ ist kein Dateityp (z. B. application/pdf).')
+            if formats and not command:
+                self.error(f'{where}.formats', 'nur zusammen mit „command“.')
+            backend = self.rel_path(t['backend'], f'{where}.backend') if 'backend' in t and ppd else None
             share = self.string_list(t, 'share', where, len(SHARES))
             for s in share:
                 if s not in SHARES:
                     self.error(f'{where}.share', f'„{shown(s)}“ unbekannt. Erlaubt: {", ".join(SHARES)}.')
-            out.append({'name': name, 'label': label, 'ppd': ppd, 'backend': backend, 'share': share})
+            out.append({'name': name, 'label': label, 'ppd': ppd, 'backend': backend, 'command': command, 'formats': formats, 'share': share})
         return out
 
     def connections(self, items: list) -> list:
@@ -418,7 +432,10 @@ def _referenced(manifest: dict) -> list[tuple[str, str, bool]]:
     if manifest['web'] and manifest['web']['entry']:
         refs.append(('web.entry', manifest['web']['entry'], False))
     for n, p in enumerate(manifest['printers'], 1):
-        refs.append((f'printers[{n}].ppd', p['ppd'], False))
+        if p['ppd']:
+            refs.append((f'printers[{n}].ppd', p['ppd'], False))
+        if p.get('command'):
+            refs.append((f'printers[{n}].command', p['command'], True))
         if p['backend']:
             refs.append((f'printers[{n}].backend', p['backend'], True))
     return refs

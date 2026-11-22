@@ -283,10 +283,18 @@ class Drucker(Fehler):
     def test_name(self):
         self.invalid(replace('name = "Beispiel-Drucker"', 'name = "Beispiel Drucker!"'), 'printers[1].name')
         doppelt = BEISPIEL + '\n[[printers]]\nname = "beispiel-drucker"\nlabel = "x"\nppd = "printer/beispiel.ppd"\n'
-        self.invalid(doppelt, 'printers[2].name', 'doppelt')
+        self.invalid(doppelt, 'printers[3].name', 'doppelt')
+
+    def test_ipp_everywhere(self):
+        self.invalid(replace('formats = ["application/pdf"]', 'formats = ["pdf"]'), 'printers[2].formats', 'kein Dateityp')
+        self.invalid(replace('command = "printer/kienzle-beispiel-druck"\n', 'command = "printer/kienzle-beispiel-druck"\nppd = "printer/beispiel.ppd"\n'),
+                     'printers[2]', 'nicht beides')
+        self.invalid(replace('ppd = "printer/beispiel.ppd"\n', 'ppd = "printer/beispiel.ppd"\nformats = ["application/pdf"]\n'), 'printers[1].formats', 'nur zusammen')
+        m = manifest.check_text(replace('formats = ["application/pdf"]\n', '', BEISPIEL))
+        self.assertEqual(m['printers'][1]['formats'], ['application/pdf'])
 
     def test_pflichtfelder_und_freigabe(self):
-        self.invalid(replace('ppd = "printer/beispiel.ppd"\n', ''), 'printers[1]', '„ppd“ fehlt')
+        self.invalid(replace('ppd = "printer/beispiel.ppd"\n', ''), 'printers[1]', '„command“ oder „ppd“ fehlt')
         self.invalid(replace('share = ["samba", "ipp"]', 'share = ["ftp"]'), 'printers[1].share', 'unbekannt')
         self.invalid(replace('backend = "printer/kienzle-beispiel-backend"', 'backend = "../../usr/lib/cups/backend/ipp"'),
                      'printers[1].backend')
@@ -404,7 +412,8 @@ class Alle(Ordner):
         text = BEISPIEL.replace('beispiel', mid)
         # Dateien im Ordner heißen weiterhin wie im Beispiel.
         text = text.replace(f'printer/{mid}.ppd', 'printer/beispiel.ppd')
-        text = text.replace(f'kienzle-{mid}-backend', 'kienzle-beispiel-backend')
+        text = text.replace(f'kienzle-{mid}-backend', 'kienzle-beispiel-backend').replace(f'kienzle-{mid}-druck', 'kienzle-beispiel-druck')
+        text = replace('name = "Beispiel-PDF"', f'name = "{mid.capitalize()}-PDF"', text)
         text = replace('name = "Beispiel-Drucker"', f'name = "{mid.capitalize()}-Drucker"', text)
         text = text.replace('port = 8766', 'port = 8767').replace('"10000-10010"', '"10011-10020"')
         for old, new in changes.items():

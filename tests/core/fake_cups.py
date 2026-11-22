@@ -40,6 +40,11 @@ elif prog == 'lpstat':
     if not data['queues']:
         print('lpstat: No destinations added.', file=sys.stderr)
         sys.exit(1)
+    if args == ['-o']:
+        for j in data['jobs']:
+            if not j.get('fertig'):
+                print(f'{j["id"]}  {j["user"]}  {j["bytes"]}  Sun 22 Nov 2026 18:00:00 CET')
+        sys.exit(0)
     if args == ['-v']:
         for n, q in data['queues'].items():
             print(f'device for {n}: {q["uri"]}')
@@ -55,6 +60,23 @@ elif prog == 'lpinfo':
     print('direct usb://EPSON/TM-m10?serial=X1')
     print('network bad uri with spaces')
 elif prog == 'lp':
-    data['jobs'].append({'args': args, 'bytes': len(sys.stdin.buffer.read())})
+    data['jobs'].append({'args': args, 'bytes': len(sys.stdin.buffer.read()), 'id': f'{opt("-d")}-{len(data["jobs"]) + 1}', 'user': os.environ.get('USER', 'root')})
     save()
     print(f'request id is {opt("-d")}-{len(data["jobs"])} (1 file(s))')
+elif prog == 'cancel':
+    for j in data['jobs']:
+        if j['id'] in args or ('-a' in args and j['id'].rsplit('-', 1)[0] == args[-1]):
+            j['fertig'] = True
+    save()
+elif prog == 'net':
+    data.setdefault('net', []).append({'args': args, 'passwd': os.environ.get('PASSWD')})
+    save()
+    if os.environ.get('PASSWD') != 'Domaenen-Passwort-1':
+        print('Failed to join domain: Logon failure', file=sys.stderr)
+        sys.exit(255)
+elif prog == 'testparm':
+    save()
+    sys.exit(0)
+elif prog == 'systemctl':
+    data.setdefault('systemctl', []).append(args)
+    save()

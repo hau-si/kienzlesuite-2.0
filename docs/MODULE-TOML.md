@@ -96,8 +96,10 @@ Virtuelle Drucker des Moduls. Die Druckerverwaltung der Basis legt sie an und en
 |---|---|---|
 | `name` | ja | Warteschlangenname, 1–40 Zeichen aus `A–Z a–z 0–9 _ -`, über alle Module eindeutig (ohne Groß-/Kleinschreibung) |
 | `label` | ja | Beschreibung |
-| `ppd` | ja | PPD-Datei im Modulordner |
-| `backend` | nein | CUPS-Backend im Modulordner (ausführbar) |
+| `command` | eins von beiden | **Empfohlen.** Programm im Modulordner; die Basis startet dafür einen IPP-Everywhere-Drucker (`ippeveprinter`) als `ks-<id>`, nur auf localhost. Das Programm bekommt jeden Auftrag als Datei (Pfad als Argument) und läuft als Modul-Benutzer |
+| `formats` | nein | nur mit `command`: angenommene Dateitypen, Vorgabe `["application/pdf"]`, höchstens 5 |
+| `ppd` | eins von beiden | Ältere Art: CUPS-Warteschlange mit PPD-Datei aus dem Modulordner (CUPS behandelt PPDs als veraltet) |
+| `backend` | nein | nur mit `ppd`: CUPS-Backend im Modulordner (ausführbar, läuft als Benutzer `lp`). Ohne Backend verwirft die Warteschlange die Ausgabe der Filter (Backend `kienzle-leer` der Basis) |
 | `share` | nein | Liste aus `"samba"` und `"ipp"`: wie die Arbeitsplätze den Drucker erreichen |
 
 ### `[[connections]]` – optional
@@ -152,7 +154,7 @@ Entspricht `modules/beispiel/module.toml`; die Tests prüfen, dass dieses Beispi
 [module]
 id = "beispiel"
 name = "Beispielmodul"
-version = "0.1.3"
+version = "0.2.0"
 core_api = "1"
 description = "Zeigt alle Felder der Modul-Beschreibung; nur für Tests."
 
@@ -195,6 +197,13 @@ label = "Virtueller Drucker des Beispielmoduls"
 ppd = "printer/beispiel.ppd"
 backend = "printer/kienzle-beispiel-backend"
 share = ["samba", "ipp"]
+
+[[printers]]
+name = "Beispiel-PDF"
+label = "Virtueller PDF-Drucker des Beispielmoduls (IPP Everywhere)"
+command = "printer/kienzle-beispiel-druck"
+formats = ["application/pdf"]
+share = ["ipp"]
 
 [[connections]]
 id = "t2med"

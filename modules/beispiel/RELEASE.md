@@ -1,5 +1,9 @@
 # Beispielmodul – Release-Notizen
 
+## 0.2.0
+
+- Zweiter virtueller Drucker „Beispiel-PDF“ als IPP-Everywhere-Drucker (`command`, Basis 0.10.0).
+
 ## 0.1.3
 
 - `[backup] settings`: `einstellungen.json` kommt in den verschlüsselten Export der Einstellungen (Basis 0.6.1).

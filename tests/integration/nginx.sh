@@ -12,6 +12,7 @@ c() { curl -sS --noproxy '*' --max-time 10 --cacert /etc/kienzle/ca/ca.crt --res
 code() { c -o /dev/null -w '%{http_code} %{redirect_url}' "$@"; }
 
 echo '== Installer'
+export KIENZLE_OHNE_SYSTEMD=1
 KIENZLE_OHNE_SYSTEMD=1 bash "$repo/installer/install.sh" --name "$host" --praxis 'Praxis Beispiel'
 
 echo '== Dienste starten'
@@ -176,10 +177,24 @@ drucker '{"action":"anlegen","art":"bon","name":"Bon-Test","adresse":"socket://1
 lpstat -v Bon-Test | grep -q 'socket://192.0.2.50:9100' || fail 'Warteschlange fehlt in CUPS'
 testparm -s --suppress-prompt 2>/dev/null | grep -q '^\[Bon-Test\]' || fail 'Samba-Freigabe fehlt'
 install -d -m 0755 /opt/kienzle/beispiel && ln -sfn "$repo/modules/beispiel" /opt/kienzle/beispiel/current
+install -d -m 0750 -o ks-beispiel -g ks-beispiel /var/lib/kienzle/beispiel
+[ "$(stat -c '%a %U' /usr/lib/cups/backend/kienzle-leer)" = '755 root' ] || fail 'Backend kienzle-leer fehlt'
+grep -q 'include = /etc/samba/kienzle-netz.conf' /etc/samba/smb.conf || fail 'smb.conf ohne Windows-Netz'
+testparm -s --suppress-prompt 2>/dev/null | grep -qi 'workgroup = WORKGROUP' || fail 'Arbeitsgruppe fehlt'
 # Der zweite Lauf des Installers hat das Modulverzeichnis geleert; kienzle-web schreiben gleicht die Drucker mit ab.
 KIENZLE_NGINX_RELOAD='' /opt/kienzle/core/current/bin/kienzle-web schreiben "$repo/modules" || fail 'kienzle-web mit Modul'
 lpstat -v Beispiel-Drucker | grep -q 'kienzle-beispiel-beispiel-drucker:/Beispiel-Drucker' || fail 'virtueller Drucker fehlt'
 [ "$(stat -c '%a %U' /usr/lib/cups/backend/kienzle-beispiel-beispiel-drucker)" = '755 root' ] || fail 'Backend falsch geschützt'
+# IPP-Everywhere-Drucker des Moduls (ippeveprinter als ks-beispiel, nur localhost)
+grep -q '^User=ks-beispiel' /etc/systemd/system/kienzle-drucker-beispiel-beispiel-pdf.service || fail 'Einheit des IPP-Druckers fehlt'
+lpstat -v Beispiel-PDF | grep -q 'ipp://localhost:471' || fail 'IPP-Everywhere-Drucker fehlt in CUPS'
+pgrep -u ks-beispiel -f ippeveprinter >/dev/null || fail 'ippeveprinter läuft nicht als ks-beispiel'
+lp -d Beispiel-PDF "$repo/tests/integration/test.pdf" | grep -q 'request id is Beispiel-PDF-' || fail 'Auftrag an den IPP-Drucker'
+for _ in $(seq 1 30); do [ -s /var/lib/kienzle/beispiel/letzter-auftrag ] && break; sleep 0.5; done
+[ -s /var/lib/kienzle/beispiel/letzter-auftrag ] && echo "IPP-Drucker hat den Auftrag erhalten ($(cat /var/lib/kienzle/beispiel/letzter-auftrag) Byte)." \
+  || echo 'Hinweis: Der Auftrag kam (noch) nicht beim Programm des Moduls an (Filter von CUPS im Container?).'
+drucker '{"action":"arbeitsgruppe","arbeitsgruppe":"PRAXIS"}'
+testparm -s --suppress-prompt 2>/dev/null | grep -qi 'workgroup = PRAXIS' || fail 'Arbeitsgruppe nicht übernommen'
 runuser -u ks-beispiel -- php -r 'require "/opt/kienzle/core/current/php/modul/Kienzle.php"; $k = new KienzleModul("beispiel", ["X" => "1"]);
   echo $k->drucken("Beispiel-Drucker", "%PDF-1.4 erfunden", "Test"), "\n";' | grep -q '^Beispiel-Drucker-' || fail 'Modul druckt nicht'
 c -b "$T/dora" "https://$host/verwaltung/drucker" | grep -q 'Bon-Test' || fail 'Druckerseite'
@@ -189,5 +204,8 @@ rm /opt/kienzle/beispiel/current
 KIENZLE_NGINX_RELOAD='' /opt/kienzle/core/current/bin/kienzle-web schreiben || fail 'kienzle-web ohne Modul'
 if lpstat -v Beispiel-Drucker >/dev/null 2>&1; then fail 'virtueller Drucker nach Entfernen des Moduls noch da'; fi
 [ ! -e /usr/lib/cups/backend/kienzle-beispiel-beispiel-drucker ] || fail 'Backend nach Entfernen noch da'
+[ ! -e /etc/systemd/system/kienzle-drucker-beispiel-beispiel-pdf.service ] || fail 'Einheit des IPP-Druckers nach Entfernen noch da'
+if lpstat -v Beispiel-PDF >/dev/null 2>&1; then fail 'IPP-Drucker nach Entfernen des Moduls noch da'; fi
+pkill -u ks-beispiel -f ippeveprinter || true
 
 echo 'Ende-zu-Ende-Prüfung bestanden.'

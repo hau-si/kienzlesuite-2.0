@@ -1,5 +1,26 @@
 # Basis – Release-Notizen
 
+## 0.10.0
+
+Umsetzung der Antworten vom 22.11.2026, Teil 2: Drucker.
+
+- **Druckaufträge** auf der Seite Drucker: offene Aufträge aller Warteschlangen (Nummer, Drucker, Benutzer, Größe, Zeit; ohne
+  Titel), einzeln oder je Drucker abbrechen (protokolliert).
+- **Windows-Netz wählbar:** Arbeitsgruppe frei, oder **Domänenbeitritt** (Active Directory, `net ads join` mit einem
+  Domänen-Admin; das Passwort geht nur über die Umgebung an `net` und wird nicht gespeichert), Verlassen der Domäne.
+  `smb.conf` bindet dafür `/etc/samba/kienzle-netz.conf` ein; `winbind` läuft nur im Domänenbetrieb.
+- **Virtuelle Drucker als IPP Everywhere** (`[[printers]] command`, empfohlen): Die Basis startet je Drucker
+  `ippeveprinter` als systemd-Dienst **als Modul-Benutzer** und nur auf localhost (Ports 47100–47199); CUPS-Warteschlange
+  „everywhere“ davor, Freigabe wie bisher. Das Programm des Moduls bekommt jeden Auftrag als Datei. Keine PPD, kein
+  Backend mit Rechten des Benutzers `lp`.
+- **Virtuelle Drucker ohne Backend** (`ppd` ohne `backend`): Warteschlange mit dem Backend `kienzle-leer` der Basis
+  (die Filter des Moduls erledigen die Arbeit, die Ausgabe wird verworfen).
+- `module.toml`: `command`, `formats`; `ppd` nur noch für die ältere Art. Beispielmodul 0.2.0 mit einem IPP-Everywhere-Drucker.
+- Installer: Pakete `cups-ipp-utils`, `winbind`; Backend `kienzle-leer`.
+
+Nicht geprüft: Domänenbeitritt an einem echten Active Directory, Drucken von Windows-Domänenrechnern, ippeveprinter unter
+systemd (im Container direkt gestartet).
+
 ## 0.9.0
 
 Umsetzung der Antworten vom 22.11.2026 (`docs/OFFENE-FRAGEN.md`), Teil 1: Sicherung, E-Mail, Export.
