@@ -1,5 +1,12 @@
 # Basis – Release-Notizen
 
+## 0.8.1
+
+- `cupsd.conf`: Die Vorlage aus 0.7.0 beschränkte alle IPP-Abfragen auf @SYSTEM. Damit sahen Module (und Arbeitsplätze)
+  keine Drucker und konnten nicht drucken. Jetzt wie in der Vorgabe von CUPS: Einrichten und Steuern der Drucker nur
+  @SYSTEM und nur am Server, Abfragen und Drucken für alle. Gefunden von der Ende-zu-Ende-Prüfung mit echtem cupsd.
+- `installer/autoinstall.yaml`: normales Ubuntu Server statt „minimized“ (Werkzeuge für die Fehlersuche bleiben).
+
 ## 0.8.0
 
 Meilenstein 8 aus `docs/PLAN.md`: Druckerverwaltung in der Basis. Damit ist Schritt 1 (Basis) vollständig.

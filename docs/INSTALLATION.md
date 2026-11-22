@@ -13,7 +13,7 @@ Prüfliste für die Test-VM: `docs/VM-TEST.md`.
 
 ## Installation von Hand
 
-1. Ubuntu Server 26.04 installieren (Sprache Deutsch, Tastatur Deutsch, Zeitzone Europe/Berlin, OpenSSH-Server an).
+1. Ubuntu Server 26.04 installieren – die normale Variante „Ubuntu Server“, nicht „minimized“ (Sprache Deutsch, Tastatur Deutsch, Zeitzone Europe/Berlin, OpenSSH-Server an).
 2. Anmelden und die Suite holen:
 
    ```sh

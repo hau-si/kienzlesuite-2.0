@@ -15,7 +15,8 @@ autoinstall:
     layout: de
   timezone: Europe/Berlin
   source:
-    id: ubuntu-server-minimal
+    # Normales Ubuntu Server, nicht „minimized“: Werkzeuge für die Fehlersuche vor Ort bleiben da.
+    id: ubuntu-server
   identity:
     hostname: <RECHNERNAME>
     username: praxisadmin

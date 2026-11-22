@@ -33,6 +33,10 @@ class Vorlagen(unittest.TestCase):
         admin = text.split('<Location /admin>', 1)[1].split('</Location>', 1)[0]
         self.assertIn('Allow localhost', admin)
         self.assertNotIn('Allow all', admin)
+        # Verwaltung der Drucker nur für @SYSTEM; Abfragen und Drucken für alle (sonst sehen Module ihre Drucker nicht).
+        policy = text.split('<Policy default>', 1)[1]
+        self.assertRegex(policy, r'<Limit CUPS-Add-Modify-Printer[^>]*>\s*AuthType Default\s*Require user @SYSTEM')
+        self.assertRegex(policy, r'<Limit All>\s*Order deny,allow\s*</Limit>')
 
     def test_php_darf_status_lesen(self):
         text = (VORLAGEN / 'php-fpm-core.conf').read_text()
@@ -48,6 +52,7 @@ class Vorlagen(unittest.TestCase):
         text = (ROOT / 'installer' / 'autoinstall.yaml').read_text()
         self.assertTrue(text.startswith('#cloud-config\n'))
         self.assertIn('installer/install.sh --name <SERVERNAME>', text)
+        self.assertIn('id: ubuntu-server\n', text)
         try:
             import yaml
         except ImportError:
