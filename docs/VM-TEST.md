@@ -132,10 +132,10 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
 3. [ ] Passkey unter dem Namen anlegen und damit anmelden.
 4. [ ] Ungültigen Namen eingeben: Fehlermeldung, nichts geändert.
 
-## Basis 0.16.0 – Module über das Webinterface, Kasse (sumup 2.0.0)
+## Basis 0.16.0 – Module über das Webinterface, Kasse (sumup 2.0)
 
 1. [ ] Basis auf 0.16.0 bringen (dieses Mal noch an der Konsole: `git pull && sudo bash installer/install.sh`).
-2. [ ] Verwaltung → Module: „Kasse 2.0.0 – Mit der Basis geliefert“ steht unter „Verfügbar“. „Installieren“ (Bestätigung
+2. [ ] Verwaltung → Module: „Kasse 2.0.x – Mit der Basis geliefert“ steht unter „Verfügbar“. „Installieren“ (Bestätigung
        mit Passwort und Code). Die Seite aktualisiert sich; nach einigen Minuten (Pakete) steht die Kasse unter „Installiert“.
        Bei Fehlern: Protokoll auf der Seite, `journalctl -u kienzle-module-anwenden`.
 3. [ ] `systemctl status kienzle-sumup-php` läuft als `ks-sumup`; `ls -ld /var/lib/kienzle/sumup` zeigt `drwx------ ks-sumup`.

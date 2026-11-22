@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.0.1
+
+- Test der Barzahlung unabhängig von der Reihenfolge gleichzeitiger Zahlungen (schlug gelegentlich fehl).
+
 ## 2.0.0
 
 Erste Fassung als Modul der Kienzle-Suite 2.0, übernommen aus kienzle-sumup, Branch `rechnungseingang`,

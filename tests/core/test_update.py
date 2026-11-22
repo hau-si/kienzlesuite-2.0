@@ -414,8 +414,8 @@ class Updater(Umgebung):
 
 class Skripte(unittest.TestCase):
     def test_bauen_und_signieren(self):
-        """scripts/release-bauen mit dem echten Repository (nur wenn core/ und installer/ eingecheckt sind)."""
-        st = subprocess.run(['git', '-C', str(ROOT), 'status', '--porcelain', 'core', 'installer'], capture_output=True, text=True)
+        """scripts/release-bauen mit dem echten Repository (nur wenn core/, installer/ und modules/ eingecheckt sind)."""
+        st = subprocess.run(['git', '-C', str(ROOT), 'status', '--porcelain', 'core', 'installer', 'modules'], capture_output=True, text=True)
         if st.returncode != 0:
             self.skipTest('git nicht nutzbar: ' + st.stderr.strip()[:80])
         if st.stdout.strip():
@@ -428,6 +428,8 @@ class Skripte(unittest.TestCase):
             m = release.parse_manifest((Path(tmp) / n['manifest']).read_bytes(), 'core')
             self.assertIn('installer/install.sh', m['files'])
             self.assertIn('core/php/Web.php', m['files'])
+            self.assertIn('modules/sumup/module.toml', m['files'])                          # mitgelieferte Module
+            self.assertFalse([f for f in m['files'] if f.startswith('modules/beispiel/')])   # Beispielmodul nicht
             release.check_archive((Path(tmp) / n['archive']).read_bytes(), m)
             subprocess.run(['openssl', 'genpkey', '-algorithm', 'ed25519', '-out', f'{tmp}/k.pem'], check=True)
             (Path(tmp) / 'keys').mkdir()
@@ -438,6 +440,14 @@ class Skripte(unittest.TestCase):
             self.assertEqual(len((Path(tmp) / n['signature']).read_bytes()), 64)
             again = subprocess.run([sys.executable, str(ROOT / 'scripts' / 'release-bauen'), 'core', '--ziel', f'{tmp}/2'], capture_output=True, text=True)
             self.assertEqual(again.returncode, 0)
+            # Modul-Release: nur modules/<id>/, Version aus module.toml.
+            r = subprocess.run([sys.executable, str(ROOT / 'scripts' / 'release-bauen'), 'sumup', '--ziel', f'{tmp}/m'], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            mv = (ROOT / 'modules' / 'sumup' / 'VERSION').read_text().strip()
+            mm = release.parse_manifest((Path(tmp) / 'm' / release.names('sumup', mv)['manifest']).read_bytes(), 'sumup')
+            self.assertTrue(all(f.startswith('modules/sumup/') for f in mm['files']))
+            self.assertIn('modules/sumup/module.toml', mm['files'])
+            self.assertEqual(subprocess.run([sys.executable, str(ROOT / 'scripts' / 'release-bauen'), 'beispiel', '--ziel', f'{tmp}/b'], capture_output=True).returncode, 2)
             self.assertEqual((Path(tmp) / '2' / n['archive']).read_bytes(), (Path(tmp) / n['archive']).read_bytes(), 'Archiv nicht reproduzierbar')
 
 

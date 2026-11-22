@@ -17,7 +17,7 @@
   Anmeldung an dieses Modul (nur POST, 64 KiB); der Starter weist sich mit seinem Schlüssel aus. Den einmaligen
   Startlink `https://<server>/#launch=…` gibt die Basis nach der Anmeldung an das Modul weiter (core.js).
 - Release-Workflow und `scripts/release-bauen` bauen auch Modul-Releases (Tag `<modul>-v<version>`).
-- Mitgeliefert: Modul **Kasse** (`sumup` 2.0.0, siehe `modules/sumup/RELEASE.md`).
+- Mitgeliefert: Modul **Kasse** (`sumup` 2.0.1, siehe `modules/sumup/RELEASE.md`).
 
 Nicht auf echtem Ubuntu 26.04 geprüft: Installation eines Moduls über die Seite (apt, useradd, systemd, php-fpm
 des Moduls, AppArmor), Starter 1.4.1 gegen `/api.php`, Weitergabe des Startlinks nach der Anmeldung im Browser.

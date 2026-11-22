@@ -64,12 +64,14 @@ try {
     $app->mock($v1, ['payment_id' => $card['id'], 'status' => 'successful']);
     $export = new TaxExport($app->db, $app->config);
     $rows = $export->invoices((int)date('Y'), 0, true);
-    check(array_column($rows, 'cash') === [false, true, true], 'Zahlungsart im Export falsch: ' . json_encode(array_column($rows, 'cash')));
+    // Reihenfolge innerhalb derselben Sekunde ist nicht festgelegt: nur die Kennzeichnung zählt.
+    $flags = array_column($rows, 'cash'); sort($flags);
+    check($flags === [false, true, true], 'Zahlungsart im Export falsch: ' . json_encode(array_column($rows, 'cash')));
     file_put_contents($state . '/x.xlsx', $export->workbook((int)date('Y'), (int)date('n'), false, true));
     $out = shell_exec('python3 -I -c ' . escapeshellarg('import openpyxl,sys
 wb=openpyxl.load_workbook(sys.argv[1]); ws=wb["Rechnungen"]; h=[c.value for c in ws[1]]
 art=[r[h.index("Zahlungsart")] for r in ws.iter_rows(min_row=2,values_only=True)][:-1]
-assert art==["Kartenzahlung","Bar","Bar"], art
+assert sorted(art)==["Bar","Bar","Kartenzahlung"], art
 s=wb["Summe"]; sh=[c.value for c in s[1]]; r=list(s.iter_rows(min_row=2,max_row=2,values_only=True))[0]
 assert r[sh.index("davon bar")]==30 and r[sh.index("davon Kartenzahlung")]==15, (sh,r)
 print("ok")') . ' ' . escapeshellarg($state . '/x.xlsx') . ' 2>&1');

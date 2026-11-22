@@ -273,7 +273,7 @@ r=$(c -b "$T/bert" -H "Origin: https://$host" -H "X-Kienzle-Csrf: $kcsrf" -H 'Co
 grep -q "\"url\":\"https://$host/kasse/#launch=" <<< "$r" || fail "Testpatient in der Kasse: $r"
 [ "$(c -b "$T/bert" -o /dev/null -w '%{http_code}' "https://$host/kasse/settings.php")" = 403 ] || fail 'Einstellungen ohne Recht'
 lpstat -v SumUp-Rechnung 2>/dev/null | grep -q 'ipp://localhost:471' || echo 'Hinweis: Drucker „SumUp-Rechnung“ im Container nicht angelegt.'
-c -b "$T/dora" "https://$host/verwaltung/module" | grep -q 'Kasse <span class="tag">2.0.0' || fail 'Seite Module'
+c -b "$T/dora" "https://$host/verwaltung/module" | grep -q 'Kasse <span class="tag">2.0.' || fail 'Seite Module'
 /opt/kienzle/core/current/bin/kienzle-module entfernen sumup > /dev/null || fail 'Kasse entfernen'
 [ ! -e /opt/kienzle/sumup ] && [ -d /var/lib/kienzle/sumup ] || fail 'Entfernen: Programm noch da oder Daten weg'
 pkill -u ks-sumup -f php-fpm || true
