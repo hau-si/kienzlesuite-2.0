@@ -1,5 +1,12 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.1.0
+
+- Praxisname, Anschrift und Kontakt kommen aus der Basis (Verwaltung → Server und Name) und sind aus den Kasse-Einstellungen
+  entfallen. Die Kasse übernimmt sie bei jedem Aufruf durch einen angemeldeten Benutzer; bis dahin (z. B. direkt nach dem
+  Update) fehlen sie auf Belegen, bis jemand die Kasse im Browser öffnet. Zuvor in der Kasse eingetragene Werte werden nicht übernommen.
+- Benötigt Basis ab 0.17.0.
+
 ## 2.0.1
 
 - Test der Barzahlung unabhängig von der Reihenfolge gleichzeitiger Zahlungen (schlug gelegentlich fehl).

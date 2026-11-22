@@ -84,6 +84,30 @@ final class Suite {
         rename($tmp, $file);
     }
 
+    /**
+     * Praxisname und Anschrift gehören der Basis (Verwaltung → Server und Name). Bei jeder angemeldeten Anfrage wird die
+     * mitgelieferte Fassung als praxis.json übernommen, damit auch der Starter (ohne Anmeldung) sie für Belege nutzen kann.
+     */
+    public static function syncPraxis(): void {
+        try { $p = self::modul()->praxis(); } catch (\Throwable) { return; }
+        if (implode('', $p) === '') return;
+        $file = self::$data . '/praxis.json';
+        $json = json_encode($p, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n";
+        if (@file_get_contents($file) === $json) return;
+        $tmp = $file . '.neu';
+        if (@file_put_contents($tmp, $json) === false) return;
+        @chmod($tmp, 0600);
+        @rename($tmp, $file);
+    }
+
+    /** @return array{name:string,street:string,city:string,contact:string} */
+    public static function praxis(): array {
+        $d = json_decode((string)@file_get_contents(self::$data . '/praxis.json'), true);
+        $out = [];
+        foreach (['name', 'street', 'city', 'contact'] as $k) $out[$k] = is_array($d) && is_string($d[$k] ?? null) ? $d[$k] : '';
+        return $out;
+    }
+
     /** Konfiguration wie früher aus der TOML-Datei, jetzt aus Vorgaben, Grundwerten und den Verbindungen der Basis. */
     public static function baseConfig(): Config {
         $v = Config::parse((string)file_get_contents(dirname(__DIR__) . '/config/kienzle-sumup.example.toml'));
@@ -96,6 +120,7 @@ final class Suite {
         $v['app']['encryption_key'] = (string)$g['encryption_key'];
         $v['invoice_inbox']['key'] = (string)$g['invoice_key'];
         // Drucker richtet die Basis ein (Verwaltung → Drucker); das Modul druckt nur auf deren Warteschlangen.
+        foreach (self::praxis() as $k => $val) $v['practice'][$k] = $val;
         $v['printing']['transport'] = 'cups';
         $v['printing']['cups_server'] = '';
         $v['office_printing']['cups_server'] = '';

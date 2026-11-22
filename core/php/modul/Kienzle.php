@@ -27,6 +27,14 @@ final class KienzleModul {
     /** @return list<string> */
     public function rechte(): array { return array_values(array_filter(explode(',', (string)($this->server['KIENZLE_RECHTE'] ?? '')))); }
     public function recht(string $recht): bool { return $this->istAdmin() || in_array($recht, $this->rechte(), true); }
+    /** Praxisdaten der Basis (Verwaltung → Server und Name): name, street, city, contact; leer, wenn keine mitgeliefert wurden. */
+    public function praxis(): array {
+        $d = json_decode(rawurldecode((string)($this->server['KIENZLE_PRAXIS'] ?? '')), true);
+        $out = [];
+        foreach (['name', 'street', 'city', 'contact'] as $k) $out[$k] = is_array($d) && is_string($d[$k] ?? null) ? $d[$k] : '';
+        return $out;
+    }
+
     public function csrf(): string { return (string)($this->server['KIENZLE_CSRF'] ?? ''); }
 
     /** CSRF-Marke einer schreibenden Anfrage prüfen (Formularfeld „csrf“ oder Kopfzeile X-Kienzle-Csrf des Browsers). */

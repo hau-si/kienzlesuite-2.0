@@ -27,10 +27,12 @@ try {
     check(Settings::effective($base) === $base, 'Ohne Überlagerung nicht die Basiskonfiguration');
 
     // Praxisdaten speichern: wirksam, verschlüsselt abgelegt, Basis unberührt.
-    Settings::save($db, $base, 'practice', ['name' => 'Beispielpraxis', 'street' => 'Musterweg 1', 'city' => '12345 Musterstadt', 'contact' => '', 'append_sumup_receipt' => false]);
+    Settings::save($db, $base, 'practice', ['append_sumup_receipt' => true]);
     $eff = Settings::effective($base);
-    check($eff->get('practice', 'name') === 'Beispielpraxis' && $eff->practiceReady(), 'Praxisdaten nicht wirksam');
-    check($base->get('practice', 'name', '') !== 'Beispielpraxis', 'Basiskonfiguration verändert');
+    check($eff->get('practice', 'append_sumup_receipt') === true, 'Belegeinstellung nicht wirksam');
+    check($base->get('practice', 'append_sumup_receipt', false) !== true, 'Basiskonfiguration verändert');
+    Settings::save($db, $base, 'practice', ['name' => 'Fremd']);
+    check(Settings::effective($base)->get('practice', 'name', '') !== 'Fremd', 'Praxisname darf nicht mehr lokal überschrieben werden');
     $raw = (string)(new PDO('sqlite:' . $state . '/payments.sqlite'))->query("SELECT value FROM settings WHERE key='config_overrides'")->fetchColumn();
     check($raw !== '' && !str_contains($raw, 'Beispielpraxis'), 'Einstellungen unverschlüsselt gespeichert');
 

@@ -37,6 +37,11 @@ final class View {
                 . ($n > 0 ? '<span class="badge" title="' . self::h($hint) . '">' . $n . '</span>' : '') . '</a>';
         };
         $menu = '<nav class="menu" aria-label="Menü"><div class="menu-group">' . $link('/', 'Start') . $link('/konto', 'Mein Konto') . '</div>';
+        if (!empty($nav['apps'])) {
+            $menu .= '<div class="menu-group"><span class="menu-title">Anwendungen</span>';
+            foreach ($nav['apps'] as $href => $label) $menu .= '<a href="' . self::h($href) . '"><span>' . self::h($label) . '</span></a>';
+            $menu .= '</div>';
+        }
         $group = null;
         if ($nav['admin']) {
             foreach (self::MENU as $title2 => $items) {

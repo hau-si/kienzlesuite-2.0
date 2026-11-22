@@ -28,11 +28,7 @@ final class Settings {
                 'help' => 'Adresse, Schlüssel und Zertifikat von T2med stehen zentral unter Verwaltung → Verbindungen der Suite.'],
             'entry_code' => ['type' => 'string', 'label' => 'Aktenkürzel', 'default' => 'ZAHLUNG'],
         ]],
-        'practice' => ['label' => 'Praxisdaten (Rechnungen und Belege)', 'fields' => [
-            'name' => ['type' => 'string', 'label' => 'Praxis / Rechnungsaussteller'],
-            'street' => ['type' => 'string', 'label' => 'Straße und Hausnummer'],
-            'city' => ['type' => 'string', 'label' => 'PLZ und Ort'],
-            'contact' => ['type' => 'string', 'label' => 'Kontakt auf dem Beleg (optional)'],
+        'practice' => ['label' => 'Belege (Praxisname und Anschrift: Verwaltung → Server und Name)', 'fields' => [
             'append_sumup_receipt' => ['type' => 'bool', 'label' => 'Originalen SumUp-Beleg statt lokaler Zahlungsbestätigung anhängen'],
         ]],
         'tax' => ['label' => 'Umsatzsteuer', 'fields' => [

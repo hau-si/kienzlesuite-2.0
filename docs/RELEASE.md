@@ -1,5 +1,12 @@
 # Basis – Release-Notizen
 
+## 0.17.0
+
+- **Praxisdaten zentral:** Unter Verwaltung → Server und Name stehen jetzt neben dem Praxisnamen auch Anschrift und Kontakt
+  (für Rechnungen und Belege). Die Module bekommen sie mit jeder Anfrage (`KienzleModul::praxis()`, Kopfzeile `X-Kienzle-Praxis`).
+- **Seitenleiste:** Jedes installierte Modul, für das der Benutzer Zugang hat, erscheint unter „Anwendungen“ (z. B. „Kasse“).
+- Nur mit nachgestelltem nginx/PHP geprüft, nicht auf einer echten VM.
+
 ## 0.16.1
 
 - **Drucker anlegen:** Die Meldung „Der Druckdienst (CUPS) läuft nicht“ kam auch, wenn der *Drucker* die automatische

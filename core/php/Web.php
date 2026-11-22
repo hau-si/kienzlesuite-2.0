@@ -150,6 +150,7 @@ final class Web {
 
     private function serverPage(?string $error = null): Response {
         $st = $this->srv()->status();
+        $addr = $this->address();
         $ips = array_values(array_filter($st['names'], fn($n) => filter_var($n, FILTER_VALIDATE_IP)));
         $dns = array_values(array_filter($st['names'], fn($n) => !filter_var($n, FILTER_VALIDATE_IP)));
         // Erster Name mit bekannter Endung → Feld „Name“ und Auswahl der Endung; alles andere steht unter „Weitere Namen“.
@@ -182,6 +183,12 @@ final class Web {
             . V::checkbox('neue_ca', '1', 'Falls nötig: neue Zertifizierungsstelle erstellen', false)
             . V::checkbox('ohne_ip', '1', 'Nicht mehr über die IP-Adresse erreichbar', false) . '</details>'
             . '<button' . ($st['pending'] ? ' disabled' : '') . '>Speichern</button></form>'
+            . '<h2>Anschrift der Praxis</h2><p class="muted">Steht auf Rechnungen und Belegen. Die Module (z. B. die Kasse) übernehmen sie von hier.</p>'
+            . '<form method="post" action="/verwaltung/server">' . $this->hidden('anschrift')
+            . V::input('street', 'Straße und Hausnummer', 'text', $addr['street'], 'maxlength="80" autocomplete="street-address"')
+            . V::input('city', 'PLZ und Ort', 'text', $addr['city'], 'maxlength="80"')
+            . V::input('contact', 'Kontakt auf dem Beleg (optional, z. B. Telefon)', 'text', $addr['contact'], 'maxlength="120"')
+            . '<button>Anschrift speichern</button></form>'
             . '<h2>Danach</h2><ol class="steps"><li>Den Namen im Router eintragen – oder auf jedem PC in der Datei hosts: '
             . '<a href="/hilfe/arbeitsplatz#name">Anleitung</a>.</li><li>Die Suite unter <strong>' . V::h($address) . '</strong> öffnen und dort neu anmelden.</li>'
             . '<li>Falls schon Passkeys eingerichtet sind: unter „Mein Konto“ neu anlegen (sie gelten für den alten Namen).</li></ol>';
@@ -189,7 +196,32 @@ final class Web {
         return $st['pending'] ? $response->with('Refresh', '3') : $response;
     }
 
+    /** Anschrift der Praxis (Straße, PLZ/Ort, Kontakt); der Name steht in der Serverkonfiguration. */
+    private function address(): array {
+        $d = json_decode((string)$this->db->setting('praxis.anschrift'), true);
+        $out = [];
+        foreach (['street', 'city', 'contact'] as $k) $out[$k] = is_array($d) && is_string($d[$k] ?? null) ? $d[$k] : '';
+        return $out;
+    }
+
+    private function saveAddress(Request $r, string $admin): Response {
+        $in = [];
+        try {
+            foreach (['street' => 80, 'city' => 80, 'contact' => 120] as $k => $max) {
+                $v = trim($r->field($k, $max + 1));
+                if (mb_strlen($v) > $max || preg_match('/[\x00-\x1f\x7f<>]/', $v)) throw new Problem('Anschrift: Angaben zu lang oder mit unerlaubten Zeichen.', 422);
+                $in[$k] = $v;
+            }
+        } catch (Problem $e) {
+            return $this->serverPage($e->getMessage());
+        }
+        $this->db->store('praxis.anschrift', json_encode($in, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+        $this->audit->write($admin, 'praxisanschrift', '');
+        return Response::redirect('/verwaltung/server');
+    }
+
     private function serverSave(Request $r, string $admin): Response {
+        if ($r->field('aktion', 20) === 'anschrift') return $this->saveAddress($r, $admin);
         $short = strtolower(trim($r->field('kurzname', 60)));
         $suffix = $r->field('endung', 30);
         $names = '';
@@ -326,7 +358,8 @@ final class Web {
             ->with('X-Kienzle-Rolle', $access['admin'] ? 'admin' : 'mitarbeiter')
             ->with('X-Kienzle-Rechte', implode(',', $access['rights']))
             ->with('X-Kienzle-Csrf', self::moduleCsrf($session['csrf'], $module))
-            ->with('X-Kienzle-Bestaetigt', (string)(int)$session['confirmed_at']);
+            ->with('X-Kienzle-Bestaetigt', (string)(int)$session['confirmed_at'])
+            ->with('X-Kienzle-Praxis', rawurlencode(json_encode(['name' => $this->config->practice] + $this->address(), JSON_UNESCAPED_UNICODE)));
     }
 
     /** CSRF-Marke, die ein Modul in seine Formulare schreibt und mit X-Kienzle-Csrf vergleicht. */
@@ -1502,7 +1535,9 @@ final class Web {
     private function nav(): ?array {
         if (($this->session['stage'] ?? '') !== 'full') return null;
         $admin = (int)$this->session['user_admin'] === 1;
-        return ['login' => $this->session['login'], 'admin' => $admin, 'csrf' => $this->session['csrf'],
+        $apps = [];
+        foreach ($this->users->access((int)$this->session['user_id']) as $id => $_) if (($p = $this->modules->webPath($id)) !== null) $apps[$p . '/'] = $this->modules->name($id);
+        return ['apps' => $apps, 'login' => $this->session['login'], 'admin' => $admin, 'csrf' => $this->session['csrf'],
             'updates' => $admin && $this->updates ? $this->updates->count() : 0, 'module' => $admin && $this->store ? $this->store->count() : 0, 'sicherung' => $admin && $this->backup ? $this->backup->count() : 0,
             'pfad' => $this->req?->path ?? '', 'einrichtung' => $admin ? $this->openSteps() : 0];
     }

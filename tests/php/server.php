@@ -21,6 +21,9 @@ function test_server(): void {
     $ok = ['aktion' => 'speichern', 'kurzname' => 'kienzle', 'endung' => '.fritz.box', 'weitere' => '', 'praxis' => ''];
     check($b->post('/verwaltung/server', $ok)->status === 422, 'zweite Anfrage, solange die erste wartet');
     unlink($f);
+    $r = $b->post('/verwaltung/server', ['aktion' => 'anschrift', 'street' => 'Musterweg 1', 'city' => '12345 Musterstadt', 'contact' => 'Telefon 01234 56789']);
+    check($r->status === 303 && str_contains($b->get('/verwaltung/server')->body, 'value="Musterweg 1"'), 'Anschrift speichern');
+    check($b->post('/verwaltung/server', ['aktion' => 'anschrift', 'street' => '<b>', 'city' => '', 'contact' => ''])->status === 422, 'Anschrift mit < abgelehnt');
     foreach ([['kurzname' => ''], ['kurzname' => 'a b'], ['kurzname' => '-x'], ['endung' => '.example.org'], ['weitere' => 'a b!'],
               ['weitere' => implode("\n", array_map(fn($i) => "n$i.example.org", range(1, 11)))], ['praxis' => '<b>']] as $bad) {
         check($b->post('/verwaltung/server', $bad + $ok)->status === 422, 'ungültig angenommen: ' . json_encode($bad));

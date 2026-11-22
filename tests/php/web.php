@@ -108,6 +108,8 @@ function test_mitarbeiter_ohne_otp_und_rechte_je_modul(): void {
     check($auth->status === 204 && $auth->header('X-Kienzle-Benutzer') === 'bert' && $auth->header('X-Kienzle-Rolle') === 'mitarbeiter'
         && $auth->header('X-Kienzle-Rechte') === 'paid', 'Weitergabe an Modul falsch');
     check(strlen((string)$auth->header('X-Kienzle-Csrf')) === 64, 'Modul-CSRF fehlt');
+    check(is_array(json_decode(rawurldecode((string)$auth->header('X-Kienzle-Praxis')), true)), 'Praxisdaten fehlen in der Weitergabe');
+    check(str_contains($b->get('/')->body, '<span class="menu-title">Anwendungen</span>'), 'Modul fehlt in der Seitenleiste');
     check($b->get('/_auth/beispiel')->status === 403, 'Zugang zu nicht freigegebenem Modul');
     check($b->get('/_auth/unbekannt')->status === 404, 'unbekanntes Modul nicht abgewiesen');
     check($b->get('/verwaltung/benutzer')->status === 403, 'Mitarbeiter in der Verwaltung');
