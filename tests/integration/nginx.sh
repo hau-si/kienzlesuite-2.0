@@ -180,7 +180,9 @@ drucker() { runuser -u ks-core -- sh -c "umask 077; printf '%s' '$1' > /var/lib/
 drucker '{"action":"anlegen","art":"bon","name":"Bon-Test","adresse":"socket://192.0.2.50:9100","freigabe":["samba"]}'
 lpstat -v Bon-Test | grep -q 'socket://192.0.2.50:9100' || fail 'Warteschlange fehlt in CUPS'
 testparm -s --suppress-prompt 2>/dev/null | grep -q '^\[Bon-Test\]' || fail 'Samba-Freigabe fehlt'
-install -d -m 0755 /opt/kienzle/beispiel && ln -sfn "$repo/modules/beispiel" /opt/kienzle/beispiel/current
+# Programmordner wie bei einer echten Installation: root-eigene Kopie (der Arbeitsordner der CI ist für ks-beispiel nicht lesbar).
+install -d -m 0755 /opt/kienzle/beispiel/releases && rm -rf /opt/kienzle/beispiel/releases/test && cp -r "$repo/modules/beispiel" /opt/kienzle/beispiel/releases/test
+chmod -R u=rwX,go=rX /opt/kienzle/beispiel/releases/test && ln -sfn releases/test /opt/kienzle/beispiel/current
 install -d -m 0750 -o ks-beispiel -g ks-beispiel /var/lib/kienzle/beispiel
 [ "$(stat -c '%a %U' /usr/lib/cups/backend/kienzle-leer)" = '755 root' ] || fail 'Backend kienzle-leer fehlt'
 grep -q 'include = /etc/samba/kienzle-netz.conf' /etc/samba/smb.conf || fail 'smb.conf ohne Windows-Netz'
@@ -191,7 +193,11 @@ lpstat -v Beispiel-Drucker | grep -q 'kienzle-beispiel-beispiel-drucker:/Beispie
 [ "$(stat -c '%a %U' /usr/lib/cups/backend/kienzle-beispiel-beispiel-drucker)" = '755 root' ] || fail 'Backend falsch geschützt'
 # IPP-Everywhere-Drucker des Moduls (ippeveprinter als ks-beispiel, nur localhost)
 grep -q '^User=ks-beispiel' /etc/systemd/system/kienzle-drucker-beispiel-beispiel-pdf.service || fail 'Einheit des IPP-Druckers fehlt'
-lpstat -v Beispiel-PDF | grep -q 'ipp://localhost:471' || fail 'IPP-Everywhere-Drucker fehlt in CUPS'
+if ! lpstat -v Beispiel-PDF 2>/dev/null | grep -q 'ipp://localhost:471'; then
+  ls -l /usr/sbin/ippeveprinter /usr/bin/ippeveprinter 2>&1; cat /var/lib/kienzle/drucker/*.log 2>&1 | tail -n 20
+  runuser -u ks-beispiel -- test -x /opt/kienzle/beispiel/current/printer/kienzle-beispiel-druck || echo 'ks-beispiel kann das Programm nicht ausführen'
+  fail 'IPP-Everywhere-Drucker fehlt in CUPS'
+fi
 pgrep -u ks-beispiel -f ippeveprinter >/dev/null || fail 'ippeveprinter läuft nicht als ks-beispiel'
 lp -d Beispiel-PDF "$repo/tests/integration/test.pdf" | grep -q 'request id is Beispiel-PDF-' || fail 'Auftrag an den IPP-Drucker'
 for _ in $(seq 1 30); do [ -s /var/lib/kienzle/beispiel/letzter-auftrag ] && break; sleep 0.5; done
@@ -204,7 +210,7 @@ runuser -u ks-beispiel -- php -r 'require "/opt/kienzle/core/current/php/modul/K
 c -b "$T/dora" "https://$host/verwaltung/drucker" | grep -q 'Bon-Test' || fail 'Druckerseite'
 drucker '{"action":"entfernen","name":"Bon-Test"}'
 if lpstat -v Bon-Test >/dev/null 2>&1; then fail 'Warteschlange nicht entfernt'; fi
-rm /opt/kienzle/beispiel/current
+rm -rf /opt/kienzle/beispiel
 KIENZLE_NGINX_RELOAD='' /opt/kienzle/core/current/bin/kienzle-web schreiben || fail 'kienzle-web ohne Modul'
 if lpstat -v Beispiel-Drucker >/dev/null 2>&1; then fail 'virtueller Drucker nach Entfernen des Moduls noch da'; fi
 [ ! -e /usr/lib/cups/backend/kienzle-beispiel-beispiel-drucker ] || fail 'Backend nach Entfernen noch da'

@@ -37,6 +37,8 @@ BIN = {k: E(f'KIENZLE_{k.upper()}', v) for k, v in {'lpadmin': '/usr/sbin/lpadmi
                                                      'lp': '/usr/bin/lp', 'cupsenable': '/usr/sbin/cupsenable', 'cupsaccept': '/usr/sbin/cupsaccept',
                                                      'smbcontrol': '/usr/bin/smbcontrol', 'cancel': '/usr/bin/cancel',
                                                      'testparm': '/usr/bin/testparm', 'ippeveprinter': '/usr/sbin/ippeveprinter', 'runuser': '/usr/sbin/runuser'}.items()}
+if not Path(BIN['ippeveprinter']).is_file() and Path('/usr/bin/ippeveprinter').is_file():
+    BIN['ippeveprinter'] = '/usr/bin/ippeveprinter'
 JOB = re.compile(r'^[A-Za-z0-9_-]{1,40}-\d{1,9}$')
 WORKGROUP = re.compile(r'^[A-Za-z0-9][A-Za-z0-9-]{0,14}$')
 MARK = 'Kienzle-Suite'
@@ -362,9 +364,10 @@ def _start_unit(unit: str, p: dict, port: int) -> None:
     if E('KIENZLE_OHNE_SYSTEMD') == '1':             # nur Container-Tests ohne systemd: Drucker direkt starten
         spool = DATA / p['modul'] / 'druckauftraege'
         subprocess.run([BIN['runuser'], '-u', f'ks-{p["modul"]}', '--', 'mkdir', '-p', str(spool)], capture_output=True, timeout=30)
+        log = open(STATE / f'{p["scheme"]}.log', 'ab')     # noqa: SIM115 – bleibt für den Hintergrundprozess offen
         subprocess.Popen([BIN['runuser'], '-u', f'ks-{p["modul"]}', '--', BIN['ippeveprinter'], '-p', str(port), '-n', 'localhost', '-r', 'off',
                           '-c', str(PROGRAMS / p['modul'] / 'current' / p['command']), '-f', ','.join(p['formats']), '-d', str(spool), p['scheme']],
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                         stdout=log, stderr=log, start_new_session=True)
     elif SYSTEMCTL and Path(SYSTEMCTL).is_file():
         subprocess.run([SYSTEMCTL, 'daemon-reload'], capture_output=True, timeout=60)
         subprocess.run([SYSTEMCTL, 'enable', unit], capture_output=True, timeout=60)
