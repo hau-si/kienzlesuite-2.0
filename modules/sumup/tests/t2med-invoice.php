@@ -101,6 +101,8 @@ try {
     check($parsedOther['number'] === 'B-77/1' && $parsedOther['amount_cents'] === 1250 && $parsedOther['patient_birthdate'] === '1970-04-03' && $parsedOther['patient_name'] === 'Max Muster', 'Eigene Textschnipsel nicht gelesen');
     $missing = rejects(fn() => T2medInvoice::parse($other, 100000), 'Fremde Vorlage ohne Textschnipsel akzeptiert', 422);
     check(str_contains($missing->getMessage(), 'nicht gefunden'), 'Fehler nennt fehlende Bezeichnung nicht');
+    $probe = "Rechnungsnummer: A1-9\nRechnungsdatum: 01.02.2026\n";
+    fwrite(STDERR, 'DIAG ' . PHP_VERSION . ' ' . PCRE_VERSION . ' ' . preg_match_all('/(?:Re\.-Datum:|Rechnungsdatum:)[ \t]*(\d{2}\.\d{2}\.\d{4})/u', $probe, $dm) . ' ' . json_encode($dm) . ' ' . bin2hex(substr($probe, 21, 16)) . "\n");
     check(T2medInvoice::parse("Rechnungsnummer: A1-9\nRechnungsdatum: 01.02.2026\nPatientin: Eva Muster , 03.04.1970\nGesamtbetrag: 5,00 EUR\n", 100000)['amount_cents'] === 500, 'Eingebaute Varianten nicht gelesen');
     check(T2medInvoice::parse("Re.-Nr.:\nRE2026-0042\nRe.-Datum:\n15.03.2026\nPatient: A B , 12.04.1980\nGesamtsumme:\n42,50 €\n", 100000, false, [], true)['number'] === 'RE2026-0042', 'Wert in Folgezeile nicht gelesen');
     rejects(fn() => T2medInvoice::parse("Re.-Nr.:\nRe.-Datum: 15.03.2026\nPatient: A B , 12.04.1980\nGesamtsumme: 42,50 €\n", 100000, false, [], true), 'Nächste Beschriftung als Rechnungsnummer gelesen', 422);
