@@ -42,6 +42,11 @@ final class View {
             foreach ($nav['apps'] as $href => $label) $menu .= '<a href="' . self::h($href) . '"><span>' . self::h($label) . '</span></a>';
             $menu .= '</div>';
         }
+        if (!empty($nav['settings'])) {
+            $menu .= '<div class="menu-group"><span class="menu-title">Einstellungen</span>';
+            foreach ($nav['settings'] as $href => $label) $menu .= '<a href="' . self::h($href) . '"><span>' . self::h($label) . '</span></a>';
+            $menu .= '</div>';
+        }
         $group = null;
         if ($nav['admin']) {
             foreach (self::MENU as $title2 => $items) {

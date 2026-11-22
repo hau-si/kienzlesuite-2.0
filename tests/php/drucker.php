@@ -50,6 +50,10 @@ function test_seite(): void {
     $b->web = fn() => $b->defaultWeb(null, null, null, null, $p);
     $page = $b->get('/verwaltung/drucker');
     check($page->status === 200 && str_contains($page->body, 'Eingerichtete Drucker') && str_contains($page->body, 'Modul Beispielmodul'), 'Seite unvollständig');
+    check(str_contains($page->body, 'Wofür welcher Drucker?'), 'Zuordnung fehlt');
+    check($b->post('/verwaltung/drucker', ['aktion' => 'rollen', 'buero' => 'Gibtsnicht', 'bon' => ''])->status === 422, 'Unbekannter Drucker in der Zuordnung');
+    check($b->post('/verwaltung/drucker', ['aktion' => 'rollen', 'buero' => 'Fremd', 'bon' => 'Bon'])->status === 303, 'Zuordnung speichern');
+    check(json_decode((string)$env->db->setting('drucker.rollen'), true) === ['buero' => 'Fremd', 'bon' => 'Bon'], 'Zuordnung nicht gespeichert');
     check(!str_contains($page->body, '<script>') && !str_contains($page->body, 'Von <b>') && !str_contains($page->body, 'A4 <i>'), 'nicht maskiert');
     check(substr_count($page->body, '>Entfernen<') === 1, 'Entfernen nur für eigene Drucker der Suite');
     $r = $b->post('/verwaltung/drucker', ['aktion' => 'freigabe', 'name' => 'Bon', 'samba' => '1', 'ipp' => '1']);

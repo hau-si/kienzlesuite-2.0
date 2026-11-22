@@ -19,7 +19,8 @@ MODULE_ROOT = '/opt/kienzle/{id}/current'
 CORE_SOCKET = '/run/kienzle/core/web.sock'
 CA_DIR = '/etc/kienzle/ca'
 HOST = re.compile(r'^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$')
-FORWARD = (('benutzer', 'Benutzer'), ('name', 'Name'), ('rolle', 'Rolle'), ('rechte', 'Rechte'), ('csrf', 'Csrf'), ('bestaetigt', 'Bestaetigt'), ('praxis', 'Praxis'))
+FORWARD = (('benutzer', 'Benutzer'), ('name', 'Name'), ('rolle', 'Rolle'), ('rechte', 'Rechte'), ('csrf', 'Csrf'), ('bestaetigt', 'Bestaetigt'),
+           ('praxis', 'Praxis'), ('drucker', 'Drucker'))
 SAFE = re.compile(r'^[A-Za-z0-9_./:-]+$')
 
 

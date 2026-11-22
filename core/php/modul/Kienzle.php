@@ -35,6 +35,14 @@ final class KienzleModul {
         return $out;
     }
 
+    /** Zuordnung der Drucker (Verwaltung → Drucker): buero = Praxisdrucker (A4), bon = Bondrucker; leer = nicht zugeordnet. */
+    public function druckerRollen(): array {
+        $d = json_decode(rawurldecode((string)($this->server['KIENZLE_DRUCKER'] ?? '')), true);
+        $out = [];
+        foreach (['buero', 'bon'] as $k) $out[$k] = is_array($d) && is_string($d[$k] ?? null) && preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/D', $d[$k]) ? $d[$k] : '';
+        return $out;
+    }
+
     public function csrf(): string { return (string)($this->server['KIENZLE_CSRF'] ?? ''); }
 
     /** CSRF-Marke einer schreibenden Anfrage prüfen (Formularfeld „csrf“ oder Kopfzeile X-Kienzle-Csrf des Browsers). */

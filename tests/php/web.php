@@ -111,6 +111,10 @@ function test_mitarbeiter_ohne_otp_und_rechte_je_modul(): void {
     check(is_array(json_decode(rawurldecode((string)$auth->header('X-Kienzle-Praxis')), true)), 'Praxisdaten fehlen in der Weitergabe');
     check(str_contains($b->get('/')->body, '<span class="menu-title">Anwendungen</span>'), 'Modul fehlt in der Seitenleiste');
     check($b->get('/_auth/beispiel')->status === 403, 'Zugang zu nicht freigegebenem Modul');
+    $env->users->setAccess($id, 'kasse', false, []);
+    $env->db->store('erstadmin:kasse', (string)$id);
+    $ra = $b->get('/_auth/kasse');
+    check($ra->header('X-Kienzle-Rolle') === 'admin' && $env->db->setting('erstadmin:kasse') === null, 'Installierender wird nicht Modul-Admin: ' . $ra->status . ' ' . $ra->header('X-Kienzle-Rolle') . ' ' . var_export($env->db->setting('erstadmin:kasse'), true));
     check($b->get('/_auth/unbekannt')->status === 404, 'unbekanntes Modul nicht abgewiesen');
     check($b->get('/verwaltung/benutzer')->status === 403, 'Mitarbeiter in der Verwaltung');
     check(str_contains($b->get('/')->body, 'href="/kasse/"') && !str_contains($b->last->body, 'href="/beispiel/"'), 'Menü zeigt falsche Module');

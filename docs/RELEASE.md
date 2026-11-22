@@ -1,5 +1,14 @@
 # Basis – Release-Notizen
 
+## 0.19.0
+
+- **Drucker zentral zuordnen:** Verwaltung → Drucker hat den Abschnitt „Wofür welcher Drucker?“ (Praxisdrucker A4, Bondrucker).
+  Module bekommen die Zuordnung mit jeder Anfrage (`KienzleModul::druckerRollen()`, `X-Kienzle-Drucker`) und fragen nicht mehr selbst.
+- **Einstellungen in der Seitenleiste:** Module können mit `web.einstellungen` (module.toml) eine Einstellungsseite angeben;
+  Modul-Admins sehen sie unter „Einstellungen“ in der Seitenleiste.
+- Wer ein Modul über die Weboberfläche installiert, wird beim nächsten Aufruf dessen Admin (einmalig).
+- Nur mit nachgestelltem nginx/PHP geprüft, nicht auf einer echten VM.
+
 ## 0.18.0
 
 - **Module aktualisieren sich selbst:** Die tägliche Prüfung (04:20, `kienzle-module pruefen`) installiert neuere Modulversionen

@@ -49,6 +49,12 @@ final class Modules {
         return '';
     }
 
+    /** Adresse der Einstellungsseite des Moduls (Webpfad + web.einstellungen), sonst null. */
+    public function settingsUrl(string $id): ?string {
+        $w = $this->modules[$id]['web'] ?? null;
+        return is_array($w) && is_string($w['einstellungen'] ?? null) ? $w['path'] . $w['einstellungen'] : null;
+    }
+
     public function webPath(string $id): ?string { return $this->modules[$id]['web']['path'] ?? null; }
 
     /** Modul, zu dessen Webpfad die angefragte Adresse gehört (genau der Pfad oder darunter), sonst null. */

@@ -1,5 +1,13 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.2.0
+
+- Der Drucker für Praxisdrucker (A4) und Bondrucker wird nicht mehr in der Kasse gewählt, sondern in der Basis
+  (Verwaltung → Drucker → „Wofür welcher Drucker?“). In der Kasse bleiben nur Modell, Papier und Schalter.
+  **Nach dem Update dort einmal zuordnen**, sonst druckt die Kasse auf die Namen „TM-m10“ bzw. „Praxisdrucker“, falls es sie gibt.
+- Die Kasse-Einstellungen stehen in der Seitenleiste der Basis („Einstellungen → Kasse“).
+- Benötigt Basis ab 0.19.0.
+
 ## 2.1.0
 
 - Praxisname, Anschrift und Kontakt kommen aus der Basis (Verwaltung → Server und Name) und sind aus den Kasse-Einstellungen

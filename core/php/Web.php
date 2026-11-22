@@ -350,6 +350,7 @@ final class Web {
         if (!$this->modules->has($module)) return new Response(404);
         $session = $this->auth->session($r->cookie(Auth::COOKIE), 'full');
         if (!$session) return new Response(401);
+        $this->claimFirstAdmin((int)$session['user_id']);
         $access = $this->users->access((int)$session['user_id'])[$module] ?? null;
         if (!$access) return new Response(403);
         return (new Response(204))
@@ -359,6 +360,7 @@ final class Web {
             ->with('X-Kienzle-Rechte', implode(',', $access['rights']))
             ->with('X-Kienzle-Csrf', self::moduleCsrf($session['csrf'], $module))
             ->with('X-Kienzle-Bestaetigt', (string)(int)$session['confirmed_at'])
+            ->with('X-Kienzle-Drucker', rawurlencode(json_encode($this->printerRoles(), JSON_UNESCAPED_UNICODE)))
             ->with('X-Kienzle-Praxis', rawurlencode(json_encode(['name' => $this->config->practice] + $this->address(), JSON_UNESCAPED_UNICODE)));
     }
 
@@ -1009,7 +1011,7 @@ final class Web {
             switch ($r->field('aktion', 20)) {
                 case 'pruefen': $store->check(); break;
                 case 'automatisch': $on = $r->field('an', 1) === '1'; $store->auto($on); $this->audit->write($admin, 'modul-automatisch', $on ? 'an' : 'aus'); break;
-                case 'installieren': $store->install($id); $this->audit->write($admin, 'modul-installieren', $id); break;
+                case 'installieren': $store->install($id); $this->db->store('erstadmin:' . $id, (string)(int)$this->session['user_id']); $this->audit->write($admin, 'modul-installieren', $id); break;
                 case 'aktualisieren': $store->update($id); $this->audit->write($admin, 'modul-aktualisieren', $id); break;
                 case 'entfernen':
                     $data = $r->field('daten', 1) === '1';
@@ -1232,6 +1234,17 @@ final class Web {
             . V::checkbox('ipp', '1', 'für macOS und andere freigeben (IPP)', in_array('ipp', $share, true));
     }
 
+    public const PRINTER_ROLES = ['buero' => 'Praxisdrucker (A4, Rechnungen)', 'bon' => 'Bondrucker (Belege)'];
+
+    /** Zuordnung Rolle → Warteschlange (Verwaltung → Drucker); nur noch vorhandene Warteschlangen. */
+    private function printerRoles(): array {
+        $d = json_decode((string)$this->db->setting('drucker.rollen'), true);
+        $names = $this->printers ? array_column($this->printers->status()['queues'], 'name') : [];
+        $out = [];
+        foreach (self::PRINTER_ROLES as $k => $_) $out[$k] = is_array($d) && is_string($d[$k] ?? null) && in_array($d[$k], $names, true) ? $d[$k] : '';
+        return $out;
+    }
+
     private function printersPage(?string $error = null): Response {
         $st = $this->pr()->status();
         $busy = $st['pending'];
@@ -1254,6 +1267,15 @@ final class Web {
                 . V::h($q['state']) . '</td><td>' . ($q['modul'] !== '' ? 'Modul ' . V::h($this->modules->name($q['modul'])) : ($q['managed'] ? 'Suite' : 'fremd')) . '</td><td>' . $actions . '</td></tr>';
         }
         $body .= '<h2>Eingerichtete Drucker</h2>' . ($rows !== '' ? '<table><tr><th>Name</th><th>Adresse</th><th>Zustand</th><th>Von</th><th></th></tr>' . $rows . '</table>' : '<p>Noch keine.</p>');
+        $roles = $this->printerRoles();
+        $pick = '';
+        foreach (self::PRINTER_ROLES as $k => $label) {
+            $opts = '<option value="">– keiner –</option>';
+            foreach ($st['queues'] as $q) if ($q['modul'] === '') $opts .= '<option value="' . V::h($q['name']) . '"' . ($roles[$k] === $q['name'] ? ' selected' : '') . '>' . V::h($q['name']) . '</option>';
+            $pick .= '<label>' . V::h($label) . '<select name="' . $k . '">' . $opts . '</select></label>';
+        }
+        $body .= '<h2>Wofür welcher Drucker?</h2><p class="muted">Module drucken auf diese Zuordnung; in den Einstellungen der Module wird kein Drucker mehr gewählt.</p>'
+            . '<form method="post" action="/verwaltung/drucker" class="box">' . $this->hidden('rollen') . $pick . '<button>Zuordnung speichern</button></form>';
         $jobRows = '';
         foreach ($st['jobs'] as $j) {
             $jobRows .= '<tr><td><code>' . V::h($j['id']) . '</code></td><td>' . V::h($j['drucker']) . '</td><td>' . V::h($j['benutzer']) . '</td><td>' . max(1, (int)($j['groesse'] / 1024)) . ' KB</td><td>'
@@ -1291,6 +1313,17 @@ final class Web {
         return $busy ? $response->with('Refresh', '3') : $response;
     }
 
+    private function saveRoles(Request $r): void {
+        $names = array_column($this->pr()->status()['queues'], 'name');
+        $out = [];
+        foreach (self::PRINTER_ROLES as $k => $_) {
+            $v = $r->field($k, 40);
+            if ($v !== '' && !in_array($v, $names, true)) throw new Problem('Unbekannter Drucker.', 422);
+            $out[$k] = $v;
+        }
+        $this->db->store('drucker.rollen', json_encode($out, JSON_THROW_ON_ERROR));
+    }
+
     private function printersAction(Request $r, string $admin): Response {
         $p = $this->pr();
         $a = $r->field('aktion', 20);
@@ -1298,6 +1331,7 @@ final class Web {
         try {
             match ($a) {
                 'suchen' => $p->search(),
+                'rollen' => $this->saveRoles($r),
                 'anlegen' => $p->add($r->field('art', 20), $r->field('name', 60), $r->field('adresse', 400), $share),
                 'entfernen' => $p->remove($r->field('name', 60)),
                 'testseite' => $p->testPage($r->field('name', 60)),
@@ -1536,12 +1570,27 @@ final class Web {
         }
     }
 
+    /** Wer ein Modul installiert hat, wird beim ersten Aufruf nach der Installation dessen Admin (einmalig; weitere Rechte vergibt er unter Benutzer). */
+    private function claimFirstAdmin(int $uid): void {
+        foreach ($this->db->query("SELECT key,value FROM settings WHERE key LIKE 'erstadmin:%'")->fetchAll() as $row) {
+            $id = substr($row['key'], 10);
+            if (!$this->modules->has($id)) continue;
+            if ((int)$row['value'] === $uid && !isset($this->users->access($uid)[$id])) $this->users->setAccess($uid, $id, true, []);
+            $this->db->query('DELETE FROM settings WHERE key=?', [$row['key']]);
+        }
+    }
+
     private function nav(): ?array {
         if (($this->session['stage'] ?? '') !== 'full') return null;
+        $this->claimFirstAdmin((int)$this->session['user_id']);
         $admin = (int)$this->session['user_admin'] === 1;
-        $apps = [];
-        foreach ($this->users->access((int)$this->session['user_id']) as $id => $_) if (($p = $this->modules->webPath($id)) !== null) $apps[$p . '/'] = $this->modules->name($id);
-        return ['apps' => $apps, 'login' => $this->session['login'], 'admin' => $admin, 'csrf' => $this->session['csrf'],
+        $apps = $settings = [];
+        foreach ($this->users->access((int)$this->session['user_id']) as $id => $a) {
+            if (($p = $this->modules->webPath($id)) === null) continue;
+            $apps[$p . '/'] = $this->modules->name($id);
+            if ($a['admin'] && ($s = $this->modules->settingsUrl($id)) !== null) $settings[$s] = $this->modules->name($id);
+        }
+        return ['apps' => $apps, 'settings' => $settings, 'login' => $this->session['login'], 'admin' => $admin, 'csrf' => $this->session['csrf'],
             'updates' => $admin && $this->updates ? $this->updates->count() : 0, 'module' => $admin && $this->store ? $this->store->count() : 0, 'sicherung' => $admin && $this->backup ? $this->backup->count() : 0,
             'pfad' => $this->req?->path ?? '', 'einrichtung' => $admin ? $this->openSteps() : 0];
     }

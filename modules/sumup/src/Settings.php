@@ -43,17 +43,15 @@ final class Settings {
             'enabled' => ['type' => 'bool', 'label' => 'Belege per E-Mail senden', 'help' => 'Server, Zugang und Absender stehen zentral unter Verwaltung → Verbindungen der Suite.'],
             'from_name' => ['type' => 'string', 'label' => 'Absendername (z. B. Praxisname)', 'optional' => true],
         ]],
-        'printing' => ['label' => 'Bondrucker', 'fields' => [
+        'printing' => ['label' => 'Bondrucker (welcher Drucker: Verwaltung → Drucker → Wofür welcher Drucker?)', 'fields' => [
             'enabled' => ['type' => 'bool', 'label' => 'Bondrucker verwenden („Beleg drucken“)'],
             'model' => ['type' => 'choice', 'label' => 'Modell', 'choices' => ['tm-m10' => 'Epson TM-m10 (58 mm)', 'tm-m30iii' => 'Epson TM-m30III (80 mm)']],
-            'queue' => ['type' => 'queue', 'label' => 'Bondrucker', 'default' => 'TM-m10', 'help' => 'Drucker richtet die Suite unter Verwaltung → Drucker ein.'],
             'width_dots' => ['type' => 'int', 'label' => 'Druckbreite in Punkten (leer: passend zum Modell)', 'optional' => true],
             'cut' => ['type' => 'bool', 'label' => 'Bon schneiden', 'default' => true],
             'cash_receipt_auto' => ['type' => 'bool', 'label' => 'Quittung automatisch drucken bei Barzahlung', 'default' => false],
         ]],
-        'office_printing' => ['label' => 'Praxisdrucker (A4)', 'fields' => [
+        'office_printing' => ['label' => 'Praxisdrucker A4 (welcher Drucker: Verwaltung → Drucker → Wofür welcher Drucker?)', 'fields' => [
             'enabled' => ['type' => 'bool', 'label' => 'Praxisdrucker für Rechnungen verwenden'],
-            'queue' => ['type' => 'queue', 'label' => 'Praxisdrucker', 'default' => 'Praxisdrucker', 'help' => 'Drucker richtet die Suite unter Verwaltung → Drucker ein.'],
             'media' => ['type' => 'choice', 'label' => 'Papier', 'choices' => ['A4' => 'A4', 'Letter' => 'Letter']],
             'duplex' => ['type' => 'bool', 'label' => 'Beidseitig drucken'],
             'invoice_auto' => ['type' => 'bool', 'label' => 'T2med-Rechnungen immer automatisch drucken (Karte, Bar und „Später“)', 'default' => true],

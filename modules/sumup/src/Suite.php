@@ -85,14 +85,15 @@ final class Suite {
     }
 
     /**
-     * Praxisname und Anschrift gehören der Basis (Verwaltung → Server und Name). Bei jeder angemeldeten Anfrage wird die
-     * mitgelieferte Fassung als praxis.json übernommen, damit auch der Starter (ohne Anmeldung) sie für Belege nutzen kann.
+     * Praxisname, Anschrift und die Zuordnung der Drucker gehören der Basis (Verwaltung → Server und Name bzw. Drucker).
+     * Bei jeder angemeldeten Anfrage wird die mitgelieferte Fassung als basis.json übernommen, damit auch der Starter
+     * (ohne Anmeldung) sie nutzen kann.
      */
-    public static function syncPraxis(): void {
-        try { $p = self::modul()->praxis(); } catch (\Throwable) { return; }
-        if (implode('', $p) === '') return;
-        $file = self::$data . '/praxis.json';
-        $json = json_encode($p, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n";
+    public static function syncBasis(): void {
+        try { $k = self::modul(); $b = ['praxis' => $k->praxis(), 'drucker' => $k->druckerRollen()]; } catch (\Throwable) { return; }
+        if (implode('', $b['praxis']) === '' && !array_filter($b['drucker'])) return;
+        $file = self::$data . '/basis.json';
+        $json = json_encode($b, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n";
         if (@file_get_contents($file) === $json) return;
         $tmp = $file . '.neu';
         if (@file_put_contents($tmp, $json) === false) return;
@@ -100,11 +101,24 @@ final class Suite {
         @rename($tmp, $file);
     }
 
+    private static function basis(): array {
+        $d = json_decode((string)@file_get_contents(self::$data . '/basis.json'), true);
+        return is_array($d) ? $d : [];
+    }
+
     /** @return array{name:string,street:string,city:string,contact:string} */
     public static function praxis(): array {
-        $d = json_decode((string)@file_get_contents(self::$data . '/praxis.json'), true);
+        $d = self::basis()['praxis'] ?? [];
         $out = [];
         foreach (['name', 'street', 'city', 'contact'] as $k) $out[$k] = is_array($d) && is_string($d[$k] ?? null) ? $d[$k] : '';
+        return $out;
+    }
+
+    /** @return array{buero:string,bon:string} Warteschlangen laut Verwaltung → Drucker (leer = nicht zugeordnet). */
+    public static function druckerRollen(): array {
+        $d = self::basis()['drucker'] ?? [];
+        $out = [];
+        foreach (['buero', 'bon'] as $k) $out[$k] = is_array($d) && is_string($d[$k] ?? null) && preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/D', $d[$k]) ? $d[$k] : '';
         return $out;
     }
 
@@ -121,6 +135,9 @@ final class Suite {
         $v['invoice_inbox']['key'] = (string)$g['invoice_key'];
         // Drucker richtet die Basis ein (Verwaltung → Drucker); das Modul druckt nur auf deren Warteschlangen.
         foreach (self::praxis() as $k => $val) $v['practice'][$k] = $val;
+        $rollen = self::druckerRollen();
+        if ($rollen['bon'] !== '') $v['printing']['queue'] = $rollen['bon'];
+        if ($rollen['buero'] !== '') $v['office_printing']['queue'] = $rollen['buero'];
         $v['printing']['transport'] = 'cups';
         $v['printing']['cups_server'] = '';
         $v['office_printing']['cups_server'] = '';

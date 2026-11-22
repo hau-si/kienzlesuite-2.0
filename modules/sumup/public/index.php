@@ -14,7 +14,7 @@ if (($_SERVER['KIENZLE_OEFFENTLICH'] ?? '') === 'starter') {
     require $root . '/seiten/starter.php';
     exit;
 }
-Suite::syncPraxis();
+Suite::syncBasis();
 $base = Suite::base();
 $path = (string)parse_url((string)($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
 $rel = str_starts_with($path, $base . '/') ? substr($path, strlen($base)) : '/';

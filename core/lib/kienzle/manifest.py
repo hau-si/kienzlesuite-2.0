@@ -57,7 +57,7 @@ LIMITS = {'packages': 50, 'services': 20, 'firewall': 20, 'rights': 30, 'printer
 SCHEMA_SECTIONS = {
     'module': {'id', 'name', 'version', 'core_api', 'description'},
     'system': {'packages', 'services', 'user', 'data'},
-    'web': {'path', 'upstream', 'protocol', 'entry', 'starter'},
+    'web': {'path', 'upstream', 'protocol', 'entry', 'starter', 'einstellungen'},
     'firewall': {'name', 'port', 'proto', 'scope'},
     'rights': {'id', 'label'},
     'backup': {'paths', 'snapshot', 'settings'},
@@ -257,7 +257,11 @@ class _Checker:
         if not isinstance(starter, bool):
             self.error('web.starter', 'muss true oder false sein.')
             starter = False
-        return {'path': path, 'upstream': upstream, 'protocol': protocol, 'entry': entry, 'starter': starter}
+        settings = t.get('einstellungen')
+        if settings is not None and (not isinstance(settings, str) or not re.fullmatch(r'/[A-Za-z0-9][A-Za-z0-9._-]{0,60}(/[A-Za-z0-9][A-Za-z0-9._-]{0,60}){0,3}', settings)):
+            self.error('web.einstellungen', 'muss ein Pfad unter dem Webpfad sein, z. B. „/settings.php“.')
+            settings = None
+        return {'path': path, 'upstream': upstream, 'protocol': protocol, 'entry': entry, 'starter': starter, 'einstellungen': settings}
 
     def firewall(self, items: list) -> list:
         if len(items) > LIMITS['firewall']:

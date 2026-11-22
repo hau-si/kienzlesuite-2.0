@@ -55,6 +55,8 @@ mit dem Archiv `modules/<id>/…` (`scripts/release-bauen <id>`). Das Programm l
 
 ### `[web]` – optional
 
+`einstellungen` (optional, z. B. `"/settings.php"`): Seite unter dem Webpfad, die Modul-Admins unter „Einstellungen“ in der Seitenleiste der Basis sehen.
+
 Ohne `[web]` erscheint das Modul nicht im Menü (z. B. ein reines Druckmodul).
 
 | Schlüssel | Pflicht | Regel |

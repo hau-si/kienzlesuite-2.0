@@ -73,12 +73,10 @@ try {
     $view = $page->handle('get', [], null);
     check(isset($view['sections']) && !str_contains(json_encode($view), 'k-geheim') && !str_contains(json_encode($view), 'sup-geheim'), 'Geheimnis in der Ansicht');
     $printing = array_values(array_filter($view['sections'], fn($x) => $x['id'] === 'printing'))[0]['fields'];
-    $queue = array_values(array_filter($printing, fn($f) => $f['key'] === 'queue'))[0];
-    check($queue['type'] === 'choice' && isset($queue['choices']['Praxisdrucker'], $queue['choices']['TM-m30III']) && !isset($queue['choices']['SumUp-Rechnung']), 'Drucker der Suite nicht zur Auswahl');
+    check(!array_filter($printing, fn($f) => $f['key'] === 'queue'), 'Druckerwahl gehört in die Basis, nicht in die Kasse');
     problem(fn() => $page->handle('save', ['section' => 'practice', 'values' => ['name' => 'X']], 'falsch'), 'Speichern ohne CSRF-Marke der Suite', 403);
-    $page->handle('save', ['section' => 'office_printing', 'values' => ['enabled' => true, 'queue' => 'Praxisdrucker', 'media' => 'A4', 'duplex' => false]], TEST_CSRF);
-    check(Settings::effective(KienzleSumup\Suite::baseConfig())->get('office_printing', 'queue') === 'Praxisdrucker', 'Praxisdrucker nicht gespeichert');
-    problem(fn() => $page->handle('save', ['section' => 'office_printing', 'values' => ['queue' => 'GibtsNicht']], TEST_CSRF), 'Unbekannter Drucker akzeptiert', 422);
+    $page->handle('save', ['section' => 'office_printing', 'values' => ['enabled' => true, 'media' => 'A4', 'duplex' => false]], TEST_CSRF);
+    check(Settings::effective(KienzleSumup\Suite::baseConfig())->get('office_printing', 'enabled') === true, 'Praxisdrucker nicht gespeichert');
     // T2med live: Adresse und Schlüssel kommen aus der Verbindung der Suite.
     $page->handle('save', ['section' => 'sumup', 'values' => ['mode' => 'live'] + $sumup], TEST_CSRF);
     $page->handle('save', ['section' => 'fhir', 'values' => ['mode' => 'live', 'entry_code' => 'ZAHLUNG']], TEST_CSRF);

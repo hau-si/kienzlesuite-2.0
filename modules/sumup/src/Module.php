@@ -42,9 +42,9 @@ final class Module {
         }
         foreach (['printing' => 'Bondrucker', 'office_printing' => 'Praxisdrucker (A4)'] as $section => $label) {
             if (!$config->get($section, 'enabled', false)) continue;
-            $known = isset(Settings::queues()[(string)$config->get($section, 'queue', '')]);
+            $known = Suite::druckerRollen()[$section === 'printing' ? 'bon' : 'buero'] !== '';
             $items[] = ['title' => $label . ($known ? ' gewählt' : ': Drucker nicht in der Suite eingerichtet'), 'state' => $known ? 'done' : 'error',
-                'hint' => 'Verwaltung → Drucker der Suite, dann hier wählen', 'link' => $link('s-' . $section)];
+                'hint' => 'Verwaltung → Drucker der Suite: unter „Wofür welcher Drucker?“ zuordnen', 'link' => $link('s-' . $section)];
         }
         if ($config->get('mail', 'enabled', false) && !Suite::connected('mail')) {
             $items[] = ['title' => 'E-Mail-Versand: Verbindung fehlt', 'state' => 'error', 'hint' => 'Verwaltung → Verbindungen der Suite', 'link' => $link('s-mail')];
