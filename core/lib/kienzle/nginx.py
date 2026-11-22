@@ -89,12 +89,12 @@ def _module(m: dict) -> list[str]:
 def render(hostnames: list[str], registry: dict) -> str:
     names = server_names(hostnames)
     out = ['# Kienzle-Suite – erzeugt von kienzle-web. Nicht von Hand ändern: Änderungen gehen beim nächsten Erzeugen verloren.',
-           'server_tokens off;', '', 'server {', '    listen 443 ssl default_server;', '    listen [::]:443 ssl default_server;',
+           '', 'server {', '    listen 443 ssl default_server;', '    listen [::]:443 ssl default_server;', '    server_tokens off;',
            '    ssl_reject_handshake on;', f'    ssl_certificate {CA_DIR}/server.crt;', f'    ssl_certificate_key {CA_DIR}/server.key;', '}', '',
            'server {', '    listen 443 ssl;', '    listen [::]:443 ssl;', '    http2 on;', '    server_name ' + ' '.join(names) + ';',
            f'    ssl_certificate {CA_DIR}/server.crt;', f'    ssl_certificate_key {CA_DIR}/server.key;',
            '    ssl_protocols TLSv1.2 TLSv1.3;', '    ssl_prefer_server_ciphers off;', '    ssl_session_tickets off;',
-           '    ssl_session_cache shared:kienzle:10m;', '    ignore_invalid_headers on;', '    underscores_in_headers off;',
+           '    ssl_session_cache shared:kienzle:10m;', '    server_tokens off;', '    ignore_invalid_headers on;', '    underscores_in_headers off;',
            '    client_max_body_size 1m;', '    access_log off;  # keine Adressen mit Vorgangs- oder Patientenbezug protokollieren',
            '    add_header Strict-Transport-Security "max-age=31536000" always;', '',
            '    location @anmelden { return 303 /anmelden?weiter=$uri; }', '',

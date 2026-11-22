@@ -43,6 +43,9 @@ class Vorlage(unittest.TestCase):
         self.assertIn('ssl_reject_handshake on;', self.conf)      # fremde Namen: kein Zertifikat, keine Seite
         self.assertIn('ssl_protocols TLSv1.2 TLSv1.3;', self.conf)
         self.assertIn('access_log off;', self.conf)
+        # Ubuntu 26.04 setzt server_tokens schon in nginx.conf (http-Ebene); hier nur in den server-Blöcken.
+        self.assertFalse(re.search(r'^server_tokens', self.conf, re.M))
+        self.assertEqual(self.conf.count('    server_tokens off;'), 2)
 
     def test_jedes_modul_wird_geprueft(self):
         for mid, path in (('beispiel', '/beispiel'), ('kasse', '/kasse')):
