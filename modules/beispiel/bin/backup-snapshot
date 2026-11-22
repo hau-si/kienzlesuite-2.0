@@ -1,0 +1,3 @@
+#!/bin/sh
+# Beispielmodul: kein Datenbestand, daher nichts zu tun.
+exit 0

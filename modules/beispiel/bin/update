@@ -1,0 +1,3 @@
+#!/bin/sh
+# Beispielmodul: Haken „update“ ohne Wirkung.
+exit 0

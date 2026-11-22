@@ -1,6 +1,6 @@
 # Kienzle-Suite 2.0 – Architektur
 
-Stand: Konzept, noch kein Code. Entscheidungen vom 22.11.2026 eingearbeitet (nginx, Updates, Zertifikat, Drucken, Backup-Ziele). Übersicht als Whiteboard:
+Stand: Konzept; Umsetzung läuft nach `docs/PLAN.md`. Entscheidungen vom 22.11.2026 eingearbeitet (nginx, Updates, Zertifikat, Drucken, Backup-Ziele). Übersicht als Whiteboard:
 https://claude.ai/artifact/EGTAPzMGVFBYbxCBUzGjsh (nur mit Freigabe sichtbar)
 
 ## Ziel
@@ -83,10 +83,8 @@ data = "/var/lib/kienzle/sumup"   # eigener Datenordner, 0700
 path = "/kasse"
 upstream = "unix:/run/kienzle/sumup.sock"
 
-[[firewall]]
-name = "SumUp-Rechnungsdrucker (IPP)"
-port = 631
-proto = "tcp"
+# [[firewall]]: Ports, die das Modul selbst anbietet (Beispiel Kienzlefon: port = 8766, proto = "tcp").
+# Die Drucker unten erreichen die Arbeitsplätze über Samba/CUPS der Basis, ohne eigenen Eintrag.
 
 [[rights]]
 id = "paid"

@@ -1,0 +1,3 @@
+#!/bin/sh
+# Beispielmodul: Haken „remove“ ohne Wirkung.
+exit 0

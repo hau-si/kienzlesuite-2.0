@@ -1,0 +1,5 @@
+#!/bin/sh
+# Beispielmodul: Einrichtungs-Überblick (Format: docs/MODULE-TOML.md).
+cat <<'JSON'
+{"items": [{"title": "Beispiel eingerichtet", "state": "done", "hint": "Nichts zu tun.", "link": "/beispiel"}]}
+JSON

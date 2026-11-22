@@ -4,7 +4,8 @@ Praxis-Appliance für Hausarztpraxen mit T2med: **eine Basis**, einmal auf einer
 einzeln dazukommen – Kartenzahlung (SumUp), Terminzettel, Fax, Telefon, Kienzlezeit. Verwaltung komplett im
 Webinterface; Firewall, Benutzer, Admin-Zugang mit OTP, Updates und verschlüsselte Sicherung gibt es nur einmal, in der Basis.
 
-Stand: **Konzept**, noch kein Code.
+Stand: **Basis 0.1.0**, Meilenstein 1 von 8 ([docs/PLAN.md](docs/PLAN.md)): Format der Modul-Beschreibung
+([docs/MODULE-TOML.md](docs/MODULE-TOML.md)) und Prüfprogramm. Noch nicht installierbar.
 
 ![Basis und Module](docs/architektur-whiteboard.png)
 

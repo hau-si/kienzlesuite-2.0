@@ -1,0 +1,59 @@
+# Beispielmodul ohne Funktion: zeigt alle Felder von module.toml und dient den Tests der Basis.
+# Wird nie auf einem Praxisserver installiert.
+
+[module]
+id = "beispiel"
+name = "Beispielmodul"
+version = "0.1.0"
+core_api = "1"
+description = "Zeigt alle Felder der Modul-Beschreibung; nur für Tests."
+
+[system]
+packages = ["sqlite3"]
+services = ["kienzle-beispiel-worker.service"]
+user = "ks-beispiel"
+data = "/var/lib/kienzle/beispiel"
+
+[web]
+path = "/beispiel"
+upstream = "unix:/run/kienzle/beispiel.sock"
+
+[[firewall]]
+name = "Beispiel-Schnittstelle für Geräte im Praxisnetz"
+port = 8766
+proto = "tcp"
+
+[[firewall]]
+name = "Beispiel-Bereich für Sprachdaten"
+port = "10000-10010"
+proto = "udp"
+
+[[rights]]
+id = "ansehen"
+label = "Beispiel-Liste ansehen"
+
+[[rights]]
+id = "bearbeiten"
+label = "Beispiel-Einträge bearbeiten"
+
+[backup]
+paths = ["/var/lib/kienzle/beispiel"]
+snapshot = "bin/backup-snapshot"
+
+[[printers]]
+name = "Beispiel-Drucker"
+label = "Virtueller Drucker des Beispielmoduls"
+ppd = "printer/beispiel.ppd"
+backend = "printer/kienzle-beispiel-backend"
+share = ["samba", "ipp"]
+
+[setup]
+overview = "bin/setup-overview"
+
+[hooks]
+install = "bin/install"
+update = "bin/update"
+remove = "bin/remove"
+busy = "bin/busy"
+health = "bin/health"
+apparmor = ["gs"]

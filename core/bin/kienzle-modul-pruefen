@@ -1,0 +1,49 @@
+#!/usr/bin/python3 -IB
+"""Modul-Beschreibung (module.toml) prüfen.
+
+  kienzle-modul-pruefen [--json] ORDNER          einen Modulordner prüfen
+  kienzle-modul-pruefen [--json] --alle ORDNER    alle Module in ORDNER prüfen, dazu Konflikte zwischen ihnen
+
+Rückgabe: 0 = gültig, 1 = ungültig, 2 = falscher Aufruf.
+Mit --json wird die geprüfte, vereinheitlichte Beschreibung ausgegeben (bei --alle das Modulverzeichnis).
+"""
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'lib'))
+from kienzle import manifest  # noqa: E402
+
+
+def main(argv: list[str]) -> int:
+    args = [a for a in argv if a != '--json']
+    as_json = len(args) != len(argv)
+    every = '--alle' in args
+    args = [a for a in args if a != '--alle']
+    if len(args) != 1 or args[0].startswith('-'):
+        print(__doc__.strip(), file=sys.stderr)
+        return 2
+    folder = Path(args[0])
+    if not folder.is_dir():
+        print(f'Ordner nicht gefunden: {manifest.shown(folder, 200)}', file=sys.stderr)
+        return 2
+    try:
+        result = manifest.check_all(folder) if every else manifest.check_folder(folder)
+    except manifest.Invalid as e:
+        print('Ungültig:', file=sys.stderr)
+        for line in e.errors:
+            print('  - ' + line, file=sys.stderr)
+        return 1
+    if as_json:
+        json.dump(result, sys.stdout, ensure_ascii=False, indent=2, sort_keys=True)
+        print()
+    elif every:
+        names = ', '.join(f'{m["module"]["id"]} {m["module"]["version"]}' for m in result['modules'])
+        print(f'Gültig: {len(result["modules"])} Module ({names or "keine"}).')
+    else:
+        print(f'Gültig: {result["module"]["id"]} {result["module"]["version"]}.')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

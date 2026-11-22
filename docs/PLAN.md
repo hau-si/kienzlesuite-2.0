@@ -45,7 +45,7 @@ Der Installer (M7) wächst ab M2 mit, damit jeder Stand auf der VM installierbar
 
 ---
 
-## M1 – Gerüst `core/`, `module.toml`-Format und Prüfprogramm
+## M1 – Gerüst `core/`, `module.toml`-Format und Prüfprogramm ✅
 
 **Ziel:** Das Format der Modul-Beschreibung ist festgelegt und wird maschinell geprüft. Alle weiteren Meilensteine bauen darauf auf.
 
@@ -80,8 +80,10 @@ Der Installer (M7) wächst ab M2 mit, damit jeder Stand auf der VM installierbar
 **Übernahme aus der Beta:** keine Programmzeilen. Beispiel und Felder kommen aus `ARCHITEKTUR.md`.
 Die Musterprüfungen (Portbereiche, Namen) folgen `scripts/firewall-apply.py` (`clean_custom`, `clean_services`).
 
-**Tests:** `tests/core/test_manifest.py` mit einer gültigen Beispieldatei und je Regel mindestens einer
-ungültigen Datei (`tests/fixtures/manifest/`), dazu Konflikte zwischen zwei Modulen.
+**Tests:** `tests/core/test_manifest.py` geht vom gültigen Beispielmodul aus und verändert je Regel genau eine Stelle
+(statt vieler einzelner Testdateien), dazu Dateiprüfungen im Modulordner und Konflikte zwischen zwei Modulen.
+
+**Stand:** erledigt mit Basis 0.1.0 (22.11.2026).
 
 ---
 

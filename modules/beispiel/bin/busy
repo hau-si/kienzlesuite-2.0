@@ -1,0 +1,3 @@
+#!/bin/sh
+# Beispielmodul: nie beschäftigt (Rückgabe 0 = frei, 75 = beschäftigt).
+exit 0
