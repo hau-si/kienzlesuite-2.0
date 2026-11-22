@@ -309,7 +309,7 @@ def healthy(version: str) -> bool:
             ok = r.returncode == 0 and f'"version":"{version}"' in r.stdout.replace(' ', '')
         else:
             host = json.loads((SETTINGS / 'core.json').read_text(encoding='utf-8'))['hostnames'][0]
-            r = subprocess.run(['curl', '-fsS', '--noproxy', '*', '--max-time', '5', '--cacert', '/etc/kienzle/ca/ca.crt', '--resolve', f'{host}:443:127.0.0.1',
+            r = subprocess.run(['curl', '-fsS', '--noproxy', '*', '--max-time', '5', '--cacert', '/etc/kienzle/ca/ca.crt', '--connect-to', f'{host}:443:127.0.0.1:443',
                                 f'https://{host}/_health'], capture_output=True, text=True, timeout=30)
             ok = r.returncode == 0 and f'"version":"{version}"' in r.stdout.replace(' ', '')
         if ok:

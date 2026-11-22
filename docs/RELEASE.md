@@ -1,5 +1,14 @@
 # Basis – Release-Notizen
 
+## 0.12.2
+
+- **Aufruf über die IP-Adresse ging nicht** (gefunden bei der ersten Installation auf der Test-VM): Browser schicken bei
+  IP-Adressen kein SNI, und `ssl_reject_handshake` im Standard-Server brach die Verbindung ab. Der Standard-Server
+  antwortet jetzt mit 421 auf unbekannte Namen; nginx wählt den Server über die Kopfzeile Host.
+- Prüfung nach Installation und Update mit `curl --connect-to` statt `--resolve` (ging bei einer IP als erstem Namen nicht
+  über 127.0.0.1, `/_health` lehnte dann ab).
+- Ende-zu-Ende-Prüfung: Aufruf über eine IP ohne SNI, fremder Name mit 421.
+
 ## 0.12.1
 
 - **Zertifizierungsstelle erlaubt interne Namensräume:** Neben den Namen bei der Installation auch `*.internal`, `*.local`,

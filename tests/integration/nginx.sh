@@ -173,12 +173,15 @@ sicher '{"action":"blatt-gedruckt"}'
 echo '== Servername ändern (Verwaltung → Server)'
 [ -f /etc/systemd/system/kienzle-servername.path ] || fail 'kienzle-servername.path fehlt'
 c -b "$T/dora" -H "Origin: https://$host" "https://$host/verwaltung/server" | grep -q 'Namen und Adressen' || fail 'Seite Server'
-runuser -u ks-core -- sh -c "umask 077; printf '%s' '{\"namen\":[\"$host\",\"kienzle.praxis.internal\"],\"praxis\":\"Praxis Test\"}' > /var/lib/kienzle/core/anfragen/servername.json"
+runuser -u ks-core -- sh -c "umask 077; printf '%s' '{\"namen\":[\"$host\",\"kienzle.praxis.internal\",\"10.11.12.13\"],\"praxis\":\"Praxis Test\"}' > /var/lib/kienzle/core/anfragen/servername.json"
 KIENZLE_NGINX_RELOAD='nginx -s reload' /opt/kienzle/core/current/bin/kienzle-servername anwenden
 python3 -c 'import json,sys; s=json.load(open("/var/lib/kienzle/servername/status.json"))["letzte"]; print(s["meldung"]); sys.exit(0 if s["ok"] else 1)' || fail 'Servername nicht übernommen'
 openssl x509 -in /etc/kienzle/ca/server.crt -noout -ext subjectAltName | grep -q 'DNS:kienzle.praxis.internal' || fail 'Zertifikat ohne neuen Namen'
 sleep 1
 curl -fsS --noproxy '*' --max-time 10 --cacert /etc/kienzle/ca/ca.crt --resolve "kienzle.praxis.internal:443:127.0.0.1" -o /dev/null https://kienzle.praxis.internal/anmelden || fail 'neuer Name nicht erreichbar'
+# Aufruf über die IP: Browser schicken dabei kein SNI – muss trotzdem gehen.
+curl -fsS --noproxy '*' --max-time 10 --cacert /etc/kienzle/ca/ca.crt --connect-to "10.11.12.13:443:127.0.0.1:443" -o /dev/null https://10.11.12.13/anmelden || fail 'Aufruf über die IP (ohne SNI) geht nicht'
+[ "$(curl -s -o /dev/null -w '%{http_code}' --noproxy '*' --max-time 10 -k --resolve "fremd.example.net:443:127.0.0.1" https://fremd.example.net/)" = 421 ] || fail 'fremder Name nicht mit 421 abgewiesen'
 if /opt/kienzle/core/current/bin/kienzle-servername setzen bank.example.net 2>/dev/null; then fail 'Name außerhalb der Zertifizierungsstelle angenommen'; fi
 KIENZLE_NGINX_RELOAD='nginx -s reload' /opt/kienzle/core/current/bin/kienzle-servername setzen "$host" || fail 'Servername zurücksetzen'
 sleep 1

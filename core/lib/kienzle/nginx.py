@@ -90,7 +90,9 @@ def render(hostnames: list[str], registry: dict) -> str:
     names = server_names(hostnames)
     out = ['# Kienzle-Suite – erzeugt von kienzle-web. Nicht von Hand ändern: Änderungen gehen beim nächsten Erzeugen verloren.',
            '', 'server {', '    listen 443 ssl default_server;', '    listen [::]:443 ssl default_server;', '    server_tokens off;',
-           '    ssl_reject_handshake on;', f'    ssl_certificate {CA_DIR}/server.crt;', f'    ssl_certificate_key {CA_DIR}/server.key;', '}', '',
+           f'    ssl_certificate {CA_DIR}/server.crt;', f'    ssl_certificate_key {CA_DIR}/server.key;',
+           '    # Unbekannte Namen: keine Seite. Den Handshake nicht abweisen – ohne SNI (Aufruf über die IP) bräche sonst jede',
+           '    # Verbindung ab; nginx wählt den Server danach über die Kopfzeile Host.', '    return 421;', '}', '',
            'server {', '    listen 443 ssl;', '    listen [::]:443 ssl;', '    http2 on;', '    server_name ' + ' '.join(names) + ';',
            f'    ssl_certificate {CA_DIR}/server.crt;', f'    ssl_certificate_key {CA_DIR}/server.key;',
            '    ssl_protocols TLSv1.2 TLSv1.3;', '    ssl_prefer_server_ciphers off;', '    ssl_session_tickets off;',

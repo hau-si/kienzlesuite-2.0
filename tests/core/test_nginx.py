@@ -40,7 +40,8 @@ class Vorlage(unittest.TestCase):
     def test_nur_443_und_eigene_namen(self):
         self.assertNotIn('listen 80', self.conf)
         self.assertIn('server_name kienzle.example.org 192.0.2.5;', self.conf)
-        self.assertIn('ssl_reject_handshake on;', self.conf)      # fremde Namen: kein Zertifikat, keine Seite
+        self.assertNotIn('ssl_reject_handshake', self.conf)       # sonst ginge der Aufruf über die IP (ohne SNI) nicht
+        self.assertIn('    return 421;\n}', self.conf)              # fremde Namen: keine Seite
         self.assertIn('ssl_protocols TLSv1.2 TLSv1.3;', self.conf)
         self.assertIn('access_log off;', self.conf)
         # Ubuntu 26.04 setzt server_tokens schon in nginx.conf (http-Ebene); hier nur in den server-Blöcken.

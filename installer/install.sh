@@ -288,7 +288,7 @@ if [ -z "$nosystemd" ]; then
   # Erreichbarkeit prüfen: über den ersten Namen mit Prüfung gegen die eigene CA.
   ok=''
   for _ in $(seq 1 20); do
-    if curl -fsS --noproxy '*' --max-time 5 --cacert /etc/kienzle/ca/ca.crt --resolve "${names[0]}:443:127.0.0.1" "https://${names[0]}/_health" >/dev/null 2>&1; then ok=1; break; fi
+    if curl -fsS --noproxy '*' --max-time 5 --cacert /etc/kienzle/ca/ca.crt --connect-to "${names[0]}:443:127.0.0.1:443" "https://${names[0]}/_health" >/dev/null 2>&1; then ok=1; break; fi
     sleep 1
   done
   [ -n "$ok" ] || { echo 'Die Basis antwortet nicht. Details: journalctl -u kienzle-core-php -u nginx'; exit 1; }
