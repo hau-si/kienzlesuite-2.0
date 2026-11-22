@@ -125,7 +125,10 @@ try {
 if (is_executable('/usr/bin/qpdf')) {
     $plain = "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]>>endobj\ntrailer<</Root 1 0 R/Size 4>>\n%%EOF\n";
     $in = tempnam(sys_get_temp_dir(), 'lx'); $out = $in . '.enc'; file_put_contents($in, $plain);
-    exec('qpdf --encrypt "" owner 256 --print=none -- ' . escapeshellarg($in) . ' ' . escapeshellarg($out) . ' 2>/dev/null');
+    // Neuere qpdf-Versionen kennen nur die benannte Form; ältere nur die kurze. Ohne verschlüsselte Datei: Test überspringen.
+    exec('qpdf --encrypt --user-password= --owner-password=owner --bits=256 --print=none -- ' . escapeshellarg($in) . ' ' . escapeshellarg($out) . ' 2>/dev/null');
+    if (!str_contains((string)@file_get_contents($out), '/Encrypt')) exec('qpdf --encrypt "" owner 256 --print=none -- ' . escapeshellarg($in) . ' ' . escapeshellarg($out) . ' 2>/dev/null');
+    if (!str_contains((string)@file_get_contents($out), '/Encrypt')) { echo "Verschlüsselungstest übersprungen (qpdf verschlüsselt nicht).\n"; @unlink($in); @unlink($out); return; }
     $method = new ReflectionMethod(KienzleSumup\Letterxpress::class, 'unprotected');
     $result = $method->invoke(null, (string)file_get_contents($out));
     check(str_starts_with($result, '%PDF-') && !str_contains($result, '/Encrypt'), 'Verschlüsselung des PDFs nicht entfernt');

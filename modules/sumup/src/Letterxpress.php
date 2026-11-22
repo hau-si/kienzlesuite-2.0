@@ -30,10 +30,12 @@ final class Letterxpress {
         try {
             chmod($file, 0600);
             if (file_put_contents($file, $pdf) !== strlen($pdf)) return $pdf;
-            $result = Command::run([$binary, '--decrypt', '--warning-exit-0', $file, '-'], '', 30);
-            return $result['code'] === 0 && str_starts_with($result['output'], '%PDF-') ? $result['output'] : $pdf;
+            // In eine Datei statt nach stdout (verhält sich bei allen qpdf-Versionen gleich); 3 = nur Warnungen.
+            $result = Command::run([$binary, '--decrypt', '--warning-exit-0', $file, $file . '.pdf'], '', 30);
+            $out = in_array($result['code'], [0, 3], true) ? (string)@file_get_contents($file . '.pdf') : '';
+            return str_starts_with($out, '%PDF-') ? $out : $pdf;
         } catch (\Throwable) { return $pdf; }
-        finally { @unlink($file); }
+        finally { @unlink($file); @unlink($file . '.pdf'); }
     }
 
     private function reason(array $response): string {

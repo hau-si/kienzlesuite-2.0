@@ -6,6 +6,7 @@
 - Rechnungseingang: Fehler der Textauswertung werden als solche gemeldet statt als „Bezeichnung fehlt“.
 - Rechnungseingang mit PCRE2 10.46 (Ubuntu 26.04, PHP 8.5): Beschriftungen wie „Rechnungsdatum:“ werden einzeln gesucht;
   in einer gemeinsamen Alternation fand 10.46 die Werte hinter der zweiten Beschriftung nicht.
+- Letterxpress: Entschlüsseln mit qpdf schreibt in eine Datei statt nach stdout (gleiches Verhalten bei allen qpdf-Versionen).
 
 ## 2.0.0
 

@@ -256,7 +256,7 @@ for _ in $(seq 1 50); do [ -S /run/kienzle/sumup/web.sock ] && break; sleep 0.2;
 nginx -s reload; sleep 1
 lkey=$(python3 -c 'import json; print(json.load(open("/var/lib/kienzle/sumup/grundwerte.json"))["launcher_key"])')
 r=$(c -H "Authorization: Bearer $lkey" -H 'Content-Type: application/json' -d '{"action":"launch","context_id":"demo","fhir_base_url":"","oauth_token":""}' "https://$host/api.php")
-grep -q "\"url\":\"https://$host/#launch=" <<< "$r" || fail "Starter über /api.php: $r"
+python3 -c 'import json,sys; u=json.loads(sys.argv[1])["url"]; sys.exit(0 if u.startswith("https://"+sys.argv[2]+"/#launch=") else 1)' "$r" "$host" || fail "Starter über /api.php: $r"
 [ "$(c -o /dev/null -w '%{http_code}' -H 'Authorization: Bearer falsch' -H 'Content-Type: application/json' -d '{}' "https://$host/api.php")" = 401 ] || fail 'Starter mit falschem Schlüssel'
 [ "$(code "https://$host/kasse/")" = "303 https://$host/anmelden?weiter=/kasse/" ] || fail 'Kasse ohne Anmeldung'
 [ "$(c -b "$T/bert" -o /dev/null -w '%{http_code}' "https://$host/kasse/")" = 403 ] || fail 'Kasse ohne Recht erreichbar'
@@ -270,7 +270,7 @@ grep -q 'data-base="/kasse/"' <<< "$page" || fail "Kasse-Seite: $(head -c 400 <<
 [ "$(code -b "$T/bert" "https://$host/kasse/assets/app.js")" = '200 ' ] || fail 'Dateien der Kasse'
 kcsrf=$(sed -n 's/.*name="kienzle-csrf" content="\([0-9a-f]*\)".*/\1/p' <<< "$page")
 r=$(c -b "$T/bert" -H "Origin: https://$host" -H "X-Kienzle-Csrf: $kcsrf" -H 'Content-Type: application/json' -d '{"action":"demo"}' "https://$host/kasse/api.php")
-grep -q "\"url\":\"https://$host/kasse/#launch=" <<< "$r" || fail "Testpatient in der Kasse: $r"
+python3 -c 'import json,sys; u=json.loads(sys.argv[1])["url"]; sys.exit(0 if u.startswith("https://"+sys.argv[2]+"/kasse/#launch=") else 1)' "$r" "$host" || fail "Testpatient in der Kasse: $r"
 [ "$(c -b "$T/bert" -o /dev/null -w '%{http_code}' "https://$host/kasse/settings.php")" = 403 ] || fail 'Einstellungen ohne Recht'
 lpstat -v SumUp-Rechnung 2>/dev/null | grep -q 'ipp://localhost:471' || echo 'Hinweis: Drucker „SumUp-Rechnung“ im Container nicht angelegt.'
 c -b "$T/dora" "https://$host/verwaltung/module" | grep -q 'Kasse <span class="tag">2.0.' || fail 'Seite Module'
