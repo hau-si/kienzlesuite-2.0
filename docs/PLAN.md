@@ -118,7 +118,7 @@ Die Musterprüfungen (Portbereiche, Namen) folgen `scripts/firewall-apply.py` (`
   Module prüfen die Rechte noch einmal; dafür gibt es eine kleine PHP-Hilfsdatei.
 - nginx-Vorlage und php-fpm-Pool `ks-core`, systemd-Einheiten gehärtet (`NoNewPrivileges`, `ProtectSystem=strict`, …).
 - **Lokale Zertifizierungsstelle (E9).** Sie gehört schon in M2, damit HTTPS von Anfang an mit dem endgültigen Zertifikat läuft.
-  - Der Installer erzeugt auf dem Server eine Stamm-CA „Kienzle-Suite <Praxisname>“ (ECDSA P-256, 10 Jahre).
+  - Der Installer erzeugt auf dem Server eine Stamm-CA „Kienzle-Suite <Praxisname>“ (ECDSA P-256, 30 Jahre).
     Ihr privater Schlüssel liegt nur für root lesbar unter `/etc/kienzle/ca/` und wird nur zum Ausstellen benutzt.
   - Die CA trägt eine **Namensbeschränkung** (`nameConstraints`) auf die Namen und Adressen der Praxis
     (Servername, `*.praxis.internal` o. Ä., die privaten Netze aus der Firewall). Selbst mit gestohlenem CA-Schlüssel

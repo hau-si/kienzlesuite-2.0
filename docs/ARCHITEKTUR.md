@@ -150,7 +150,7 @@ Basis zentral. Ein Zugang, den nur ein Modul nutzt, bleibt im Modul.**
   reicht Benutzer und Rechte als Kopfzeilen `X-Kienzle-*` an das Modul (Unix-Socket) weiter. Gleichnamige Kopfzeilen
   von außen verwirft nginx immer.
 - **Lokale Zertifizierungsstelle** ohne externe Stelle:
-  - Der Installer erzeugt auf dem Server eine Stamm-CA (ECDSA P-256, 10 Jahre). Ihr Schlüssel liegt nur für root lesbar.
+  - Der Installer erzeugt auf dem Server eine Stamm-CA (ECDSA P-256, 30 Jahre). Ihr Schlüssel liegt nur für root lesbar.
   - Die CA hat eine **Namensbeschränkung** auf die Namen und privaten Netze der Praxis; selbst mit gestohlenem Schlüssel
     lassen sich keine Zertifikate für fremde Seiten ausstellen.
   - Das Server-Zertifikat gilt höchstens 825 Tage (Vorgabe von macOS/iOS) und wird automatisch erneuert.

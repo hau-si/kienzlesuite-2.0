@@ -1,6 +1,6 @@
 """Lokale Zertifizierungsstelle der Praxis (root-Werkzeug, Aufruf über core/bin/kienzle-zertifikat).
 
-- Stamm-CA: ECDSA P-256, 10 Jahre, nur zum Ausstellen von Server-Zertifikaten (pathlen 0).
+- Stamm-CA: ECDSA P-256, 30 Jahre, nur zum Ausstellen von Server-Zertifikaten (pathlen 0).
 - Namensbeschränkung (nameConstraints, kritisch): nur die Servernamen der Praxis und private IP-Bereiche. Selbst mit
   gestohlenem CA-Schlüssel lassen sich damit keine gültigen Zertifikate für fremde Seiten (z. B. Banken) ausstellen.
 - Server-Zertifikat: ECDSA P-256, höchstens 825 Tage (Vorgabe von macOS/iOS), wird 60 Tage vor Ablauf erneuert.
@@ -19,7 +19,7 @@ import tempfile
 from pathlib import Path
 
 OPENSSL = os.environ.get('KIENZLE_OPENSSL', '/usr/bin/openssl')
-CA_DAYS = 3650
+CA_DAYS = 10958                 # 30 Jahre (Wunsch der Praxis: Arbeitsplätze nur einmal einrichten)
 SERVER_DAYS = 825
 RENEW_DAYS = 60
 PRIVATE_V4 = ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '100.64.0.0/10')

@@ -55,7 +55,7 @@ class Zertifizierungsstelle(unittest.TestCase):
         now = dt.datetime.now(dt.timezone.utc)
         self.assertLessEqual(self.ca.expires() - now, dt.timedelta(days=825))
         self.assertGreater(self.ca.expires() - now, dt.timedelta(days=824))
-        self.assertGreater(self.ca.expires(self.ca.ca_crt) - now, dt.timedelta(days=3649))
+        self.assertGreater(self.ca.expires(self.ca.ca_crt) - now, dt.timedelta(days=30 * 365))
 
     def test_rechte_der_dateien(self):
         self.ready()

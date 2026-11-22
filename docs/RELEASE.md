@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.2.4
+
+- Stamm-CA 30 Jahre gültig statt 10 (Wunsch der Praxis: Arbeitsplätze nur einmal einrichten). Das Server-Zertifikat
+  bleibt bei höchstens 825 Tagen (Vorgabe von macOS/iOS) und wird automatisch erneuert.
+- Ende-zu-Ende-Prüfung: Kopfzeilen ohne `\r` vergleichen.
+
 ## 0.2.3
 
 - php-fpm der Basis protokolliert ins Systemprotokoll (`journalctl -t kienzle-core-php`) statt nach `/proc/self/fd/2`, das sich als `ks-core` nicht öffnen lässt (gefunden in der Ende-zu-Ende-Prüfung).

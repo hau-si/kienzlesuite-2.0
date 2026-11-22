@@ -28,9 +28,10 @@ c "https://$host/_health" | grep -q '"status":"ok"' || fail 'Gesundheitsprüfung
 c "https://$host/anmelden" | grep -q '<h1>Anmelden</h1>' || fail 'Anmeldeseite'
 if curl -sS --noproxy '*' --max-time 5 -k --resolve "evil.example:443:127.0.0.1" https://evil.example/ >/dev/null 2>&1; then fail 'fremder Servername bekommt eine Seite'; fi
 [ "$(code "https://$host/_auth/beispiel")" = '404 ' ] || fail '/_auth von außen erreichbar'
-c -I "https://$host/anmelden" | grep -qi '^content-security-policy:' || fail 'CSP fehlt'
-c -I "https://$host/anmelden" | grep -qi '^strict-transport-security:' || fail 'HSTS fehlt'
-c -I "https://$host/anmelden" | grep -qi '^server: nginx$' || fail 'Serverversion wird verraten'
+heads=$(c -I "https://$host/anmelden" | tr -d '\r')   # Kopfzeilen enden auf \r\n
+grep -qi '^content-security-policy:' <<< "$heads" || fail 'CSP fehlt'
+grep -qi '^strict-transport-security:' <<< "$heads" || fail 'HSTS fehlt'
+grep -qi '^server: nginx$' <<< "$heads" || fail "Serverversion wird verraten: $(grep -i '^server:' <<< "$heads")"
 [ "$(c -o /dev/null -w '%{http_code}' "https://$host/ca.crt")" = 200 ] || fail 'ca.crt nicht abrufbar'
 [ "$(code "https://$host/assets/core.js")" = '200 ' ] || fail 'assets fehlen'
 
