@@ -176,7 +176,8 @@ drucker '{"action":"anlegen","art":"bon","name":"Bon-Test","adresse":"socket://1
 lpstat -v Bon-Test | grep -q 'socket://192.0.2.50:9100' || fail 'Warteschlange fehlt in CUPS'
 testparm -s --suppress-prompt 2>/dev/null | grep -q '^\[Bon-Test\]' || fail 'Samba-Freigabe fehlt'
 install -d -m 0755 /opt/kienzle/beispiel && ln -sfn "$repo/modules/beispiel" /opt/kienzle/beispiel/current
-/opt/kienzle/core/current/bin/kienzle-drucker abgleichen || fail 'Abgleich der virtuellen Drucker'
+# Der zweite Lauf des Installers hat das Modulverzeichnis geleert; kienzle-web schreiben gleicht die Drucker mit ab.
+KIENZLE_NGINX_RELOAD='' /opt/kienzle/core/current/bin/kienzle-web schreiben "$repo/modules" || fail 'kienzle-web mit Modul'
 lpstat -v Beispiel-Drucker | grep -q 'kienzle-beispiel-beispiel-drucker:/Beispiel-Drucker' || fail 'virtueller Drucker fehlt'
 [ "$(stat -c '%a %U' /usr/lib/cups/backend/kienzle-beispiel-beispiel-drucker)" = '755 root' ] || fail 'Backend falsch geschützt'
 runuser -u ks-beispiel -- php -r 'require "/opt/kienzle/core/current/php/modul/Kienzle.php"; $k = new KienzleModul("beispiel", ["X" => "1"]);
@@ -185,8 +186,7 @@ c -b "$T/dora" "https://$host/verwaltung/drucker" | grep -q 'Bon-Test' || fail '
 drucker '{"action":"entfernen","name":"Bon-Test"}'
 if lpstat -v Bon-Test >/dev/null 2>&1; then fail 'Warteschlange nicht entfernt'; fi
 rm /opt/kienzle/beispiel/current
-python3 -c 'import json; p="/var/lib/kienzle/core/modules.json"; d=json.load(open(p)); d["modules"]=[]; json.dump(d, open(p,"w"))'
-/opt/kienzle/core/current/bin/kienzle-drucker abgleichen || fail 'Abgleich nach Entfernen'
+KIENZLE_NGINX_RELOAD='' /opt/kienzle/core/current/bin/kienzle-web schreiben || fail 'kienzle-web ohne Modul'
 if lpstat -v Beispiel-Drucker >/dev/null 2>&1; then fail 'virtueller Drucker nach Entfernen des Moduls noch da'; fi
 [ ! -e /usr/lib/cups/backend/kienzle-beispiel-beispiel-drucker ] || fail 'Backend nach Entfernen noch da'
 
