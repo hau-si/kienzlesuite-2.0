@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.2.3
+
+- php-fpm der Basis protokolliert ins Systemprotokoll (`journalctl -t kienzle-core-php`) statt nach `/proc/self/fd/2`, das sich als `ks-core` nicht öffnen lässt (gefunden in der Ende-zu-Ende-Prüfung).
+
 ## 0.2.2
 
 - nginx: `server_tokens off` nur noch in den `server`-Blöcken. Ubuntu 26.04 setzt es schon in `nginx.conf`; doppelt lehnt nginx die Konfiguration ab (gefunden in der Ende-zu-Ende-Prüfung).

@@ -22,5 +22,5 @@ try {
     http_response_code(500);
     header('Content-Type: text/plain; charset=utf-8');
     header('Cache-Control: no-store');
-    echo "Interner Fehler der Kienzle-Suite. Details im Systemprotokoll (journalctl -u kienzle-core-php).\n";
+    echo "Interner Fehler der Kienzle-Suite. Details im Systemprotokoll (journalctl -t kienzle-core-php).\n";
 }
