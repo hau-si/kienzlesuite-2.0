@@ -214,7 +214,9 @@ Grundsatz: **so wenig Daten wie möglich, so wenig Rechte wie möglich, nichts a
   Zurücksetzen nur lokal an der Server-Konsole (root).
 - Mitarbeiter mit eigenen Konten und Rechten je Modul, ohne Zugriff auf Schlüssel und Einstellungen.
 - **Eine Anmeldung (SSO) für alle Module:** Module haben keine eigene Anmeldung; Schnittstelle in `docs/MODUL-SCHNITTSTELLE.md`.
-  Für Dienste mit eigener Anmeldung ist die Basis als OpenID-Connect-Anbieter vorgeschlagen.
+  Dienste mit eigener Anmeldung (Telefonanlage, NAS, …) melden über die Basis als **OpenID-Connect-Anbieter** an
+  (seit Basis 0.11.0, Verwaltung → Dienste): Code-Ablauf mit PKCE, ID-Token ES256, nur eingetragene Dienste und
+  Weiterleitungsadressen, Zugang je Dienst auf Admins oder auf Benutzer eines Moduls beschränkbar.
 - Admin-Rechte je Modul: wer die Kasse verwaltet, sieht nicht automatisch Arbeitszeiten und umgekehrt.
 - Kienzlezeit kennt den passwortlosen Mitarbeiter-Login per RFID-Karte am Terminal. Dieser bleibt auf
   Kienzlezeit beschränkt und gibt keinen Zugang zu anderen Modulen.

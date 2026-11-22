@@ -496,6 +496,18 @@ Danach ist die Basis bereit für das SumUp- und das Terminzettel-Modul (Schritt 
 
 ---
 
+## M9 – Basis als OpenID-Connect-Anbieter ✅
+
+**Ziel:** Dienste mit eigener Anmeldung (z. B. Oberfläche der Telefonanlage, NAS, Router) nutzen dieselbe Anmeldung
+wie die Module (entschieden am 22.11.2026). **Stand:** umgesetzt in Basis 0.11.0.
+
+- Endpunkte: `/.well-known/openid-configuration`, `/oidc/authorize`, `/oidc/token`, `/oidc/userinfo`, `/oidc/jwks`, `/oidc/abmelden`.
+- Authorization Code mit PKCE S256 (Pflicht für öffentliche Dienste), ID-Token ES256 (Schlüssel verschlüsselt in der Datenbank),
+  Code 60 s und einmal, Zugangsmarke 1 h, Claims `sub`, `preferred_username`, `name`, `groups` (`kienzle-admin`, `modul:<id>`, `modul:<id>:admin`).
+- Verwaltung → Dienste: Dienst anlegen (Weiterleitungen genau, https), Geheimnis nur einmal sichtbar, neues Geheimnis, entfernen;
+  Zugang „alle“, „nur Admins“ oder „mit Zugang zu Modul X“.
+- Nicht enthalten: Refresh-Token, Einwilligungsseite (nur vom Admin eingetragene Dienste), dynamische Registrierung, CORS für Browser-Apps.
+
 ## Vorgaben für Schritt 2 (aus den Antworten vom 22.11.2026)
 
 - SumUp: Der Unterordner der Rechnungsablage (mit `{jahr}`/`{monat}`) wird eine Einstellung des Moduls; der Basisordner gehört zum Ziel.
@@ -510,4 +522,4 @@ Danach ist die Basis bereit für das SumUp- und das Terminzettel-Modul (Schritt 
 | Einrichtungs-Überblick | Basis: Ende M7; je Modul über `[setup] overview` (E11) |
 | CUPS und Samba | Installation in M7, Verwaltung in M8 (E10) |
 | Ausgehende Freigabeliste der Firewall | nach Schritt 2 |
-| SSO für Dienste mit eigener Anmeldung (OpenID Connect, Basis als Anbieter) | Vorschlag M9, noch abzustimmen |
+| SSO für Dienste mit eigener Anmeldung (OpenID Connect, Basis als Anbieter) | M9 ✅ (Basis 0.11.0) |

@@ -1,4 +1,4 @@
--- Datenbank der Basis (core.sqlite), Version 1. Keine Patientendaten.
+-- Datenbank der Basis (core.sqlite), Version 2. Keine Patientendaten.
 
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL
@@ -83,5 +83,40 @@ CREATE TABLE IF NOT EXISTS passkey_challenges (
     challenge_hash TEXT PRIMARY KEY,
     purpose TEXT NOT NULL,
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    expires_at INTEGER NOT NULL
+);
+
+-- Version 2: Basis als OpenID-Connect-Anbieter (M9) für Dienste mit eigener Anmeldung.
+CREATE TABLE IF NOT EXISTS oidc_clients (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    secret_hash TEXT NOT NULL DEFAULT '',          -- leer = öffentlicher Client (nur mit PKCE)
+    redirect_uris TEXT NOT NULL,                   -- JSON-Liste, genaue Übereinstimmung
+    logout_uris TEXT NOT NULL DEFAULT '[]',
+    admin_only INTEGER NOT NULL DEFAULT 0,
+    module TEXT NOT NULL DEFAULT '',               -- Zugang zu diesem Modul nötig (leer = alle aktiven Benutzer)
+    created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS oidc_codes (
+    code_hash TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL REFERENCES oidc_clients(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    redirect_uri TEXT NOT NULL,
+    scope TEXT NOT NULL,
+    nonce TEXT NOT NULL DEFAULT '',
+    challenge TEXT NOT NULL DEFAULT '',
+    auth_time INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS oidc_tokens (
+    token_hash TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL REFERENCES oidc_clients(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    scope TEXT NOT NULL,
+    expires_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS oidc_pending (
+    id TEXT PRIMARY KEY,
+    params TEXT NOT NULL,
     expires_at INTEGER NOT NULL
 );

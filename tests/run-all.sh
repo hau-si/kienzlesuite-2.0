@@ -40,7 +40,7 @@ python3 -B -m unittest discover -s tests/core
 if command -v node >/dev/null; then step 'JavaScript: Syntax'; node --check core/public/assets/core.js && echo 'in Ordnung'; fi
 
 step 'PHP: Basis (tests/php)'
-for t in tests/php/core.php tests/php/passkeys.php tests/php/web.php tests/php/cli.php tests/php/firewall.php tests/php/updates.php tests/php/verbindungen.php tests/php/sicherung.php tests/php/einrichtung.php tests/php/drucker.php; do echo "-- $t"; php "$t"; done
+for t in tests/php/core.php tests/php/passkeys.php tests/php/web.php tests/php/cli.php tests/php/firewall.php tests/php/updates.php tests/php/verbindungen.php tests/php/sicherung.php tests/php/einrichtung.php tests/php/drucker.php tests/php/oidc.php; do echo "-- $t"; php "$t"; done
 
 step 'module.toml: alle Module im Repository'
 core/bin/kienzle-modul-pruefen --alle modules

@@ -126,8 +126,12 @@ c -b "$T/dora" "https://$host/verwaltung/updates" | grep -q 'Installiert: <stron
 c -b "$T/dora" "https://$host/verwaltung/firewall" | grep -q 'Freigegebene Netze' || fail 'Firewall-Seite'
 c -b "$T/dora" "https://$host/verwaltung/verbindungen" | grep -q 'T2med (FHIR)' || fail 'Verbindungsseite'
 c -b "$T/dora" "https://$host/verwaltung/einrichtung" | grep -q 'Admin mit Authenticator-App' || fail 'Einrichtungsseite'
+c "https://$host/.well-known/openid-configuration" | grep -qF "\"issuer\":\"https://$host\"" || fail 'OIDC-Discovery über nginx'
+c "https://$host/oidc/jwks" | grep -q '"crv":"P-256"' || fail 'OIDC-JWKS über nginx'
+[ "$(code -X POST "https://$host/oidc/token" -d grant_type=authorization_code -d code=x -d client_id=unbekannt)" = '401 ' ] || fail 'OIDC-Token ohne Client nicht 401'
+c -b "$T/dora" "https://$host/verwaltung/sso" | grep -q 'Dienst hinzufügen' || fail 'Seite Dienste'
 # Die Seiten müssen Status und Einheiten der root-Dienste sehen (open_basedir von php-fpm).
-for p in firewall updates verbindungen sicherung einrichtung; do
+for p in firewall updates verbindungen sicherung einrichtung drucker sso; do
   if c -b "$T/dora" "https://$host/verwaltung/$p" | grep -q 'Bitte den Installer ausführen'; then fail "Seite $p sieht ihren Dienst nicht"; fi
 done
 c -b "$T/dora" "https://$host/verwaltung/verbindungen" | grep -q 'ssh-ed25519 ' || fail 'Verbindungsseite zeigt den SSH-Schlüssel nicht (Status unlesbar)'

@@ -18,7 +18,7 @@ final class Web {
     public function __construct(
         private Config $config, private Database $db, private Users $users, private Auth $auth, private ?Passkeys $passkeys,
         private Modules $modules, private AuditLog $audit, ?callable $qr = null, private ?Firewall $firewall = null, private ?Updates $updates = null,
-        private ?Connections $connections = null, private ?Backup $backup = null, private ?Overview $overview = null, private ?Printers $printers = null,
+        private ?Connections $connections = null, private ?Backup $backup = null, private ?Overview $overview = null, private ?Printers $printers = null, private ?Oidc $oidc = null,
     ) {
         $this->qr = $qr ?? static function (string $uri): ?string {
             if (!is_executable('/usr/bin/qrencode')) return null;
@@ -43,6 +43,8 @@ final class Web {
         if ($r->path === '/_health') return $this->health();
         if (!$this->config->ownHost($r->header('host'))) throw new Problem('Unbekannter Servername.', 421);
         if (preg_match('#^/_auth/([a-z][a-z0-9-]{1,28})$#D', $r->path, $m)) return $this->forward($r, $m[1]);
+        // OpenID Connect: Abfragen der Dienste selbst (ohne Cookie, ohne Origin des Browsers).
+        if ($this->oidc && ($r->path === '/.well-known/openid-configuration' || in_array($r->path, ['/oidc/jwks', '/oidc/token', '/oidc/userinfo'], true))) return $this->oidcApi($r);
         if ($r->method === 'POST') $this->checkOrigin($r);
         elseif ($r->method !== 'GET' && $r->method !== 'HEAD') throw new Problem('Methode nicht erlaubt.', 405);
 
@@ -58,6 +60,8 @@ final class Web {
             case '/anmelden/passkey': return $this->passkeyLogin($r);
             case '/einrichten': return $get ? $this->setupPage($r->get('t', 60)) : $this->setup($r);
             case '/abmelden': if (!$get) return $this->logout($r); break;
+            case '/oidc/authorize': if ($get && $this->oidc && $stage !== 'full') return Response::redirect('/anmelden?weiter=/oidc/fortsetzen/' . $this->oidc->park($r->query)); break;
+            case '/oidc/abmelden': if ($this->oidc && $stage !== 'full') return Response::redirect($this->oidc->logoutTarget($r->get('client_id', 100) ?: $this->oidc->clientFromIdToken($r->get('id_token_hint', 4000)), $r->get('post_logout_redirect_uri', 300)) ?? '/anmelden'); break;
         }
         if ($stage === 'otp') return $r->path === '/anmelden/code' ? ($get ? $this->codePage() : $this->code($r)) : Response::redirect('/anmelden/code');
         if ($stage === 'enroll') return $r->path === '/konto/otp' ? ($get ? $this->enrollPage() : $this->enroll($r)) : Response::redirect('/konto/otp');
@@ -82,8 +86,116 @@ final class Web {
         ];
         $key = ($get ? 'GET' : 'POST') . ' ' . $r->path;
         if (isset($routes[$key])) return $routes[$key]();
+        if ($this->oidc && $get && $r->path === '/oidc/authorize') return Response::redirect($this->oidc->authorize($r->query, $this->session));
+        if ($this->oidc && $get && preg_match('#^/oidc/fortsetzen/([0-9a-f]{32})$#D', $r->path, $m)) return Response::redirect($this->oidc->authorize($this->oidc->unpark($m[1]), $this->session));
+        if ($this->oidc && $r->path === '/oidc/abmelden') return $get ? $this->oidcLogoutPage($r) : $this->oidcLogout($r);
         if (str_starts_with($r->path, '/verwaltung/')) return $this->admin($r, $get);
         throw new Problem('Seite nicht gefunden.', 404);
+    }
+
+    // ---- OpenID Connect ------------------------------------------------------------------------------------------
+    private function oidcApi(Request $r): Response {
+        $json = fn(int $status, array $data) => Response::json($data, $status)->with('Cache-Control', 'no-store')->with('Pragma', 'no-cache');
+        if ($r->path === '/.well-known/openid-configuration') return Response::json($this->oidc->discovery())->with('Cache-Control', 'max-age=300');
+        if ($r->path === '/oidc/jwks') return Response::json($this->oidc->jwks())->with('Cache-Control', 'max-age=300');
+        if ($r->path === '/oidc/token') {
+            if ($r->method !== 'POST') return $json(405, ['error' => 'invalid_request']);
+            [$status, $data] = $this->oidc->token($r->post, $r->header('authorization'));
+            if ($status === 200) $this->audit->write('oidc', 'oidc-anmeldung', (string)($r->post['client_id'] ?? 'basic'));
+            return $json($status, $data);
+        }
+        [$status, $data] = $this->oidc->userinfo($r->header('authorization'));
+        $resp = $json($status, $data);
+        return $status === 401 ? $resp->with('WWW-Authenticate', 'Bearer error="invalid_token"') : $resp;
+    }
+
+    private function oidcLogoutPage(Request $r): Response {
+        $target = $this->oidc->logoutTarget($r->get('client_id', 100) ?: $this->oidc->clientFromIdToken($r->get('id_token_hint', 4000)), $r->get('post_logout_redirect_uri', 300));
+        $body = '<p>Bei der Kienzle-Suite abmelden? Damit endet die Anmeldung für alle Module und Dienste auf diesem Gerät.</p>'
+            . '<form method="post" action="/oidc/abmelden" class="box">' . V::csrf($this->session['csrf'])
+            . '<input type="hidden" name="ziel" value="' . V::h($target ?? '') . '"><input type="hidden" name="state" value="' . V::h($r->get('state', 500)) . '">'
+            . '<button>Abmelden</button></form>';
+        return Response::html(V::page('Abmelden', $body, $this->nav(), $this->config->practice));
+    }
+
+    private function oidcLogout(Request $r): Response {
+        $target = $r->field('ziel', 300);
+        $ok = false;
+        foreach ($this->oidc->clients() as $c) if (in_array($target, $c['logout_uris'], true)) $ok = true;
+        $this->audit->write((string)$this->session['login'], 'abgemeldet', 'oidc');
+        $this->auth->logout($this->token);
+        $state = $r->field('state', 500);
+        return Response::redirect($ok ? $target . ($state !== '' ? (str_contains($target, '?') ? '&' : '?') . 'state=' . rawurlencode($state) : '') : '/anmelden')
+            ->with('Set-Cookie', Auth::clearCookie());
+    }
+
+    private function sso(): Oidc {
+        if (!$this->oidc) throw new Problem('Anmeldung für Dienste ist auf diesem Server nicht verfügbar.', 503);
+        return $this->oidc;
+    }
+
+    private function ssoPage(?string $error = null, ?array $created = null): Response {
+        $o = $this->sso();
+        $body = V::error($error);
+        if ($created) {
+            $body .= '<div class="box wide notice"><p><strong>Dienst „' . V::h($created['name']) . '“ angelegt.</strong> Diese Angaben im Dienst eintragen:</p><table>'
+                . '<tr><td>Anbieter (Issuer)</td><td><code>' . V::h($o->issuer()) . '</code></td></tr>'
+                . '<tr><td>Discovery</td><td><code>' . V::h($o->issuer()) . '/.well-known/openid-configuration</code></td></tr>'
+                . '<tr><td>Client-ID</td><td><code>' . V::h($created['id']) . '</code></td></tr>'
+                . ($created['secret'] !== '' ? '<tr><td>Client-Geheimnis</td><td><code>' . V::h($created['secret']) . '</code><br><small>Wird nur jetzt angezeigt.</small></td></tr>' : '')
+                . '</table></div>';
+        }
+        $body .= '<p>Dienste mit eigener Anmeldung (z. B. Oberfläche der Telefonanlage, NAS) können Benutzer über die Suite anmelden '
+            . '(OpenID Connect). Es gelten dieselben Konten, Authenticator-Apps und Passkeys. Die Arbeitsplätze müssen der '
+            . '<a href="/ca.crt">Zertifizierungsstelle</a> vertrauen, der Dienst ebenfalls.</p>'
+            . '<p>Anbieter: <code>' . V::h($o->issuer()) . '</code></p>';
+        $rows = '';
+        foreach ($o->clients() as $c) {
+            $rows .= '<tr><td><strong>' . V::h($c['name']) . '</strong><br><code>' . V::h($c['id']) . '</code></td><td>' . implode('<br>', array_map(fn($u) => V::h($u), $c['redirect_uris']))
+                . '</td><td>' . ($c['admin_only'] ? 'nur Admins' : ($c['module'] !== '' ? 'Zugang zu ' . V::h($this->modules->name($c['module'])) : 'alle Benutzer')) . ($c['public'] ? '<br>öffentlich (PKCE)' : '')
+                . '</td><td>' . (!$c['public'] ? '<form method="post" action="/verwaltung/sso" class="inline">' . $this->hidden('geheimnis', ['id' => $c['id']]) . '<button>Neues Geheimnis</button></form> ' : '')
+                . '<form method="post" action="/verwaltung/sso" class="inline">' . $this->hidden('loeschen', ['id' => $c['id']]) . '<button class="danger">Entfernen</button></form></td></tr>';
+        }
+        $body .= '<h2>Dienste</h2>' . ($rows !== '' ? '<table><tr><th>Dienst</th><th>Weiterleitung</th><th>Wer darf</th><th></th></tr>' . $rows . '</table>' : '<p>Noch keine.</p>');
+        $mods = '<option value="">alle aktiven Benutzer</option>';
+        foreach ($this->modules->all() as $id => $m) $mods .= '<option value="' . V::h($id) . '">nur mit Zugang zu ' . V::h($this->modules->name($id)) . '</option>';
+        $body .= '<h2>Dienst hinzufügen</h2><form method="post" action="/verwaltung/sso" class="box wide">' . $this->hidden('anlegen')
+            . V::input('name', 'Name', 'text', '', 'required maxlength="60"')
+            . '<label>Weiterleitungsadressen (eine je Zeile, https)<textarea name="redirect_uris" rows="3" required placeholder="https://telefon.example.org/oauth/callback"></textarea></label>'
+            . '<label>Adressen nach dem Abmelden (optional)<textarea name="logout_uris" rows="2"></textarea></label>'
+            . '<label>Wer darf sich anmelden<select name="modul">' . $mods . '</select></label>'
+            . V::checkbox('admin_only', '1', 'nur Basis-Admins', false)
+            . V::checkbox('public', '1', 'öffentlicher Dienst ohne Geheimnis (App im Browser; nur mit PKCE)', false)
+            . '<button>Anlegen</button></form>';
+        return Response::html(V::page('Anmeldung für Dienste', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+    }
+
+    private function ssoAction(Request $r, string $admin): Response {
+        $o = $this->sso();
+        $a = $r->field('aktion', 20);
+        try {
+            if ($a === 'anlegen') {
+                [$id, $secret] = $o->createClient($r->field('name', 100), $r->field('redirect_uris', 4000), $r->field('logout_uris', 4000), $r->field('public') === '1',
+                    $r->field('admin_only') === '1', $r->field('modul', 40));
+                $this->audit->write($admin, 'sso-dienst-angelegt', $id);
+                return $this->ssoPage(null, ['id' => $id, 'secret' => $secret, 'name' => $r->field('name', 100)])->with('Cache-Control', 'no-store');
+            }
+            if ($a === 'geheimnis') {
+                $c = $o->client($r->field('id', 40)) ?? throw new Problem('Dienst nicht gefunden.', 404);
+                $secret = $o->newSecret($c['id']);
+                $this->audit->write($admin, 'sso-geheimnis-neu', $c['id']);
+                return $this->ssoPage(null, ['id' => $c['id'], 'secret' => $secret, 'name' => $c['name']])->with('Cache-Control', 'no-store');
+            }
+            if ($a === 'loeschen') {
+                $o->deleteClient($r->field('id', 40));
+                $this->audit->write($admin, 'sso-dienst-entfernt', $r->field('id', 40));
+                return Response::redirect('/verwaltung/sso');
+            }
+            throw new Problem('Unbekannte Aktion.', 422);
+        } catch (Problem $e) {
+            if (in_array($e->http, [404, 409, 422], true)) return $this->ssoPage($e->getMessage());
+            throw $e;
+        }
     }
 
     // ---- Prüfung für nginx --------------------------------------------------------------------------------------
@@ -435,6 +547,7 @@ final class Web {
         if ($r->path === '/verwaltung/firewall/aus' && !$get) return $this->firewallOff($admin);
         if ($r->path === '/verwaltung/updates') return $get ? $this->updatesPage() : $this->updatesAction($r, $admin);
         if ($r->path === '/verwaltung/verbindungen') return $get ? $this->connectionsPage() : $this->connectionsAction($r, $admin);
+        if ($r->path === '/verwaltung/sso') return $get ? $this->ssoPage() : $this->ssoAction($r, $admin);
         if ($r->path === '/verwaltung/drucker') return $get ? $this->printersPage() : $this->printersAction($r, $admin);
         if ($r->path === '/verwaltung/einrichtung') return $get ? $this->overviewPage() : $this->overviewAction($r, $admin);
         if ($r->path === '/verwaltung/sicherung') return $get ? $this->backupPage() : $this->backupAction($r, $admin);

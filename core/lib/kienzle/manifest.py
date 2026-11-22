@@ -39,7 +39,7 @@ RESERVED_IDS = frozenset({'core', 'kienzle', 'admin', 'ablage', 'sicherung', 'dr
                           'update', 'updates', 'beta', 'stabil', 'requests', 'run'})
 # Pfade des Webinterfaces der Basis.
 RESERVED_PATHS = frozenset({'/anmelden', '/abmelden', '/verwaltung', '/einrichtung', '/konto', '/hilfe', '/assets',
-                            '/api', '/_auth', '/_health', '/core', '/kienzle'})
+                            '/api', '/_auth', '/_health', '/core', '/kienzle', '/oidc', '/bestaetigen', '/ca.crt'})
 # Ports, die die Basis selbst verwaltet: SSH, HTTPS, Samba (Drucker), IPP (CUPS).
 RESERVED_PORTS = {('tcp', 22): 'SSH', ('tcp', 443): 'HTTPS der Basis', ('tcp', 445): 'Samba der Basis',
                   ('tcp', 631): 'CUPS der Basis', ('udp', 631): 'CUPS der Basis'}

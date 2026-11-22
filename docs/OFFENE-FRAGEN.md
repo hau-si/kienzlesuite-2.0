@@ -65,3 +65,11 @@ Wo eine Entscheidung nötig war, steht dabei, was umgesetzt wurde; das lässt si
 
 Schritt 1 (Basis) ist bis auf die Prüfungen auf der Test-VM (`docs/VM-TEST.md`, M2–M8) und den Release-Schlüssel fertig.
 Als Nächstes: Prüflisten auf der Test-VM, dann Schritt 2 (SumUp- und Terminzettel-Modul auf die Basis umstellen).
+
+## Aus der Umsetzung vom 22.11.2026 (0.9.0–0.11.0)
+
+20. **Anmeldung für Dienste:** Welche Dienste sollen zuerst angebunden werden (Telefonanlage, NAS, Router)? Brauchen sie
+    Refresh-Token (lange Sitzungen ohne erneute Anmeldung) oder Browser-Apps mit CORS? Beides ist bisher nicht eingebaut.
+21. **Domäne:** Gibt es eine Praxis mit Active Directory zum Testen des Beitritts? Ohne echte Domäne ist er nur nachgebaut geprüft.
+22. **Schlüsselblatt:** Enthält jetzt den privaten SSH-Schlüssel für das NAS. Wer das Blatt hat, kann die Sicherung lesen und
+    sich am NAS anmelden – der Tresor ist Pflicht. Passt das so?

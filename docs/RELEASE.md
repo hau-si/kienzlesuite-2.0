@@ -1,5 +1,24 @@
 # Basis – Release-Notizen
 
+## 0.11.0
+
+Meilenstein 9 (`docs/PLAN.md`): Basis als OpenID-Connect-Anbieter für Dienste mit eigener Anmeldung.
+
+- **Verwaltung → Dienste:** Dienst eintragen (Name, Weiterleitungsadressen, Adressen nach dem Abmelden, wer darf sich
+  anmelden: alle, nur Admins oder nur mit Zugang zu einem Modul; vertraulich mit Geheimnis oder öffentlich mit PKCE).
+  Client-ID und Geheimnis werden einmal angezeigt; Geheimnis erneuern, Dienst entfernen; alles protokolliert.
+- **Ablauf:** Authorization Code mit PKCE (S256), Anmeldung mit Passwort+OTP oder Passkey wie bei den Modulen, Rückkehr
+  zum Dienst nach der Anmeldung; ID-Token ES256 (Signaturschlüssel P-256, mit dem Schlüssel der Basis verschlüsselt in
+  der Datenbank), Userinfo mit Zugangsmarke (1 Stunde), Abmelden mit Rücksprung nur an eingetragene Adressen.
+- Gespeichert werden nur SHA-256 von Codes, Zugangsmarken und Geheimnissen; Codes einmalig und 60 Sekunden gültig, auch bei
+  Fehlversuchen verbraucht. Gesperrte Benutzer verlieren sofort den Zugang (auch über Userinfo).
+- Datenbank Version 2 (neue Tabellen `oidc_*`, Übernahme automatisch). Pfade `/oidc`, `/bestaetigen`, `/ca.crt` für die Basis reserviert.
+- Tests: Ablauf über den nachgebauten Browser mit Signaturprüfung, Fehlerfälle (fremde Weiterleitung, Implicit Flow,
+  PKCE plain/falsch, Code doppelt/abgelaufen, falsches Geheimnis), Zugang je Dienst, Abmelden, Verwaltung; Ende-zu-Ende
+  Discovery, JWKS und Token über nginx.
+
+Nicht geprüft: Anmeldung echter Dienste (z. B. Telefonanlage, Synology DSM), die dem Zertifikat der Suite vertrauen müssen.
+
 ## 0.10.0
 
 Umsetzung der Antworten vom 22.11.2026, Teil 2: Drucker.

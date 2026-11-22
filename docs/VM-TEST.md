@@ -115,3 +115,11 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
 5. [ ] Freigabe „IPP“: Drucker auf einem Mac über `ipp://kienzle.praxis.internal/printers/<Name>` hinzufügen und drucken.
 6. [ ] Beispielmodul installieren: „Beispiel-Drucker“ erscheint (Modul), lässt sich nicht entfernen; Modul entfernen: Drucker weg.
 7. [ ] `id ks-core` zeigt keine Gruppe `lpadmin`; ein von Hand angelegter Drucker lässt sich in der Suite nicht entfernen.
+
+## Meilenstein 9 – Anmeldung für Dienste (Basis 0.11.0)
+
+1. [ ] Verwaltung → Dienste: Testdienst anlegen (z. B. Synology DSM „SSO-Client“ oder ein OIDC-Testprogramm), Weiterleitung eintragen.
+2. [ ] Im Dienst Discovery-Adresse, Client-ID und Geheimnis eintragen; der Dienst vertraut der Zertifizierungsstelle der Suite.
+3. [ ] Anmelden im Dienst führt zur Suite, nach Passwort+OTP bzw. Passkey zurück; Benutzername stimmt.
+4. [ ] Dienst auf „nur Admins“ stellen: Mitarbeiter wird abgewiesen.
+5. [ ] Abmelden im Dienst meldet auch in der Suite ab (wenn der Dienst das unterstützt).
