@@ -32,7 +32,12 @@ SAMBA_NET = Path(E('KIENZLE_DRUCKER_SAMBA_NETZ', '/etc/samba/kienzle-netz.conf')
 UNITS = Path(E('KIENZLE_DRUCKER_UNITS', '/etc/systemd/system'))
 SYSTEMCTL = E('KIENZLE_DRUCKER_SYSTEMCTL', '/usr/bin/systemctl')
 DATA = Path(E('KIENZLE_DRUCKER_DATA', '/var/lib/kienzle'))
-PORTS = range(47100, 47200)                     # IPP-Everywhere-Drucker der Module, nur localhost
+PORTS = range(47100, 47200)
+SYSTEMD_RUN = Path(E('KIENZLE_SYSTEMD_RUN', '/run/systemd/system'))   # gibt es nur, wenn systemd läuft (wie sd_booted)
+
+
+def without_systemd() -> bool:
+    return E('KIENZLE_OHNE_SYSTEMD') == '1' or not SYSTEMD_RUN.is_dir()                     # IPP-Everywhere-Drucker der Module, nur localhost
 BIN = {k: E(f'KIENZLE_{k.upper()}', v) for k, v in {'lpadmin': '/usr/sbin/lpadmin', 'lpinfo': '/usr/sbin/lpinfo', 'lpstat': '/usr/bin/lpstat',
                                                      'lp': '/usr/bin/lp', 'cupsenable': '/usr/sbin/cupsenable', 'cupsaccept': '/usr/sbin/cupsaccept',
                                                      'smbcontrol': '/usr/bin/smbcontrol', 'cancel': '/usr/bin/cancel',
@@ -361,7 +366,7 @@ def _port_open(port: int) -> bool:
 
 
 def _start_unit(unit: str, p: dict, port: int) -> None:
-    if E('KIENZLE_OHNE_SYSTEMD') == '1':             # nur Container-Tests ohne systemd: Drucker direkt starten
+    if without_systemd():                            # Container ohne systemd (Tests): Drucker direkt starten
         spool = DATA / p['modul'] / 'druckauftraege'
         subprocess.run([BIN['runuser'], '-u', f'ks-{p["modul"]}', '--', 'mkdir', '-p', str(spool)], capture_output=True, timeout=30)
         log = open(STATE / f'{p["scheme"]}.log', 'ab')     # noqa: SIM115 – bleibt für den Hintergrundprozess offen
@@ -381,10 +386,10 @@ def _start_unit(unit: str, p: dict, port: int) -> None:
 
 def _stop_unit(unit: str) -> None:
     path = UNITS / unit
-    if SYSTEMCTL and Path(SYSTEMCTL).is_file() and E('KIENZLE_OHNE_SYSTEMD') != '1':
+    if SYSTEMCTL and Path(SYSTEMCTL).is_file() and not without_systemd():
         subprocess.run([SYSTEMCTL, 'disable', '--now', unit], capture_output=True, timeout=60)
     path.unlink(missing_ok=True)
-    if SYSTEMCTL and Path(SYSTEMCTL).is_file() and E('KIENZLE_OHNE_SYSTEMD') != '1':
+    if SYSTEMCTL and Path(SYSTEMCTL).is_file() and not without_systemd():
         subprocess.run([SYSTEMCTL, 'daemon-reload'], capture_output=True, timeout=60)
 
 

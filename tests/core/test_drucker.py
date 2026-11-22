@@ -27,7 +27,7 @@ class Umgebung(unittest.TestCase):
                'KIENZLE_DRUCKER_PPDS': self.t / 'ppd', 'KIENZLE_DRUCKER_SAMBA': self.t / 'kienzle-drucker.conf', 'KIENZLE_DRUCKER_UID': os.getuid(),
                'KIENZLE_DRUCKER_CHOWN': '0', 'KIENZLE_DRUCKER_PROBE': 'ja', 'KIENZLE_SMBCONTROL': self.t / 'fehlt',
                'KIENZLE_DRUCKER_SAMBA_NETZ': self.t / 'kienzle-netz.conf', 'KIENZLE_DRUCKER_UNITS': self.t / 'units', 'KIENZLE_DRUCKER_SYSTEMCTL': self.t / 'bin/systemctl',
-               'KIENZLE_DRUCKER_DATA': self.t / 'data', 'KIENZLE_DRUCKER_WARTEN': '1'}
+               'KIENZLE_DRUCKER_DATA': self.t / 'data', 'KIENZLE_DRUCKER_WARTEN': '1', 'KIENZLE_SYSTEMD_RUN': self.t}
         env.update({f'KIENZLE_{p.upper()}': self.t / 'bin' / p for p in ('lpadmin', 'lpstat', 'lpinfo', 'lp', 'cancel', 'testparm')})
         p = mock.patch.dict(os.environ, {k: str(v) for k, v in env.items()})
         p.start()

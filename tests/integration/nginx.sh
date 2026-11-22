@@ -194,7 +194,7 @@ lpstat -v Beispiel-Drucker | grep -q 'kienzle-beispiel-beispiel-drucker:/Beispie
 # IPP-Everywhere-Drucker des Moduls (ippeveprinter als ks-beispiel, nur localhost)
 grep -q '^User=ks-beispiel' /etc/systemd/system/kienzle-drucker-beispiel-beispiel-pdf.service || fail 'Einheit des IPP-Druckers fehlt'
 if ! lpstat -v Beispiel-PDF 2>/dev/null | grep -q 'ipp://localhost:471'; then
-  ls -l /usr/sbin/ippeveprinter /usr/bin/ippeveprinter 2>&1; cat /var/lib/kienzle/drucker/*.log 2>&1 | tail -n 20
+  ls -l /usr/sbin/ippeveprinter /usr/bin/ippeveprinter 2>&1; cat /var/lib/kienzle/drucker/*.log 2>&1 | tail -n 20 || true; env | grep -c KIENZLE_OHNE_SYSTEMD || true
   runuser -u ks-beispiel -- test -x /opt/kienzle/beispiel/current/printer/kienzle-beispiel-druck || echo 'ks-beispiel kann das Programm nicht ausführen'
   fail 'IPP-Everywhere-Drucker fehlt in CUPS'
 fi
