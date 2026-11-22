@@ -350,7 +350,8 @@ def unit_text(p: dict, port: int) -> str:
     spool = DATA / mid / 'druckauftraege'
     cmd = PROGRAMS / mid / 'current' / p['command']
     return (f'# Kienzle-Suite: virtueller Drucker „{p["name"]}“ des Moduls {mid} (von kienzle-drucker erzeugt).\n[Unit]\n'
-            f'Description=Kienzle-Suite Drucker {p["name"]} ({mid})\nAfter=network.target\n\n[Service]\nUser=ks-{mid}\nGroup=ks-{mid}\n'
+            f'Description=Kienzle-Suite Drucker {p["name"]} ({mid})\nAfter=network.target avahi-daemon.service\nWants=avahi-daemon.service\n\n'
+            f'[Service]\nUser=ks-{mid}\nGroup=ks-{mid}\n'
             f'ExecStartPre=/usr/bin/mkdir -p {spool}\n'
             f'ExecStart={BIN["ippeveprinter"]} -p {port} -n localhost -r off -c {cmd} -f {",".join(p["formats"])} -d {spool} {p["scheme"]}\n'
             'Restart=on-failure\nNoNewPrivileges=yes\nProtectSystem=strict\nProtectHome=yes\nPrivateTmp=yes\n'

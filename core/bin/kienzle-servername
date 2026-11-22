@@ -1,0 +1,24 @@
+#!/usr/bin/python3 -IB
+"""Servernamen und Praxisname der Kienzle-Suite ändern (nur root).
+
+  kienzle-servername anwenden              Anfrage des Webinterfaces verarbeiten (kienzle-servername.path)
+  kienzle-servername setzen NAME [NAME …]  von Hand an der Konsole (z. B. kienzle-servername setzen kienzle.praxis.internal 192.0.2.10)
+"""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'lib'))
+from kienzle import servername as s  # noqa: E402
+
+if __name__ == '__main__':
+    try:
+        if sys.argv[1:] == ['anwenden']:
+            s.handle()
+        elif len(sys.argv) >= 3 and sys.argv[1] == 'setzen':
+            print(s.apply(sys.argv[2:], None))
+        else:
+            print(__doc__.strip(), file=sys.stderr)
+            sys.exit(2)
+    except s.Fehler as e:
+        print(f'Fehler: {e}', file=sys.stderr)
+        sys.exit(1)

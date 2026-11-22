@@ -1,0 +1,10 @@
+# Kienzle-Suite: neue Servernamen aus Verwaltung → Server übernehmen (Anfragedatei von ks-core).
+[Unit]
+Description=Kienzle-Suite Servername (Anfragen)
+
+[Path]
+PathExists=/var/lib/kienzle/core/anfragen/servername.json
+Unit=kienzle-servername-anwenden.service
+
+[Install]
+WantedBy=multi-user.target

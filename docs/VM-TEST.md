@@ -123,3 +123,11 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
 3. [ ] Anmelden im Dienst führt zur Suite, nach Passwort+OTP bzw. Passkey zurück; Benutzername stimmt.
 4. [ ] Dienst auf „nur Admins“ stellen: Mitarbeiter wird abgewiesen.
 5. [ ] Abmelden im Dienst meldet auch in der Suite ab (wenn der Dienst das unterstützt).
+
+## Basis 0.12.0 – Erstinstallation und Servername
+
+1. [ ] Frische VM: `sudo bash installer/install.sh` ohne Angaben; Ausgabe nennt die IP, Einrichtungslink über die IP funktioniert.
+2. [ ] Verwaltung → Server: Namen `kienzle.praxis.internal` (Eintrag im DNS/Router bzw. hosts-Datei) und Praxisname setzen;
+       danach unter dem Namen erreichbar, ohne Zertifikatswarnung.
+3. [ ] Passkey unter dem Namen anlegen und damit anmelden.
+4. [ ] Ungültigen Namen eingeben: Fehlermeldung, nichts geändert.

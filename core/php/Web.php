@@ -18,7 +18,7 @@ final class Web {
     public function __construct(
         private Config $config, private Database $db, private Users $users, private Auth $auth, private ?Passkeys $passkeys,
         private Modules $modules, private AuditLog $audit, ?callable $qr = null, private ?Firewall $firewall = null, private ?Updates $updates = null,
-        private ?Connections $connections = null, private ?Backup $backup = null, private ?Overview $overview = null, private ?Printers $printers = null, private ?Oidc $oidc = null,
+        private ?Connections $connections = null, private ?Backup $backup = null, private ?Overview $overview = null, private ?Printers $printers = null, private ?Oidc $oidc = null, private ?Server $server = null,
     ) {
         $this->qr = $qr ?? static function (string $uri): ?string {
             if (!is_executable('/usr/bin/qrencode')) return null;
@@ -91,6 +91,41 @@ final class Web {
         if ($this->oidc && $r->path === '/oidc/abmelden') return $get ? $this->oidcLogoutPage($r) : $this->oidcLogout($r);
         if (str_starts_with($r->path, '/verwaltung/')) return $this->admin($r, $get);
         throw new Problem('Seite nicht gefunden.', 404);
+    }
+
+    // ---- Servername ---------------------------------------------------------------------------------------------
+    private function srv(): Server { return $this->server ?? new Server($this->db, $this->config); }
+
+    private function serverPage(?string $error = null): Response {
+        $st = $this->srv()->status();
+        $here = strtolower((string)preg_replace('/:\d+$/', '', $this->req?->header('host') ?? ''));
+        $body = V::error($error) . ($st['last'] ? '<p class="' . (($st['last']['ok'] ?? false) ? 'notice' : 'error') . '">' . V::h((string)($st['last']['meldung'] ?? '')) . '</p>' : '')
+            . ($st['pending'] ? '<p class="notice">Wird übernommen …</p>' : '')
+            . (!$this->srv()->named() ? '<p class="error">Noch kein Servername festgelegt. Passkeys funktionieren nur über einen Namen (z. B. kienzle.praxis.internal), '
+                . 'den die Arbeitsplätze über DNS bzw. den Router auflösen.</p>' : '')
+            . '<form method="post" action="/verwaltung/server" class="box wide">' . $this->hidden('speichern')
+            . '<label>Namen und Adressen, unter denen die Arbeitsplätze die Suite erreichen (einer je Zeile; der erste Name ohne IP gilt für Passkeys)'
+            . '<textarea name="namen" rows="4" required>' . V::h(implode("\n", $st['names'])) . '</textarea></label>'
+            . V::input('praxis', 'Praxisname (erscheint auf den Seiten und auf dem Schlüsselblatt)', 'text', $st['practice'], 'maxlength="60"')
+            . '<p>Beim Speichern stellt die Suite das Server-Zertifikat für die neuen Namen aus; die Zertifizierungsstelle bleibt, die Arbeitsplätze '
+            . 'müssen nichts neu einrichten. <strong>Achtung:</strong> Wird der erste Name geändert, gelten bisherige Passkeys nicht mehr '
+            . '(neu anlegen unter „Mein Konto“); Dienste mit Anmeldung über die Suite brauchen dann die neue Anbieter-Adresse.</p>'
+            . ($here !== '' ? '<p>Sie sehen diese Seite gerade unter <code>' . V::h($here) . '</code>. Bleibt diese Adresse nicht in der Liste, '
+                . 'danach die neue Adresse aufrufen.</p>' : '')
+            . '<button' . ($st['pending'] ? ' disabled' : '') . '>Speichern</button></form>';
+        $response = Response::html(V::page('Server', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+        return $st['pending'] ? $response->with('Refresh', '3') : $response;
+    }
+
+    private function serverSave(Request $r, string $admin): Response {
+        try {
+            $this->srv()->save($r->field('namen', 3000), $r->field('praxis', 200));
+        } catch (Problem $e) {
+            if (in_array($e->http, [409, 422, 503], true)) return $this->serverPage($e->getMessage());
+            throw $e;
+        }
+        $this->audit->write($admin, 'servername', strtolower(implode(' ', array_slice(preg_split('/[\s,;]+/', trim($r->field('namen', 3000))) ?: [], 0, 10))));
+        return Response::redirect('/verwaltung/server');
     }
 
     // ---- OpenID Connect ------------------------------------------------------------------------------------------
@@ -547,6 +582,7 @@ final class Web {
         if ($r->path === '/verwaltung/firewall/aus' && !$get) return $this->firewallOff($admin);
         if ($r->path === '/verwaltung/updates') return $get ? $this->updatesPage() : $this->updatesAction($r, $admin);
         if ($r->path === '/verwaltung/verbindungen') return $get ? $this->connectionsPage() : $this->connectionsAction($r, $admin);
+        if ($r->path === '/verwaltung/server') return $get ? $this->serverPage() : $this->serverSave($r, $admin);
         if ($r->path === '/verwaltung/sso') return $get ? $this->ssoPage() : $this->ssoAction($r, $admin);
         if ($r->path === '/verwaltung/drucker') return $get ? $this->printersPage() : $this->printersAction($r, $admin);
         if ($r->path === '/verwaltung/einrichtung') return $get ? $this->overviewPage() : $this->overviewAction($r, $admin);
@@ -1069,7 +1105,7 @@ final class Web {
 
     // ---- Einrichtungs-Überblick ----------------------------------------------------------------------------------
     private function ov(): Overview {
-        return $this->overview ?? new Overview($this->db, $this->users, $this->modules, $this->firewall, $this->updates, $this->connections, $this->backup);
+        return $this->overview ?? new Overview($this->db, $this->users, $this->modules, $this->firewall, $this->updates, $this->connections, $this->backup, $this->config);
     }
 
     private function overviewList(array $items): string {

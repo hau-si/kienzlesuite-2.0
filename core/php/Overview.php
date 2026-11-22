@@ -13,7 +13,7 @@ final class Overview {
     private const KEY = 'ueberblick_manuell';
 
     public function __construct(private Database $db, private Users $users, private Modules $modules, private ?Firewall $firewall = null,
-        private ?Updates $updates = null, private ?Connections $connections = null, private ?Backup $backup = null) {}
+        private ?Updates $updates = null, private ?Connections $connections = null, private ?Backup $backup = null, private ?Config $config = null) {}
 
     private function manual(): array {
         $m = json_decode((string)$this->db->setting(self::KEY), true);
@@ -44,6 +44,9 @@ final class Overview {
         $codes = array_filter($admins, fn($u) => $this->users->recoveryLeft((int)$u['id']) > 0);
         $manual = $this->manual();
         $out = [];
+        $named = false;
+        foreach ($this->config?->hostnames ?? [] as $h) if (!filter_var($h, FILTER_VALIDATE_IP) && str_contains($h, '.')) $named = true;
+        if ($this->config) $out[] = self::item('Servername festgelegt', $named ? 'done' : 'open', $named ? implode(', ', $this->config->hostnames) : 'Für Passkeys auf allen Arbeitsplätzen nötig', '/verwaltung/server');
         $out[] = self::item('Admin mit Authenticator-App', $admins && count($withOtp) === count($admins) ? 'done' : 'open',
             $admins ? count($withOtp) . ' von ' . count($admins) . ' Admins mit OTP' : 'Noch kein Admin', '/verwaltung/benutzer');
         $out[] = self::item('Mindestens zwei Admins (Vertretung)', count($admins) >= 2 ? 'done' : 'open', 'Fällt ein Admin aus, kommt sonst nur noch die Konsole weiter.', '/verwaltung/benutzer');

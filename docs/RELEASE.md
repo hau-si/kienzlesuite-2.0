@@ -1,5 +1,21 @@
 # Basis – Release-Notizen
 
+## 0.12.0
+
+- **Einfache Erstinstallation:** `sudo bash installer/install.sh` ohne Angaben. Der Installer nimmt die IPv4-Adressen und
+  den Rechnernamen der VM (IP zuerst, damit der Einrichtungslink sofort funktioniert).
+- **Verwaltung → Server:** Servernamen und Praxisname im Webinterface festlegen. Der root-Dienst `kienzle-servername`
+  schreibt `core.json`, stellt das Server-Zertifikat für die neuen Namen aus (Zertifizierungsstelle bleibt) und schreibt
+  nginx neu; lehnt nginx ab, kommt der vorige Stand zurück. An der Konsole: `sudo kienzle-servername setzen NAME …`.
+  Hinweise zu Passkeys (an den ersten Namen gebunden) und zur Adresse der Anmeldung für Dienste. Punkt „Servername
+  festgelegt“ im Einrichtungs-Überblick.
+- `kienzle-web neu`: nginx neu schreiben und das Modulverzeichnis behalten. Der Installer nutzt das; ein zweiter Lauf
+  leert das Modulverzeichnis nicht mehr.
+- Virtuelle IPP-Drucker: `avahi-daemon` wird mitinstalliert (`ippeveprinter` braucht DNS-SD), Start ohne laufendes
+  systemd erkannt wie `sd_booted`.
+
+Nicht geprüft: Namensänderung auf einer echten VM mit systemd; automatische Namen bei mehreren Netzwerkkarten.
+
 ## 0.11.2
 
 - **Release-Schlüssel des Herausgebers eingetragen** (`installer/release-keys/`): Hauptschlüssel `kienzle-release-2026`

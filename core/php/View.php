@@ -11,7 +11,7 @@ final class View {
         $menu = '';
         if ($nav) {
             $menu = '<nav class="menu"><a href="/">Start</a><a href="/konto">Mein Konto</a>'
-                . ($nav['admin'] ? '<a href="/verwaltung/einrichtung">Einrichtung</a><a href="/verwaltung/benutzer">Benutzer</a><a href="/verwaltung/verbindungen">Verbindungen</a><a href="/verwaltung/drucker">Drucker</a><a href="/verwaltung/sso">Dienste</a><a href="/verwaltung/sicherung">Sicherung'
+                . ($nav['admin'] ? '<a href="/verwaltung/einrichtung">Einrichtung</a><a href="/verwaltung/server">Server</a><a href="/verwaltung/benutzer">Benutzer</a><a href="/verwaltung/verbindungen">Verbindungen</a><a href="/verwaltung/drucker">Drucker</a><a href="/verwaltung/sso">Dienste</a><a href="/verwaltung/sicherung">Sicherung'
                     . (($nav['sicherung'] ?? 0) > 0 ? ' <span class="badge" title="Hinweise zur Sicherung">' . (int)$nav['sicherung'] . '</span>' : '') . '</a><a href="/verwaltung/firewall">Firewall</a><a href="/verwaltung/updates">Updates'
                     . (($nav['updates'] ?? 0) > 0 ? ' <span class="badge" title="Neue Version verfügbar">' . (int)$nav['updates'] . '</span>' : '') . '</a><a href="/verwaltung/zugang">Zugang</a><a href="/verwaltung/protokoll">Protokoll</a>' : '')
                 . '<form method="post" action="/abmelden" class="inline">' . self::csrf($nav['csrf']) . '<button class="link">Abmelden (' . self::h($nav['login']) . ')</button></form></nav>';

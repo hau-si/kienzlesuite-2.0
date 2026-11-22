@@ -1,0 +1,11 @@
+# Kienzle-Suite: Servernamen übernehmen – core.json, Server-Zertifikat, nginx (root).
+[Unit]
+Description=Kienzle-Suite Servername anwenden
+
+[Service]
+Type=oneshot
+ExecStart=/opt/kienzle/core/current/bin/kienzle-servername anwenden
+TimeoutStartSec=300
+NoNewPrivileges=yes
+ProtectHome=yes
+PrivateTmp=yes

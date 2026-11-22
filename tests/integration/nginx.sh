@@ -170,8 +170,23 @@ cmp -s "$T/ansicht/etc/kienzle/ca/ca.crt" /etc/kienzle/ca/ca.crt || fail 'CA feh
 sicher '{"action":"blatt-gedruckt"}'
 [ ! -e /var/lib/kienzle/sicherung/blatt.html ] || fail 'Blatt nicht gelöscht'
 
+echo '== Servername ändern (Verwaltung → Server)'
+[ -f /etc/systemd/system/kienzle-servername.path ] || fail 'kienzle-servername.path fehlt'
+c -b "$T/dora" -H "Origin: https://$host" "https://$host/verwaltung/server" | grep -q 'Namen und Adressen' || fail 'Seite Server'
+runuser -u ks-core -- sh -c "umask 077; printf '%s' '{\"namen\":[\"$host\",\"neu.example.org\"],\"praxis\":\"Praxis Test\"}' > /var/lib/kienzle/core/anfragen/servername.json"
+KIENZLE_NGINX_RELOAD='nginx -s reload' /opt/kienzle/core/current/bin/kienzle-servername anwenden
+python3 -c 'import json,sys; s=json.load(open("/var/lib/kienzle/servername/status.json"))["letzte"]; print(s["meldung"]); sys.exit(0 if s["ok"] else 1)' || fail 'Servername nicht übernommen'
+openssl x509 -in /etc/kienzle/ca/server.crt -noout -ext subjectAltName | grep -q 'DNS:neu.example.org' || fail 'Zertifikat ohne neuen Namen'
+sleep 1
+curl -fsS --noproxy '*' --max-time 10 --cacert /etc/kienzle/ca/ca.crt --resolve "neu.example.org:443:127.0.0.1" -o /dev/null https://neu.example.org/anmelden || fail 'neuer Name nicht erreichbar'
+KIENZLE_NGINX_RELOAD='nginx -s reload' /opt/kienzle/core/current/bin/kienzle-servername setzen "$host" || fail 'Servername zurücksetzen'
+sleep 1
+
 echo '== Drucker (echtes CUPS ohne systemd)'
 for u in kienzle-drucker.path kienzle-drucker-anwenden.service kienzle-drucker.timer; do [ -f "/etc/systemd/system/$u" ] || fail "$u fehlt"; done
+# ippeveprinter braucht DNS-SD (avahi über D-Bus); im Container von Hand starten.
+install -d -m 0755 /run/dbus && dbus-daemon --system --fork || fail 'dbus startet nicht'
+avahi-daemon -D || fail 'avahi startet nicht'
 /usr/sbin/cupsd || fail 'cupsd startet nicht'
 for _ in $(seq 1 50); do [ -S /run/cups/cups.sock ] && break; sleep 0.2; done
 if id -nG ks-core | grep -qw lpadmin; then fail 'ks-core ist in der Gruppe lpadmin'; fi

@@ -2,6 +2,7 @@
 """Modulverzeichnis und nginx-Konfiguration schreiben (nur root).
 
   kienzle-web schreiben [MODULORDNER]
+  kienzle-web neu                       nur nginx neu schreiben, Modulverzeichnis bleibt (z. B. nach neuen Servernamen)
 
 Prüft alle Module in MODULORDNER (Vorgabe: keine Module) mit dem Prüfprogramm, schreibt das Modulverzeichnis
 für das Webinterface und die nginx-Konfiguration, prüft sie mit „nginx -t“ und lädt nginx neu.
@@ -39,16 +40,27 @@ def write(path: Path, text: str, mode: int, group: str | None = None) -> None:
 
 
 def main(argv: list[str]) -> int:
+    if argv == ['neu']:
+        try:
+            existing = json.loads(Path(REGISTRY).read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            existing = {'core_api': sorted(manifest.supported_api()), 'modules': []}
+        return write_all(existing)
     if not argv or argv[0] != 'schreiben' or len(argv) > 2:
         print(__doc__.strip(), file=sys.stderr)
         return 2
     try:
-        config = json.loads(Path(CONFIG).read_text(encoding='utf-8'))
         registry = manifest.check_all(argv[1]) if len(argv) == 2 else {'core_api': sorted(manifest.supported_api()), 'modules': []}
-        site = nginx.render(config.get('hostnames') or [], registry)
     except manifest.Invalid as e:
         print('Module ungültig, nichts geändert:\n  - ' + '\n  - '.join(e.errors), file=sys.stderr)
         return 1
+    return write_all(registry)
+
+
+def write_all(registry: dict) -> int:
+    try:
+        config = json.loads(Path(CONFIG).read_text(encoding='utf-8'))
+        site = nginx.render(config.get('hostnames') or [], registry)
     except (nginx.Fehler, OSError, ValueError) as e:
         print(f'Fehler: {e}', file=sys.stderr)
         return 1

@@ -14,24 +14,30 @@ Prüfliste für die Test-VM: `docs/VM-TEST.md`.
 ## Installation von Hand
 
 1. Ubuntu Server 26.04 installieren – die normale Variante „Ubuntu Server“, nicht „minimized“ (Sprache Deutsch, Tastatur Deutsch, Zeitzone Europe/Berlin, OpenSSH-Server an).
-2. Anmelden und die Suite holen:
+2. Anmelden und die Suite holen und installieren – ohne weitere Angaben:
 
    ```sh
    sudo apt-get install -y git
    git clone https://github.com/hau-si/kienzlesuite-2.0.git
    cd kienzlesuite-2.0
-   sudo bash installer/install.sh --name kienzle.praxis.internal --name 192.0.2.10 --praxis "Praxis Dr. Beispiel"
+   sudo bash installer/install.sh
    ```
 
-   `--name` ist der Name bzw. die Adresse, unter der die Arbeitsplätze den Server erreichen (mehrfach möglich).
+   Der Installer nimmt die IP-Adresse(n) und den Rechnernamen der VM. Den endgültigen Namen und den Praxisnamen legt
+   ein Admin danach unter **Verwaltung → Server** fest. Wer es gleich richtig haben will, kann beides auch mitgeben:
+   `--name kienzle.praxis.internal --name 192.0.2.10 --praxis "Praxis Dr. Beispiel"`.
 3. Am Ende zeigt der Installer
+   - die Adresse(n), unter denen die Suite erreichbar ist (zunächst über die IP),
    - den **Fingerabdruck der Zertifizierungsstelle** (zum Vergleich auf den Arbeitsplätzen),
    - den **einmaligen Einrichtungslink** für den ersten Admin (gilt 24 Stunden).
-4. Auf einem Arbeitsplatz `https://kienzle.praxis.internal/ca.crt` laden und als **vertrauenswürdige
+4. Auf einem Arbeitsplatz `https://<IP-der-VM>/ca.crt` laden und als **vertrauenswürdige
    Stammzertifizierungsstelle** eintragen (Windows: Doppelklick → Zertifikat installieren → Lokaler Computer →
    „Vertrauenswürdige Stammzertifizierungsstellen“). Fingerabdruck vergleichen.
 5. Einrichtungslink öffnen, Passwort setzen, Authenticator-App einrichten, Wiederherstellungscodes ausdrucken.
-6. **Verwaltung → Einrichtung** zeigt, was noch fehlt: zweiter Admin, Firewall, Netzwerkspeicher, Sicherung,
+6. **Verwaltung → Server:** Namen festlegen, unter dem die Arbeitsplätze die Suite erreichen (z. B. `kienzle.praxis.internal`,
+   Eintrag im DNS bzw. Router nötig), dazu den Praxisnamen. Das Server-Zertifikat wird dabei neu ausgestellt; die
+   Zertifizierungsstelle bleibt. Passkeys funktionieren nur über diesen Namen.
+7. **Verwaltung → Einrichtung** zeigt, was noch fehlt: zweiter Admin, Firewall, Netzwerkspeicher, Sicherung,
    Schlüsselblatt, Schnappschüsse am NAS, Probe-Wiederherstellung – und darunter die Punkte der Module.
 
 ## Unbeaufsichtigt (autoinstall)

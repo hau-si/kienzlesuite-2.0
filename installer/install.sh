@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Kienzle-Suite: Installer der Basis für Ubuntu Server 26.04 LTS.
 #
-#   sudo bash installer/install.sh --name kienzle.praxis.internal [--name 192.168.1.10] [--praxis "Praxis Dr. Muster"]
+#   sudo bash installer/install.sh                         (Erstinstallation; Name und Praxis danach im Webinterface)
+#   sudo bash installer/install.sh --name kienzle.praxis.internal [--name 192.0.2.10] [--praxis "Praxis Dr. Muster"]
 #   sudo bash installer/install.sh --wiederherstellen     (neue VM nach Totalausfall: alles aus der Sicherung holen)
 #   sudo bash installer/install.sh --admin-reset NAME     (Admin-Zugang an der Konsole zurücksetzen, wie kienzle-admin)
 #   sudo bash installer/install.sh --kanal beta           (Update-Kanal festlegen: stabil oder beta)
@@ -17,7 +18,7 @@ here=$(cd -- "$(dirname -- "$0")/.." && pwd)
 if [ -f "$here/core/VERSION" ]; then src=$here/core; else src=$here; fi
 version=$(tr -dc '0-9A-Za-z.+-' < "$src/VERSION")
 nosystemd=${KIENZLE_OHNE_SYSTEMD:-}      # nur für Tests im Container ohne systemd
-names=(); practice=''; update=''; restore=''; restore_json=''; admin_reset=''; kanal=''
+names=(); auto_names=''; practice=''; update=''; restore=''; restore_json=''; admin_reset=''; kanal=''
 
 usage() { echo 'Aufruf: sudo bash installer/install.sh --name SERVERNAME [--name IP] [--praxis "Name"]'; exit 2; }
 while [ $# -gt 0 ]; do
@@ -62,10 +63,16 @@ if [ ${#names[@]} -eq 0 ] && [ -z "$restore" ]; then
   if [ -f "$conf" ]; then
     mapfile -t names < <(python3 -c 'import json,sys; print("\n".join(json.load(open(sys.argv[1]))["hostnames"]))' "$conf")
   else
-    echo 'Bitte mindestens einen Servernamen angeben, unter dem die Arbeitsplätze die Suite erreichen, z. B.:'
-    echo "  sudo bash installer/install.sh --name kienzle.praxis.internal --name $(hostname -I 2>/dev/null | awk '{print $1}')"
-    echo 'Passkeys funktionieren nur über einen Namen, nicht über eine IP-Adresse.'
-    exit 2
+    # Erstinstallation ohne Angaben: Rechnername und alle IPv4-Adressen der VM. Den endgültigen Namen legt ein Admin
+    # danach unter Verwaltung → Server fest (dort auch Praxisname); das Zertifikat wird dann neu ausgestellt.
+    # Zuerst die IP-Adressen: Unter ihnen erreichen die Arbeitsplätze den Server sicher schon jetzt (Einrichtungslink).
+    for ip in $(hostname -I 2>/dev/null); do
+      if [[ $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] && [[ ! $ip =~ ^127\. ]]; then names+=("$ip"); fi
+    done
+    host=$(hostname -f 2>/dev/null | tr 'A-Z' 'a-z')
+    if [[ $host =~ ^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$ ]] && [ "$host" != localhost ]; then names+=("$host"); fi
+    [ ${#names[@]} -gt 0 ] || { echo 'Weder Rechnername noch IP-Adresse gefunden. Bitte mit --name angeben.'; exit 2; }
+    auto_names=1
   fi
 fi
 for n in "${names[@]}"; do
@@ -90,7 +97,7 @@ DEBIAN_FRONTEND=noninteractive apt-get update -q
 wait_apt
 DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends \
   nginx php-fpm php-cli php-sqlite3 php-mbstring openssl qrencode python3 ca-certificates psmisc curl nftables iproute2 smbclient openssh-client restic cifs-utils \
-  cups cups-bsd cups-ipp-utils samba unattended-upgrades
+  cups cups-bsd cups-ipp-utils avahi-daemon samba unattended-upgrades
 
 phpv=$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')
 phpfpm=/usr/sbin/php-fpm$phpv
@@ -107,7 +114,7 @@ install -d -m 0755 -o root -g root /var/lib/kienzle/firewall /var/lib/kienzle/up
 install -d -m 0755 -o root -g root /etc/kienzle/verbindungen /etc/kienzle/verbindungen/module /etc/kienzle/schluessel /var/spool/kienzle /var/spool/kienzle/ablage
 install -d -m 0755 -o ks-ablage -g ks-ablage /var/lib/kienzle/ablage
 install -d -m 0700 -o root -g root /etc/kienzle/sicherung /var/cache/kienzle-sicherung
-install -d -m 0755 -o root -g root /var/lib/kienzle/sicherung /var/lib/kienzle/ueberblick
+install -d -m 0755 -o root -g root /var/lib/kienzle/sicherung /var/lib/kienzle/ueberblick /var/lib/kienzle/servername
 install -d -m 0700 -o ks-ablage -g ks-ablage /var/lib/kienzle/ablage/.ssh
 # Eigener SSH-Schlüssel des Netzwerkspeicher-Dienstes (für SFTP-Ziele; der öffentliche Teil steht unter Verwaltung → Verbindungen).
 if [ ! -f /var/lib/kienzle/ablage/.ssh/id_ed25519 ] && command -v ssh-keygen >/dev/null; then
@@ -124,7 +131,7 @@ chown -R root:root "$tmp"; chmod -R u=rwX,go=rX "$tmp"
 rm -rf -- "$release.alt"; [ -e "$release" ] && mv -- "$release" "$release.alt"
 mv -- "$tmp" "$release"; rm -rf -- "$release.alt"
 ln -sfn "releases/$version" /opt/kienzle/core/.current.neu && mv -Tf /opt/kienzle/core/.current.neu /opt/kienzle/core/current
-for tool in kienzle-admin kienzle-zertifikat kienzle-web kienzle-modul-pruefen kienzle-update kienzle-verbindungen kienzle-sicherung kienzle-ueberblick kienzle-drucker; do ln -sfn "/opt/kienzle/core/current/bin/$tool" "/usr/local/sbin/$tool"; done
+for tool in kienzle-admin kienzle-zertifikat kienzle-web kienzle-modul-pruefen kienzle-update kienzle-verbindungen kienzle-sicherung kienzle-ueberblick kienzle-drucker kienzle-servername; do ln -sfn "/opt/kienzle/core/current/bin/$tool" "/usr/local/sbin/$tool"; done
 
 if [ -n "$restore" ]; then
   echo '== Wiederherstellung aus der Sicherung'
@@ -243,6 +250,7 @@ install -m 0644 "$vorlagen/kienzle-zertifikat.service" "$vorlagen/kienzle-zertif
   "$vorlagen/kienzle-sicherung.path" "$vorlagen/kienzle-sicherung-anwenden.service" "$vorlagen/kienzle-sicherung.service" "$vorlagen/kienzle-sicherung.timer" \
   "$vorlagen/kienzle-ueberblick.path" "$vorlagen/kienzle-ueberblick.service" "$vorlagen/kienzle-ueberblick.timer" \
   "$vorlagen/kienzle-drucker.path" "$vorlagen/kienzle-drucker-anwenden.service" "$vorlagen/kienzle-drucker.timer" \
+  "$vorlagen/kienzle-servername.path" "$vorlagen/kienzle-servername-anwenden.service" \
   /etc/systemd/system/
 chmod 0644 /etc/systemd/system/kienzle-core-php.service
 
@@ -250,7 +258,7 @@ chmod 0644 /etc/systemd/system/kienzle-core-php.service
 if [ -L /etc/nginx/sites-enabled/default ] && [ "$(readlink /etc/nginx/sites-enabled/default)" = /etc/nginx/sites-available/default ]; then
   rm -f /etc/nginx/sites-enabled/default
 fi
-KIENZLE_NGINX_RELOAD='' /opt/kienzle/core/current/bin/kienzle-web schreiben
+KIENZLE_NGINX_RELOAD="" /opt/kienzle/core/current/bin/kienzle-web neu
 /opt/kienzle/core/current/bin/kienzle-verbindungen verteilen
 if [ -z "$nosystemd" ]; then
   systemctl daemon-reload
@@ -258,7 +266,7 @@ if [ -z "$nosystemd" ]; then
   systemctl disable --now "php$phpv-fpm.service" >/dev/null 2>&1 || true
   systemctl enable --now kienzle-core-php.service kienzle-zertifikat.timer kienzle-firewall.path
   systemctl enable kienzle-firewall.service kienzle-update-start.service
-  systemctl enable --now kienzle-update.path kienzle-update-pruefen.timer kienzle-verbindungen.path kienzle-ablage.timer kienzle-sicherung.path kienzle-sicherung.timer kienzle-ueberblick.path kienzle-ueberblick.timer kienzle-drucker.path kienzle-drucker.timer
+  systemctl enable --now kienzle-update.path kienzle-update-pruefen.timer kienzle-verbindungen.path kienzle-ablage.timer kienzle-sicherung.path kienzle-sicherung.timer kienzle-ueberblick.path kienzle-ueberblick.timer kienzle-drucker.path kienzle-drucker.timer kienzle-servername.path
   # Druckserver: CUPS und smbd; nmbd (NetBIOS) und der AD-Dienst werden nicht gebraucht.
   systemctl disable --now nmbd.service samba-ad-dc.service >/dev/null 2>&1 || true
   systemctl enable cups.service smbd.service >/dev/null 2>&1 || true
@@ -291,6 +299,10 @@ echo "Kienzle-Suite Basis $version ist installiert: https://${names[0]}/"
 echo 'Zertifizierungsstelle für die Arbeitsplätze: https://'"${names[0]}"'/ca.crt'
 echo "Einrichtungs-Überblick: https://${names[0]}/verwaltung/einrichtung"
 echo "Fingerabdruck zum Vergleich: $(/opt/kienzle/core/current/bin/kienzle-zertifikat status | sed -n 's/^CA (SHA-256): //p')"
+if [ -n "$auto_names" ]; then
+  echo "Erreichbar unter: ${names[*]}. Den endgültigen Namen (für Passkeys nötig) und den Praxisnamen bitte unter"
+  echo "Verwaltung → Server festlegen."
+fi
 /opt/kienzle/core/current/bin/kienzle-ueberblick sammeln >/dev/null || echo 'Hinweis: Einrichtungs-Überblicke der Module nicht lesbar.'
 if [ -n "$admin_reset" ]; then /opt/kienzle/core/current/bin/kienzle-admin zuruecksetzen "$admin_reset"; fi
 if [ -n "$nosystemd" ] || [ -n "$update" ]; then exit 0; fi
