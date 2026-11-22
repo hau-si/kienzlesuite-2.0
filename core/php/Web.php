@@ -18,7 +18,7 @@ final class Web {
     public function __construct(
         private Config $config, private Database $db, private Users $users, private Auth $auth, private ?Passkeys $passkeys,
         private Modules $modules, private AuditLog $audit, ?callable $qr = null, private ?Firewall $firewall = null, private ?Updates $updates = null,
-        private ?Connections $connections = null,
+        private ?Connections $connections = null, private ?Backup $backup = null,
     ) {
         $this->qr = $qr ?? static function (string $uri): ?string {
             if (!is_executable('/usr/bin/qrencode')) return null;
@@ -435,6 +435,12 @@ final class Web {
         if ($r->path === '/verwaltung/firewall/aus' && !$get) return $this->firewallOff($admin);
         if ($r->path === '/verwaltung/updates') return $get ? $this->updatesPage() : $this->updatesAction($r, $admin);
         if ($r->path === '/verwaltung/verbindungen') return $get ? $this->connectionsPage() : $this->connectionsAction($r, $admin);
+        if ($r->path === '/verwaltung/sicherung') return $get ? $this->backupPage() : $this->backupAction($r, $admin);
+        if ($r->path === '/verwaltung/sicherung/blatt' && $get) {
+            $this->audit->write($admin, 'sicherung-blatt-angezeigt');
+            return Response::html($this->bk()->sheet())->with('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'")
+                ->with('Cache-Control', 'no-store');
+        }
         throw new Problem('Seite nicht gefunden.', 404);
     }
 
@@ -838,12 +844,118 @@ final class Web {
         return Response::redirect('/verwaltung/verbindungen');
     }
 
+    // ---- Sicherung ----------------------------------------------------------------------------------------------
+    private function bk(): Backup {
+        if (!$this->backup) throw new Problem('Die Sicherung ist auf diesem Server nicht verfügbar.', 503);
+        return $this->backup;
+    }
+
+    private function result(?array $r, string $label): string {
+        if (!$r) return '<tr><td>' . V::h($label) . '</td><td>–</td></tr>';
+        return '<tr><td>' . V::h($label) . '</td><td class="' . (($r['ok'] ?? false) ? 'ok' : 'error') . '">' . V::date((int)($r['zeit'] ?? 0)) . ' – '
+            . (($r['ok'] ?? false) ? 'in Ordnung' : 'Fehler') . (isset($r['meldung']) ? ': ' . V::h((string)$r['meldung']) : '')
+            . (isset($r['bytes']) ? ' (' . (int)($r['bytes'] / 1048576) . ' MB geprüft, ' . (int)(($r['neu'] ?? 0) / 1048576) . ' MB neu)' : '') . '</td></tr>';
+    }
+
+    private function backupPage(?string $error = null): Response {
+        $st = $this->bk()->status();
+        $busy = $st['pending'] || $st['laeuft'] !== '';
+        $dis = $busy ? ' disabled' : '';
+        $form = fn(string $action, string $label, string $class = '', array $extra = []) => '<form method="post" action="/verwaltung/sicherung" class="inline">'
+            . $this->hidden($action, $extra) . '<button' . ($class ? ' class="' . $class . '"' : '') . $dis . '>' . V::h($label) . '</button></form> ';
+        $body = V::error($error)
+            . ($st['letzte'] ? '<p class="' . ($st['letzte']['ok'] ? 'notice' : 'error') . '">' . V::h((string)$st['letzte']['meldung']) . '</p>' : '')
+            . ($busy ? '<p class="notice">Vorgang läuft: ' . V::h($st['laeuft'] ?: 'wird übernommen') . ' …</p>' : '')
+            . implode('', array_map(fn($w) => '<p class="error">' . V::h($w) . '</p>', $st['warnungen']))
+            . (!$st['service'] ? '<p class="error">Der Sicherungsdienst ist nicht eingerichtet. Bitte den Installer ausführen.</p>' : '');
+        if (!$st['eingerichtet']) {
+            $targets = $this->connections ? $this->connections->status()['ablage'] : [];
+            $opts = implode('', array_map(fn($t) => '<option value="' . V::h((string)$t['id']) . '">' . V::h((string)$t['name']) . ' (' . V::h(strtoupper((string)$t['art'])) . ')</option>', $targets));
+            $body .= '<p>Die Sicherung wird auf dem Server verschlüsselt (restic). Das Passwort wird zufällig erzeugt und einmal auf einem Wiederherstellungsblatt '
+                . 'ausgegeben – ohne dieses Blatt lässt sich die Sicherung nach einem Totalausfall nicht lesen.</p>'
+                . '<form method="post" action="/verwaltung/sicherung" class="box wide">' . $this->hidden('einrichten')
+                . '<label class="check"><input type="radio" name="art" value="ziel" checked> Netzwerkspeicher aus „Verbindungen“ (SFTP empfohlen)</label>'
+                . ($opts !== '' ? '<label>Ziel<select name="id">' . $opts . '</select></label>' : '<p class="error">Noch kein Ziel unter <a href="/verwaltung/verbindungen">Verbindungen</a> eingetragen.</p>')
+                . V::input('ordner', 'Unterordner auf dem Ziel', 'text', 'kienzle-sicherung')
+                . '<label class="check"><input type="radio" name="art" value="rest"> restic-REST-Server (z. B. im Nur-Anfügen-Modus auf dem NAS)</label>'
+                . V::input('url', 'Adresse', 'url', '', 'placeholder="https://nas.example.org:8000/kienzle"') . V::input('benutzer', 'Benutzer (REST)', 'text')
+                . V::input('passwort', 'Passwort (REST)', 'password', '', 'autocomplete="new-password"')
+                . '<label class="check"><input type="radio" name="art" value="lokal"> Ordner auf diesem Server (z. B. eingehängte USB-Platte)</label>'
+                . V::input('pfad', 'Ordner', 'text', '', 'placeholder="/media/sicherung"')
+                . '<button' . $dis . '>Sicherung einrichten</button></form>';
+            $response = Response::html(V::page('Sicherung', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+            return $busy ? $response->with('Refresh', '3') : $response;
+        }
+        if ($st['blatt']) {
+            $body .= '<div class="box wide notice"><p><strong>Wiederherstellungsblatt jetzt drucken</strong> und im Praxistresor aufbewahren. Es enthält das Passwort der Sicherung.</p>'
+                . '<p><a class="button" href="/verwaltung/sicherung/blatt" target="_blank" rel="noopener">Blatt anzeigen und drucken</a></p>'
+                . $form('blatt-gedruckt', 'Blatt ist gedruckt – vom Server löschen') . '</div>';
+        }
+        $body .= '<table>' . $this->result($st['letzte_sicherung'], 'Letzte Sicherung') . $this->result($st['letzte_pruefung'], 'Letzte Prüfung')
+            . $this->result($st['letzte_probe'], 'Probe-Wiederherstellung') . $this->result($st['letztes_aufraeumen'], 'Aufräumen') . '</table>'
+            . '<p>Täglich nachts sichern, sonntags aufräumen und prüfen, am ersten Sonntag im Monat zusätzlich lesen und probeweise wiederherstellen.</p><p>'
+            . $form('jetzt', 'Jetzt sichern') . $form('pruefen', 'Prüfen') . $form('pruefen', 'Prüfen und 5 % lesen', '', ['lesen' => '1'])
+            . $form('probe', 'Probe-Wiederherstellung') . $form('aufraeumen', 'Aufräumen') . '</p>';
+        $body .= '<h2>Schutz vor Erpressungstrojanern</h2><form method="post" action="/verwaltung/sicherung" class="box wide">' . $this->hidden('nas-schnappschuesse')
+            . '<p>Wer den Server übernimmt, könnte Sicherungen löschen. Schutz: schreibgeschützte Schnappschüsse des Sicherungsordners <strong>am NAS</strong> '
+            . '(z. B. täglich, 30 Tage) oder ein REST-Server im Nur-Anfügen-Modus. Das wird am NAS eingerichtet, nicht hier.</p>'
+            . V::checkbox('bestaetigt', '1', 'Am NAS sind schreibgeschützte Schnappschüsse eingerichtet', !in_array('Schreibgeschützte Schnappschüsse am NAS sind nicht als eingerichtet bestätigt (Schutz vor Erpressungstrojanern).', $st['warnungen'], true))
+            . '<button' . $dis . '>Speichern</button></form>';
+        $body .= '<h2>Aufbewahrung</h2><form method="post" action="/verwaltung/sicherung" class="box">' . $this->hidden('aufbewahren')
+            . V::input('daily', 'Tägliche', 'number', '7', 'min="0" max="1000"') . V::input('weekly', 'Wöchentliche', 'number', '4', 'min="0" max="1000"')
+            . V::input('monthly', 'Monatliche', 'number', '12', 'min="0" max="1000"') . V::input('yearly', 'Jährliche', 'number', '3', 'min="0" max="1000"')
+            . '<button' . $dis . '>Speichern</button></form>';
+        $rows = '';
+        $parts = '';
+        foreach ($st['teile'] as $id => $name) $parts .= '<option value="' . V::h($id) . '">' . V::h($name) . '</option>';
+        foreach (array_reverse(array_slice($st['schnappschuesse'], -20)) as $snap) {
+            $rows .= '<tr><td><code>' . V::h((string)$snap['id']) . '</code></td><td>' . V::h(str_replace('T', ' ', (string)$snap['zeit'])) . '</td><td>'
+                . '<form method="post" action="/verwaltung/sicherung" class="inline">' . $this->hidden('wiederherstellen', ['snapshot' => (string)$snap['id']])
+                . '<select name="teil">' . $parts . '</select> <button class="danger"' . $dis . '>Wiederherstellen</button></form></td></tr>';
+        }
+        $body .= '<h2>Vorhandene Sicherungen</h2>' . $form('schnappschuesse', 'Liste aktualisieren')
+            . ($rows !== '' ? '<p><strong>Achtung:</strong> Wiederherstellen ersetzt die Daten des gewählten Teils durch den Stand der Sicherung; spätere Änderungen gehen verloren.</p>'
+                . '<table><tr><th>Sicherung</th><th>Zeit</th><th></th></tr>' . $rows . '</table>' : '<p>Noch keine.</p>');
+        $response = Response::html(V::page('Sicherung', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+        return $busy ? $response->with('Refresh', '3') : $response;
+    }
+
+    private function backupAction(Request $r, string $admin): Response {
+        $b = $this->bk();
+        $a = $r->field('aktion', 30);
+        try {
+            if ($a === 'einrichten') {
+                $b->setup(['art' => $r->field('art', 10), 'id' => $r->field('id', 40), 'ordner' => $r->field('ordner'), 'url' => $r->field('url'), 'benutzer' => $r->field('benutzer', 100),
+                    'passwort' => $r->field('passwort'), 'pfad' => $r->field('pfad')], $this->config->practice);
+            } elseif ($a === 'aufbewahren') {
+                $keep = [];
+                foreach (['daily', 'weekly', 'monthly', 'yearly'] as $k) {
+                    if (!ctype_digit($r->field($k, 5))) throw new Problem('Aufbewahrung: bitte ganze Zahlen.', 422);
+                    $keep[$k] = (int)$r->field($k, 5);
+                }
+                $b->action('aufbewahren', ['aufbewahren' => $keep]);
+            } elseif ($a === 'nas-schnappschuesse') {
+                $b->action($a, ['bestaetigt' => $r->field('bestaetigt') === '1']);
+            } elseif ($a === 'pruefen') {
+                $b->action($a, ['lesen' => $r->field('lesen') === '1']);
+            } elseif ($a === 'wiederherstellen') {
+                $b->action($a, ['snapshot' => $r->field('snapshot', 20), 'teil' => $r->field('teil', 40)]);
+            } else {
+                $b->action($a);
+            }
+        } catch (Problem $e) {
+            return $this->backupPage($e->getMessage());
+        }
+        $this->audit->write($admin, 'sicherung-' . $a, $a === 'wiederherstellen' ? $r->field('teil', 40) . ' ' . $r->field('snapshot', 20) : '');
+        return Response::redirect('/verwaltung/sicherung');
+    }
+
     // ---- Hilfen -------------------------------------------------------------------------------------------------
     private function nav(): ?array {
         if (($this->session['stage'] ?? '') !== 'full') return null;
         $admin = (int)$this->session['user_admin'] === 1;
         return ['login' => $this->session['login'], 'admin' => $admin, 'csrf' => $this->session['csrf'],
-            'updates' => $admin && $this->updates ? $this->updates->count() : 0];
+            'updates' => $admin && $this->updates ? $this->updates->count() : 0, 'sicherung' => $admin && $this->backup ? $this->backup->count() : 0];
     }
 
     private function issuer(): string { return $this->config->practice !== '' ? 'Kienzle-Suite ' . $this->config->practice : 'Kienzle-Suite'; }
@@ -893,7 +1005,7 @@ final class Web {
             ->with('Cross-Origin-Opener-Policy', 'same-origin')
             ->with('Cross-Origin-Resource-Policy', 'same-origin')
             ->with('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), publickey-credentials-get=(self), publickey-credentials-create=(self)');
-        if ($response->header('Content-Type') !== null && str_starts_with((string)$response->header('Content-Type'), 'text/html')) {
+        if ($response->header('Content-Security-Policy') === null && $response->header('Content-Type') !== null && str_starts_with((string)$response->header('Content-Type'), 'text/html')) {
             $response->with('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
         }
         return $response;

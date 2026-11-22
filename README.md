@@ -4,8 +4,8 @@ Praxis-Appliance für Hausarztpraxen mit T2med: **eine Basis**, einmal auf einer
 einzeln dazukommen – Kartenzahlung (SumUp), Terminzettel, Fax, Telefon, Kienzlezeit. Verwaltung komplett im
 Webinterface; Firewall, Benutzer, Admin-Zugang mit OTP, Updates und verschlüsselte Sicherung gibt es nur einmal, in der Basis.
 
-Stand: **Basis 0.5.0**, Meilenstein 5 von 8 ([docs/PLAN.md](docs/PLAN.md)): Anmeldung für alle Module, Benutzer und
-Rechte, Admin-OTP, Passkeys, lokale Zertifizierungsstelle, Firewall, Updater mit signierten Releases, Netzwerkspeicher und zentrale Verbindungen. Installierbar nur auf einer Test-VM ([docs/VM-TEST.md](docs/VM-TEST.md)).
+Stand: **Basis 0.6.0**, Meilenstein 6 von 8 ([docs/PLAN.md](docs/PLAN.md)): Anmeldung für alle Module, Benutzer und
+Rechte, Admin-OTP, Passkeys, lokale Zertifizierungsstelle, Firewall, Updater mit signierten Releases, Netzwerkspeicher und zentrale Verbindungen, verschlüsselte Sicherung mit restic. Installierbar nur auf einer Test-VM ([docs/VM-TEST.md](docs/VM-TEST.md)).
 
 ![Basis und Module](docs/architektur-whiteboard.png)
 

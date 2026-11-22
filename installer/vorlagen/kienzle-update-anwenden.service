@@ -8,4 +8,4 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 ExecStart=/opt/kienzle/core/current/bin/kienzle-update anwenden
-TimeoutStartSec=3600
+TimeoutStartSec=6h

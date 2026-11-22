@@ -341,6 +341,19 @@ def cleanup(current: str, previous: str) -> None:
             log(f'Alte Version {v} entfernt.')
 
 
+def pre_backup() -> None:
+    """Vor dem Update eine restic-Sicherung, falls eingerichtet (ARCHITEKTUR.md, Updates Punkt 4). Ein Fehler hält das
+    Update nicht auf – der lokale Daten-Schnappschuss danach ist der Rückweg –, steht aber im Protokoll."""
+    cmd = E('KIENZLE_UPDATE_SICHERUNG', '/opt/kienzle/core/current/bin/kienzle-sicherung')
+    if not cmd or not Path(cmd).is_file() or not Path(E('KIENZLE_SICHERUNG_ETC', '/etc/kienzle/sicherung'), 'einstellungen.json').is_file():
+        return
+    try:
+        r = subprocess.run([cmd, 'jetzt'], capture_output=True, text=True, timeout=6 * 3600)
+        log('Sicherung vor dem Update: ' + ('erfolgreich.' if r.returncode == 0 else 'fehlgeschlagen – ' + (r.stderr.strip() or r.stdout.strip())[-200:]))
+    except (OSError, subprocess.SubprocessError) as e:
+        log(f'Sicherung vor dem Update fehlgeschlagen: {e}')
+
+
 def install(version: str, rollback_to_local: bool = False) -> None:
     """Basis auf `version` bringen. rollback_to_local: auf eine hier aufbewahrte ältere Version zurück (von Hand)."""
     current = installed()
@@ -400,6 +413,7 @@ def install(version: str, rollback_to_local: bool = False) -> None:
         return
 
     set_status(step='sichern')
+    pre_backup()
     _run(STOP)
     snap = snapshot(current)
     set_status(step='installieren', snapshot=str(snap))

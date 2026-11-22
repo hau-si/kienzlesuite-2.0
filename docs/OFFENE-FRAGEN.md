@@ -20,3 +20,12 @@ Wo eine Entscheidung nötig war, steht dabei, was umgesetzt wurde; das lässt si
 6. **SFTP nur mit Schlüssel:** Passwort-Anmeldung über SFTP habe ich bewusst nicht eingebaut (bräuchte `sshpass`, Passwort im Prozess).
    Passt das für die NAS in den Praxen?
 7. **E-Mail prüfen ohne Versand:** „Anmeldung prüfen“ meldet sich nur am Server an. Soll es zusätzlich „Testmail an …“ geben?
+
+## Aus M6 (Sicherung)
+
+8. **SFTP bei Totalausfall:** Die neue VM hat zunächst einen neuen SSH-Schlüssel; ihn muss man für die Wiederherstellung
+   am NAS kurz erlauben (der Installer zeigt ihn an). Danach gilt wieder der alte, mitgesicherte Schlüssel. Alternativ SMB
+   oder REST für die Wiederherstellung. Reicht das, oder soll der Schlüssel zusätzlich auf dem Blatt stehen (dann wäre er auf Papier)?
+9. **Zweite Kopie außer Haus** (z. B. USB-Platte im Wechsel oder ein zweites Ziel): bisher nur ein Ziel je Server. Bedarf?
+10. **E-Mail bei Fehlern der Sicherung:** bisher nur die Warnung im Webinterface. Über die zentrale E-Mail-Verbindung nachrüsten?
+11. **Uhrzeit:** täglich 02:30 (± 20 Min.). Laufen die Server in den Praxen nachts?

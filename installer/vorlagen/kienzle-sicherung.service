@@ -1,0 +1,15 @@
+# Kienzle-Suite: nächtliche Sicherung (sonntags zusätzlich aufräumen und prüfen, monatlich Probe-Wiederherstellung).
+[Unit]
+Description=Kienzle-Suite Sicherung
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/kienzle/core/current/bin/kienzle-sicherung taeglich
+TimeoutStartSec=12h
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=yes
+ProtectHome=yes
+PrivateTmp=yes

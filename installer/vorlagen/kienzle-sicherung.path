@@ -1,0 +1,10 @@
+# Kienzle-Suite: Aufträge der Seite „Sicherung“ übernehmen (Anfragedatei von ks-core).
+[Unit]
+Description=Kienzle-Suite Sicherung (Anfragen)
+
+[Path]
+PathExists=/var/lib/kienzle/core/anfragen/sicherung.json
+Unit=kienzle-sicherung-anwenden.service
+
+[Install]
+WantedBy=multi-user.target

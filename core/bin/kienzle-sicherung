@@ -1,0 +1,86 @@
+#!/usr/bin/python3 -IB
+"""Datensicherung der Kienzle-Suite mit restic (nur root, gestartet von systemd).
+
+  kienzle-sicherung anwenden    Anfrage des Webinterfaces verarbeiten (kienzle-sicherung.path)
+  kienzle-sicherung taeglich    Nächtlicher Lauf (kienzle-sicherung.timer): sichern, sonntags aufräumen und prüfen
+  kienzle-sicherung jetzt       Sofort sichern
+  kienzle-sicherung status      Stand und Warnungen anzeigen
+  kienzle-sicherung komplett [--json DATEI]
+                                Nach Totalausfall alles aus der letzten Sicherung holen (ruft der Installer mit
+                                --wiederherstellen auf; fragt Ablage und Passwort vom Wiederherstellungsblatt ab)
+"""
+import getpass
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'lib'))
+from kienzle import sicherung as s  # noqa: E402
+
+
+
+def ask(prompt: str, default: str = '') -> str:
+    value = input(f'{prompt}{f" [{default}]" if default else ""}: ').strip()
+    return value or default
+
+
+def interactive() -> tuple[dict, str]:
+    """Angaben vom Wiederherstellungsblatt abfragen."""
+    from kienzle import ablage
+    print('Wo liegt die Sicherung?  1) SFTP  2) SMB-Freigabe  3) restic-REST-Server  4) Ordner auf diesem Server')
+    art = ask('Auswahl', '1')
+    if art == '4':
+        ziel = {'art': 'lokal', 'pfad': ask('Ordner')}
+    elif art == '3':
+        ziel = {'art': 'rest', 'url': ask('Adresse (https://…)'), 'benutzer': ask('Benutzer (leer = keiner)')}
+        ziel['passwort'] = getpass.getpass('Passwort des REST-Servers: ') if ziel['benutzer'] else ''
+    elif art in ('1', '2'):
+        t = {'id': 'wiederherstellung', 'name': 'Wiederherstellung', 'art': 'sftp' if art == '1' else 'smb', 'host': ask('Server (Name oder IP)'),
+             'ordner': ask('Basisordner auf dem Server (leer = keiner)'), 'benutzer': ask('Benutzer')}
+        if art == '1':
+            t['port'] = int(ask('Port', '22'))
+            keys = ablage.scan_hostkey(t['host'], t['port'])
+            if not keys:
+                raise s.Fehler('Der SFTP-Server antwortet nicht.')
+            print('Fingerabdruck des Servers: ' + ablage.fingerprint(keys[0]))
+            if ask('Stimmt er mit dem am NAS angezeigten überein? (ja/nein)', 'nein') != 'ja':
+                raise s.Fehler('Abgebrochen.')
+            t['hostkey'] = keys[0]
+            print('Der SSH-Schlüssel dieses Servers muss am NAS erlaubt sein (steht nach der Wiederherstellung wieder unter Verbindungen):')
+            print(Path('/var/lib/kienzle/ablage/.ssh/id_ed25519.pub').read_text().strip() if Path('/var/lib/kienzle/ablage/.ssh/id_ed25519.pub').exists() else '(noch keiner)')
+        else:
+            t['freigabe'] = ask('Freigabe')
+            t['passwort'] = getpass.getpass('Passwort der Freigabe: ')
+        ziel = {'art': 'ziel', 'direkt': t, 'ordner': ask('Unterordner der Sicherung', 'kienzle-sicherung')}
+    else:
+        raise s.Fehler('Unbekannte Auswahl.')
+    return ziel, getpass.getpass('Passwort vom Wiederherstellungsblatt: ').replace(' ', '')
+
+
+if __name__ == '__main__':
+    cmd = sys.argv[1:]
+    try:
+        if cmd == ['anwenden']:
+            s.handle()
+        elif cmd == ['taeglich']:
+            print('Sicherung: ' + ', '.join(s.daily()))
+        elif cmd == ['jetzt']:
+            r = s.backup()
+            print(f'Gesichert: {r["snapshot"]} ({r["bytes"] // 1048576} MB geprüft, {r["neu"] // 1048576} MB neu).')
+        elif cmd[:1] == ['komplett'] and cmd[1:] in ([], ['--json', *cmd[2:3]]) and len(cmd) in (1, 3):
+            if len(cmd) == 3:
+                data = json.loads(Path(cmd[2]).read_text(encoding='utf-8'))
+                ziel, password = data['ziel'], data['passwort']
+            else:
+                ziel, password = interactive()
+            parts = s.full_restore(ziel, password)
+            print(f'Wiederhergestellt: {len(parts)} Teile aus der letzten Sicherung.')
+        elif cmd == ['status']:
+            st = s.set_status()
+            print(json.dumps({k: st.get(k) for k in ('letzte_sicherung', 'letzte_pruefung', 'letzte_probe', 'warnungen')}, ensure_ascii=False, indent=1))
+        else:
+            print(__doc__.strip(), file=sys.stderr)
+            sys.exit(2)
+    except (s.Fehler, s.ablage.Fehler, ValueError, KeyError, OSError) as e:
+        print(f'Fehler: {e}', file=sys.stderr)
+        sys.exit(1)

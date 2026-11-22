@@ -115,4 +115,27 @@ c -b "$T/dora" "https://$host/verwaltung/updates" | grep -q 'Installiert: <stron
 c -b "$T/dora" "https://$host/verwaltung/firewall" | grep -q 'Freigegebene Netze' || fail 'Firewall-Seite'
 c -b "$T/dora" "https://$host/verwaltung/verbindungen" | grep -q 'T2med (FHIR)' || fail 'Verbindungsseite'
 
+echo '== Sicherung (echtes restic, Ziel: lokaler Ordner)'
+for u in kienzle-sicherung.path kienzle-sicherung-anwenden.service kienzle-sicherung.service kienzle-sicherung.timer; do [ -f "/etc/systemd/system/$u" ] || fail "$u fehlt"; done
+sicher() { runuser -u ks-core -- sh -c "umask 077; printf '%s' '$1' > /var/lib/kienzle/core/anfragen/sicherung.json"; /opt/kienzle/core/current/bin/kienzle-sicherung anwenden
+  python3 -c 'import json,sys; s=json.load(open("/var/lib/kienzle/sicherung/status.json"))["letzte"]; print(s["meldung"]); sys.exit(0 if s["ok"] else 1)' || fail "Sicherung: $1"; }
+sicher '{"action":"einrichten","ziel":{"art":"lokal","pfad":"/srv/test-sicherung"},"praxis":"Praxis Beispiel"}'
+[ "$(stat -c '%a %U' /etc/kienzle/sicherung/passwort)" = '600 root' ] || fail 'Sicherungspasswort falsch geschützt'
+if runuser -u ks-core -- cat /etc/kienzle/sicherung/passwort >/dev/null 2>&1; then fail 'ks-core liest das Sicherungspasswort'; fi
+c -b "$T/dora" "https://$host/verwaltung/sicherung/blatt" | grep -q "$(cat /etc/kienzle/sicherung/passwort)" || fail 'Wiederherstellungsblatt'
+sicher '{"action":"jetzt"}'
+sicher '{"action":"probe"}'
+sicher '{"action":"pruefen","lesen":true}'
+snap=$(python3 -c 'import json; print(json.load(open("/var/lib/kienzle/sicherung/status.json"))["schnappschuesse"][-1]["id"])')
+sql() { runuser -u ks-core -- php -r '$p = new PDO("sqlite:/var/lib/kienzle/core/core.sqlite"); $r = $p->query($argv[1]); echo $r ? $r->fetchColumn() : "";' "$1"; }
+sql "INSERT INTO settings VALUES ('test_nach_sicherung', '1', 0)" >/dev/null
+[ "$(sql "SELECT count(*) FROM settings WHERE key = 'test_nach_sicherung'")" = 1 ] || fail 'Testeintrag'
+sicher "{\"action\":\"wiederherstellen\",\"teil\":\"core\",\"snapshot\":\"$snap\"}"
+[ "$(sql "SELECT count(*) FROM settings WHERE key = 'test_nach_sicherung'")" = 0 ] || fail 'Wiederherstellung hat den späteren Eintrag nicht entfernt'
+[ "$(sql "SELECT count(*) FROM users WHERE login = 'dora'")" = 1 ] || fail 'Benutzer nach Wiederherstellung fehlt'
+[ "$(stat -c '%U' /var/lib/kienzle/core/core.sqlite)" = ks-core ] || fail 'Datenbank nach Wiederherstellung nicht ks-core'
+c -b "$T/dora" "https://$host/verwaltung/sicherung" | grep -q 'Letzte Sicherung' || fail 'Sicherungsseite'
+sicher '{"action":"blatt-gedruckt"}'
+[ ! -e /var/lib/kienzle/sicherung/blatt.html ] || fail 'Blatt nicht gelöscht'
+
 echo 'Ende-zu-Ende-Prüfung bestanden.'

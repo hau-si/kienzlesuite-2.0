@@ -60,7 +60,8 @@ class Umgebung(unittest.TestCase):
         env = {'KIENZLE_UPDATE_STATE': self.t / 'state', 'KIENZLE_UPDATE_REQUEST': self.t / 'daten/anfragen/update.json', 'KIENZLE_UPDATE_KEYS': self.t / 'keys',
                'KIENZLE_UPDATE_CORE': self.t / 'core', 'KIENZLE_UPDATE_DATA': self.t / 'daten', 'KIENZLE_UPDATE_SETTINGS': self.t / 'einstellungen',
                'KIENZLE_UPDATE_MODULES': self.t / 'modules.json', 'KIENZLE_UPDATE_QUELLE': f'ordner:{self.t / "quelle"}', 'KIENZLE_UPDATE_STOP': 'true',
-               'KIENZLE_UPDATE_START': 'true', 'KIENZLE_UPDATE_HEALTH': str(self.t / 'health'), 'KIENZLE_UPDATE_HEALTH_SECONDS': '1', 'KIENZLE_UPDATE_UID': os.getuid()}
+               'KIENZLE_UPDATE_START': 'true', 'KIENZLE_UPDATE_HEALTH': str(self.t / 'health'), 'KIENZLE_UPDATE_HEALTH_SECONDS': '1', 'KIENZLE_UPDATE_UID': os.getuid(),
+               'KIENZLE_UPDATE_SICHERUNG': '', 'KIENZLE_SICHERUNG_ETC': self.t / 'sicherung'}
         patcher = mock.patch.dict(os.environ, {k: str(v) for k, v in env.items()})
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -215,6 +216,19 @@ class Updater(Umgebung):
         self.assertFalse((self.t / 'state' / 'arbeit' / 'core-0.4.0').exists())
         self.assertIn('Signatur, Manifest und alle Dateien geprüft', (self.t / 'state' / 'update.log').read_text())
         self.assertTrue((self.t / 'core' / 'releases' / '0.4.0' / 'installer' / 'install.sh').is_file())
+
+    def test_sicherung_vor_dem_update(self):
+        (self.t / 'sicherung').mkdir()
+        (self.t / 'sicherung' / 'einstellungen.json').write_text('{"ziel": {"art": "lokal", "pfad": "/media/x"}}')
+        fake = self.t / 'kienzle-sicherung'
+        fake.write_text(f'#!/bin/sh\necho "$@" > {self.t / "sicherung-aufgerufen"}\nexit 1\n')
+        fake.chmod(0o755)
+        os.environ['KIENZLE_UPDATE_SICHERUNG'] = str(fake)
+        self.publish('0.4.0')
+        self.request({'action': 'installieren', 'version': '0.4.0'})
+        self.assertEqual((self.t / 'sicherung-aufgerufen').read_text().strip(), 'jetzt')
+        self.assertEqual(self.status()['state'], 'done', 'fehlgeschlagene Sicherung darf das Update nicht aufhalten')
+        self.assertIn('Sicherung vor dem Update: fehlgeschlagen', (self.t / 'state' / 'update.log').read_text())
 
     def assert_unchanged(self, needle):
         s = self.status()

@@ -2,10 +2,11 @@
 # Kienzle-Suite: Installer der Basis für Ubuntu Server 26.04 LTS.
 #
 #   sudo bash installer/install.sh --name kienzle.praxis.internal [--name 192.168.1.10] [--praxis "Praxis Dr. Muster"]
+#   sudo bash installer/install.sh --wiederherstellen     (neue VM nach Totalausfall: alles aus der Sicherung holen)
 #
 # Mehrfaches Ausführen ist erlaubt: Vorhandenes (Schlüssel, Zertifizierungsstelle, Daten) bleibt erhalten.
-# Stand Meilenstein 2: Basis mit Anmeldung, lokaler Zertifizierungsstelle, php-fpm und nginx. Firewall, Updates,
-# Netzwerkspeicher, Sicherung, CUPS/Samba und autoinstall folgen (docs/PLAN.md, M3–M8).
+# Stand Meilenstein 6: Anmeldung, Zertifizierungsstelle, Firewall, Updater, Verbindungen, Sicherung.
+# CUPS/Samba, autoinstall und Druckerverwaltung folgen (docs/PLAN.md, M7–M8).
 set -euo pipefail
 
 here=$(cd -- "$(dirname -- "$0")/.." && pwd)
@@ -13,7 +14,7 @@ here=$(cd -- "$(dirname -- "$0")/.." && pwd)
 if [ -f "$here/core/VERSION" ]; then src=$here/core; else src=$here; fi
 version=$(tr -dc '0-9A-Za-z.+-' < "$src/VERSION")
 nosystemd=${KIENZLE_OHNE_SYSTEMD:-}      # nur für Tests im Container ohne systemd
-names=(); practice=''; update=''
+names=(); practice=''; update=''; restore=''; restore_json=''
 
 usage() { echo 'Aufruf: sudo bash installer/install.sh --name SERVERNAME [--name IP] [--praxis "Name"]'; exit 2; }
 while [ $# -gt 0 ]; do
@@ -21,6 +22,8 @@ while [ $# -gt 0 ]; do
     --name) [ $# -ge 2 ] || usage; names+=("$(printf '%s' "$2" | tr 'A-Z' 'a-z')"); shift 2 ;;
     --praxis) [ $# -ge 2 ] || usage; practice=$2; shift 2 ;;
     --aktualisieren) update=1; shift ;;   # vom Updater: ohne Rückfragen, ohne Einrichtungslink
+    --wiederherstellen) restore=1; shift ;;
+    --wiederherstellen-json) [ $# -ge 2 ] || usage; restore=1; restore_json=$2; shift 2 ;;   # für Tests: Angaben aus Datei
     -h|--hilfe) usage ;;
     *) echo "Unbekannte Option: $1"; usage ;;
   esac
@@ -35,7 +38,10 @@ fi
 [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'core/VERSION ungültig.'; exit 1; }
 
 conf=/etc/kienzle/core/core.json
-if [ ${#names[@]} -eq 0 ]; then
+if [ -n "$restore" ] && [ -f /var/lib/kienzle/core/core.sqlite ]; then
+  echo 'Auf diesem Server ist die Suite schon eingerichtet. Wiederherstellen nur auf einer frischen VM.'; exit 2
+fi
+if [ ${#names[@]} -eq 0 ] && [ -z "$restore" ]; then
   if [ -f "$conf" ]; then
     mapfile -t names < <(python3 -c 'import json,sys; print("\n".join(json.load(open(sys.argv[1]))["hostnames"]))' "$conf")
   else
@@ -66,7 +72,7 @@ wait_apt
 DEBIAN_FRONTEND=noninteractive apt-get update -q
 wait_apt
 DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends \
-  nginx php-fpm php-cli php-sqlite3 php-mbstring openssl qrencode python3 ca-certificates psmisc curl nftables iproute2 smbclient openssh-client
+  nginx php-fpm php-cli php-sqlite3 php-mbstring openssl qrencode python3 ca-certificates psmisc curl nftables iproute2 smbclient openssh-client restic cifs-utils
 
 phpv=$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')
 phpfpm=/usr/sbin/php-fpm$phpv
@@ -82,6 +88,8 @@ install -d -m 0700 -o ks-core -g ks-core /var/lib/kienzle/core /var/lib/kienzle/
 install -d -m 0755 -o root -g root /var/lib/kienzle/firewall /var/lib/kienzle/update /var/lib/kienzle/verbindungen
 install -d -m 0755 -o root -g root /etc/kienzle/verbindungen /etc/kienzle/verbindungen/module /etc/kienzle/schluessel /var/spool/kienzle /var/spool/kienzle/ablage
 install -d -m 0755 -o ks-ablage -g ks-ablage /var/lib/kienzle/ablage
+install -d -m 0700 -o root -g root /etc/kienzle/sicherung /var/cache/kienzle-sicherung
+install -d -m 0755 -o root -g root /var/lib/kienzle/sicherung
 install -d -m 0700 -o ks-ablage -g ks-ablage /var/lib/kienzle/ablage/.ssh
 # Eigener SSH-Schlüssel des Netzwerkspeicher-Dienstes (für SFTP-Ziele; der öffentliche Teil steht unter Verwaltung → Verbindungen).
 if [ ! -f /var/lib/kienzle/ablage/.ssh/id_ed25519 ] && command -v ssh-keygen >/dev/null; then
@@ -98,7 +106,22 @@ chown -R root:root "$tmp"; chmod -R u=rwX,go=rX "$tmp"
 rm -rf -- "$release.alt"; [ -e "$release" ] && mv -- "$release" "$release.alt"
 mv -- "$tmp" "$release"; rm -rf -- "$release.alt"
 ln -sfn "releases/$version" /opt/kienzle/core/.current.neu && mv -Tf /opt/kienzle/core/.current.neu /opt/kienzle/core/current
-for tool in kienzle-admin kienzle-zertifikat kienzle-web kienzle-modul-pruefen kienzle-update kienzle-verbindungen; do ln -sfn "/opt/kienzle/core/current/bin/$tool" "/usr/local/sbin/$tool"; done
+for tool in kienzle-admin kienzle-zertifikat kienzle-web kienzle-modul-pruefen kienzle-update kienzle-verbindungen kienzle-sicherung; do ln -sfn "/opt/kienzle/core/current/bin/$tool" "/usr/local/sbin/$tool"; done
+
+if [ -n "$restore" ]; then
+  echo '== Wiederherstellung aus der Sicherung'
+  if [ -n "$restore_json" ]; then
+    /opt/kienzle/core/current/bin/kienzle-sicherung komplett --json "$restore_json"
+  else
+    /opt/kienzle/core/current/bin/kienzle-sicherung komplett < /dev/tty
+  fi
+  # Namen und Praxis kommen aus der gesicherten Einstellung, sofern nicht neu angegeben.
+  if [ ${#names[@]} -eq 0 ]; then
+    mapfile -t names < <(python3 -c 'import json,sys; print("\n".join(json.load(open(sys.argv[1]))["hostnames"]))' "$conf")
+  fi
+  if [ -z "$practice" ]; then practice=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("practice",""))' "$conf"); fi
+  chown -R ks-core:ks-core /var/lib/kienzle/core
+fi
 
 echo '== Einstellungen und Schlüssel'
 python3 - "$conf" "$practice" "${names[@]}" <<'PY'
@@ -144,6 +167,7 @@ install -m 0644 "$vorlagen/kienzle-zertifikat.service" "$vorlagen/kienzle-zertif
   "$vorlagen/kienzle-update.path" "$vorlagen/kienzle-update-anwenden.service" "$vorlagen/kienzle-update-pruefen.service" \
   "$vorlagen/kienzle-update-pruefen.timer" "$vorlagen/kienzle-update-start.service" \
   "$vorlagen/kienzle-verbindungen.path" "$vorlagen/kienzle-verbindungen-anwenden.service" "$vorlagen/kienzle-ablage.service" "$vorlagen/kienzle-ablage.timer" \
+  "$vorlagen/kienzle-sicherung.path" "$vorlagen/kienzle-sicherung-anwenden.service" "$vorlagen/kienzle-sicherung.service" "$vorlagen/kienzle-sicherung.timer" \
   /etc/systemd/system/
 chmod 0644 /etc/systemd/system/kienzle-core-php.service
 
@@ -159,7 +183,7 @@ if [ -z "$nosystemd" ]; then
   systemctl disable --now "php$phpv-fpm.service" >/dev/null 2>&1 || true
   systemctl enable --now kienzle-core-php.service kienzle-zertifikat.timer kienzle-firewall.path
   systemctl enable kienzle-firewall.service kienzle-update-start.service
-  systemctl enable --now kienzle-update.path kienzle-update-pruefen.timer kienzle-verbindungen.path kienzle-ablage.timer
+  systemctl enable --now kienzle-update.path kienzle-update-pruefen.timer kienzle-verbindungen.path kienzle-ablage.timer kienzle-sicherung.path kienzle-sicherung.timer
   if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q 'Status: active'; then
     echo 'Hinweis: ufw ist aktiv. Die Firewall der Suite (Verwaltung → Firewall) arbeitet unabhängig davon; bitte nur eine von beiden verwenden.'
   fi

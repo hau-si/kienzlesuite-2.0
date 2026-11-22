@@ -75,3 +75,18 @@ Test-NAS oder zweite VM mit Samba-Freigabe und SFTP; ein Test-SMTP-Konto; wenn m
 5. [ ] E-Mail eintragen, „Anmeldung prüfen“: erfolgreich, es wird keine Nachricht verschickt.
 6. [ ] T2med eintragen (mit Zertifikat), „Verbindung prüfen“: CapabilityStatement.
 7. [ ] `sudo -u ks-core cat /etc/kienzle/verbindungen/ablage.json` wird verweigert.
+
+## Meilenstein 6 – Sicherung (Basis 0.6.0)
+
+Test-NAS mit SFTP und SMB-Freigabe aus M5.
+
+1. [ ] Verwaltung → Sicherung → Ziel (SFTP aus „Verbindungen“) einrichten. Blatt öffnen, drucken, „Blatt ist gedruckt“.
+       Danach liefert `/verwaltung/sicherung/blatt` 404.
+2. [ ] „Jetzt sichern“: Erfolg, Größe plausibel. Auf dem NAS liegt nur verschlüsseltes (`config`, `data/`, `keys/` …).
+3. [ ] „Prüfen und 5 % lesen“, „Probe-Wiederherstellung“: beides in Ordnung.
+4. [ ] Ziel SMB (zweite Test-VM): Sicherung läuft, `mount | grep cifs` zeigt danach nichts mehr.
+5. [ ] Einen Benutzer anlegen, dann Basis auf die Sicherung davor wiederherstellen: Benutzer ist weg, Anmeldung geht.
+6. [ ] `systemctl list-timers kienzle-sicherung.timer` zeigt den nächsten Lauf; am nächsten Morgen steht die Sicherung in der Liste.
+7. [ ] Totalausfall: neue VM, `sudo bash installer/install.sh --wiederherstellen`, Angaben vom Blatt: Anmeldung mit den alten
+       Zugangsdaten, Arbeitsplätze vertrauen dem Zertifikat weiter (gleiche CA).
+8. [ ] Am NAS schreibgeschützte Schnappschüsse einrichten und in der Suite bestätigen: keine Warnung mehr.

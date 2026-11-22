@@ -323,7 +323,10 @@ Unterordner (`{jahr}`/`{monat}`); SFTP nur mit Schlüssel; Prüfungen laufen im 
 
 ---
 
-## M6 – Backup mit restic 🖥
+## M6 – Backup mit restic 🖥 ✅
+
+**Stand:** umgesetzt in Basis 0.6.0 (`docs/RELEASE.md`). Abweichungen: ein Schnappschuss mit Tag `kienzle` statt Tags je Teil;
+SFTP- und REST-Server im CI-Container stehen noch aus. `--wiederherstellen` ist schon in M6 dabei.
 
 **Ziel:** Verschlüsselte, geprüfte Sicherung aller Teile nach `ARCHITEKTUR.md`, Abschnitt Backup.
 

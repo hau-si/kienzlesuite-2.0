@@ -1,5 +1,38 @@
 # Basis – Release-Notizen
 
+## 0.6.0
+
+Meilenstein 6 aus `docs/PLAN.md`: verschlüsselte Datensicherung mit restic.
+
+- **Verwaltung → Sicherung:** Ziel wählen (Netzwerkspeicher aus „Verbindungen“ per SFTP oder SMB, restic-REST-Server,
+  Ordner auf dem Server), dann einmal das **Wiederherstellungsblatt** drucken. Es enthält das zufällige Passwort
+  (40 Zeichen in 8 Fünfergruppen), die Ablage und die Repository-ID. Nach „Blatt ist gedruckt“ wird es vom Server gelöscht;
+  das Webinterface kann das Passwort danach nicht mehr lesen (`/etc/kienzle/sicherung/passwort`, root, 0600).
+- **Ablauf (Timer 02:30):** täglich sichern; sonntags `forget --prune` (Vorgabe 7/4/12/3, einstellbar) und `check`;
+  am ersten Sonntag im Monat `check --read-data-subset 5%` und Probe-Wiederherstellung der Datenbanken mit `PRAGMA integrity_check`.
+  „Jetzt sichern“, „Prüfen“ und „Probe-Wiederherstellung“ auch von Hand.
+- **Inhalt:** Stand der Datenbank der Basis per `VACUUM INTO`, `/etc/kienzle` (Zertifizierungsstelle, Schlüssel, Verbindungen),
+  `/var/lib/kienzle/core`, der SSH-Schlüssel des Netzwerkspeichers und die `[backup] paths` der Module (vorher deren
+  Schnappschuss-Haken als Modulbenutzer). Nicht gesichert: Programme, das Sicherungspasswort, das Blatt.
+- **SMB nur während der Sicherung eingehängt** (`mount.cifs`, SMB 3.1.1 mit Verschlüsselung, Zugangsdatei 0600 im
+  privaten Arbeitsordner), SFTP mit eigenem Schlüssel und festem Serverschlüssel.
+- **Wiederherstellen:** Basis oder ein Modul auf den Stand einer Sicherung (Dienste anhalten, Daten ersetzen, Eigentümer
+  setzen, starten), protokolliert. Nach Totalausfall: `sudo bash installer/install.sh --wiederherstellen` auf einer neuen VM
+  fragt Ablage und Passwort ab und holt alles zurück (gleiche Zertifizierungsstelle, gleiche Benutzer).
+- **Warnungen** in der Navigation: keine Sicherung seit 36 Stunden, Prüfung oder Probe fehlgeschlagen, Blatt nicht
+  gedruckt, schreibgeschützte NAS-Schnappschüsse nicht bestätigt.
+- Vor jedem Update eine Sicherung, falls eingerichtet (Fehler halten das Update nicht auf, stehen aber im Protokoll).
+- root-Dienst `kienzle-sicherung` (`.path` für Anfragen, `.timer` für den täglichen Lauf); Installer bringt `restic` und `cifs-utils` mit.
+- Übernommen aus Kienzlezeit (`kienzlezeit-backup-und-restore.sh`): geprüfte Wiederherstellung, zeitgesteuerter Ablauf,
+  SFTP/SMB-Anbindung (über M5).
+- Tests: 13 Python-Tests (in GitHub Actions mit echtem restic, lokal mit nachgebautem), 3 PHP-Tests, Ende-zu-Ende im
+  Container mit echtem restic: einrichten, Blatt, sichern, Probe, Prüfung mit Lesen, Wiederherstellen der Basis.
+
+Abweichend vom Plan: ein gemeinsamer Schnappschuss mit Tag `kienzle` statt Tags je Teil (Wiederherstellung je Teil über
+die Pfade); SFTP- und REST-Server im CI-Container noch nicht.
+Nicht geprüft: echtes NAS über SFTP und SMB (`mount.cifs` braucht Kernel-Rechte), REST-Server im Nur-Anfügen-Modus,
+`--wiederherstellen` auf einer frischen Ubuntu-26.04-VM, Schnappschuss-Haken echter Module.
+
 ## 0.5.0
 
 Meilenstein 5 aus `docs/PLAN.md`: Netzwerkspeicher und zentrale Verbindungen.
