@@ -102,6 +102,17 @@ if runuser -u ks-core -- cat /etc/kienzle/verbindungen/ablage.json >/dev/null 2>
 
 /opt/kienzle/core/current/bin/kienzle-update start || fail 'kienzle-update start'
 
+echo '== Drucken, Sicherheitsupdates, Überblick'
+cmp -s /etc/cups/cupsd.conf /opt/kienzle/core/current/installer/vorlagen/cupsd.conf || fail 'cupsd.conf nicht aus der Vorlage'
+cmp -s /etc/samba/smb.conf /opt/kienzle/core/current/installer/vorlagen/smb.conf || fail 'smb.conf nicht aus der Vorlage'
+[ -f /etc/kienzle/original/smb.conf ] || fail 'ursprüngliche smb.conf nicht gesichert'
+ls /etc/cups/cupsd.conf.kienzle-vorher /etc/samba/smb.conf.kienzle-vorher >/dev/null 2>&1 && fail 'Zwischenkopien bleiben liegen'
+testparm -s --suppress-prompt /etc/samba/smb.conf 2>/dev/null | grep -q '\[printers\]' || fail 'Samba ohne Druckerfreigabe'
+if testparm -s --suppress-prompt /etc/samba/smb.conf 2>/dev/null | grep -E '^\[' | grep -qv '^\[\(global\|printers\)\]'; then fail 'Samba hat Dateifreigaben'; fi
+grep -q 'Automatic-Reboot "false"' /etc/apt/apt.conf.d/52kienzle-unattended || fail 'unattended-upgrades ohne Neustart-Sperre'
+[ -d /var/lib/kienzle/ueberblick ] || fail 'Ordner für Überblicke fehlt'
+for u in kienzle-ueberblick.path kienzle-ueberblick.service kienzle-ueberblick.timer; do [ -f "/etc/systemd/system/$u" ] || fail "$u fehlt"; done
+
 echo '== Update-Seite'
 runuser -u ks-core -- php -r '
 require "/opt/kienzle/core/current/php/bootstrap.php";
@@ -114,8 +125,9 @@ code=$(php -r 'require "/opt/kienzle/core/current/php/bootstrap.php"; echo Kienz
 c -b "$T/dora" "https://$host/verwaltung/updates" | grep -q 'Installiert: <strong>Basis' || fail 'Update-Seite'
 c -b "$T/dora" "https://$host/verwaltung/firewall" | grep -q 'Freigegebene Netze' || fail 'Firewall-Seite'
 c -b "$T/dora" "https://$host/verwaltung/verbindungen" | grep -q 'T2med (FHIR)' || fail 'Verbindungsseite'
+c -b "$T/dora" "https://$host/verwaltung/einrichtung" | grep -q 'Admin mit Authenticator-App' || fail 'Einrichtungsseite'
 # Die Seiten müssen Status und Einheiten der root-Dienste sehen (open_basedir von php-fpm).
-for p in firewall updates verbindungen sicherung; do
+for p in firewall updates verbindungen sicherung einrichtung; do
   if c -b "$T/dora" "https://$host/verwaltung/$p" | grep -q 'Bitte den Installer ausführen'; then fail "Seite $p sieht ihren Dienst nicht"; fi
 done
 c -b "$T/dora" "https://$host/verwaltung/verbindungen" | grep -q 'ssh-ed25519 ' || fail 'Verbindungsseite zeigt den SSH-Schlüssel nicht (Status unlesbar)'

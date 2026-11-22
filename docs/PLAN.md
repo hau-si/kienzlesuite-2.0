@@ -394,7 +394,10 @@ SMB per `mount.cifs` braucht Kernel-Rechte; das prüft nur die Test-VM.
 
 ---
 
-## M7 – Installer für Ubuntu 26.04 🖥
+## M7 – Installer für Ubuntu 26.04 🖥 ✅
+
+**Stand:** umgesetzt in Basis 0.7.0 (`docs/RELEASE.md`). `--wiederherstellen` kam schon mit M6. Überblicke der Module sammelt
+ein eigener root-Dienst (`kienzle-ueberblick`), weil das Webinterface keine Haken als Modul-Benutzer starten darf.
 
 **Ziel:** Eine Standard-Installation von Ubuntu Server 26.04.1 wird mit einem Befehl zur Kienzle-Suite (nur Basis). Erneutes Ausführen ändert nichts Unerwünschtes.
 

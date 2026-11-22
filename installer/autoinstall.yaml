@@ -1,0 +1,56 @@
+#cloud-config
+# Kienzle-Suite: Vorlage für die unbeaufsichtigte Installation mit der Standard-ISO von Ubuntu Server 26.04
+# (keine eigene ISO). Anleitung: docs/INSTALLATION.md, Abschnitt „Unbeaufsichtigt“.
+#
+# Vor der Verwendung anpassen (alles in <SPITZEN KLAMMERN>):
+#   - Rechnername, Servername der Suite, Praxisname
+#   - Passwort-Hash des Konsolen-Benutzers: mkpasswd -m yescrypt   (Paket whois)
+#   - optional ein SSH-Schlüssel für die Wartung
+# Die Datei als „user-data“ (z. B. auf einem zweiten Laufwerk mit Bezeichnung CIDATA, daneben eine leere „meta-data“)
+# bereitstellen. Achtung: Die Installation löscht das größte Laufwerk der VM ohne Rückfrage.
+autoinstall:
+  version: 1
+  locale: de_DE.UTF-8
+  keyboard:
+    layout: de
+  timezone: Europe/Berlin
+  source:
+    id: ubuntu-server-minimal
+  identity:
+    hostname: <RECHNERNAME>
+    username: praxisadmin
+    password: "<PASSWORT-HASH>"
+  ssh:
+    install-server: true
+    allow-pw: false
+    authorized-keys: []
+    # - "ssh-ed25519 AAAA… wartung@example.org"
+  storage:
+    layout:
+      name: lvm
+      sizing-policy: all
+  packages:
+    - git
+    - ca-certificates
+  updates: security
+  late-commands:
+    # Kienzle-Suite aus dem Repository holen und beim ersten Start installieren (Netz ist dann sicher verfügbar).
+    - curtin in-target -- git clone --depth 1 https://github.com/hau-si/kienzlesuite-2.0.git /opt/kienzle-installer
+    - |
+      cat > /target/etc/systemd/system/kienzle-erstinstallation.service <<'UNIT'
+      [Unit]
+      Description=Kienzle-Suite: Erstinstallation
+      After=network-online.target
+      Wants=network-online.target
+      ConditionPathExists=!/var/lib/kienzle/core/core.sqlite
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/bin/bash /opt/kienzle-installer/installer/install.sh --name <SERVERNAME> --praxis "<PRAXISNAME>"
+      StandardOutput=journal+console
+      TimeoutStartSec=3600
+
+      [Install]
+      WantedBy=multi-user.target
+      UNIT
+    - curtin in-target -- systemctl enable kienzle-erstinstallation.service

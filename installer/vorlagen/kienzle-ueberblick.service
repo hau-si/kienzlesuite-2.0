@@ -1,0 +1,12 @@
+# Kienzle-Suite: Einrichtungs-Überblicke der Module einsammeln (Haken laufen als Modul-Benutzer).
+[Unit]
+Description=Kienzle-Suite Einrichtungs-Überblick
+
+[Service]
+Type=oneshot
+ExecStart=/opt/kienzle/core/current/bin/kienzle-ueberblick sammeln
+TimeoutStartSec=300
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/var/lib/kienzle

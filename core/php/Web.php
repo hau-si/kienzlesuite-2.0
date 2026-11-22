@@ -18,7 +18,7 @@ final class Web {
     public function __construct(
         private Config $config, private Database $db, private Users $users, private Auth $auth, private ?Passkeys $passkeys,
         private Modules $modules, private AuditLog $audit, ?callable $qr = null, private ?Firewall $firewall = null, private ?Updates $updates = null,
-        private ?Connections $connections = null, private ?Backup $backup = null,
+        private ?Connections $connections = null, private ?Backup $backup = null, private ?Overview $overview = null,
     ) {
         $this->qr = $qr ?? static function (string $uri): ?string {
             if (!is_executable('/usr/bin/qrencode')) return null;
@@ -435,6 +435,7 @@ final class Web {
         if ($r->path === '/verwaltung/firewall/aus' && !$get) return $this->firewallOff($admin);
         if ($r->path === '/verwaltung/updates') return $get ? $this->updatesPage() : $this->updatesAction($r, $admin);
         if ($r->path === '/verwaltung/verbindungen') return $get ? $this->connectionsPage() : $this->connectionsAction($r, $admin);
+        if ($r->path === '/verwaltung/einrichtung') return $get ? $this->overviewPage() : $this->overviewAction($r, $admin);
         if ($r->path === '/verwaltung/sicherung') return $get ? $this->backupPage() : $this->backupAction($r, $admin);
         if ($r->path === '/verwaltung/sicherung/export' && $get) {
             [$file, $name] = $this->bk()->exportFile();
@@ -853,6 +854,54 @@ final class Web {
         }
         $this->audit->write($admin, 'verbindung', $what);
         return Response::redirect('/verwaltung/verbindungen');
+    }
+
+    // ---- Einrichtungs-Überblick ----------------------------------------------------------------------------------
+    private function ov(): Overview {
+        return $this->overview ?? new Overview($this->db, $this->users, $this->modules, $this->firewall, $this->updates, $this->connections, $this->backup);
+    }
+
+    private function overviewList(array $items): string {
+        $label = ['done' => '✓ erledigt', 'open' => 'offen', 'error' => 'Fehler'];
+        $rows = '';
+        foreach ($items as $i) {
+            $title = $i['link'] !== '' ? '<a href="' . V::h($i['link']) . '">' . V::h($i['title']) . '</a>' : V::h($i['title']);
+            $manual = '';
+            if (!empty($i['manuell'])) {
+                $manual = '<form method="post" action="/verwaltung/einrichtung" class="inline">' . $this->hidden('bestaetigen', ['punkt' => $i['manuell'], 'erledigt' => $i['state'] === 'done' ? '0' : '1'])
+                    . '<button>' . ($i['state'] === 'done' ? 'Zurücknehmen' : 'Erledigt') . '</button></form>';
+            }
+            $rows .= '<tr><td class="' . ($i['state'] === 'done' ? 'ok' : ($i['state'] === 'error' ? 'error' : '')) . '">' . $label[$i['state']] . '</td><td>' . $title
+                . ($i['hint'] !== '' ? '<br><small>' . V::h($i['hint']) . '</small>' : '') . '</td><td>' . $manual . '</td></tr>';
+        }
+        return '<table>' . $rows . '</table>';
+    }
+
+    private function overviewPage(): Response {
+        $o = $this->ov();
+        $core = $o->core();
+        $open = count(array_filter($core, fn($i) => $i['state'] !== 'done'));
+        $body = '<p>Was für einen sicheren Betrieb noch fehlt. ' . ($open ? '<strong>' . $open . ' Punkte der Basis offen.</strong>' : 'Die Basis ist vollständig eingerichtet.') . '</p>'
+            . '<h2>Basis</h2>' . $this->overviewList($core);
+        foreach ($o->modules() as $m) {
+            $body .= '<h2>' . V::h($m['name']) . '</h2>' . ($m['fehler'] !== '' ? '<p class="error">Überblick nicht lesbar: ' . V::h($m['fehler']) . '</p>' : '')
+                . ($m['items'] ? $this->overviewList($m['items']) : '') . ($m['zeit'] ? '<p><small>Stand ' . V::date($m['zeit']) . '</small></p>' : '');
+        }
+        $body .= '<form method="post" action="/verwaltung/einrichtung">' . $this->hidden('neu') . '<button>Module neu prüfen</button></form>';
+        return Response::html(V::page('Einrichtung', $body, $this->nav(), $this->config->practice));
+    }
+
+    private function overviewAction(Request $r, string $admin): Response {
+        $a = $r->field('aktion', 20);
+        if ($a === 'bestaetigen') {
+            $this->ov()->confirm($r->field('punkt', 20), $r->field('erledigt') === '1');
+            $this->audit->write($admin, 'einrichtung-' . ($r->field('erledigt') === '1' ? 'erledigt' : 'zurueck'), $r->field('punkt', 20));
+        } elseif ($a === 'neu') {
+            $this->ov()->refresh();
+        } else {
+            throw new Problem('Unbekannte Aktion.', 422);
+        }
+        return Response::redirect('/verwaltung/einrichtung');
     }
 
     // ---- Sicherung ----------------------------------------------------------------------------------------------

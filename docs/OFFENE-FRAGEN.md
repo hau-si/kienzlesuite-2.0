@@ -36,3 +36,11 @@ Wo eine Entscheidung nötig war, steht dabei, was umgesetzt wurde; das lässt si
     nicht die Benutzerkonten (die stehen in der Datenbank und kommen über die Datensicherung zurück). Sollen Benutzer mit?
 13. **Signaturprüfung „aus“:** gilt für alle Versionen und auch, wenn kein Release-Schlüssel hinterlegt ist. Eine vorhandene,
     aber falsche Signatur lehne ich trotzdem ab (Hinweis auf Manipulation). Soll „aus“ auch das übergehen?
+
+## Aus M7 (Installer)
+
+14. **Samba-Gastzugriff auf Drucker:** Arbeitsplätze drucken ohne Anmeldung (nur aus freigegebenen Netzen). Soll das
+    Drucken über Samba ein Konto verlangen?
+15. **Arbeitsgruppe:** `WORKGROUP` fest. Nutzen die Praxen eine andere Arbeitsgruppe oder eine Domäne?
+16. **autoinstall** holt die Suite per `git clone` aus dem öffentlichen Repository. Bei privatem Repository bräuchte es
+    einen Token oder das Release-Archiv; welcher Weg?

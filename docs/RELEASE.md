@@ -1,5 +1,30 @@
 # Basis – Release-Notizen
 
+## 0.7.0
+
+Meilenstein 7 aus `docs/PLAN.md`: Installer für Ubuntu Server 26.04.
+
+- **CUPS und Samba als Druckserver** aus festen Vorlagen (`installer/vorlagen/cupsd.conf`, `smb.conf`): vor dem Übernehmen
+  geprüft (`cupsd -t`, `testparm`), Original einmalig nach `/etc/kienzle/original/`, startet der Dienst nicht, kommt die
+  vorige Datei zurück (Vorgehen aus `terminzettel/install.py`). CUPS ohne Weboberfläche und Verwaltung nur am Server,
+  Samba nur mit `[printers]`, SMB 3, ohne NetBIOS. Erreichbar erst nach Freigabe in der Firewall.
+- **Vorabprüfungen** (Kerne, Arbeitsspeicher, Plattenplatz als Hinweis), **automatische Sicherheitsupdates ohne Neustart**
+  (aus der Beta, `scripts/install-server.sh`).
+- **AppArmor:** `kienzle-web schreiben` ergänzt `/etc/apparmor.d/local/gs` bzw. `qpdf` in einem markierten Abschnitt um die
+  Datenordner der Module, die das in `hooks.apparmor` anmelden; andere Zeilen bleiben (aus der Beta, Zeilen 41–51).
+- **Einrichtungs-Überblick** (Verwaltung → Einrichtung): Punkte der Basis (Admins mit OTP, Vertretung, Wiederherstellungscodes,
+  Zertifizierungsstelle auf den Arbeitsplätzen, Firewall, Signaturprüfung, Updates, Netzwerkspeicher, Sicherung, Blatt,
+  NAS-Schnappschüsse, Probe), nicht prüfbare Punkte von Hand bestätigen; darunter die Überblicke der Module. Die Haken
+  `[setup] overview` sammelt der root-Dienst `kienzle-ueberblick` als Modul-Benutzer ein (Timer alle 15 Minuten, „neu prüfen“),
+  geprüft nach Format und Links.
+- Installer-Optionen `--admin-reset NAME`, `--kanal stabil|beta`; `installer/autoinstall.yaml` für die Standard-ISO;
+  Anleitung `docs/INSTALLATION.md`.
+- Tests: Vorlagen (nur Drucker in Samba, CUPS-Verwaltung nur lokal, `open_basedir`, autoinstall), AppArmor-Abschnitt,
+  Einsammeln der Überblicke, Seite Einrichtung; Ende-zu-Ende im Container mit echtem CUPS/Samba-Paket und `testparm`.
+
+Nicht geprüft: Start von CUPS und smbd unter systemd (nur Test-VM), Drucken von Windows und macOS, autoinstall mit der
+echten ISO, AppArmor auf echtem Ubuntu 26.04 (im Container gibt es keine Profile).
+
 ## 0.6.1
 
 - **Einstellungen exportieren** (Verwaltung → Sicherung): alle Einstellungen der Basis (`/etc/kienzle`: Zertifizierungsstelle,

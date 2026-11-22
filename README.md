@@ -4,12 +4,13 @@ Praxis-Appliance für Hausarztpraxen mit T2med: **eine Basis**, einmal auf einer
 einzeln dazukommen – Kartenzahlung (SumUp), Terminzettel, Fax, Telefon, Kienzlezeit. Verwaltung komplett im
 Webinterface; Firewall, Benutzer, Admin-Zugang mit OTP, Updates und verschlüsselte Sicherung gibt es nur einmal, in der Basis.
 
-Stand: **Basis 0.6.1**, Meilenstein 6 von 8 ([docs/PLAN.md](docs/PLAN.md)): Anmeldung für alle Module, Benutzer und
-Rechte, Admin-OTP, Passkeys, lokale Zertifizierungsstelle, Firewall, Updater mit signierten Releases, Netzwerkspeicher und zentrale Verbindungen, verschlüsselte Sicherung mit restic. Installierbar nur auf einer Test-VM ([docs/VM-TEST.md](docs/VM-TEST.md)).
+Stand: **Basis 0.7.0**, Meilenstein 7 von 8 ([docs/PLAN.md](docs/PLAN.md)): Anmeldung für alle Module, Benutzer und
+Rechte, Admin-OTP, Passkeys, lokale Zertifizierungsstelle, Firewall, Updater mit signierten Releases, Netzwerkspeicher und zentrale Verbindungen, verschlüsselte Sicherung mit restic, Installer mit CUPS/Samba und Einrichtungs-Überblick. Installierbar nur auf einer Test-VM ([docs/VM-TEST.md](docs/VM-TEST.md)).
 
 ![Basis und Module](docs/architektur-whiteboard.png)
 
 - Architektur und Sicherheitskonzept: [docs/ARCHITEKTUR.md](docs/ARCHITEKTUR.md)
+- Installation: [docs/INSTALLATION.md](docs/INSTALLATION.md)
 - Umsetzungsplan Schritt 1: [docs/PLAN.md](docs/PLAN.md)
 - Schnittstelle für Module: [docs/MODUL-SCHNITTSTELLE.md](docs/MODUL-SCHNITTSTELLE.md), Format [docs/MODULE-TOML.md](docs/MODULE-TOML.md)
 - Arbeitsregeln (auch für Claude Code): [AGENTS.md](AGENTS.md)

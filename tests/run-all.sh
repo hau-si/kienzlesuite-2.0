@@ -17,7 +17,7 @@ for m in modules/*/; do
 done
 
 step 'Python: Syntax und Stil'
-python_bins=(core/bin/kienzle-modul-pruefen core/bin/kienzle-zertifikat core/bin/kienzle-web core/bin/kienzle-firewall core/bin/kienzle-update core/bin/kienzle-verbindungen core/bin/kienzle-ablage core/bin/kienzle-sicherung scripts/release-bauen scripts/release-signieren)
+python_bins=(core/bin/kienzle-modul-pruefen core/bin/kienzle-zertifikat core/bin/kienzle-web core/bin/kienzle-firewall core/bin/kienzle-update core/bin/kienzle-verbindungen core/bin/kienzle-ablage core/bin/kienzle-sicherung core/bin/kienzle-ueberblick scripts/release-bauen scripts/release-signieren)
 python3 -B -m py_compile core/lib/kienzle/*.py "${python_bins[@]}" tests/core/*.py tests/integration/*.py
 if command -v ruff >/dev/null; then
   ruff check --no-cache --select E,F,W,B --line-length 180 core tests "${python_bins[@]}"
@@ -40,7 +40,7 @@ python3 -B -m unittest discover -s tests/core
 if command -v node >/dev/null; then step 'JavaScript: Syntax'; node --check core/public/assets/core.js && echo 'in Ordnung'; fi
 
 step 'PHP: Basis (tests/php)'
-for t in tests/php/core.php tests/php/passkeys.php tests/php/web.php tests/php/cli.php tests/php/firewall.php tests/php/updates.php tests/php/verbindungen.php tests/php/sicherung.php; do echo "-- $t"; php "$t"; done
+for t in tests/php/core.php tests/php/passkeys.php tests/php/web.php tests/php/cli.php tests/php/firewall.php tests/php/updates.php tests/php/verbindungen.php tests/php/sicherung.php tests/php/einrichtung.php; do echo "-- $t"; php "$t"; done
 
 step 'module.toml: alle Module im Repository'
 core/bin/kienzle-modul-pruefen --alle modules

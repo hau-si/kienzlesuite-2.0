@@ -1,0 +1,21 @@
+#!/usr/bin/python3 -IB
+"""Einrichtungs-Überblicke der Module einsammeln (nur root, gestartet von systemd).
+
+  kienzle-ueberblick sammeln     Haken [setup] overview aller Module als Modul-Benutzer ausführen (Timer, Installer)
+  kienzle-ueberblick anwenden    Anfrage des Webinterfaces („Neu prüfen“) verarbeiten
+"""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'lib'))
+from kienzle import ueberblick as u  # noqa: E402
+
+if __name__ == '__main__':
+    if sys.argv[1:] == ['sammeln']:
+        print(f'{u.collect()} Module mit Überblick.')
+        sys.exit(0)
+    if sys.argv[1:] == ['anwenden']:
+        u.handle()
+        sys.exit(0)
+    print(__doc__.strip(), file=sys.stderr)
+    sys.exit(2)

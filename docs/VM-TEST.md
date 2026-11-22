@@ -90,3 +90,17 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
 7. [ ] Totalausfall: neue VM, `sudo bash installer/install.sh --wiederherstellen`, Angaben vom Blatt: Anmeldung mit den alten
        Zugangsdaten, Arbeitsplätze vertrauen dem Zertifikat weiter (gleiche CA).
 8. [ ] Am NAS schreibgeschützte Schnappschüsse einrichten und in der Suite bestätigen: keine Warnung mehr.
+
+## Meilenstein 7 – Installer (Basis 0.7.0)
+
+1. [ ] Frische VM 26.04.1, Installation nach `docs/INSTALLATION.md`: Hinweise der Vorabprüfung stimmen, Einrichtungslink erscheint.
+2. [ ] Zweiter Lauf des Installers: keine Änderung an Schlüsseln, CA, Daten; `cupsd.conf`/`smb.conf` unverändert.
+3. [ ] `systemctl status cups smbd` aktiv, `nmbd` aus. `ss -ltn` zeigt 631 und 445; ohne Firewall-Freigabe von einem
+       Arbeitsplatz aus nicht erreichbar, mit Freigabe erreichbar.
+4. [ ] Von Windows `\\kienzle.praxis.internal\` öffnen: nur Drucker, keine Ordner; Gastzugriff auf Drucker geht.
+5. [ ] `http://localhost:631/admin` vom Arbeitsplatz aus verweigert.
+6. [ ] `/etc/apt/apt.conf.d/52kienzle-unattended` vorhanden; `unattended-upgrade --dry-run` läuft.
+7. [ ] Verwaltung → Einrichtung: Punkte stimmen mit dem Zustand überein; „Erledigt“ für die Zertifizierungsstelle.
+8. [ ] autoinstall: zweite VM mit `installer/autoinstall.yaml` (angepasst) und Standard-ISO, nach dem ersten Start
+       ist die Suite erreichbar, Link über `journalctl -u kienzle-erstinstallation`.
+9. [ ] `--admin-reset NAME` und `--kanal beta` ausprobieren.

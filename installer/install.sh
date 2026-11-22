@@ -3,10 +3,13 @@
 #
 #   sudo bash installer/install.sh --name kienzle.praxis.internal [--name 192.168.1.10] [--praxis "Praxis Dr. Muster"]
 #   sudo bash installer/install.sh --wiederherstellen     (neue VM nach Totalausfall: alles aus der Sicherung holen)
+#   sudo bash installer/install.sh --admin-reset NAME     (Admin-Zugang an der Konsole zurücksetzen, wie kienzle-admin)
+#   sudo bash installer/install.sh --kanal beta           (Update-Kanal festlegen: stabil oder beta)
 #
 # Mehrfaches Ausführen ist erlaubt: Vorhandenes (Schlüssel, Zertifizierungsstelle, Daten) bleibt erhalten.
-# Stand Meilenstein 6: Anmeldung, Zertifizierungsstelle, Firewall, Updater, Verbindungen, Sicherung.
-# CUPS/Samba, autoinstall und Druckerverwaltung folgen (docs/PLAN.md, M7–M8).
+# Richtet ein: Anmeldung, Zertifizierungsstelle, nginx/php-fpm, Firewall, Updater, Verbindungen, Sicherung, CUPS und Samba
+# als Druckserver, automatische Sicherheitsupdates, AppArmor-Ergänzungen der Module, Einrichtungs-Überblick.
+# Anleitung: docs/INSTALLATION.md. Für eine unbeaufsichtigte Installation: installer/autoinstall.yaml.
 set -euo pipefail
 
 here=$(cd -- "$(dirname -- "$0")/.." && pwd)
@@ -14,7 +17,7 @@ here=$(cd -- "$(dirname -- "$0")/.." && pwd)
 if [ -f "$here/core/VERSION" ]; then src=$here/core; else src=$here; fi
 version=$(tr -dc '0-9A-Za-z.+-' < "$src/VERSION")
 nosystemd=${KIENZLE_OHNE_SYSTEMD:-}      # nur für Tests im Container ohne systemd
-names=(); practice=''; update=''; restore=''; restore_json=''
+names=(); practice=''; update=''; restore=''; restore_json=''; admin_reset=''; kanal=''
 
 usage() { echo 'Aufruf: sudo bash installer/install.sh --name SERVERNAME [--name IP] [--praxis "Name"]'; exit 2; }
 while [ $# -gt 0 ]; do
@@ -23,6 +26,8 @@ while [ $# -gt 0 ]; do
     --praxis) [ $# -ge 2 ] || usage; practice=$2; shift 2 ;;
     --aktualisieren) update=1; shift ;;   # vom Updater: ohne Rückfragen, ohne Einrichtungslink
     --wiederherstellen) restore=1; shift ;;
+    --admin-reset) [ $# -ge 2 ] || usage; admin_reset=$2; shift 2 ;;
+    --kanal) [ $# -ge 2 ] || usage; kanal=$2; shift 2 ;;
     --wiederherstellen-json) [ $# -ge 2 ] || usage; restore=1; restore_json=$2; shift 2 ;;   # für Tests: Angaben aus Datei
     -h|--hilfe) usage ;;
     *) echo "Unbekannte Option: $1"; usage ;;
@@ -36,6 +41,18 @@ if [ "${ID:-}" != ubuntu ] || [ "${VERSION_ID:-}" != 26.04 ]; then
 fi
 [ -n "$nosystemd" ] || command -v systemctl >/dev/null || { echo 'systemd wird benötigt.'; exit 1; }
 [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'core/VERSION ungültig.'; exit 1; }
+[ -z "$kanal" ] || [ "$kanal" = stabil ] || [ "$kanal" = beta ] || { echo 'Kanal: stabil oder beta.'; exit 2; }
+[ -z "$admin_reset" ] || [[ $admin_reset =~ ^[a-z0-9._-]{1,64}$ ]] || { echo "Ungültiger Benutzername: $admin_reset"; exit 2; }
+
+# Vorabprüfungen (nur Hinweise; die Installation läuft trotzdem weiter).
+if [ -z "$update" ]; then
+  cores=$(nproc 2>/dev/null || echo 1)
+  mem_kb=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)
+  disk_kb=$(df -Pk / 2>/dev/null | awk 'NR==2 {print $2}')
+  [ "$cores" -ge 2 ] || echo "Hinweis: $cores CPU-Kern(e); empfohlen sind mindestens 2."
+  [ "${mem_kb:-0}" -ge 3800000 ] || echo "Hinweis: $(( ${mem_kb:-0} / 1024 )) MB Arbeitsspeicher; empfohlen sind mindestens 4 GB."
+  [ "${disk_kb:-0}" -ge 95000000 ] || echo "Hinweis: $(( ${disk_kb:-0} / 1048576 )) GB Speicher auf /; empfohlen sind mindestens 100 GB."
+fi
 
 conf=/etc/kienzle/core/core.json
 if [ -n "$restore" ] && [ -f /var/lib/kienzle/core/core.sqlite ]; then
@@ -72,7 +89,8 @@ wait_apt
 DEBIAN_FRONTEND=noninteractive apt-get update -q
 wait_apt
 DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends \
-  nginx php-fpm php-cli php-sqlite3 php-mbstring openssl qrencode python3 ca-certificates psmisc curl nftables iproute2 smbclient openssh-client restic cifs-utils
+  nginx php-fpm php-cli php-sqlite3 php-mbstring openssl qrencode python3 ca-certificates psmisc curl nftables iproute2 smbclient openssh-client restic cifs-utils \
+  cups cups-bsd samba unattended-upgrades
 
 phpv=$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')
 phpfpm=/usr/sbin/php-fpm$phpv
@@ -89,7 +107,7 @@ install -d -m 0755 -o root -g root /var/lib/kienzle/firewall /var/lib/kienzle/up
 install -d -m 0755 -o root -g root /etc/kienzle/verbindungen /etc/kienzle/verbindungen/module /etc/kienzle/schluessel /var/spool/kienzle /var/spool/kienzle/ablage
 install -d -m 0755 -o ks-ablage -g ks-ablage /var/lib/kienzle/ablage
 install -d -m 0700 -o root -g root /etc/kienzle/sicherung /var/cache/kienzle-sicherung
-install -d -m 0755 -o root -g root /var/lib/kienzle/sicherung
+install -d -m 0755 -o root -g root /var/lib/kienzle/sicherung /var/lib/kienzle/ueberblick
 install -d -m 0700 -o ks-ablage -g ks-ablage /var/lib/kienzle/ablage/.ssh
 # Eigener SSH-Schlüssel des Netzwerkspeicher-Dienstes (für SFTP-Ziele; der öffentliche Teil steht unter Verwaltung → Verbindungen).
 if [ ! -f /var/lib/kienzle/ablage/.ssh/id_ed25519 ] && command -v ssh-keygen >/dev/null; then
@@ -106,7 +124,7 @@ chown -R root:root "$tmp"; chmod -R u=rwX,go=rX "$tmp"
 rm -rf -- "$release.alt"; [ -e "$release" ] && mv -- "$release" "$release.alt"
 mv -- "$tmp" "$release"; rm -rf -- "$release.alt"
 ln -sfn "releases/$version" /opt/kienzle/core/.current.neu && mv -Tf /opt/kienzle/core/.current.neu /opt/kienzle/core/current
-for tool in kienzle-admin kienzle-zertifikat kienzle-web kienzle-modul-pruefen kienzle-update kienzle-verbindungen kienzle-sicherung; do ln -sfn "/opt/kienzle/core/current/bin/$tool" "/usr/local/sbin/$tool"; done
+for tool in kienzle-admin kienzle-zertifikat kienzle-web kienzle-modul-pruefen kienzle-update kienzle-verbindungen kienzle-sicherung kienzle-ueberblick; do ln -sfn "/opt/kienzle/core/current/bin/$tool" "/usr/local/sbin/$tool"; done
 
 if [ -n "$restore" ]; then
   echo '== Wiederherstellung aus der Sicherung'
@@ -152,6 +170,57 @@ for key in "$here"/installer/release-keys/*.pem; do [ -f "$key" ] && install -m 
 echo '== Zertifikat'
 /opt/kienzle/core/current/bin/kienzle-zertifikat einrichten
 
+vorlagen=/opt/kienzle/core/current/installer/vorlagen
+echo '== Drucken: CUPS und Samba'
+# Feste Vorlagen der Basis. Erst prüfen (cupsd -t, testparm), dann die bisherige Datei einmalig sichern und ersetzen;
+# startet der Dienst danach nicht, kommt die vorige Datei zurück. (Vorgehen aus terminzettel/install.py.)
+install -d -m 0700 -o root -g root /etc/kienzle/original
+conf_changed=()
+put_conf() {   # Vorlage Ziel Dienst Prüfbefehl…
+  local src=$1 dest=$2 unit=$3; shift 3
+  local check; check=$(mktemp -d)
+  cp -- "$src" "$check/$(basename -- "$dest")"
+  if ! "$@" "$check/$(basename -- "$dest")" >"$check/log" 2>&1; then
+    echo "Vorlage $(basename -- "$dest") wird abgelehnt, bisherige bleibt:"; tail -n 5 "$check/log"; rm -rf -- "$check"; return 1
+  fi
+  rm -rf -- "$check"
+  if [ -f "$dest" ] && cmp -s "$src" "$dest"; then return 0; fi
+  [ -f "$dest" ] && [ ! -f "/etc/kienzle/original/$(basename -- "$dest")" ] && cp -p -- "$dest" "/etc/kienzle/original/$(basename -- "$dest")"
+  [ -f "$dest" ] && cp -p -- "$dest" "$dest.kienzle-vorher"
+  install -m 0644 -o root -g root "$src" "$dest"
+  conf_changed+=("$unit:$dest")
+}
+cups_check() { cupsd -t -c "$1" -s /etc/cups/cups-files.conf; }
+put_conf "$vorlagen/cupsd.conf" /etc/cups/cupsd.conf cups.service cups_check || true
+put_conf "$vorlagen/smb.conf" /etc/samba/smb.conf smbd.service testparm -s --suppress-prompt || true
+install -d -m 1777 /var/spool/samba
+if [ -n "$nosystemd" ]; then for e in "${conf_changed[@]}"; do rm -f -- "${e#*:}.kienzle-vorher"; done; fi
+
+echo '== Automatische Sicherheitsupdates'
+# Nur die Sicherheitsquelle der Distribution, kein automatischer Neustart (übernommen aus kienzle-suite-beta).
+if ! grep -rqs 'APT::Periodic::Unattended-Upgrade' /etc/apt/apt.conf.d/; then
+  printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' > /etc/apt/apt.conf.d/20auto-upgrades
+fi
+printf '// Kienzle-Suite: Neustarts plant die Praxis selbst.\nUnattended-Upgrade::Automatic-Reboot "false";\n' > /etc/apt/apt.conf.d/52kienzle-unattended
+
+if [ -n "$kanal" ]; then
+  python3 - "$kanal" <<'PY'
+import json, os, sys
+path = '/var/lib/kienzle/update/einstellungen.json'
+data = {}
+if os.path.exists(path):
+    with open(path, encoding='utf-8') as f:
+        data = json.load(f)
+data['kanal'] = sys.argv[1]
+if data.get('signatur') == 'beta' and sys.argv[1] != 'beta':
+    data['signatur'] = 'pflicht'
+with open(path + '.neu', 'w', encoding='utf-8') as f:
+    json.dump(data, f)
+os.replace(path + '.neu', path)
+PY
+  echo "Update-Kanal: $kanal"
+fi
+
 echo '== Dienste'
 vorlagen=/opt/kienzle/core/current/installer/vorlagen
 install -m 0644 "$vorlagen/tmpfiles-kienzle.conf" /etc/tmpfiles.d/kienzle.conf
@@ -168,6 +237,7 @@ install -m 0644 "$vorlagen/kienzle-zertifikat.service" "$vorlagen/kienzle-zertif
   "$vorlagen/kienzle-update-pruefen.timer" "$vorlagen/kienzle-update-start.service" \
   "$vorlagen/kienzle-verbindungen.path" "$vorlagen/kienzle-verbindungen-anwenden.service" "$vorlagen/kienzle-ablage.service" "$vorlagen/kienzle-ablage.timer" \
   "$vorlagen/kienzle-sicherung.path" "$vorlagen/kienzle-sicherung-anwenden.service" "$vorlagen/kienzle-sicherung.service" "$vorlagen/kienzle-sicherung.timer" \
+  "$vorlagen/kienzle-ueberblick.path" "$vorlagen/kienzle-ueberblick.service" "$vorlagen/kienzle-ueberblick.timer" \
   /etc/systemd/system/
 chmod 0644 /etc/systemd/system/kienzle-core-php.service
 
@@ -183,7 +253,19 @@ if [ -z "$nosystemd" ]; then
   systemctl disable --now "php$phpv-fpm.service" >/dev/null 2>&1 || true
   systemctl enable --now kienzle-core-php.service kienzle-zertifikat.timer kienzle-firewall.path
   systemctl enable kienzle-firewall.service kienzle-update-start.service
-  systemctl enable --now kienzle-update.path kienzle-update-pruefen.timer kienzle-verbindungen.path kienzle-ablage.timer kienzle-sicherung.path kienzle-sicherung.timer
+  systemctl enable --now kienzle-update.path kienzle-update-pruefen.timer kienzle-verbindungen.path kienzle-ablage.timer kienzle-sicherung.path kienzle-sicherung.timer kienzle-ueberblick.path kienzle-ueberblick.timer
+  # Druckserver: CUPS und smbd; nmbd (NetBIOS) und der AD-Dienst werden nicht gebraucht.
+  systemctl disable --now nmbd.service samba-ad-dc.service >/dev/null 2>&1 || true
+  systemctl enable cups.service smbd.service >/dev/null 2>&1 || true
+  for entry in "${conf_changed[@]}"; do
+    unit=${entry%%:*}; dest=${entry#*:}
+    if ! systemctl restart "$unit"; then
+      echo "$unit startet mit der neuen Konfiguration nicht – vorige Datei wieder eingesetzt."
+      [ -f "$dest.kienzle-vorher" ] && cp -p -- "$dest.kienzle-vorher" "$dest" && systemctl restart "$unit" || true
+    fi
+    rm -f -- "$dest.kienzle-vorher"
+  done
+  systemctl start cups.service smbd.service >/dev/null 2>&1 || true
   if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q 'Status: active'; then
     echo 'Hinweis: ufw ist aktiv. Die Firewall der Suite (Verwaltung → Firewall) arbeitet unabhängig davon; bitte nur eine von beiden verwenden.'
   fi
@@ -202,7 +284,10 @@ fi
 echo
 echo "Kienzle-Suite Basis $version ist installiert: https://${names[0]}/"
 echo 'Zertifizierungsstelle für die Arbeitsplätze: https://'"${names[0]}"'/ca.crt'
+echo "Einrichtungs-Überblick: https://${names[0]}/verwaltung/einrichtung"
 echo "Fingerabdruck zum Vergleich: $(/opt/kienzle/core/current/bin/kienzle-zertifikat status | sed -n 's/^CA (SHA-256): //p')"
+/opt/kienzle/core/current/bin/kienzle-ueberblick sammeln >/dev/null || echo 'Hinweis: Einrichtungs-Überblicke der Module nicht lesbar.'
+if [ -n "$admin_reset" ]; then /opt/kienzle/core/current/bin/kienzle-admin zuruecksetzen "$admin_reset"; fi
 if [ -n "$nosystemd" ] || [ -n "$update" ]; then exit 0; fi
 if ! /opt/kienzle/core/current/bin/kienzle-admin benutzer 2>/dev/null | grep -q 'Basis-Admin'; then
   echo; /opt/kienzle/core/current/bin/kienzle-admin einrichtungslink

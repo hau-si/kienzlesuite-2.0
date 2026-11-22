@@ -1,0 +1,10 @@
+# Kienzle-Suite: „Neu prüfen“ auf der Seite Einrichtung.
+[Unit]
+Description=Kienzle-Suite Einrichtungs-Überblick (Anfragen)
+
+[Path]
+PathExists=/var/lib/kienzle/core/anfragen/ueberblick.json
+Unit=kienzle-ueberblick.service
+
+[Install]
+WantedBy=multi-user.target

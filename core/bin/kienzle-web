@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'lib'))
-from kienzle import manifest, nginx  # noqa: E402
+from kienzle import apparmor, manifest, nginx  # noqa: E402
 
 E = os.environ.get
 CONFIG = E('KIENZLE_CORE_CONFIG', '/etc/kienzle/core/core.json')
@@ -64,6 +64,9 @@ def main(argv: list[str]) -> int:
         print('nginx lehnt die Konfiguration ab, alte bleibt aktiv: ' + test.stderr.strip()[:300], file=sys.stderr)
         return 1
     write(Path(REGISTRY), json.dumps(registry, ensure_ascii=False, indent=1, sort_keys=True) + '\n', 0o640, OWNER)
+    if E('KIENZLE_APPARMOR', '1') == '1':
+        for prog in apparmor.apply(registry):
+            print(f'AppArmor: Ergänzung für {prog} angepasst.')
     if RELOAD:
         subprocess.run(RELOAD.split(), check=False, timeout=30)
     # Verbindungen und Modulschlüssel an den neuen Stand der Module anpassen.
