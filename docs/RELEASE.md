@@ -1,5 +1,12 @@
 # Basis – Release-Notizen
 
+## 0.12.3
+
+- **Formulare im echten Browser abgelehnt** („Anfrage von einer fremden Seite“, gefunden auf der Test-VM): Mit
+  `Referrer-Policy: no-referrer` schicken Browser bei Formularen `Origin: null`. Jetzt `same-origin` (keine Adressen an
+  fremde Seiten, eigene Herkunft bleibt), und `Origin: null` gilt nur zusammen mit `Sec-Fetch-Site: same-origin`.
+  Die Tests liefen bisher nur mit gesetzter Herkunft; jetzt auch mit `null`.
+
 ## 0.12.2
 
 - **Aufruf über die IP-Adresse ging nicht** (gefunden bei der ersten Installation auf der Test-VM): Browser schicken bei

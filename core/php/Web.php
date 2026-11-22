@@ -1335,7 +1335,8 @@ final class Web {
     private function checkOrigin(Request $r): void {
         $origin = $r->header('origin');
         $site = $r->header('sec-fetch-site');
-        if ($origin !== '') {
+        // „null“ schicken Browser z. B. nach einer Weiterleitung oder bei strenger Referrer-Policy; dann zählt Sec-Fetch-Site.
+        if ($origin !== '' && $origin !== 'null') {
             if (!preg_match('#^https://([^/]+)$#D', $origin, $m) || !$this->config->ownHost($m[1])) throw new Problem('Anfrage von einer fremden Seite abgelehnt.', 403);
         } elseif ($site !== 'same-origin') {
             throw new Problem('Anfrage ohne Herkunftsangabe abgelehnt.', 403);
@@ -1358,7 +1359,7 @@ final class Web {
     private static function secure(Response $response): Response {
         $response->with('Cache-Control', 'no-store')
             ->with('X-Content-Type-Options', 'nosniff')
-            ->with('Referrer-Policy', 'no-referrer')
+            ->with('Referrer-Policy', 'same-origin')   // „no-referrer“ ließe Browser bei Formularen „Origin: null“ senden
             ->with('X-Frame-Options', 'DENY')
             ->with('Cross-Origin-Opener-Policy', 'same-origin')
             ->with('Cross-Origin-Resource-Policy', 'same-origin')

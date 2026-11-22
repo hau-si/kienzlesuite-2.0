@@ -197,6 +197,9 @@ function test_herkunft_und_servername(): void {
     $b = new Browser($env);
     check($b->post('/anmelden', ['login' => 'anna', 'password' => 'Wiesen-Blume-Fahrrad-7'], ['origin' => 'https://evil.example'])->status === 403, 'fremde Herkunft angenommen');
     check($b->post('/anmelden', ['login' => 'anna', 'password' => 'Wiesen-Blume-Fahrrad-7'], ['origin' => null])->status === 403, 'POST ohne Herkunft angenommen');
+    check($b->post('/anmelden', ['login' => 'anna', 'password' => 'Wiesen-Blume-Fahrrad-7'], ['origin' => 'null'])->status === 403, 'Origin null ohne Sec-Fetch-Site angenommen');
+    check($b->post('/anmelden', ['login' => 'anna', 'password' => 'Wiesen-Blume-Fahrrad-7'], ['origin' => 'null', 'sec-fetch-site' => 'cross-site'])->status === 403, 'Origin null von fremder Seite angenommen');
+    check($b->post('/anmelden', ['login' => 'anna', 'password' => 'Wiesen-Blume-Fahrrad-7'], ['origin' => 'null', 'sec-fetch-site' => 'same-origin'])->status === 303, 'Origin null bei gleicher Seite abgelehnt (Browser nach Weiterleitung)');
     check($b->post('/anmelden', ['login' => 'anna', 'password' => 'Wiesen-Blume-Fahrrad-7'], ['origin' => null, 'sec-fetch-site' => 'same-origin'])->status === 303, 'Sec-Fetch-Site same-origin abgelehnt');
     check($b->get('/anmelden', ['host' => 'evil.example'])->status === 421, 'fremder Servername angenommen');
     $ip = new Browser($env); $ip->host = '192.0.2.5';

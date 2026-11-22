@@ -27,7 +27,7 @@ sleep 1
 echo '== Zertifikat und Servername'
 c "https://$host/_health" | grep -q '"status":"ok"' || fail 'Gesundheitsprüfung'
 c "https://$host/anmelden" | grep -q '<h1>Anmelden</h1>' || fail 'Anmeldeseite'
-if curl -sS --noproxy '*' --max-time 5 -k --resolve "evil.example:443:127.0.0.1" https://evil.example/ >/dev/null 2>&1; then fail 'fremder Servername bekommt eine Seite'; fi
+[ "$(curl -s -o /dev/null -w "%{http_code}" --noproxy "*" --max-time 5 -k --resolve "evil.example:443:127.0.0.1" https://evil.example/)" = 421 ] || fail "fremder Servername bekommt eine Seite"
 [ "$(code "https://$host/_auth/beispiel")" = '404 ' ] || fail '/_auth von außen erreichbar'
 heads=$(c -I "https://$host/anmelden" | tr -d '\r')   # Kopfzeilen enden auf \r\n
 grep -qi '^content-security-policy:' <<< "$heads" || fail 'CSP fehlt'
