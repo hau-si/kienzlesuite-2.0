@@ -992,7 +992,10 @@ final class Web {
                 . '<form method="post" action="/verwaltung/module">' . $csrf . '<input type="hidden" name="aktion" value="installieren"><input type="hidden" name="id" value="' . V::h($m['id']) . '">'
                 . '<button' . $off . '>Installieren</button></form></div>';
         }
-        $body .= '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="pruefen"><button class="secondary"' . $off . '>Nach Modulen sehen</button></form>'
+        $body .= '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="pruefen"><button class="secondary"' . $off . '>Nach Modulen sehen</button></form> '
+            . '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="automatisch"><input type="hidden" name="an" value="' . ($st['auto'] ? '0' : '1') . '">'
+            . '<button class="secondary"' . $off . '>' . ($st['auto'] ? 'Automatische Updates ausschalten' : 'Automatische Updates einschalten') . '</button></form>'
+            . '<p class="muted">' . ($st['auto'] ? 'Neue Modulversionen werden täglich nachts installiert, nicht während einer Zahlung.' : 'Modul-Updates nur von Hand.') . '</p>'
             . '<p class="muted">Zuletzt geprüft: ' . V::date($st['checked_at']) . ($st['error'] ? ' – GitHub nicht erreichbar: ' . V::h($st['error']) : '') . '</p>';
         if ($st['log']) $body .= '<h2>Protokoll</h2><pre class="notes">' . V::h(implode("\n", $st['log'])) . '</pre>';
         $response = Response::html(V::page('Module', $body, $this->nav(), $this->config->practice, 'Betrieb'), $error ? 409 : 200);
@@ -1005,6 +1008,7 @@ final class Web {
         try {
             switch ($r->field('aktion', 20)) {
                 case 'pruefen': $store->check(); break;
+                case 'automatisch': $on = $r->field('an', 1) === '1'; $store->auto($on); $this->audit->write($admin, 'modul-automatisch', $on ? 'an' : 'aus'); break;
                 case 'installieren': $store->install($id); $this->audit->write($admin, 'modul-installieren', $id); break;
                 case 'aktualisieren': $store->update($id); $this->audit->write($admin, 'modul-aktualisieren', $id); break;
                 case 'entfernen':

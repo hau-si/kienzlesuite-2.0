@@ -84,6 +84,38 @@ def set_status(**changes) -> dict:
     return s
 
 
+def auto_enabled() -> bool:
+    return read_status().get('auto') is not False
+
+
+def auto_update() -> list[str]:
+    """Module mit neuerer Version selbst aktualisieren (täglich nach der Prüfung, außer abgeschaltet).
+    Ein beschäftigtes Modul (Haken busy) wird übersprungen und am nächsten Tag erneut versucht."""
+    if not auto_enabled():
+        return []
+    done: list[str] = []
+    STATE.mkdir(mode=0o755, parents=True, exist_ok=True)
+    with open(STATE / '.sperre', 'w') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        for row in read_status().get('installed', []):
+            up = row.get('update') if isinstance(row, dict) else None
+            if not up:
+                continue
+            mid = row['id']
+            try:
+                msg = install(mid, up['version'])
+                log(f'{mid}: automatisch aktualisiert.')
+                set_status(running=None, last={'ok': True, 'message': 'Automatisch: ' + msg[:380], 'time': int(time.time())})
+                done.append(mid)
+            except (Fehler, update.Fehler, release.Fehler, OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as e:
+                msg = str(e) if isinstance(e, (Fehler, update.Fehler, release.Fehler)) else f'Vorgang fehlgeschlagen ({type(e).__name__}).'
+                log(f'{mid}: automatische Aktualisierung abgebrochen: {msg}')
+                set_status(running=None, last={'ok': False, 'message': f'Automatisch, {mid}: {msg}'[:400], 'time': int(time.time())})
+        if done:
+            check()
+    return done
+
+
 def log(line: str) -> None:
     STATE.mkdir(mode=0o755, parents=True, exist_ok=True)
     path = STATE / 'module.log'
@@ -603,6 +635,10 @@ def dispatch(req: dict) -> str:
     if action == 'pruefen':
         check()
         return 'Angebot aktualisiert.'
+    if action == 'automatisch':
+        on = req.get('an') is True
+        set_status(auto=on)
+        return 'Module werden automatisch aktualisiert.' if on else 'Automatische Modul-Updates sind aus.'
     mid = req.get('id')
     if not isinstance(mid, str) or not ID.match(mid) or mid == 'core':
         raise Fehler('Modul-ID ungültig.')

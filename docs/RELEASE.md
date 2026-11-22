@@ -1,5 +1,13 @@
 # Basis – Release-Notizen
 
+## 0.18.0
+
+- **Module aktualisieren sich selbst:** Die tägliche Prüfung (04:20, `kienzle-module pruefen`) installiert neuere Modulversionen
+  von GitHub und aus der Basis automatisch. Ein Modul, das gerade beschäftigt ist (z. B. laufende Zahlung), wird übersprungen
+  und am nächsten Tag erneut versucht; scheitert ein Update, springt die Basis wie bisher zurück. Das Ergebnis steht unter
+  Verwaltung → Module. Abschaltbar ebendort („Automatische Updates ausschalten“).
+- Nur mit nachgestellten Modulen geprüft, nicht auf einer echten VM.
+
 ## 0.17.0
 
 - **Praxisdaten zentral:** Unter Verwaltung → Server und Name stehen jetzt neben dem Praxisnamen auch Anschrift und Kontakt

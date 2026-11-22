@@ -36,12 +36,14 @@ final class ModuleAdmin {
         $lines = is_string($log) ? array_slice(preg_split('/\R/', rtrim($log)), -20) : [];
         return ['installed' => $installed, 'available' => $available, 'running' => $running, 'pending' => is_file($this->request()), 'last' => $last,
             'checked_at' => (int)($s['checked_at'] ?? 0), 'error' => isset($s['error']) ? mb_substr((string)$s['error'], 0, 300) : null,
-            'service' => is_file(self::$unit),
+            'service' => is_file(self::$unit), 'auto' => ($s['auto'] ?? true) !== false,
             'log' => array_map(static fn($l) => mb_substr((string)preg_replace('/[\x00-\x08\x0b-\x1f\x7f]/', '', $l), 0, 300), $lines)];
     }
 
     /** Anzahl installierter Module mit neuerer Version (für das Menü). */
     public function count(): int { return count(array_filter($this->status()['installed'], fn($m) => $m['update'] !== null)); }
+
+    public function auto(bool $on): void { $this->write(['action' => 'automatisch', 'an' => $on]); }
 
     public function check(): void { $this->write(['action' => 'pruefen']); }
 

@@ -130,6 +130,24 @@ class Modulverwaltung(unittest.TestCase):
         self.assertEqual((self.data() / 'kasse.sqlite').read_text(), 'daten 1.1.0')
         self.assertEqual(json.loads((self.t / 'modules.json').read_text())['modules'][0]['module']['version'], '1.1.0')
 
+    def test_automatisch_aktualisieren(self):
+        self.mo.dispatch({'action': 'installieren', 'id': 'test-kasse'})
+        self.bundle('1.1.0')
+        self.mo.check()
+        # beschäftigt: übersprungen, nichts kaputt
+        (self.data() / 'BESCHAEFTIGT').write_text('')
+        self.assertEqual(self.mo.auto_update(), [])
+        self.assertFalse(self.mo.read_status()['last']['ok'])
+        self.assertIn('beschäftigt', self.mo.read_status()['last']['message'])
+        (self.data() / 'BESCHAEFTIGT').unlink()
+        # ausgeschaltet: nichts
+        self.mo.dispatch({'action': 'automatisch', 'an': False})
+        self.assertEqual(self.mo.auto_update(), [])
+        self.mo.dispatch({'action': 'automatisch', 'an': True})
+        self.assertEqual(self.mo.auto_update(), ['test-kasse'])
+        self.assertEqual((self.t / 'opt' / 'test-kasse' / 'current').resolve().parent.name, '1.1.0')
+        self.assertIsNone(self.mo.read_status()['installed'][0]['update'])
+
     def test_nicht_waehrend_beschaeftigt(self):
         self.mo.dispatch({'action': 'installieren', 'id': 'test-kasse'})
         (self.data() / 'BESCHAEFTIGT').write_text('')
