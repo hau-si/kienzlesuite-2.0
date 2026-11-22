@@ -101,6 +101,10 @@ ppd = "printer/sumup-rechnung.ppd"
 backend = "printer/kienzle-sumup-backend"
 share = ["samba", "ipp"]
 
+[[connections]]                   # zentrale Verbindung der Basis, die das Modul nutzt
+id = "t2med"
+purpose = "Akteneintrag nach erfolgreicher Zahlung"
+
 [setup]
 overview = "bin/setup-overview"   # Einrichtungs-Überblick des Moduls als JSON
 
@@ -115,6 +119,28 @@ apparmor = ["gs", "qpdf"]         # Programme, die Zugriff auf den Datenordner b
 
 Das vollständige Format mit allen Prüfregeln steht in `docs/MODULE-TOML.md` (entsteht in Meilenstein 1, `docs/PLAN.md`).
 Gelesen wird `module.toml` nur vom Prüfprogramm der Basis; das Webinterface liest dessen geprüfte Ausgabe.
+
+## Zugänge zu anderen Diensten
+
+Regel (entschieden am 22.11.2026): **Was mehrere Module brauchen oder zur Praxis als Ganzes gehört, verwaltet die
+Basis zentral. Ein Zugang, den nur ein Modul nutzt, bleibt im Modul.**
+
+| Zugang | Wer braucht ihn | Wo |
+|---|---|---|
+| T2med (FHIR: Server-Adresse, erlaubte Start-Adressen, API-Schlüssel, T2med-Zertifikat) | SumUp, voraussichtlich Fax, Telefon, Terminzettel | zentral |
+| E-Mail-Versand (SMTP) | SumUp-Belege, Meldungen der Basis, später Fax | zentral |
+| Netzwerkspeicher | Ablage, Sicherung | zentral |
+| Letterxpress | SumUp | im Modul |
+| SumUp-API | SumUp | im Modul |
+| Google (Sprachausgabe) | Telefon | im Modul |
+
+- Die Basis hat eine Seite „Verbindungen“: eintragen, Verbindung testen, Passwörter verschlüsselt, nach dem Speichern
+  nie mehr angezeigt.
+- Ein Modul meldet in `module.toml` an, welche zentrale Verbindung es nutzt (`[[connections]]`, mit Zweck).
+  Nur diese Module bekommen die Zugangsdaten, lesbar nur für ihren Systembenutzer.
+- Modul-eigene Zugänge speichert das Modul mit demselben Verschlüsselungsverfahren der Basis, aber mit eigenem
+  Schlüssel: Die Basis und Admins anderer Module können sie nicht lesen.
+- Die Zugangstoken je Patientenaufruf liefert T2med weiter beim Start des Moduls mit.
 
 ## Zugang, Zertifikat und Drucken
 
@@ -295,3 +321,6 @@ Aus der Beta übernommener Code behält damit seinen Lizenzhinweis.
 
 - Wie Thomas seine Projekte künftig pflegen möchte (in diesem Repository oder eigene Repositories, die als Module eingebunden werden).
 - Telefonie: welche Dienste Port-Freigaben ins VPN brauchen und ob Telefonie in derselben VM bleiben soll.
+- Google-Sprachausgabe (Telefon): Gehen Patientennamen oder Gesprächsinhalte an Google, sind das Gesundheitsdaten an
+  einen US-Anbieter. Nötig sind ein Auftragsverarbeitungsvertrag und die Prüfung, was genau übertragen wird; mit Thomas
+  bei der Aufnahme des Telefon-Moduls klären.

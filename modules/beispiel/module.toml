@@ -4,7 +4,7 @@
 [module]
 id = "beispiel"
 name = "Beispielmodul"
-version = "0.1.0"
+version = "0.1.1"
 core_api = "1"
 description = "Zeigt alle Felder der Modul-Beschreibung; nur für Tests."
 
@@ -46,6 +46,15 @@ label = "Virtueller Drucker des Beispielmoduls"
 ppd = "printer/beispiel.ppd"
 backend = "printer/kienzle-beispiel-backend"
 share = ["samba", "ipp"]
+
+[[connections]]
+id = "t2med"
+purpose = "Beispiel: Patient zum Vorgang lesen"
+
+[[connections]]
+id = "mail"
+purpose = "Beispiel: Nachricht an die Praxis senden"
+required = false
 
 [setup]
 overview = "bin/setup-overview"

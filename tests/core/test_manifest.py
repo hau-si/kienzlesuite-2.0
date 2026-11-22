@@ -79,8 +79,9 @@ class Gueltig(unittest.TestCase):
         self.assertEqual(m['module']['id'], 'sumup')
 
     def test_minimal(self):
-        text = drop_section('web', drop_section('firewall', drop_section('rights', drop_section('backup', drop_section(
-            'printers', drop_section('setup', drop_section('hooks')))))))
+        text = BEISPIEL
+        for section in ('web', 'firewall', 'rights', 'backup', 'printers', 'connections', 'setup', 'hooks'):
+            text = drop_section(section, text)
         text = replace('packages = ["sqlite3"]\nservices = ["kienzle-beispiel-worker.service"]\n', '', text)
         text = replace('description = "Zeigt alle Felder der Modul-Beschreibung; nur für Tests."\n', '', text)
         m = manifest.check_text(text)
@@ -90,9 +91,10 @@ class Gueltig(unittest.TestCase):
         self.assertEqual(m['system']['packages'], [])
         self.assertIsNone(m['hooks']['install'])
         self.assertIsNone(m['module']['description'])
+        self.assertEqual(m['connections'], [])
 
     def test_vorabversion_und_scope_any(self):
-        text = replace('version = "0.1.0"', 'version = "2.1.0-beta.3"')
+        text = replace('version = "0.1.1"', 'version = "2.1.0-beta.3"')
         text = replace('port = 8766\nproto = "tcp"', 'port = 51820\nproto = "udp"\nscope = "any"', text)
         m = manifest.check_text(text)
         self.assertEqual(m['module']['version'], '2.1.0-beta.3')
@@ -138,7 +140,7 @@ class Grundregeln(Fehler):
         self.invalid(replace('name = "Beispielmodul"', 'name = 7'), 'module.name', 'Text')
 
     def test_alle_fehler_auf_einmal(self):
-        text = replace('version = "0.1.0"', 'version = "1.0"', replace('user = "ks-beispiel"', 'user = "root"'))
+        text = replace('version = "0.1.1"', 'version = "1.0"', replace('user = "ks-beispiel"', 'user = "root"'))
         errors = self.invalid(text, 'module.version')
         self.assert_error(errors, 'system.user')
 
@@ -162,7 +164,7 @@ class Modul(Fehler):
     def test_version(self):
         for bad in ('1.0', '01.0.0', '1.0.0-', 'v1.0.0', '1.0.0+build'):
             with self.subTest(bad):
-                self.invalid(replace('version = "0.1.0"', f'version = "{bad}"'), 'module.version')
+                self.invalid(replace('version = "0.1.1"', f'version = "{bad}"'), 'module.version')
 
     def test_core_api(self):
         self.invalid(replace('core_api = "1"', 'core_api = 1'), 'module.core_api', 'ungültig')
@@ -276,6 +278,30 @@ class Drucker(Fehler):
         self.invalid(replace('share = ["samba", "ipp"]', 'share = ["ftp"]'), 'printers[1].share', 'unbekannt')
         self.invalid(replace('backend = "printer/kienzle-beispiel-backend"', 'backend = "../../usr/lib/cups/backend/ipp"'),
                      'printers[1].backend')
+
+
+class Verbindungen(Fehler):
+    def test_gueltig(self):
+        m = manifest.check_folder(BEISPIEL_DIR)
+        self.assertEqual(m['connections'], [
+            {'id': 't2med', 'purpose': 'Beispiel: Patient zum Vorgang lesen', 'required': True},
+            {'id': 'mail', 'purpose': 'Beispiel: Nachricht an die Praxis senden', 'required': False}])
+        ohne = manifest.check_text(drop_section('connections'))
+        self.assertEqual(ohne['connections'], [])
+
+    def test_unbekannt_und_doppelt(self):
+        self.invalid(replace('id = "t2med"', 'id = "letterxpress"'), 'connections[1].id', 'unbekannt')
+        self.invalid(replace('id = "mail"', 'id = "t2med"'), 'connections[2].id', 'doppelt')
+
+    def test_zweck_und_pflicht(self):
+        self.invalid(replace('purpose = "Beispiel: Patient zum Vorgang lesen"\n', ''), 'connections[1]', '„purpose“ fehlt')
+        self.invalid(replace('required = false', 'required = "nein"'), 'connections[2].required', 'true oder false')
+        self.invalid(replace('purpose = "Beispiel: Patient zum Vorgang lesen"', 'purpose = "' + 'x' * 121 + '"'),
+                     'connections[1].purpose', 'zu lang')
+
+    def test_unbekannter_schluessel(self):
+        self.invalid(replace('required = false', 'required = false\napi_key = "geheim"'), 'connections',
+                     'unbekannter Schlüssel „api_key“')
 
 
 class Haken(Fehler):
@@ -401,7 +427,7 @@ class Alle(Ordner):
 
     def test_ungueltiges_modul_und_ordner_ohne_beschreibung(self):
         self.module()
-        self.second(**{'version = "0.1.0"': 'version = "x"'})
+        self.second(**{'version = "0.1.1"': 'version = "x"'})
         (self.tmp / 'leer').mkdir()
         errors = self.all_errors()
         self.assert_error(errors, 'zweites: module.version')
@@ -414,7 +440,7 @@ class Befehl(Ordner):
 
     def test_gueltig(self):
         r = self.run_cli(str(BEISPIEL_DIR))
-        self.assertEqual((r.returncode, r.stdout.strip()), (0, 'Gültig: beispiel 0.1.0.'), r.stderr)
+        self.assertEqual((r.returncode, r.stdout.strip()), (0, 'Gültig: beispiel 0.1.1.'), r.stderr)
 
     def test_json(self):
         r = self.run_cli('--json', str(BEISPIEL_DIR))
@@ -424,7 +450,7 @@ class Befehl(Ordner):
         self.assertEqual(json.loads(r.stdout)['core_api'], ['1'])
 
     def test_ungueltig(self):
-        folder = self.module(text=replace('version = "0.1.0"', 'version = "1"'))
+        folder = self.module(text=replace('version = "0.1.1"', 'version = "1"'))
         r = self.run_cli(str(folder))
         self.assertEqual(r.returncode, 1)
         self.assertEqual(r.stdout, '')

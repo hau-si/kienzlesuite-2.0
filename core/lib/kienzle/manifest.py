@@ -46,9 +46,12 @@ RESERVED_PORTS = {('tcp', 22): 'SSH', ('tcp', 443): 'HTTPS der Basis', ('tcp', 4
 RESERVED_RIGHTS = frozenset({'admin'})
 APPARMOR = frozenset({'gs', 'qpdf'})
 HOOKS = ('install', 'update', 'remove', 'busy', 'health')
+# Zentrale Verbindungen der Basis, die ein Modul anmelden kann (Zugangsdaten bekommen nur anmeldende Module).
+CONNECTIONS = ('t2med', 'mail', 'ablage')
 SHARES = ('samba', 'ipp')
 
-LIMITS = {'packages': 50, 'services': 20, 'firewall': 20, 'rights': 30, 'printers': 10, 'paths': 20}
+LIMITS = {'packages': 50, 'services': 20, 'firewall': 20, 'rights': 30, 'printers': 10, 'paths': 20,
+          'connections': len(CONNECTIONS)}
 
 SCHEMA_SECTIONS = {
     'module': {'id', 'name', 'version', 'core_api', 'description'},
@@ -58,11 +61,12 @@ SCHEMA_SECTIONS = {
     'rights': {'id', 'label'},
     'backup': {'paths', 'snapshot'},
     'printers': {'name', 'label', 'ppd', 'backend', 'share'},
+    'connections': {'id', 'purpose', 'required'},
     'setup': {'overview'},
     'hooks': {*HOOKS, 'apparmor'},
 }
 TABLES = {'module', 'system', 'web', 'backup', 'setup', 'hooks'}
-ARRAYS = {'firewall', 'rights', 'printers'}
+ARRAYS = {'firewall', 'rights', 'printers', 'connections'}
 REQUIRED_TABLES = ('module', 'system')
 
 
@@ -186,6 +190,7 @@ class _Checker:
         out['rights'] = self.rights(data.get('rights', []))
         out['backup'] = self.backup(data['backup'], mid) if 'backup' in data else None
         out['printers'] = self.printers(data.get('printers', []))
+        out['connections'] = self.connections(data.get('connections', []))
         out['setup'] = self.setup(data.get('setup', {}))
         out['hooks'] = self.hooks(data.get('hooks', {}))
         return None if self.errors else out
@@ -332,6 +337,27 @@ class _Checker:
                 if s not in SHARES:
                     self.error(f'{where}.share', f'„{shown(s)}“ unbekannt. Erlaubt: {", ".join(SHARES)}.')
             out.append({'name': name, 'label': label, 'ppd': ppd, 'backend': backend, 'share': share})
+        return out
+
+    def connections(self, items: list) -> list:
+        if len(items) > LIMITS['connections']:
+            self.error('connections', f'höchstens {LIMITS["connections"]} Einträge.')
+            return []
+        out, seen = [], set()
+        for n, t in enumerate(items, 1):
+            where = f'connections[{n}]'
+            cid = t.get('id')
+            if cid not in CONNECTIONS:
+                self.error(f'{where}.id', f'„{shown(cid)}“ unbekannt. Erlaubt: {", ".join(CONNECTIONS)}.')
+                cid = None
+            elif cid in seen:
+                self.error(f'{where}.id', f'„{cid}“ ist doppelt.')
+            seen.add(cid)
+            purpose = self.text(t, 'purpose', where, limit=120)
+            required = t.get('required', True)
+            if not isinstance(required, bool):
+                self.error(f'{where}.required', 'muss true oder false sein.')
+            out.append({'id': cid, 'purpose': purpose, 'required': required is True})
         return out
 
     def setup(self, t: dict) -> dict:

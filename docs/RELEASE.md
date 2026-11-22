@@ -1,5 +1,14 @@
 # Basis – Release-Notizen
 
+## 0.1.1
+
+- Neu im Format `module.toml`: `[[connections]]`. Ein Modul meldet an, welche zentrale Verbindung der Basis es nutzt
+  (`t2med`, `mail`, `ablage`), wofür (`purpose`) und ob es ohne sie arbeitet (`required`). Nur anmeldende Module
+  bekommen die Zugangsdaten. Zugänge, die nur ein Modul nutzt (Letterxpress, SumUp-API, Google), bleiben im Modul.
+- Tests für das neue Feld.
+
+Nicht geprüft: Lauf auf echtem Ubuntu 26.04 (lokal Python 3.13).
+
 ## 0.1.0
 
 Meilenstein 1 aus `docs/PLAN.md`: Gerüst der Basis und Format der Modul-Beschreibung.

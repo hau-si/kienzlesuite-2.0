@@ -1,5 +1,9 @@
 # Beispielmodul – Release-Notizen
 
+## 0.1.1
+
+- Zeigt das neue Feld `[[connections]]` (T2med als Pflicht, E-Mail optional).
+
 ## 0.1.0
 
 - Erste Fassung: zeigt alle Felder von `module.toml` (Format der Basis 0.1.0, `core_api` 1) und dient den Tests der Basis.

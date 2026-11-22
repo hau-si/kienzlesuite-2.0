@@ -30,6 +30,7 @@ Restic auf SMB: die robusteste und sicherste Lösung wählen; Ergebnis siehe M6.
 | E9 | TLS im Praxisnetz | **Lokale Zertifizierungsstelle auf dem Server**, ohne externe Stelle (Details in M2) | Browser ohne Warnung auf allen Arbeitsplätzen; nichts muss aus dem Internet erreichbar sein |
 | E10 | Drucken | CUPS und Samba installiert und konfiguriert die Basis. Module drucken über die lokalen Warteschlangen und melden eigene virtuelle Drucker in `module.toml` an (`[[printers]]`). Anlegen und Entfernen übernimmt ein root-Dienst der Basis (M8). | ein Druckdienst für alle Module; kein Modul braucht die Gruppe `lpadmin` (in der Beta war der PHP-Dienst Mitglied) |
 | E11 | Starter und Überblick | Arbeitsplatz-Starter gehören zum SumUp-Modul (Schritt 2). Jedes Modul liefert seinen eigenen Einrichtungs-Überblick über einen Haken; die Basis zeigt ihren eigenen und die der Module auf einer Seite. | Starter und Überblick stammen aus der SumUp-Suite und sind modulspezifisch |
+| E12 | Zugänge zu anderen Diensten | Zentral, was mehrere Module brauchen oder zur Praxis gehört (T2med/FHIR, E-Mail, Netzwerkspeicher); im Modul, was nur ein Modul nutzt (Letterxpress, SumUp-API, Google). Module melden zentrale Verbindungen in `[[connections]]` an. | eine Stelle für Praxis-Zugänge; „ein Modul bekommt nur seine eigenen Geheimnisse“ bleibt gewahrt |
 
 ## Prüfung je Meilenstein
 
@@ -83,7 +84,7 @@ Die Musterprüfungen (Portbereiche, Namen) folgen `scripts/firewall-apply.py` (`
 **Tests:** `tests/core/test_manifest.py` geht vom gültigen Beispielmodul aus und verändert je Regel genau eine Stelle
 (statt vieler einzelner Testdateien), dazu Dateiprüfungen im Modulordner und Konflikte zwischen zwei Modulen.
 
-**Stand:** erledigt mit Basis 0.1.0 (22.11.2026).
+**Stand:** erledigt mit Basis 0.1.0 (22.11.2026); 0.1.1 ergänzt `[[connections]]` (E12).
 
 ---
 
@@ -257,9 +258,10 @@ landen, nach dem Start geprüft werden und bei Fehlern automatisch auf den vorhe
 
 ---
 
-## M5 – Netzwerkspeicher 🖥
+## M5 – Netzwerkspeicher und Verbindungen 🖥
 
-**Ziel:** Ein gemeinsamer Dienst für Ziele auf dem NAS. Module legen Dateien ab, ohne die Zugangsdaten zu kennen.
+**Ziel:** Ein gemeinsamer Dienst für Ziele auf dem NAS, dazu die zentralen Verbindungen zu T2med und E-Mail (E12).
+Module legen Dateien ab, ohne die NAS-Zugangsdaten zu kennen; T2med- und E-Mail-Zugang bekommen nur Module, die sie anmelden.
 
 **Ergebnis (prüfbar):**
 
@@ -274,16 +276,28 @@ landen, nach dem Start geprüft werden und bei Fehlern automatisch auf den vorhe
   - Wiederholung bei Fehlern, Platzhalter `{jahr}`/`{monat}`.
   - Dateinamen werden geprüft (keine Pfadteile, kein `..`).
 - Beschreibung in `docs/MODUL-SCHNITTSTELLE.md`.
+- **Seite „Verbindungen“:**
+  - T2med (FHIR): Server-Adresse, erlaubte Start-Adressen, API-Schlüssel, T2med-Zertifikat bzw. Fingerabdruck.
+  - E-Mail (SMTP): Server, Port, `starttls`/`smtps`, Benutzer, Passwort, Absender.
+  - Je Verbindung „Verbindung prüfen“ (T2med: `/metadata`; E-Mail: Anmeldung am Server ohne Versand oder Testmail an eine einzugebende Adresse).
+  - Liste, welches Modul welche Verbindung wofür nutzt (`purpose` aus `[[connections]]`).
+- **Weitergabe:** Der root-Dienst schreibt je Modul nur die angemeldeten Verbindungen nach `/etc/kienzle/verbindungen/<id>.json`
+  (0640, root:ks-<id>). Ändert der Admin eine Verbindung, werden die Dateien neu geschrieben und die Module benachrichtigt.
+- **Modul-eigene Geheimnisse:** kleine Hilfsdatei, mit der Module ihre eigenen Zugänge mit libsodium verschlüsseln;
+  Schlüssel je Modul unter `/etc/kienzle/schluessel/<id>.key` (0640, root:ks-<id>), für die Basis nicht lesbar.
 
 **Übernahme:**
 
 | Quelle | Verwendung |
 |---|---|
+| Beta `src/FhirClient.php`, `src/HttpClient.php`, `src/Config.php` (`[fhir]`) | Prüfung der FHIR-Adressen (feste Basis-URL, Liste erlaubter Start-Adressen), T2med-Zertifikat und Pinning, `/metadata`-Abruf für „Verbindung prüfen“ |
+| Beta `src/ReceiptMailer.php`, `scripts/configure.py` (`[mail]`), `src/vendor/phpmailer` | SMTP-Einstellungen und Versand; PHPMailer als Rückfall, Systempaket hat Vorrang |
 | Beta `src/InvoiceExport.php` | `smbclient`-Aufruf mit Zugangsdatei (0600, `-A`), schrittweises `mkdir`, Auswertung der `NT_STATUS_*`-Codes, Unterordner mit `{jahr}`/`{monat}`. Der Teil für Rechnungsnamen bleibt im SumUp-Modul. |
 | Beta `scripts/export-invoices.php` + Timer im Installer | stündliche Nachholung |
 | kienzlezeit `kienzlezeit-backup-und-restore.sh` | Prüfung der Verbindungsangaben (`transport` ssh/smb, Gastzugang), SSH-Aufrufe, Hochladen über `.part` mit anschließendem Umbenennen, Rücklesen und Vergleich der SHA-256-Prüfsumme |
 
-**Tests:** Prüfung der Angaben, Pfad-Angriffe in Aufträgen, Aufbau der `smbclient`- und `sftp`-Befehle, Wiederholung, Geheimnisse nicht im Protokoll.
+**Tests:** Weitergabe nur an anmeldende Module (ein Modul ohne `t2med` bekommt keine Datei), Rechte der Dateien,
+keine Geheimnisse in Antworten und Protokollen, Prüfung der FHIR-Adressen. Für den Netzwerkspeicher: Prüfung der Angaben, Pfad-Angriffe in Aufträgen, Aufbau der `smbclient`- und `sftp`-Befehle, Wiederholung, Geheimnisse nicht im Protokoll.
 Im CI-Container zusätzlich ein Durchlauf mit einem echten Samba- und SSH-Server auf `127.0.0.1`.
 
 **VM:** Ablage auf ein Test-NAS bzw. eine Samba-Freigabe auf einer zweiten VM.

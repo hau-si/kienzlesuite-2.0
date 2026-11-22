@@ -1,6 +1,6 @@
 # Modul-Beschreibung `module.toml`
 
-Gilt für `core_api = "1"` (Basis ab 0.1.0). Jedes Modul liegt in `modules/<id>/` und bringt dort eine `module.toml` mit.
+Gilt für `core_api = "1"` (Basis ab 0.1.1). Jedes Modul liegt in `modules/<id>/` und bringt dort eine `module.toml` mit.
 Geprüft wird sie mit
 
 ```
@@ -97,6 +97,18 @@ Virtuelle Drucker des Moduls. Die Druckerverwaltung der Basis legt sie an und en
 | `backend` | nein | CUPS-Backend im Modulordner (ausführbar) |
 | `share` | nein | Liste aus `"samba"` und `"ipp"`: wie die Arbeitsplätze den Drucker erreichen |
 
+### `[[connections]]` – optional
+
+Zentrale Verbindungen, die die Basis verwaltet (Seite „Verbindungen“). Nur Module, die eine Verbindung hier anmelden,
+bekommen deren Zugangsdaten; sie sind dann nur für `ks-<id>` lesbar. Zugänge, die nur ein Modul braucht
+(z. B. Letterxpress, SumUp-API, Google), verwaltet das Modul selbst.
+
+| Schlüssel | Pflicht | Regel |
+|---|---|---|
+| `id` | ja | `"t2med"` (FHIR-Zugang zu T2med), `"mail"` (E-Mail-Versand per SMTP) oder `"ablage"` (Netzwerkspeicher); je einmal |
+| `purpose` | ja | wofür das Modul die Verbindung nutzt, höchstens 120 Zeichen; wird dem Admin angezeigt |
+| `required` | nein | `true` (Vorgabe): ohne die Verbindung arbeitet das Modul nicht; `false`: nur einzelne Funktionen fehlen |
+
 ### `[setup]` – optional
 
 | Schlüssel | Pflicht | Regel |
@@ -137,7 +149,7 @@ Entspricht `modules/beispiel/module.toml`; die Tests prüfen, dass dieses Beispi
 [module]
 id = "beispiel"
 name = "Beispielmodul"
-version = "0.1.0"
+version = "0.1.1"
 core_api = "1"
 description = "Zeigt alle Felder der Modul-Beschreibung; nur für Tests."
 
@@ -179,6 +191,15 @@ label = "Virtueller Drucker des Beispielmoduls"
 ppd = "printer/beispiel.ppd"
 backend = "printer/kienzle-beispiel-backend"
 share = ["samba", "ipp"]
+
+[[connections]]
+id = "t2med"
+purpose = "Beispiel: Patient zum Vorgang lesen"
+
+[[connections]]
+id = "mail"
+purpose = "Beispiel: Nachricht an die Praxis senden"
+required = false
 
 [setup]
 overview = "bin/setup-overview"
