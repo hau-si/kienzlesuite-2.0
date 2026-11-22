@@ -1,5 +1,12 @@
 # Basis – Release-Notizen
 
+## 0.15.0
+
+- **Signaturprüfung der Updates vorerst optional** (Entscheidung vom 22.11.2026): Vorgabe ist „ohne Signaturprüfung“;
+  „nur im Beta-Kanal ohne Signatur“ und „immer prüfen“ bleiben wählbar. Manifest und SHA-256 jeder Datei werden weiter
+  geprüft, eine vorhandene, aber falsche Signatur wird weiter abgelehnt. Im Überblick ist die Signaturprüfung ein
+  optionaler Hinweis statt eines offenen Punkts. Wer „immer prüfen“ gewählt hat, behält das.
+
 ## 0.14.1
 
 - **Releases über GitHub Actions:** Ein Tag `core-v<version>` prüft die Version, führt alle Tests aus, baut Archiv und

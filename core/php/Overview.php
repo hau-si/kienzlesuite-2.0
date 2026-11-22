@@ -65,8 +65,8 @@ final class Overview {
         }
         if ($this->updates) {
             $u = $this->updates->status();
-            $out[] = self::item('Updates: Signaturprüfung eingeschaltet', $u['signatur'] === 'pflicht' ? 'done' : 'open',
-                $u['signatur'] === 'pflicht' ? 'Nur signierte Versionen' : 'Unsignierte Versionen zugelassen', '/verwaltung/updates');
+            $out[] = self::item('Updates: Signaturprüfung (optional)', $u['signatur'] === 'pflicht' ? 'done' : 'info',
+                $u['signatur'] === 'pflicht' ? 'Nur signierte Versionen' : 'Derzeit ohne Signaturprüfung – einschalten, sobald Releases signiert werden', '/verwaltung/updates');
             $out[] = self::item('Updates: kürzlich nach neuen Versionen gesehen', $u['checked_at'] > time() - 3 * 86400 && !$u['error'] ? 'done' : ($u['error'] ? 'error' : 'open'),
                 $u['error'] ? (string)$u['error'] : ($u['checked_at'] ? 'Zuletzt ' . View::date($u['checked_at']) : 'Noch nie'), '/verwaltung/updates');
         }

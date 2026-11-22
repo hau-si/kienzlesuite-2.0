@@ -939,9 +939,9 @@ final class Web {
             . '<label class="check"><input type="radio" name="kanal" value="stabil"' . ($st['channel'] === 'stabil' ? ' checked' : '') . '> Stabil (empfohlen)</label>'
             . '<label class="check"><input type="radio" name="kanal" value="beta"' . ($st['channel'] === 'beta' ? ' checked' : '') . '> Beta (Vorabversionen zum Testen)</label>'
             . '<h3>Signaturprüfung</h3>'
-            . '<label class="check"><input type="radio" name="signatur" value="pflicht"' . ($st['signatur'] === 'pflicht' ? ' checked' : '') . '> Immer prüfen (empfohlen)</label>'
-            . '<label class="check"><input type="radio" name="signatur" value="beta"' . ($st['signatur'] === 'beta' ? ' checked' : '') . '> Im Beta-Kanal auch unsignierte Versionen zulassen</label>'
-            . '<label class="check"><input type="radio" name="signatur" value="aus"' . ($st['signatur'] === 'aus' ? ' checked' : '') . '> Ohne Signaturprüfung – alle Versionen (nicht empfohlen)</label>'
+            . '<label class="check"><input type="radio" name="signatur" value="aus"' . ($st['signatur'] === 'aus' ? ' checked' : '') . '> Ohne Signaturprüfung (Vorgabe)</label>'
+            . '<label class="check"><input type="radio" name="signatur" value="beta"' . ($st['signatur'] === 'beta' ? ' checked' : '') . '> Nur im Beta-Kanal ohne Signatur</label>'
+            . '<label class="check"><input type="radio" name="signatur" value="pflicht"' . ($st['signatur'] === 'pflicht' ? ' checked' : '') . '> Immer prüfen – sobald der Herausgeber die Releases signiert</label>'
             . '<p>Ohne Signatur ist nicht gesichert, dass eine Version vom Herausgeber stammt: Wer das Repository auf GitHub verändern kann, '
             . 'könnte dann Programme mit root-Rechten auf diesen Server bringen. Geprüft wird weiter gegen Beschädigung (Manifest, SHA-256), und eine '
             . 'vorhandene, aber falsche Signatur wird immer abgelehnt.</p>'
@@ -964,7 +964,7 @@ final class Web {
             switch ($r->field('aktion', 20)) {
                 case 'pruefen': $up->check(); $this->audit->write($admin, 'update-pruefen'); break;
                 case 'kanal':
-                    $mode = $r->field('signatur', 10) ?: ($r->field('unsigniert') === '1' ? 'beta' : 'pflicht');
+                    $mode = $r->field('signatur', 10) ?: ($r->field('unsigniert') === '1' ? 'beta' : 'aus');
                     $up->setChannel($r->field('kanal', 10), $mode);
                     $this->audit->write($admin, 'update-kanal', $r->field('kanal', 10) . ' signatur-' . $mode);
                     break;

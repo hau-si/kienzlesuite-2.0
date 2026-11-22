@@ -107,13 +107,14 @@ def channel() -> str:
 
 
 SIGNATUR = ('pflicht', 'beta', 'aus')
+DEFAULT_SIGNATUR = E('KIENZLE_UPDATE_SIGNATUR_VORGABE', 'aus')     # Signatur vorerst optional; „pflicht“ wählbar
 
 
 def signature_mode() -> str:
-    """Signaturprüfung: pflicht (Vorgabe) | beta (unsignierte Vorabversionen im Beta-Kanal erlaubt) | aus (jede Version
+    """Signaturprüfung: aus (Vorgabe, Entscheidung vom 22.11.2026) | beta (unsignierte Vorabversionen im Beta-Kanal) | pflicht (jede Version
     darf unsigniert sein). Eine vorhandene, aber falsche Signatur wird in jeder Stufe abgelehnt."""
     s = _settings()
-    mode = s.get('signatur') if s.get('signatur') in SIGNATUR else ('beta' if s.get('unsigniert') is True else 'pflicht')
+    mode = s.get('signatur') if s.get('signatur') in SIGNATUR else ('beta' if s.get('unsigniert') is True else DEFAULT_SIGNATUR)
     return 'pflicht' if mode == 'beta' and channel() != 'beta' else mode
 
 
@@ -501,8 +502,8 @@ def _dispatch(req: dict) -> None:
     action = req.get('action')
     if action == 'pruefen':
         check()
-    elif action == 'kanal' and req.get('kanal') in release.CHANNELS and isinstance(req.get('unsigniert', False), bool) and req.get('signatur', 'pflicht') in SIGNATUR:
-        mode = req.get('signatur') if 'signatur' in req else ('beta' if req.get('unsigniert') is True else 'pflicht')
+    elif action == 'kanal' and req.get('kanal') in release.CHANNELS and isinstance(req.get('unsigniert', False), bool) and req.get('signatur', 'aus') in SIGNATUR:
+        mode = req.get('signatur') if 'signatur' in req else ('beta' if req.get('unsigniert') is True else signature_mode())
         if mode == 'beta' and req['kanal'] != 'beta':
             mode = 'pflicht'
         _write_json(STATE / 'einstellungen.json', {'kanal': req['kanal'], 'signatur': mode})

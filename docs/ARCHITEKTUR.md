@@ -182,8 +182,8 @@ Freigegeben am 22.11.2026. Ablauf je Teil (Basis oder Modul):
 6. **Prüfung nach dem Start:** Dienste aktiv und Gesundheitsprüfung (`/_health` bzw. `hooks.health`) binnen 60 Sekunden.
 7. **Rücksprung** bei Fehler oder abgebrochenem Update: alter Verweis, Daten-Schnappschuss zurück, Start, Meldung in der Glocke.
    Von Hand ist der Rückweg auf eine der aufbewahrten Versionen möglich, mit Hinweis auf möglichen Datenverlust.
-8. **Signaturprüfung wählbar** (Wünsche vom 22.11.2026): Vorgabe „immer prüfen“; ein Basis-Admin kann unsignierte
-   Beta-Versionen zulassen oder die Prüfung ganz abschalten. Prüfsummen bleiben, eine vorhandene falsche Signatur wird immer abgelehnt.
+8. **Signaturprüfung wählbar** (Wünsche vom 22.11.2026): vorerst Vorgabe „ohne Signaturprüfung“; ein Basis-Admin kann
+   „nur Beta ohne Signatur“ oder „immer prüfen“ wählen, sobald die Releases signiert werden. Prüfsummen bleiben, eine vorhandene falsche Signatur wird immer abgelehnt.
 
 Ablauf für den Herausgeber: `docs/RELEASE-ABLAUF.md`.
 

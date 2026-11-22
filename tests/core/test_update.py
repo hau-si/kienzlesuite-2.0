@@ -283,8 +283,8 @@ class Updater(Umgebung):
     def test_unsigniert_nur_beta_und_nur_mit_freigabe(self):
         self.publish('0.4.0', signed=False)
         self.publish('0.5.0-beta.1', prerelease=True, signed=False)
-        self.request({'action': 'kanal', 'kanal': 'beta'})
-        self.assertEqual(self.status()['available']['core'], [], 'unsignierte Versionen ohne Freigabe angeboten')
+        self.request({'action': 'kanal', 'kanal': 'beta', 'signatur': 'pflicht'})
+        self.assertEqual(self.status()['available']['core'], [], 'unsignierte Versionen bei Pflicht angeboten')
         self.request({'action': 'installieren', 'version': '0.5.0-beta.1'})
         self.assert_unchanged('nicht signiert')
         self.request({'action': 'kanal', 'kanal': 'stabil', 'unsigniert': True})       # Freigabe gilt nur im Beta-Kanal
@@ -297,9 +297,15 @@ class Updater(Umgebung):
         self.assertEqual(self.current(), '0.5.0-beta.1')
         self.assertIn('OHNE Signatur', (self.t / 'state' / 'update.log').read_text())
 
+    def test_vorgabe_ohne_signaturpruefung(self):
+        self.publish('0.4.0', signed=False)
+        self.request({'action': 'pruefen'})
+        self.assertEqual(self.status()['signatur'], 'aus')
+        self.assertEqual([(a['version'], a['signed']) for a in self.status()['available']['core']], [('0.4.0', False)])
+
     def test_signaturpruefung_aus(self):
         self.publish('0.4.0', signed=False)
-        self.request({'action': 'kanal', 'kanal': 'stabil'})
+        self.request({'action': 'kanal', 'kanal': 'stabil', 'signatur': 'pflicht'})
         self.assertEqual(self.status()['available']['core'], [])
         self.request({'action': 'kanal', 'kanal': 'stabil', 'signatur': 'beta'})   # gilt nur im Beta-Kanal
         self.assertEqual(self.status()['signatur'], 'pflicht')

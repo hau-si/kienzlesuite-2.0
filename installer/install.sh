@@ -233,7 +233,7 @@ if os.path.exists(path):
         data = json.load(f)
 data['kanal'] = sys.argv[1]
 if data.get('signatur') == 'beta' and sys.argv[1] != 'beta':
-    data['signatur'] = 'pflicht'
+    data['signatur'] = 'aus'
 with open(path + '.neu', 'w', encoding='utf-8') as f:
     json.dump(data, f)
 os.replace(path + '.neu', path)
