@@ -1,5 +1,12 @@
 # Basis – Release-Notizen
 
+## 0.14.1
+
+- **Releases über GitHub Actions:** Ein Tag `core-v<version>` prüft die Version, führt alle Tests aus, baut Archiv und
+  Manifest und veröffentlicht das Release. Signieren bleibt offline beim Herausgeber; die `.sig` wird danach hochgeladen
+  (`docs/RELEASE-ABLAUF.md`). Bis dahin nur mit abgeschalteter Signaturprüfung installierbar.
+- Erstes Release für das Update-Panel; davor gab es nur Commits, deshalb fand die Test-VM keine neue Version.
+
 ## 0.14.0
 
 Neue Gestaltung nach Entwurf B (Rückmeldung von der Test-VM): Farben, Schrift, Karten und Einrichtungsliste wie im

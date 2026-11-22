@@ -1,0 +1,33 @@
+name: Release
+# Ein Tag „core-v<version>“ baut das Release der Basis (Archiv und Manifest) und veröffentlicht es auf GitHub.
+# Die Signatur entsteht offline beim Herausgeber (docs/RELEASE-ABLAUF.md) und wird danach als .sig hochgeladen.
+# Bis dahin installieren Server das Release nur mit abgeschalteter Signaturprüfung (Verwaltung → Updates).
+on:
+  push:
+    tags: ['core-v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Version prüfen
+        run: |
+          version="${GITHUB_REF_NAME#core-v}"
+          [ "$version" = "$(cat core/VERSION)" ] || { echo "Tag $GITHUB_REF_NAME passt nicht zu core/VERSION $(cat core/VERSION)"; exit 1; }
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - name: Tests
+        run: sudo apt-get update && sudo apt-get install -y php-cli php-sqlite3 php-mbstring openssl && bash tests/run-all.sh
+      - name: Bauen
+        run: |
+          kanal=stabil; case "$VERSION" in *-*) kanal=beta ;; esac
+          python3 -B scripts/release-bauen core --kanal "$kanal"
+      - name: Veröffentlichen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pre=''; case "$VERSION" in *-*) pre='--prerelease' ;; esac
+          awk -v v="## $VERSION" '$0==v{f=1;next} /^## /{f=0} f' docs/RELEASE.md > notizen.md
+          printf '\n---\nNoch ohne Signatur: Signatur folgt vom Herausgeber (docs/RELEASE-ABLAUF.md).\n' >> notizen.md
+          gh release create "$GITHUB_REF_NAME" dist/core-"$VERSION".tar.gz dist/core-"$VERSION".manifest.json --title "Basis $VERSION" --notes-file notizen.md $pre

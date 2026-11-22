@@ -23,7 +23,20 @@ Den ausgegebenen Fingerabdruck in `README.md` eintragen. Wer installiert, vergle
 Solange in `installer/release-keys/` kein Schlüssel liegt, nimmt der Updater keine Releases an. Ausnahme:
 Beta-Versionen ohne Signatur, wenn ein Admin das im Beta-Kanal ausdrücklich zugelassen hat (siehe unten).
 
-## Je Release der Basis
+## Je Release der Basis (über GitHub Actions)
+
+1. Version in `core/VERSION` erhöhen, `docs/RELEASE.md` ergänzen, alle Tests grün, committen und pushen.
+2. Tag setzen und pushen: `git tag core-v<version> && git push origin core-v<version>`. Der Ablauf „Release“ baut
+   Archiv und Manifest und veröffentlicht das Release (Vorabversion, wenn die Version einen Bindestrich hat).
+3. Signieren auf dem Rechner mit dem privaten Schlüssel:
+   ```
+   gh release download core-v<version> -p '*.manifest.json' -D dist
+   scripts/release-signieren dist/core-<version>.manifest.json --schluessel /media/tresor/kienzle-release-2026.pem
+   gh release upload core-v<version> dist/core-<version>.manifest.json.sig
+   ```
+   Ab dann installieren alle Server das Release mit eingeschalteter Signaturprüfung.
+
+## Je Release der Basis (von Hand)
 
 1. Version in `core/VERSION` erhöhen, `docs/RELEASE.md` ergänzen, alle Tests grün, committen.
 2. Bauen (nur eingecheckte Dateien, reproduzierbar):
