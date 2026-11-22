@@ -17,7 +17,7 @@ final class Web {
 
     public function __construct(
         private Config $config, private Database $db, private Users $users, private Auth $auth, private ?Passkeys $passkeys,
-        private Modules $modules, private AuditLog $audit, ?callable $qr = null,
+        private Modules $modules, private AuditLog $audit, ?callable $qr = null, private ?Firewall $firewall = null,
     ) {
         $this->qr = $qr ?? static function (string $uri): ?string {
             if (!is_executable('/usr/bin/qrencode')) return null;
@@ -429,6 +429,9 @@ final class Web {
         }
         if ($r->path === '/verwaltung/zugang') return $get ? $this->accessPage() : $this->accessSave($r, $admin);
         if ($r->path === '/verwaltung/protokoll' && $get) return $this->protocol();
+        if ($r->path === '/verwaltung/firewall') return $get ? $this->firewallPage() : $this->firewallApply($r, $admin);
+        if ($r->path === '/verwaltung/firewall/bestaetigen' && !$get) return $this->firewallConfirm($admin);
+        if ($r->path === '/verwaltung/firewall/aus' && !$get) return $this->firewallOff($admin);
         throw new Problem('Seite nicht gefunden.', 404);
     }
 
@@ -564,6 +567,80 @@ final class Web {
         $lines = array_map(fn($l) => '<li><code>' . V::h($l) . '</code></li>', $this->audit->recent(200));
         return Response::html(V::page('Protokoll', '<p>Anmeldungen und Änderungen, neueste zuerst. Ohne Passwörter, Codes und Patientendaten.</p><ol class="log">' . implode('', $lines) . '</ol>',
             $this->nav(), $this->config->practice));
+    }
+
+    // ---- Firewall -----------------------------------------------------------------------------------------------
+    private function fw(): Firewall {
+        if (!$this->firewall) throw new Problem('Die Firewall ist auf diesem Server nicht verfügbar.', 503);
+        return $this->firewall;
+    }
+
+    private function firewallPage(?string $error = null, ?array $input = null): Response {
+        $o = $this->fw()->overview($this->req->remote);
+        $c = $input ?? $o['config'];
+        $st = $o['status'];
+        $csrf = V::csrf($this->session['csrf']);
+        $labels = ['off' => 'aus', 'requested' => 'wird geladen …', 'pending' => 'geladen, wartet auf Bestätigung', 'active' => 'aktiv',
+            'reverted' => 'zurückgesetzt (nicht bestätigt)', 'failed' => 'Fehler'];
+        $body = V::error($error) . '<p>Zustand: <strong>' . V::h($labels[$st['state']] ?? $st['state']) . '</strong>' . ($st['message'] !== '' ? ' – ' . V::h($st['message']) : '') . '</p>';
+        if ($st['state'] === 'pending') {
+            $body .= '<form method="post" action="/verwaltung/firewall/bestaetigen" class="box notice">' . $csrf
+                . '<p><strong>Diese Seite ist mit den neuen Regeln erreichbar?</strong> Dann jetzt bestätigen – sonst werden die vorherigen Regeln um '
+                . V::h(date('H:i:s', (int)$st['deadline'])) . ' Uhr wiederhergestellt.</p><button>Firewall bestätigen</button></form>';
+        }
+        if (!$o['service']) $body .= '<p class="error">Der Firewall-Dienst ist nicht eingerichtet. Bitte den Installer ausführen.</p>';
+        $nets = [];
+        foreach ($o['network']['interfaces'] as $i) foreach ($i['addresses'] as $a) if ($a['private']) $nets[$a['network']] = $i['name'];
+        foreach ($c['cidrs'] as $n) $nets[$n] ??= 'gespeichert';
+        $netBoxes = '';
+        foreach ($nets as $n => $where) $netBoxes .= V::checkbox('networks[]', $n, $n . ' (' . $where . ')' . ($o['client']['network'] === $n ? ' – hier ist dieses Gerät' : ''), in_array($n, $c['cidrs'], true));
+        $ports = '';
+        foreach ($o['catalog'] as $id => $p) {
+            $ports .= V::checkbox('modules[]', $id, $p['module'] . ': ' . $p['name'] . ' (' . $p['proto'] . ' ' . $p['ports'] . ($p['scope'] === 'any' ? ', von überall' : '') . ')', in_array($id, $c['modules'], true));
+        }
+        $body .= '<form method="post" action="/verwaltung/firewall" class="box wide">' . $csrf
+            . '<h2>Freigegebene Netze</h2><p>Nur aus diesen Netzen ist die Suite erreichbar. Dieses Gerät: <code>' . V::h($o['client']['ip']) . '</code></p>' . $netBoxes
+            . V::input('extra', 'Weitere Netze (z. B. VPN), mit Komma getrennt', 'text', (string)($input['extra'] ?? ''), 'placeholder="10.8.0.0/24"')
+            . '<h2>Dienste der Basis</h2><p>HTTPS (443) ist immer aus den freigegebenen Netzen offen.</p>'
+            . V::checkbox('ssh', '1', 'SSH (Fernwartung)', (bool)$c['ssh']) . V::checkbox('ipp', '1', 'Drucken über IPP (631)', (bool)$c['ipp'])
+            . V::checkbox('samba', '1', 'Drucken über Windows-Freigabe (Samba, 445)', (bool)$c['samba'])
+            . ($ports !== '' ? '<h2>Ports der Module</h2><p>Module melden ihre Ports an; sie sind zu, bis sie hier freigeschaltet werden.</p>' . $ports : '')
+            . '<h2>Eigene Ports</h2><label>Ein Eintrag je Zeile, z. B. <code>tcp 8080</code> oder <code>udp 5000-5100</code><textarea name="custom" rows="3">'
+            . V::h(implode("\n", $c['custom'])) . '</textarea></label>'
+            . '<h2>Art</h2>' . '<label class="check"><input type="radio" name="strict" value="1"' . ($c['strict'] ? ' checked' : '') . '> Alles andere gesperrt (empfohlen)</label>'
+            . '<label class="check"><input type="radio" name="strict" value="0"' . (!$c['strict'] ? ' checked' : '') . '> Nur die oben genannten Ports auf die Netze beschränken, alles andere unverändert</label>'
+            . '<p>Nach dem Laden muss die Änderung binnen 2 Minuten auf dieser Seite bestätigt werden, sonst gilt wieder die vorherige Einstellung.</p>'
+            . '<button' . ($o['service'] && !in_array($st['state'], ['pending', 'requested'], true) ? '' : ' disabled') . '>Firewall laden</button></form>';
+        if (in_array($st['state'], ['active', 'pending', 'failed', 'reverted'], true)) {
+            $body .= '<form method="post" action="/verwaltung/firewall/aus" class="box">' . $csrf . '<button class="danger">Firewall ausschalten</button></form>';
+        }
+        $response = Response::html(V::page('Firewall', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+        return $st['state'] === 'requested' ? $response->with('Refresh', '2') : $response;
+    }
+
+    private function firewallApply(Request $r, string $admin): Response {
+        $input = ['networks' => $r->list('networks'), 'extra' => $r->field('extra', 1000), 'ssh' => $r->field('ssh') === '1', 'ipp' => $r->field('ipp') === '1',
+            'samba' => $r->field('samba') === '1', 'strict' => $r->field('strict') !== '0', 'modules' => $r->list('modules'), 'custom' => $r->field('custom', 2000)];
+        try {
+            $config = $this->fw()->apply($input, $r->remote);
+        } catch (Problem $e) {
+            $again = ['cidrs' => $input['networks'], 'custom' => preg_split('/\R/', $input['custom'], -1, PREG_SPLIT_NO_EMPTY)] + $input;
+            return $this->firewallPage($e->getMessage(), $again);
+        }
+        $this->audit->write($admin, 'firewall-geladen', implode(',', $config['cidrs']) . ($config['strict'] ? ' alles-zu' : ' nur-ports') . ($config['modules'] ? ' ' . implode(',', $config['modules']) : ''));
+        return Response::redirect('/verwaltung/firewall');
+    }
+
+    private function firewallConfirm(string $admin): Response {
+        $this->fw()->confirm();
+        $this->audit->write($admin, 'firewall-bestaetigt');
+        return Response::redirect('/verwaltung/firewall');
+    }
+
+    private function firewallOff(string $admin): Response {
+        $this->fw()->disable();
+        $this->audit->write($admin, 'firewall-ausgeschaltet');
+        return Response::redirect('/verwaltung/firewall');
     }
 
     // ---- Hilfen -------------------------------------------------------------------------------------------------

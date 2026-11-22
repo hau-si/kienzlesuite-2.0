@@ -1,0 +1,13 @@
+# Kienzle-Suite: Firewall-Anfrage prüfen, Regeln laden, auf Bestätigung warten (sonst Rücksprung).
+[Unit]
+Description=Kienzle-Suite Firewall anwenden
+
+[Service]
+Type=oneshot
+ExecStart=/opt/kienzle/core/current/bin/kienzle-firewall anwenden
+TimeoutStartSec=300
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/etc/kienzle /var/lib/kienzle/firewall /var/lib/kienzle/core/anfragen

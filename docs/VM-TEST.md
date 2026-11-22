@@ -33,3 +33,16 @@ Ergebnis je Punkt hier abhaken und in `docs/RELEASE.md` bei der Version vermerke
 13. [ ] `sudo bash installer/install.sh` ein zweites Mal: Fingerabdruck der CA unverändert, Anmeldung und Konten bleiben.
 14. [ ] `sudo systemctl start kienzle-zertifikat.service` läuft ohne Fehler (nichts zu erneuern).
 15. [ ] Neustart der VM: alles kommt von selbst wieder hoch.
+
+## Meilenstein 3 – Firewall (Basis 0.3.0)
+
+Zweites Gerät bereithalten, das **nicht** im freigegebenen Netz liegt (z. B. Telefon im Gäste-WLAN), und eine Konsole an der VM
+(Hypervisor), falls man sich doch aussperrt: `sudo nft delete table inet kienzle` hebt die Firewall sofort auf.
+
+1. [ ] Verwaltung → Firewall: vorgeschlagen ist das Netz dieses Arbeitsplatzes, SSH an, „Alles andere gesperrt“.
+2. [ ] Ein Netz wählen, in dem dieser Arbeitsplatz nicht liegt: Die Seite lehnt ab („wäre ausgesperrt“).
+3. [ ] Laden, **nicht** bestätigen: Nach 2 Minuten ist der vorherige Zustand zurück (`sudo nft list ruleset`).
+4. [ ] Laden und bestätigen: Zustand „aktiv“. Vom Gerät außerhalb ist weder 443 noch SSH erreichbar, vom Arbeitsplatz beides.
+5. [ ] `sudo nft list table inet kienzle` zeigt nur 443 (+ 22) für das Praxisnetz; `ping` geht weiter.
+6. [ ] Neustart der VM: Firewall ist sofort wieder aktiv (`systemctl status kienzle-firewall`).
+7. [ ] Firewall ausschalten: Tabelle verschwindet, alles wieder erreichbar.

@@ -1,0 +1,15 @@
+# Kienzle-Suite: bestätigte Firewall-Regeln beim Start laden, bevor das Netz hochkommt.
+[Unit]
+Description=Kienzle-Suite Firewall laden
+DefaultDependencies=no
+After=local-fs.target
+Before=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/kienzle/core/current/bin/kienzle-firewall laden
+
+[Install]
+WantedBy=multi-user.target

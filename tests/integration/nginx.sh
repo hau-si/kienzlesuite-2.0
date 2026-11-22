@@ -83,5 +83,8 @@ KIENZLE_OHNE_SYSTEMD=1 bash "$repo/installer/install.sh" > "$T/zweiter-lauf.log"
 [ "$(stat -c '%a %U %G' /etc/kienzle/core/secret.key)" = '640 root ks-core' ] || fail 'Schlüsselrechte'
 [ "$(stat -c '%a %U' /etc/kienzle/ca/ca.key)" = '600 root' ] || fail 'CA-Schlüsselrechte'
 [ "$(stat -c '%a %U' /var/lib/kienzle/core)" = '700 ks-core' ] || fail 'Datenordner'
+[ "$(stat -c '%a %U' /var/lib/kienzle/core/anfragen)" = '700 ks-core' ] || fail 'Anfrageordner'
+for u in kienzle-firewall.path kienzle-firewall-anwenden.service kienzle-firewall.service; do [ -f "/etc/systemd/system/$u" ] || fail "$u fehlt"; done
+/opt/kienzle/core/current/bin/kienzle-firewall laden || fail 'Firewall laden ohne Regeln'
 
 echo 'Ende-zu-Ende-Prüfung bestanden.'

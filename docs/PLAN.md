@@ -88,7 +88,7 @@ Die Musterprüfungen (Portbereiche, Namen) folgen `scripts/firewall-apply.py` (`
 
 ---
 
-## M2 – Anmeldung, Benutzer und Rechte inkl. Admin-OTP und Passkeys 🖥
+## M2 – Anmeldung, Benutzer und Rechte inkl. Admin-OTP und Passkeys 🖥 ✅
 
 **Ziel:** Eine Anmeldung für alle Module, mehrere Benutzerkonten, Rechte je Modul. Admins melden sich nur mit Passwort **und** TOTP an.
 
@@ -169,7 +169,7 @@ Prüfung der Namensbeschränkung), Ersteinrichtung mit OTP-App, Anmeldung, Mitar
 
 ---
 
-## M3 – Firewall 🖥
+## M3 – Firewall 🖥 ✅
 
 **Ziel:** Die Firewall der Beta, verallgemeinert: Ports kommen aus den installierten Modulen statt aus einer festen Liste. Standardmäßig ist alles zu.
 
@@ -198,6 +198,8 @@ Prüfung der Namensbeschränkung), Ersteinrichtung mit OTP-App, Anmeldung, Mitar
 Richtlinie `drop`, und `nft -c` gegen die erzeugten Regeln im CI-Container (mit sudo).
 
 **VM:** Firewall einschalten, Bestätigung verstreichen lassen (Rücksprung), aussperrendes Netz wird abgelehnt, Neustart lädt die Regeln.
+
+**Stand:** umgesetzt mit Basis 0.3.0 (22.11.2026). Zusätzlich zum Plan: Samba (445) als eigene Option für die Druckfreigabe der Basis.
 
 ---
 

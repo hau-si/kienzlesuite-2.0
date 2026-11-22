@@ -13,6 +13,8 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y shellcheck php-cli php-sqlite3 php-mbstring openssl
       - run: python3 -m pip install --user --break-system-packages ruff
       - run: bash tests/run-all.sh
+      # Erzeugte Firewall-Regeln mit echtem nft prüfen (braucht root, daher hier mit sudo und nicht im Container).
+      - run: sudo apt-get install -y nftables && sudo python3 -B -m unittest -v tests.core.test_firewall.EchtesNft
   # Zielplattform: dieselben Tests mit Python, PHP und OpenSSL aus Ubuntu 26.04, dazu die Ende-zu-Ende-Prüfung
   # mit echtem nginx und php-fpm (ohne systemd, Dienste werden von Hand gestartet).
   ubuntu-26-04:

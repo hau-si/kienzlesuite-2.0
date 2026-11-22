@@ -1,0 +1,20 @@
+#!/usr/bin/python3 -IB
+"""Firewall der Kienzle-Suite (nur root, gestartet von systemd).
+
+  kienzle-firewall anwenden    Anfrage des Webinterfaces verarbeiten (kienzle-firewall.path)
+  kienzle-firewall laden       bestätigte Regeln beim Start laden (kienzle-firewall.service)
+"""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'lib'))
+from kienzle import firewall  # noqa: E402
+
+if __name__ == '__main__':
+    if sys.argv[1:] == ['anwenden']:
+        firewall.handle()
+        sys.exit(0)
+    if sys.argv[1:] == ['laden']:
+        sys.exit(firewall.boot())
+    print(__doc__.strip(), file=sys.stderr)
+    sys.exit(2)

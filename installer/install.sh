@@ -63,7 +63,7 @@ wait_apt
 DEBIAN_FRONTEND=noninteractive apt-get update -q
 wait_apt
 DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends \
-  nginx php-fpm php-cli php-sqlite3 php-mbstring openssl qrencode python3 ca-certificates psmisc curl
+  nginx php-fpm php-cli php-sqlite3 php-mbstring openssl qrencode python3 ca-certificates psmisc curl nftables iproute2
 
 phpv=$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')
 phpfpm=/usr/sbin/php-fpm$phpv
@@ -74,7 +74,8 @@ echo '== Benutzer und Ordner'
 id ks-core >/dev/null 2>&1 || useradd --system --home-dir /var/lib/kienzle/core --no-create-home --shell /usr/sbin/nologin ks-core
 install -d -m 0755 -o root -g root /etc/kienzle /var/lib/kienzle /opt/kienzle /opt/kienzle/core /opt/kienzle/core/releases
 install -d -m 0750 -o root -g ks-core /etc/kienzle/core
-install -d -m 0700 -o ks-core -g ks-core /var/lib/kienzle/core
+install -d -m 0700 -o ks-core -g ks-core /var/lib/kienzle/core /var/lib/kienzle/core/anfragen
+install -d -m 0755 -o root -g root /var/lib/kienzle/firewall
 
 # Programm in den Versionsordner kopieren (nur root beschreibbar) und „current“ atomar umsetzen.
 release=/opt/kienzle/core/releases/$version
@@ -120,7 +121,8 @@ else
 fi
 install -m 0640 -o root -g ks-core "$vorlagen/php-fpm-core.conf" /etc/kienzle/core/php-fpm.conf
 sed "s#@PHPFPM@#$phpfpm#" "$vorlagen/kienzle-core-php.service" > /etc/systemd/system/kienzle-core-php.service
-install -m 0644 "$vorlagen/kienzle-zertifikat.service" "$vorlagen/kienzle-zertifikat.timer" /etc/systemd/system/
+install -m 0644 "$vorlagen/kienzle-zertifikat.service" "$vorlagen/kienzle-zertifikat.timer" \
+  "$vorlagen/kienzle-firewall.path" "$vorlagen/kienzle-firewall-anwenden.service" "$vorlagen/kienzle-firewall.service" /etc/systemd/system/
 chmod 0644 /etc/systemd/system/kienzle-core-php.service
 
 # nginx: nur die Suite. Die Beispielseite der Distribution wird abgeschaltet (nur der mitgelieferte Verweis).
@@ -132,7 +134,11 @@ if [ -z "$nosystemd" ]; then
   systemctl daemon-reload
   # Der php-fpm-Dienst der Distribution (Pool www-data) wird nicht gebraucht.
   systemctl disable --now "php$phpv-fpm.service" >/dev/null 2>&1 || true
-  systemctl enable --now kienzle-core-php.service kienzle-zertifikat.timer
+  systemctl enable --now kienzle-core-php.service kienzle-zertifikat.timer kienzle-firewall.path
+  systemctl enable kienzle-firewall.service
+  if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q 'Status: active'; then
+    echo 'Hinweis: ufw ist aktiv. Die Firewall der Suite (Verwaltung → Firewall) arbeitet unabhängig davon; bitte nur eine von beiden verwenden.'
+  fi
   systemctl restart kienzle-core-php.service
   systemctl enable nginx.service >/dev/null 2>&1 || true
   systemctl restart nginx.service

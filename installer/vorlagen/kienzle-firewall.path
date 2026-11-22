@@ -1,0 +1,10 @@
+# Kienzle-Suite: Firewall-Anfrage des Webinterfaces abarbeiten (Anfragedatei von ks-core).
+[Unit]
+Description=Kienzle-Suite Firewall-Anfragen
+
+[Path]
+PathExists=/var/lib/kienzle/core/anfragen/firewall.json
+Unit=kienzle-firewall-anwenden.service
+
+[Install]
+WantedBy=multi-user.target

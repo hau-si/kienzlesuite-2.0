@@ -1,5 +1,27 @@
 # Basis – Release-Notizen
 
+## 0.3.0
+
+Meilenstein 3 aus `docs/PLAN.md`: Firewall.
+
+- **Verwaltung → Firewall:** freigegebene Netze (Vorschlag: das Netz dieses Geräts), SSH, Drucken über IPP (631) und
+  Samba (445), Ports der Module einzeln freischaltbar, eigene Ports.
+- **Vorgabe „alles zu“** (policy drop); wahlweise wie in der Beta nur die verwalteten Ports auf die Netze beschränken.
+  HTTPS (443) ist immer aus den freigegebenen Netzen offen.
+- **Ports der Module** kommen aus `[[firewall]]` der `module.toml`. Der root-Dienst schlägt sie im root-eigenen
+  Modulverzeichnis nach; die Anfrage des Webinterfaces nennt nur Kennungen wie `beispiel/1`.
+- **Schutz vor Aussperren** (aus der Beta): Das anfragende Gerät muss in einem freigegebenen Netz liegen; ohne Bestätigung
+  binnen 2 Minuten stellt der Dienst die vorherigen Regeln wieder her. Bestätigte Regeln werden beim Start vor dem Netz geladen.
+- Root-Dienst `kienzle-firewall` (aus `scripts/firewall-apply.py` der Beta): eigene Tabelle `inet kienzle`, Regeln nur aus
+  festen Vorlagen, Anfragen nur als echte, kleine Datei von `ks-core`, `nft -c` vor dem Laden.
+- systemd: `kienzle-firewall.path`, `kienzle-firewall-anwenden.service`, `kienzle-firewall.service`; Installer richtet sie ein.
+- Übernommen aus der Beta: `src/Network.php`, `src/Firewall.php`, `scripts/firewall-apply.py`, `tests/firewall.php`, `tests/firewall-apply.sh`.
+- Tests: 12 Python-Tests für den Dienst (nachgebautes nft), Syntaxprüfung mit echtem nft (lokal und in GitHub Actions mit sudo),
+  7 PHP-Tests für Seite und Prüfung.
+
+Nicht geprüft: Laden der Regeln im echten Kernel auf Ubuntu 26.04 mit systemd, Aussperrschutz über das Netz (Prüfliste
+`docs/VM-TEST.md`, Meilenstein 3).
+
 ## 0.2.4
 
 - Stamm-CA 30 Jahre gültig statt 10 (Wunsch der Praxis: Arbeitsplätze nur einmal einrichten). Das Server-Zertifikat
