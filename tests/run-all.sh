@@ -17,7 +17,7 @@ for m in modules/*/; do
 done
 
 step 'Python: Syntax und Stil'
-python_bins=(core/bin/kienzle-modul-pruefen core/bin/kienzle-zertifikat core/bin/kienzle-web core/bin/kienzle-firewall core/bin/kienzle-update core/bin/kienzle-verbindungen core/bin/kienzle-ablage core/bin/kienzle-sicherung core/bin/kienzle-ueberblick core/bin/kienzle-drucker core/bin/kienzle-servername scripts/release-bauen scripts/release-signieren)
+python_bins=(core/bin/kienzle-module core/bin/kienzle-modul-pruefen core/bin/kienzle-zertifikat core/bin/kienzle-web core/bin/kienzle-firewall core/bin/kienzle-update core/bin/kienzle-verbindungen core/bin/kienzle-ablage core/bin/kienzle-sicherung core/bin/kienzle-ueberblick core/bin/kienzle-drucker core/bin/kienzle-servername scripts/release-bauen scripts/release-signieren)
 python3 -B -m py_compile core/lib/kienzle/*.py "${python_bins[@]}" tests/core/*.py tests/integration/*.py
 if command -v ruff >/dev/null; then
   ruff check --no-cache --select E,F,W,B --line-length 180 core tests "${python_bins[@]}"
@@ -26,21 +26,41 @@ else
 fi
 
 step 'PHP: Syntax'
-for f in core/php/*.php core/php/modul/*.php core/public/*.php core/bin/kienzle-admin core/bin/kienzle-tresor tests/php/*.php; do php -l "$f" >/dev/null || { php -l "$f"; exit 1; }; done
+for f in core/php/*.php core/php/modul/*.php core/public/*.php core/bin/kienzle-admin core/bin/kienzle-tresor tests/php/*.php \
+         modules/*/src/*.php modules/*/seiten/*.php modules/*/public/*.php modules/*/tests/*.php; do
+  [ -f "$f" ] || continue
+  php -l "$f" >/dev/null || { php -l "$f"; exit 1; }
+done
+# Haken und Drucker der Module: je nach Kopfzeile PHP oder Shell.
+for f in modules/*/bin/* modules/*/printer/*; do
+  case "$(head -c 40 "$f")" in
+    '#!/usr/bin/php'*) php -l "$f" >/dev/null || { php -l "$f"; exit 1; } ;;
+    '#!/bin/sh'*|'#!/usr/bin/env bash'*|'#!/bin/bash'*) sh -n "$f" ;;
+  esac
+done
 echo 'in Ordnung'
 
 step 'Shell: Syntax'
 bash -n tests/run-all.sh installer/install.sh tests/integration/nginx.sh scripts/schluessel-erzeugen
-for f in modules/*/bin/* modules/*/printer/*-backend; do sh -n "$f"; done
 if command -v shellcheck >/dev/null; then shellcheck -S warning tests/run-all.sh installer/install.sh tests/integration/nginx.sh; else echo 'shellcheck nicht installiert – übersprungen.'; fi
 
 step 'Python: Prüfprogramm, Zertifikate, nginx-Vorlage (tests/core)'
 python3 -B -m unittest discover -s tests/core
 
-if command -v node >/dev/null; then step 'JavaScript: Syntax'; node --check core/public/assets/core.js && echo 'in Ordnung'; fi
+if command -v node >/dev/null; then
+  step 'JavaScript: Syntax'
+  for f in core/public/assets/core.js modules/*/public/assets/*.js; do node --check "$f"; done
+  echo 'in Ordnung'
+fi
 
 step 'PHP: Basis (tests/php)'
-for t in tests/php/core.php tests/php/passkeys.php tests/php/web.php tests/php/cli.php tests/php/firewall.php tests/php/updates.php tests/php/verbindungen.php tests/php/sicherung.php tests/php/einrichtung.php tests/php/drucker.php tests/php/oidc.php tests/php/server.php tests/php/uhrzeit.php; do echo "-- $t"; php "$t"; done
+for t in tests/php/core.php tests/php/passkeys.php tests/php/web.php tests/php/cli.php tests/php/firewall.php tests/php/updates.php tests/php/verbindungen.php tests/php/sicherung.php tests/php/einrichtung.php tests/php/drucker.php tests/php/oidc.php tests/php/server.php tests/php/uhrzeit.php tests/php/module.php; do echo "-- $t"; php "$t"; done
+
+step 'Modul Kasse (modules/sumup/tests)'
+for t in critical reader-cancel invoice t2med-invoice letterxpress auto-print settings tax goae-t2med cash print-format mail-mime suite; do
+  echo "-- $t"; php "modules/sumup/tests/$t.php"
+done
+grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/sumup/module.toml | head -1)" modules/sumup/VERSION || { echo 'modules/sumup/VERSION passt nicht zu module.toml'; exit 1; }
 
 step 'module.toml: alle Module im Repository'
 core/bin/kienzle-modul-pruefen --alle modules

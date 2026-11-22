@@ -131,3 +131,25 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
        danach unter dem Namen erreichbar, ohne Zertifikatswarnung.
 3. [ ] Passkey unter dem Namen anlegen und damit anmelden.
 4. [ ] Ungültigen Namen eingeben: Fehlermeldung, nichts geändert.
+
+## Basis 0.16.0 – Module über das Webinterface, Kasse (sumup 2.0.0)
+
+1. [ ] Basis auf 0.16.0 bringen (dieses Mal noch an der Konsole: `git pull && sudo bash installer/install.sh`).
+2. [ ] Verwaltung → Module: „Kasse 2.0.0 – Mit der Basis geliefert“ steht unter „Verfügbar“. „Installieren“ (Bestätigung
+       mit Passwort und Code). Die Seite aktualisiert sich; nach einigen Minuten (Pakete) steht die Kasse unter „Installiert“.
+       Bei Fehlern: Protokoll auf der Seite, `journalctl -u kienzle-module-anwenden`.
+3. [ ] `systemctl status kienzle-sumup-php` läuft als `ks-sumup`; `ls -ld /var/lib/kienzle/sumup` zeigt `drwx------ ks-sumup`.
+4. [ ] Verwaltung → Benutzer: einem Mitarbeiter das Recht „Kasse: Kartenzahlung …“ geben; sich als dieser anmelden:
+       Start zeigt „Kasse“, `/kasse/` öffnet die Kasse, „Testpatient öffnen (Testmodus)“ funktioniert, Mock-Zahlung gelingt.
+5. [ ] Als Admin des Moduls: `/kasse/settings.php` (Einstellungen). Praxisdaten speichern verlangt einmal die Bestätigung
+       der Suite und kehrt danach zurück. Einrichtungs-Überblick der Suite zeigt die Punkte der Kasse.
+6. [ ] Verwaltung → Verbindungen: T2med eintragen (Adresse, API-Key, erlaubte Aufrufadressen). In der Kasse „T2med-Anbindung“
+       auf Live: kein Fehler; „T2med-Verbindung der Suite vorhanden“ im Überblick.
+7. [ ] Verwaltung → Drucker: „SumUp-Rechnung“ erscheint als Drucker des Moduls. Am Windows-PC als IPP-Drucker hinzufügen
+       (`http://<server>:631/printers/SumUp-Rechnung`, Papier A4), aus T2med eine Testrechnung (Testpatient) drucken:
+       erscheint im Rechnungseingang der Kasse.
+8. [ ] Kassen-PC: Zertifikat der Suite einrichten (Arbeitsplatz einrichten), in der Kasse unter Einstellungen → Arbeitsplätze das
+       Paket für Windows laden (Bestätigung), installieren. In T2med den Button „Kartenzahlung“ anlegen (Anleitung in der Kasse).
+       Klick beim Patienten: Browser öffnet die Suite, nach der Anmeldung (falls nötig) die Kasse mit dem Patienten.
+9. [ ] Verwaltung → Module → Kasse → Entfernen ohne Häkchen: Kasse weg, `/var/lib/kienzle/sumup` bleibt; erneut installieren:
+       Einstellungen und Leistungen sind wieder da.

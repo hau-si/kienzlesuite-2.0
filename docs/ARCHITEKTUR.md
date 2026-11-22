@@ -34,7 +34,7 @@ Code dafür entsteht.
 kienzlesuite-2.0/
   core/                 Basis: Webinterface, Benutzer, Firewall, Updates, Backup, Netzwerkspeicher, Zertifikate
   modules/
-    sumup/
+    sumup/              Kasse (Kartenzahlung, Rechnungseingang); ab Basis 0.16.0 mitgeliefert, Webpfad /kasse
     terminzettel/
     fax/
     telefon/
@@ -58,6 +58,7 @@ die Basis eine API-Version, gegen die Module geprüft werden.
 | Zertifikat und Zugang | lokale Zertifizierungsstelle auf dem Server (siehe unten), ein Zugang über Port 443 (nginx) mit Pfaden je Modul |
 | Einrichtungs-Überblick | eigener Überblick der Basis, darunter die Überblicke der Module |
 | Updates | je Modul, Kanal stabil/beta, Sicherung vor dem Update, Rücksprung |
+| Module | installieren, aktualisieren, entfernen über Verwaltung → Module (root-Dienst `kienzle-module`, Basis 0.16.0) |
 | Netzwerkspeicher | gemeinsamer Dienst für SMB-Ziele (aus der Rechnungsablage der SumUp-Suite) |
 | Backup | verschlüsselte Sicherung aller Module auf den Netzwerkspeicher; Export aller Einstellungen als passwortverschlüsselte Datei |
 | CUPS, Samba, Protokolle | gemeinsame Dienste; Basis installiert und verwaltet Drucker, Module drucken darauf und melden eigene virtuelle Drucker an |

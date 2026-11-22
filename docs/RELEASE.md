@@ -1,5 +1,27 @@
 # Basis – Release-Notizen
 
+## 0.16.0
+
+- **Module über das Webinterface installieren** (Verwaltung → Module): installieren, aktualisieren und entfernen, ohne Konsole.
+  Quellen: mit der Basis mitgelieferte Module (im Release unter `modules/`, ohne Beispielmodul) und GitHub-Releases
+  `<modul>-v<version>` (Prüfung wie bei der Basis: Manifest, SHA-256 jeder Datei, Signatur je nach Einstellung).
+  Neuer root-Dienst `kienzle-module` (Anfragedatei, `.path`-Einheit, täglicher Timer für das Angebot):
+  Pakete aus `[system] packages`, Systembenutzer `ks-<id>`, Datenordner 0700, Socket-Ordner, Versionsordner
+  `/opt/kienzle/<id>/releases/<version>/<id>` mit Verweis `current`, eigene php-fpm-Instanz je FastCGI-Modul
+  (`kienzle-<id>-php.service`, gehärtet, darf ins Netz, schreibt nur in eigene Ordner), Haken als `ks-<id>`,
+  Gesundheitsprüfung. Beim Aktualisieren: Sperre bei „beschäftigt“, Daten-Schnappschuss, Rücksprung bei Fehler.
+  Entfernen behält die Daten, außer der Admin wählt „Auch alle Daten löschen“.
+  An der Konsole: `sudo kienzle-module liste|installieren <id>|entfernen <id>`.
+- `kienzle-web module`: Modulverzeichnis aus den installierten Modulen; der Installer nutzt es bei jedem Lauf.
+- **Arbeitsplatz-Starter** (`[web] starter = true`, höchstens ein Modul): `POST https://<server>/api.php` geht ohne
+  Anmeldung an dieses Modul (nur POST, 64 KiB); der Starter weist sich mit seinem Schlüssel aus. Den einmaligen
+  Startlink `https://<server>/#launch=…` gibt die Basis nach der Anmeldung an das Modul weiter (core.js).
+- Release-Workflow und `scripts/release-bauen` bauen auch Modul-Releases (Tag `<modul>-v<version>`).
+- Mitgeliefert: Modul **Kasse** (`sumup` 2.0.0, siehe `modules/sumup/RELEASE.md`).
+
+Nicht auf echtem Ubuntu 26.04 geprüft: Installation eines Moduls über die Seite (apt, useradd, systemd, php-fpm
+des Moduls, AppArmor), Starter 1.4.1 gegen `/api.php`, Weitergabe des Startlinks nach der Anmeldung im Browser.
+
 ## 0.15.0
 
 - **Signaturprüfung der Updates vorerst optional** (Entscheidung vom 22.11.2026): Vorgabe ist „ohne Signaturprüfung“;

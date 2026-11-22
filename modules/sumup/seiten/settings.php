@@ -1,0 +1,59 @@
+<?php
+declare(strict_types=1);
+// Einstellungen und Abrechnung der Kasse. Anmeldung über die Suite; Admins des Moduls sehen alles, Mitarbeiter ihre Bereiche.
+use KienzleSumup\Suite;
+if (!Suite::rights()) {
+    http_response_code(403);
+    header('Content-Type: text/plain; charset=utf-8');
+    exit("Für die Einstellungen der Kasse fehlt das Recht. Bitte den Admin fragen (Verwaltung → Benutzer der Suite).\n");
+}
+header('Cache-Control: no-store');
+header('Referrer-Policy: no-referrer');
+header('X-Content-Type-Options: nosniff');
+header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
+$version = ks_h(trim((string)file_get_contents(dirname(__DIR__) . '/VERSION')));
+$base = ks_h(Suite::base() . '/');
+?>
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kasse · Einstellungen · Kienzle-Suite</title><link rel="stylesheet" href="<?= $base ?>assets/style.css?v=<?= $version ?>"><script src="<?= $base ?>assets/goae-calc.js?v=<?= $version ?>" defer></script><script src="<?= $base ?>assets/settings.js?v=<?= $version ?>" defer></script></head>
+<body data-base="<?= $base ?>"><main class="settings-main">
+<header class="top"><a class="brand" href="/"><span class="mark" aria-hidden="true">K</span><div><strong>Kasse</strong><span>Einstellungen · Kienzle-Suite</span></div></a><span id="mode" class="badge" hidden></span></header>
+<p id="message" class="notice" role="status" hidden></p>
+
+<div id="settings" hidden>
+<nav id="tabs" class="tab-bar" role="tablist" aria-label="Bereiche"><span id="update-bell" hidden></span></nav>
+<p id="warning" class="inline-error" hidden></p>
+<div id="tab-panels"></div>
+<div id="sections" hidden></div>
+<section class="card settings-card" id="s-checklist"><h2>Einrichtung – Überblick</h2><p class="muted">Diese Schritte sind nur einmal nötig, geordnet nach dem Ort, an dem sie erledigt werden. Ein Klick auf einen Punkt öffnet die passende Einstellung.</p><div id="checklist"></div></section>
+<section class="card settings-card" id="s-t2med-paid"><h2>T2med-Rechnungen als bezahlt abhaken</h2>
+<p>Alle über den Drucker „SumUp-Rechnung“ übernommenen und per Karte bezahlten T2med-Rechnungen, nach Rechnungsnummer sortiert. In T2med unter Rechnungen die Nummern als bezahlt markieren und hier anschließend abhaken – dann erscheinen beim nächsten Mal nur die neuen. Mit „Korrigieren“ lässt sich eine Zahlung nachträglich stornieren oder der Betrag für Statistik und Excel ändern (keine Erstattung bei SumUp).</p>
+<div id="t2med-paid" class="settings-form"></div></section>
+<section class="card settings-card" id="s-export"><h2>Export für die Steuerberatung</h2>
+<p>Alle hier im Rechnungstool erstellten und bezahlten Rechnungen (bar und Karte, in der Spalte „Zahlungsart“ gekennzeichnet) als Excel-Tabelle – für ein ganzes Jahr oder einen Monat. T2med-Rechnungen sind nicht enthalten; sie stehen in T2med.</p>
+<form id="export-form" class="settings-form export-form"></form>
+<p class="muted small">Die Datei hat drei Blätter: <strong>Rechnungen</strong> (je Rechnung Brutto, Netto und MwSt. je Satz), <strong>Positionen</strong> (jede Leistung einzeln) und <strong>Monatssummen</strong>. Patientennamen nur, wenn angekreuzt.</p></section>
+<section class="card settings-card" id="s-clients"><h2>Arbeitsplätze einrichten</h2>
+<p>Auf dem Kassen-PC diese Seite öffnen, an der Suite anmelden und das passende Paket laden. Es enthält die Einrichtung des Starters, mit dem T2med die Kasse öffnet. Das Zertifikat der Suite vorher einmal einrichten: <a href="/hilfe/arbeitsplatz">Arbeitsplatz einrichten</a>.</p>
+<div id="client-downloads" class="row-buttons"></div>
+<div id="client-steps" class="steps"></div>
+<p class="muted small">Die Pakete enthalten den Starter-Schlüssel der Praxis: nicht per E-Mail verschicken, nach der Einrichtung löschen. Der Starter prüft genau das aktuelle Serverzertifikat der Suite; bekommt der Server ein neues Zertifikat (neuer Name, Erneuerung nach gut zwei Jahren), das Paket auf jedem Kassen-PC erneut ausführen.</p></section>
+<section class="card settings-card" id="invoice-printer-help" hidden><h2>Drucker „SumUp-Rechnung“</h2>
+<div id="invoice-printer-status"></div>
+</section>
+<section class="card settings-card" id="s-inbox-list"><h2>Rechnungseingang</h2>
+<p class="muted">Von T2med auf „SumUp-Rechnung“ gedruckte Rechnungen. Mit Name und Geburtsdatum des Patienten (nur nach Anmeldung sichtbar). Nicht bezahlte Rechnungen lassen sich löschen. „Offen“ heißt: Wird beim passenden Patienten zum Kassieren angeboten.</p>
+<div class="row-buttons"><button id="inbox-load" class="secondary" type="button">Aktualisieren</button></div>
+<div id="inbox-box"><p class="muted">Wird geladen …</p></div></section>
+<section class="card settings-card" id="s-catalog"><h2>Leistungen und GOÄ-Positionen</h2>
+<p class="muted">Die an der Kasse auswählbaren Leistungen. Mit GOÄ-Ziffer, Faktor und Gebührenrahmen für den Beleg; der GOÄ-Rechner stellt den Faktor so ein, dass der gewünschte Endbetrag genau erreicht wird. Gelöschte Leistungen verschwinden aus der Auswahl, frühere Zahlungen behalten ihre Angaben.</p>
+<div id="catalog-box"><p class="muted">Wird geladen …</p></div></section>
+<section class="card settings-card" id="s-audit"><h2>Sicherheitsprotokoll</h2>
+<p class="muted">Änderungen an dieser Einstellungsseite mit Zeit, Adresse des Geräts und Benutzer – nie mit Passwörtern oder Werten. Anmeldungen protokolliert die Suite (Verwaltung → Protokoll).</p>
+<div class="row-buttons"><button id="audit-load" class="secondary" type="button">Letzte Vorgänge anzeigen</button></div>
+<pre id="audit-list" class="audit-list" hidden></pre></section>
+<p class="settings-foot"><a href="<?= $base ?>">Zur Kasse</a> · <a href="/">Zur Kienzle-Suite</a></p>
+</div>
+<footer>Kasse v<?= $version ?> · auf Grundlage von kienzle-sumup von Dr. Thomas Kienzle</footer>
+</main></body></html>

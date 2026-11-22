@@ -14,6 +14,14 @@ Rückgabe 0 = gültig, 1 = ungültig (alle Fehler werden aufgelistet), 2 = falsc
 Nur dieses Prüfprogramm liest `module.toml`. Installer, Updater, Firewall, Druckerverwaltung und Webinterface lesen
 seine Ausgabe (`--alle --json`), die die Basis als `/var/lib/kienzle/core/modules.json` ablegt.
 
+## Installation
+
+Module installiert, aktualisiert und entfernt die Basis (Verwaltung → Module bzw. `sudo kienzle-module …`). Quellen: die mit
+der Basis gelieferten Module (`modules/<id>/` im Release der Basis, ohne `beispiel`) und GitHub-Releases `<id>-v<version>`
+mit dem Archiv `modules/<id>/…` (`scripts/release-bauen <id>`). Das Programm landet in `/opt/kienzle/<id>/releases/<version>/<id>/`
+(nur root beschreibbar), aktiv über `/opt/kienzle/<id>/current`. FastCGI-Module bekommen eine eigene php-fpm-Instanz
+(`kienzle-<id>-php.service`, Konfiguration `/etc/kienzle/module/<id>/php-fpm.conf`, `open_basedir` auf die eigenen Ordner).
+
 ## Grundregeln
 
 - **Streng:** unbekannte Abschnitte und Schlüssel sowie falsche Typen sind Fehler.
@@ -43,7 +51,7 @@ seine Ausgabe (`--alle --json`), die die Basis als `/var/lib/kienzle/core/module
 | `user` | ja | genau `ks-<id>`; der Systembenutzer, unter dem alle Dienste und Haken des Moduls laufen |
 | `data` | ja | genau `/var/lib/kienzle/<id>`; eigener Datenordner (0700) |
 | `packages` | nein | Ubuntu-Pakete, höchstens 50, Muster `[a-z0-9][a-z0-9+.-]+`. Die Basis installiert sie. |
-| `services` | nein | systemd-Einheiten des Moduls, höchstens 20, nur `kienzle-<id>[-…].service/.timer/.path/.socket` |
+| `services` | nein | systemd-Einheiten des Moduls, höchstens 20, nur `kienzle-<id>[-…].service/.timer/.path/.socket`. Die Dateien liegen im Modul unter `systemd/<name>`; jeder Dienst muss genau `User=ks-<id>` enthalten (keine Gruppen, keine Befehle mit Vorrechten) |
 
 ### `[web]` – optional
 
@@ -55,6 +63,7 @@ Ohne `[web]` erscheint das Modul nicht im Menü (z. B. ein reines Druckmodul).
 | `upstream` | ja | genau `unix:/run/kienzle/<id>/web.sock`. Der Ordner gehört `ks-<id>`, Gruppe `www-data`, Rechte 0750: nur das Modul und nginx kommen hinein, andere Module nicht |
 | `protocol` | nein | `"http"` (Vorgabe: das Modul spricht HTTP über den Socket) oder `"fastcgi"` (PHP über php-fpm) |
 | `entry` | bei `fastcgi` | Einstiegsdatei im Modulordner, z. B. `public/index.php`; alle Anfragen unter `path` gehen an sie |
+| `starter` | nein | `true`: das Modul bedient den Arbeitsplatz-Starter (`POST https://<server>/api.php` ohne Anmeldung, siehe `docs/MODUL-SCHNITTSTELLE.md`). Nur mit `fastcgi`, höchstens ein Modul. Vorgabe `false` |
 
 ### `[[firewall]]` – optional, höchstens 20
 

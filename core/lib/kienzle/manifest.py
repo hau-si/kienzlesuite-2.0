@@ -57,7 +57,7 @@ LIMITS = {'packages': 50, 'services': 20, 'firewall': 20, 'rights': 30, 'printer
 SCHEMA_SECTIONS = {
     'module': {'id', 'name', 'version', 'core_api', 'description'},
     'system': {'packages', 'services', 'user', 'data'},
-    'web': {'path', 'upstream', 'protocol', 'entry'},
+    'web': {'path', 'upstream', 'protocol', 'entry', 'starter'},
     'firewall': {'name', 'port', 'proto', 'scope'},
     'rights': {'id', 'label'},
     'backup': {'paths', 'snapshot', 'settings'},
@@ -253,7 +253,11 @@ class _Checker:
                 entry = self.rel_path(t['entry'], 'web.entry')
         elif 'entry' in t:
             self.error('web.entry', 'nur mit protocol = "fastcgi".')
-        return {'path': path, 'upstream': upstream, 'protocol': protocol, 'entry': entry}
+        starter = t.get('starter', False)
+        if not isinstance(starter, bool):
+            self.error('web.starter', 'muss true oder false sein.')
+            starter = False
+        return {'path': path, 'upstream': upstream, 'protocol': protocol, 'entry': entry, 'starter': starter}
 
     def firewall(self, items: list) -> list:
         if len(items) > LIMITS['firewall']:
@@ -498,12 +502,28 @@ def check_all(modules_dir: str | os.PathLike) -> dict:
 
     Ergebnis ist das Modulverzeichnis, das die Basis als modules.json ablegt."""
     root = Path(modules_dir)
+    return check_list(sorted(p for p in root.iterdir() if p.is_dir() and not p.is_symlink() and not p.name.startswith('.')))
+
+
+def installed_folders(programs: str | os.PathLike = '/opt/kienzle') -> list[Path]:
+    """Ordner der installierten Module: /opt/kienzle/<id>/current (Verweis auf releases/<version>/<id>), ohne die Basis."""
+    root = Path(programs)
+    out = []
+    for p in sorted(root.iterdir()) if root.is_dir() else []:
+        if p.name != 'core' and ID.match(p.name) and not p.is_symlink() and (p / 'current' / 'module.toml').is_file():
+            out.append(p / 'current')
+    return out
+
+
+def check_list(folders: list) -> dict:
+    """Die genannten Modulordner prüfen, dazu Konflikte zwischen ihnen (Ergebnis wie check_all)."""
     errors, manifests = [], []
-    for folder in sorted(p for p in root.iterdir() if p.is_dir() and not p.is_symlink() and not p.name.startswith('.')):
+    for folder in folders:
+        folder = Path(folder)
         try:
             manifests.append(check_folder(folder))
         except Invalid as e:
-            errors += [f'{folder.name}: {line}' for line in e.errors]
+            errors += [f'{folder.resolve().name}: {line}' for line in e.errors]
     seen: dict[tuple, str] = {}
 
     def claim(key: tuple, owner: str, message: str):
@@ -517,6 +537,8 @@ def check_all(modules_dir: str | os.PathLike) -> dict:
         claim(('id', mid), mid, 'doppelte Modul-ID')
         if m['web']:
             claim(('path', m['web']['path']), mid, f'Webpfad {m["web"]["path"]}')
+            if m['web']['starter']:
+                claim(('starter',), mid, 'Arbeitsplatz-Starter (/api.php)')
         for p in m['printers']:
             claim(('printer', p['name'].lower()), mid, f'Drucker „{p["name"]}“')
         for f in m['firewall']:

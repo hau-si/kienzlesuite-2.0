@@ -1,0 +1,75 @@
+<?php
+declare(strict_types=1);
+// JSON-Schnittstelle der Kasse (nur mit Anmeldung der Suite und dem Recht „kassieren“). Den Start aus T2med nimmt
+// seiten/starter.php entgegen (POST /api.php ohne Anmeldung).
+use KienzleSumup\{App, Problem, Suite};
+
+header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store');
+header('X-Content-Type-Options: nosniff');
+header('Referrer-Policy: no-referrer');
+try {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new Problem('POST erforderlich.', 405);
+    ks_require_same_site();
+    if ((int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 32768) throw new Problem('Anfrage zu groß.', 413);
+    if (!str_starts_with(strtolower($_SERVER['CONTENT_TYPE'] ?? ''), 'application/json')) throw new Problem('JSON erforderlich.', 415);
+    $raw = ks_body(32769);
+    if (strlen($raw) > 32768) throw new Problem('Anfrage zu groß.', 413);
+    try { $input = json_decode($raw, true, 32, JSON_THROW_ON_ERROR); }
+    catch (\JsonException) { throw new Problem('Ungültige JSON-Anfrage.'); }
+    if (!is_array($input)) throw new Problem('Ungültige Anfrage.');
+    $app = ks_app();
+    $action = App::string($input, 'action', 32);
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    if ($origin !== '' && $origin !== rtrim($app->config->get('app', 'base_url'), '/')) throw new Problem('Unzulässiger Ursprung.', 403);
+    if (!Suite::can('kassieren')) throw new Problem('Für die Kasse fehlt das Recht „Kassieren“. Bitte den Admin fragen (Verwaltung → Benutzer).', 403);
+    // Marke der Suite für dieses Modul (meta kienzle-csrf der Seite) bei allem außer dem reinen Abfragen des Zustands.
+    if ($action !== 'state' && !Suite::modul()->csrfGueltig($_SERVER['HTTP_X_KIENZLE_CSRF'] ?? null)) throw new Problem('Sitzung abgelaufen. Bitte Seite neu laden.', 403);
+    if ($action === 'demo') {
+        // Nur im Testbetrieb (SumUp und T2med im Testmodus): Testpatient ohne T2med öffnen.
+        if ($app->config->get('sumup', 'mode') !== 'mock' || $app->config->get('fhir', 'mode') !== 'mock') throw new Problem('Testpatient nur im Testmodus.', 403);
+        $result = $app->launch(['context_id' => 'demo', 'oauth_token' => '', 'fhir_base_url' => '']);
+        $result['url'] = str_replace('/#launch=', ks_url('#launch='), $result['url']);
+    } elseif ($action === 'exchange') {
+        $result = $app->exchange(App::string($input, 'ticket', 64), $_COOKIE['ks_browser'] ?? null);
+        setcookie('ks_browser', $result['cookie'], ['expires' => time() + $app->config->get('app', 'session_hours') * 3600,
+            'path' => Suite::base() . '/', 'secure' => true, 'httponly' => true, 'samesite' => 'Strict']);
+        unset($result['cookie']);
+    } else {
+        $browser = $app->browser($_COOKIE['ks_browser'] ?? null);
+        $visit = $app->visit($browser, App::string($input, 'visit_id', 32));
+        if ($action !== 'state' && !hash_equals($browser['csrf'], $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) throw new Problem('Sitzungsprüfung fehlgeschlagen. Bitte Seite neu laden.', 403);
+        $result = match ($action) {
+            'state' => $app->state($visit, $browser),
+            'start' => $app->start($visit, $input),
+            'start_invoice' => $app->startInvoice($visit, $input),
+            'invoice_letter' => $app->invoiceLetter($visit, $input),
+            'invoice_later' => $app->invoiceLater($visit, $input),
+            'invoice_export' => $app->invoiceExport($visit, App::string($input, 'payment_id', 32)),
+            'invoice_print' => $app->invoicePrint($visit, $input),
+            'print_settings' => $app->savePrintSettings($visit, $input),
+            'status' => $app->poll($visit, App::string($input, 'payment_id', 32)),
+            'cancel' => $app->cancel($visit, App::string($input, 'payment_id', 32)),
+            'reader_status' => $app->readerAction($visit, App::string($input, 'payment_id', 32)),
+            'reader_cancel' => $app->readerAction($visit, App::string($input, 'payment_id', 32), true),
+            'document' => $app->document($visit, App::string($input, 'payment_id', 32)),
+            'receipt_share' => $app->receiptShare($visit, App::string($input, 'payment_id', 32)),
+            'receipt_recipient' => $app->receiptRecipient($visit, App::string($input, 'payment_id', 32)),
+            'receipt_email' => $app->receiptEmail($visit, $input),
+            'receipt_print' => $app->receiptPrint($visit, $input),
+            'service_save' => (function () use ($app, $visit, $input) { $app->saveService($visit, $input); return ['ok' => true]; })(),
+            'service_delete' => (function () use ($app, $visit, $input) { $app->deleteService($visit, App::string($input, 'id', 32)); return ['ok' => true]; })(),
+            'group_save' => (function () use ($app, $visit, $input) { $app->saveGroup($visit, $input); return ['ok' => true]; })(),
+            'group_delete' => (function () use ($app, $visit, $input) { $app->deleteGroup($visit, App::string($input, 'id', 32)); return ['ok' => true]; })(),
+            'mock' => (function () use ($app, $visit, $input) { $app->mock($visit, $input); return ['ok' => true]; })(),
+            default => throw new Problem('Unbekannte Aktion.', 404),
+        };
+    }
+    echo json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+} catch (Problem $e) {
+    http_response_code($e->http); echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+} catch (\Throwable $e) {
+    // Keine Rohantworten, URLs, Tokens oder Gesundheitsdaten in Logs.
+    error_log('kienzle-sumup: ' . get_class($e));
+    http_response_code(500); echo json_encode(['error' => 'Der Vorgang konnte nicht verarbeitet werden. Bitte erneut laden; ein angelegter Zahlungsversuch bleibt erhalten.']);
+}

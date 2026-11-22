@@ -1,0 +1,13 @@
+# Kienzle-Suite: Angebot an Modulen (mitgeliefert und GitHub) täglich neu ermitteln.
+[Unit]
+Description=Kienzle-Suite Module prüfen
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/kienzle/core/current/bin/kienzle-module pruefen
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=yes
+PrivateTmp=yes

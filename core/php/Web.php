@@ -19,6 +19,7 @@ final class Web {
         private Config $config, private Database $db, private Users $users, private Auth $auth, private ?Passkeys $passkeys,
         private Modules $modules, private AuditLog $audit, ?callable $qr = null, private ?Firewall $firewall = null, private ?Updates $updates = null,
         private ?Connections $connections = null, private ?Backup $backup = null, private ?Overview $overview = null, private ?Printers $printers = null, private ?Oidc $oidc = null, private ?Server $server = null,
+        private ?ModuleAdmin $store = null,
     ) {
         $this->qr = $qr ?? static function (string $uri): ?string {
             if (!is_executable('/usr/bin/qrencode')) return null;
@@ -29,6 +30,7 @@ final class Web {
 
     public function handle(Request $req): Response {
         $this->req = $req;
+        V::$starter = $this->modules->starterPath();
         try {
             $response = $this->route($req);
         } catch (Problem $e) {
@@ -678,6 +680,7 @@ final class Web {
         if ($r->path === '/verwaltung/firewall/bestaetigen' && !$get) return $this->firewallConfirm($admin);
         if ($r->path === '/verwaltung/firewall/aus' && !$get) return $this->firewallOff($admin);
         if ($r->path === '/verwaltung/updates') return $get ? $this->updatesPage() : $this->updatesAction($r, $admin);
+        if ($r->path === '/verwaltung/module') return $get ? $this->modulesPage() : $this->modulesAction($r, $admin);
         if ($r->path === '/verwaltung/verbindungen') return $get ? $this->connectionsPage() : $this->connectionsAction($r, $admin);
         if ($r->path === '/verwaltung/server') return $get ? $this->serverPage() : $this->serverSave($r, $admin);
         if ($r->path === '/verwaltung/sso') return $get ? $this->ssoPage() : $this->ssoAction($r, $admin);
@@ -906,6 +909,82 @@ final class Web {
         $this->fw()->disable();
         $this->audit->write($admin, 'firewall-ausgeschaltet');
         return Response::redirect('/verwaltung/firewall');
+    }
+
+    // ---- Module -------------------------------------------------------------------------------------------------
+    private function store(): ModuleAdmin {
+        if (!$this->store) throw new Problem('Die Modulverwaltung ist auf diesem Server nicht verfügbar.', 503);
+        return $this->store;
+    }
+
+    private function modulesPage(?string $error = null): Response {
+        $st = $this->store()->status();
+        $csrf = V::csrf($this->session['csrf']);
+        $busy = $st['pending'] || $st['running'] !== null;
+        $off = $busy ? ' disabled' : '';
+        $actions = ['installieren' => 'Installation', 'aktualisieren' => 'Aktualisierung', 'entfernen' => 'Entfernen'];
+        $body = V::error($error);
+        if ($busy) {
+            $body .= '<p class="notice">' . ($st['running'] ? V::h(($actions[$st['running']['action']] ?? 'Vorgang') . ' von „' . $st['running']['id'] . '“ läuft …')
+                : 'Auftrag wird übernommen …') . ' Das kann einige Minuten dauern (Pakete werden geladen). Die Seite aktualisiert sich selbst.</p>';
+        } elseif ($st['last']) {
+            $body .= $st['last']['ok'] ? V::notice($st['last']['message']) : V::error('Nicht erfolgreich: ' . $st['last']['message']);
+        }
+        if (!$st['service']) $body .= '<p class="error">Die Modulverwaltung ist nicht eingerichtet. Bitte den Installer ausführen.</p>';
+        $body .= '<p>Module erweitern die Suite um Programme wie die Kasse. Jedes Modul läuft unter einem eigenen Systembenutzer und sieht nur seine eigenen Daten. '
+            . 'Nach dem Installieren unter <a href="/verwaltung/benutzer">Benutzer</a> festlegen, wer das Modul nutzen darf.</p>';
+        $body .= '<h2>Installiert</h2>';
+        if (!$st['installed']) $body .= '<p>Noch keine Module installiert.</p>';
+        foreach ($st['installed'] as $m) {
+            $hidden = '<input type="hidden" name="id" value="' . V::h($m['id']) . '">';
+            $body .= '<div class="box wide"><h3>' . V::h($m['name']) . ' <span class="tag">' . V::h($m['version']) . '</span></h3>'
+                . ($m['description'] !== '' ? '<p>' . V::h($m['description']) . '</p>' : '')
+                . ($m['path'] ? '<p><a href="' . V::h($m['path']) . '/">Öffnen</a></p>' : '');
+            if ($m['update']) {
+                $body .= '<form method="post" action="/verwaltung/module">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="aktualisieren">'
+                    . '<p>Neue Version <strong>' . V::h($m['update']['version']) . '</strong>' . ($m['update']['source'] === 'github' ? ' (GitHub' . ($m['update']['signed'] === false ? ', nicht signiert' : '') . ')' : ' (mit der Basis geliefert)')
+                    . '. Vorher wird ein Schnappschuss der Moduldaten angelegt; schlägt etwas fehl, springt das Modul zurück.</p><button' . $off . '>Aktualisieren</button></form>';
+            }
+            $body .= '<details class="how"><summary>Entfernen</summary><form method="post" action="/verwaltung/module">' . $csrf . $hidden
+                . '<input type="hidden" name="aktion" value="entfernen"><label class="check"><input type="checkbox" name="daten" value="1"> Auch alle Daten des Moduls löschen (nicht rückgängig zu machen)</label>'
+                . '<p>Ohne Häkchen bleiben die Daten erhalten; eine spätere Installation übernimmt sie.</p><button class="danger"' . $off . '>Modul entfernen</button></form></details></div>';
+        }
+        $body .= '<h2>Verfügbar</h2>';
+        if (!$st['available']) $body .= '<p>Keine weiteren Module verfügbar.</p>';
+        foreach ($st['available'] as $m) {
+            $body .= '<div class="box wide"><h3>' . V::h($m['name']) . ' <span class="tag">' . V::h($m['version']) . '</span>'
+                . ($m['signed'] === false ? ' <span class="tag warn">nicht signiert</span>' : '') . '</h3>'
+                . ($m['description'] !== '' ? '<p>' . V::h($m['description']) . '</p>' : '')
+                . '<p class="muted">' . ($m['source'] === 'github' ? 'Von GitHub' : 'Mit der Basis geliefert') . ($m['path'] ? ' · Adresse ' . V::h($m['path']) : '') . '</p>'
+                . '<form method="post" action="/verwaltung/module">' . $csrf . '<input type="hidden" name="aktion" value="installieren"><input type="hidden" name="id" value="' . V::h($m['id']) . '">'
+                . '<button' . $off . '>Installieren</button></form></div>';
+        }
+        $body .= '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="pruefen"><button class="secondary"' . $off . '>Nach Modulen sehen</button></form>'
+            . '<p class="muted">Zuletzt geprüft: ' . V::date($st['checked_at']) . ($st['error'] ? ' – GitHub nicht erreichbar: ' . V::h($st['error']) : '') . '</p>';
+        if ($st['log']) $body .= '<h2>Protokoll</h2><pre class="notes">' . V::h(implode("\n", $st['log'])) . '</pre>';
+        $response = Response::html(V::page('Module', $body, $this->nav(), $this->config->practice, 'Betrieb'), $error ? 409 : 200);
+        return $busy ? $response->with('Refresh', '4') : $response;
+    }
+
+    private function modulesAction(Request $r, string $admin): Response {
+        $store = $this->store();
+        $id = $r->field('id', 40);
+        try {
+            switch ($r->field('aktion', 20)) {
+                case 'pruefen': $store->check(); break;
+                case 'installieren': $store->install($id); $this->audit->write($admin, 'modul-installieren', $id); break;
+                case 'aktualisieren': $store->update($id); $this->audit->write($admin, 'modul-aktualisieren', $id); break;
+                case 'entfernen':
+                    $data = $r->field('daten', 1) === '1';
+                    $store->remove($id, $data);
+                    $this->audit->write($admin, 'modul-entfernen', $id . ($data ? ' samt-daten' : ''));
+                    break;
+                default: throw new Problem('Unbekannte Aktion.', 422);
+            }
+        } catch (Problem $e) {
+            return $this->modulesPage($e->getMessage());
+        }
+        return Response::redirect('/verwaltung/module');
     }
 
     // ---- Updates ------------------------------------------------------------------------------------------------
@@ -1424,7 +1503,7 @@ final class Web {
         if (($this->session['stage'] ?? '') !== 'full') return null;
         $admin = (int)$this->session['user_admin'] === 1;
         return ['login' => $this->session['login'], 'admin' => $admin, 'csrf' => $this->session['csrf'],
-            'updates' => $admin && $this->updates ? $this->updates->count() : 0, 'sicherung' => $admin && $this->backup ? $this->backup->count() : 0,
+            'updates' => $admin && $this->updates ? $this->updates->count() : 0, 'module' => $admin && $this->store ? $this->store->count() : 0, 'sicherung' => $admin && $this->backup ? $this->backup->count() : 0,
             'pfad' => $this->req?->path ?? '', 'einrichtung' => $admin ? $this->openSteps() : 0];
     }
 

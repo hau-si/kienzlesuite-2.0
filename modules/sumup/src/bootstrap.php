@@ -1,0 +1,50 @@
+<?php
+declare(strict_types=1);
+
+spl_autoload_register(static function (string $class): void {
+    if (str_starts_with($class, 'KienzleSumup\\')) {
+        $file = __DIR__ . '/' . substr($class, strlen('KienzleSumup\\')) . '.php';
+        if (is_file($file)) require $file;
+    }
+});
+
+// Zusätzliche Schutz-Header für jede Web-Antwort (zusätzlich zu denen von nginx).
+if (PHP_SAPI !== 'cli' && PHP_SAPI !== 'cli-server' && !headers_sent()) {
+    header('X-Frame-Options: DENY');
+    header('Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()');
+    header('Cross-Origin-Opener-Policy: same-origin');
+    header('Cross-Origin-Resource-Policy: same-origin');
+    header_remove('X-Powered-By');
+}
+
+/** Anfragen anderer Websites ablehnen: Browser melden Sec-Fetch-Site; Starter und Druckserver senden den Header nicht. */
+function ks_require_same_site(): void {
+    $site = $_SERVER['HTTP_SEC_FETCH_SITE'] ?? '';
+    if ($site !== '' && $site !== 'same-origin' && $site !== 'none') throw new KienzleSumup\Problem('Unzulässiger Ursprung.', 403);
+}
+
+function ks_app(): KienzleSumup\App {
+    static $app;
+    return $app ??= new KienzleSumup\App(KienzleSumup\Settings::effective(ks_base_config()));
+}
+
+/** Grundwerte aus der Suite (Vorgaben, Schlüssel, Verbindungen der Basis); Weboberflächen-Einstellungen liegen darüber. */
+function ks_base_config(): KienzleSumup\Config {
+    static $config;
+    return $config ??= KienzleSumup\Suite::baseConfig();
+}
+
+/** Pfad innerhalb des Moduls, z. B. ks_url('api.php') → „/kasse/api.php“. */
+function ks_url(string $rel = ''): string { return KienzleSumup\Suite::base() . '/' . ltrim($rel, '/'); }
+
+/** Inhalt der Anfrage (höchstens $max Bytes). Tests setzen $GLOBALS['KS_TEST_BODY'], da php://input in der CLI leer ist. */
+function ks_body(int $max): string {
+    if (PHP_SAPI === 'cli' && isset($GLOBALS['KS_TEST_BODY'])) return substr((string)$GLOBALS['KS_TEST_BODY'], 0, $max);
+    return (string)file_get_contents('php://input', false, null, 0, $max);
+}
+
+// Datenordner und Hilfsdatei der Basis: Vorgaben der Suite; die Haken bekommen KIENZLE_DATEN von der Basis.
+if (preg_match('#^/[A-Za-z0-9/_.-]{1,200}$#D', (string)getenv('KIENZLE_DATEN')) && !str_contains((string)getenv('KIENZLE_DATEN'), '..')) KienzleSumup\Suite::$data = (string)getenv('KIENZLE_DATEN');
+if (PHP_SAPI === 'cli' && is_file((string)getenv('KIENZLE_SUITE_HILFE'))) KienzleSumup\Suite::$helper = (string)getenv('KIENZLE_SUITE_HILFE');
+
+function ks_h(string $s): string { return htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }

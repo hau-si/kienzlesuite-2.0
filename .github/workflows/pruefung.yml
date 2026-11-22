@@ -10,7 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - run: sudo apt-get update && sudo apt-get install -y shellcheck php-cli php-sqlite3 php-mbstring openssl
+      # Dazu die Werkzeuge des Moduls Kasse (PDF, Bilder, Excel-Prüfung, Texterkennung).
+      - run: sudo apt-get update && sudo apt-get install -y shellcheck php-cli php-sqlite3 php-mbstring php-gd php-curl php-xml openssl librsvg2-bin poppler-utils qpdf fonts-dejavu-core ghostscript python3-openpyxl tesseract-ocr tesseract-ocr-deu
       - run: python3 -m pip install --user --break-system-packages ruff
       - run: bash tests/run-all.sh
       # Erzeugte Firewall-Regeln mit echtem nft prüfen (braucht root, daher hier mit sudo und nicht im Container).
@@ -21,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     container: ubuntu:26.04
     steps:
-      - run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git ca-certificates python3 shellcheck restic php-cli php-sqlite3 php-mbstring openssl
+      - run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git ca-certificates python3 shellcheck restic php-cli php-sqlite3 php-mbstring php-gd php-curl php-xml openssl librsvg2-bin poppler-utils qpdf fonts-dejavu-core ghostscript python3-openpyxl
       - uses: actions/checkout@v5
       # Im Container gehört der Arbeitsordner einem anderen Benutzer; git braucht die ausdrückliche Freigabe.
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"

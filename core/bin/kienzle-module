@@ -1,0 +1,54 @@
+#!/usr/bin/python3 -IB
+"""Modulverwaltung der Kienzle-Suite (nur root).
+
+  kienzle-module anwenden                       Anfrage des Webinterfaces verarbeiten (kienzle-module.path)
+  kienzle-module pruefen                        Angebot (mitgeliefert, GitHub) und Bestand neu ermitteln
+  kienzle-module liste                          installierte und verfügbare Module anzeigen
+  kienzle-module installieren ID [VERSION]      an der Konsole installieren bzw. aktualisieren
+  kienzle-module entfernen ID [--daten-loeschen]
+"""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'lib'))
+from kienzle import module as mo, release, update  # noqa: E402
+
+
+def main(argv: list[str]) -> int:
+    if argv == ['anwenden']:
+        mo.handle()
+        return 0
+    if argv == ['pruefen']:
+        s = mo.check()
+        return 1 if s.get('error') else 0
+    if argv == ['liste']:
+        s = mo.check()
+        for m in s.get('installed', []):
+            extra = f'  (neu: {m["update"]["version"]})' if m.get('update') else ''
+            print(f'installiert  {m["id"]:20} {m["version"]:14} {m["name"]}{extra}')
+        for m in s.get('available', []):
+            print(f'verfügbar    {m["id"]:20} {m["version"]:14} {m["name"]} [{m["source"]}]')
+        if s.get('error'):
+            print(f'Hinweis: GitHub nicht abrufbar: {s["error"]}', file=sys.stderr)
+        return 0
+    if len(argv) in (2, 3) and argv[0] == 'installieren':
+        action = 'aktualisieren' if argv[1] in mo.installed() else 'installieren'
+        req = {'action': action, 'id': argv[1], **({'version': argv[2]} if len(argv) == 3 else {})}
+    elif len(argv) in (2, 3) and argv[0] == 'entfernen' and argv[2:] in ([], ['--daten-loeschen']):
+        req = {'action': 'entfernen', 'id': argv[1], 'daten_loeschen': argv[2:] == ['--daten-loeschen']}
+    else:
+        print(__doc__.strip(), file=sys.stderr)
+        return 2
+    try:
+        print(mo.dispatch(req))
+    except (mo.Fehler, update.Fehler, release.Fehler) as e:
+        print(f'Fehler: {e}', file=sys.stderr)
+        return 1
+    finally:
+        mo.set_status(running=None)
+        mo.check()
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

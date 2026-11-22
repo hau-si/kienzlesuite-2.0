@@ -3,6 +3,7 @@
 
   kienzle-web schreiben [MODULORDNER]
   kienzle-web neu                       nur nginx neu schreiben, Modulverzeichnis bleibt (z. B. nach neuen Servernamen)
+  kienzle-web module                    Modulverzeichnis aus den installierten Modulen (/opt/kienzle/<id>/current) neu schreiben
 
 Prüft alle Module in MODULORDNER (Vorgabe: keine Module) mit dem Prüfprogramm, schreibt das Modulverzeichnis
 für das Webinterface und die nginx-Konfiguration, prüft sie mit „nginx -t“ und lädt nginx neu.
@@ -26,6 +27,7 @@ SITE = E('KIENZLE_NGINX_SITE', '/etc/nginx/conf.d/kienzle.conf')
 NGINX = E('KIENZLE_NGINX', '/usr/sbin/nginx')
 RELOAD = E('KIENZLE_NGINX_RELOAD', 'systemctl reload nginx.service')
 OWNER = E('KIENZLE_CORE_USER', 'ks-core')
+PROGRAMS = E('KIENZLE_MODULE_PROGRAMME', '/opt/kienzle')
 
 
 def write(path: Path, text: str, mode: int, group: str | None = None) -> None:
@@ -46,6 +48,13 @@ def main(argv: list[str]) -> int:
         except (OSError, ValueError):
             existing = {'core_api': sorted(manifest.supported_api()), 'modules': []}
         return write_all(existing)
+    if argv == ['module']:
+        try:
+            registry = manifest.check_list(manifest.installed_folders(PROGRAMS))
+        except manifest.Invalid as e:
+            print('Installierte Module ungültig, nichts geändert:\n  - ' + '\n  - '.join(e.errors), file=sys.stderr)
+            return 1
+        return write_all(registry)
     if not argv or argv[0] != 'schreiben' or len(argv) > 2:
         print(__doc__.strip(), file=sys.stderr)
         return 2

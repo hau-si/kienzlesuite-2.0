@@ -86,6 +86,21 @@ def _module(m: dict) -> list[str]:
     return lines
 
 
+def _starter(m: dict) -> list[str]:
+    """Arbeitsplatz-Starter (z. B. Kienzle-SumUp 1.x): ruft https://<server>/api.php ohne Anmeldung der Suite auf und weist sich
+    mit dem Starter-Schlüssel aus. Nur diese eine Adresse; das Modul erfährt über KIENZLE_OEFFENTLICH, dass niemand angemeldet ist."""
+    mid = _safe(m['module']['id'])
+    web = m['web']
+    if web['protocol'] != 'fastcgi':
+        raise Fehler(f'{mid}: Starter nur für FastCGI-Module.')
+    socket = _safe(web['upstream'].removeprefix('unix:'))
+    return [f'    # Arbeitsplatz-Starter des Moduls {mid} (ohne Anmeldung; das Modul prüft den Starter-Schlüssel)', '    location = /api.php {',
+            '        limit_except POST { deny all; }', '        client_max_body_size 64k;'] + _fastcgi_common() + [
+            f'        fastcgi_param SCRIPT_FILENAME {MODULE_ROOT.format(id=mid)}/{_safe(web["entry"])};',
+            f'        fastcgi_param SCRIPT_NAME {_safe(web["path"])};', '        fastcgi_param KIENZLE_OEFFENTLICH starter;',
+            f'        fastcgi_param KIENZLE_PFAD {_safe(web["path"])};', f'        fastcgi_pass unix:{socket};', '    }']
+
+
 def render(hostnames: list[str], registry: dict) -> str:
     names = server_names(hostnames)
     out = ['# Kienzle-Suite – erzeugt von kienzle-web. Nicht von Hand ändern: Änderungen gehen beim nächsten Erzeugen verloren.',
@@ -112,6 +127,8 @@ def render(hostnames: list[str], registry: dict) -> str:
     for m in registry.get('modules', []):
         if m.get('web'):
             out += _module(m) + ['']
+            if m['web'].get('starter'):
+                out += _starter(m) + ['']
     out += ['    # Basis: alle übrigen Pfade', '    location / {'] + _fastcgi_common() + [
             f'        fastcgi_param SCRIPT_FILENAME {CORE_ROOT}/public/index.php;', f'        fastcgi_pass unix:{CORE_SOCKET};', '    }', '}', '']
     return '\n'.join(out)

@@ -1,0 +1,50 @@
+#!/usr/bin/php
+<?php
+declare(strict_types=1);
+// Haken des Moduls für die Basis (laufen als ks-sumup, nie als root): install, update, remove, busy, health,
+// setup-overview, backup-snapshot. Aufruf über die gleichnamigen Verweise in bin/ bzw. mit dem Namen als Argument.
+require_once dirname(__DIR__) . '/src/bootstrap.php';
+use KienzleSumup\{Database, Module, Settings, Suite};
+
+$hook = $argv[1] ?? '';
+try {
+    switch ($hook) {
+        case 'install':
+        case 'update':
+            Suite::ensureGrundwerte();
+            $db = new Database(Suite::$data);
+            $db->migrate();
+            echo "Datenbank auf Version " . (int)$db->query('PRAGMA user_version')->fetchColumn() . ".\n";
+            exit(0);
+        case 'remove':
+            exit(0);   // Daten bleiben; löschen nur auf ausdrücklichen Wunsch (Basis)
+        case 'busy':
+            // Kein Update während einer Kartenzahlung, die gerade am Terminal läuft (höchstens 10 Minuten alt).
+            if (!is_file(Suite::$data . '/payments.sqlite')) exit(0);
+            $db = new Database(Suite::$data);
+            $n = (int)$db->one("SELECT COUNT(*) AS n FROM payments WHERE payment_status IN ('starting','pending','unknown','cancel_requested') AND created_at > ?", [time() - 600])['n'];
+            exit($n > 0 ? 75 : 0);
+        case 'health':
+            $db = new Database(Suite::$data);
+            $db->query('SELECT 1');
+            Suite::grundwerte();
+            exit(0);
+        case 'setup-overview':
+            $config = Settings::effective(Suite::baseConfig());
+            echo json_encode(['items' => Module::overview($config)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), "\n";
+            exit(0);
+        case 'backup-snapshot':
+            // Stimmige Kopie der Datenbank für die Sicherung (VACUUM INTO), neben der laufenden Datei.
+            $target = Suite::$data . '/sicherung/payments.sqlite';
+            if (!is_dir(dirname($target))) mkdir(dirname($target), 0700);
+            @unlink($target);
+            if (is_file(Suite::$data . '/payments.sqlite')) (new Database(Suite::$data))->query('VACUUM INTO ' . "'" . str_replace("'", "''", $target) . "'");
+            exit(0);
+        default:
+            fwrite(STDERR, "Aufruf: kienzle-sumup install|update|remove|busy|health|setup-overview|backup-snapshot\n");
+            exit(2);
+    }
+} catch (\Throwable $e) {
+    fwrite(STDERR, 'Fehler: ' . ($e instanceof KienzleSumup\Problem || $e instanceof RuntimeException ? $e->getMessage() : get_class($e)) . "\n");
+    exit(1);
+}

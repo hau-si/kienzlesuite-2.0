@@ -78,4 +78,20 @@
   }));
 
   document.querySelectorAll('[data-print]').forEach((b) => b.addEventListener('click', () => window.print()));
+
+  // Arbeitsplatz-Starter (z. B. Kasse aus T2med): Der Starter öffnet https://<server>/#launch=<einmaliger Code>.
+  // Ohne Anmeldung den Code bis nach der Anmeldung im Tab merken, danach an das Modul weitergeben (data-starter).
+  (function starter() {
+    const target = document.body && document.body.dataset.starter;
+    if (!target) return;
+    let hash = /^#launch=[0-9a-f]{64}$/.test(location.hash) ? location.hash : '';
+    if (hash) history.replaceState(null, '', location.pathname + location.search);
+    const login = location.pathname === '/anmelden' || location.pathname.startsWith('/anmelden/') || location.pathname === '/konto/otp';
+    try {
+      if (login) { if (hash) sessionStorage.setItem('kienzle-launch', hash); return; }
+      hash = hash || sessionStorage.getItem('kienzle-launch') || '';
+      sessionStorage.removeItem('kienzle-launch');
+    } catch (e) { /* ohne sessionStorage: nur direkte Weitergabe */ }
+    if (/^#launch=[0-9a-f]{64}$/.test(hash)) location.replace(target + '/' + hash);
+  })();
 })();

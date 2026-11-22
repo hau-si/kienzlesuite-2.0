@@ -1,0 +1,10 @@
+# Kienzle-Suite: Aufträge der Seite „Module“ übernehmen (Anfragedatei von ks-core).
+[Unit]
+Description=Kienzle-Suite Module (Anfragen)
+
+[Path]
+PathExists=/var/lib/kienzle/core/anfragen/module.json
+Unit=kienzle-module-anwenden.service
+
+[Install]
+WantedBy=multi-user.target

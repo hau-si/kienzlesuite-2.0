@@ -1,0 +1,34 @@
+<?php
+declare(strict_types=1);
+namespace KienzleSumup;
+
+final class ReceiptPdf {
+    public static function convert(string $source): string {
+        return self::render($source, ['--format=pdf'], '%PDF-');
+    }
+    public static function raster(string $source, int $width): string {
+        if ($width < 128 || $width > 576) throw new Problem('Ungültige Druckbreite.');
+        return self::render($source, ['--format=png', '--width=' . $width, '--keep-aspect-ratio', '--background-color=white'], "\x89PNG\r\n\x1a\n");
+    }
+    private static function render(string $source, array $options, string $signature): string {
+        if (strlen($source) > 2 * 1024 * 1024) throw new Problem('Der SumUp-Beleg ist zu groß.', 502);
+        // PNG-Belege ebenfalls als eingebettetes Bild rendern. SVG bleibt vektorbasiert.
+        if (str_starts_with($source, "\x89PNG\r\n\x1a\n")) {
+            $size = @getimagesizefromstring($source);
+            if (!$size || $size[0] < 1 || $size[1] < 1 || $size[0] > 8000 || $size[1] > 20000) throw new Problem('Ungültige Belegabmessungen.', 502);
+            $source = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="'.$size[0].'" height="'.$size[1].'"><image width="100%" height="100%" xlink:href="data:image/png;base64,'.base64_encode($source).'"/></svg>';
+        }
+        if (!preg_match('/<svg\b/i', $source)) throw new Problem('SumUp hat keinen lesbaren SVG- oder PNG-Beleg geliefert.', 502);
+        $binary = null;
+        foreach (['/usr/bin/rsvg-convert', '/opt/homebrew/bin/rsvg-convert', '/usr/local/bin/rsvg-convert'] as $path) {
+            if (is_executable($path)) { $binary = $path; break; }
+        }
+        if (!$binary) throw new Problem('PDF-Konverter fehlt. Bitte das Modul unter Verwaltung → Module neu installieren (Paket librsvg2-bin).', 503);
+        // stdin hat keine Basis-URL: librsvg lädt keine lokalen/externen Dateien.
+        $result = Command::run([$binary, ...$options], $source);
+        if ($result['code'] !== 0 || !str_starts_with($result['output'], $signature)) {
+            throw new Problem('Der SumUp-Originalbeleg konnte nicht aufbereitet werden.', 502);
+        }
+        return $result['output'];
+    }
+}

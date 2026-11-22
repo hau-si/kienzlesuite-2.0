@@ -241,6 +241,39 @@ def check() -> dict:
                       local=local_releases(), available={'core': [entry(r) for r in shown[:10]]})
 
 
+# ---- Laden und prüfen (Basis und Module) -------------------------------------------------------------------------
+def fetch_release(part: str, version: str, current: str | None, work: Path) -> bool:
+    """Release `part`-`version` aus der Quelle laden, Signatur (soweit vorhanden bzw. verlangt), Manifest und jede Datei
+    prüfen und nach `work` auspacken. current: installierte Version (nur neuere erlaubt) oder None (Erstinstallation).
+    Liefert, ob das Release signiert war."""
+    listing = source().releases()
+    entry = next((r for r in candidates(listing, part, current or '0.0.0-0', channel()) if r['version'] == version), None)
+    if not entry:
+        raise Fehler(f'Version {version} ist im Kanal „{channel()}“ nicht verfügbar.')
+    n = release.names(part, version)
+    if n['archive'] not in entry['assets'] or n['manifest'] not in entry['assets']:
+        raise Fehler('Release unvollständig (Archiv oder Manifest fehlt).')
+    s = source()
+    manifest_raw = s.fetch(entry['assets'][n['manifest']], 1024 * 1024)
+    if n['signature'] in entry['assets']:
+        # Vorhandene Signatur muss immer stimmen – auch wenn unsignierte Versionen zugelassen sind.
+        release.verify_signature(manifest_raw, s.fetch(entry['assets'][n['signature']], 1024), release.trusted_keys(KEYS))
+        signed = True
+    elif allow_unsigned(entry['prerelease']):
+        signed = False
+    else:
+        raise Fehler('Release ist nicht signiert. Unsignierte Versionen nur nach ausdrücklicher Freigabe (Verwaltung → Updates → Signaturprüfung).')
+    manifest = release.parse_manifest(manifest_raw, part)
+    if manifest['version'] != version or (manifest['channel'] == 'beta' and channel() != 'beta'):
+        raise Fehler('Manifest passt nicht zur angeforderten Version bzw. zum Kanal.')
+    if not signed and manifest['channel'] != 'beta' and signature_mode() != 'aus':
+        raise Fehler('Unsigniert sind nur Beta-Versionen erlaubt.')
+    archive = s.fetch(entry['assets'][n['archive']], release.MAX_ARCHIVE)
+    release.check_archive(archive, manifest)
+    release.extract(archive, manifest, work)
+    return signed
+
+
 # ---- Aktualisieren -----------------------------------------------------------------------------------------------
 def _run(cmd: str | list, timeout: int = 1800) -> subprocess.CompletedProcess:
     args = cmd.split() if isinstance(cmd, str) else cmd
@@ -386,32 +419,7 @@ def install(version: str, rollback_to_local: bool = False) -> None:
         else:
             if not release.newer(version, current):
                 raise Fehler(f'{version} ist nicht neuer als die installierte Version {current}.')
-            listing = source().releases()
-            entry = next((r for r in candidates(listing, 'core', current, channel()) if r['version'] == version), None)
-            if not entry:
-                raise Fehler(f'Version {version} ist im Kanal „{channel()}“ nicht verfügbar.')
-            n = release.names('core', version)
-            if n['archive'] not in entry['assets'] or n['manifest'] not in entry['assets']:
-                raise Fehler('Release unvollständig (Archiv oder Manifest fehlt).')
-            s = source()
-            manifest_raw = s.fetch(entry['assets'][n['manifest']], 1024 * 1024)
-            if n['signature'] in entry['assets']:
-                # Vorhandene Signatur muss immer stimmen – auch wenn unsignierte Versionen zugelassen sind.
-                release.verify_signature(manifest_raw, s.fetch(entry['assets'][n['signature']], 1024), release.trusted_keys(KEYS))
-                signed = True
-            elif allow_unsigned(entry['prerelease']):
-                signed = False
-            else:
-                raise Fehler('Release ist nicht signiert. Unsignierte Versionen nur nach ausdrücklicher Freigabe (Verwaltung → Updates → Signaturprüfung).')
-            manifest = release.parse_manifest(manifest_raw, 'core')
-            if manifest['version'] != version or (manifest['channel'] == 'beta' and channel() != 'beta'):
-                raise Fehler('Manifest passt nicht zur angeforderten Version bzw. zum Kanal.')
-            if not signed and manifest['channel'] != 'beta' and signature_mode() != 'aus':
-                raise Fehler('Unsigniert sind nur Beta-Versionen erlaubt.')
-            archive = s.fetch(entry['assets'][n['archive']], release.MAX_ARCHIVE)
-            release.check_archive(archive, manifest)
-            set_status(step='pruefen')
-            release.extract(archive, manifest, work)
+            signed = fetch_release('core', version, current, work)
             src = work
             log('Signatur, Manifest und alle Dateien geprüft.' if signed else
                 f'OHNE Signatur (vom Admin zugelassen: {"alle Versionen" if signature_mode() == "aus" else "Beta-Versionen"}); Manifest und alle Dateien geprüft.')

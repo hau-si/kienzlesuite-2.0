@@ -1,0 +1,11 @@
+# Kienzle-Suite: Angebot an Modulen täglich prüfen (zusammen mit den Updates der Basis).
+[Unit]
+Description=Kienzle-Suite Module täglich prüfen
+
+[Timer]
+OnCalendar=*-*-* 04:20
+RandomizedDelaySec=30m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

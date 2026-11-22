@@ -123,7 +123,7 @@ install -d -m 0755 -o root -g root /var/lib/kienzle/firewall /var/lib/kienzle/up
 install -d -m 0755 -o root -g root /etc/kienzle/verbindungen /etc/kienzle/verbindungen/module /etc/kienzle/schluessel /var/spool/kienzle /var/spool/kienzle/ablage
 install -d -m 0755 -o ks-ablage -g ks-ablage /var/lib/kienzle/ablage
 install -d -m 0700 -o root -g root /etc/kienzle/sicherung /var/cache/kienzle-sicherung
-install -d -m 0755 -o root -g root /var/lib/kienzle/sicherung /var/lib/kienzle/ueberblick /var/lib/kienzle/servername
+install -d -m 0755 -o root -g root /var/lib/kienzle/sicherung /var/lib/kienzle/ueberblick /var/lib/kienzle/servername /var/lib/kienzle/module /etc/kienzle/module
 install -d -m 0700 -o ks-ablage -g ks-ablage /var/lib/kienzle/ablage/.ssh
 # Eigener SSH-Schlüssel des Netzwerkspeicher-Dienstes (für SFTP-Ziele; der öffentliche Teil steht unter Verwaltung → Verbindungen).
 if [ ! -f /var/lib/kienzle/ablage/.ssh/id_ed25519 ] && command -v ssh-keygen >/dev/null; then
@@ -136,11 +136,19 @@ tmp=$(mktemp -d /opt/kienzle/core/releases/.neu.XXXXXX)
 cp -r -- "$src/." "$tmp/"
 # Installer mit ablegen: Damit kann der Updater später auf genau diese Version zurückspringen.
 rm -rf -- "$tmp/installer"; mkdir "$tmp/installer"; cp -r -- "$here/installer/." "$tmp/installer/"
+# Mitgelieferte Module (ohne Beispielmodul): installierbar über Verwaltung → Module.
+if [ "$src" != "$here" ] && [ -d "$here/modules" ]; then
+  rm -rf -- "$tmp/modules"; mkdir "$tmp/modules"
+  for m in "$here"/modules/*/; do
+    m=${m%/}; [ "$(basename -- "$m")" = beispiel ] && continue
+    [ -f "$m/module.toml" ] && cp -r -- "$m" "$tmp/modules/"
+  done
+fi
 chown -R root:root "$tmp"; chmod -R u=rwX,go=rX "$tmp"
 rm -rf -- "$release.alt"; [ -e "$release" ] && mv -- "$release" "$release.alt"
 mv -- "$tmp" "$release"; rm -rf -- "$release.alt"
 ln -sfn "releases/$version" /opt/kienzle/core/.current.neu && mv -Tf /opt/kienzle/core/.current.neu /opt/kienzle/core/current
-for tool in kienzle-admin kienzle-zertifikat kienzle-web kienzle-modul-pruefen kienzle-update kienzle-verbindungen kienzle-sicherung kienzle-ueberblick kienzle-drucker kienzle-servername; do ln -sfn "/opt/kienzle/core/current/bin/$tool" "/usr/local/sbin/$tool"; done
+for tool in kienzle-admin kienzle-zertifikat kienzle-web kienzle-modul-pruefen kienzle-update kienzle-verbindungen kienzle-sicherung kienzle-ueberblick kienzle-drucker kienzle-servername kienzle-module; do ln -sfn "/opt/kienzle/core/current/bin/$tool" "/usr/local/sbin/$tool"; done
 
 if [ -n "$restore" ]; then
   echo '== Wiederherstellung aus der Sicherung'
@@ -260,6 +268,7 @@ install -m 0644 "$vorlagen/kienzle-zertifikat.service" "$vorlagen/kienzle-zertif
   "$vorlagen/kienzle-ueberblick.path" "$vorlagen/kienzle-ueberblick.service" "$vorlagen/kienzle-ueberblick.timer" \
   "$vorlagen/kienzle-drucker.path" "$vorlagen/kienzle-drucker-anwenden.service" "$vorlagen/kienzle-drucker.timer" \
   "$vorlagen/kienzle-servername.path" "$vorlagen/kienzle-servername-anwenden.service" \
+  "$vorlagen/kienzle-module.path" "$vorlagen/kienzle-module-anwenden.service" "$vorlagen/kienzle-module-pruefen.service" "$vorlagen/kienzle-module-pruefen.timer" \
   /etc/systemd/system/
 chmod 0644 /etc/systemd/system/kienzle-core-php.service
 
@@ -267,7 +276,8 @@ chmod 0644 /etc/systemd/system/kienzle-core-php.service
 if [ -L /etc/nginx/sites-enabled/default ] && [ "$(readlink /etc/nginx/sites-enabled/default)" = /etc/nginx/sites-available/default ]; then
   rm -f /etc/nginx/sites-enabled/default
 fi
-KIENZLE_NGINX_RELOAD="" /opt/kienzle/core/current/bin/kienzle-web neu
+# Modulverzeichnis aus den installierten Modulen (ohne Module: nur die Basis).
+KIENZLE_NGINX_RELOAD="" /opt/kienzle/core/current/bin/kienzle-web module || KIENZLE_NGINX_RELOAD="" /opt/kienzle/core/current/bin/kienzle-web neu
 /opt/kienzle/core/current/bin/kienzle-verbindungen verteilen
 if [ -z "$nosystemd" ]; then
   systemctl daemon-reload
@@ -275,7 +285,7 @@ if [ -z "$nosystemd" ]; then
   systemctl disable --now "php$phpv-fpm.service" >/dev/null 2>&1 || true
   systemctl enable --now kienzle-core-php.service kienzle-zertifikat.timer kienzle-firewall.path
   systemctl enable kienzle-firewall.service kienzle-update-start.service
-  systemctl enable --now kienzle-update.path kienzle-update-pruefen.timer kienzle-verbindungen.path kienzle-ablage.timer kienzle-sicherung.path kienzle-sicherung.timer kienzle-ueberblick.path kienzle-ueberblick.timer kienzle-drucker.path kienzle-drucker.timer kienzle-servername.path
+  systemctl enable --now kienzle-update.path kienzle-update-pruefen.timer kienzle-verbindungen.path kienzle-ablage.timer kienzle-sicherung.path kienzle-sicherung.timer kienzle-ueberblick.path kienzle-ueberblick.timer kienzle-drucker.path kienzle-drucker.timer kienzle-servername.path kienzle-module.path kienzle-module-pruefen.timer
   # Druckserver: CUPS und smbd; nmbd (NetBIOS) und der AD-Dienst werden nicht gebraucht.
   systemctl disable --now nmbd.service samba-ad-dc.service >/dev/null 2>&1 || true
   systemctl enable cups.service smbd.service >/dev/null 2>&1 || true
@@ -313,6 +323,7 @@ if [ -n "$auto_names" ]; then
   echo "Verwaltung → Server festlegen."
 fi
 /opt/kienzle/core/current/bin/kienzle-ueberblick sammeln >/dev/null || echo 'Hinweis: Einrichtungs-Überblicke der Module nicht lesbar.'
+/opt/kienzle/core/current/bin/kienzle-module pruefen >/dev/null 2>&1 || true   # Angebot für Verwaltung → Module (GitHub darf fehlen)
 if [ -n "$admin_reset" ]; then /opt/kienzle/core/current/bin/kienzle-admin zuruecksetzen "$admin_reset"; fi
 if [ -n "$nosystemd" ] || [ -n "$update" ]; then exit 0; fi
 if ! /opt/kienzle/core/current/bin/kienzle-admin benutzer 2>/dev/null | grep -q 'Basis-Admin'; then

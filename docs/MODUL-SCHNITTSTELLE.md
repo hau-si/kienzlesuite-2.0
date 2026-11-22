@@ -46,10 +46,19 @@ selbst und nginx kommen hinein; ein anderes Modul kann den Socket nicht an nginx
 5. **Abmelden** ist Sache der Basis: Link bzw. Formular auf `/abmelden` (POST mit der CSRF-Marke der Basis) oder einfach zur
    Startseite `/` verlinken.
 
+## Arbeitsplatz-Starter
+
+Ein Modul mit `[web] starter = true` (z. B. die Kasse) bekommt `POST https://<server>/api.php` **ohne** Anmeldung der Suite.
+nginx setzt dann nur `KIENZLE_OEFFENTLICH=starter` und `KIENZLE_PFAD`, keine Benutzerangaben; das Modul muss den Aufrufer selbst
+prüfen (Starter-Schlüssel) und darf dort nur den Start annehmen. Der Starter öffnet danach `https://<server>/#launch=<64 Hexzeichen>`.
+Die Basis gibt diesen Teil nach der Anmeldung an `<web.path>/#launch=…` weiter (core.js, über `sessionStorage` im selben Tab,
+falls erst angemeldet werden muss). Der Code verlässt den Browser dabei nicht.
+
 ## Gesundheitsprüfung
 
 Die Basis antwortet auf `GET https://<server>/_health` (nur von localhost) mit `{"status":"ok","version":"…"}`.
-Module melden ihren Zustand über `hooks.health` (Meilenstein 4).
+Module melden ihren Zustand über `hooks.health`; die Modulverwaltung wartet nach dem Start bis zu 60 Sekunden darauf.
+Haken bekommen `KIENZLE_MODUL`, `KIENZLE_MODUL_VERSION`, `KIENZLE_DATEN` (Datenordner) und beim Aktualisieren `KIENZLE_VORHER`.
 
 ## Hilfsdatei für PHP-Module
 
