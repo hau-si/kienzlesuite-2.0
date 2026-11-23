@@ -27,7 +27,7 @@ final class KienzleModul {
     /** @return list<string> */
     public function rechte(): array { return array_values(array_filter(explode(',', (string)($this->server['KIENZLE_RECHTE'] ?? '')))); }
     public function recht(string $recht): bool { return $this->istAdmin() || in_array($recht, $this->rechte(), true); }
-    /** Praxisdaten der Basis (Verwaltung → Server und Name): name, street, city, contact; leer, wenn keine mitgeliefert wurden. */
+    /** Praxisdaten der Basis (Verwaltung → Praxis): name, street, city, contact; leer, wenn keine mitgeliefert wurden. */
     public function praxis(): array {
         $d = json_decode(rawurldecode((string)($this->server['KIENZLE_PRAXIS'] ?? '')), true);
         $out = [];
@@ -35,7 +35,7 @@ final class KienzleModul {
         return $out;
     }
 
-    /** Kontodaten und Steuerangaben der Basis (Verwaltung → Praxis und Daten): holder, iban, bic, bank_name, tax_id, small_business. */
+    /** Kontodaten und Steuerangaben der Basis (Verwaltung → Praxis): holder, iban, bic, bank_name, tax_id, small_business. */
     public function stammdaten(): array {
         $d = json_decode(rawurldecode((string)($this->server['KIENZLE_PRAXIS'] ?? '')), true);
         $out = [];

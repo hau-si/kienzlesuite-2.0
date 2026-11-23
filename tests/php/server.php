@@ -12,20 +12,26 @@ function test_server(): void {
     Server::$unit = $env->dir . '/kienzle-servername.path'; touch(Server::$unit);
     [$b] = admin_browser($env);
     $p = $b->get('/verwaltung/server');
-    check($p->status === 200 && str_contains($p->body, 'name="kurzname" value="kienzle"') && str_contains($p->body, 'value="Praxis Beispiel"'), 'Seite Server');
+    check($p->status === 200 && str_contains($p->body, 'name="kurzname" value="kienzle"') && !str_contains($p->body, 'name="praxis"'), 'Seite Server (ohne Praxisname)');
     check(str_contains($p->body, 'kienzle.example.org</textarea>') && str_contains($p->body, 'über 192.0.2.5 erreichbar'), 'weitere Namen oder IP fehlen');
-    $r = $b->post('/verwaltung/server', ['aktion' => 'speichern', 'kurzname' => ' Kienzle ', 'endung' => '.praxis.internal', 'weitere' => '', 'praxis' => 'Praxis Dr. Beispiel']);
+    $r = $b->post('/verwaltung/server', ['aktion' => 'speichern', 'kurzname' => ' Kienzle ', 'endung' => '.praxis.internal', 'weitere' => '']);
     check($r->status === 303, 'Speichern');
     $f = $env->dir . '/anfragen/servername.json';
-    check(json_decode((string)file_get_contents($f), true) === ['namen' => ['kienzle.praxis.internal', '192.0.2.5'], 'praxis' => 'Praxis Dr. Beispiel'], 'Anfrage: ' . file_get_contents($f));
-    $ok = ['aktion' => 'speichern', 'kurzname' => 'kienzle', 'endung' => '.fritz.box', 'weitere' => '', 'praxis' => ''];
+    check(json_decode((string)file_get_contents($f), true) === ['namen' => ['kienzle.praxis.internal', '192.0.2.5'], 'praxis' => 'Praxis Beispiel'], 'Anfrage (Praxisname bleibt unverändert): ' . file_get_contents($f));
+    $ok = ['aktion' => 'speichern', 'kurzname' => 'kienzle', 'endung' => '.fritz.box', 'weitere' => ''];
     check($b->post('/verwaltung/server', $ok)->status === 422, 'zweite Anfrage, solange die erste wartet');
     unlink($f);
+    $seite = $b->get('/verwaltung/praxis')->body;
+    check(str_contains($seite, 'name="praxis" value="Praxis Beispiel"') && str_contains($seite, 'Name der Praxis <span class="tag ok">✓ eingetragen</span>'), 'Praxisname steht unter Praxis');
+    $r = $b->post('/verwaltung/praxis', ['aktion' => 'name', 'praxis' => ' Praxis Dr. Beispiel ']);
+    check($r->status === 200 && json_decode((string)file_get_contents($f), true) === ['namen' => ['kienzle.example.org', '192.0.2.5'], 'praxis' => 'Praxis Dr. Beispiel'], 'Praxisname: Anfrage mit unveränderten Servernamen');
+    unlink($f);
+    check($b->post('/verwaltung/praxis', ['aktion' => 'name', 'praxis' => '<b>'])->status === 422 && !is_file($f), 'Praxisname mit < abgelehnt');
     $r = $b->post('/verwaltung/praxis', ['aktion' => 'anschrift', 'street' => 'Musterweg 1', 'city' => '12345 Musterstadt', 'contact' => 'Telefon 01234 56789']);
     check($r->status === 200 && str_contains($b->get('/verwaltung/praxis')->body, 'value="Musterweg 1"'), 'Anschrift speichern');
     check($b->post('/verwaltung/praxis', ['aktion' => 'anschrift', 'street' => '<b>', 'city' => '', 'contact' => ''])->status === 422, 'Anschrift mit < abgelehnt');
     foreach ([['kurzname' => ''], ['kurzname' => 'a b'], ['kurzname' => '-x'], ['endung' => '.example.org'], ['weitere' => 'a b!'],
-              ['weitere' => implode("\n", array_map(fn($i) => "n$i.example.org", range(1, 11)))], ['praxis' => '<b>']] as $bad) {
+              ['weitere' => implode("\n", array_map(fn($i) => "n$i.example.org", range(1, 11)))]] as $bad) {
         check($b->post('/verwaltung/server', $bad + $ok)->status === 422, 'ungültig angenommen: ' . json_encode($bad));
     }
     $b->post('/verwaltung/server', ['ohne_ip' => '1', 'weitere' => "kienzle.example.org"] + $ok);

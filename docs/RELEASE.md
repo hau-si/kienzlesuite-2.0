@@ -1,5 +1,14 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.28
+
+- Der Name der Praxis steht jetzt unter Verwaltung → Praxis (ganz oben, mit Status „✓ eingetragen“); die Seite „Server“ enthält nur noch den Namen des Servers. Die Seitentitel und das Menü heißen kurz „Server“ und „Praxis“ (vorher „Server und Name“ und „Praxis und Daten“). Beim Speichern des Praxisnamens bleiben die Servernamen unverändert; der Root-Dienst übernimmt die Änderung wie bisher.
+- Kasse 2.3.4-beta.9: Hinweistexte in den Kasse-Einstellungen nennen „Verwaltung → Praxis“.
+
+## 0.21.4-beta.27
+
+- Module: Die Seite zeigt Kacheln statt langer Kästen. Installierte Module mit Symbol, Status („✓ läuft“, „gestoppt“), Version und „Öffnen“; bei einem Update steht „Update x.y.z“ mit Knopf „Aktualisieren“ in der Kachel. Noch nicht installierte Module stehen gestrichelt im selben Raster mit „verfügbar“ und „Installieren“. Starten, Neu starten, Nach Update suchen und das rote „Modul entfernen“ (mit Wahl, ob die Daten gelöscht werden) sind im Drei-Punkte-Menü der Kachel. Die Funktionen sind unverändert.
+
 ## 0.21.4-beta.26
 
 - Seitenleiste vereinfacht: Die Gruppe „Einstellungen“ entfällt (sie führte zu denselben Modulen wie „Anwendungen“). „Anwendungen“ ist einklappbar und zeigt je Modul das Symbol der Startseite; der rote Punkt neben einem Modul zeigt, dass dort noch etwas eingerichtet werden muss. Die Einstellungen eines Moduls öffnen sich im Modul selbst.

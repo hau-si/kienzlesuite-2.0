@@ -76,6 +76,8 @@ function test_seite_menue_und_rechte(): void {
     $b = module_browser($env, $m);
     $page = $b->get('/verwaltung/module');
     check($page->status === 200 && str_contains($page->body, 'Neue Version <strong>2.1.0</strong> (GitHub, nicht signiert)') && str_contains($page->body, 'Telefon &lt;b&gt;'), 'Seite unvollständig oder nicht maskiert');
+    check(str_contains($page->body, 'class="mod-grid"') && str_contains($page->body, 'mod-tile available') && str_contains($page->body, '<span class="tag">verfügbar</span>') && str_contains($page->body, 'class="mod-remove"')
+        && str_contains($page->body, '<button class="danger">') && str_contains($page->body, 'Update 2.1.0') && str_contains($page->body, ' Installieren</button>'), 'Modulkacheln: installiert, verfügbar, Update, rotes Entfernen');
     check(str_contains($b->get('/')->body, 'title="Neue Modulversion verfügbar">1</span>'), 'Hinweis im Menü fehlt');
     $r = $b->post('/verwaltung/module', ['aktion' => 'installieren', 'id' => 'telefon']);
     check($r->status === 303 && mreq($env)['id'] === 'telefon', 'Installieren über die Seite');

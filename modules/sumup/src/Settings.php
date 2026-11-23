@@ -28,13 +28,13 @@ final class Settings {
                 'help' => 'Adresse, Schlüssel und Zertifikat von T2med stehen zentral unter Verwaltung → Verbindungen der Suite.'],
             'entry_code' => ['type' => 'string', 'label' => 'Aktenkürzel', 'default' => 'ZAHLUNG'],
         ]],
-        'practice' => ['label' => 'Belege (Praxisname: Verwaltung → Server und Name, Anschrift: Verwaltung → Praxis und Daten)', 'fields' => [
+        'practice' => ['label' => 'Belege (Praxisname und Anschrift: Verwaltung → Praxis)', 'fields' => [
             'append_sumup_receipt' => ['type' => 'bool', 'label' => 'Originalen SumUp-Beleg statt lokaler Zahlungsbestätigung anhängen'],
         ]],
-        'bank' => ['label' => 'Überweisung (Kontodaten: Verwaltung → Praxis und Daten)', 'fields' => [
+        'bank' => ['label' => 'Überweisung (Kontodaten: Verwaltung → Praxis)', 'fields' => [
             'purpose' => ['type' => 'string', 'label' => 'Verwendungszweck', 'default' => 'Rechnung {nummer}', 'optional' => true],
         ]],
-        'tax' => ['label' => 'Umsatzsteuer (Steuernummer und Kleinunternehmerregelung: Verwaltung → Praxis und Daten)', 'fields' => [
+        'tax' => ['label' => 'Umsatzsteuer (Steuernummer und Kleinunternehmerregelung: Verwaltung → Praxis)', 'fields' => [
             'rate' => ['type' => 'percent', 'label' => 'MwSt.-Satz in Prozent', 'default' => 1900],
             'manual_vat' => ['type' => 'bool', 'label' => '„Sonstiger Betrag“ mit MwSt. berechnen', 'default' => false],
             'exempt_note' => ['type' => 'text', 'label' => 'Hinweis bei Positionen ohne MwSt. (optional)', 'default' => ''],

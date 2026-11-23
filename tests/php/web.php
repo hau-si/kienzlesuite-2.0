@@ -147,7 +147,7 @@ function test_verwaltung_braucht_bestaetigung_und_csrf(): void {
     check($b->get('/verwaltung/benutzer')->status === 200, 'Verwaltung direkt nach Anmeldung nicht erreichbar');
     $page = $b->get('/verwaltung/benutzer')->body;
     check(str_contains($page, 'Gruppen</h2>') && str_contains($page, 'Benutzer</h2>'), 'Benutzer und Gruppen nicht auf einer Seite');
-    check(str_contains($b->get('/verwaltung/praxis')->body, 'Kontodaten für Überweisungen'), 'Praxis und Daten fehlt');
+    check(str_contains($b->get('/verwaltung/praxis')->body, 'Kontodaten für Überweisungen'), 'Seite Praxis fehlt');
     check($b->post('/verwaltung/praxis', ['aktion' => 'konto', 'holder' => 'Praxis Beispiel', 'iban' => 'DE02 1203 0000 0000 2020 52'])->status === 422, 'falsche IBAN angenommen');
     check($b->post('/verwaltung/praxis', ['aktion' => 'konto', 'holder' => 'Praxis Beispiel', 'iban' => 'DE02 1203 0000 0000 2020 51'])->status === 200 && str_contains($b->get('/verwaltung/praxis')->body, 'DE02 1203 0000 0000 2020 51'), 'Kontodaten nicht gespeichert');
     check($b->post('/verwaltung/praxis', ['aktion' => 'steuer', 'tax_id' => '12/345/67890', 'small_business' => '1'])->status === 200 && str_contains($b->get('/verwaltung/praxis')->body, '12/345/67890'), 'Steuerangaben nicht gespeichert');

@@ -85,7 +85,7 @@ final class Suite {
     }
 
     /**
-     * Praxisname, Anschrift und die Zuordnung der Drucker gehören der Basis (Verwaltung → Server und Name bzw. Drucker).
+     * Praxisname, Anschrift und die Zuordnung der Drucker gehören der Basis (Verwaltung → Praxis bzw. Drucker).
      * Bei jeder angemeldeten Anfrage wird die mitgelieferte Fassung als basis.json übernommen, damit auch der Starter
      * (ohne Anmeldung) sie nutzen kann.
      */
@@ -141,7 +141,7 @@ final class Suite {
         $v['printing']['width_dots'] = Config::PRINTER_MODELS[$v['printing']['model']]['width_dots'];
         // Drucker richtet die Basis ein (Verwaltung → Drucker); das Modul druckt nur auf deren Warteschlangen.
         foreach (self::praxis() as $k => $val) $v['practice'][$k] = $val;
-        // Kontodaten und Steuerangaben gehören ebenfalls der Basis (Verwaltung → Praxis und Daten).
+        // Kontodaten und Steuerangaben gehören ebenfalls der Basis (Verwaltung → Praxis).
         try {
             $st = self::modul()->stammdaten();
             foreach (['holder', 'iban', 'bic', 'bank_name'] as $f) $v['bank'][$f] = $st[$f];

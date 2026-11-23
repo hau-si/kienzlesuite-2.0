@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.9
+
+- Hinweise in den Einstellungen verweisen auf „Verwaltung → Praxis“ (Praxisname, Anschrift, Konto, Steuer stehen dort gemeinsam; die Seite „Praxis und Daten“ heißt jetzt „Praxis“). Nur Text.
+
 ## 2.3.4-beta.8
 
 - Testbetrieb gelb: Die Anzeige „TESTMODUS“/„T2MED TESTMODUS“ oben in der Kasse und den Einstellungen ist gelb; im Rechnungseingang steht bei Letterxpress im Testbetrieb ein gelbes Schild „TESTBETRIEB Post“. Nicht im Browser geprüft.

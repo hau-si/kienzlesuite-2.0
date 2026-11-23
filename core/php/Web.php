@@ -135,7 +135,7 @@ final class Web {
             . '<h2 id="name">2. Den Namen der Suite bekannt machen</h2>'
             . '<p>Die Suite heißt <strong>' . V::h($name) . '</strong> und hat die Adresse <strong>' . V::h($ip) . '</strong>. Damit der Name funktioniert, gibt es zwei Wege:</p>'
             . '<details class="how" open><summary>Einmal im Router (empfohlen, gilt für alle PCs)</summary><p>Viele Router kennen Geräte im Netz automatisch unter ihrem Rechnernamen, '
-            . 'eine FRITZ!Box z. B. als <code>rechnername.fritz.box</code>. Dann unter „Server und Name“ genau diesen Namen mit der Endung „.fritz.box“ wählen. '
+            . 'eine FRITZ!Box z. B. als <code>rechnername.fritz.box</code>. Dann unter „Server“ genau diesen Namen mit der Endung „.fritz.box“ wählen. '
             . 'Andere Router oder ein eigener DNS-Server: den Namen <code>' . V::h($name) . '</code> mit der Adresse <code>' . V::h($ip) . '</code> eintragen (meist die IT).</p></details>'
             . '<details class="how"><summary>Oder auf jedem PC in der Datei hosts</summary><ol class="steps">'
             . '<li>Windows: Startmenü → „Editor“ mit der rechten Maustaste → <strong>Als Administrator ausführen</strong>.</li>'
@@ -167,9 +167,8 @@ final class Web {
         $address = 'https://' . $short . $suffix . '/';
         $body = V::error($error) . ($st['last'] ? '<p class="' . (($st['last']['ok'] ?? false) ? 'notice' : 'error') . '">' . V::h((string)($st['last']['meldung'] ?? '')) . '</p>' : '')
             . ($st['pending'] ? '<p class="notice">Wird übernommen …</p>' : '')
-            . '<h2>Name der Praxis und des Servers</h2>'
+            . '<h2>Servername</h2>'
             . '<form method="post" action="/verwaltung/server">' . $this->hidden('speichern')
-            . V::input('praxis', 'Name der Praxis', 'text', $st['practice'], 'maxlength="60" placeholder="Praxis Dr. Beispiel"')
             . '<label>Name des Servers<span class="name-row">'
             . '<input type="text" name="kurzname" value="' . V::h($short) . '" required maxlength="40" pattern="[A-Za-z0-9][A-Za-z0-9-]*" aria-label="Name">'
             . '<select name="endung" aria-label="Endung">' . $options . '</select></span></label>'
@@ -183,12 +182,12 @@ final class Web {
             . V::checkbox('neue_ca', '1', 'Falls nötig: neue Zertifizierungsstelle erstellen', false)
             . V::checkbox('ohne_ip', '1', 'Nicht mehr über die IP-Adresse erreichbar', false) . '</details>'
             . '<button' . ($st['pending'] ? ' disabled' : '') . '>Speichern</button></form>'
-            . '<h2>Anschrift, Kontodaten und Steuer</h2><p class="muted">Stehen jetzt gemeinsam unter <a href="/verwaltung/praxis">Praxis und Daten</a>.</p>'
+            . '<h2>Name, Anschrift, Konto und Steuer der Praxis</h2><p class="muted">Stehen gemeinsam unter <a href="/verwaltung/praxis">Praxis</a>.</p>'
             . '<h2>Danach</h2><ol class="steps"><li>Den Namen im Router eintragen – oder auf jedem PC in der Datei hosts: '
             . '<a href="/hilfe/arbeitsplatz#name">Anleitung</a>.</li><li>Die Suite unter <strong>' . V::h($address) . '</strong> öffnen und dort neu anmelden.</li>'
             . '<li>Falls schon Passkeys eingerichtet sind: unter „Mein Konto“ neu anlegen (sie gelten für den alten Namen).</li></ol>'
             . '<p class="muted">Diese drei Schritte bestätigst du von Hand unter <a href="/verwaltung/einrichtung">Einrichtung</a>; erst dann gilt „Servername festgelegt“ als erledigt.</p>';
-        $response = Response::html(V::page('Server und Name', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+        $response = Response::html(V::page('Server', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
         return $st['pending'] ? $response->with('Refresh', '3') : $response;
     }
 
@@ -215,9 +214,10 @@ final class Web {
         $a = $this->address(); $m = $this->master();
         $form = fn(string $kind, string $fields, string $button) => '<form method="post" action="/verwaltung/praxis">' . V::csrf($this->session['csrf'])
             . '<input type="hidden" name="aktion" value="' . $kind . '">' . $fields . '<button>' . $button . '</button></form>';
-        $body = V::error($error) . V::notice($notice) . '<section class="card"><p class="muted">Diese Angaben gelten für alle Module (Rechnungen, Belege, Überweisungs-QR, Bons). Den Namen der Praxis änderst du unter <a href="/verwaltung/server">Server und Name</a> (Praxis: <strong>'
-            . V::h($this->config->practice !== '' ? $this->config->practice : 'noch nicht eingetragen') . '</strong>).</p>'
-            . '<details class="fold" open><summary><h2>Anschrift</h2></summary>' . $form('anschrift',
+        $body = V::error($error) . V::notice($notice) . '<section class="card"><p class="muted">Diese Angaben gelten für alle Module (Rechnungen, Belege, Überweisungs-QR, Bons). </p>'
+            . '<details class="fold" open><summary><h2>Name der Praxis</h2></summary>' . $form('name',
+                V::input('praxis', 'Name der Praxis (erscheint auf Belegen, Bons und im Kopf der Suite)', 'text', $this->config->practice, 'maxlength="60" placeholder="Praxis Dr. Beispiel"'), 'Name speichern') . '</details>'
+            . '<details class="fold"><summary><h2>Anschrift</h2></summary>' . $form('anschrift',
                 V::input('street', 'Straße und Hausnummer', 'text', $a['street'], 'maxlength="80" autocomplete="street-address"')
                 . V::input('city', 'PLZ und Ort', 'text', $a['city'], 'maxlength="80"')
                 . V::input('contact', 'Kontakt auf dem Beleg (optional, z. B. Telefon)', 'text', $a['contact'], 'maxlength="120"'), 'Anschrift speichern') . '</details>'
@@ -230,8 +230,8 @@ final class Web {
                 V::input('tax_id', 'Steuernummer oder USt-IdNr. (steht auf der Rechnung)', 'text', $m['tax_id'], 'maxlength="40"')
                 . V::checkbox('small_business', '1', 'Kleinunternehmerregelung (§ 19 UStG): keine Umsatzsteuer ausweisen', $m['small_business']), 'Steuerangaben speichern') . '</details></section>';
         $filled = fn(bool $ok) => [$ok, 'ausgefüllt', 'nicht ausgefüllt'];
-        V::$status = ['Anschrift' => $filled($a['street'] !== '' && $a['city'] !== ''), 'Kontodaten für Überweisungen' => $filled($m['iban'] !== ''), 'Steuer' => $filled($m['tax_id'] !== '' || $m['small_business'])];
-        return Response::html(V::page('Praxis und Daten', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+        V::$status = ['Name der Praxis' => [$this->config->practice !== '', 'eingetragen', 'nicht eingetragen'], 'Anschrift' => $filled($a['street'] !== '' && $a['city'] !== ''), 'Kontodaten für Überweisungen' => $filled($m['iban'] !== ''), 'Steuer' => $filled($m['tax_id'] !== '' || $m['small_business'])];
+        return Response::html(V::page('Praxis', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
     }
 
     private function practiceSave(Request $r, string $admin): Response {
@@ -247,6 +247,13 @@ final class Web {
                 $this->db->store('praxis.anschrift', json_encode($in, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
                 $this->audit->write($admin, 'praxisanschrift', '');
                 return $this->practicePage(null, 'Anschrift gespeichert.');
+            }
+            if ($kind === 'name') {
+                // Der Name steckt in der Serverkonfiguration (Root-Dienst): Servernamen bleiben unverändert, nur der Praxisname wechselt.
+                $name = trim($r->field('praxis', 200));
+                $this->srv()->save(implode("\n", $this->config->hostnames), $name, false);
+                $this->audit->write($admin, 'praxisname', $name);
+                return $this->practicePage(null, 'Name der Praxis wird übernommen und erscheint gleich überall.');
             }
             if (!in_array($kind, ['konto', 'steuer'], true)) throw new Problem('Unbekannte Aktion.', 400);
             $m = $this->master();
@@ -284,7 +291,7 @@ final class Web {
             if (!isset(self::SUFFIXES[$suffix])) throw new Problem('Bitte eine Endung wählen.', 422);
             $ips = $r->field('ohne_ip') === '1' ? [] : array_filter($this->config->hostnames, fn($n) => filter_var($n, FILTER_VALIDATE_IP));
             $names = implode("\n", array_merge([$short . $suffix], preg_split('/\R/', trim($r->field('weitere', 3000))) ?: [], $ips));
-            $this->srv()->save($names, $r->field('praxis', 200), $r->field('neue_ca') === '1');
+            $this->srv()->save($names, $this->config->practice, $r->field('neue_ca') === '1');   // Praxisname unverändert; er steht unter Praxis
         } catch (Problem $e) {
             if (in_array($e->http, [409, 422, 503], true)) return $this->serverPage($e->getMessage());
             throw $e;
@@ -1264,43 +1271,46 @@ final class Web {
         if (!$st['service']) $body .= '<p class="error">Die Modulverwaltung ist nicht eingerichtet. Bitte den Installer ausführen.</p>';
         $body .= '<p>Module erweitern die Suite um Programme wie die Kasse. Jedes Modul läuft unter einem eigenen Systembenutzer und sieht nur seine eigenen Daten. '
             . 'Nach dem Installieren unter <a href="/verwaltung/benutzer">Benutzer</a> festlegen, wer das Modul nutzen darf.</p>';
-        $body .= '<h2>Installiert</h2>';
-        if (!$st['installed']) $body .= '<p>Noch keine Module installiert.</p>';
+        $post = fn(string $aktion, string $label, string $hidden = '', string $class = '', string $extra = '') => '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . $hidden
+            . '<input type="hidden" name="aktion" value="' . $aktion . '">' . $extra . '<button' . ($class !== '' ? ' class="' . $class . '"' : '') . $off . '>' . $label . '</button></form>';
+        $tiles = '';
         foreach ($st['installed'] as $m) {
             $hidden = '<input type="hidden" name="id" value="' . V::h($m['id']) . '">';
-            $body .= '<div class="box wide"><h3>' . V::h($m['name']) . ' <span class="tag">' . V::h($m['version']) . '</span></h3>'
-                . ($m['description'] !== '' ? '<p>' . V::h($m['description']) . '</p>' : '')
-                . ($m['path'] ? '<p><a href="' . V::h($m['path']) . '/">Öffnen</a></p>' : '');
+            $state = '';
+            $stopped = false;
             if ($m['dienste']) {
                 $active = count(array_filter($m['dienste'], fn($d) => $d['aktiv'] === true));
                 $unknown = count(array_filter($m['dienste'], fn($d) => $d['aktiv'] === null)) > 0;
                 $all = $active === count($m['dienste']);
-                $body .= '<p>Dienst: ' . ($unknown ? '<span class="tag">Status unbekannt</span>' : ($all ? '<span class="tag">läuft</span>' : '<span class="tag warn">' . ($active === 0 ? 'gestoppt' : 'teilweise gestoppt') . '</span>'))
-                    . ' <small class="muted">' . V::h(implode(', ', array_map(fn($d) => preg_replace('/^kienzle-|\.service$/', '', $d['name']) . ($d['aktiv'] === true ? ' ✓' : ($d['aktiv'] === false ? ' ✗' : ' ?')), $m['dienste']))) . '</small> '
-                    . (!$all ? '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="dienst-start"><button' . $off . '>Starten</button></form> ' : '')
-                    . '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="dienst-neustart"><button class="secondary"' . $off . '>Neu starten</button></form></p>';
+                $stopped = !$all && !$unknown;
+                $state = $unknown ? '<span class="tag">Status unbekannt</span>' : ($all ? '<span class="tag ok">✓ läuft</span>' : '<span class="tag warn">' . ($active === 0 ? 'gestoppt' : 'teilweise gestoppt') . '</span>');
             }
-            if ($m['update']) {
-                $body .= '<form method="post" action="/verwaltung/module">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="aktualisieren">'
-                    . '<p>Neue Version <strong>' . V::h($m['update']['version']) . '</strong>' . ($m['update']['source'] === 'github' ? ' (GitHub' . ($m['update']['signed'] === false ? ', nicht signiert' : '') . ')' : ' (mit der Basis geliefert)')
-                    . '. Vorher wird ein Schnappschuss der Moduldaten angelegt; schlägt etwas fehl, springt das Modul zurück.</p><button' . $off . '>Aktualisieren</button></form>';
-            }
-            else $body .= '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="pruefen"><p class="muted">Dieses Modul ist auf dem neuesten bekannten Stand. '
-                . '<button class="secondary"' . $off . '>Jetzt nach einem Update suchen</button></p></form>';
-            $body .= '<details class="how"><summary>Entfernen</summary><form method="post" action="/verwaltung/module">' . $csrf . $hidden
-                . '<input type="hidden" name="aktion" value="entfernen"><label class="check"><input type="checkbox" name="daten" value="1"> Auch alle Daten des Moduls löschen (nicht rückgängig zu machen)</label>'
-                . '<p>Ohne Häkchen bleiben die Daten erhalten; eine spätere Installation übernimmt sie.</p><button class="danger"' . $off . '>Modul entfernen</button></form></details></div>';
+            $more = '<details class="mod-more"><summary class="icon-btn" title="Mehr" aria-label="Mehr zu ' . V::h($m['name']) . '">' . V::icon('st:mehr') . '</summary><div class="mod-menu">'
+                . ($m['dienste'] ? '<small class="muted">Dienste: ' . V::h(implode(', ', array_map(fn($d) => preg_replace('/^kienzle-|\.service$/', '', $d['name']) . ($d['aktiv'] === true ? ' ✓' : ($d['aktiv'] === false ? ' ✗' : ' ?')), $m['dienste']))) . '</small>' : '')
+                . ($stopped ? $post('dienst-start', 'Starten', $hidden) : '')
+                . ($m['dienste'] ? $post('dienst-neustart', 'Neu starten', $hidden, 'secondary') : '')
+                . (!$m['update'] ? $post('pruefen', 'Nach Update suchen', '', 'secondary') : '')
+                . '<form method="post" action="/verwaltung/module" class="mod-remove">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="entfernen">'
+                . '<label class="check"><input type="checkbox" name="daten" value="1"> Auch alle Daten löschen (nicht rückgängig zu machen)</label>'
+                . '<small class="muted">Ohne Häkchen bleiben die Daten erhalten; eine spätere Installation übernimmt sie.</small><button class="danger"' . $off . '>' . V::icon('st:papierkorb') . ' Modul entfernen</button></form></div></details>';
+            $upd = $m['update'] ? '<span class="tag warn">Update ' . V::h($m['update']['version']) . '</span>' : '<span class="tag">aktuell</span>';
+            $tiles .= '<div class="mod-tile"><div class="mod-head"><span class="t-ico">' . V::icon('modul:' . $m['id']) . '</span>' . $state . '</div>'
+                . '<p class="mod-name">' . V::h($m['name']) . '</p><p class="muted mod-sub">Version ' . V::h($m['version']) . '</p>' . ($m['description'] !== '' ? '<p class="muted mod-desc">' . V::h($m['description']) . '</p>' : '')
+                . $upd
+                . ($m['update'] ? '<p class="muted mod-desc">Neue Version <strong>' . V::h($m['update']['version']) . '</strong>' . ($m['update']['source'] === 'github' ? ' (GitHub' . ($m['update']['signed'] === false ? ', nicht signiert' : '') . ')' : ' (mit der Basis geliefert)')
+                    . '. Vorher wird ein Schnappschuss der Moduldaten angelegt; schlägt etwas fehl, springt das Modul zurück.</p>'
+                    . '<form method="post" action="/verwaltung/module">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="aktualisieren"><button' . $off . '>Aktualisieren</button></form>' : '')
+                . '<div class="mod-foot">' . ($m['path'] ? '<a class="button secondary" href="' . V::h($m['path']) . '/">Öffnen</a>' : '') . $more . '</div></div>';
         }
-        $body .= '<h2>Verfügbar</h2>';
-        if (!$st['available']) $body .= '<p>Keine weiteren Module verfügbar.</p>';
         foreach ($st['available'] as $m) {
-            $body .= '<div class="box wide"><h3>' . V::h($m['name']) . ' <span class="tag">' . V::h($m['version']) . '</span>'
-                . ($m['signed'] === false ? ' <span class="tag warn">nicht signiert</span>' : '') . '</h3>'
-                . ($m['description'] !== '' ? '<p>' . V::h($m['description']) . '</p>' : '')
-                . '<p class="muted">' . ($m['source'] === 'github' ? 'Von GitHub' : 'Mit der Basis geliefert') . ($m['path'] ? ' · Adresse ' . V::h($m['path']) : '') . '</p>'
-                . '<form method="post" action="/verwaltung/module">' . $csrf . '<input type="hidden" name="aktion" value="installieren"><input type="hidden" name="id" value="' . V::h($m['id']) . '">'
-                . '<button' . $off . '>Installieren</button></form></div>';
+            $tiles .= '<div class="mod-tile available"><div class="mod-head"><span class="t-ico">' . V::icon('modul:' . $m['id']) . '</span><span class="tag">verfügbar</span></div>'
+                . '<p class="mod-name">' . V::h($m['name']) . '</p><p class="muted mod-sub">Version ' . V::h($m['version']) . ($m['signed'] === false ? ' <span class="tag warn">nicht signiert</span>' : '') . '</p>'
+                . ($m['description'] !== '' ? '<p class="muted mod-desc">' . V::h($m['description']) . '</p>' : '')
+                . '<p class="muted mod-desc">' . ($m['source'] === 'github' ? 'Von GitHub' : 'Mit der Basis geliefert') . ($m['path'] ? ' · Adresse ' . V::h($m['path']) : '') . '</p>'
+                . '<div class="mod-foot"><form method="post" action="/verwaltung/module">' . $csrf . '<input type="hidden" name="aktion" value="installieren"><input type="hidden" name="id" value="' . V::h($m['id']) . '">'
+                . '<button' . $off . '>' . V::icon('st:herunter') . ' Installieren</button></form></div></div>';
         }
+        $body .= '<h2>Module</h2>' . ($tiles !== '' ? '<div class="mod-grid">' . $tiles . '</div>' : '<p>Noch keine Module installiert, und es sind keine weiteren verfügbar.</p>');
         $body .= '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="status"><button class="secondary"' . $off . '>Status der Dienste aktualisieren</button></form> '
             . '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="pruefen"><button class="secondary"' . $off . '>Nach Modulen sehen</button></form> '
             . '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="automatisch"><input type="hidden" name="an" value="' . ($st['auto'] ? '0' : '1') . '">'
