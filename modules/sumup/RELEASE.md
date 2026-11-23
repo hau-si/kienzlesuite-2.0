@@ -1,5 +1,11 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.3-beta.1
+
+- Rechnungseingang mit Texterkennung: Liest die Texterkennung dieselbe Rechnungsnummer an mehreren Stellen leicht verschieden (z. B. O statt 0, Abweichung um höchstens ein Zeichen), gilt die häufigste bzw. zuerst gelesene Nummer, statt die Rechnung mit „nicht eindeutig“ abzulehnen. Betrag, Zahlbetrag, Patient und Geburtsdatum werden weiterhin streng gegengeprüft; ohne Texterkennung (Textebene) bleibt die Prüfung unverändert streng.
+- Hinweis: Die Meldung „[object Observable]“ vor dem Fehlertext ist der Dokumentname, den T2med beim Drucken mitschickt (kommt nicht aus der Kasse).
+- Nicht mit echten T2med-Rechnungen getestet.
+
 ## 2.3.2-beta.3
 
 - Windows-Skript: „Set-PrintConfiguration -PaperSize“ entfernt (der IPP-Class-Treiber lehnt es ab; die Papiergröße kommt vom Drucker). Nicht getestet.
