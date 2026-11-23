@@ -1,5 +1,12 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.25
+
+- Startseite (Admins): neue Karte „Server-Zustand“ mit Kacheln für freien Speicherplatz, Arbeitsspeicher, Prozessorlast (Minutenmittel je Kern), Temperatur (nur wenn der Server einen Sensor meldet, in einer VM meist nicht), Laufzeit seit dem Neustart, Datum der letzten Sicherung (gelb bei „nicht eingerichtet“ oder älter als drei Tage, rot bei Fehler; Klick öffnet die Sicherung) sowie Guthaben bei Letterxpress und seven.io (nur wenn eingerichtet; gelb unter 5 €). Warnfarben: Speicher und Arbeitsspeicher ab 85 % (rot ab 95 %) belegt, Prozessor ab 80 % (rot ab 95 %), Temperatur ab 75 °C (rot ab 85 °C). Mitarbeiter ohne Admin-Recht sehen die Karte nicht.
+- Guthaben: Aktualisieren-Pfeil an der Kachel fragt den Betrag beim Anbieter ab und lädt die Startseite danach selbst neu. Neu: seven.io-Guthaben wird abgefragt (Schlüssel prüfen merkt den Betrag ebenfalls). Es wird nichts verschickt. Nur mit nachgebautem Aufruf getestet, nicht gegen echtes seven.io/Letterxpress; der root-Dienst muss neu starten (normales Update genügt).
+- Symbole: Einrichtung, Server-Zustand, Ihre Module sowie je Modul (Kasse, Terminzettel; andere das Standardsymbol) erhalten ein Symbol.
+- Technik: Neue Klasse `SystemStatus` liest nur /proc und /sys (keine Befehle, keine Rechte). Die Prüfen-Aktion der Verbindungen kennt `zurueck=start`.
+
 ## 0.21.4-beta.24
 
 - Verbindungen → E-Mail: Ist Gmail (oder SMTP) verbunden, zeigt ein grüner Balken „Mit Google verbunden: …“ und die Überschrift „✓ eingerichtet“; die Anmeldung (Anleitung, Schritt 1) ist dann unter „Erneut einrichten oder anderes Konto verbinden“ eingeklappt. Knopfreihe (Anmeldung prüfen, Testnachricht mit Empfängerfeld, Entfernen) steht in einer Zeile; das Feld bleibt mit seinem Knopf zusammen (auch bei SMS und Letterxpress).

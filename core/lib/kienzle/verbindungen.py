@@ -256,11 +256,24 @@ def _sms_call(c: dict, path: str, payload: dict | None) -> dict:
     return out if isinstance(out, dict) else {'wert': out}
 
 
-def test_sms(c: dict | None) -> str:
+def sms_balance(c: dict | None) -> float | None:
+    """Guthaben bei seven.io abfragen (es wird nichts verschickt) und samt Zeit merken; None, wenn kein Betrag gemeldet wird."""
     if not c:
         raise Fehler('SMS ist nicht eingerichtet.')
-    r = _sms_call(c, 'balance', None)
-    return 'Schlüssel von seven.io akzeptiert (keine SMS gesendet).' + (f' Guthaben: {r["wert"]} €.' if isinstance(r.get('wert'), (int, float)) else '')
+    wert = _sms_call(c, 'balance', None).get('wert')
+    bal = float(wert) if isinstance(wert, (int, float)) and not isinstance(wert, bool) else None
+    _balance_record('sms', bal)
+    return bal
+
+
+def test_sms(c: dict | None) -> str:
+    bal = sms_balance(c)
+    return 'Schlüssel von seven.io akzeptiert (keine SMS gesendet).' + (f' Guthaben: {bal:.2f} €.' if bal is not None else '')
+
+
+def balance_sms(c: dict | None) -> str:
+    bal = sms_balance(c)
+    return f'Guthaben bei seven.io: {bal:.2f} €.' if bal is not None else 'seven.io hat kein Guthaben gemeldet.'
 
 
 def send_sms(c: dict | None, to: str, text: str) -> None:
@@ -707,6 +720,9 @@ def dispatch(config: dict, req: dict) -> str:
                 msg = test_sms(config.get('sms'))
             elif art == 'letterxpress':
                 msg = test_letterxpress(config.get('letterxpress'))
+            elif art == 'guthaben' and tid == 'sms':
+                key = 'guthaben'
+                msg = balance_sms(config.get('sms'))
             elif art == 'guthaben':
                 key = 'guthaben'
                 msg = balance_letterxpress(config.get('letterxpress'))

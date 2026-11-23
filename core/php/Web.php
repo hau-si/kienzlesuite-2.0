@@ -609,28 +609,96 @@ final class Web {
     }
 
     // ---- Start und Konto ----------------------------------------------------------------------------------------
+    /** Dienste, die die Startseite für Serverwerte benutzt (für Tests austauschbar). */
+    public ?SystemStatus $system = null;
+
     private function start(): Response {
         $uid = (int)$this->session['user_id'];
         $items = '';
         foreach ($this->users->access($uid) as $module => $a) {
             $path = $this->modules->webPath($module);
-            if ($path !== null) $items .= '<li><a href="' . V::h($path) . '/">' . V::h($this->modules->name($module)) . '</a>' . ($a['admin'] ? ' <span class="tag">Admin</span>' : '') . '</li>';
+            if ($path !== null) $items .= '<li><a href="' . V::h($path) . '/">' . V::icon('modul:' . $module) . '<span>' . V::h($this->modules->name($module)) . '</span></a>' . ($a['admin'] ? ' <span class="tag">Admin</span>' : '') . '</li>';
         }
-        $body = '<p>Angemeldet als <strong>' . V::h($this->session['display'] ?: $this->session['login']) . '</strong>.</p>'
+        $body = '<h2>Ihre Module</h2><p>Angemeldet als <strong>' . V::h($this->session['display'] ?: $this->session['login']) . '</strong>.</p>'
             . ($items !== '' ? '<ul class="modules">' . $items . '</ul>' : '<p>Für dieses Konto sind noch keine Module freigegeben.'
                 . ((int)$this->session['user_admin'] === 1 ? ' Zugang zu Modulen vergeben Sie unter <a href="/verwaltung/benutzer">Benutzer</a>, auch für sich selbst.' : ' Bitte den Admin fragen.') . '</p>');
+        $pending = false;
+        $body = '<section class="card">' . $body . '</section>';
         if ((int)$this->session['user_admin'] === 1) {
+            $server = '';
+            try {
+                [$tiles, $pending] = $this->statusTiles();
+                if ($tiles !== '') $server = '<section class="card"><h2>Server-Zustand</h2><div class="tiles">' . $tiles . '</div></section>';
+            } catch (\Throwable) { /* ohne Werte keine Karte */ }
+            $setup = '';
             try {
                 $sum = $this->ov()->summary();
                 $pct = $sum['total'] ? (int)round(100 * $sum['done'] / $sum['total']) : 100;
-                $body = '<section class="card">' . $body . '</section>';
-                $body = '<a class="card setup-card" href="/verwaltung/einrichtung"><h2>Einrichtung ' . ($sum['done'] >= $sum['total'] ? '<span class="tag">fertig</span>' : '<span class="tag warn">' . ($sum['total'] - $sum['done']) . ' offen</span>') . '</h2>'
+                $setup = '<a class="card setup-card" href="/verwaltung/einrichtung"><h2>' . V::heading('Einrichtung') . ' ' . ($sum['done'] >= $sum['total'] ? '<span class="tag ok">✓ fertig</span>' : '<span class="tag warn">' . ($sum['total'] - $sum['done']) . ' offen</span>') . '</h2>'
                     . '<progress class="progress" value="' . $pct . '" max="100" aria-label="Fortschritt der Einrichtung">' . $pct . ' %</progress>'
                     . '<p class="muted">' . $sum['done'] . ' von ' . $sum['total'] . ' nötigen Schritten erledigt.'
-                    . ($sum['next'] !== '' ? ' Als Nächstes: <strong>' . V::h($sum['next']) . '</strong>.' : '') . '</p></a>' . $body;
+                    . ($sum['next'] !== '' ? ' Als Nächstes: <strong>' . V::h($sum['next']) . '</strong>.' : '') . '</p></a>';
             } catch (\Throwable) { /* ohne Überblick keine Karte */ }
+            $body = $setup . $server . $body;
         }
-        return Response::html(V::page('Start', $body, $this->nav(), $this->config->practice));
+        $response = Response::html(V::page('Start', $body, $this->nav(), $this->config->practice));
+        // Wird gerade ein Guthaben abgefragt, nach kurzer Zeit neu laden, damit der neue Wert erscheint.
+        return $pending ? $response->with('Refresh', '3; url=/') : $response;
+    }
+
+    private function tile(string $icon, string $label, string $value, string $sub = '', string $level = 'ok', ?int $percent = null, string $extra = '', string $href = ''): string {
+        $val = '<strong class="t-val">' . V::h($value) . '</strong>';
+        return '<div class="tile ' . $level . '"><span class="t-ico">' . V::icon($icon) . '</span><div class="t-body"><span class="t-label">' . V::h($label) . '</span>'
+            . ($href !== '' ? '<a href="' . V::h($href) . '">' . $val . '</a>' : $val)
+            . ($sub !== '' ? '<small class="muted">' . V::h($sub) . '</small>' : '')
+            . ($percent !== null ? '<progress class="progress" value="' . $percent . '" max="100" aria-label="' . V::h($label) . '">' . $percent . ' %</progress>' : '') . '</div>' . $extra . '</div>';
+    }
+
+    /** Kacheln für den Server-Zustand und ob gerade eine Abfrage läuft. @return array{0:string,1:bool} */
+    private function statusTiles(): array {
+        $sys = ($this->system ?? new SystemStatus())->read();
+        $t = '';
+        if ($sys['disk']) {
+            $used = (int)round(100 * (1 - $sys['disk']['frei'] / $sys['disk']['gesamt']));
+            $t .= $this->tile('st:disk', 'Speicherplatz', SystemStatus::bytes($sys['disk']['frei']) . ' frei', 'von ' . SystemStatus::bytes($sys['disk']['gesamt']) . ' (' . $used . ' % belegt)', $used >= 95 ? 'bad' : ($used >= 85 ? 'warn' : 'ok'), $used);
+        }
+        if ($sys['ram']) {
+            $used = (int)round(100 * (1 - $sys['ram']['frei'] / $sys['ram']['gesamt']));
+            $t .= $this->tile('st:ram', 'Arbeitsspeicher', SystemStatus::bytes($sys['ram']['frei']) . ' frei', 'von ' . SystemStatus::bytes($sys['ram']['gesamt']) . ' (' . $used . ' % belegt)', $used >= 95 ? 'bad' : ($used >= 85 ? 'warn' : 'ok'), $used);
+        }
+        if ($sys['cpu']) {
+            $p = $sys['cpu']['prozent'];
+            $t .= $this->tile('st:cpu', 'Prozessor', $p . ' % ausgelastet', 'Last ' . number_format($sys['cpu']['last'], 2, ',', '') . ' bei ' . $sys['cpu']['kerne'] . ($sys['cpu']['kerne'] === 1 ? ' Kern' : ' Kernen') . ' (Minutenmittel)', $p >= 95 ? 'bad' : ($p >= 80 ? 'warn' : 'ok'), $p);
+        }
+        if ($sys['temp'] !== null) $t .= $this->tile('st:temp', 'Temperatur', number_format($sys['temp'], 0, ',', '') . ' °C', 'höchster Messwert', $sys['temp'] >= 85 ? 'bad' : ($sys['temp'] >= 75 ? 'warn' : 'ok'));
+        if ($sys['laufzeit'] !== null) $t .= $this->tile('st:zeit', 'Läuft seit', SystemStatus::dauer($sys['laufzeit']), 'seit dem letzten Neustart');
+        if ($this->backup) {
+            $b = $this->backup->status();
+            $l = $b['letzte_sicherung'];
+            if (!$b['eingerichtet']) $t .= $this->tile('st:backup', 'Letzte Sicherung', 'nicht eingerichtet', 'Ohne Sicherung gehen Daten bei einem Ausfall verloren.', 'warn', null, '', '/verwaltung/sicherung');
+            elseif (!$l) $t .= $this->tile('st:backup', 'Letzte Sicherung', 'noch keine', 'Die erste Sicherung steht noch aus.', 'warn', null, '', '/verwaltung/sicherung');
+            else {
+                $alt = time() - (int)($l['zeit'] ?? 0);
+                $ok = ($l['ok'] ?? false) === true;
+                $t .= $this->tile('st:backup', 'Letzte Sicherung', V::date((int)($l['zeit'] ?? 0)), $ok ? ($alt > 3 * 86400 ? 'Älter als drei Tage' : 'in Ordnung') : 'Fehlgeschlagen', !$ok ? 'bad' : ($alt > 3 * 86400 ? 'warn' : 'ok'), null, '', '/verwaltung/sicherung');
+            }
+        }
+        $pending = false;
+        if ($this->connections) {
+            $st = $this->connections->status();
+            $pending = (bool)$st['pending'];
+            foreach (['letterxpress' => ['st:post', 'Guthaben Letterxpress', 'Brief-Versand'], 'sms' => ['st:sms', 'Guthaben seven.io', 'SMS-Versand']] as $key => [$icon, $label, $sub]) {
+                if (empty($st[$key])) continue;
+                $g = $st['guthaben'][$key] ?? null;
+                $wert = is_array($g) && isset($g['wert']) && is_numeric($g['wert']) ? (float)$g['wert'] : null;
+                $knopf = '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'guthaben', 'id' => $key === 'sms' ? 'sms' : '', 'zurueck' => 'start'])
+                    . '<button class="icon-btn" title="Guthaben jetzt abfragen" aria-label="' . V::h($label) . ' aktualisieren"' . ($pending ? ' disabled' : '') . '>' . V::icon('st:aktualisieren') . '</button></form>';
+                $t .= $this->tile($icon, $label, $wert !== null ? number_format($wert, 2, ',', '.') . ' €' : ($g ? 'unbekannt' : 'noch nicht abgefragt'),
+                    $pending ? 'wird abgefragt …' : ($g ? $sub . ', abgefragt ' . V::date((int)($g['zeit'] ?? 0)) : $sub . ': mit dem Pfeil abfragen'),
+                    $wert !== null && $wert < 5 ? 'warn' : 'ok', null, $knopf);
+            }
+        }
+        return [$t, $pending];
     }
 
     private function account(?string $error = null, ?string $notice = null): Response {
@@ -1585,7 +1653,7 @@ final class Web {
             return $this->connectionsPage($e->getMessage());
         }
         $this->audit->write($admin, 'verbindung', $what);
-        return Response::redirect('/verwaltung/verbindungen');
+        return Response::redirect($f('zurueck', 10) === 'start' ? '/' : '/verwaltung/verbindungen');
     }
 
     // ---- Neustart -----------------------------------------------------------------------------------------------

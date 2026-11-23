@@ -35,10 +35,27 @@ final class View {
         '/verwaltung/module' => '<path d="M12 3l9 5v8l-9 5-9-5V8z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
         '/verwaltung/sicherheit' => '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
         '/verwaltung/neustart' => '<path d="M12 3v9"/><path d="M6.3 6.3a8 8 0 1011.4 0"/>',
+        // Startseite: Einrichtung, Module und Serverwerte
+        'start:einrichtung' => '<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2h9"/>',
+        'modul:sumup' => '<rect x="4" y="13" width="16" height="7" rx="1"/><path d="M7 13V6h10v7M9 9h6M8 17h.01M12 17h.01M16 17h.01"/>',
+        'modul:terminzettel' => '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',
+        'st:disk' => '<rect x="3" y="14" width="18" height="6" rx="1"/><path d="M5 14l3-9h8l3 9M7 17h.01"/>',
+        'st:ram' => '<rect x="3" y="8" width="18" height="8" rx="1"/><path d="M7 16v3M11 16v3M15 16v3M7 8V5M11 8V5M15 8V5"/>',
+        'st:cpu' => '<rect x="6" y="6" width="12" height="12" rx="1"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>',
+        'st:temp' => '<path d="M10 14V5a2 2 0 014 0v9a4 4 0 11-4 0z"/>',
+        'st:zeit' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+        'st:backup' => '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
+        'st:post' => '<path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/>',
+        'st:sms' => '<path d="M21 12a8 8 0 01-11.6 7.1L3 21l1.9-5.4A8 8 0 1121 12z"/>',
+        'st:aktualisieren' => '<path d="M21 12a9 9 0 01-15.5 6.2M3 12A9 9 0 0118.5 5.8"/><path d="M18 2v4h-4M6 22v-4h4"/>',
+        'st:server' => '<rect x="3" y="4" width="18" height="6" rx="1"/><rect x="3" y="14" width="18" height="6" rx="1"/><path d="M7 7h.01M7 17h.01"/>',
     ];
 
     /** Zeichen für Kartenüberschriften: Schlagwort im Titel => Symbol. Die erste Übereinstimmung zählt. */
     private const HEADINGS = [
+        'Einrichtung' => '<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2h9"/>',
+        'Server-Zustand' => '<rect x="3" y="4" width="18" height="6" rx="1"/><rect x="3" y="14" width="18" height="6" rx="1"/><path d="M7 7h.01M7 17h.01"/>',
+        'Ihre Module' => '<rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/>',
         'Firewall' => '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
         'Erpressungstrojaner' => '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
         'Zugang (' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
@@ -117,7 +134,7 @@ final class View {
         $brand = '<a class="brand" href="/" title="Start"><span class="mark" aria-hidden="true">K' . (!empty($nav['offenLogo']) ? '<span class="logo-dot" title="Die Einrichtung ist noch nicht abgeschlossen"></span>' : '') . '</span><span><strong>Kienzle-Suite</strong>'
             . '<span class="sub">' . self::h($practice !== '' ? $practice : 'Praxis') . '</span></span></a>';
         $head = '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=18"><script src="/assets/core.js" defer></script></head><body'
+            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=19"><script src="/assets/core.js" defer></script></head><body'
             . (self::$starter !== '' ? ' data-starter="' . self::h(self::$starter) . '"' : '') . '>';
         if (!$nav) {
             return $head . '<div class="solo">' . $brand . '<main><h1>' . self::h($title) . '</h1>' . self::cards($body) . '</main></div></body></html>';
