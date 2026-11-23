@@ -1419,6 +1419,18 @@ final class Web {
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('testsms') . '<input type="tel" name="an" placeholder="01701234567" required maxlength="30" aria-label="Handynummer der Test-SMS"> <button>Test-SMS senden</button></form> '
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'sms']) . '<button class="danger">Entfernen</button></form>' : '')
             . '</section>';
+        // Letterxpress
+        $lxp = $st['letterxpress'] ?? [];
+        $body .= '<section><h2>Letterxpress (Briefversand)</h2><p class="muted">Rechnungen und Briefe per Post. Zugang unter letterxpress.de im Kundenkonto → API anlegen. Module, die Post versenden, nutzen diese Verbindung. Im Testbetrieb wird nichts gedruckt oder verschickt.</p>'
+            . '<form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('letterxpress')
+            . V::input('username', 'Letterxpress Benutzername', 'text', (string)($lxp['username'] ?? ''), 'autocomplete="off" maxlength="200"')
+            . V::input('api_key', 'Letterxpress API-Key', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($lxp['schluessel_gesetzt'] ?? false))) . '"')
+            . '<label>Betrieb<select name="modus"><option value="test"' . (($lxp['modus'] ?? 'test') !== 'live' ? ' selected' : '') . '>Test (nur Postausgang bei Letterxpress, nichts wird gedruckt oder verschickt)</option>'
+            . '<option value="live"' . (($lxp['modus'] ?? '') === 'live' ? ' selected' : '') . '>Live (echter Postversand, kostenpflichtig)</option></select></label>'
+            . '<button>Speichern</button></form>'
+            . ($lxp ? $this->testLine($st['tests'], 'letterxpress') . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'letterxpress']) . '<button>Zugang prüfen</button></form> '
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'letterxpress']) . '<button class="danger">Entfernen</button></form>' : '')
+            . '</section>';
         // Netzwerkspeicher
         $body .= '<section><h2>Netzwerkspeicher</h2>';
         foreach ($st['ablage'] as $t) {
@@ -1470,7 +1482,7 @@ final class Web {
         $body = preg_replace('#(<p>Zugänge, die mehrere Module brauchen.*?</p>)#s', '<section class="card">$1</section>', $body, 1);
         // Jeder Abschnitt klappt zu; eingerichtete tragen ein grünes „eingerichtet“, offene und fehlerhafte bleiben aufgeklappt.
         $done = ['T2med (FHIR)' => trim((string)($t2['base_url'] ?? '')) !== '', 'E-Mail-Versand (SMTP)' => trim((string)($mail['host'] ?? '')) !== '',
-            'SMS (seven.io)' => !empty($st['sms']), 'Netzwerkspeicher' => !empty($st['ablage'])];
+            'SMS (seven.io)' => !empty($st['sms']), 'Letterxpress (Briefversand)' => !empty($st['letterxpress']), 'Netzwerkspeicher' => !empty($st['ablage'])];
         $body = preg_replace_callback('#<section><h2>([^<]*)</h2>(.*?)</section>#s', function (array $m) use ($done): string {
             $title = html_entity_decode($m[1], ENT_QUOTES, 'UTF-8');
             $status = !array_key_exists($title, $done) ? '' : ($done[$title] ? ' <span class="tag ok">✓ eingerichtet</span>' : ' <span class="tag opt">nicht eingerichtet</span>');
@@ -1494,14 +1506,15 @@ final class Web {
                     $c->saveMail(['host' => $f('host'), 'port' => $f('port', 10), 'sicherheit' => $f('sicherheit', 20), 'benutzer' => $f('benutzer'), 'passwort' => $f('passwort'), 'absender' => $f('absender')]);
                     $what = 'mail'; break;
                 case 'sms': $c->saveSms(['api_key' => $f('api_key'), 'absender' => $f('absender', 20)]); $what = 'sms'; break;
+                case 'letterxpress': $c->saveLetterxpress(['username' => $f('username', 200), 'api_key' => $f('api_key', 200), 'modus' => $f('modus', 10)]); $what = 'letterxpress'; break;
                 case 'testsms': $c->testSms($f('an', 40)); $what = 'testsms'; break;
                 case 'ziel':
                     $c->saveTarget(['id' => $f('id', 40), 'name' => $f('name', 80), 'art' => $f('art', 10), 'host' => $f('host'), 'freigabe' => $f('freigabe', 100), 'port' => $f('port', 10),
                         'ordner' => $f('ordner'), 'benutzer' => $f('benutzer', 100), 'passwort' => $f('passwort'), 'domaene' => $f('domaene', 100), 'gast' => $f('gast') === '1']);
                     $what = 'ziel ' . $f('id', 40); break;
                 case 'ziel-loeschen': $c->removeTarget($f('id', 40)); $what = 'ziel-entfernt ' . $f('id', 40); break;
-                case 'entfernen': $c->remove($f('was', 10)); $what = 'entfernt ' . $f('was', 10); break;
-                case 'pruefen': $c->test($f('art', 10), $f('id', 40)); $what = 'pruefen ' . $f('art', 10) . ' ' . $f('id', 40); break;
+                case 'entfernen': $c->remove($f('was', 20)); $what = 'entfernt ' . $f('was', 10); break;
+                case 'pruefen': $c->test($f('art', 20), $f('id', 40)); $what = 'pruefen ' . $f('art', 10) . ' ' . $f('id', 40); break;
                 case 'testmail': $c->testMail($f('an', 300)); $what = 'testmail'; break;
                 case 'zertifikat-holen': $c->fetchCertificate(); $what = 'zertifikat-holen'; break;
                 case 'zertifikat-uebernehmen': $c->acceptCertificate($f('fingerprint', 100)); $what = 'zertifikat-uebernommen'; break;

@@ -18,6 +18,7 @@ function page(string $root, array $server, string $body = '', array $cookies = [
 $dirs = [];
 try {
     $t2med = ['t2med' => ['base_url' => 'https://t2med.example.org/aps/fhir/api/r4', 'launch_urls' => [], 'api_key' => 'k-beispiel', 'ca_pem' => '', 'pin' => ''],
+        'letterxpress' => ['username' => 'praxis-test', 'api_key' => 'lxp-geheim', 'modus' => 'live'],
         'ablage' => ['ausgang' => '', 'ziele' => [['id' => 'steuerbuero', 'name' => 'Steuerbüro']]]];
     $dirs[] = $root = suite(admin_server(), $t2med, [['name' => 'SumUp-Rechnung', 'description' => 'Kienzle-Suite', 'state' => 'bereit'], ['name' => 'Praxisdrucker', 'description' => '', 'state' => 'bereit']]);
 
@@ -31,6 +32,7 @@ try {
     $base = Suite::baseConfig();
     check($base->get('app', 'base_url') === 'https://kasse.example.org' && $base->get('app', 'state_dir') === Suite::$data, 'Adresse oder Datenordner falsch');
     check($base->get('fhir', 'launch_urls') === ['https://t2med.example.org/aps/fhir/api/r4'] && $base->get('invoice_export', 'ziel') === 'steuerbuero', 'Verbindungen nicht übernommen');
+    check($base->get('letterxpress', 'username') === 'praxis-test' && $base->get('letterxpress', 'api_key') === 'lxp-geheim' && $base->get('letterxpress', 'mode') === 'live', 'Letterxpress nicht aus der Verbindung übernommen');
     check($base->get('printing', 'transport') === 'cups', 'Bondrucker nicht über die Suite');
     $_SERVER['HTTP_HOST'] = 'evil"name'; check(Suite::host() === 'localhost', 'Unsicherer Servername übernommen'); $_SERVER['HTTP_HOST'] = 'kasse.example.org';
 

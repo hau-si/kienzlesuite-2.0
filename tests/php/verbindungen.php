@@ -112,6 +112,21 @@ function test_ablegen(): void {
     try { (new KienzleModul('zeit', ['X' => '1'], $dir, $dir))->ablegen('steuerbuero', 'x', 'a.pdf'); throw new LogicException('ohne Verbindung abgelegt'); } catch (RuntimeException) {}
 }
 
+function test_letterxpress(): void {
+    [$env, $c] = con_env(['letterxpress' => ['username' => 'praxis-test', 'modus' => 'live', 'schluessel_gesetzt' => true]]);
+    [$b] = admin_browser($env);
+    $b->web = fn() => $b->defaultWeb(null, null, $c);
+    $page = $b->get('/verwaltung/verbindungen')->body;
+    check(str_contains($page, 'Letterxpress (Briefversand)') && str_contains($page, 'value="praxis-test"') && str_contains($page, 'gespeichert – leer lassen') && str_contains($page, 'Zugang prüfen')
+        && str_contains($page, '<option value="live" selected>'), 'Letterxpress-Abschnitt unvollständig');
+    $r = $b->post('/verwaltung/verbindungen', ['aktion' => 'letterxpress', 'username' => ' praxis-test ', 'api_key' => ' lxp-1 ', 'modus' => 'live']);
+    check($r->status === 303 && req_v($env) === ['action' => 'letterxpress', 'daten' => ['username' => 'praxis-test', 'api_key' => 'lxp-1', 'modus' => 'live']], 'Speicher-Anfrage falsch');
+    $b->post('/verwaltung/verbindungen', ['aktion' => 'pruefen', 'art' => 'letterxpress']);
+    check(req_v($env) === ['action' => 'pruefen', 'art' => 'letterxpress', 'id' => ''], 'Prüf-Anfrage falsch');
+    $b->post('/verwaltung/verbindungen', ['aktion' => 'entfernen', 'was' => 'letterxpress']);
+    check(req_v($env) === ['action' => 'letterxpress', 'loeschen' => true], 'Entfernen-Anfrage falsch');
+}
+
 function test_testnachricht(): void {
     [$env, $c] = con_env(['mail' => ['host' => 'smtp.example.org', 'port' => 587, 'sicherheit' => 'starttls', 'benutzer' => 'p@example.org', 'absender' => 'p@example.org', 'passwort_gesetzt' => true]]);
     [$b] = admin_browser($env);

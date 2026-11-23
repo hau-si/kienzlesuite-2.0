@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.18
+
+- Verbindungen: neuer Abschnitt „Letterxpress (Briefversand)“ mit Benutzername, API-Key und Betrieb Test/Live, Prüfung (Guthaben) und Entfernen. Module melden die Verbindung `letterxpress` in ihrer module.toml an und bekommen die Zugangsdaten wie bei E-Mail. Erfordert einmal den Installer bzw. ein normales Update. Nur mit nachgebautem Aufruf getestet, nicht gegen das echte Letterxpress.
+
 ## 0.21.4-beta.17
 
 - Verbindungen: Alle Abschnitte (T2med, E-Mail, SMS, Netzwerkspeicher, Wer nutzt was) lassen sich einklappen. Eingerichtete sind zugeklappt und tragen ein grünes „✓ eingerichtet“; noch nicht eingerichtete oder fehlerhafte bleiben aufgeklappt. Nur mit Testdaten geprüft, nicht im Browser.

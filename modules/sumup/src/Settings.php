@@ -66,10 +66,7 @@ final class Settings {
             'label_patient' => ['type' => 'list', 'label' => 'Eigene Textschnipsel vor Patient und Geburtsdatum', 'optional' => true],
         ]],
         'letterxpress' => ['label' => 'Letterxpress (Rechnung per Post)', 'fields' => [
-            'enabled' => ['type' => 'bool', 'label' => 'Rechnungen per Post über Letterxpress versenden'],
-            'username' => ['type' => 'string', 'label' => 'Letterxpress Benutzername'],
-            'api_key' => ['type' => 'secret', 'label' => 'Letterxpress API-Key'],
-            'mode' => ['type' => 'choice', 'label' => 'Betrieb', 'default' => 'test', 'choices' => ['test' => 'Test (nur Postausgang bei Letterxpress, es wird nichts gedruckt oder verschickt)', 'live' => 'Live (echter Postversand, kostenpflichtig)']],
+            'enabled' => ['type' => 'bool', 'label' => 'Rechnungen per Post über Letterxpress versenden', 'help' => 'Benutzername, API-Key und Test/Live stehen zentral unter Verwaltung → Verbindungen der Suite (Letterxpress).'],
             'color' => ['type' => 'choice', 'label' => 'Druck', 'default' => '1', 'choices' => ['1' => 'Schwarz-Weiß', '4' => 'Farbe']],
             'duplex' => ['type' => 'bool', 'label' => 'Beidseitig drucken', 'default' => false],
             'shipping' => ['type' => 'choice', 'label' => 'Versandart', 'default' => 'auto', 'choices' => ['auto' => 'Automatisch (Inland oder Ausland)', 'national' => 'Nur Inland', 'international' => 'Ausland']],

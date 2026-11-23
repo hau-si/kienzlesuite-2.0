@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.6
+
+- Letterxpress-Zugang (Benutzername, API-Key, Test/Live) kommt jetzt zentral aus der Basis (Verwaltung → Verbindungen) und steht nicht mehr in den Einstellungen der Kasse. Bisher hier eingetragene Werte werden nicht mehr verwendet: bitte einmal in der Basis eintragen. Druck, Beidseitig, Versandart und Einschreiben bleiben in der Kasse. Voraussetzung: Basis 0.21.4-beta.18. Nicht gegen das echte Letterxpress getestet.
+
 ## 2.3.4-beta.5
 
 - Rechnungseingang: In der Liste stand in der Spalte „Eingang“ „[object Observable]“ statt Datum und Uhrzeit, weil die Datumsfunktion in der Einstellungsseite fehlte; behoben. Auch das Datum im Protokoll der abgelehnten Drucke ist davon betroffen gewesen. Nicht im Browser getestet.

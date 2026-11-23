@@ -311,7 +311,7 @@ class Verbindungen(Fehler):
         self.assertEqual(ohne['connections'], [])
 
     def test_unbekannt_und_doppelt(self):
-        self.invalid(replace('id = "t2med"', 'id = "letterxpress"'), 'connections[1].id', 'unbekannt')
+        self.invalid(replace('id = "t2med"', 'id = "gmail"'), 'connections[1].id', 'unbekannt')
         self.invalid(replace('id = "mail"', 'id = "t2med"'), 'connections[2].id', 'doppelt')
 
     def test_zweck_und_pflicht(self):

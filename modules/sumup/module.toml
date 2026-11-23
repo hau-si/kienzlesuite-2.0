@@ -5,7 +5,7 @@
 [module]
 id = "sumup"
 name = "Kasse"
-version = "2.3.4-beta.5"
+version = "2.3.4-beta.6"
 core_api = "1"
 description = "Kartenzahlung am SumUp Solo aus T2med, T2med-Rechnungseingang über den Drucker „SumUp-Rechnung“, GOÄ-Leistungen, Barzahlung, Belege per E-Mail, Druck und Post."
 
@@ -67,6 +67,11 @@ purpose = "Patient lesen und Zahlung in die Akte schreiben (FHIR)"
 [[connections]]
 id = "mail"
 purpose = "Zahlungsbelege per E-Mail an Patienten senden"
+required = false
+
+[[connections]]
+id = "letterxpress"
+purpose = "Rechnungen per Post versenden"
 required = false
 
 [[connections]]

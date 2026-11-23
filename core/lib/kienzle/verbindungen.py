@@ -74,7 +74,7 @@ def load() -> dict:
         data = json.loads((ETC / 'konfiguration.json').read_text(encoding='utf-8'))
     except FileNotFoundError:
         data = {}
-    return {'t2med': data.get('t2med'), 'mail': data.get('mail'), 'sms': data.get('sms'), 'ablage': data.get('ablage', [])}
+    return {'t2med': data.get('t2med'), 'mail': data.get('mail'), 'sms': data.get('sms'), 'letterxpress': data.get('letterxpress'), 'ablage': data.get('ablage', [])}
 
 
 def save(config: dict) -> None:
@@ -174,6 +174,43 @@ def set_sms(config: dict, d: dict) -> None:
     if sender and not SMS_SENDER.match(sender):
         raise Fehler('Absender: höchstens 11 Buchstaben/Ziffern (ohne Leerzeichen) oder eine Nummer.')
     config['sms'] = {'anbieter': 'seven', 'api_key': key, 'absender': sender}
+
+
+LXP_URL = 'https://api.letterxpress.de/v3'
+
+
+def set_letterxpress(config: dict, d: dict) -> None:
+    """Letterxpress (Briefversand): Benutzername, API-Key und Betrieb Test/Live; ein leerer Schlüssel behält den gespeicherten."""
+    old = config.get('letterxpress') or {}
+    key = d.get('api_key', '')
+    if not isinstance(key, str) or len(key) > 200 or CONTROL.search(key):
+        raise Fehler('API-Key ungültig.')
+    key = key.strip() or old.get('api_key', '')
+    if not key:
+        raise Fehler('Bitte den Letterxpress API-Key eingeben.')
+    mode = d.get('modus', 'test')
+    if mode not in ('test', 'live'):
+        raise Fehler('Betrieb: bitte Test oder Live wählen.')
+    config['letterxpress'] = {'username': _text(d.get('username', ''), 'Benutzername', 200), 'api_key': key, 'modus': mode}
+
+
+def test_letterxpress(c: dict | None) -> str:
+    """Zugangsdaten prüfen (Guthaben abfragen); es wird nichts gedruckt oder verschickt."""
+    if not c:
+        raise Fehler('Letterxpress ist nicht eingerichtet.')
+    import urllib.request
+    body = json.dumps({'auth': {'username': c['username'], 'apikey': c['api_key'], 'mode': c.get('modus', 'test')}}).encode()
+    req = urllib.request.Request(LXP_URL + '/balance', data=body, method='GET', headers={'Accept': 'application/json', 'Content-Type': 'application/json'})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:  # noqa: S310 (feste https-Adresse)
+            out = json.loads(r.read(20000).decode('utf-8', 'replace'))
+    except OSError as e:
+        raise Fehler(f'Letterxpress nicht erreichbar oder Zugangsdaten abgelehnt: {str(e)[:100]}') from None
+    except ValueError:
+        raise Fehler('Letterxpress hat unlesbar geantwortet.') from None
+    data = out.get('data') if isinstance(out, dict) and isinstance(out.get('data'), dict) else {}
+    bal = data.get('balance')
+    return 'Verbunden' + (f'. Guthaben: {float(bal):.2f} €' if isinstance(bal, (int, float)) else '') + f'. Betrieb: {"Live (echter Postversand)" if c.get("modus") == "live" else "Test (nichts wird verschickt)"}.'
 
 
 def _sms_call(c: dict, path: str, payload: dict | None) -> dict:
@@ -281,6 +318,8 @@ def distribute(config: dict) -> list[str]:
             out['t2med'] = config['t2med']
         if 'mail' in ids and config['mail']:
             out['mail'] = config['mail']
+        if 'letterxpress' in ids and config.get('letterxpress'):
+            out['letterxpress'] = config['letterxpress']
         if 'ablage' in ids:
             spool = SPOOL / mid
             spool.mkdir(mode=0o2770, parents=True, exist_ok=True)
@@ -420,6 +459,7 @@ def view(config: dict, extra: dict | None = None) -> dict:
     t2 = config['t2med']
     mail = config['mail']
     sms = config.get('sms')
+    lxp = config.get('letterxpress')
     ca_fp = ''
     if t2 and t2.get('ca_pem'):
         ca_fp = hashlib.sha256(ssl.PEM_cert_to_DER_cert(t2['ca_pem'])).hexdigest()
@@ -435,6 +475,7 @@ def view(config: dict, extra: dict | None = None) -> dict:
            't2med': {**{k: t2[k] for k in ('base_url', 'launch_urls', 'pin')}, 'api_key_gesetzt': bool(t2.get('api_key')), 'zertifikat': ca_fp} if t2 else None,
            'mail': {**{k: mail[k] for k in ('host', 'port', 'sicherheit', 'benutzer', 'absender')}, 'passwort_gesetzt': bool(mail.get('passwort'))} if mail else None,
            'sms': {'anbieter': sms['anbieter'], 'absender': sms.get('absender', ''), 'schluessel_gesetzt': bool(sms.get('api_key'))} if sms else None,
+           'letterxpress': {'username': lxp['username'], 'modus': lxp.get('modus', 'test'), 'schluessel_gesetzt': bool(lxp.get('api_key'))} if lxp else None,
            'ablage': [{**{k: v for k, v in t.items() if k != 'passwort'}, 'passwort_gesetzt': bool(t.get('passwort')),
                        'fingerprint': ablage.fingerprint(t['hostkey']) if t.get('hostkey') else ''} for t in config['ablage']],
            'nutzung': usage, 'sftp_schluessel': ABLAGE_PUB.read_text(encoding='utf-8').strip() if ABLAGE_PUB.is_file() else ''}
@@ -510,6 +551,14 @@ def dispatch(config: dict, req: dict) -> str:
         save(config)
         view(config, {'hinweise': distribute(config)})
         return 'SMS-Verbindung gespeichert.' if config.get('sms') else 'SMS-Verbindung entfernt.'
+    if action == 'letterxpress':
+        if req.get('loeschen') is True:
+            config['letterxpress'] = None
+        else:
+            set_letterxpress(config, d)
+        save(config)
+        view(config, {'hinweise': distribute(config)})
+        return 'Letterxpress gespeichert und an die Module verteilt.' if config.get('letterxpress') else 'Letterxpress entfernt.'
     if action == 'sms-senden':
         send_sms(config.get('sms'), req.get('an'), req.get('text'))
         return 'SMS verschickt.'
@@ -540,6 +589,8 @@ def dispatch(config: dict, req: dict) -> str:
                 msg = test_mail(config['mail'])
             elif art == 'sms':
                 msg = test_sms(config.get('sms'))
+            elif art == 'letterxpress':
+                msg = test_letterxpress(config.get('letterxpress'))
             elif art == 'testsms':
                 key = 'sms'
                 msg = test_sms_send(config.get('sms'), req.get('an'))

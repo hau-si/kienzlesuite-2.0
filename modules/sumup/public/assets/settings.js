@@ -10,7 +10,7 @@ const SHOW = {
   'sumup.api_key': v => v.mode === 'live', 'sumup.affiliate_key': v => v.mode === 'live', 'sumup.app_id': v => v.mode === 'live',
   'sumup.merchant_code': v => v.mode === 'live', 'sumup.reader_id': v => v.mode === 'live',
   'fhir.entry_code': v => v.mode === 'live', 'mail.from_name': v => v.enabled,
-  'letterxpress.username': v => v.enabled, 'letterxpress.api_key': v => v.enabled, 'letterxpress.mode': v => v.enabled, 'letterxpress.color': v => v.enabled,
+  'letterxpress.color': v => v.enabled,
   'letterxpress.duplex': v => v.enabled, 'letterxpress.shipping': v => v.enabled, 'letterxpress.registered': v => v.enabled,
   'tax.rate': v => !v.small_business, 'tax.manual_vat': v => !v.small_business, 'tax.exempt_note': v => !v.small_business, 'tax.small_business_note': v => v.small_business,
 };

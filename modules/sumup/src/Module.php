@@ -49,6 +49,9 @@ final class Module {
         if ($config->get('mail', 'enabled', false) && !Suite::connected('mail')) {
             $items[] = ['title' => 'E-Mail-Versand: Verbindung fehlt', 'state' => 'error', 'hint' => 'Verwaltung → Verbindungen der Suite', 'link' => $link('s-mail')];
         }
+        if ($config->get('letterxpress', 'enabled', false) && !Suite::connected('letterxpress')) {
+            $items[] = ['title' => 'Letterxpress: Verbindung fehlt', 'state' => 'error', 'hint' => 'Verwaltung → Verbindungen der Suite (Benutzername, API-Key)', 'link' => $link('s-letterxpress')];
+        }
         if ($config->get('invoice_export', 'enabled', false) && !isset(Suite::targets()[(string)$config->get('invoice_export', 'ziel', '')])) {
             $items[] = ['title' => 'Ablage: Ziel im Netzwerkspeicher fehlt', 'state' => 'error', 'hint' => 'Verwaltung → Verbindungen der Suite, dann hier wählen', 'link' => $link('s-invoice_export')];
         }

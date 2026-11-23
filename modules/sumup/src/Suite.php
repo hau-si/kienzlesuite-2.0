@@ -166,6 +166,10 @@ final class Suite {
         $v['mail'] = $m ? ['enabled' => false, 'host' => (string)($m['host'] ?? ''), 'port' => (int)($m['port'] ?? 587),
             'encryption' => ($m['sicherheit'] ?? '') === 'smtps' ? 'smtps' : 'starttls', 'username' => (string)($m['benutzer'] ?? ''),
             'password' => (string)($m['passwort'] ?? ''), 'from_address' => (string)($m['absender'] ?? ''), 'from_name' => ''] : ['enabled' => false];
+        $l = $k->verbindung('letterxpress');
+        $v['letterxpress']['username'] = $l ? (string)($l['username'] ?? '') : '';
+        $v['letterxpress']['api_key'] = $l ? (string)($l['api_key'] ?? '') : '';
+        $v['letterxpress']['mode'] = $l && ($l['modus'] ?? '') === 'live' ? 'live' : 'test';
         $a = $k->verbindung('ablage');
         $v['invoice_export']['ziel'] = $a ? (string)(($a['ziele'][0]['id'] ?? '')) : '';
         return new Config($v);
