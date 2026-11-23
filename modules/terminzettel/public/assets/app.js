@@ -5,6 +5,8 @@
   if (!form) return;
   const csrf = document.querySelector('meta[name="kienzle-csrf"]').content;
   const img = document.getElementById('bild'), hint = document.getElementById('hinweis');
+  const dirty = document.getElementById('ungespeichert');
+  const initial = JSON.stringify(Object.entries((() => { const o = {}; for (const el of form.elements) { if (el.name && el.name !== 'kienzle-csrf' && el.name !== 'aktion') o[el.name] = el.type === 'checkbox' ? (el.checked ? '1' : '') : el.value; } return o; })()));
   let timer = null, seq = 0;
   const values = () => {
     const out = {};
@@ -16,6 +18,7 @@
   };
   const refresh = () => {
     clearTimeout(timer);
+    if (dirty) dirty.hidden = JSON.stringify(Object.entries(values())) === initial;
     timer = setTimeout(async () => {
       const mine = ++seq;
       try {

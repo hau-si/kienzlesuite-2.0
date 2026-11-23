@@ -30,7 +30,7 @@ wirft(fn() => Seite::pruefen(['qr_size' => 'riesig'] + $in), 'ungültige QR-Grö
 $o = Seite::overlay($v);
 check(!array_key_exists('queue', $o) && $o['model'] === 'tm-m30iii' && $o['cut'] === false, 'Overlay: Kopf');
 check($o['header']['enabled'] === true && $o['header']['first_size'] === '2x2' && $o['header']['first_bold'] === true && $o['footer']['enabled'] === false, 'Overlay: Kopf und Fuß');
-check($o['qr']['width_dots'] === 320 && $o['qr']['position'] === 'below' && $o['appointments']['size'] === '1x2', 'Overlay: QR');
+check($o['qr']['width_dots'] === 384 && $o['qr']['position'] === 'below' && $o['appointments']['size'] === '1x2', 'Overlay: QR');
 
 check($defaults['qr_position'] === 'below' && $defaults['header_first_size'] === '2x2' && $defaults['header_size'] === '1x1' && $defaults['appointment_size'] === '2x2', 'neue Vorgaben');
 $html0 = Ansicht::seite('/terminzettel', $defaults, 'tok', 'Bon-1', null, null, 'server');

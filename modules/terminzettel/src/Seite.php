@@ -10,7 +10,7 @@ namespace KienzleTerminzettel;
 final class Seite {
     public static string $data = '/var/lib/kienzle/terminzettel';
     public static string $helper = '/opt/kienzle/core/current/php/modul/Kienzle.php';
-    public const QR_SIZES = ['small' => 160, 'medium' => 256, 'large' => 320];
+    public const QR_SIZES = ['small' => 224, 'medium' => 292, 'large' => 384];
     private const SIZES = ['1x1' => 'Normal (1×1)', '1x2' => 'Hoch (1×2)', '2x1' => 'Breit (2×1)', '2x2' => 'Groß (2×2)', '2x3' => 'Groß und hoch (2×3)', '3x3' => 'Sehr groß (3×3)', '4x4' => 'Riesig (4×4)'];
     /** Erklärungen als Tooltip neben der Beschriftung. */
     public const HILFE = [

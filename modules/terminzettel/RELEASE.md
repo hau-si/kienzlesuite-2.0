@@ -1,5 +1,11 @@
 # Terminzettel – Release-Notizen
 
+## 1.1.2-beta.1
+
+- Behoben: Die Größe „Klein“ des Kalender-QR-Codes (160 Druckpunkte) war für den Kalendereintrag zu klein, der QR-Code wurde weder in der Vorschau noch beim Druck erzeugt. Die Größen sind jetzt Klein 224, Mittel 292 und Groß 384 Druckpunkte (je mindestens 3 Punkte pro Modul).
+- Die Vorschau erklärt jetzt, warum ein QR-Code nicht auf den Bon passt, und weist darauf hin, wenn Änderungen noch nicht gespeichert sind (gedruckt wird nur der gespeicherte Stand, z. B. das Papierformat 80 mm).
+- Nicht auf echtem Drucker getestet.
+
 ## 1.1.1-beta.1
 
 - Neue Vorgaben: QR-Code mittig unter dem Termin, erste Zeile des Kopfes 2×2, Adressbereich 1×1, Termine 2×2. Bereits gespeicherte Layouts bleiben unverändert.
