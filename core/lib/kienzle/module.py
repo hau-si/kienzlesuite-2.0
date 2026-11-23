@@ -207,6 +207,10 @@ def check() -> dict:
         rows.append({**_summary(m), 'update': {'version': newer['version'], 'source': newer['source'], 'signed': newer['signed']} if newer else None,
                      'releases': local_releases(mid)})
     available = [o for mid, o in sorted(offer.items()) if mid not in have]
+    try:
+        ensure_running()
+    except (OSError, subprocess.SubprocessError):
+        pass
     return set_status(installed=rows, available=available, checked_at=int(time.time()), error=error)
 
 
@@ -485,6 +489,31 @@ def start(names: list[str]) -> None:
         if n.endswith(('.service', '.timer', '.path', '.socket')):
             _systemctl('enable', n)
             _systemctl('restart', n)
+
+
+def ensure_running() -> list[str]:
+    """Dienste installierter Module, die eingeschaltet, aber gestoppt sind, wieder starten (z. B. nach einem unterbrochenen Update).
+    Läuft gerade eine Installation oder Aktualisierung, geschieht nichts. Einmalige Dienste (Type=oneshot) werden nicht angefasst."""
+    if read_status().get('running'):
+        return []
+    started: list[str] = []
+    for mid in sorted(installed()):
+        for n in unit_names(mid):
+            if n.endswith('.service'):
+                try:
+                    if 'Type=oneshot' in (UNITS / n).read_text(encoding='utf-8'):
+                        continue
+                except OSError:
+                    continue
+            elif not n.endswith(('.timer', '.path', '.socket')):
+                continue
+            enabled, active = _systemctl('is-enabled', n), _systemctl('is-active', n)
+            if enabled is None or active is None or enabled.returncode != 0 or active.returncode == 0:
+                continue
+            _systemctl('start', n)
+            log(f'{mid}: {n} war gestoppt und wurde wieder gestartet.')
+            started.append(n)
+    return started
 
 
 def stop(mid: str) -> None:

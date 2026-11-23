@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.13
+
+- Modul-Dienste, die nach einem unterbrochenen Update gestoppt blieben (z. B. Terminzettel: Seite zeigte „Einen Moment bitte“), werden bei der täglichen Modulprüfung und bei „Neu prüfen“ wieder gestartet, wenn sie eingeschaltet sind und gerade kein Update läuft. Einmalige Dienste (Type=oneshot) bleiben unberührt. Nur mit nachgebautem systemctl getestet.
+
 ## 0.21.4-beta.12
 
 - Fehler behoben: Auf der Updates-Seite (bei verfügbarer Version) rutschte der Inhalt unter die Seitenleiste. Ursache: Die Aufteilung in Karten schnitt an jeder Überschrift, auch an der im Update-Kasten, und ließ ein div offen. Karten beginnen jetzt nur noch an Überschriften auf oberster Ebene. Das betrifft ebenso andere Seiten mit Überschriften in Kästen (z. B. Gruppen). Im Test mit Beispiel-HTML geprüft, nicht im Browser.
