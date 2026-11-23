@@ -21,7 +21,7 @@ final class View {
         $brand = '<a class="brand" href="/"><span class="mark" aria-hidden="true">K</span><span><strong>Kienzle-Suite</strong>'
             . '<span class="sub">' . self::h($practice !== '' ? $practice : 'Praxis') . '</span></span></a>';
         $head = '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=4"><script src="/assets/core.js" defer></script></head><body'
+            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=5"><script src="/assets/core.js" defer></script></head><body'
             . (self::$starter !== '' ? ' data-starter="' . self::h(self::$starter) . '"' : '') . '>';
         if (!$nav) {
             return $head . '<div class="solo">' . $brand . '<main><h1>' . self::h($title) . '</h1>' . self::cards($body) . '</main></div></body></html>';
@@ -54,6 +54,10 @@ final class View {
                 foreach ($items as $href => $label) $menu .= $link($href, $label);
                 $menu .= '</div>';
             }
+        }
+        if ($nav['admin']) {
+            $menu .= '<details class="menu-group menu-fold"' . (str_starts_with($path, '/verwaltung/neustart') ? ' open' : '') . '><summary class="menu-title">Neu starten</summary>'
+                . $link('/verwaltung/neustart?art=dienste', 'Dienste neu starten') . $link('/verwaltung/neustart?art=server', 'Server neu starten') . '</details>';
         }
         $menu .= '</nav>';
         $foot = '<div class="side-foot"><form method="post" action="/abmelden" class="inline">' . self::csrf($nav['csrf'])

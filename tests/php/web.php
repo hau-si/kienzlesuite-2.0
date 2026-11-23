@@ -156,6 +156,14 @@ function test_verwaltung_braucht_bestaetigung_und_csrf(): void {
     $code = $env->auth->smsCodeIssue($fake);
     check(preg_match('/^\d{6}$/D', $code) === 1, 'SMS-Code ohne 6 Ziffern');
     try { $env->auth->smsCodeIssue($fake); check(false, 'zweiter Code binnen einer Minute'); } catch (\Kienzle\Core\Problem $e) { }
+    check(str_contains($b->get('/verwaltung/benutzer')->body, 'Server neu starten'), 'Neustart nicht im Menü');
+    check(str_contains($b->get('/verwaltung/neustart?art=server')->body, 'Server jetzt neu starten'), 'Neustart-Seite fehlt');
+    check(str_contains($b->post('/verwaltung/neustart', ['art' => 'dienste'])->body, 'nicht eingerichtet'), 'Neustart ohne Dienst nicht abgelehnt');
+    \Kienzle\Core\Web::$restartUnit = __FILE__;
+    check($b->post('/verwaltung/neustart', ['art' => 'wasanderes'])->status === 422, 'unbekannte Art angenommen');
+    check($b->post('/verwaltung/neustart', ['art' => 'dienste'])->status === 200 && is_file($env->dir . '/anfragen/neustart.json'), 'Neustart-Anfrage nicht geschrieben');
+    check(str_contains(implode("\n", $env->audit->recent()), 'neustart dienste'), 'Neustart nicht protokolliert');
+    unlink($env->dir . '/anfragen/neustart.json');
     $page = $b->get('/verwaltung/sicherheit')->body;
     check(str_contains($page, '<h2>Firewall</h2>') && str_contains($page, 'Zugang (Abmeldezeiten)') && str_contains($page, '<h2>Protokoll</h2>') && str_contains($page, 'name="idle_einheit"'), 'Sicherheit unvollständig');
     check($b->post('/verwaltung/zugang', ['idle' => '2', 'idle_einheit' => 'd', 'max' => '3', 'max_einheit' => 'd'])->status === 200 && $env->auth->idleSeconds() === 172800, 'Zugang in Tagen nicht gespeichert');

@@ -814,6 +814,7 @@ final class Web {
         if ($r->path === '/verwaltung/updates') return $get ? $this->updatesPage() : $this->updatesAction($r, $admin);
         if ($r->path === '/verwaltung/module') return $get ? $this->modulesPage() : $this->modulesAction($r, $admin);
         if ($r->path === '/verwaltung/verbindungen') return $get ? $this->connectionsPage() : $this->connectionsAction($r, $admin);
+        if ($r->path === '/verwaltung/neustart') return $get ? $this->restartPage() : $this->restartDo($r, $admin);
         if ($r->path === '/verwaltung/praxis') return $get ? $this->practicePage() : $this->practiceSave($r, $admin);
         if ($r->path === '/verwaltung/server') return $get ? $this->serverPage() : $this->serverSave($r, $admin);
         if ($r->path === '/verwaltung/sso') return $get ? $this->ssoPage() : $this->ssoAction($r, $admin);
@@ -1472,6 +1473,40 @@ final class Web {
         }
         $this->audit->write($admin, 'verbindung', $what);
         return Response::redirect('/verwaltung/verbindungen');
+    }
+
+    // ---- Neustart -----------------------------------------------------------------------------------------------
+    public static string $restartUnit = '/etc/systemd/system/kienzle-neustart.path';
+
+    private function restartPage(?string $error = null, ?string $notice = null): Response {
+        $art = $this->req->get('art', 10) === 'server' ? 'server' : 'dienste';
+        $text = $art === 'server'
+            ? 'Der ganze Server startet neu. Alle Arbeitsplätze verlieren kurz die Verbindung (Drucken, Kasse, Terminzettel); nach etwa ein bis zwei Minuten ist die Suite wieder da und du musst dich neu anmelden.'
+            : 'Webinterface und alle Module werden neu gestartet. Das dauert wenige Sekunden; laufende Anmeldungen bleiben bestehen, eine Seite lädt eventuell einmal neu.';
+        $body = V::error($error) . V::notice($notice) . '<section class="card"><h2>' . ($art === 'server' ? 'Server neu starten' : 'Dienste neu starten') . '</h2><p>' . V::h($text)
+            . '</p><p class="muted">Läuft gerade ein Update, eine Sicherung oder eine Zahlung an der Kasse, bitte erst warten.</p>'
+            . '<form method="post" action="/verwaltung/neustart">' . V::csrf($this->session['csrf']) . '<input type="hidden" name="art" value="' . $art . '">'
+            . '<button class="danger">' . ($art === 'server' ? 'Server jetzt neu starten' : 'Dienste jetzt neu starten') . '</button></form></section>';
+        return Response::html(V::page('Neu starten', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+    }
+
+    private function restartDo(Request $r, string $admin): Response {
+        $art = $r->field('art', 10);
+        try {
+            if (!in_array($art, ['dienste', 'server'], true)) throw new Problem('Unbekannte Art des Neustarts.', 422);
+            if (!is_file(self::$restartUnit)) throw new Problem('Der Neustart-Dienst ist nicht eingerichtet. Bitte den Installer ausführen.', 503);
+            $file = $this->db->directory . '/anfragen/neustart.json';
+            if (is_file($file)) throw new Problem('Ein Neustart wurde schon angefordert.', 409);
+            $dir = dirname($file);
+            if (!is_dir($dir) && !mkdir($dir, 0700) && !is_dir($dir)) throw new Problem('Anfrage konnte nicht gespeichert werden.', 500);
+            $tmp = $dir . '/.neustart.' . bin2hex(random_bytes(4));
+            if (file_put_contents($tmp, json_encode(['art' => $art], JSON_THROW_ON_ERROR)) === false || !rename($tmp, $file)) { @unlink($tmp); throw new Problem('Anfrage konnte nicht gespeichert werden.', 500); }
+        } catch (Problem $e) {
+            return $this->restartPage($e->getMessage());
+        }
+        $this->audit->write($admin, 'neustart', $art);
+        return Response::html(V::page('Neu starten', V::notice($art === 'server' ? 'Der Server startet neu. In ein bis zwei Minuten diese Seite neu laden.' : 'Die Dienste starten neu. Gleich diese Seite neu laden.')
+            . '<p><a class="button" href="/">Zur Startseite</a></p>', $this->nav(), $this->config->practice))->with('Refresh', $art === 'server' ? '90; url=/' : '8; url=/');
     }
 
     // ---- Drucker ------------------------------------------------------------------------------------------------

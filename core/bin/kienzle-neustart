@@ -1,0 +1,52 @@
+#!/usr/bin/python3 -IB
+"""Dienste oder den ganzen Server der Kienzle-Suite neu starten (nur root, gestartet von kienzle-neustart.path).
+
+  kienzle-neustart anwenden    Anfrage des Webinterfaces (anfragen/neustart.json) verarbeiten: {"art": "dienste"|"server"}
+"""
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+REQUEST = Path(os.environ.get('KIENZLE_NEUSTART_ANFRAGE', '/var/lib/kienzle/core/anfragen/neustart.json'))
+DRY = os.environ.get('KIENZLE_NEUSTART_PROBE') == '1'
+
+
+def run(*cmd: str) -> None:
+    if DRY:
+        print(' '.join(cmd))
+        return
+    subprocess.run(cmd, check=False, timeout=120)
+
+
+def units() -> list[str]:
+    out = subprocess.run(['systemctl', 'list-units', '--type=service', '--no-legend', '--plain', 'kienzle-*-php.service'],
+                         capture_output=True, text=True, timeout=30).stdout if not DRY else ''
+    return sorted({line.split()[0] for line in out.splitlines() if line.strip()})
+
+
+def handle() -> int:
+    try:
+        art = json.loads(REQUEST.read_text(encoding='utf-8')).get('art')
+    except (OSError, ValueError, AttributeError):
+        art = None
+    REQUEST.unlink(missing_ok=True)   # zuerst löschen: sonst startet der Pfad-Dienst endlos neu
+    if art == 'dienste':
+        for unit in units():
+            run('systemctl', 'restart', unit)
+        run('systemctl', 'restart', 'kienzle-core-php.service')
+        run('systemctl', 'reload-or-restart', 'nginx.service')
+    elif art == 'server':
+        run('systemctl', '--no-block', 'reboot')
+    else:
+        print('Unbekannte Anfrage.', file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == '__main__':
+    if sys.argv[1:] == ['anwenden']:
+        sys.exit(handle())
+    print(__doc__.strip(), file=sys.stderr)
+    sys.exit(2)

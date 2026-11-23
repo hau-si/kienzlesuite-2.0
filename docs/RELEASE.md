@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.4
+
+- Neu im Menü links (nur Admins): aufklappbarer Punkt „Neu starten“ mit „Dienste neu starten“ (Webinterface, Module, nginx) und „Server neu starten“. Beides fragt erst auf einer eigenen Seite nach, wird protokolliert und läuft über einen neuen root-Dienst (kienzle-neustart.path); er wird vom Installer eingerichtet, also nach dem Update einmal `sudo bash installer/install.sh` ausführen. Nicht auf dem Server getestet, der Neustart selbst nur im Probelauf.
+
 ## 0.21.4-beta.3
 
 - Neue zentrale Verbindung „SMS (seven.io)“ unter Verwaltung → Verbindungen: API-Schlüssel und optionaler Absendername, Schlüssel prüfen, Test-SMS. Der Versand läuft über den root-Dienst für Verbindungen; der Schlüssel wird nie wieder angezeigt. Gedacht auch für die spätere kienzlefon-App.

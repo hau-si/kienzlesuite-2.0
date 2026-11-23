@@ -164,3 +164,9 @@ details.fold > summary h2 { margin: 0; }
 details.fold[open] > summary { margin-bottom: 6px; }
 .row { display: flex; gap: 8px; align-items: center; }
 .row input { flex: 1; }
+
+/* Aufklappbarer Menüpunkt (Neu starten) */
+details.menu-fold > summary { cursor: pointer; list-style: none; }
+details.menu-fold > summary::-webkit-details-marker { display: none; }
+details.menu-fold > summary::after { content: " ▸"; }
+details.menu-fold[open] > summary::after { content: " ▾"; }

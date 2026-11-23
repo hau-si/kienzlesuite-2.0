@@ -1,0 +1,11 @@
+# Kienzle-Suite: Dienste oder den Server neu starten (root).
+[Unit]
+Description=Kienzle-Suite Neustart anwenden
+
+[Service]
+Type=oneshot
+ExecStart=/opt/kienzle/core/current/bin/kienzle-neustart anwenden
+TimeoutStartSec=300
+NoNewPrivileges=yes
+ProtectHome=yes
+PrivateTmp=yes
