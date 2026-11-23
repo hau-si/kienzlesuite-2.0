@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.20.3-beta.1
+
+- Einrichtung: „Servername festgelegt“ gilt erst als erledigt, wenn die Schritte danach von Hand bestätigt sind: Namen im Router bzw. in der hosts-Datei eintragen, Suite unter dem neuen Namen öffnen und neu anmelden, Passkeys neu anlegen (oder keine vorhanden). Die zwei neuen Punkte stehen im Einrichtungs-Überblick neben dem bestehenden Punkt zum Servernamen.
+
 ## 0.20.2-beta.1
 
 - T2med: Das Feld heißt „API-Schlüssel (Client Secret aus T2med)“ mit Hinweis, dass T2med es nur einmal anzeigt (verloren = Drittanbieter-Zugriff in T2med löschen und neu erstellen).
