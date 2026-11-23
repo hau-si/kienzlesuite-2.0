@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.3-beta.2
+
+- Virtuelle Drucker bieten nur noch das Papierformat des Moduls an (neu in module.toml: `paper`, Vorgabe A4; Kasse A4, Terminzettel A6) statt A6/A5/A4/Letter. Nicht mit Windows getestet.
+
 ## 0.21.3-beta.1
 
 - Virtuelle Drucker der Module (Kasse „SumUp-Rechnung“, „Terminzettel“): Die CUPS-Warteschlange wird nicht mehr mit „everywhere“, sondern mit einer mitgelieferten Durchreich-PPD angelegt (PDF und PostScript unverändert, wie im früheren Rechnungseingang). Vorher bot CUPS zusätzlich Raster- und Bildformate (pwg-raster, urf, pclm, jpeg, …) an; der Windows-IPP-Treiber wählte so ein Format, das PDF hatte keine Textebene und die Rechnung musste per Texterkennung gelesen werden (Fehler „Rechnungsnummer nicht eindeutig (Texterkennung)“). Bestehende Warteschlangen werden beim nächsten Abgleich (Installer bzw. „Virtuelle Drucker der Module abgleichen“) automatisch umgestellt. Echte Drucker bleiben unverändert.

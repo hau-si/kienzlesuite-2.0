@@ -88,7 +88,8 @@ def ppd_text(p: dict) -> str:
     und das PDF hat keine Textebene mehr (Texterkennung nötig)."""
     name = re.sub(r'[^A-Za-z0-9_-]', '', str(p['name'])) or 'Drucker'
     label = re.sub(r'[^\x20-\x7e]', '?', f'Kienzle-Suite {p["name"]}')[:60].replace('"', "'")
-    sizes = (('A6', 298, 420), ('A5', 420, 595), ('A4', 595, 842), ('Letter', 612, 792))
+    paper = p.get('paper') if p.get('paper') in ('A4', 'A5', 'A6') else 'A4'          # nur das Papierformat des Moduls anbieten
+    sizes = tuple(s for s in (('A6', 298, 420), ('A5', 420, 595), ('A4', 595, 842)) if s[0] == paper)
     lines = ['*PPD-Adobe: "4.3"', '*FormatVersion: "4.3"', '*FileVersion: "1.0"', '*LanguageVersion: English', '*LanguageEncoding: ISOLatin1',
              f'*PCFileName: "{name[:8].upper()}.PPD"', '*Manufacturer: "Kienzle-Suite"', f'*Product: "({label})"', f'*ModelName: "{label}"',
              f'*ShortNickName: "{label}"', f'*NickName: "{label} (PDF/PostScript)"', '*PSVersion: "(3010.000) 0"', '*LanguageLevel: "3"',
@@ -98,13 +99,13 @@ def ppd_text(p: dict) -> str:
              '*cupsFilter2: "application/vnd.cups-pdf application/pdf 0 -"', '*cupsFilter2: "application/postscript application/postscript 0 -"',
              '*cupsFilter2: "application/vnd.cups-postscript application/postscript 0 -"']
     for key, label2 in (('PageSize', 'Original page size'), ('PageRegion', 'Original page region')):
-        lines += [f'*OpenUI *{key}/{label2}: PickOne', f'*OrderDependency: 10 AnySetup *{key}', f'*Default{key}: A4']
-        lines += [f'*{key} {n}/{"US Letter" if n == "Letter" else n}: "<</PageSize[{w} {h}]>>setpagedevice"' for n, w, h in sizes]
+        lines += [f'*OpenUI *{key}/{label2}: PickOne', f'*OrderDependency: 10 AnySetup *{key}', f'*Default{key}: {paper}']
+        lines += [f'*{key} {n}/{n}: "<</PageSize[{w} {h}]>>setpagedevice"' for n, w, h in sizes]
         lines.append(f'*CloseUI: *{key}')
-    lines.append('*DefaultImageableArea: A4')
-    lines += [f'*ImageableArea {n}/{"US Letter" if n == "Letter" else n}: "0 0 {w} {h}"' for n, w, h in sizes]
-    lines.append('*DefaultPaperDimension: A4')
-    lines += [f'*PaperDimension {n}/{"US Letter" if n == "Letter" else n}: "{w} {h}"' for n, w, h in sizes]
+    lines.append(f'*DefaultImageableArea: {paper}')
+    lines += [f'*ImageableArea {n}/{n}: "0 0 {w} {h}"' for n, w, h in sizes]
+    lines.append(f'*DefaultPaperDimension: {paper}')
+    lines += [f'*PaperDimension {n}/{n}: "{w} {h}"' for n, w, h in sizes]
     lines += ['*DefaultFont: Courier', '*Font Courier: Standard "(001.007)" Standard ROM', '']
     return '\n'.join(lines)
 

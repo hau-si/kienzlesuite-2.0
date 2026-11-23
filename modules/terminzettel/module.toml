@@ -4,7 +4,7 @@
 [module]
 id = "terminzettel"
 name = "Terminzettel"
-version = "1.2.3-beta.2"
+version = "1.2.4-beta.1"
 core_api = "1"
 description = "Terminblatt aus T2med als Bon auf dem Bondrucker: virtueller Drucker „Terminzettel“, Layout mit Vorschau, Kalender-QR je Termin."
 
@@ -29,6 +29,7 @@ name = "Terminzettel"
 label = "T2med-Terminblatt als Bon (Terminzettel)"
 command = "printer/kienzle-terminzettel"
 formats = ["application/pdf", "application/postscript", "application/vnd.ms-xpsdocument", "text/plain", "application/octet-stream"]
+paper = "A6"
 share = ["samba", "ipp"]
 
 [backup]

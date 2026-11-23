@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.3-beta.2
+
+- Virtuelle Drucker bieten nur noch das Papierformat des Moduls an (neu in module.toml: `paper`, Vorgabe A4; Kasse A4, Terminzettel A6) statt A6/A5/A4/Letter. Nicht mit Windows getestet.
+
 ## 2.3.3-beta.1
 
 - Rechnungseingang mit Texterkennung: Liest die Texterkennung dieselbe Rechnungsnummer an mehreren Stellen leicht verschieden (z. B. O statt 0, Abweichung um höchstens ein Zeichen), gilt die häufigste bzw. zuerst gelesene Nummer, statt die Rechnung mit „nicht eindeutig“ abzulehnen. Betrag, Zahlbetrag, Patient und Geburtsdatum werden weiterhin streng gegengeprüft; ohne Texterkennung (Textebene) bleibt die Prüfung unverändert streng.

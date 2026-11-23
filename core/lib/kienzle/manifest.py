@@ -61,7 +61,7 @@ SCHEMA_SECTIONS = {
     'firewall': {'name', 'port', 'proto', 'scope'},
     'rights': {'id', 'label'},
     'backup': {'paths', 'snapshot', 'settings'},
-    'printers': {'name', 'label', 'ppd', 'backend', 'command', 'formats', 'share'},
+    'printers': {'name', 'label', 'ppd', 'backend', 'command', 'formats', 'paper', 'share'},
     'connections': {'id', 'purpose', 'required'},
     'setup': {'overview'},
     'hooks': {*HOOKS, 'apparmor'},
@@ -370,12 +370,15 @@ class _Checker:
                     self.error(f'{where}.formats', f'„{shown(f)}“ ist kein Dateityp (z. B. application/pdf).')
             if formats and not command:
                 self.error(f'{where}.formats', 'nur zusammen mit „command“.')
+            paper = str(t.get('paper', 'A4')) if command else None
+            if 'paper' in t and (not command or paper not in ('A4', 'A5', 'A6')):
+                self.error(f'{where}.paper', 'nur zusammen mit „command“; erlaubt: A4, A5, A6.')
             backend = self.rel_path(t['backend'], f'{where}.backend') if 'backend' in t and ppd else None
             share = self.string_list(t, 'share', where, len(SHARES))
             for s in share:
                 if s not in SHARES:
                     self.error(f'{where}.share', f'„{shown(s)}“ unbekannt. Erlaubt: {", ".join(SHARES)}.')
-            out.append({'name': name, 'label': label, 'ppd': ppd, 'backend': backend, 'command': command, 'formats': formats, 'share': share})
+            out.append({'name': name, 'label': label, 'ppd': ppd, 'backend': backend, 'command': command, 'formats': formats, 'paper': paper, 'share': share})
         return out
 
     def connections(self, items: list) -> list:
