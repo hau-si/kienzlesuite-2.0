@@ -67,7 +67,7 @@ final class Web {
             case '/oidc/authorize': if ($get && $this->oidc && $stage !== 'full') return Response::redirect('/anmelden?weiter=/oidc/fortsetzen/' . $this->oidc->park($r->query)); break;
             case '/oidc/abmelden': if ($this->oidc && $stage !== 'full') return Response::redirect($this->oidc->logoutTarget($r->get('client_id', 100) ?: $this->oidc->clientFromIdToken($r->get('id_token_hint', 4000)), $r->get('post_logout_redirect_uri', 300)) ?? '/anmelden'); break;
         }
-        if ($stage === 'otp') return $r->path === '/anmelden/code' ? ($get ? $this->codePage() : $this->code($r)) : Response::redirect('/anmelden/code');
+        if ($stage === 'otp') return $r->path === '/anmelden/code' ? ($get ? $this->codePage() : $this->code($r)) : ($r->path === '/anmelden/code/sms' && !$get ? $this->smsCodeSend() : Response::redirect('/anmelden/code'));
         if ($stage === 'enroll') return $r->path === '/konto/otp' ? ($get ? $this->enrollPage() : $this->enroll($r)) : Response::redirect('/konto/otp');
         if ($stage !== 'full') return Response::redirect('/anmelden' . ($get && $r->path !== '/' ? '?weiter=' . rawurlencode($r->path) : ''));
         if (!$get) $this->checkCsrf($r);
@@ -79,6 +79,7 @@ final class Web {
             'GET /konto/otp' => fn() => $this->enrollPage(),
             'POST /konto/otp' => fn() => $this->enroll($r),
             'POST /konto/codes' => fn() => $this->newCodes(),
+            'POST /konto/telefon' => fn() => $this->savePhone($r),
             'POST /konto/geraete' => fn() => $this->revoke($r),
             'POST /konto/passkey/optionen' => fn() => $this->passkeyRegisterOptions(),
             'POST /konto/passkey' => fn() => $this->passkeyRegister($r),
@@ -480,10 +481,32 @@ final class Web {
         return Response::html(V::page('Uhrzeit', $body, null, $this->config->practice))->with('Refresh', '4; url=' . $back);
     }
 
-    private function codePage(?string $error = null, ?\Throwable $e = null): Response {
-        $body = V::error($error) . $this->clockOffer($e) . '<form method="post" action="/anmelden/code" class="box">'
-            . V::input('code', 'Code aus der Authenticator-App (oder Wiederherstellungscode)', 'text', '', 'autocomplete="one-time-code" inputmode="text" required autofocus')
+    /** Handynummer für den SMS-Ersatzcode (nur Admins; leer = keine). */
+    private function phoneOf(int $uid): string { return (string)$this->db->setting('telefon.' . $uid); }
+
+    private function smsReady(int $uid): bool {
+        try { return $this->phoneOf($uid) !== '' && $this->con()->status()['sms'] !== null; } catch (Problem) { return false; }
+    }
+
+    private function smsCodeSend(): Response {
+        $uid = (int)$this->session['user_id'];
+        try {
+            if (!$this->smsReady($uid)) throw new Problem('SMS-Codes sind nicht eingerichtet.', 409);
+            $code = $this->auth->smsCodeIssue($this->session);
+            $this->con()->sendSms($this->phoneOf($uid), 'Kienzle-Suite: Ihr Code lautet ' . $code . ' (10 Minuten gültig). Niemandem weitergeben.');
+        } catch (Problem $e) {
+            return $this->codePage($e->getMessage());
+        }
+        $this->audit->write((string)$this->session['login'], 'sms-code-gesendet');
+        return $this->codePage(null, null, 'Der Code wurde per SMS geschickt. Es kann einen Moment dauern.');
+    }
+
+    private function codePage(?string $error = null, ?\Throwable $e = null, ?string $notice = null): Response {
+        $uid = (int)($this->session['user_id'] ?? 0);
+        $body = V::error($error) . V::notice($notice) . $this->clockOffer($e) . '<form method="post" action="/anmelden/code" class="box">'
+            . V::input('code', 'Code aus der Authenticator-App (oder Wiederherstellungscode oder SMS-Code)', 'text', '', 'autocomplete="one-time-code" inputmode="text" required autofocus')
             . '<button>Weiter</button></form>'
+            . ($this->smsReady($uid) ? '<form method="post" action="/anmelden/code/sms"><button class="link">Code per SMS senden</button></form>' : '')
             . '<form method="post" action="/abmelden"><button class="link">Abbrechen</button></form>';
         return Response::html(V::page('Code eingeben', $body, null, $this->config->practice), $error ? 401 : 200);
     }
@@ -618,6 +641,9 @@ final class Web {
             . V::input('password', 'Neues Passwort', 'password', '', 'autocomplete="new-password" required')
             . V::input('password2', 'Neues Passwort wiederholen', 'password', '', 'autocomplete="new-password" required')
             . '<button>Ändern</button></form></section>'
+            . ($this->users->needsOtp($user) ? '<section><h2>Handynummer für SMS-Code (Ersatz)</h2><p>Hast du die Authenticator-App nicht dabei, kann ein Code per SMS geschickt werden. Das geht nur, wenn unter Verwaltung → Verbindungen SMS eingerichtet ist.</p>'
+                . '<form method="post" action="/konto/telefon" class="box">' . $csrf . V::input('telefon', 'Handynummer (leer lassen zum Entfernen)', 'tel', $this->phoneOf($uid), 'maxlength="30" placeholder="01701234567" autocomplete="tel"')
+                . '<button>Speichern</button></form></section>' : '')
             . '<section><h2>Authenticator-App</h2><p>' . ($otp ? 'Eingerichtet. Übrige Wiederherstellungscodes: ' . $this->users->recoveryLeft($uid) . '.' : 'Nicht eingerichtet' . ($this->users->needsOtp($user) ? ' (für Admins Pflicht).' : '.')) . '</p>'
             . '<p><a class="button" href="/konto/otp">' . ($otp ? 'Neu einrichten' : 'Einrichten') . '</a></p>'
             . ($otp ? '<form method="post" action="/konto/codes">' . $csrf . '<button>Neue Wiederherstellungscodes erzeugen</button></form>' : '') . '</section>'
@@ -629,6 +655,22 @@ final class Web {
             . '<section><h2>Gemerkte Geräte</h2>' . ($devices !== '' ? '<table><tr><th>Gerät</th><th>Zuletzt</th><th></th></tr>' . $devices . '</table>'
                 . '<form method="post" action="/konto/geraete">' . $csrf . '<input type="hidden" name="id" value="all"><button class="link">Alle abmelden</button></form>' : '<p>Keine.</p>') . '</section>';
         return Response::html(V::page('Mein Konto', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+    }
+
+    private function savePhone(Request $r): Response {
+        $uid = (int)$this->session['user_id'];
+        $user = $this->users->find($uid);
+        try {
+            if (!$this->auth->confirmedRecently($this->session)) return $this->needConfirm('/konto');
+            if (!$this->users->needsOtp($user)) throw new Problem('Die SMS-Ersatzanmeldung gibt es nur für Admin-Konten.', 403);
+            $raw = trim($r->field('telefon', 40));
+            if ($raw === '') { $this->db->query('DELETE FROM settings WHERE key=?', ['telefon.' . $uid]); $notice = 'Handynummer entfernt.'; }
+            else { $this->db->store('telefon.' . $uid, Connections::phone($raw)); $notice = 'Handynummer gespeichert.'; }
+        } catch (Problem $e) {
+            return $this->account($e->getMessage());
+        }
+        $this->audit->write($user['login'], 'handynummer-geaendert');
+        return $this->account(null, $notice);
     }
 
     private function changePassword(Request $r): Response {
@@ -1334,6 +1376,17 @@ final class Web {
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('testmail') . '<input type="email" name="an" placeholder="empfaenger@example.org" required maxlength="254" aria-label="Empfänger der Testnachricht"> <button>Testnachricht senden</button></form> '
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'mail']) . '<button class="danger">Entfernen</button></form>' : '')
             . '</section>';
+        // SMS
+        $sms = $st['sms'] ?? [];
+        $body .= '<section><h2>SMS (seven.io)</h2><p class="muted">Für Einmalcodes als Ersatz bei der Admin-Anmeldung und später für Nachrichten der kienzlefon-App. Schlüssel unter seven.io → Entwickler → API-Schlüssel anlegen.</p>'
+            . '<form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('sms')
+            . V::input('api_key', 'API-Schlüssel von seven.io', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($sms['schluessel_gesetzt'] ?? false))) . '"')
+            . V::input('absender', 'Absendername (optional, höchstens 11 Zeichen)', 'text', (string)($sms['absender'] ?? ''), 'maxlength="16" placeholder="Praxis"')
+            . '<button>Speichern</button></form>'
+            . ($sms ? $this->testLine($st['tests'], 'sms') . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'sms']) . '<button>Schlüssel prüfen</button></form> '
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('testsms') . '<input type="tel" name="an" placeholder="01701234567" required maxlength="30" aria-label="Handynummer der Test-SMS"> <button>Test-SMS senden</button></form> '
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'sms']) . '<button class="danger">Entfernen</button></form>' : '')
+            . '</section>';
         // Netzwerkspeicher
         $body .= '<section><h2>Netzwerkspeicher</h2>';
         foreach ($st['ablage'] as $t) {
@@ -1398,6 +1451,8 @@ final class Web {
                 case 'mail':
                     $c->saveMail(['host' => $f('host'), 'port' => $f('port', 10), 'sicherheit' => $f('sicherheit', 20), 'benutzer' => $f('benutzer'), 'passwort' => $f('passwort'), 'absender' => $f('absender')]);
                     $what = 'mail'; break;
+                case 'sms': $c->saveSms(['api_key' => $f('api_key'), 'absender' => $f('absender', 20)]); $what = 'sms'; break;
+                case 'testsms': $c->testSms($f('an', 40)); $what = 'testsms'; break;
                 case 'ziel':
                     $c->saveTarget(['id' => $f('id', 40), 'name' => $f('name', 80), 'art' => $f('art', 10), 'host' => $f('host'), 'freigabe' => $f('freigabe', 100), 'port' => $f('port', 10),
                         'ordner' => $f('ordner'), 'benutzer' => $f('benutzer', 100), 'passwort' => $f('passwort'), 'domaene' => $f('domaene', 100), 'gast' => $f('gast') === '1']);

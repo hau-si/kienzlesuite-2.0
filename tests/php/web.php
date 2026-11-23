@@ -4,7 +4,7 @@ declare(strict_types=1);
 require __DIR__ . '/lib.php';
 require __DIR__ . '/browser.php';
 
-use Kienzle\Core\{Auth, Totp};
+use Kienzle\Core\{Auth, Connections, Totp};
 
 function test_ersteinrichtung_mit_link_und_otp(): void {
     $env = new Env();
@@ -150,6 +150,12 @@ function test_verwaltung_braucht_bestaetigung_und_csrf(): void {
     check($b->post('/verwaltung/praxis', ['aktion' => 'konto', 'holder' => 'Praxis Beispiel', 'iban' => 'DE02 1203 0000 0000 2020 52'])->status === 422, 'falsche IBAN angenommen');
     check($b->post('/verwaltung/praxis', ['aktion' => 'konto', 'holder' => 'Praxis Beispiel', 'iban' => 'DE02 1203 0000 0000 2020 51'])->status === 200 && str_contains($b->get('/verwaltung/praxis')->body, 'DE02 1203 0000 0000 2020 51'), 'Kontodaten nicht gespeichert');
     check($b->post('/verwaltung/praxis', ['aktion' => 'steuer', 'tax_id' => '12/345/67890', 'small_business' => '1'])->status === 200 && str_contains($b->get('/verwaltung/praxis')->body, '12/345/67890'), 'Steuerangaben nicht gespeichert');
+    check(Connections::phone('0151 123 456 78') === '+4915112345678' && Connections::phone('0049 151 12345678') === '+4915112345678' && Connections::phone('+43 660 1234567') === '+436601234567', 'Handynummer nicht normalisiert');
+    try { Connections::phone('12345'); check(false, 'zu kurze Nummer angenommen'); } catch (\Kienzle\Core\Problem $e) { }
+    $fake = ['token_hash' => 'sms-test'];
+    $code = $env->auth->smsCodeIssue($fake);
+    check(preg_match('/^\d{6}$/D', $code) === 1, 'SMS-Code ohne 6 Ziffern');
+    try { $env->auth->smsCodeIssue($fake); check(false, 'zweiter Code binnen einer Minute'); } catch (\Kienzle\Core\Problem $e) { }
     $page = $b->get('/verwaltung/sicherheit')->body;
     check(str_contains($page, '<h2>Firewall</h2>') && str_contains($page, 'Zugang (Abmeldezeiten)') && str_contains($page, '<h2>Protokoll</h2>') && str_contains($page, 'name="idle_einheit"'), 'Sicherheit unvollständig');
     check($b->post('/verwaltung/zugang', ['idle' => '2', 'idle_einheit' => 'd', 'max' => '3', 'max_einheit' => 'd'])->status === 200 && $env->auth->idleSeconds() === 172800, 'Zugang in Tagen nicht gespeichert');

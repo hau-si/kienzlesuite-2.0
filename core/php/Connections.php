@@ -16,7 +16,7 @@ final class Connections {
     public function status(): array {
         $s = json_decode((string)@file_get_contents(self::$state . '/status.json'), true);
         $s = is_array($s) ? $s : [];
-        return ['t2med' => is_array($s['t2med'] ?? null) ? $s['t2med'] : null, 'mail' => is_array($s['mail'] ?? null) ? $s['mail'] : null,
+        return ['t2med' => is_array($s['t2med'] ?? null) ? $s['t2med'] : null, 'mail' => is_array($s['mail'] ?? null) ? $s['mail'] : null, 'sms' => is_array($s['sms'] ?? null) ? $s['sms'] : null,
             'ablage' => array_values(array_filter((array)($s['ablage'] ?? []), 'is_array')), 'tests' => (array)($s['tests'] ?? []),
             'hostkeys' => (array)($s['hostkeys'] ?? []), 'zertifikate' => (array)($s['zertifikate'] ?? []), 'nutzung' => array_values(array_filter((array)($s['nutzung'] ?? []), 'is_array')),
             'hinweise' => array_values(array_filter((array)($s['hinweise'] ?? []), 'is_string')), 'letzte' => is_array($s['letzte'] ?? null) ? $s['letzte'] : null,
@@ -31,6 +31,24 @@ final class Connections {
         if (!preg_match('#^https://#', $d['base_url'])) throw new Problem('Adresse des FHIR-Servers: bitte mit https:// angeben.', 422);
         $this->write(['action' => 't2med', 'daten' => $d]);
     }
+
+    public function saveSms(array $in): void {
+        $this->write(['action' => 'sms', 'daten' => ['api_key' => trim((string)($in['api_key'] ?? '')), 'absender' => trim((string)($in['absender'] ?? ''))]]);
+    }
+
+    /** Handynummer im internationalen Format (+491701234567); aus 0170… wird +49170…. */
+    public static function phone(string $raw): string {
+        $n = preg_replace('/[\s\/()-]+/', '', trim($raw)) ?? '';
+        if (str_starts_with($n, '00')) $n = '+' . substr($n, 2);
+        elseif (str_starts_with($n, '0')) $n = '+49' . substr($n, 1);
+        if (!preg_match('/^\+[1-9][0-9]{7,14}$/D', $n)) throw new Problem('Handynummer bitte so eingeben: +491701234567 oder 01701234567.', 422);
+        return $n;
+    }
+
+    public function testSms(string $to): void { $this->write(['action' => 'pruefen', 'art' => 'testsms', 'an' => self::phone($to)]); }
+
+    /** Eine SMS über die zentrale Verbindung verschicken (der root-Dienst sendet; der Text darf einen Code enthalten, die Anfrage ist nur für ks-core und root lesbar). */
+    public function sendSms(string $to, string $text): void { $this->write(['action' => 'sms-senden', 'an' => self::phone($to), 'text' => $text]); }
 
     public function saveMail(array $in): void {
         $port = (string)($in['port'] ?? '');
@@ -56,7 +74,7 @@ final class Connections {
     public function removeTarget(string $id): void { $this->write(['action' => 'ziel-loeschen', 'id' => $id]); }
 
     public function remove(string $what): void {
-        if (!in_array($what, ['t2med', 'mail'], true)) throw new Problem('Unbekannte Verbindung.', 422);
+        if (!in_array($what, ['t2med', 'mail', 'sms'], true)) throw new Problem('Unbekannte Verbindung.', 422);
         $this->write(['action' => $what, 'loeschen' => true]);
     }
 
@@ -67,7 +85,7 @@ final class Connections {
     }
 
     public function test(string $art, string $id = ''): void {
-        if (!in_array($art, ['t2med', 'mail', 'ziel'], true)) throw new Problem('Unbekannte Prüfung.', 422);
+        if (!in_array($art, ['t2med', 'mail', 'sms', 'ziel'], true)) throw new Problem('Unbekannte Prüfung.', 422);
         $this->write(['action' => 'pruefen', 'art' => $art, 'id' => $id]);
     }
 

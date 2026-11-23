@@ -74,7 +74,7 @@ def load() -> dict:
         data = json.loads((ETC / 'konfiguration.json').read_text(encoding='utf-8'))
     except FileNotFoundError:
         data = {}
-    return {'t2med': data.get('t2med'), 'mail': data.get('mail'), 'ablage': data.get('ablage', [])}
+    return {'t2med': data.get('t2med'), 'mail': data.get('mail'), 'sms': data.get('sms'), 'ablage': data.get('ablage', [])}
 
 
 def save(config: dict) -> None:
@@ -154,6 +154,71 @@ def set_mail(config: dict, d: dict) -> None:
         raise Fehler('Passwort ungültig.')
     config['mail'] = {'host': host, 'port': port, 'sicherheit': sec, 'benutzer': _text(d.get('benutzer', ''), 'Benutzer', 254, required=False),
                       'passwort': pw if pw else old.get('passwort', ''), 'absender': sender}
+
+
+SMS_NUMBER = re.compile(r'^\+[1-9][0-9]{7,14}$')
+SMS_SENDER = re.compile(r'^(?:[A-Za-z0-9]{1,11}|\+?[0-9]{1,15})$')
+SMS_URL = 'https://gateway.seven.io/api/'
+
+
+def set_sms(config: dict, d: dict) -> None:
+    """SMS-Verbindung (seven.io): API-Schlüssel und optionaler Absendername; ein leerer Schlüssel behält den gespeicherten."""
+    old = config.get('sms') or {}
+    key = d.get('api_key', '')
+    if not isinstance(key, str) or len(key) > 200 or CONTROL.search(key) or ' ' in key:
+        raise Fehler('API-Schlüssel ungültig.')
+    key = key or old.get('api_key', '')
+    if not key:
+        raise Fehler('Bitte den API-Schlüssel von seven.io eingeben.')
+    sender = _text(d.get('absender', ''), 'Absender', 16, required=False)
+    if sender and not SMS_SENDER.match(sender):
+        raise Fehler('Absender: höchstens 11 Buchstaben/Ziffern (ohne Leerzeichen) oder eine Nummer.')
+    config['sms'] = {'anbieter': 'seven', 'api_key': key, 'absender': sender}
+
+
+def _sms_call(c: dict, path: str, payload: dict | None) -> dict:
+    import urllib.request
+    data = json.dumps(payload).encode() if payload is not None else None
+    req = urllib.request.Request(SMS_URL + path, data=data, method='POST' if payload is not None else 'GET',
+                                 headers={'X-Api-Key': c['api_key'], 'Accept': 'application/json', 'Content-Type': 'application/json', 'SentWith': 'Kienzle-Suite'})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:  # noqa: S310 (feste https-Adresse)
+            body = r.read(20000).decode('utf-8', 'replace')
+    except OSError as e:
+        raise Fehler(f'seven.io nicht erreichbar oder Schlüssel abgelehnt: {str(e)[:100]}') from None
+    try:
+        out = json.loads(body)
+    except ValueError:
+        out = body.strip()
+    return out if isinstance(out, dict) else {'wert': out}
+
+
+def test_sms(c: dict | None) -> str:
+    if not c:
+        raise Fehler('SMS ist nicht eingerichtet.')
+    r = _sms_call(c, 'balance', None)
+    return 'Schlüssel von seven.io akzeptiert (keine SMS gesendet).' + (f' Guthaben: {r["wert"]} €.' if isinstance(r.get('wert'), (int, float)) else '')
+
+
+def send_sms(c: dict | None, to: str, text: str) -> None:
+    """Eine SMS über die zentrale Verbindung (nur kurzer Text, keine Patientendaten)."""
+    if not c:
+        raise Fehler('SMS ist nicht eingerichtet.')
+    if not isinstance(to, str) or not SMS_NUMBER.match(to):
+        raise Fehler('Handynummer bitte im Format +491701234567 angeben.')
+    if not isinstance(text, str) or not text.strip() or len(text) > 320 or CONTROL.search(text.replace('\n', ' ')):
+        raise Fehler('SMS-Text ungültig.')
+    payload = {'to': to, 'text': text}
+    if c.get('absender'):
+        payload['from'] = c['absender']
+    r = _sms_call(c, 'sms', payload)
+    if str(r.get('success', '')) != '100':
+        raise Fehler(f'seven.io hat die SMS nicht angenommen (Antwort {str(r.get("success", r))[:40]}).')
+
+
+def test_sms_send(c: dict | None, to: str) -> str:
+    send_sms(c, to, 'Kienzle-Suite: Testnachricht. Es ist nichts weiter zu tun.')
+    return f'Test-SMS an {to} verschickt.'
 
 
 def set_target(config: dict, d: dict) -> None:
@@ -354,6 +419,7 @@ def view(config: dict, extra: dict | None = None) -> dict:
         old = {}
     t2 = config['t2med']
     mail = config['mail']
+    sms = config.get('sms')
     ca_fp = ''
     if t2 and t2.get('ca_pem'):
         ca_fp = hashlib.sha256(ssl.PEM_cert_to_DER_cert(t2['ca_pem'])).hexdigest()
@@ -368,6 +434,7 @@ def view(config: dict, extra: dict | None = None) -> dict:
            'hinweise': old.get('hinweise', []),
            't2med': {**{k: t2[k] for k in ('base_url', 'launch_urls', 'pin')}, 'api_key_gesetzt': bool(t2.get('api_key')), 'zertifikat': ca_fp} if t2 else None,
            'mail': {**{k: mail[k] for k in ('host', 'port', 'sicherheit', 'benutzer', 'absender')}, 'passwort_gesetzt': bool(mail.get('passwort'))} if mail else None,
+           'sms': {'anbieter': sms['anbieter'], 'absender': sms.get('absender', ''), 'schluessel_gesetzt': bool(sms.get('api_key'))} if sms else None,
            'ablage': [{**{k: v for k, v in t.items() if k != 'passwort'}, 'passwort_gesetzt': bool(t.get('passwort')),
                        'fingerprint': ablage.fingerprint(t['hostkey']) if t.get('hostkey') else ''} for t in config['ablage']],
            'nutzung': usage, 'sftp_schluessel': ABLAGE_PUB.read_text(encoding='utf-8').strip() if ABLAGE_PUB.is_file() else ''}
@@ -435,6 +502,17 @@ def dispatch(config: dict, req: dict) -> str:
         save(config)
         view(config, {'hinweise': distribute(config)})
         return 'E-Mail-Verbindung gespeichert und an die Module verteilt.' if config['mail'] else 'E-Mail-Verbindung entfernt.'
+    if action == 'sms':
+        if req.get('loeschen') is True:
+            config['sms'] = None
+        else:
+            set_sms(config, d)
+        save(config)
+        view(config, {'hinweise': distribute(config)})
+        return 'SMS-Verbindung gespeichert.' if config.get('sms') else 'SMS-Verbindung entfernt.'
+    if action == 'sms-senden':
+        send_sms(config.get('sms'), req.get('an'), req.get('text'))
+        return 'SMS verschickt.'
     if action == 'ziel':
         set_target(config, d)
         save(config)
@@ -460,6 +538,11 @@ def dispatch(config: dict, req: dict) -> str:
                 msg = test_t2med(config['t2med'])
             elif art == 'mail':
                 msg = test_mail(config['mail'])
+            elif art == 'sms':
+                msg = test_sms(config.get('sms'))
+            elif art == 'testsms':
+                key = 'sms'
+                msg = test_sms_send(config.get('sms'), req.get('an'))
             elif art == 'testmail':
                 key = 'mail'
                 msg = test_mail_send(config['mail'], req.get('an'))

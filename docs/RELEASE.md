@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.3
+
+- Neue zentrale Verbindung „SMS (seven.io)“ unter Verwaltung → Verbindungen: API-Schlüssel und optionaler Absendername, Schlüssel prüfen, Test-SMS. Der Versand läuft über den root-Dienst für Verbindungen; der Schlüssel wird nie wieder angezeigt. Gedacht auch für die spätere kienzlefon-App.
+- Ersatz bei der Admin-Anmeldung: Admins hinterlegen unter „Mein Konto“ ihre Handynummer (nur nach Bestätigung mit Passwort und Code). Auf der Code-Seite gibt es dann „Code per SMS senden“: 6 Ziffern, 10 Minuten gültig, einmal verwendbar, höchstens 3 je Anmeldung, frühestens nach einer Minute erneut; protokolliert. Hinweis: Das schwächt die Zwei-Faktor-Anmeldung auf „Besitz der SIM-Karte“; wer das nicht will, richtet SMS nicht ein.
+- Nicht auf dem Server und nicht gegen seven.io getestet (nur mit nachgebauter Schnittstelle).
+
 ## 0.21.4-beta.2
 
 - Neue Seite „Praxis und Daten“ (Verwaltung → Praxis): Anschrift, Kontodaten für Überweisungen (Kontoinhaber, IBAN mit Prüfziffer, BIC, Bank) und Steuerangaben (Steuernummer/USt-IdNr., Kleinunternehmerregelung) an einer Stelle; die Module übernehmen sie. Die Anschrift ist von „Server und Name“ hierher gezogen. Nicht auf dem Server getestet.
