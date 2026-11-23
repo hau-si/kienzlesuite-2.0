@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.20.5-beta.1
+
+- Behoben: Im Einrichtungs-Überblick stand bei Modulen „Überblick nicht lesbar: [Errno 2] No such file or directory: 'runuser'“, weil der Dienst `runuser` (liegt in /usr/sbin) nicht im Suchpfad fand. Überblick, Update-Haken und Sicherungs-Haken der Module verwenden jetzt den vollen Pfad. Nicht auf der VM geprüft.
+
 ## 0.20.4-beta.1
 
 - Verbindungen → T2med: Die Adresse für den Eintrag in T2med (`kienzle-sumup://?kontextId=…`) steht jetzt direkt unter dem Formular. Das Feld heißt „Erlaubte fhirBasisUrl aus T2med – weitere Adressen“ und erklärt, dass hier die von T2med mitgeschickte FHIR-Adresse gemeint ist, nicht die Abrufadresse.

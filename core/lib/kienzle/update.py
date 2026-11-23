@@ -27,6 +27,9 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+# runuser liegt in /usr/sbin; der Dienst hat nicht immer sbin im PATH: absoluten Pfad bestimmen.
+RUNUSER_BIN = next((c for c in ('/usr/sbin/runuser', '/usr/bin/runuser', '/sbin/runuser') if os.path.exists(c)), 'runuser')
+
 from . import release
 
 E = os.environ.get
@@ -295,7 +298,7 @@ def busy_modules() -> list[str]:
         mid = m['module']['id']
         path = Path(f'/opt/kienzle/{mid}/current') / hook if hook else None
         if path and path.is_file():
-            r = subprocess.run(['runuser', '-u', f'ks-{mid}', '--', str(path)], capture_output=True, timeout=30)
+            r = subprocess.run([RUNUSER_BIN, '-u', f'ks-{mid}', '--', str(path)], capture_output=True, timeout=30)
             if r.returncode == 75:
                 out.append(mid)
     return out

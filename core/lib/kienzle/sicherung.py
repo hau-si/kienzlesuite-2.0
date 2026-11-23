@@ -24,6 +24,9 @@ import tempfile
 import time
 from pathlib import Path
 
+# runuser liegt in /usr/sbin; der Dienst hat nicht immer sbin im PATH: absoluten Pfad bestimmen.
+RUNUSER_BIN = next((c for c in ('/usr/sbin/runuser', '/usr/bin/runuser', '/sbin/runuser') if os.path.exists(c)), 'runuser')
+
 from . import ablage
 
 E = os.environ.get
@@ -418,7 +421,7 @@ def prepare() -> tuple[list[str], list[str], list[str]]:
         hook = b.get('snapshot')
         if hook:
             path = Path(f'/opt/kienzle/{mid}/current') / hook
-            r = subprocess.run(['runuser', '-u', f'ks-{mid}', '--', str(path)], capture_output=True, text=True, timeout=1800) if path.is_file() else None
+            r = subprocess.run([RUNUSER_BIN, '-u', f'ks-{mid}', '--', str(path)], capture_output=True, text=True, timeout=1800) if path.is_file() else None
             if r is None or r.returncode != 0:
                 notes.append(f'{mid}: Schnappschuss-Haken fehlgeschlagen; gesichert wird der aktuelle Stand der Dateien.')
         paths += [p for p in b.get('paths', []) if Path(p).exists()]

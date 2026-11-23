@@ -13,6 +13,9 @@ import subprocess
 import time
 from pathlib import Path
 
+# runuser liegt in /usr/sbin; der Dienst hat nicht immer sbin im PATH: absoluten Pfad bestimmen.
+RUNUSER_BIN = next((c for c in ('/usr/sbin/runuser', '/usr/bin/runuser', '/sbin/runuser') if os.path.exists(c)), 'runuser')
+
 E = os.environ.get
 STATE = Path(E('KIENZLE_UEBERBLICK_STATE', '/var/lib/kienzle/ueberblick'))
 MODULES = Path(E('KIENZLE_UEBERBLICK_MODULES', '/var/lib/kienzle/core/modules.json'))
@@ -70,7 +73,7 @@ def collect() -> int:
         try:
             if not path.is_file():
                 raise ValueError('Haken fehlt.')
-            cmd = ['runuser', '-u', f'ks-{mid}', '--', str(path)] if RUNAS else [str(path)]
+            cmd = [RUNUSER_BIN, '-u', f'ks-{mid}', '--', str(path)] if RUNAS else [str(path)]
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=20, env={'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8'})
             if r.returncode != 0:
                 raise ValueError(f'Haken endete mit Fehler {r.returncode}.')
