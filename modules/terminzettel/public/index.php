@@ -60,7 +60,7 @@ try {
                 Seite::speichern(Seite::pruefen($_POST));
                 $meldung = 'Gespeichert.';
             } elseif ($aktion === 'testdruck') {
-                Seite::testdruck($k, Seite::werte());
+                Seite::testdruck($k, Seite::werte($k->praxis()));
                 $meldung = 'Beispiel-Terminzettel an den Bondrucker übergeben (gespeichertes Layout).';
             } else {
                 throw new InvalidArgumentException('Unbekannte Aktion.');
@@ -73,7 +73,7 @@ try {
     $host = preg_replace('/:\d+$/', '', $host);
     header('Content-Type: text/html; charset=utf-8');
     header('Cache-Control: no-store');
-    echo Ansicht::seite($base, Seite::werte(), $k->csrf(), $k->druckerRollen()['bon'], $meldung, $fehler, $host);
+    echo Ansicht::seite($base, Seite::werte($k->praxis()), $k->csrf(), $k->druckerRollen()['bon'], $meldung, $fehler, $host);
 } catch (Throwable $e) {
     http_response_code(500);
     echo 'Der Terminzettel ist gerade nicht erreichbar.';

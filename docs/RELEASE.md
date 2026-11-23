@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.19.7-beta.1
+
+- Anmeldeseite: Hinweis mit Link „Arbeitsplatz einrichten“ (Zertifikat und Servername je PC), für den Fall, dass der Browser „Nicht sicher“ meldet oder die Adresse nicht öffnet.
+
 ## 0.19.6-beta.1
 
 - T2med-Prüfung: Statt „antwortet nicht wie ein FHIR-Server“ nennt die Meldung jetzt den HTTP-Status und die wahrscheinliche Ursache (Schlüssel abgelehnt, Pfad falsch, Adresse zeigt nicht auf die FHIR-Schnittstelle). Nicht an einer echten T2med-Installation geprüft.

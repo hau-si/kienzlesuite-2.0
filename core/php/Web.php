@@ -383,7 +383,9 @@ final class Web {
             . V::checkbox('remember', '1', 'Dieses Gerät merken (bis zu 6 Monate, nur aus diesem Netz)', false)
             . '<button>Anmelden</button></form>'
             . ($this->passkeys ? '<div class="box" data-passkey-login data-next="' . V::h($weiter) . '"><p>Oder ohne Passwort:</p>'
-                . '<button type="button">Mit Passkey anmelden</button><p class="error" hidden></p></div>' : '');
+                . '<button type="button">Mit Passkey anmelden</button><p class="error" hidden></p></div>' : '')
+            . '<p class="muted">Warnt der Browser („Nicht sicher“) oder lässt sich die Adresse nicht öffnen? Dieser PC muss einmal eingerichtet werden (Zertifikat und Name): '
+            . '<a href="/hilfe/arbeitsplatz">Arbeitsplatz einrichten</a>.</p>';
         return Response::html(V::page('Anmelden', $body, null, $this->config->practice), $error ? 401 : 200);
     }
 

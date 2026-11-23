@@ -21,13 +21,14 @@ final class Ansicht {
         $printer = 'http://' . $host . ':631/printers/Terminzettel';
         return '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             . '<meta name="kienzle-csrf" content="' . $h($csrf) . '"><title>Terminzettel</title><link rel="stylesheet" href="' . $h($base) . '/assets/style.css"></head><body>'
-            . '<main><h1>Terminzettel</h1>'
+            . '<main><header class="top"><a class="brand" href="/"><span class="mark" aria-hidden="true">K</span><div><strong>Terminzettel</strong>'
+            . '<span class="sub">Einstellungen · Kienzle-Suite</span></div></a></header>'
             . ($meldung ? '<p class="ok">' . $h($meldung) . '</p>' : '') . ($fehler ? '<p class="fehler">' . $h($fehler) . '</p>' : '')
             . ($queue === '' ? '<p class="fehler">Noch kein Bondrucker zugeordnet: Verwaltung → Drucker → „Wofür welcher Drucker?“.</p>'
                 : '<p class="muted">Bondrucker: <strong>' . $h($queue) . '</strong> (Verwaltung → Drucker).</p>')
-            . '<div class="gitter"><form method="post" action="' . $h($base) . '/" class="box" id="layout"><input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"><input type="hidden" name="aktion" value="speichern">'
+            . '<div class="gitter"><form method="post" action="' . $h($base) . '/" class="card" id="layout"><input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"><input type="hidden" name="aktion" value="speichern">'
             . $form . '<p><button>Speichern</button></p></form>'
-            . '<aside><h2>Vorschau (Beispieldaten)</h2><div id="vorschau" class="vorschau"><img id="bild" alt="Vorschau des Bons" hidden><p id="hinweis" class="muted">Wird geladen …</p></div>'
+            . '<aside class="card"><h2>Vorschau (Beispieldaten)</h2><div id="vorschau" class="vorschau"><img id="bild" alt="Vorschau des Bons" hidden><p id="hinweis" class="muted">Wird geladen …</p></div>'
             . '<form method="post" action="' . $h($base) . '/"><input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"><input type="hidden" name="aktion" value="testdruck">'
             . '<button class="zweit"' . ($queue === '' ? ' disabled' : '') . '>Beispiel-Terminzettel drucken</button></form></aside></div>'
             . '<details><summary>Drucker „Terminzettel“ auf den Arbeitsplätzen einrichten</summary><ol>'

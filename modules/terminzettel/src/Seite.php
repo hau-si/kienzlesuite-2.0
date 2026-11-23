@@ -36,11 +36,22 @@ final class Seite {
         ];
     }
 
-    /** Gespeicherte Werte, ergänzt um die Vorgaben. */
-    public static function werte(): array {
+    /** Kopf aus den Praxisdaten der Basis: Name, dann Straße, Ort, Kontakt (nur ausgefüllte Zeilen). */
+    public static function kopfAusPraxis(array $praxis): string {
+        $zeilen = [];
+        foreach (['name', 'street', 'city', 'contact'] as $k) {
+            $z = trim(preg_replace('/[\x00-\x1f\x7f-\x9f]+/u', ' ', (string)($praxis[$k] ?? '')) ?? '');
+            if ($z !== '') $zeilen[] = $z;
+        }
+        return mb_substr(implode("\n", $zeilen), 0, 1000);
+    }
+
+    /** Gespeicherte Werte, ergänzt um die Vorgaben; der Kopf ist mit den Praxisdaten der Basis vorbelegt, solange er nicht gespeichert wurde. */
+    public static function werte(array $praxis = []): array {
         $d = json_decode((string)@file_get_contents(self::$data . '/werte.json'), true);
         $out = [];
         foreach (self::schema() as $k => $f) $out[$k] = is_array($d) && array_key_exists($k, $d) && self::passt($f, $d[$k]) ? $d[$k] : $f[2];
+        if (!is_array($d) || !array_key_exists('header_text', $d)) $out['header_text'] = self::kopfAusPraxis($praxis);
         return $out;
     }
 
@@ -102,6 +113,8 @@ final class Seite {
         $neu = ['drucker' => $k->druckerRollen(), 'praxis' => $k->praxis()];
         $alt = json_decode((string)@file_get_contents(self::$data . '/basis.json'), true);
         if ($alt !== $neu) self::schreiben('basis.json', $neu);
+        // Erster Besuch: Layout mit den Praxisdaten im Kopf anlegen, damit schon ohne Speichern gedruckt wird (danach frei änderbar).
+        if (!is_file(self::$data . '/werte.json')) self::speichern(self::werte($neu['praxis']));
     }
 
     private static function schreiben(string $name, array $data): void {

@@ -1,5 +1,11 @@
 # Terminzettel – Release-Notizen
 
+## 1.1.0-beta.1
+
+- Gestaltung an die Suite angepasst (Petrol, Karten, Kopfzeile mit Logo, gleiche Knöpfe und Eingabefelder).
+- Der Kopf des Bons ist beim ersten Öffnen mit den Praxisdaten der Basis vorbelegt (Name, Straße, Ort, Kontakt aus Verwaltung → Server und Name) und bleibt frei änderbar; ein gespeicherter Kopf wird nicht überschrieben. Beim ersten Besuch wird dieses Layout angelegt, damit schon ohne Speichern gedruckt wird.
+- Nicht auf einem echten Bondrucker geprüft; das neue Aussehen nicht in einem echten Browser angesehen.
+
 ## 1.0.1-beta.1
 
 - Behoben: Nach der Installation meldete der Gesundheitstest „Das Modul antwortet nach dem Start nicht“, weil er das Programm
