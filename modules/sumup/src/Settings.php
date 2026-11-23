@@ -18,7 +18,7 @@ final class Settings {
             'affiliate_key' => ['type' => 'secret', 'label' => 'SumUp Affiliate-Key'],
             'app_id' => ['type' => 'string', 'label' => 'SumUp App-ID', 'default' => 'de.kienzle.sumup'],
             'merchant_code' => ['type' => 'string', 'label' => 'SumUp Händlercode', 'help' => 'z. B. MK01A8C2'],
-            'reader_id' => ['type' => 'string', 'label' => 'SumUp Reader-ID', 'help' => 'API-ID des gekoppelten Solo, siehe README'],
+            'reader_id' => ['type' => 'string', 'label' => 'SumUp Reader-ID', 'help' => 'Beginnt mit rdr_; Herkunft siehe Hinweis (?)'],
         ]],
         'app' => ['label' => 'Zahlungen', 'fields' => [
             'max_amount_cents' => ['type' => 'money', 'label' => 'Höchstbetrag pro Zahlung (Euro)'],

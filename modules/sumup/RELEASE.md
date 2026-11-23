@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.2.2-beta.1
+
+- Hinweise bei den SumUp-Feldern (API-Key, Händlercode, Reader-ID) erklären, woher die Werte kommen und wie man die Reader-ID des Solo über die SumUp-Cloud-API erhält. Die genauen Menünamen bei SumUp sind nicht gegen das aktuelle Händlerkonto geprüft.
+
 ## 2.2.1
 
 - Aufgeräumt: Hilfetexte zum Terminzettel entfernt (der Terminzettel ist ein eigenes Modul).
