@@ -26,6 +26,7 @@ final class Connections {
     public function saveT2med(array $in): void {
         $launch = array_values(array_filter(array_map('trim', preg_split('/\R/', (string)($in['launch_urls'] ?? ''))), fn($u) => $u !== ''));
         $d = ['base_url' => trim((string)($in['base_url'] ?? '')), 'launch_urls' => $launch, 'api_key' => (string)($in['api_key'] ?? ''), 'pin' => ($in['pin'] ?? false) === true];
+        if (($in['api_key_entfernen'] ?? false) === true) $d['api_key_entfernen'] = true;
         if (trim((string)($in['ca_pem'] ?? '')) !== '' || ($in['ca_entfernen'] ?? false) === true) $d['ca_pem'] = trim((string)($in['ca_pem'] ?? ''));
         if (!preg_match('#^https://#', $d['base_url'])) throw new Problem('Adresse des FHIR-Servers: bitte mit https:// angeben.', 422);
         $this->write(['action' => 't2med', 'daten' => $d]);

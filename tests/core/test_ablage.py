@@ -267,6 +267,9 @@ class Verbindungen(Umgebung):
                        {'pin': True}, {'ca_pem': 'kein zertifikat'}):
             with self.subTest(change), self.assertRaises(self.vb.Fehler):
                 self.vb.set_t2med({}, {**self.T2MED, **change})
+        c3 = {'t2med': dict(c['t2med'], ca_pem='x')}
+        self.vb.set_t2med(c3, {**self.T2MED, 'api_key': '', 'api_key_entfernen': True})
+        self.assertEqual((c3['t2med']['api_key'], c3['t2med']['ca_pem']), ('', 'x'), 'Schlüssel entfernen darf das Zertifikat nicht löschen')
         c2 = {}
         self.vb.set_t2med(c2, {**self.T2MED, 'api_key': '  geheim-2 \t'})
         self.assertEqual(c2['t2med']['api_key'], 'geheim-2', 'Leerzeichen am Rand bleiben im Schlüssel')

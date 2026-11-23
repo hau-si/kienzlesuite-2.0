@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.2.6-beta.1
+
+- Ist in der Suite kein API-Schlüssel für T2med gespeichert, nimmt die Kasse wie das alte Tool den hinterlegten T2med-Demo-Schlüssel (Basis 0.20.8-beta.1 bietet „Schlüssel entfernen“). Nicht an einer echten T2med-Installation geprüft.
+
 ## 2.2.5-beta.1
 
 - Meldung „Patientenkontext konnte nicht aus t2med geladen werden“ nennt jetzt den HTTP-Status, die wahrscheinliche Ursache (Secret/Token, Kontext abgelaufen, Adresse) und die Auskunft von T2med, soweit sie keine Patientendaten enthält. Nicht an einer echten T2med-Installation geprüft.

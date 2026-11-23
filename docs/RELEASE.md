@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.20.8-beta.1
+
+- T2med: Das Feld heißt „API-Schlüssel der FHIR-Schnittstelle“ (nicht mehr „Client Secret“); der Hinweis erklärt, dass T2med bei einem unpassenden Wert „FHIR-API-Key fehlt oder ist ungültig“ (HTTP 403) meldet. Neu: „Gespeicherten Schlüssel entfernen“, dann nimmt die Kasse wie das alte Tool den hinterlegten T2med-Demo-Schlüssel. Vermutung, nicht an echtem T2med bestätigt: Der Wert, der im alten Tool funktionierte, war der Demo-Schlüssel, nicht das Client Secret des Drittanbieters.
+
 ## 0.20.7-beta.1
 
 - T2med: Leerzeichen und Tabulatoren am Rand des API-Schlüssels (Client Secret) werden beim Speichern entfernt; beim Kopieren aus T2med werden sie leicht mitgenommen und führen zu „FHIR-API-Key fehlt oder ist ungültig“.

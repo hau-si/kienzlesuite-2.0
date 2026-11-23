@@ -124,11 +124,12 @@ def set_t2med(config: dict, d: dict) -> None:
         raise Fehler('Höchstens 10 Start-Adressen.')
     base = _url(d.get('base_url'), 'Adresse des FHIR-Servers')
     key = d.get('api_key', '')
+    clear = d.get('api_key_entfernen') is True
     key = key.strip() if isinstance(key, str) else key   # beim Kopieren mitgenommene Leerzeichen am Rand
     if not isinstance(key, str) or len(key) > 300 or CONTROL.search(key):
         raise Fehler('API-Schlüssel ungültig.')
     config['t2med'] = {'base_url': base, 'launch_urls': sorted({_url(u, 'Start-Adresse') for u in launch} | {base}),
-                       'api_key': key if key else old.get('api_key', ''), 'ca_pem': _cert(d.get('ca_pem', '')) if 'ca_pem' in d else old.get('ca_pem', ''),
+                       'api_key': '' if clear else (key or old.get('api_key', '')), 'ca_pem': _cert(d.get('ca_pem', '')) if 'ca_pem' in d else old.get('ca_pem', ''),
                        'pin': d.get('pin') is True}
     if config['t2med']['pin'] and not config['t2med']['ca_pem']:
         raise Fehler('Zum festen Prüfen (Pinning) bitte das Zertifikat des T2med-Servers eintragen.')

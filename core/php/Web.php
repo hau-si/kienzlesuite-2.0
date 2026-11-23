@@ -1196,8 +1196,9 @@ final class Web {
         $body .= '<section><h2>T2med (FHIR)</h2><form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('t2med')
             . V::input('base_url', 'Adresse des FHIR-Servers', 'url', (string)($t2['base_url'] ?? ''), 'placeholder="https://t2med-server:16567/aps/fhir/api/r4"')
             . '<label>Erlaubte fhirBasisUrl aus T2med – weitere Adressen (eine je Zeile)<textarea name="launch_urls" rows="2">' . V::h(implode("\n", array_diff((array)($t2['launch_urls'] ?? []), [(string)($t2['base_url'] ?? '')]))) . '</textarea></label>'
-            . V::input('api_key', 'API-Schlüssel (Client Secret aus T2med)', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($t2['api_key_gesetzt'] ?? false))) . '"')
-            . '<p class="muted small">In T2med heißt er „Client Secret“ und wird bei der Einrichtung des Drittanbieters nur einmal angezeigt. Ist er verloren, muss der Drittanbieter-Zugriff in T2med gelöscht und neu erstellt werden.</p>'
+            . V::input('api_key', 'API-Schlüssel der FHIR-Schnittstelle', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($t2['api_key_gesetzt'] ?? false))) . '"')
+            . '<p class="muted small">Schlüssel der FHIR-Schnittstelle (wird als X-API-Key gesendet). Antwortet T2med mit „FHIR-API-Key fehlt oder ist ungültig“, passt der Wert nicht, z. B. wenn hier das Client Secret des Drittanbieters steht. Mit „Schlüssel entfernen“ nutzt die Kasse wie das alte Tool den hinterlegten T2med-Demo-Schlüssel.</p>'
+            . V::checkbox('api_key_entfernen', '1', 'Gespeicherten Schlüssel entfernen (Kasse nimmt den T2med-Demo-Schlüssel)', false)
             . '<label>Zertifikat des T2med-Servers (PEM, optional)' . (($t2['zertifikat'] ?? '') !== '' ? ' – gespeichert, SHA-256 <code>' . V::h(substr((string)$t2['zertifikat'], 0, 16)) . '…</code>' : '')
             . '<textarea name="ca_pem" rows="3" placeholder="-----BEGIN CERTIFICATE-----"></textarea></label>'
             . V::checkbox('ca_entfernen', '1', 'Gespeichertes Zertifikat entfernen', false)
@@ -1289,7 +1290,7 @@ final class Web {
             switch ($f('aktion', 30)) {
                 case 't2med':
                     $c->saveT2med(['base_url' => $f('base_url'), 'launch_urls' => $f('launch_urls', 3000), 'api_key' => $f('api_key'), 'ca_pem' => $f('ca_pem', 20000),
-                        'ca_entfernen' => $f('ca_entfernen') === '1', 'pin' => $f('pin') === '1']);
+                        'ca_entfernen' => $f('ca_entfernen') === '1', 'api_key_entfernen' => $f('api_key_entfernen') === '1', 'pin' => $f('pin') === '1']);
                     $what = 't2med'; break;
                 case 'mail':
                     $c->saveMail(['host' => $f('host'), 'port' => $f('port', 10), 'sicherheit' => $f('sicherheit', 20), 'benutzer' => $f('benutzer'), 'passwort' => $f('passwort'), 'absender' => $f('absender')]);
