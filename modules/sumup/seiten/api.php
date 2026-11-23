@@ -43,6 +43,8 @@ try {
             'state' => $app->state($visit, $browser),
             'start' => $app->start($visit, $input),
             'start_invoice' => $app->startInvoice($visit, $input),
+            'switch_method' => $app->switchMethod($visit, $input),
+            'confirm_transfer' => $app->confirmTransfer($visit, App::string($input, 'payment_id', 32)),
             'invoice_letter' => $app->invoiceLetter($visit, $input),
             'invoice_later' => $app->invoiceLater($visit, $input),
             'invoice_export' => $app->invoiceExport($visit, App::string($input, 'payment_id', 32)),

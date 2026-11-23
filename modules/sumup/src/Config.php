@@ -38,6 +38,11 @@ final class Config {
             $value = $this->get('practice', $field, '');
             if (!is_string($value) || mb_strlen($value) > 200 || preg_match('/[\x00-\x1f\x7f]/', $value)) throw new \RuntimeException('Ungültige Praxisangabe: ' . $field);
         }
+        foreach (['holder' => 70, 'iban' => 42, 'bic' => 11, 'bank_name' => 100, 'purpose' => 140] as $field => $max) {
+            $value = $this->get('bank', $field, '');
+            if (!is_string($value) || mb_strlen($value) > $max || preg_match('/[\x00-\x1f\x7f]/', $value)) throw new \RuntimeException('Ungültige Bankangabe: ' . $field);
+        }
+        if (trim((string)$this->get('bank', 'iban', '')) !== '' && !Bank::validIban((string)$this->get('bank', 'iban', ''))) throw new \RuntimeException('Die IBAN ist ungültig (Prüfziffer stimmt nicht).');
         if (!is_bool($this->get('practice', 'append_sumup_receipt', false))) throw new \RuntimeException('practice.append_sumup_receipt muss true oder false sein.');
         if ($this->get('sumup', 'mode') === 'live') {
             foreach (['api_key', 'affiliate_key', 'app_id', 'merchant_code', 'reader_id'] as $key) {

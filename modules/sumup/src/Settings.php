@@ -31,6 +31,13 @@ final class Settings {
         'practice' => ['label' => 'Belege (Praxisname und Anschrift: Verwaltung → Server und Name)', 'fields' => [
             'append_sumup_receipt' => ['type' => 'bool', 'label' => 'Originalen SumUp-Beleg statt lokaler Zahlungsbestätigung anhängen'],
         ]],
+        'bank' => ['label' => 'Überweisung (Kontodaten der Praxis)', 'fields' => [
+            'holder' => ['type' => 'string', 'label' => 'Kontoinhaber', 'default' => '', 'optional' => true],
+            'iban' => ['type' => 'string', 'label' => 'IBAN', 'default' => '', 'optional' => true],
+            'bic' => ['type' => 'string', 'label' => 'BIC (optional)', 'default' => '', 'optional' => true],
+            'bank_name' => ['type' => 'string', 'label' => 'Bank (optional)', 'default' => '', 'optional' => true],
+            'purpose' => ['type' => 'string', 'label' => 'Verwendungszweck', 'default' => 'Rechnung {nummer}', 'optional' => true],
+        ]],
         'tax' => ['label' => 'Umsatzsteuer', 'fields' => [
             'small_business' => ['type' => 'bool', 'label' => 'Kleinunternehmerregelung (§ 19 UStG): alle Rechnungen ohne MwSt.', 'default' => false],
             'rate' => ['type' => 'percent', 'label' => 'MwSt.-Satz in Prozent', 'default' => 1900],

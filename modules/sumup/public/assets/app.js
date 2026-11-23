@@ -45,13 +45,14 @@ function updateTotal() {
   const ids=selectedIds();
   const sum = state.services.filter(s => ids.has(s.id)).reduce((total,s) => total+s.price_cents, 0) + manualCents();
   $('total').textContent = Number.isFinite(sum) ? euro(sum) : '—';
-  const cash = payMethod() === 'cash';
-  $('pay').textContent = cash ? (sum > 0 ? euro(sum) + ' bar erhalten – Rechnung erstellen' : 'Bar kassieren') : (sum > 0 ? euro(sum) + ' mit Karte kassieren' : 'Mit Karte kassieren');
-  $('pay').classList.toggle('cash', cash);
+  const method = payMethod(), cash = method === 'cash', transfer = method === 'transfer';
+  $('pay-transfer-label').hidden = !state.bank_ready;
+  $('pay').textContent = transfer ? (sum > 0 ? euro(sum) + ' per Überweisung – Rechnung erstellen' : 'Per Überweisung') : cash ? (sum > 0 ? euro(sum) + ' bar erhalten – Rechnung erstellen' : 'Bar kassieren') : (sum > 0 ? euro(sum) + ' mit Karte kassieren' : 'Mit Karte kassieren');
+  $('pay').classList.toggle('cash', cash || transfer);
   // Barzahlung braucht kein freies Terminal, aber Praxisdaten für die Rechnung.
-  $('pay').disabled = busy || (!cash && !!state.reader_payment) || (cash && !state.local_receipts) || !(sum > 0 && sum <= state.max_amount_cents);
-  $('pay-method-note').hidden = !(cash && !state.local_receipts);
-  $('pay-method-note').textContent = 'Für Barzahlungen bitte zuerst Praxisname und Anschrift unter Einstellungen eintragen.';
+  $('pay').disabled = busy || (!cash && !!state.reader_payment) || ((cash || transfer) && !state.local_receipts) || !(sum > 0 && sum <= state.max_amount_cents);
+  $('pay-method-note').hidden = !((cash || transfer) && !state.local_receipts);
+  $('pay-method-note').textContent = 'Für Bar und Überweisung bitte zuerst Praxisname und Anschrift unter Einstellungen eintragen.';
   document.querySelectorAll('.invoice-pay').forEach(b => b.disabled = busy || !!state.reader_payment);
 }
 let invoiceSeen = null, invoiceLater = new Set();
@@ -83,13 +84,18 @@ function renderInvoices() {
     card.onclick = pay('card');
     const cash = element('button','Bar bezahlt','secondary wide invoice-cash');
     cash.onclick = () => { if (confirm(euro(invoice.amount_cents)+' bar erhalten? Die Zahlung wird als bezahlt erfasst.')) pay('cash')(); };
+    if (state.bank_ready) {
+      const transfer = element('button','Per Überweisung (QR-Code anzeigen)','secondary wide invoice-transfer');
+      transfer.onclick = pay('transfer');
+      box.append(transfer);
+    }
     const later = element('button','Später (Überweisung)','text-button invoice-later');
     later.onclick = () => run(async() => {
       // Ist der Rechnungsdruck eingeschaltet, kommt die Rechnung jetzt einmal auf den Praxisdrucker (für die Überweisung).
       if (state.print?.t2med_auto && !invoice.printed_at) { const result = await api('invoice_later', {invoice_id: invoice.id}); if (result.message) message(result.message); }
       invoiceLater.add(invoice.id); await load();
     });
-    box.append(line, card, cash, later);
+    box.prepend(line, card, cash); box.append(later);
     if (invoice.printed_at) box.append(element('p', '🖨 Rechnung gedruckt am ' + new Date(invoice.printed_at * 1000).toLocaleString('de-DE', {dateStyle: 'short', timeStyle: 'short'}), 'muted invoice-letter-note'));
     if (state.letter?.enabled && invoice.letter?.postable) {
       const sent = invoice.letter || {};
@@ -264,7 +270,7 @@ function renderPayment() {
   $('receipt-data-note').hidden=!showing || p.payment_status!=='successful' || !p.local_receipt;
   renderReader();
   if (showing) manage(false);
-  for (const id of ['document','receipt','receipt-mail','receipt-print','receipt-share','retry','cancel','mock-controls','mock-fhir-label']) $(id).hidden=true;
+  for (const id of ['document','receipt','receipt-mail','receipt-print','receipt-share','retry','cancel','mock-controls','mock-fhir-label','transfer-box','confirm-transfer','switch-cash','switch-transfer']) $(id).hidden=true;
   if(!showing || receiptPrintPayment!==p.id) { $('receipt-print-status').hidden=true; $('receipt-print').textContent='Beleg drucken'; }
   if(!showing || p.payment_status!=='successful' || receiptShare?.paymentId!==p.id) { $('receipt-share-panel').hidden=true; receiptShare=null; }
   if(!showing || p.payment_status!=='successful' || receiptRecipient?.paymentId!==p.id) {
@@ -273,7 +279,7 @@ function renderPayment() {
   clearTimeout(timer);
   if (!showing) return;
   // Bar bezahlte T2med-Rechnung: Quittung statt Rechnungsbeleg; kein SumUp-Link.
-  const quittung = p.method==='cash' && !p.local_receipt;
+  const quittung = ['cash','transfer'].includes(p.method) && !p.local_receipt;
   $('receipt').hidden=p.payment_status!=='successful';
   $('receipt').textContent=quittung ? 'Quittung als PDF' : p.local_receipt ? 'Rechnung / Leistungsbeleg als PDF' : 'Zahlungsbeleg / PDF';
   $('receipt-share').hidden=p.payment_status!=='successful' || quittung;
@@ -291,21 +297,33 @@ function renderPayment() {
     title='Vorgang abgeschlossen'; symbol='✓';
     description=state.fhir_mock ? 'Testdokumentation gespeichert. Es wurde nichts in t2med geschrieben. Dieses Fenster kann geschlossen werden.' : 'Die Zahlung wurde in t2med dokumentiert. Dieses Fenster kann geschlossen werden.';
   } else if(p.payment_status==='successful') {
-    title=p.method==='cash' ? 'Barzahlung erfasst' : 'Zahlung erfolgreich'; symbol='✓';
+    title=p.method==='cash' ? 'Barzahlung erfasst' : p.method==='transfer' ? 'Überweisung bestätigt' : 'Zahlung erfolgreich'; symbol='✓';
     description='Mit „Dokumentation in der Akte“ wird die Zahlung in t2med dokumentiert und der Vorgang abgeschlossen.';
     $('document').hidden=false;
     $('document').textContent=p.doc_status==='unknown' || p.doc_status==='writing' ? 'Dokumentation prüfen / erneut versuchen' : 'Dokumentation in der Akte';
     $('mock-fhir-label').hidden=!state.mock;
     $('mock-fhir-fail').checked=state.mock_document_fail;
+  } else if(p.payment_status==='transfer_open') {
+    title='Überweisung offen'; symbol='🏦';
+    description='Der Patient überweist mit den Kontodaten oder dem QR-Code. Sobald das Geld eingegangen ist, den Zahlungseingang bestätigen. Bis dahin kann auf eine andere Zahlart gewechselt werden.';
+    renderTransfer(p); $('confirm-transfer').hidden=false; $('switch-cash').hidden=false; $('cancel').hidden=false; $('cancel').textContent='Überweisung abbrechen';
   } else if(['failed','cancelled'].includes(p.payment_status)) {
-    title=p.payment_status==='failed'?'Zahlung nicht erfolgt':'Zahlung abgebrochen'; symbol='×'; description='Du kannst die Zahlung erneut starten.'; $('retry').hidden=false;
+    title=p.payment_status==='failed'?'Zahlung nicht erfolgt':'Zahlung abgebrochen'; symbol='×'; description='Du kannst die Zahlung erneut starten oder die Zahlart wechseln.'; $('retry').hidden=false;
+    $('switch-cash').hidden=false; $('switch-transfer').hidden=!state.bank_ready;
   } else {
     title=p.payment_status==='unknown' || p.payment_status==='starting'?'Zahlung wird geprüft':p.payment_status==='cancel_requested'?'Abbruch wird geprüft':'Zahlung läuft';
     description='Bitte den Hinweisen am Terminal folgen. Dieses Fenster bis zum Abschluss geöffnet lassen.';
-    $('cancel').hidden=false; $('mock-controls').hidden=!state.mock;
+    $('cancel').hidden=false; $('cancel').textContent='Zahlung abbrechen'; $('mock-controls').hidden=!state.mock;
     timer=setTimeout(poll,2200);
   }
   $('payment-title').textContent=title; $('payment-description').textContent=description; $('status-symbol').textContent=symbol;
+}
+function renderTransfer(p) {
+  const t = p.transfer; $('transfer-box').hidden = !t; if (!t) return;
+  // Das SVG stammt vom eigenen Server (Qr::svg) und enthält nur Formen.
+  $('transfer-qr').innerHTML = t.qr_svg;
+  const rows = [['Empfänger', t.holder], ['IBAN', t.iban], ['BIC', t.bic], ['Bank', t.bank], ['Betrag', euro(p.amount_cents)], ['Verwendungszweck', t.purpose]].filter(r => r[1]);
+  $('transfer-data').replaceChildren(...rows.flatMap(([k, v]) => [element('dt', k), element('dd', v)]));
 }
 function printChoice() { return $('print-box').hidden ? {} : {auto_print: $('auto-print').checked}; }
 function renderPrintBox() {
@@ -409,6 +427,15 @@ $('pay').onclick=()=>run(async()=>{
   document.querySelector('input[name="pay-method"][value="card"]').checked=true; renderPayment();
 });
 $('retry').onclick=()=>{ retrySelection=true; startRequest=null; renderPayment(); updateTotal(); };
+$('switch-cash').onclick=()=>run(async()=>{
+  if(!confirm(euro(state.payment.amount_cents)+' bar erhalten? Die Zahlung wird als bezahlt erfasst.')) return;
+  state.payment=await api('switch_method',{payment_id:state.payment.id,request_id:crypto.randomUUID(),method:'cash'}); retrySelection=false; renderPayment();
+});
+$('switch-transfer').onclick=()=>run(async()=>{ state.payment=await api('switch_method',{payment_id:state.payment.id,request_id:crypto.randomUUID(),method:'transfer'}); retrySelection=false; renderPayment(); });
+$('confirm-transfer').onclick=()=>run(async()=>{
+  if(!confirm('Ist der Betrag von '+euro(state.payment.amount_cents)+' auf dem Konto eingegangen? Die Zahlung wird dann als bezahlt erfasst.')) return;
+  state.payment=await api('confirm_transfer',{payment_id:state.payment.id}); renderPayment();
+});
 $('cancel').onclick=()=>run(async()=>{ state.payment=await api('cancel',{payment_id:state.payment.id}); });
 $('reader-cancel').onclick=()=>run(()=>refreshReader('reader_cancel'));
 $('reader-status').onclick=()=>run(()=>refreshReader('reader_status'));

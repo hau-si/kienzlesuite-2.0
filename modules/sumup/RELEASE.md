@@ -1,5 +1,14 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.0-beta.1
+
+- Neu: Zahlart **Überweisung**. In den Einstellungen (Abschnitt „Überweisung“) werden Kontoinhaber, IBAN (mit Prüfziffernkontrolle), optional BIC und Bank sowie eine Vorlage für den Verwendungszweck fest hinterlegt (`{nummer}`, `{betrag}`).
+- Die Kasse zeigt für eine Überweisung die Kontodaten und einen **EPC-QR-Code („GiroCode“)** mit Betrag und Verwendungszweck; die Banking-App füllt die Überweisung damit selbst aus. Der QR-Code wird ohne externe Bibliothek im Modul erzeugt.
+- Eine Überweisung bleibt „offen“, bis der Zahlungseingang bestätigt wird; erst dann entstehen Rechnungsnummer (`UEB-JJJJ-NNNN`), Beleg bzw. Quittung und die Dokumentation in der Akte. Offene Überweisungen lassen sich abbrechen.
+- Nach fehlgeschlagener oder abgebrochener Zahlung (und bei offener Überweisung) kann direkt auf **Bar** oder **Überweisung** gewechselt werden – bei der Leistungsauswahl („IGeL“) wie bei T2med-Rechnungen; Positionen und Betrag werden übernommen. Bei T2med-Rechnungen gibt es zusätzlich den Knopf „Per Überweisung (QR-Code anzeigen)“, bei der Leistungsauswahl die dritte Zahlart.
+- Akteneintrag, Beleg und Steuerexport (neue Spalte „davon Überweisung“) kennzeichnen Überweisungen.
+- Nicht auf echter Hardware, nicht mit einer echten Banking-App getestet; der QR-Code wurde mit zwei OpenCV-Decodern gegengelesen.
+
 ## 2.2.6-beta.1
 
 - Ist in der Suite kein API-Schlüssel für T2med gespeichert, nimmt die Kasse wie das alte Tool den hinterlegten T2med-Demo-Schlüssel (Basis 0.20.8-beta.1 bietet „Schlüssel entfernen“). Nicht an einer echten T2med-Installation geprüft.

@@ -50,7 +50,7 @@ $base = ks_h(Suite::base() . '/');
 <button id="reader-cancel" class="secondary wide">Anderen Vorgang abbrechen</button>
 <button id="reader-status" class="text-button">Status prüfen</button>
 </div>
-<div id="pay-method" class="pay-method" role="radiogroup" aria-label="Zahlungsart"><label><input type="radio" name="pay-method" value="card" checked><span>💳 Karte (SumUp)</span></label><label><input type="radio" name="pay-method" value="cash"><span>💶 Bar</span></label></div><p id="pay-method-note" class="muted small" hidden></p>
+<div id="pay-method" class="pay-method" role="radiogroup" aria-label="Zahlungsart"><label><input type="radio" name="pay-method" value="card" checked><span>💳 Karte (SumUp)</span></label><label><input type="radio" name="pay-method" value="cash"><span>💶 Bar</span></label><label id="pay-transfer-label" hidden><input type="radio" name="pay-method" value="transfer"><span>🏦 Überweisung</span></label></div><p id="pay-method-note" class="muted small" hidden></p>
 <button id="pay" class="primary wide" disabled>Mit Karte kassieren</button></section>
 <section id="manager" class="card" hidden><div class="section-heading"><h2>Leistungen verwalten</h2><button id="manage-close" class="text-button">Fertig</button></div><div id="manage-list"></div>
 <form id="service-form"><input id="service-id" type="hidden"><label for="service-label">Bezeichnung</label><input id="service-label" required maxlength="160" placeholder="z. B. Attest"><label for="service-price">Preis in Euro</label><input id="service-price" required inputmode="decimal" placeholder="10,00" maxlength="12">
@@ -70,7 +70,7 @@ $base = ks_h(Suite::base() . '/');
 <p class="muted">Vorhandene Einzelleistungen auswählen. Dieselbe Blutentnahme in allen passenden Kombinationen verwenden.</p><div id="group-members"></div>
 <div class="actions"><button id="group-save" class="primary" type="submit">Kombination hinzufügen</button><button id="group-reset" class="secondary" type="button" hidden>Abbrechen</button></div></form></details>
 </section>
-<section id="payment" class="card payment-card" hidden aria-live="polite"><span id="status-symbol" class="status-symbol" aria-hidden="true">…</span><h2 id="payment-title"></h2><p id="payment-description"></p><strong id="payment-amount" class="payment-amount"></strong><p id="payment-reference" class="muted reference"></p><p id="payment-error" class="inline-error" hidden></p>
+<section id="payment" class="card payment-card" hidden aria-live="polite"><span id="status-symbol" class="status-symbol" aria-hidden="true">…</span><h2 id="payment-title"></h2><p id="payment-description"></p><strong id="payment-amount" class="payment-amount"></strong><p id="payment-reference" class="muted reference"></p><p id="payment-error" class="inline-error" hidden></p><div id="transfer-box" class="transfer-box" hidden><div id="transfer-qr"></div><dl id="transfer-data"></dl><p class="muted small">Mit der Banking-App den QR-Code scannen: Betrag, Empfänger und Verwendungszweck sind schon eingetragen.</p></div>
 <button id="receipt" class="secondary wide" hidden>Zahlungsbeleg / PDF</button>
 <p id="receipt-data-note" class="muted" hidden>Dieser Beleg enthält Patientendaten und die abgerechneten Leistungen. Beim Mailversand wird dieses PDF angehängt.</p>
 <button id="receipt-mail" class="secondary wide" hidden>Beleg mailen</button>
@@ -79,7 +79,7 @@ $base = ks_h(Suite::base() . '/');
 <p id="receipt-print-status" class="muted" role="status" hidden></p>
 <p id="invoice-print-status" class="muted" role="status" hidden></p><button id="invoice-print" class="text-button" hidden>Rechnung erneut drucken</button>
 <p id="invoice-export-status" class="muted" role="status" hidden></p><button id="invoice-export" class="text-button" hidden>Rechnungs-PDF erneut ablegen</button>
-<button id="document" class="primary wide" hidden>Dokumentation in der Akte</button><button id="retry" class="primary wide" hidden>Erneut versuchen</button><button id="cancel" class="text-button" hidden>Zahlung abbrechen</button>
+<button id="document" class="primary wide" hidden>Dokumentation in der Akte</button><button id="confirm-transfer" class="primary wide" hidden>Zahlungseingang bestätigt</button><button id="retry" class="primary wide" hidden>Erneut versuchen</button><button id="switch-cash" class="secondary wide" hidden>Stattdessen bar bezahlt</button><button id="switch-transfer" class="secondary wide" hidden>Stattdessen per Überweisung</button><button id="cancel" class="text-button" hidden>Zahlung abbrechen</button>
 <button id="receipt-share" class="text-button" hidden>Beleglink / E-Mail-Adresse ändern</button>
 <div id="receipt-share-panel" class="receipt-share" hidden>
 <p id="receipt-share-message" class="muted" role="status"></p>
