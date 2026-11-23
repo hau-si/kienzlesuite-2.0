@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.3-beta.4
+
+- AGENTS.md: Hinweise für neue Sitzungen (Stand, Arbeitsweise, offene Punkte). Nur Dokumentation.
+
 ## 0.21.3-beta.3
 
 - README: aktueller Stand und Abschnitt „So sieht es aus“ mit Bildschirmfotos (Anmeldung, Benutzer, Gruppen, Sicherung auf das NAS per SFTP, Updater; nur erfundene Beispieldaten). Nur Dokumentation, kein Programmcode geändert.
