@@ -299,7 +299,9 @@ def extract_text(data: bytes, cfg: dict[str, Any]) -> str:
                     run_checked(["gs", "-q", "-dSAFER", "-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite",
                                  "-sOutputFile=" + str(pdf), str(source)], temp_dir=td)
                 else:
-                    run_checked(["gxps2pdf", str(source), str(pdf)], temp_dir=td)
+                    # Ubuntu liefert das Werkzeug aus libgxps-utils als „xpstopdf“; „gxps2pdf“ nur ältere Pakete.
+                    tool = "xpstopdf" if shutil.which("xpstopdf", path="/usr/bin:/bin") else "gxps2pdf"
+                    run_checked([tool, str(source), str(pdf)], temp_dir=td)
                 return extract_pdf_text(str(pdf), cfg, temp_dir=td)
     encoding = str(cfg.get("input", {}).get("text_encoding", "utf-8"))
     try:

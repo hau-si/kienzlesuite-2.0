@@ -1,5 +1,12 @@
 # Terminzettel – Release-Notizen
 
+## 1.0.1-beta.1
+
+- Behoben: Nach der Installation meldete der Gesundheitstest „Das Modul antwortet nach dem Start nicht“, weil er das Programm
+  `gxps2pdf` verlangte, das Ubuntu nicht liefert (Paket libgxps-utils enthält `xpstopdf`). Der Test verlangt jetzt nur noch
+  die Programme für PDF, PostScript und Texterkennung; für XPS wird `xpstopdf` bzw. `gxps2pdf` genommen, was vorhanden ist.
+- Nicht auf echtem Ubuntu 26.04 geprüft; die Ursache ist aus der Programmliste abgeleitet, nicht aus dem Protokoll der VM.
+
 ## 1.0.0
 
 - Der T2med-Terminzettel (t2med-terminzettel 1.3.1 von Dr. Thomas Kienzle) ist ein eigenes Modul der Kienzle-Suite 2.0

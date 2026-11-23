@@ -11,7 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import terminzettel as app  # noqa: E402
 
-PROGRAMME = ("pdftotext", "pdfinfo", "pdftoppm", "tesseract", "gs", "gxps2pdf")
+PROGRAMME = ("pdftotext", "pdfinfo", "pdftoppm", "tesseract", "gs")  # XPS (xpstopdf) ist nur für Windows-Druck per XPS nötig
 
 
 def health() -> int:
