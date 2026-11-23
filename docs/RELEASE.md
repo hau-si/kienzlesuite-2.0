@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.14
+
+- Verwaltung → Module zeigt pro Modul den Zustand der Dienste („läuft“ / „gestoppt“) mit den Knöpfen „Starten“ bzw. „Neu starten“ und „Status der Dienste aktualisieren“. Der Status wird bei der täglichen Modulprüfung und auf Knopfdruck erneuert. Nur mit nachgebautem systemctl getestet, nicht auf dem echten Server (Ubuntu 26.04).
+
 ## 0.21.4-beta.13
 
 - Modul-Dienste, die nach einem unterbrochenen Update gestoppt blieben (z. B. Terminzettel: Seite zeigte „Einen Moment bitte“), werden bei der täglichen Modulprüfung und bei „Neu prüfen“ wieder gestartet, wenn sie eingeschaltet sind und gerade kein Update läuft. Einmalige Dienste (Type=oneshot) bleiben unberührt. Nur mit nachgebautem systemctl getestet.

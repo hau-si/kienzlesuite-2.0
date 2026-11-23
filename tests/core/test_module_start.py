@@ -34,6 +34,22 @@ class Wiederstart(unittest.TestCase):
         self.assertIn(('start', 'kienzle-demo-php.service'), self.calls)
         self.assertNotIn(('start', 'kienzle-demo-einmal.service'), self.calls)
 
+    def test_dienstzustaende_und_start(self):
+        def antwort(*args):
+            self.calls.append(args)
+            return subprocess.CompletedProcess(args, 3 if args[0] == 'is-active' else 0)
+        with mock.patch.object(m, 'UNITS', self.t), mock.patch.object(m, 'installed', return_value={'demo': {}}), \
+                mock.patch.object(m, '_systemctl', side_effect=antwort), mock.patch.object(m, 'log'), \
+                mock.patch.object(m, 'read_status', return_value={'installed': [{'id': 'demo'}]}), mock.patch.object(m, 'set_status') as st:
+            self.assertEqual(m.service_states(), {'demo': [{'name': 'kienzle-demo-php.service', 'aktiv': False}]})
+            msg = m.service_action('demo', restart=True)
+            self.assertIn(('restart', 'kienzle-demo-php.service'), self.calls)
+            self.assertNotIn(('restart', 'kienzle-demo-einmal.service'), self.calls)
+            self.assertIn('neu gestartet', msg)
+            self.assertEqual(st.call_args.kwargs['installed'][0]['dienste'][0]['aktiv'], False)
+            with self.assertRaises(m.Fehler):
+                m.service_action('unbekannt', restart=False)
+
     def test_nichts_waehrend_update(self):
         self.assertEqual(self.lauf({'action': 'aktualisieren', 'id': 'demo'}), [])
         self.assertEqual(self.calls, [])

@@ -1197,6 +1197,15 @@ final class Web {
             $body .= '<div class="box wide"><h3>' . V::h($m['name']) . ' <span class="tag">' . V::h($m['version']) . '</span></h3>'
                 . ($m['description'] !== '' ? '<p>' . V::h($m['description']) . '</p>' : '')
                 . ($m['path'] ? '<p><a href="' . V::h($m['path']) . '/">Öffnen</a></p>' : '');
+            if ($m['dienste']) {
+                $active = count(array_filter($m['dienste'], fn($d) => $d['aktiv'] === true));
+                $unknown = count(array_filter($m['dienste'], fn($d) => $d['aktiv'] === null)) > 0;
+                $all = $active === count($m['dienste']);
+                $body .= '<p>Dienst: ' . ($unknown ? '<span class="tag">Status unbekannt</span>' : ($all ? '<span class="tag">läuft</span>' : '<span class="tag warn">' . ($active === 0 ? 'gestoppt' : 'teilweise gestoppt') . '</span>'))
+                    . ' <small class="muted">' . V::h(implode(', ', array_map(fn($d) => preg_replace('/^kienzle-|\.service$/', '', $d['name']) . ($d['aktiv'] === true ? ' ✓' : ($d['aktiv'] === false ? ' ✗' : ' ?')), $m['dienste']))) . '</small> '
+                    . (!$all ? '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="dienst-start"><button' . $off . '>Starten</button></form> ' : '')
+                    . '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="dienst-neustart"><button class="secondary"' . $off . '>Neu starten</button></form></p>';
+            }
             if ($m['update']) {
                 $body .= '<form method="post" action="/verwaltung/module">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="aktualisieren">'
                     . '<p>Neue Version <strong>' . V::h($m['update']['version']) . '</strong>' . ($m['update']['source'] === 'github' ? ' (GitHub' . ($m['update']['signed'] === false ? ', nicht signiert' : '') . ')' : ' (mit der Basis geliefert)')
@@ -1218,7 +1227,8 @@ final class Web {
                 . '<form method="post" action="/verwaltung/module">' . $csrf . '<input type="hidden" name="aktion" value="installieren"><input type="hidden" name="id" value="' . V::h($m['id']) . '">'
                 . '<button' . $off . '>Installieren</button></form></div>';
         }
-        $body .= '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="pruefen"><button class="secondary"' . $off . '>Nach Modulen sehen</button></form> '
+        $body .= '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="status"><button class="secondary"' . $off . '>Status der Dienste aktualisieren</button></form> '
+            . '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="pruefen"><button class="secondary"' . $off . '>Nach Modulen sehen</button></form> '
             . '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="automatisch"><input type="hidden" name="an" value="' . ($st['auto'] ? '0' : '1') . '">'
             . '<button class="secondary"' . $off . '>' . ($st['auto'] ? 'Automatische Updates ausschalten' : 'Automatische Updates einschalten') . '</button></form>'
             . '<p class="muted">' . ($st['auto'] ? 'Neue Modulversionen werden täglich nachts installiert, nicht während einer Zahlung.' : 'Modul-Updates nur von Hand.') . '</p>'
@@ -1234,6 +1244,8 @@ final class Web {
         try {
             switch ($r->field('aktion', 20)) {
                 case 'pruefen': $store->check(); break;
+                case 'status': $store->refreshStates(); break;
+                case 'dienst-start': case 'dienst-neustart': $restart = $r->field('aktion', 20) === 'dienst-neustart'; $store->startService($id, $restart); $this->audit->write($admin, $restart ? 'modul-dienst-neustart' : 'modul-dienst-start', $id); break;
                 case 'automatisch': $on = $r->field('an', 1) === '1'; $store->auto($on); $this->audit->write($admin, 'modul-automatisch', $on ? 'an' : 'aus'); break;
                 case 'installieren': $store->install($id); $this->db->store('erstadmin:' . $id, (string)(int)$this->session['user_id']); $this->audit->write($admin, 'modul-installieren', $id); break;
                 case 'aktualisieren': $store->update($id); $this->audit->write($admin, 'modul-aktualisieren', $id); break;

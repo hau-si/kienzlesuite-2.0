@@ -24,6 +24,8 @@ final class ModuleAdmin {
             return ['id' => (string)$m['id'], 'name' => mb_substr((string)($m['name'] ?? $m['id']), 0, 80), 'version' => (string)$m['version'],
                 'description' => mb_substr((string)($m['description'] ?? ''), 0, 300), 'path' => is_string($m['path'] ?? null) ? $m['path'] : null,
                 'source' => ($m['source'] ?? '') === 'github' ? 'github' : 'mitgeliefert', 'signed' => $m['signed'] ?? null,
+                'dienste' => array_values(array_filter(array_map(static fn($d) => is_array($d) && is_string($d['name'] ?? null) && preg_match('/^[A-Za-z0-9@_.-]{1,80}$/D', $d['name'])
+                    ? ['name' => $d['name'], 'aktiv' => is_bool($d['aktiv'] ?? null) ? $d['aktiv'] : null] : null, (array)($m['dienste'] ?? [])))),
                 'update' => $u ? ['version' => (string)$u['version'], 'source' => ($u['source'] ?? '') === 'github' ? 'github' : 'mitgeliefert', 'signed' => $u['signed'] ?? null] : null];
         };
         $installed = array_values(array_filter(array_map($clean, (array)($s['installed'] ?? []))));
@@ -44,6 +46,13 @@ final class ModuleAdmin {
     public function count(): int { return count(array_filter($this->status()['installed'], fn($m) => $m['update'] !== null)); }
 
     public function auto(bool $on): void { $this->write(['action' => 'automatisch', 'an' => $on]); }
+
+    public function refreshStates(): void { $this->write(['action' => 'status']); }
+
+    public function startService(string $id, bool $restart): void {
+        $m = $this->find('installed', $id);
+        $this->write(['action' => $restart ? 'dienst-neustart' : 'dienst-start', 'id' => $m['id']]);
+    }
 
     public function check(): void { $this->write(['action' => 'pruefen']); }
 
