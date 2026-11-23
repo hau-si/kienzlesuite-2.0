@@ -1405,7 +1405,13 @@ final class Web {
             . '</section>';
         // E-Mail
         $sec = (string)($mail['sicherheit'] ?? 'starttls');
-        $body .= '<section><h2>E-Mail-Versand (SMTP)</h2><form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('mail')
+        $gmail = ($mail['art'] ?? '') === 'gmail';
+        $pending = $this->con()->gmailPending();
+        $lead = $mail ? '<p class="' . (($gmail && empty($mail['verbunden'])) ? 'error' : 'ok') . '">' . ($gmail ? 'Gmail: ' . V::h((string)($mail['absender'] ?? '')) . ($mail['verbunden'] ? ' – mit Google verbunden' : ' – noch nicht angemeldet')
+            : 'SMTP-Server: ' . V::h((string)($mail['host'] ?? '')) . ' (' . V::h((string)($mail['absender'] ?? '')) . ')') . '</p>' : '';
+        $body .= '<section><h2>E-Mail-Versand</h2>' . $lead
+            . '<details class="fold"' . (!$gmail ? ' open' : '') . '><summary><h3>SMTP-Server (eigener Mailserver, z. B. Praxis-Domain)</h3></summary>'
+            . 'form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('mail')
             . V::input('host', 'SMTP-Server', 'text', (string)($mail['host'] ?? ''), 'placeholder="smtp.example.org"')
             . V::input('port', 'Port', 'number', (string)($mail['port'] ?? '587'), 'min="1" max="65535"')
             . '<label>Verschlüsselung<select name="sicherheit"><option value="starttls"' . ($sec === 'starttls' ? ' selected' : '') . '>STARTTLS (meist 587)</option>'
@@ -1413,7 +1419,26 @@ final class Web {
             . V::input('benutzer', 'Benutzername', 'text', (string)($mail['benutzer'] ?? ''), 'autocomplete="off"')
             . V::input('passwort', 'Passwort', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($mail['passwort_gesetzt'] ?? false))) . '"')
             . V::input('absender', 'Absender', 'email', (string)($mail['absender'] ?? ''), 'placeholder="praxis@example.org"')
-            . '<button>Speichern</button></form>'
+            . '<button>Speichern</button></form>' . '</details>'
+            . '<details class="fold"' . ($gmail || $pending ? ' open' : '') . '><summary><h3>Gmail-Konto (OAuth, ohne Passwort im Klartext)</h3></summary>'
+            . '<p class="muted">Gilt für ein normales Gmail-Konto. Jede Praxis legt dafür einmalig einen eigenen Zugang bei Google an (kostenlos, ca. 10 Minuten). Gesendet wird nur über die Gmail-Schnittstelle mit der Berechtigung „E-Mails senden“; die Suite kann keine Postfächer lesen.</p>'
+            . '<ol class="muted"><li>Auf <strong>console.cloud.google.com</strong> mit dem Gmail-Konto anmelden und ein neues Projekt anlegen (Name z. B. „Kienzle-Suite“).</li>'
+            . '<li>Unter „APIs und Dienste“ → „Bibliothek“ die <strong>Gmail API</strong> aktivieren.</li>'
+            . '<li>Unter „OAuth-Zustimmungsbildschirm“ (neu: „Google Auth Platform“) die App einrichten: Nutzertyp <strong>Extern</strong>, App-Name und deine E-Mail-Adresse eintragen. Bei „Datenzugriff“/„Bereiche“ <code>https://www.googleapis.com/auth/gmail.send</code> hinzufügen. Dein Gmail-Konto als Testnutzer eintragen.</li>'
+            . '<li>Danach die App auf <strong>„In Produktion“ veröffentlichen</strong> (Zielgruppe → App veröffentlichen). Sonst läuft die Anmeldung nach 7 Tagen ab. Eine Prüfung durch Google ist dafür nicht nötig; bei der Anmeldung erscheint „Google hat diese App nicht überprüft“ – dort „Erweitert“ → „Weiter zu … (unsicher)“ wählen.</li>'
+            . '<li>Unter „Clients“/„Anmeldedaten“ eine <strong>OAuth-Client-ID vom Typ „Desktop-App“</strong> erstellen. Client-ID und Client-Secret hier eintragen. (Menünamen bei Google ändern sich öfter und sind nicht gegen dein Konto geprüft.)</li></ol>'
+            . '<form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('gmail-start') . '<h4>Schritt 1: bei Google anmelden</h4>'
+            . $this->tipInput('client_id', 'Client-ID', 'Endet meist auf .apps.googleusercontent.com.', 'text', (string)($pending['client_id'] ?? $mail['client_id'] ?? ''), 'autocomplete="off" maxlength="200"')
+            . $this->tipInput('absender', 'Gmail-Adresse (Absender)', 'Das Konto, mit dem du dich bei Google anmeldest; von dort werden die E-Mails verschickt.', 'email', (string)($pending['absender'] ?? $mail['absender'] ?? ''), 'placeholder="praxis@gmail.com"')
+            . '<button>Weiter</button></form>'
+            . ($pending ? '<div class="box wide"><h4>Schritt 2: Code übernehmen</h4><p><a href="' . V::h($this->con()->gmailUrl($pending)) . '" target="_blank" rel="noopener">Hier bei Google anmelden und den Zugriff erlauben</a> (öffnet in neuem Tab). '
+                . 'Danach zeigt der Browser eine Fehlerseite („Seite nicht erreichbar“ unter <code>localhost</code>) – das ist richtig. Die <strong>ganze Adresse aus der Adresszeile</strong> (beginnt mit <code>http://localhost/?state=</code>) kopieren und hier einfügen:</p>'
+                . '<form method="post" action="/verwaltung/verbindungen">' . $this->hidden('gmail')
+                . '<label>Adresse aus der Adresszeile<input type="text" name="adresse" required maxlength="2000" autocomplete="off" placeholder="http://localhost/?state=…&amp;code=…"></label>'
+                . V::input('client_secret', 'Client-Secret', 'password', '', 'autocomplete="new-password" required maxlength="200"')
+                . '<button>Verbinden</button></form><p class="muted">Die Anmeldung ist 30 Minuten gültig.</p></div>' : '')
+            . '</details>'
+
             . ($mail ? $this->testLine($st['tests'], 'mail') . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'mail']) . '<button>Anmeldung prüfen</button></form> '
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('testmail') . '<input type="email" name="an" placeholder="empfaenger@example.org" required maxlength="254" aria-label="Empfänger der Testnachricht"> <button>Testnachricht senden</button></form> '
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'mail']) . '<button class="danger">Entfernen</button></form>' : '')
@@ -1491,7 +1516,7 @@ final class Web {
         $body .= '<section><h2>Wer nutzt was</h2>' . ($rows !== '' ? '<table><tr><th>Modul</th><th>Verbindung</th><th>Wofür</th><th>Nötig</th></tr>' . $rows . '</table>' : '<p>Kein installiertes Modul nutzt eine zentrale Verbindung.</p>') . '</section>';
         $body = preg_replace('#(<p>Zugänge, die mehrere Module brauchen.*?</p>)#s', '<section class="card">$1</section>', $body, 1);
         // Jeder Abschnitt klappt zu; eingerichtete tragen ein grünes „eingerichtet“, offene und fehlerhafte bleiben aufgeklappt.
-        $done = ['T2med (FHIR)' => trim((string)($t2['base_url'] ?? '')) !== '', 'E-Mail-Versand (SMTP)' => trim((string)($mail['host'] ?? '')) !== '',
+        $done = ['T2med (FHIR)' => trim((string)($t2['base_url'] ?? '')) !== '', 'E-Mail-Versand' => $mail !== null && $mail !== [],
             'SMS (seven.io)' => !empty($st['sms']), 'Letterxpress (Briefversand)' => !empty($st['letterxpress']), 'Netzwerkspeicher' => !empty($st['ablage'])];
         $body = preg_replace_callback('#<section><h2>([^<]*)</h2>(.*?)</section>#s', function (array $m) use ($done): string {
             $title = html_entity_decode($m[1], ENT_QUOTES, 'UTF-8');
@@ -1517,6 +1542,8 @@ final class Web {
                     $what = 'mail'; break;
                 case 'sms': $c->saveSms(['api_key' => $f('api_key'), 'absender' => $f('absender', 20)]); $what = 'sms'; break;
                 case 'letterxpress': $c->saveLetterxpress(['username' => $f('username', 200), 'api_key' => $f('api_key', 200), 'modus' => $f('modus', 10)]); $what = 'letterxpress'; break;
+                case 'gmail-start': $c->gmailStart($f('client_id', 200), $f('absender', 254)); $what = 'gmail-start'; break;
+                case 'gmail': $c->saveGmail($f('client_secret', 200), $f('adresse', 2000)); $what = 'gmail'; break;
                 case 'testsms': $c->testSms($f('an', 40)); $what = 'testsms'; break;
                 case 'ziel':
                     $c->saveTarget(['id' => $f('id', 40), 'name' => $f('name', 80), 'art' => $f('art', 10), 'host' => $f('host'), 'freigabe' => $f('freigabe', 100), 'port' => $f('port', 10),

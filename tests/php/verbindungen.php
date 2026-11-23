@@ -127,6 +127,30 @@ function test_letterxpress(): void {
     check(req_v($env) === ['action' => 'letterxpress', 'loeschen' => true], 'Entfernen-Anfrage falsch');
 }
 
+function test_gmail(): void {
+    [$env, $c] = con_env([]);
+    [$b] = admin_browser($env);
+    $b->web = fn() => $b->defaultWeb(null, null, $c);
+    $r = $b->post('/verwaltung/verbindungen', ['aktion' => 'gmail-start', 'client_id' => 'kurz', 'absender' => 'praxis@gmail.example']);
+    check($r->status === 422, 'Ungültige Client-ID angenommen');
+    $b->post('/verwaltung/verbindungen', ['aktion' => 'gmail-start', 'client_id' => '1234567890-abc.apps.googleusercontent.com', 'absender' => 'praxis@gmail.example']);
+    $page = $b->get('/verwaltung/verbindungen')->body;
+    check(preg_match('#href="(https://accounts\.google\.com/o/oauth2/v2/auth\?[^"]+)"#', $page, $m) === 1, 'Anmelde-Link fehlt');
+    $url = html_entity_decode($m[1]);
+    parse_str((string)parse_url($url, PHP_URL_QUERY), $q);
+    check($q['scope'] === 'https://www.googleapis.com/auth/gmail.send' && $q['redirect_uri'] === 'http://localhost' && $q['access_type'] === 'offline' && strlen($q['state']) === 32, 'Anmelde-Adresse falsch');
+    $r = $b->post('/verwaltung/verbindungen', ['aktion' => 'gmail', 'client_secret' => 'GOCSPX-geheim', 'adresse' => 'http://localhost/?state=falsch&code=4/abc']);
+    check($r->status === 422 && !file_exists($env->dir . '/anfragen/verbindungen.json'), 'Falscher Zustandswert angenommen');
+    $r = $b->post('/verwaltung/verbindungen', ['aktion' => 'gmail', 'client_secret' => 'GOCSPX-geheim', 'adresse' => 'http://localhost/?state=' . $q['state'] . '&code=4%2Fabc&scope=x']);
+    check($r->status === 303 && req_v($env) === ['action' => 'gmail', 'daten' => ['client_id' => '1234567890-abc.apps.googleusercontent.com', 'client_secret' => 'GOCSPX-geheim', 'absender' => 'praxis@gmail.example', 'code' => '4/abc']], 'Gmail-Anfrage falsch');
+    check(!str_contains($b->get('/verwaltung/verbindungen')->body, 'accounts.google.com'), 'Anmeldung nach Abschluss noch offen');
+    [$env2, $c2] = con_env(['mail' => ['art' => 'gmail', 'client_id' => '1234567890-abc.apps.googleusercontent.com', 'absender' => 'praxis@gmail.example', 'secret_gesetzt' => true, 'verbunden' => true]]);
+    [$b2] = admin_browser($env2);
+    $b2->web = fn() => $b2->defaultWeb(null, null, $c2);
+    $page2 = $b2->get('/verwaltung/verbindungen')->body;
+    check(str_contains($page2, 'mit Google verbunden') && str_contains($page2, '✓ eingerichtet') && !str_contains($page2, 'GOCSPX'), 'Gmail-Status falsch');
+}
+
 function test_testnachricht(): void {
     [$env, $c] = con_env(['mail' => ['host' => 'smtp.example.org', 'port' => 587, 'sicherheit' => 'starttls', 'benutzer' => 'p@example.org', 'absender' => 'p@example.org', 'passwort_gesetzt' => true]]);
     [$b] = admin_browser($env);

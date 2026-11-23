@@ -86,6 +86,13 @@ final class FakeMailer extends ReceiptMailer {
         if($this->lost) throw new Problem('Versandantwort verloren.',502);
     }
 }
+final class GmailMailer extends ReceiptMailer {
+    public array $calls=[];
+    protected function googlePost(string $url,string $body,array $headers):array {
+        $this->calls[]=[$url,$body,$headers];
+        return $url==='https://oauth2.googleapis.com/token'?['access_token'=>'acc-test']:['id'=>'1'];
+    }
+}
 final class FakePrinter extends ReceiptPrinter {
     public int $sent=0;
     public bool $lost=false;
@@ -202,7 +209,16 @@ try {
     $mailer->lost=false;$mailInput['request_id']=App::id();check($mailApp->receiptEmail($v,$mailInput)['status']==='sent','Bewusster Neuversand nicht möglich');
     check($app->db->one('SELECT * FROM payments WHERE id=?',[$p['id']])===$paymentBefore,'Mailversand verändert Zahlung');
     check($http->posts('t2med.test')===$fhirBefore,'Mailversand schreibt Akteneintrag');
-    echo "OK: PDF-Anhang, Migration, Versandwiederholung und verlorene SMTP-Antwort.\n";
+    // Gmail (OAuth): Nachricht über die Gmail-Schnittstelle, ohne SMTP; Zugangsdaten nur im Token-Aufruf.
+    $gv=$cfg->values;$gv['mail']=['enabled'=>true,'art'=>'gmail','client_id'=>'1234567890-abc.apps.googleusercontent.com','client_secret'=>'GOCSPX-test','refresh_token'=>'r-test','from_address'=>'praxis@gmail.example','from_name'=>''];
+    $gc=new Config($gv);$gm=new GmailMailer($gc);
+    $gm->send('erika@example.invalid','%PDF-1.4 Beleg','TEST-1');
+    check(count($gm->calls)===2&&$gm->calls[0][0]==='https://oauth2.googleapis.com/token'&&str_contains($gm->calls[0][1],'grant_type=refresh_token')&&!str_contains($gm->calls[1][1],'GOCSPX'),'Gmail-Token-Aufruf falsch');
+    check($gm->calls[1][0]==='https://gmail.googleapis.com/gmail/v1/users/me/messages/send'&&in_array('Authorization: Bearer acc-test',$gm->calls[1][2],true),'Gmail-Sendeaufruf falsch');
+    $mime=base64_decode(strtr((string)json_decode($gm->calls[1][1],true)['raw'],'-_','+/'));
+    check(str_contains($mime,'To: erika@example.invalid')&&str_contains($mime,'From: praxis@gmail.example')&&str_contains($mime,'application/pdf'),'Gmail-Nachricht unvollständig');
+    foreach(['client_secret','refresh_token'] as $key){$bad=$gv;$bad['mail'][$key]='';try{new Config($bad);throw new RuntimeException('Gmail ohne '.$key.' akzeptiert');}catch(\RuntimeException $e){check(!str_starts_with($e->getMessage(),'Gmail ohne'),$e->getMessage());}}
+    echo "OK: PDF-Anhang, Migration, Versandwiederholung und verlorene SMTP-Antwort, Gmail-Versand.\n";
     // Direktdruck: bestehende Zahlungen erhalten, standardmäßig aus, keine Doppelübergabe.
     $app->db->query('DROP TABLE receipt_prints');$app->db->query('PRAGMA user_version=2');$app->db->migrate();
     $printInput=['payment_id'=>$p['id'],'request_id'=>App::id()];

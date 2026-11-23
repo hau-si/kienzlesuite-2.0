@@ -239,3 +239,4 @@ button.small { padding: 4px 10px; font-size: 13px; }
 .setup-card.needs { border-left: 4px solid #dc2626; }
 .tag.ok { background: #e5f3ed; color: #16503f; }
 details.fold > summary .tag { margin-left: 4px; }
+details.fold > summary h3 { margin: 0; font-size: 15px; }

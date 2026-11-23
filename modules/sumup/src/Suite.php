@@ -163,9 +163,10 @@ final class Suite {
         $v['fhir']['ca_file'] = $t ? self::caFile((string)($t['ca_pem'] ?? '')) : '';
         $v['fhir']['pin_certificate'] = $t && !empty($t['pin']) && $v['fhir']['ca_file'] !== '';
         $m = $k->verbindung('mail');
-        $v['mail'] = $m ? ['enabled' => false, 'host' => (string)($m['host'] ?? ''), 'port' => (int)($m['port'] ?? 587),
+        $v['mail'] = $m && ($m['art'] ?? '') === 'gmail' ? ['enabled' => false, 'art' => 'gmail', 'client_id' => (string)($m['client_id'] ?? ''), 'client_secret' => (string)($m['client_secret'] ?? ''),
+            'refresh_token' => (string)($m['refresh_token'] ?? ''), 'from_address' => (string)($m['absender'] ?? ''), 'from_name' => ''] : ($m ? ['enabled' => false, 'host' => (string)($m['host'] ?? ''), 'port' => (int)($m['port'] ?? 587),
             'encryption' => ($m['sicherheit'] ?? '') === 'smtps' ? 'smtps' : 'starttls', 'username' => (string)($m['benutzer'] ?? ''),
-            'password' => (string)($m['passwort'] ?? ''), 'from_address' => (string)($m['absender'] ?? ''), 'from_name' => ''] : ['enabled' => false];
+            'password' => (string)($m['passwort'] ?? ''), 'from_address' => (string)($m['absender'] ?? ''), 'from_name' => ''] : ['enabled' => false]);
         $l = $k->verbindung('letterxpress');
         $v['letterxpress']['username'] = $l ? (string)($l['username'] ?? '') : '';
         $v['letterxpress']['api_key'] = $l ? (string)($l['api_key'] ?? '') : '';

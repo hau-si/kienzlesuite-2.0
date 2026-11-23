@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.7
+
+- E-Mail-Beleg: Wird in der Basis ein Gmail-Konto verbunden, versendet die Kasse Belege über die Gmail-Schnittstelle statt per SMTP. Voraussetzung: Basis 0.21.4-beta.20. Nicht mit einem echten Gmail-Konto getestet.
+
 ## 2.3.4-beta.6
 
 - Letterxpress-Zugang (Benutzername, API-Key, Test/Live) kommt jetzt zentral aus der Basis (Verwaltung → Verbindungen) und steht nicht mehr in den Einstellungen der Kasse. Bisher hier eingetragene Werte werden nicht mehr verwendet: bitte einmal in der Basis eintragen. Druck, Beidseitig, Versandart und Einschreiben bleiben in der Kasse. Voraussetzung: Basis 0.21.4-beta.18. Nicht gegen das echte Letterxpress getestet.

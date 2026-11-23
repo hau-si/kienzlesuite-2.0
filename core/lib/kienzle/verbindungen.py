@@ -414,9 +414,78 @@ def _smtp(c: dict, action) -> None:
         action(smtp)
 
 
+GOOGLE_TOKEN = 'https://oauth2.googleapis.com/token'
+GMAIL_SEND = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send'
+GOOGLE_REDIRECT = 'http://localhost'
+CLIENT_ID = re.compile(r'^[A-Za-z0-9._-]{10,200}$')
+
+
+def _google_post(url: str, data: bytes, headers: dict) -> dict:
+    """POST an Google; Fehler ohne Schlüssel und mit kurzer Begründung."""
+    import urllib.error
+    import urllib.request
+    req = urllib.request.Request(url, data=data, method='POST', headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:  # noqa: S310 (feste https-Adressen)
+            out = json.loads(r.read(200000).decode('utf-8', 'replace') or '{}')
+    except urllib.error.HTTPError as e:
+        try:
+            err = json.loads(e.read(20000).decode('utf-8', 'replace'))
+        except ValueError:
+            err = {}
+        why = err.get('error_description') or (err.get('error') if isinstance(err.get('error'), str) else '') or ((err.get('error') or {}).get('message') if isinstance(err.get('error'), dict) else '') or ''
+        raise Fehler(f'Google lehnt ab (HTTP {e.code})' + (f': {CONTROL.sub(" ", str(why))[:160]}' if why else '') + '.') from None
+    except (OSError, ValueError) as e:
+        raise Fehler(f'Google nicht erreichbar: {str(e)[:100]}') from None
+    return out if isinstance(out, dict) else {}
+
+
+def set_gmail(config: dict, d: dict) -> None:
+    """Gmail per OAuth: eigener Google-Client der Praxis; der Code aus der Anmeldung wird gegen ein Refresh-Token getauscht.
+    Ohne neuen Code bleibt die bestehende Anmeldung (nur Absender, Client ändern ist dann nicht möglich)."""
+    old = config.get('mail') if (config.get('mail') or {}).get('art') == 'gmail' else {}
+    cid = _text(d.get('client_id', old.get('client_id', '')), 'Client-ID', 200)
+    if not CLIENT_ID.match(cid):
+        raise Fehler('Client-ID ungültig (sie endet meist auf .apps.googleusercontent.com).')
+    secret = d.get('client_secret', '')
+    if not isinstance(secret, str) or len(secret) > 200 or CONTROL.search(secret) or ' ' in secret:
+        raise Fehler('Client-Secret ungültig.')
+    secret = secret or old.get('client_secret', '')
+    if not secret:
+        raise Fehler('Bitte das Client-Secret eintragen.')
+    sender = _text(d.get('absender'), 'Absender', 254)
+    if not EMAIL.match(sender):
+        raise Fehler('Absender ist keine E-Mail-Adresse (die Gmail-Adresse, mit der du dich anmeldest).')
+    code = d.get('code', '')
+    if not isinstance(code, str) or len(code) > 500 or CONTROL.search(code) or ' ' in code:
+        raise Fehler('Code ungültig.')
+    refresh = old.get('refresh_token', '')
+    if code:
+        data = urllib.parse.urlencode({'code': code, 'client_id': cid, 'client_secret': secret, 'redirect_uri': GOOGLE_REDIRECT, 'grant_type': 'authorization_code'}).encode()
+        out = _google_post(GOOGLE_TOKEN, data, {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'})
+        refresh = out.get('refresh_token', '')
+        if not refresh:
+            raise Fehler('Google hat kein Dauer-Token geliefert. Bitte die Anmeldung wiederholen und unter „Zugriff“ alles bestätigen (ggf. bei myaccount.google.com → Sicherheit den alten Zugriff entfernen).')
+    if not refresh:
+        raise Fehler('Noch nicht mit Google angemeldet: bitte auf „Mit Google verbinden“ klicken und den Code übernehmen.')
+    config['mail'] = {'art': 'gmail', 'client_id': cid, 'client_secret': secret, 'refresh_token': refresh, 'absender': sender}
+
+
+def _gmail_access(c: dict) -> str:
+    data = urllib.parse.urlencode({'client_id': c['client_id'], 'client_secret': c['client_secret'], 'refresh_token': c['refresh_token'], 'grant_type': 'refresh_token'}).encode()
+    out = _google_post(GOOGLE_TOKEN, data, {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'})
+    token = out.get('access_token')
+    if not isinstance(token, str) or not token:
+        raise Fehler('Google hat kein Zugriffs-Token geliefert.')
+    return token
+
+
 def test_mail(c: dict) -> str:
     if not c:
         raise Fehler('E-Mail ist nicht eingerichtet.')
+    if c.get('art') == 'gmail':
+        _gmail_access(c)
+        return 'Anmeldung bei Google erfolgreich (keine Nachricht gesendet).'
     try:
         _smtp(c, lambda smtp: None)
     except (OSError, smtplib.SMTPException, ssl.SSLError) as e:
@@ -424,7 +493,7 @@ def test_mail(c: dict) -> str:
     return 'Anmeldung am SMTP-Server erfolgreich (keine Nachricht gesendet).'
 
 
-def send_mail(c: dict | None, to: list[str], subject: str, body: str) -> None:
+def send_mail(c: dict | None, to: list[str], subject: str, body: str) -> None:  # noqa: C901
     """Nachricht der Suite über die zentrale E-Mail-Verbindung (nur Text, keine Patientendaten)."""
     from email.message import EmailMessage
     if not c:
@@ -436,6 +505,11 @@ def send_mail(c: dict | None, to: list[str], subject: str, body: str) -> None:
     msg['From'], msg['To'], msg['Subject'] = c['absender'], ', '.join(to), CONTROL.sub('', subject)[:150]
     msg['Auto-Submitted'] = 'auto-generated'
     msg.set_content(body[:20000])
+    if c.get('art') == 'gmail':
+        import base64
+        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+        _google_post(GMAIL_SEND, json.dumps({'raw': raw}).encode(), {'Authorization': 'Bearer ' + _gmail_access(c), 'Content-Type': 'application/json', 'Accept': 'application/json'})
+        return
     try:
         _smtp(c, lambda smtp: smtp.send_message(msg))
     except (OSError, smtplib.SMTPException, ssl.SSLError) as e:
@@ -473,7 +547,8 @@ def view(config: dict, extra: dict | None = None) -> dict:
     out = {'zeit': int(time.time()), 'tests': old.get('tests', {}), 'hostkeys': old.get('hostkeys', {}), 'zertifikate': old.get('zertifikate', {}),
            'hinweise': old.get('hinweise', []),
            't2med': {**{k: t2[k] for k in ('base_url', 'launch_urls', 'pin')}, 'api_key_gesetzt': bool(t2.get('api_key')), 'zertifikat': ca_fp} if t2 else None,
-           'mail': {**{k: mail[k] for k in ('host', 'port', 'sicherheit', 'benutzer', 'absender')}, 'passwort_gesetzt': bool(mail.get('passwort'))} if mail else None,
+           'mail': ({'art': 'gmail', 'client_id': mail['client_id'], 'absender': mail['absender'], 'secret_gesetzt': bool(mail.get('client_secret')), 'verbunden': bool(mail.get('refresh_token'))}
+                    if mail.get('art') == 'gmail' else {'art': 'smtp', **{k: mail[k] for k in ('host', 'port', 'sicherheit', 'benutzer', 'absender')}, 'passwort_gesetzt': bool(mail.get('passwort'))}) if mail else None,
            'sms': {'anbieter': sms['anbieter'], 'absender': sms.get('absender', ''), 'schluessel_gesetzt': bool(sms.get('api_key'))} if sms else None,
            'letterxpress': {'username': lxp['username'], 'modus': lxp.get('modus', 'test'), 'schluessel_gesetzt': bool(lxp.get('api_key'))} if lxp else None,
            'ablage': [{**{k: v for k, v in t.items() if k != 'passwort'}, 'passwort_gesetzt': bool(t.get('passwort')),
@@ -543,6 +618,11 @@ def dispatch(config: dict, req: dict) -> str:
         save(config)
         view(config, {'hinweise': distribute(config)})
         return 'E-Mail-Verbindung gespeichert und an die Module verteilt.' if config['mail'] else 'E-Mail-Verbindung entfernt.'
+    if action == 'gmail':
+        set_gmail(config, d)
+        save(config)
+        view(config, {'hinweise': distribute(config)})
+        return 'Gmail verbunden und an die Module verteilt.'
     if action == 'sms':
         if req.get('loeschen') is True:
             config['sms'] = None

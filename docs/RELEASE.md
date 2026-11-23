@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.20
+
+- Verbindungen → E-Mail-Versand: neben dem SMTP-Server jetzt auch ein Gmail-Konto per OAuth (Gmail-Schnittstelle, nur Berechtigung „E-Mails senden“). Jede Praxis legt dazu einmal einen eigenen Google-Zugang an (Anleitung auf der Seite); die Anmeldung geschieht über Weiterleitung auf localhost und Einfügen der Adresse. Module bekommen `art = gmail` mit Client und Refresh-Token. Nur mit nachgebautem Google getestet, nicht mit einem echten Konto.
+
 ## 0.21.4-beta.19
 
 - Verbindungen: Hilfe-Tooltips (i) bei den Feldern von SMS (seven.io: welche Einstellungen und Berechtigungen der API-Key braucht – nur „sms“ und „balance“, Umgebung Live, unbegrenzt gültig) und Letterxpress. Nur Text, nicht im Browser geprüft.
