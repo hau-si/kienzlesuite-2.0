@@ -109,7 +109,8 @@ function test_mitarbeiter_ohne_otp_und_rechte_je_modul(): void {
         && $auth->header('X-Kienzle-Rechte') === 'paid', 'Weitergabe an Modul falsch');
     check(strlen((string)$auth->header('X-Kienzle-Csrf')) === 64, 'Modul-CSRF fehlt');
     check(is_array(json_decode(rawurldecode((string)$auth->header('X-Kienzle-Praxis')), true)), 'Praxisdaten fehlen in der Weitergabe');
-    check(str_contains($b->get('/')->body, '<span class="menu-title">Anwendungen</span>'), 'Modul fehlt in der Seitenleiste');
+    $start = $b->get('/')->body;
+    check(str_contains($start, '<summary class="menu-title">Anwendungen</summary>') && !str_contains($start, '<span class="menu-title">Einstellungen</span>'), 'Anwendungen fehlen oder Einstellungen stehen doppelt in der Seitenleiste');
     check($b->get('/_auth/beispiel')->status === 403, 'Zugang zu nicht freigegebenem Modul');
     $env->users->setAccess($id, 'kasse', false, []);
     $env->db->store('erstadmin:kasse', (string)$id);

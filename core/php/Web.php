@@ -717,26 +717,27 @@ final class Web {
         }
         $otp = $this->users->hasOtp($user);
         $body = V::error($error) . V::notice($notice)
-            . '<section><h2>Passwort ändern</h2><form method="post" action="/konto/passwort" class="box">' . $csrf
+            . '<h2>Passwort ändern</h2><form method="post" action="/konto/passwort" class="box">' . $csrf
             . V::input('current', 'Bisheriges Passwort', 'password', '', 'autocomplete="current-password" required')
             . V::input('password', 'Neues Passwort', 'password', '', 'autocomplete="new-password" required')
             . V::input('password2', 'Neues Passwort wiederholen', 'password', '', 'autocomplete="new-password" required')
-            . '<button>Ändern</button></form></section>'
-            . ($this->users->needsOtp($user) ? '<section><h2>Handynummer für SMS-Code (Ersatz)</h2><p>Hast du die Authenticator-App nicht dabei, kann ein Code per SMS geschickt werden. Das geht nur, wenn unter Verwaltung → Verbindungen SMS eingerichtet ist.</p>'
+            . '<button>Ändern</button></form>'
+            . ($this->users->needsOtp($user) ? '<h2>Handynummer für SMS-Code (Ersatz)</h2><p>Hast du die Authenticator-App nicht dabei, kann ein Code per SMS geschickt werden. Das geht nur, wenn unter Verwaltung → Verbindungen SMS eingerichtet ist.</p>'
                 . '<form method="post" action="/konto/telefon" class="box">' . $csrf . V::input('telefon', 'Handynummer (leer lassen zum Entfernen)', 'tel', $this->phoneOf($uid), 'maxlength="30" placeholder="01701234567" autocomplete="tel"')
-                . '<button>Speichern</button></form></section>' : '')
-            . '<section><h2>Authenticator-App</h2><p>' . ($otp ? 'Eingerichtet. Übrige Wiederherstellungscodes: ' . $this->users->recoveryLeft($uid) . '.' : 'Nicht eingerichtet' . ($this->users->needsOtp($user) ? ' (für Admins Pflicht).' : '.')) . '</p>'
+                . '<button>Speichern</button></form>' : '')
+            . '<h2>Authenticator-App</h2><p>' . ($otp ? 'Eingerichtet. Übrige Wiederherstellungscodes: ' . $this->users->recoveryLeft($uid) . '.' : 'Nicht eingerichtet' . ($this->users->needsOtp($user) ? ' (für Admins Pflicht).' : '.')) . '</p>'
             . '<p><a class="button" href="/konto/otp">' . ($otp ? 'Neu einrichten' : 'Einrichten') . '</a></p>'
-            . ($otp ? '<form method="post" action="/konto/codes">' . $csrf . '<button>Neue Wiederherstellungscodes erzeugen</button></form>' : '') . '</section>'
-            . ($this->passkeys ? '<section><h2>Passkeys</h2><p>Anmelden ohne Passwort mit Fingerabdruck, Gesicht oder PIN des Geräts. Funktioniert nur unter der Adresse <code>'
+            . ($otp ? '<form method="post" action="/konto/codes">' . $csrf . '<button>Neue Wiederherstellungscodes erzeugen</button></form>' : '') . ''
+            . ($this->passkeys ? '<h2>Passkeys</h2><p>Anmelden ohne Passwort mit Fingerabdruck, Gesicht oder PIN des Geräts. Funktioniert nur unter der Adresse <code>'
                 . V::h($this->passkeys->origin()) . '</code>.' . ($this->users->needsOtp($user) ? ' Die Authenticator-App bleibt als Rückfall nötig.' : '') . '</p>'
                 . ($keys !== '' ? '<table><tr><th>Passkey</th><th>Zuletzt</th><th></th></tr>' . $keys . '</table>' : '<p>Noch kein Passkey.</p>')
                 . '<div class="box" data-passkey-register data-csrf="' . V::h($this->session['csrf']) . '">' . V::input('label', 'Bezeichnung', 'text', '', 'maxlength="60" placeholder="z. B. Laptop Empfang"')
-                . '<button type="button">Passkey hinzufügen</button><p class="error" hidden></p></div></section>' : '')
-            . '<section><h2>Gemerkte Geräte</h2>' . ($devices !== '' ? '<table><tr><th>Gerät</th><th>Zuletzt</th><th></th></tr>' . $devices . '</table>'
-                . '<form method="post" action="/konto/geraete">' . $csrf . '<input type="hidden" name="id" value="all"><button class="link">Alle abmelden</button></form>' : '<p>Keine.</p>') . '</section>';
+                . '<button type="button">Passkey hinzufügen</button><p class="error" hidden></p></div>' : '')
+            . '<h2>Gemerkte Geräte</h2>' . ($devices !== '' ? '<table><tr><th>Gerät</th><th>Zuletzt</th><th></th></tr>' . $devices . '</table>'
+                . '<form method="post" action="/konto/geraete">' . $csrf . '<input type="hidden" name="id" value="all"><button class="link">Alle abmelden</button></form>' : '<p>Keine.</p>') . '';
         V::$status = ['Authenticator-App' => [$otp, 'eingerichtet', 'nicht eingerichtet'], 'Passkeys' => [$keys !== '', 'eingerichtet', 'nicht eingerichtet'],
-            'Handynummer für SMS-Code (Ersatz)' => [$this->phoneOf($uid) !== '', 'hinterlegt', 'nicht hinterlegt']];
+            'Handynummer für SMS-Code (Ersatz)' => [$this->phoneOf($uid) !== '', 'hinterlegt', 'nicht hinterlegt'],
+            'Gemerkte Geräte' => [$devices !== '', 'vorhanden', 'keine']];
         return Response::html(V::page('Mein Konto', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
     }
 
@@ -2128,13 +2129,17 @@ final class Web {
         if (($this->session['stage'] ?? '') !== 'full') return null;
         $this->claimFirstAdmin((int)$this->session['user_id']);
         $admin = (int)$this->session['user_admin'] === 1;
-        $apps = $settings = [];
+        $apps = $settings = $meta = [];
         foreach ($this->users->access((int)$this->session['user_id']) as $id => $a) {
             if (($p = $this->modules->webPath($id)) === null) continue;
             $apps[$p . '/'] = $this->modules->name($id);
-            if ($a['admin'] && ($s = $this->modules->settingsUrl($id)) !== null) $settings[$s] = $this->modules->name($id);
+            $s = $a['admin'] ? $this->modules->settingsUrl($id) : null;
+            if ($s !== null) $settings[$s] = $this->modules->name($id);
+            $meta[$p . '/'] = ['id' => $id, 'settings' => $s];
         }
-        return ['apps' => $apps, 'settings' => $settings, 'login' => $this->session['login'], 'admin' => $admin, 'csrf' => $this->session['csrf'],
+        $offen = $admin ? $this->openPaths() : [];
+        foreach ($meta as $k => $m) $meta[$k]['todo'] = $m['settings'] !== null && in_array($m['settings'], $offen, true);
+        return ['apps' => $apps, 'appmeta' => $meta, 'settings' => $settings, 'login' => $this->session['login'], 'admin' => $admin, 'csrf' => $this->session['csrf'],
             'updates' => $admin && $this->updates ? $this->updates->count() : 0, 'module' => $admin && $this->store ? $this->store->count() : 0, 'sicherung' => $admin && $this->backup ? $this->backup->count() : 0,
             'pfad' => $this->req?->path ?? '', 'einrichtung' => $admin ? $this->openSteps() : 0, 'offenLogo' => $admin && $this->openSteps() > 0, 'offen' => $admin ? $this->openPaths() : []];
     }

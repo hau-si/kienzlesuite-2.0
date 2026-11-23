@@ -15,7 +15,7 @@ final class View {
 
     /** Abschnitte, die auf langen Seiten eingeklappt erscheinen, weil man sie selten braucht. */
     public const COLLAPSED = ['Drucker suchen', 'Drucker von Hand eintragen', 'Wer nutzt was', 'Danach', 'Zeitplan', 'Benachrichtigung bei Fehlern', 'Aufbewahrung',
-        'Protokoll', 'Kanal', 'Zurück auf eine frühere Version', 'Dienst hinzufügen', 'Neue Gruppe'];
+        'Protokoll', 'Kanal', 'Passwort ändern', 'Handynummer für SMS-Code (Ersatz)', 'Authenticator-App', 'Passkeys', 'Gemerkte Geräte', 'Zurück auf eine frühere Version', 'Dienst hinzufügen', 'Neue Gruppe'];
 
     /** Symbole der Menüeinträge (Linienzeichnungen 24×24); Schlüssel: Pfad ohne Anhang, sonst das Standardsymbol. */
     private const ICONS = [
@@ -151,16 +151,18 @@ final class View {
                 . ($todo ? '<span class="todo-dot" title="Hier muss noch etwas eingegeben oder bestätigt werden (siehe Einrichtung auf der Startseite)"></span>' : '') . '</a>';
         };
         $menu = '<nav class="menu" aria-label="Menü"><div class="menu-group">' . $link('/konto', 'Mein Konto') . '</div>';
+        // Anwendungen: nur noch ein Eintrag je Modul (mit Symbol des Moduls); der Punkt zeigt offene Einstellungen. Einklappbar, weil weitere Module dazukommen.
         if (!empty($nav['apps'])) {
-            $menu .= '<div class="menu-group"><span class="menu-title">Anwendungen</span>';
-            foreach ($nav['apps'] as $href => $label) $menu .= '<a href="' . self::h($href) . '"><span>' . self::icon('app') . self::h($label) . '</span></a>';
-            $menu .= '</div>';
-        }
-        if (!empty($nav['settings'])) {
-            $menu .= '<div class="menu-group"><span class="menu-title">Einstellungen</span>';
-            foreach ($nav['settings'] as $href => $label) $menu .= '<a href="' . self::h($href) . '"><span>' . self::icon('settings') . self::h($label) . '</span>'
-                . (in_array($href, (array)($nav['offen'] ?? []), true) ? '<span class="todo-dot" title="Hier muss noch etwas eingegeben oder bestätigt werden (siehe Einrichtung auf der Startseite)"></span>' : '') . '</a>';
-            $menu .= '</div>';
+            $links = '';
+            $open = false;
+            foreach ($nav['apps'] as $href => $label) {
+                $meta = (array)($nav['appmeta'][$href] ?? []);
+                $current = $path === rtrim($href, '/') || str_starts_with($path, $href);
+                $open = $open || $current;
+                $links .= '<a href="' . self::h($href) . '"' . ($current ? ' class="current" aria-current="page"' : '') . '><span>' . self::icon('modul:' . (string)($meta['id'] ?? ''), 'app') . self::h($label) . '</span>'
+                    . (!empty($meta['todo']) ? '<span class="todo-dot" title="Hier muss noch etwas eingegeben oder bestätigt werden (siehe Einrichtung auf der Startseite)"></span>' : '') . '</a>';
+            }
+            $menu .= '<details class="menu-group menu-fold" open><summary class="menu-title">Anwendungen</summary>' . $links . '</details>';
         }
         $group = null;
         if ($nav['admin']) {

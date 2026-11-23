@@ -72,4 +72,18 @@ function test_startseite_ohne_einrichtung(): void {
     check(!str_contains($ps, 'Server-Zustand') && !str_contains($ps, 'Speicherplatz'), 'Mitarbeiter sehen keine Serverwerte');
 }
 
+function test_seitenleiste_und_konto_einklappbar(): void {
+    [$env, $c] = con_env([]);
+    [$b] = admin_browser($env);
+    $b->web = fn() => $b->defaultWeb(null, null, $c);
+    $p = $b->get('/')->body;
+    check(substr_count($p, '<span class="menu-title">Einstellungen</span>') === 0 && str_contains($p, '<details class="menu-group menu-fold" open><summary class="menu-title">Anwendungen</summary>'), 'Seitenleiste: eine Gruppe Anwendungen, einklappbar');
+    check(preg_match('#<a href="/[a-z]+/"[^>]*><span><svg class="ico"#', $p) === 1, 'Symbol vor dem Modul in der Seitenleiste');
+    $k = $b->get('/konto')->body;
+    foreach (['Passwort ändern', 'Authenticator-App', 'Gemerkte Geräte'] as $titel) {
+        check(preg_match('#<details class="fold"><summary><h2>[^<]*(?:<svg.*?</svg>)?' . preg_quote($titel, '#') . '#s', $k) === 1, 'Konto: „' . $titel . '“ nicht einklappbar');
+    }
+    check(preg_match('#<summary><h2>.*?Authenticator-App <span class="tag ok">✓ eingerichtet</span>#s', $k) === 1, 'Konto: Status im eingeklappten Kopf');
+}
+
 run_tests();

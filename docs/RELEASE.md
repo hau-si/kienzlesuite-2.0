@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.26
+
+- Seitenleiste vereinfacht: Die Gruppe „Einstellungen“ entfällt (sie führte zu denselben Modulen wie „Anwendungen“). „Anwendungen“ ist einklappbar und zeigt je Modul das Symbol der Startseite; der rote Punkt neben einem Modul zeigt, dass dort noch etwas eingerichtet werden muss. Die Einstellungen eines Moduls öffnen sich im Modul selbst.
+- Mein Konto: Alle Abschnitte (Passwort ändern, Handynummer, Authenticator-App, Passkeys, Gemerkte Geräte) sind einklappbar und beim Öffnen der Seite eingeklappt; der Status (z. B. „✓ eingerichtet“) steht in der Kopfzeile und bleibt eingeklappt sichtbar. Abschnitte mit Fehlermeldung bleiben offen.
+
 ## 0.21.4-beta.25
 
 - Startseite (Admins): neue Karte „Server-Zustand“ mit Kacheln für freien Speicherplatz, Arbeitsspeicher, Prozessorlast (Minutenmittel je Kern), Temperatur (nur wenn der Server einen Sensor meldet, in einer VM meist nicht), Laufzeit seit dem Neustart, Datum der letzten Sicherung (gelb bei „nicht eingerichtet“ oder älter als drei Tage, rot bei Fehler; Klick öffnet die Sicherung) sowie Guthaben bei Letterxpress und seven.io (nur wenn eingerichtet; gelb unter 5 €). Warnfarben: Speicher und Arbeitsspeicher ab 85 % (rot ab 95 %) belegt, Prozessor ab 80 % (rot ab 95 %), Temperatur ab 75 °C (rot ab 85 °C). Mitarbeiter ohne Admin-Recht sehen die Karte nicht.
