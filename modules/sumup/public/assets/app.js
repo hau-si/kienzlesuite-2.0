@@ -84,7 +84,7 @@ function renderInvoices() {
     card.onclick = pay('card');
     const cash = element('button','Bar bezahlt','secondary wide invoice-cash');
     cash.onclick = () => { if (confirm(euro(invoice.amount_cents)+' bar erhalten? Die Zahlung wird als bezahlt erfasst.')) pay('cash')(); };
-    const later = element('button','Später (Überweisung)','text-button invoice-later');
+    const later = element('button','Patient zahlt später (Überweisung)','text-button invoice-later');
     later.onclick = () => run(async() => {
       // Ist der Rechnungsdruck eingeschaltet, kommt die Rechnung jetzt einmal auf den Praxisdrucker (für die Überweisung).
       if (state.print?.t2med_auto && !invoice.printed_at) { const result = await api('invoice_later', {invoice_id: invoice.id}); if (result.message) message(result.message); }
@@ -265,7 +265,7 @@ function renderPayment() {
   $('receipt-data-note').hidden=!showing || p.payment_status!=='successful' || !p.local_receipt;
   renderReader();
   if (showing) manage(false);
-  for (const id of ['document','receipt','receipt-mail','receipt-print','receipt-share','retry','cancel','mock-controls','mock-fhir-label','transfer-box','confirm-transfer','switch-cash','switch-transfer']) $(id).hidden=true;
+  for (const id of ['document','receipt','receipt-mail','receipt-print','receipt-share','retry','cancel','mock-controls','mock-fhir-label','transfer-box','confirm-transfer','switch-cash','switch-transfer','switch-later']) $(id).hidden=true;
   if(!showing || receiptPrintPayment!==p.id) { $('receipt-print-status').hidden=true; $('receipt-print').textContent='Beleg drucken'; }
   if(!showing || p.payment_status!=='successful' || receiptShare?.paymentId!==p.id) { $('receipt-share-panel').hidden=true; receiptShare=null; }
   if(!showing || p.payment_status!=='successful' || receiptRecipient?.paymentId!==p.id) {
@@ -306,7 +306,7 @@ function renderPayment() {
     renderTransfer(p); $('confirm-transfer').hidden=false; $('switch-cash').hidden=false; $('cancel').hidden=false; $('cancel').textContent='Überweisung abbrechen';
   } else if(['failed','cancelled'].includes(p.payment_status)) {
     title=p.payment_status==='failed'?'Zahlung nicht erfolgt':'Zahlung abgebrochen'; symbol='×'; description='Du kannst die Zahlung erneut starten oder die Zahlart wechseln.'; $('retry').hidden=false;
-    $('switch-cash').hidden=false; $('switch-transfer').hidden=!state.bank_ready || !!p.t2med_invoice;
+    $('switch-cash').hidden=false; $('switch-transfer').hidden=!state.bank_ready || !!p.t2med_invoice; $('switch-later').hidden=!p.t2med_invoice;
   } else {
     title=p.payment_status==='unknown' || p.payment_status==='starting'?'Zahlung wird geprüft':p.payment_status==='cancel_requested'?'Abbruch wird geprüft':'Zahlung läuft';
     description='Bitte den Hinweisen am Terminal folgen. Dieses Fenster bis zum Abschluss geöffnet lassen.';
@@ -429,6 +429,13 @@ $('switch-cash').onclick=()=>run(async()=>{
   state.payment=await api('switch_method',{payment_id:state.payment.id,request_id:crypto.randomUUID(),method:'cash'}); retrySelection=false; renderPayment();
 });
 $('switch-transfer').onclick=()=>run(async()=>{ state.payment=await api('switch_method',{payment_id:state.payment.id,request_id:crypto.randomUUID(),method:'transfer'}); retrySelection=false; renderPayment(); });
+$('switch-later').onclick=()=>run(async()=>{
+  // T2med-Rechnung: Der Überweisungs-QR-Code steht auf der Rechnung. Wie „Patient zahlt später“ in der Rechnungsliste: Rechnung drucken (wenn eingeschaltet) und zurück zur Auswahl.
+  const id=state.payment.invoice_id, invoice=(state.invoices||[]).find(i=>i.id===id);
+  if(invoice && state.print?.t2med_auto && !invoice.printed_at) { const result=await api('invoice_later',{invoice_id:id}); if(result.message) message(result.message); }
+  if(id) invoiceLater.add(id);
+  retrySelection=true; startRequest=null; await load(); renderPayment(); updateTotal();
+});
 $('confirm-transfer').onclick=()=>run(async()=>{
   if(!confirm('Ist der Betrag von '+euro(state.payment.amount_cents)+' auf dem Konto eingegangen? Die Zahlung wird dann als bezahlt erfasst.')) return;
   state.payment=await api('confirm_transfer',{payment_id:state.payment.id}); renderPayment();

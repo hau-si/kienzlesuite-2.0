@@ -1,5 +1,10 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.3-beta.3
+
+- Nach einer nicht erfolgten oder abgebrochenen Zahlung heißt die Überweisung überall „Patient zahlt später (Überweisung)“. Bei internen Rechnungen (Leistungsauswahl) wechselt sie in die offene Überweisung mit Kontodaten und QR-Code (Bon druckbar); bei T2med-Rechnungen, deren Überweisungs-QR-Code schon auf der Rechnung steht, kehrt sie zur Rechnungsliste zurück (Rechnung wird gedruckt, wenn der Rechnungsdruck eingeschaltet ist). Dieselbe Beschriftung gilt in der Rechnungsliste.
+- Nicht auf echter Hardware getestet.
+
 ## 2.3.3-beta.2
 
 - Virtuelle Drucker bieten nur noch das Papierformat des Moduls an (neu in module.toml: `paper`, Vorgabe A4; Kasse A4, Terminzettel A6) statt A6/A5/A4/Letter. Nicht mit Windows getestet.

@@ -79,7 +79,7 @@ $base = ks_h(Suite::base() . '/');
 <p id="receipt-print-status" class="muted" role="status" hidden></p>
 <p id="invoice-print-status" class="muted" role="status" hidden></p><button id="invoice-print" class="text-button" hidden>Rechnung erneut drucken</button>
 <p id="invoice-export-status" class="muted" role="status" hidden></p><button id="invoice-export" class="text-button" hidden>Rechnungs-PDF erneut ablegen</button>
-<button id="document" class="primary wide" hidden>Dokumentation in der Akte</button><button id="confirm-transfer" class="primary wide" hidden>Zahlungseingang bestätigt</button><button id="retry" class="primary wide" hidden>Erneut versuchen</button><button id="switch-cash" class="secondary wide" hidden>Stattdessen bar bezahlt</button><button id="switch-transfer" class="secondary wide" hidden>Stattdessen per Überweisung</button><button id="cancel" class="text-button" hidden>Zahlung abbrechen</button>
+<button id="document" class="primary wide" hidden>Dokumentation in der Akte</button><button id="confirm-transfer" class="primary wide" hidden>Zahlungseingang bestätigt</button><button id="retry" class="primary wide" hidden>Erneut versuchen</button><button id="switch-cash" class="secondary wide" hidden>Stattdessen bar bezahlt</button><button id="switch-transfer" class="secondary wide" hidden>Patient zahlt später (Überweisung)</button><button id="switch-later" class="secondary wide" hidden>Patient zahlt später (Überweisung)</button><button id="cancel" class="text-button" hidden>Zahlung abbrechen</button>
 <button id="receipt-share" class="text-button" hidden>Beleglink / E-Mail-Adresse ändern</button>
 <div id="receipt-share-panel" class="receipt-share" hidden>
 <p id="receipt-share-message" class="muted" role="status"></p>
