@@ -22,7 +22,7 @@ final class SettingsHelp {
                 'live' => 'Patient aus dem T2med-Aufruf, Zahlungen werden in der Akte dokumentiert. Nur zusammen mit SumUp „Live“.']],
         'fhir.base_url' => ['tip' => 'Adresse der T2med-FHIR-Schnittstelle, wie sie dieser Server erreicht. Rechnername oder IP des T2med-Servers, Port meist 16567.', 'example' => 'https://t2med-server:16567/aps/fhir/api/r4'],
         'fhir.launch_urls' => ['tip' => 'Nur nötig, wenn T2med beim Aufruf eine andere Adresse übergibt als oben (z. B. IP statt Rechnername). Eine Adresse pro Zeile.', 'example' => "https://192.0.2.10:16567/aps/fhir/api/r4"],
-        'fhir.api_key' => ['tip' => 'Schlüssel für die T2med-Schnittstelle. Leer lassen, dann wird der T2med-Demo-Schlüssel verwendet.', 'example' => '(leer lassen)'],
+        'fhir.api_key' => ['tip' => 'Schlüssel für die T2med-Schnittstelle. Leer lassen, dann wird der T2med-Demo-Schlüssel verwendet. Beim Demo-Schlüssel darf kein eigener API-Schlüssel eingetragen sein (sonst Fehler 403).', 'example' => '(leer lassen)'],
         'fhir.entry_code' => ['tip' => 'Kürzel, unter dem die Zahlung in der Patientenakte erscheint.', 'example' => 'ZAHLUNG'],
         'fhir.ca_pem' => ['tip' => 'Nur nötig, wenn der T2med-Server ein eigenes Zertifikat hat und die Verbindung sonst abgelehnt wird. Inhalt der .pem/.crt-Datei einfügen; „-“ entfernt es.', 'example' => '-----BEGIN CERTIFICATE----- …'],
         'fhir.pin_certificate' => ['tip' => 'Nur ankreuzen, wenn das T2med-Zertifikat nicht zum Rechnernamen passt. Dann wird genau dieses Zertifikat akzeptiert.'],

@@ -64,3 +64,10 @@ Module über den Beta-Kanal). Die Adresse der VM gehört nicht ins Repository.
 - Ideen ohne Entscheidung: Karte „Arbeitsplätze“ der Kasse in die Basis verschieben; Schaltfläche „Reader suchen“ für SumUp; Updater prüft nur OpenSSL-Release-Schlüssel (SSH-Signaturen wären eine Erweiterung); Repository später an Thomas übertragen (GitHub: Settings → Transfer ownership; danach Workflows und Release-Schlüssel prüfen).
 
 **Bildschirmfotos für die README** (`docs/screenshots/`) entstehen aus den Seiten der Basis mit erfundenen Daten: Testumgebung aus `tests/php/lib.php` und `tests/php/browser.php` (Klasse `Env`, `admin_browser`) mit den echten Modul-Manifesten, Seiten als HTML mit eingebettetem `core/public/assets/core.css` speichern, mit `google-chrome --headless=new --screenshot` aufnehmen, bei Bedarf zuschneiden. Nie Daten der echten VM verwenden.
+
+### Offene Wünsche (Stand 23.11.2026, abends)
+
+- **Verwaltung entschlacken (teilweise erledigt in core 0.21.4-beta.1):** „Sicherheit“ (Firewall, Zugang, Protokoll) und „Benutzer und Gruppen“ sind zusammengelegt. Noch offen: Stammdaten (Kontodaten/IBAN, Steuernummer, USt-Pflicht) unter „Praxis und Daten“ zusammenführen; weitere Zusammenlegungen prüfen.
+- **SMS-Anbindung** zentral unter „Verbindungen“: für Einmalcodes/Passwort-Erstellung (Handynummer bei Admins abfragen) und später für die kienzlefon-App.
+- **E-Mail: OAuth für Gmail** als zusätzliche Möglichkeit bei den Mail-Verbindungen.
+- Kürzel der Rechnungsnummern (sumup 2.3.4-beta.1) und die neuen Verwaltungsseiten sind noch nicht auf der VM geprüft.

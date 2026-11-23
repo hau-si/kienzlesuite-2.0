@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.2
+
+- Hinweis zum T2med-Demo-Schlüssel (kein eigener API-Schlüssel eintragen, sonst 403) in Einstellungshilfe.
+
 ## 2.3.4-beta.1
 
 - Neue Einstellung „Kürzel der Rechnungsnummern“ (T2med-Rechnungen übernehmen, ein Kürzel pro Zeile, mehrere Rechnungsgruppen möglich): Die Texterkennung liest das Kürzel oft verschieden („1IG“, „16G“, „162“); die Kasse ordnet es dem eingetragenen Kürzel zu (Verwechslungen I/1, G/6, O/0 …), sodass dieselbe Rechnung immer dieselbe Nummer erhält und beim erneuten Druck „Ersetzt“ wird. Nur mit erfundenen Nummern getestet, nicht mit echten T2med-Rechnungen.

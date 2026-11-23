@@ -16,8 +16,8 @@ final class Auth {
     public const COOKIE = 'kienzle_sitzung';
     public const IDLE_DEFAULT = 30;              // Minuten ohne Aktion
     public const MAX_DEFAULT = 12;               // Stunden Höchstdauer
-    public const MAX_IDLE_MINUTES = 263520;      // 183 Tage
-    public const MAX_HOURS = 4392;               // 183 Tage
+    public const MAX_IDLE_MINUTES = 525600;      // 1 Jahr
+    public const MAX_HOURS = 8760;               // 1 Jahr
     public const STEP_SECONDS = 600;             // 10 Minuten für OTP-Eingabe bzw. OTP-Einrichtung
     public const REMEMBER_IDLE = 2592000;        // gemerkte Geräte: 30 Tage ohne Nutzung …
     public const REMEMBER_MAX = 15811200;        // … höchstens 6 Monate
@@ -215,8 +215,8 @@ final class Auth {
     public function maxSeconds(): int { return max(1, min(self::MAX_HOURS, (int)($this->db->setting('session_max_hours') ?? self::MAX_DEFAULT))) * 3600; }
 
     public function saveTimes(int $idleMinutes, int $maxHours): void {
-        if ($idleMinutes < 5 || $idleMinutes > self::MAX_IDLE_MINUTES) throw new Problem('Die Abmeldung bei Inaktivität muss zwischen 5 Minuten und 6 Monaten (183 Tagen) liegen.', 422);
-        if ($maxHours < 1 || $maxHours > self::MAX_HOURS) throw new Problem('Die Höchstdauer einer Sitzung muss zwischen 1 Stunde und 6 Monaten (183 Tagen) liegen.', 422);
+        if ($idleMinutes < 5 || $idleMinutes > self::MAX_IDLE_MINUTES) throw new Problem('Die Abmeldung bei Inaktivität muss zwischen 5 Minuten und 1 Jahr liegen.', 422);
+        if ($maxHours < 1 || $maxHours > self::MAX_HOURS) throw new Problem('Die Höchstdauer einer Sitzung muss zwischen 1 Stunde und 1 Jahr liegen.', 422);
         if ($idleMinutes * 60 > $maxHours * 3600) throw new Problem('Die Abmeldung bei Inaktivität darf nicht länger sein als die Höchstdauer der Sitzung.', 422);
         $this->db->store('session_idle_minutes', (string)$idleMinutes);
         $this->db->store('session_max_hours', (string)$maxHours);

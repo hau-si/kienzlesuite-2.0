@@ -1,5 +1,12 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.1
+
+- Verwaltung entschlackt: „Sicherheit“ fasst Firewall, Zugang (Abmeldezeiten) und Protokoll in einer Karte mit aufklappbaren Abschnitten zusammen; „Benutzer und Gruppen“ stehen auf einer Seite. Die alten Adressen (/verwaltung/firewall, /zugang, /protokoll, /gruppen) funktionieren weiter.
+- Zugang: Zeiten mit Einheit (Minuten, Stunden, Tage), bis höchstens 1 Jahr (vorher 183 Tage).
+- Hinweis (Tooltip und Text) zum T2med-Demo-Schlüssel: Dabei darf kein eigener API-Schlüssel eingetragen sein.
+- Noch offen: Stammdaten (Kontodaten, Steuernummer, USt) unter „Praxis und Daten“ zusammenführen. Nicht auf dem Server getestet.
+
 ## 0.21.3-beta.6
 
 - Durchreich-PPD der virtuellen Drucker enthält nur noch die drei Filterzeilen des früheren Rechnungseingangs (PDF, PostScript, CUPS-PostScript). Die zusätzlichen Zeilen über „application/vnd.cups-pdf“ ließen CUPS weiter JPEG, PNG, TIFF, PWG-Raster und URF anbieten; Windows schickte JPEG-Seiten (Bild-PDF ohne Textebene, Texterkennung nötig). Die Warteschlangen werden beim nächsten Abgleich neu angelegt. Folge: `lp` einer reinen Textdatei an einen virtuellen Drucker funktioniert nicht mehr (Windows druckt PDF). Nicht mit Windows getestet.

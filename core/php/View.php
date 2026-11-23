@@ -9,9 +9,8 @@ final class View {
     /** Menü der Seitenleiste: Gruppe => [Pfad => Bezeichnung]. Nur Admins sehen die Gruppen ab „Einrichten“. */
     public const MENU = [
         'Einrichten' => ['/verwaltung/einrichtung' => 'Überblick', '/verwaltung/server' => 'Server und Name', '/hilfe/arbeitsplatz' => 'Arbeitsplätze'],
-        'Praxis' => ['/verwaltung/benutzer' => 'Benutzer', '/verwaltung/gruppen' => 'Gruppen', '/verwaltung/drucker' => 'Drucker', '/verwaltung/verbindungen' => 'Verbindungen', '/verwaltung/sso' => 'Dienste'],
-        'Betrieb' => ['/verwaltung/sicherung' => 'Sicherung', '/verwaltung/updates' => 'Updates', '/verwaltung/module' => 'Module', '/verwaltung/firewall' => 'Firewall',
-            '/verwaltung/zugang' => 'Zugang', '/verwaltung/protokoll' => 'Protokoll'],
+        'Praxis' => ['/verwaltung/benutzer' => 'Benutzer und Gruppen', '/verwaltung/drucker' => 'Drucker', '/verwaltung/verbindungen' => 'Verbindungen', '/verwaltung/sso' => 'Dienste'],
+        'Betrieb' => ['/verwaltung/sicherung' => 'Sicherung', '/verwaltung/updates' => 'Updates', '/verwaltung/module' => 'Module', '/verwaltung/sicherheit' => 'Sicherheit'],
     ];
 
     /** Webpfad des Moduls mit Arbeitsplatz-Starter (web.starter), z. B. „/kasse“: core.js leitet „#launch=…“ dorthin weiter. */
@@ -22,7 +21,7 @@ final class View {
         $brand = '<a class="brand" href="/"><span class="mark" aria-hidden="true">K</span><span><strong>Kienzle-Suite</strong>'
             . '<span class="sub">' . self::h($practice !== '' ? $practice : 'Praxis') . '</span></span></a>';
         $head = '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=3"><script src="/assets/core.js" defer></script></head><body'
+            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=4"><script src="/assets/core.js" defer></script></head><body'
             . (self::$starter !== '' ? ' data-starter="' . self::h(self::$starter) . '"' : '') . '>';
         if (!$nav) {
             return $head . '<div class="solo">' . $brand . '<main><h1>' . self::h($title) . '</h1>' . self::cards($body) . '</main></div></body></html>';

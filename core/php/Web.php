@@ -713,6 +713,7 @@ final class Web {
             if (!$get && $action === '/link') return $this->userLink($id, $admin);
             if (!$get && $action === '/loeschen') return $this->userDelete($id, $admin);
         }
+        if ($r->path === '/verwaltung/sicherheit') return $this->securityPage();
         if ($r->path === '/verwaltung/zugang') return $get ? $this->accessPage() : $this->accessSave($r, $admin);
         if ($r->path === '/verwaltung/protokoll' && $get) return $this->protocol();
         if ($r->path === '/verwaltung/firewall') return $get ? $this->firewallPage() : $this->firewallApply($r, $admin);
@@ -750,8 +751,12 @@ final class Web {
             $rows .= '<tr><td><a href="/verwaltung/benutzer/' . $u['id'] . '">' . V::h($u['login']) . '</a></td><td>' . V::h($u['display']) . '</td><td>' . V::h(implode(', ', $roles) ?: '–')
                 . '</td><td>' . ($u['active'] ? ($u['password'] ? ($u['otp'] ? 'Passwort + App' : 'Passwort') : 'Einrichtung offen') : 'gesperrt') . '</td></tr>';
         }
-        return Response::html(V::page('Benutzer', V::notice($notice) . '<p><a class="button" href="/verwaltung/benutzer/neu">Benutzer anlegen</a></p>'
-            . '<table><tr><th>Anmeldename</th><th>Name</th><th>Zugang</th><th>Anmeldung</th></tr>' . $rows . '</table>', $this->nav(), $this->config->practice));
+        $groups = self::stripCards(self::inner($this->groupsPage()));
+        return Response::html(V::page('Benutzer und Gruppen', V::notice($notice) . '<section class="card"><details class="fold" open><summary><h2>Benutzer</h2></summary>'
+            . '<p><a class="button" href="/verwaltung/benutzer/neu">Benutzer anlegen</a></p>'
+            . '<table><tr><th>Anmeldename</th><th>Name</th><th>Zugang</th><th>Anmeldung</th></tr>' . $rows . '</table></details>'
+            . '<details class="fold" id="gruppen"' . (str_contains((string)($this->req?->query['bereich'] ?? ''), 'gruppen') ? ' open' : '') . '><summary><h2>Gruppen</h2></summary>' . $groups . '</details></section>',
+            $this->nav(), $this->config->practice));
     }
 
     private function userNew(?string $error = null): Response {
@@ -854,7 +859,7 @@ final class Web {
         } catch (Problem $e) {
             return $this->groupsPage($e->getMessage());
         }
-        return $this->groupsPage(null, 'Gespeichert.');
+        return Response::redirect('/verwaltung/benutzer?bereich=gruppen');
     }
 
     private function userSave(Request $r, int $id, string $admin): Response {
@@ -913,23 +918,70 @@ final class Web {
         return $this->userList('Gelöscht: ' . $user['login'] . '.');
     }
 
+    /** Zeitfeld mit Einheit: Wert + Minuten/Stunden/Tage (nur Einheiten ab $smallest). */
+    private function durationField(string $name, string $label, int $seconds, array $units): string {
+        $factor = ['min' => 60, 'h' => 3600, 'd' => 86400]; $names = ['min' => 'Minuten', 'h' => 'Stunden', 'd' => 'Tage'];
+        $unit = $units[0];
+        foreach (array_reverse($units) as $u) if ($seconds % $factor[$u] === 0) { $unit = $u; break; }
+        $options = '';
+        foreach ($units as $u) $options .= '<option value="' . $u . '"' . ($u === $unit ? ' selected' : '') . '>' . $names[$u] . '</option>';
+        return '<label>' . V::h($label) . '<span class="row"><input type="number" name="' . $name . '" min="1" value="' . intdiv($seconds, $factor[$unit]) . '" required>'
+            . '<select name="' . $name . '_einheit" aria-label="Einheit">' . $options . '</select></span></label>';
+    }
+
     private function accessPage(?string $error = null, ?string $notice = null): Response {
-        $body = V::error($error) . V::notice($notice) . '<form method="post" action="/verwaltung/zugang" class="box">' . V::csrf($this->session['csrf'])
-            . V::input('idle', 'Abmelden nach Minuten ohne Aktion (5 bis 263520)', 'number', (string)intdiv($this->auth->idleSeconds(), 60), 'min="5" max="263520" required')
-            . V::input('max', 'Höchstdauer einer Sitzung in Stunden (1 bis 4392)', 'number', (string)intdiv($this->auth->maxSeconds(), 3600), 'min="1" max="4392" required')
+        return Response::html(V::page('Zugang', $this->accessBody($error, $notice), $this->nav(), $this->config->practice), $error ? 422 : 200);
+    }
+
+    private function accessBody(?string $error = null, ?string $notice = null): string {
+        return V::error($error) . V::notice($notice) . '<form method="post" action="/verwaltung/zugang" class="box">' . V::csrf($this->session['csrf'])
+            . $this->durationField('idle', 'Abmelden nach … ohne Aktion (5 Minuten bis 1 Jahr)', $this->auth->idleSeconds(), ['min', 'h', 'd'])
+            . $this->durationField('max', 'Höchstdauer einer Sitzung (1 Stunde bis 1 Jahr)', $this->auth->maxSeconds(), ['h', 'd'])
             . '<p>Gemerkte Geräte bleiben bis zu 30 Tage ohne Nutzung und höchstens 6 Monate angemeldet, nur aus dem Netz der Anmeldung.</p><button>Speichern</button></form>';
-        return Response::html(V::page('Zugang', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+    }
+
+    private static function seconds(Request $r, string $name, int $default): int {
+        $factor = ['min' => 60, 'h' => 3600, 'd' => 86400];
+        $unit = $r->field($name . '_einheit', 5);
+        return max(0, (int)$r->field($name, 10)) * ($factor[$unit] ?? $default);
     }
 
     private function accessSave(Request $r, string $admin): Response {
         try {
-            $this->auth->saveTimes((int)$r->field('idle', 10), (int)$r->field('max', 10));
+            $idle = self::seconds($r, 'idle', 60); $max = self::seconds($r, 'max', 3600);
+            if ($idle % 60 !== 0 || $max % 3600 !== 0) throw new Problem('Die Höchstdauer einer Sitzung gibt es nur in ganzen Stunden oder Tagen.', 422);
+            $this->auth->saveTimes(intdiv($idle, 60), intdiv($max, 3600));
         } catch (Problem $e) {
-            return $this->accessPage($e->getMessage());
+            return $this->securityPage($e->getMessage());
         }
         $this->audit->write($admin, 'zugang-gespeichert', 'abmeldezeiten');
-        return $this->accessPage(null, 'Gespeichert.');
+        return $this->securityPage(null, 'Gespeichert.');
     }
+
+    /** Inhalt einer fertigen Seite ohne Rahmen und Überschrift (für zusammengelegte Seiten). */
+    private static function inner(Response $page): string {
+        return preg_match('#</h1>(.*)</main>#s', $page->body, $m) ? $m[1] : '';
+    }
+
+    /** Sicherheit: Firewall, Zugang (Abmeldezeiten) und Protokoll als aufklappbare Abschnitte in einer Karte. */
+    private function securityPage(?string $error = null, ?string $notice = null): Response {
+        $log = $this->protocol();
+        try {
+            $fw = $this->firewallPage(); $fwState = (string)$this->fw()->overview($this->req->remote)['status']['state'];
+        } catch (Problem $e) {
+            $fw = Response::html('<main><h1>x</h1><p class="muted">' . V::h($e->getMessage()) . '</p></main>'); $fwState = 'off';
+        }
+        $open = fn(string $id) => str_contains((string)($this->req?->query['bereich'] ?? ''), $id) || $error !== null && $id === 'zugang' ? ' open' : '';
+        $body = V::error($error) . V::notice($notice) . '<section class="card">'
+            . '<details class="fold" id="firewall"' . ($open('firewall') ?: ($fwState === 'pending' ? ' open' : '')) . '><summary><h2>Firewall</h2></summary>' . self::stripCards(self::inner($fw)) . '</details>'
+            . '<details class="fold" id="zugang"' . $open('zugang') . '><summary><h2>Zugang (Abmeldezeiten)</h2></summary>' . $this->accessBody() . '</details>'
+            . '<details class="fold" id="protokoll"' . $open('protokoll') . '><summary><h2>Protokoll</h2></summary>' . self::stripCards(self::inner($log)) . '</details></section>';
+        $response = Response::html(V::page('Sicherheit', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+        if (($refresh = $fw->header('Refresh')) !== null) $response->with('Refresh', $refresh);
+        return $response;
+    }
+
+    private static function stripCards(string $html): string { return preg_replace('#</?section[^>]*>#', '', $html) ?? $html; }
 
     private function protocol(): Response {
         $lines = array_map(fn($l) => '<li><code>' . V::h($l) . '</code></li>', $this->audit->recent(200));
@@ -996,19 +1048,19 @@ final class Web {
             return $this->firewallPage($e->getMessage(), $again);
         }
         $this->audit->write($admin, 'firewall-geladen', implode(',', $config['cidrs']) . ($config['strict'] ? ' alles-zu' : ' nur-ports') . ($config['modules'] ? ' ' . implode(',', $config['modules']) : ''));
-        return Response::redirect('/verwaltung/firewall');
+        return Response::redirect('/verwaltung/sicherheit?bereich=firewall');
     }
 
     private function firewallConfirm(string $admin): Response {
         $this->fw()->confirm();
         $this->audit->write($admin, 'firewall-bestaetigt');
-        return Response::redirect('/verwaltung/firewall');
+        return Response::redirect('/verwaltung/sicherheit?bereich=firewall');
     }
 
     private function firewallOff(string $admin): Response {
         $this->fw()->disable();
         $this->audit->write($admin, 'firewall-ausgeschaltet');
-        return Response::redirect('/verwaltung/firewall');
+        return Response::redirect('/verwaltung/sicherheit?bereich=firewall');
     }
 
     // ---- Module -------------------------------------------------------------------------------------------------
@@ -1196,8 +1248,8 @@ final class Web {
         $body .= '<section><h2>T2med (FHIR)</h2><form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('t2med')
             . V::input('base_url', 'Adresse des FHIR-Servers', 'url', (string)($t2['base_url'] ?? ''), 'placeholder="https://t2med-server:16567/aps/fhir/api/r4"')
             . '<label>Erlaubte fhirBasisUrl aus T2med – weitere Adressen (eine je Zeile)<textarea name="launch_urls" rows="2">' . V::h(implode("\n", array_diff((array)($t2['launch_urls'] ?? []), [(string)($t2['base_url'] ?? '')]))) . '</textarea></label>'
-            . V::input('api_key', 'API-Schlüssel der FHIR-Schnittstelle', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($t2['api_key_gesetzt'] ?? false))) . '"')
-            . '<p class="muted small">Schlüssel der FHIR-Schnittstelle (wird als X-API-Key gesendet). Antwortet T2med mit „FHIR-API-Key fehlt oder ist ungültig“, passt der Wert nicht, z. B. wenn hier das Client Secret des Drittanbieters steht. Mit „Schlüssel entfernen“ nutzt die Kasse wie das alte Tool den hinterlegten T2med-Demo-Schlüssel.</p>'
+            . V::input('api_key', 'API-Schlüssel der FHIR-Schnittstelle', 'password', '', 'title="Beim T2med-Demo-Schlüssel hier nichts eintragen: Feld leer lassen und den gespeicherten Schlüssel entfernen. Ein eigener Schlüssel führt dort zu Fehler 403." autocomplete="new-password" placeholder="' . V::h($set((bool)($t2['api_key_gesetzt'] ?? false))) . '"')
+            . '<p class="muted small">Schlüssel der FHIR-Schnittstelle (wird als X-API-Key gesendet). Antwortet T2med mit „FHIR-API-Key fehlt oder ist ungültig“, passt der Wert nicht, z. B. wenn hier das Client Secret des Drittanbieters steht. Mit „Schlüssel entfernen“ nutzt die Kasse wie das alte Tool den hinterlegten T2med-Demo-Schlüssel. <strong>Beim Demo-Schlüssel darf hier kein eigener API-Schlüssel stehen</strong> (sonst Fehler 403): Feld leer lassen und den gespeicherten Schlüssel entfernen.</p>'
             . V::checkbox('api_key_entfernen', '1', 'Gespeicherten Schlüssel entfernen (Kasse nimmt den T2med-Demo-Schlüssel)', false)
             . '<label>Zertifikat des T2med-Servers (PEM, optional)' . (($t2['zertifikat'] ?? '') !== '' ? ' – gespeichert, SHA-256 <code>' . V::h(substr((string)$t2['zertifikat'], 0, 16)) . '…</code>' : '')
             . '<textarea name="ca_pem" rows="3" placeholder="-----BEGIN CERTIFICATE-----"></textarea></label>'

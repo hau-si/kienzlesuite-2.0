@@ -144,6 +144,13 @@ function test_verwaltung_braucht_bestaetigung_und_csrf(): void {
     $env = new Env();
     [$b, , $secret] = admin_browser($env);
     check($b->get('/verwaltung/benutzer')->status === 200, 'Verwaltung direkt nach Anmeldung nicht erreichbar');
+    $page = $b->get('/verwaltung/benutzer')->body;
+    check(str_contains($page, '<h2>Gruppen</h2>') && str_contains($page, '<h2>Benutzer</h2>'), 'Benutzer und Gruppen nicht auf einer Seite');
+    $page = $b->get('/verwaltung/sicherheit')->body;
+    check(str_contains($page, '<h2>Firewall</h2>') && str_contains($page, 'Zugang (Abmeldezeiten)') && str_contains($page, '<h2>Protokoll</h2>') && str_contains($page, 'name="idle_einheit"'), 'Sicherheit unvollständig');
+    check($b->post('/verwaltung/zugang', ['idle' => '2', 'idle_einheit' => 'd', 'max' => '3', 'max_einheit' => 'd'])->status === 200 && $env->auth->idleSeconds() === 172800, 'Zugang in Tagen nicht gespeichert');
+    check($b->post('/verwaltung/zugang', ['idle' => '400', 'idle_einheit' => 'd', 'max' => '400', 'max_einheit' => 'd'])->status === 422, 'mehr als ein Jahr angenommen');
+    check($b->post('/verwaltung/zugang', ['idle' => '365', 'idle_einheit' => 'd', 'max' => '365', 'max_einheit' => 'd'])->status === 200, 'ein Jahr abgelehnt');
     $env->db->query('UPDATE sessions SET confirmed_at=?', [time() - Auth::CONFIRM_SECONDS - 1]);
     check(str_starts_with((string)$b->get('/verwaltung/benutzer')->header('Location'), '/bestaetigen'), 'Verwaltung ohne erneute Bestätigung');
     $b->get('/bestaetigen?weiter=/verwaltung/benutzer');
