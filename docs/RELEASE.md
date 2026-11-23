@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.20.9-beta.1
+
+- Verwaltung → Drucker: Freigaben (Samba/IPP) gibt es nur noch für die virtuellen Drucker der Module; echte Drucker und der Bondrucker brauchen keine (Auswahl beim Anlegen entfällt, Hinweis im Text).
+- Neu: aufklappbare Anleitung „virtuelle Drucker an den Arbeitsplätzen einrichten“ unter den virtuellen Druckern (Windows per IPP mit Adresse und Treiber je Drucker, PowerShell-Befehle, Mac, T2med-Einstellung). Die Adresse enthält den Servernamen, unter dem die Seite aufgerufen wird.
+- Nicht auf der echten VM getestet.
+
 ## 0.20.8-beta.1
 
 - T2med: Das Feld heißt „API-Schlüssel der FHIR-Schnittstelle“ (nicht mehr „Client Secret“); der Hinweis erklärt, dass T2med bei einem unpassenden Wert „FHIR-API-Key fehlt oder ist ungültig“ (HTTP 403) meldet. Neu: „Gespeicherten Schlüssel entfernen“, dann nimmt die Kasse wie das alte Tool den hinterlegten T2med-Demo-Schlüssel. Vermutung, nicht an echtem T2med bestätigt: Der Wert, der im alten Tool funktionierte, war der Demo-Schlüssel, nicht das Client Secret des Drittanbieters.

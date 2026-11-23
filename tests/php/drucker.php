@@ -49,7 +49,7 @@ function test_seite(): void {
     [$b] = admin_browser($env);
     $b->web = fn() => $b->defaultWeb(null, null, null, null, $p);
     $page = $b->get('/verwaltung/drucker');
-    check($page->status === 200 && str_contains($page->body, 'Virtuelle Drucker') && str_contains($page->body, 'Modul Beispielmodul'), 'Seite unvollständig');
+    check($page->status === 200 && str_contains($page->body, 'Virtuelle Drucker') && str_contains($page->body, 'Modul Beispielmodul') && str_contains($page->body, 'Anleitung: virtuelle Drucker an den Arbeitsplätzen') && str_contains($page->body, ':631/printers/'), 'Seite unvollständig');
     check(str_contains($page->body, 'Wofür welcher Drucker?'), 'Zuordnung fehlt');
     check($b->post('/verwaltung/drucker', ['aktion' => 'rollen', 'buero' => 'Gibtsnicht', 'bon' => ''])->status === 422, 'Unbekannter Drucker in der Zuordnung');
     check($b->post('/verwaltung/drucker', ['aktion' => 'rollen', 'buero' => 'Fremd', 'bon' => 'Bon'])->status === 303, 'Zuordnung speichern');
