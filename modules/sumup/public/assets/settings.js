@@ -346,7 +346,7 @@ function ippByIp(url, ips) {
 }
 function ippPowerShell(queue, url, ips, paper) {
   const byIp = ippByIp(url, ips), use = byIp.length ? byIp[0].url : url;
-  return '# 1. Alte Einrichtung entfernen (behebt „Das Handle ist ungültig“)\nRestart-Service Spooler\nGet-Printer -Name "' + queue + '" -ErrorAction SilentlyContinue | Remove-Printer\n# 2. Neu einrichten\nEnable-WindowsOptionalFeature -Online -FeatureName Printing-Foundation-InternetPrinting-Client -NoRestart\nAdd-PrinterDriver -Name "Microsoft IPP Class Driver"\n$url = "' + use + '"\nAdd-PrinterPort -Name $url -ErrorAction SilentlyContinue\nAdd-Printer -Name "' + queue + '" -DriverName "Microsoft IPP Class Driver" -PortName $url' + (paper ? '\nSet-PrintConfiguration -PrinterName "' + queue + '" -PaperSize ' + paper : '');
+  return 'Enable-WindowsOptionalFeature -Online -FeatureName Printing-Foundation-InternetPrinting-Client -NoRestart | Out-Null\n# Druckspooler neu starten und auf den laufenden Dienst warten; alten Drucker entfernen (behebt „Das Handle ist ungültig“)\nRestart-Service Spooler -Force\n(Get-Service Spooler).WaitForStatus(\'Running\', \'00:00:30\')\nStart-Sleep 3\nGet-Printer -Name "' + queue + '" -ErrorAction SilentlyContinue | Remove-Printer\nAdd-PrinterDriver -Name "Microsoft IPP Class Driver"\n$url = "' + use + '"\nAdd-PrinterPort -Name $url -ErrorAction SilentlyContinue\nAdd-Printer -Name "' + queue + '" -DriverName "Microsoft IPP Class Driver" -PortName $url' + (paper ? '\nSet-PrintConfiguration -PrinterName "' + queue + '" -PaperSize ' + paper : '');
 }
 function ippIpNote(url, ips) {
   const byIp = ippByIp(url, ips);

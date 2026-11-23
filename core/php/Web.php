@@ -1428,8 +1428,10 @@ final class Web {
             $name = (string)$q['name'];
             $url = 'http://' . $host . ':631/printers/' . rawurlencode($name);
             $paper = preg_match('/terminzettel/i', $name) ? 'A6' : 'A4';
-            $script = "# 1. Alte Einrichtung entfernen (behebt „Das Handle ist ungültig“)\nRestart-Service Spooler\nGet-Printer -Name \"" . $name . "\" -ErrorAction SilentlyContinue | Remove-Printer\n# 2. Neu einrichten\n"
-                . "Enable-WindowsOptionalFeature -Online -FeatureName Printing-Foundation-InternetPrinting-Client -NoRestart\n"
+            $script = "Enable-WindowsOptionalFeature -Online -FeatureName Printing-Foundation-InternetPrinting-Client -NoRestart | Out-Null\n"
+                . "# Druckspooler neu starten und auf den laufenden Dienst warten; alten Drucker entfernen (behebt „Das Handle ist ungültig“)\n"
+                . "Restart-Service Spooler -Force\n(Get-Service Spooler).WaitForStatus('Running', '00:00:30')\nStart-Sleep 3\n"
+                . "Get-Printer -Name \"" . $name . "\" -ErrorAction SilentlyContinue | Remove-Printer\n"
                 . "Add-PrinterDriver -Name \"Microsoft IPP Class Driver\"\n\$url = \"" . $url . "\"\nAdd-PrinterPort -Name \$url -ErrorAction SilentlyContinue\n"
                 . "Add-Printer -Name \"" . $name . "\" -DriverName \"Microsoft IPP Class Driver\" -PortName \$url"
                 . ($paper === 'A4' ? "\nSet-PrintConfiguration -PrinterName \"" . $name . "\" -PaperSize A4" : '');
