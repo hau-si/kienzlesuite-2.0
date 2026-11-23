@@ -24,10 +24,10 @@ import tempfile
 import time
 from pathlib import Path
 
+from . import ablage
+
 # runuser liegt in /usr/sbin; der Dienst hat nicht immer sbin im PATH: absoluten Pfad bestimmen.
 RUNUSER_BIN = next((c for c in ('/usr/sbin/runuser', '/usr/bin/runuser', '/sbin/runuser') if os.path.exists(c)), 'runuser')
-
-from . import ablage
 
 E = os.environ.get
 RESTIC = E('KIENZLE_RESTIC', '/usr/bin/restic')
