@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.20.0-beta.1
+
+- Basis-Admins dürfen in jedem installierten Modul alles: Sie gelten dort als Modul-Admin mit allen Rechten, ohne dass Haken gesetzt sein müssen (Menü, Einstellungen und Zugriff der Module; auch die Haken in der Benutzerverwaltung erscheinen gesetzt).
+- Neu: Verwaltung → Gruppen. Vorgaben „Admin“ (Admin in allen Modulen, alle Rechte), „Arzt“ (alle Rechte) und „MFA“ (Kasse im Alltag: kassieren, bezahlt abhaken, Rechnungseingang). Gruppen sind änderbar, zurücksetzbar und um eigene ergänzbar. Beim Bearbeiten eines Benutzers übernimmt „Gruppe anwenden“ beim Speichern die Rechte der Gruppe; danach lassen sich die Haken einzeln ändern. Spätere Änderungen an einer Gruppe ändern bestehende Benutzer nicht. Ungeänderte Vorgaben schließen neue Module von selbst ein; die Gruppe „Admin“ macht in der Benutzerverwaltung zum Modul-Admin, was die Authenticator-App voraussetzt.
+- Nicht in einem echten Browser angesehen.
+
 ## 0.19.9-beta.1
 
 - Installer: `libnss-mdns` wird mitinstalliert (trägt mDNS in die Namensauflösung ein) und der Avahi-Dienst eingeschaltet. Damit löst der Server Namen wie `Drucker.local` selbst auf; bisher scheiterte das Einrichten und Drucken mit „Temporary failure in name resolution“. Nach dem Update den Installer erneut ausführen. Nicht auf echter Hardware geprüft: Funktioniert mDNS im Praxisnetz nicht (z. B. gesperrt im Router), bleibt nur die IP-Adresse des Druckers.

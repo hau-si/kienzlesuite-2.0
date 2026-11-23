@@ -703,6 +703,7 @@ final class Web {
         $admin = (string)$this->session['login'];
         if ($r->path === '/verwaltung/benutzer') return $get ? $this->userList() : $this->userCreate($r, $admin);
         if ($r->path === '/verwaltung/benutzer/neu' && $get) return $this->userNew();
+        if ($r->path === '/verwaltung/gruppen') return $get ? $this->groupsPage() : $this->groupsAction($r, $admin);
         if (preg_match('#^/verwaltung/benutzer/(\d{1,9})(/link|/loeschen)?$#D', $r->path, $m)) {
             $id = (int)$m[1];
             $action = $m[2] ?? '';
@@ -792,6 +793,7 @@ final class Web {
             . '<form method="post" action="/verwaltung/benutzer/' . $id . '" class="box">' . V::csrf($this->session['csrf'])
             . '<p>Anmeldename: <strong>' . V::h($user['login']) . '</strong></p>'
             . V::input('display', 'Name', 'text', $user['display'])
+            . $this->groupSelect()
             . V::checkbox('admin', '1', 'Basis-Admin', (int)$user['admin'] === 1) . V::checkbox('active', '1', 'Konto aktiv', (int)$user['active'] === 1)
             . ($modules !== '' ? '<h2>Zugang zu Modulen</h2>' . $modules : '<p>Es sind noch keine Module installiert.</p>')
             . '<button>Speichern</button></form>'
@@ -802,13 +804,73 @@ final class Web {
         return Response::html(V::page('Benutzer ' . $user['login'], $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
     }
 
+    private function groupSelect(): string {
+        $opts = '<option value="">– nicht ändern, Haken unten gelten –</option>';
+        foreach (array_keys((new Groups($this->db, $this->modules))->all()) as $name) $opts .= '<option value="' . V::h($name) . '">' . V::h($name) . '</option>';
+        return '<label>Gruppe anwenden<select name="gruppe">' . $opts . '</select></label>'
+            . '<p class="muted small">Setzt beim Speichern die Modulrechte dieser Gruppe (<a href="/verwaltung/gruppen">Gruppen bearbeiten</a>). Danach lassen sich die Haken einzeln ändern.</p>';
+    }
+
+    private function groupBoxes(string $prefix, array $g): string {
+        $out = '';
+        foreach ($this->modules->all() as $mid => $_) {
+            $rights = '';
+            foreach ($this->modules->rights($mid) as $right) $rights .= V::checkbox('recht[]', $mid . ':' . $right['id'], $right['label'], in_array($mid . ':' . $right['id'], $g['rechte'], true));
+            $out .= '<fieldset><legend>' . V::h($this->modules->name($mid)) . '</legend>' . V::checkbox('modul_admin[]', $mid, 'Admin dieses Moduls', in_array($mid, $g['admin'], true)) . $rights . '</fieldset>';
+        }
+        return $out;
+    }
+
+    private function groupsPage(?string $error = null, ?string $notice = null): Response {
+        $groups = new Groups($this->db, $this->modules);
+        $body = V::error($error) . V::notice($notice)
+            . '<p>Gruppen sind Vorlagen für Modulrechte. Beim Bearbeiten eines Benutzers wählt man eine Gruppe, die Rechte werden dann übernommen. '
+            . 'Spätere Änderungen an einer Gruppe ändern bestehende Benutzer nicht. Basis-Admins dürfen in allen Modulen ohnehin alles.</p>';
+        foreach ($groups->all() as $name => $g) {
+            $body .= '<form method="post" action="/verwaltung/gruppen" class="box">' . V::csrf($this->session['csrf']) . '<input type="hidden" name="aktion" value="speichern"><input type="hidden" name="name" value="' . V::h($name) . '">'
+                . '<h2>' . V::h($name) . '</h2>' . $this->groupBoxes($name, $g) . '<button>Speichern</button></form>'
+                . '<form method="post" action="/verwaltung/gruppen" class="inline">' . V::csrf($this->session['csrf']) . '<input type="hidden" name="aktion" value="zuruecksetzen"><input type="hidden" name="name" value="' . V::h($name) . '">'
+                . '<button class="danger">' . (isset($groups->defaults()[$name]) ? 'Auf Vorgabe zurücksetzen' : 'Gruppe löschen') . '</button></form>';
+        }
+        $body .= '<h2>Neue Gruppe</h2><form method="post" action="/verwaltung/gruppen" class="box">' . V::csrf($this->session['csrf']) . '<input type="hidden" name="aktion" value="speichern">'
+            . V::input('name', 'Name der Gruppe', 'text', '', 'maxlength="30" required') . $this->groupBoxes('', ['admin' => [], 'rechte' => []]) . '<button>Anlegen</button></form>';
+        return Response::html(V::page('Gruppen', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+    }
+
+    private function groupsAction(Request $r, string $admin): Response {
+        $g = new Groups($this->db, $this->modules);
+        $name = trim($r->field('name', 30));
+        try {
+            if ($r->field('aktion', 20) === 'speichern') {
+                $g->set($name, $r->list('modul_admin'), $r->list('recht'));
+                $this->audit->write($admin, 'gruppe-gespeichert', $name);
+            } elseif ($r->field('aktion', 20) === 'zuruecksetzen') {
+                $g->reset($name);
+                $this->audit->write($admin, 'gruppe-zurueckgesetzt', $name);
+            } else {
+                throw new Problem('Unbekannte Aktion.', 422);
+            }
+        } catch (Problem $e) {
+            return $this->groupsPage($e->getMessage());
+        }
+        return $this->groupsPage(null, 'Gespeichert.');
+    }
+
     private function userSave(Request $r, int $id, string $admin): Response {
         $user = $this->users->find($id);
         if (!$user) throw new Problem('Benutzer nicht gefunden.', 404);
         $moduleAdmin = $r->list('modul_admin');
+        $entries = $r->list('recht');
+        $groupName = $r->field('gruppe', 30);
+        if ($groupName !== '') {
+            $g = (new Groups($this->db, $this->modules))->get($groupName);
+            if (!$g) return $this->userEdit($id, 'Unbekannte Gruppe.');
+            $moduleAdmin = $g['admin'];
+            $entries = $g['rechte'];
+        }
         $rights = [];
-        foreach ($r->list('recht') as $entry) {
-            [$m, $right] = array_pad(explode(':', $entry, 2), 2, '');
+        foreach ($entries as $entry) {
+            [$m, $right] = array_pad(explode(':', (string)$entry, 2), 2, '');
             $rights[$m][] = $right;
         }
         try {
