@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.7
+
+- Zugang (Abmeldezeiten): Zahlenfeld und Einheit stehen jetzt nebeneinander in sinnvoller Breite (vorher war das Zahlenfeld zusammengedrückt); der doppelte Rahmen im aufklappbaren Abschnitt ist weg. Nicht im Browser angesehen.
+
 ## 0.21.4-beta.6
 
 - Updates: Während ein Update läuft, steht oben ein gelb hinterlegter, beim Scrollen mitlaufender Hinweis mit drehendem Symbol und dem aktuellen Schritt; die Knöpfe sind gesperrt, bis „fertig“ dasteht. Neu: Hinweis, dass Module beim Update automatisch mit aktualisiert werden, wenn unter Module die automatische Aktualisierung an ist. Nicht im Browser angesehen.

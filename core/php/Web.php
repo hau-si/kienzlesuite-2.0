@@ -1039,7 +1039,7 @@ final class Web {
     }
 
     private function accessBody(?string $error = null, ?string $notice = null): string {
-        return V::error($error) . V::notice($notice) . '<form method="post" action="/verwaltung/zugang" class="box">' . V::csrf($this->session['csrf'])
+        return V::error($error) . V::notice($notice) . '<form method="post" action="/verwaltung/zugang">' . V::csrf($this->session['csrf'])
             . $this->durationField('idle', 'Abmelden nach … ohne Aktion (5 Minuten bis 1 Jahr)', $this->auth->idleSeconds(), ['min', 'h', 'd'])
             . $this->durationField('max', 'Höchstdauer einer Sitzung (1 Stunde bis 1 Jahr)', $this->auth->maxSeconds(), ['h', 'd'])
             . '<p>Gemerkte Geräte bleiben bis zu 30 Tage ohne Nutzung und höchstens 6 Monate angemeldet, nur aus dem Netz der Anmeldung.</p><button>Speichern</button></form>';
