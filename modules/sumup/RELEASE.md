@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.3-beta.4
+
+- Windows-Skript: Anschluss und Drucker werden bis zu viermal angelegt (Pause nach dem Spooler-Neustart, sonst Fehler 0x800703eb), am Ende zeigt es den angelegten Drucker. Nicht getestet (auf dem Windows-PC des Anwenders klappte der Befehl `Add-Printer` beim zweiten Versuch).
+
 ## 2.3.3-beta.3
 
 - Nach einer nicht erfolgten oder abgebrochenen Zahlung heißt die Überweisung überall „Patient zahlt später (Überweisung)“. Bei internen Rechnungen (Leistungsauswahl) wechselt sie in die offene Überweisung mit Kontodaten und QR-Code (Bon druckbar); bei T2med-Rechnungen, deren Überweisungs-QR-Code schon auf der Rechnung steht, kehrt sie zur Rechnungsliste zurück (Rechnung wird gedruckt, wenn der Rechnungsdruck eingeschaltet ist). Dieselbe Beschriftung gilt in der Rechnungsliste.
