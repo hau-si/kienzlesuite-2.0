@@ -1434,7 +1434,7 @@ final class Web {
                 . "Get-Printer -Name \"" . $name . "\" -ErrorAction SilentlyContinue | Remove-Printer\n"
                 . "Add-PrinterDriver -Name \"Microsoft IPP Class Driver\"\n\$url = \"" . $url . "\"\nAdd-PrinterPort -Name \$url -ErrorAction SilentlyContinue\n"
                 . "Add-Printer -Name \"" . $name . "\" -DriverName \"Microsoft IPP Class Driver\" -PortName \$url"
-                . ($paper === 'A4' ? "\nSet-PrintConfiguration -PrinterName \"" . $name . "\" -PaperSize A4" : '');
+               ;
             $mac = isset($ppd[$q['modul']]) ? ' <a href="' . V::h($ppd[$q['modul']]) . '" download>PDF-Beschreibungsdatei (PPD) herunterladen</a>' : '';
             $blocks .= '<h3>Drucker „' . V::h($name) . '“</h3><ol>'
                 . '<li>Windows: Drucker hinzufügen → „Freigegebenen Drucker über den Namen auswählen“: <code>' . V::h($url) . '</code> – Treiber „Microsoft IPP Class Driver“, Papier ' . $paper . '. '
