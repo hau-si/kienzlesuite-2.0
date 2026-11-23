@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.8
+
+- Einrichtung: „Mindestens zwei Admins“, „Netzwerkspeicher eingetragen“ und „Probe-Wiederherstellung erfolgreich“ sind jetzt als optional gekennzeichnet und zählen nicht für den Fortschritt.
+
 ## 0.21.4-beta.7
 
 - Zugang (Abmeldezeiten): Zahlenfeld und Einheit stehen jetzt nebeneinander in sinnvoller Breite (vorher war das Zahlenfeld zusammengedrückt); der doppelte Rahmen im aufklappbaren Abschnitt ist weg. Nicht im Browser angesehen.
