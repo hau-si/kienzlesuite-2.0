@@ -164,6 +164,9 @@ function test_verwaltung_braucht_bestaetigung_und_csrf(): void {
     check($b->post('/verwaltung/neustart', ['art' => 'dienste'])->status === 200 && is_file($env->dir . '/anfragen/neustart.json'), 'Neustart-Anfrage nicht geschrieben');
     check(str_contains(implode("\n", $env->audit->recent()), 'neustart dienste'), 'Neustart nicht protokolliert');
     unlink($env->dir . '/anfragen/neustart.json');
+    // Update-Seite: jede Karte muss geschlossen sein (ein h2 im Update-Kasten zerriss früher den Aufbau und schob die Seitenleiste weg).
+    $upd = $b->get('/verwaltung/updates')->body;
+    check(substr_count($upd, '<div') === substr_count($upd, '</div') && substr_count($upd, '<section') === substr_count($upd, '</section'), 'Updates-Seite: ungleich viele öffnende und schließende Tags');
     $home = $b->get('/')->body;
     check(str_contains($home, 'todo-dot'), 'Keine blaue Markierung für offene Schritte im Menü');
     check(str_contains($b->get('/verwaltung/drucker')->body, '<summary><h2>Drucker suchen</h2></summary>') || !str_contains($b->get('/verwaltung/drucker')->body, 'Drucker suchen'), 'Drucker suchen nicht eingeklappt');

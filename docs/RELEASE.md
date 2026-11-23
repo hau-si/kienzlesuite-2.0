@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.12
+
+- Fehler behoben: Auf der Updates-Seite (bei verfügbarer Version) rutschte der Inhalt unter die Seitenleiste. Ursache: Die Aufteilung in Karten schnitt an jeder Überschrift, auch an der im Update-Kasten, und ließ ein div offen. Karten beginnen jetzt nur noch an Überschriften auf oberster Ebene. Das betrifft ebenso andere Seiten mit Überschriften in Kästen (z. B. Gruppen). Im Test mit Beispiel-HTML geprüft, nicht im Browser.
+
 ## 0.21.4-beta.11
 
 - Menü: Ein dezenter blauer Punkt hinter einem Menüeintrag zeigt, dass auf dieser Seite noch ein nötiger Schritt aus der Einrichtung offen ist (optionale Punkte zählen nicht); auch bei Modul-Einstellungen, wenn das Modul offene Schritte meldet.

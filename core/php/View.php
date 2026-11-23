@@ -106,7 +106,19 @@ final class View {
         if (str_contains($body, 'class="card')) return $body;
         $lead = '';
         while (preg_match('#^\s*(<p class="(?:error|notice)"[^>]*>.*?</p>)#s', $body, $m)) { $lead .= $m[1]; $body = substr($body, strlen($m[0])); }
-        $parts = preg_split('#(?=<h2[ >])#', $body) ?: [$body];
+        // Nur Überschriften auf oberster Ebene beginnen eine Karte; eine h2 in einem offenen div/form (z. B. Update-Kasten) darf den Aufbau nicht zerreißen.
+        $cuts = [0];
+        $depth = 0;
+        if (preg_match_all('#<(/?)(div|form|section|details|table|ul|ol|pre|fieldset)\b[^>]*>|<h2[ >]#', $body, $found, PREG_OFFSET_CAPTURE | PREG_SET_ORDER)) {
+            foreach ($found as $tag) {
+                if (str_starts_with($tag[0][0], '<h2')) { if ($depth === 0 && $tag[0][1] > 0) $cuts[] = $tag[0][1]; }
+                elseif ($tag[1][0] === '/') $depth = max(0, $depth - 1);
+                else $depth++;
+            }
+        }
+        $cuts[] = strlen($body);
+        $parts = [];
+        for ($k = 0; $k + 1 < count($cuts); $k++) $parts[] = substr($body, $cuts[$k], $cuts[$k + 1] - $cuts[$k]);
         $out = $lead;
         foreach ($parts as $part) {
             if (trim($part) === '') continue;
