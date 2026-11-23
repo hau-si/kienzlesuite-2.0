@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.19.4-beta.1
+
+- Drucker: Die Seite trennt jetzt „Drucker“ (echte Drucker und Bondrucker) von „Virtuelle Drucker“ (von Modulen angelegt, mit dem Knopf zum Abgleichen).
+- Drucker einrichten: Namen wie `Drucker.local` (mDNS) löst der Server nun selbst in eine IP-Adresse auf (avahi-utils wird vom Installer mitinstalliert); gelingt das nicht, nennt die Meldung klar den Weg über die IP-Adresse statt „Temporary failure in name resolution“. Nicht an echten Druckern geprüft.
+
 ## 0.19.3-beta.1
 
 - Verbindungen → T2med: Selbstsignierte Zertifikate lassen sich jetzt im Webinterface übernehmen. „Zertifikat des Servers abrufen“ holt das Zertifikat von T2med und zeigt den SHA-256-Fingerabdruck; nach dem Vergleich (z. B. im Browser unter „Zertifikat anzeigen“) hinterlegt „Übernehmen“ es fest (Pinning). Die Verbindung prüft dann nur noch diesen Fingerabdruck, auch wenn das Zertifikat selbstsigniert ist oder nicht auf den Servernamen lautet. Bei einem Zertifikatsfehler weist die Meldung auf diesen Weg hin.

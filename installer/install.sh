@@ -97,7 +97,7 @@ DEBIAN_FRONTEND=noninteractive apt-get update -q
 wait_apt
 DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends \
   nginx php-fpm php-cli php-sqlite3 php-mbstring openssl qrencode python3 ca-certificates psmisc curl nftables iproute2 smbclient openssh-client restic cifs-utils \
-  cups cups-bsd cups-ipp-utils avahi-daemon samba unattended-upgrades
+  cups cups-bsd cups-ipp-utils avahi-daemon avahi-utils samba unattended-upgrades
 
 phpv=$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')
 phpfpm=/usr/sbin/php-fpm$phpv

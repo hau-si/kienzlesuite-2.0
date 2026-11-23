@@ -110,6 +110,7 @@ class Praxisdrucker(Umgebung):
         # „Unable to query printer: Connection refused“ kommt vom Drucker, nicht von CUPS.
         with self.assertRaisesRegex(self.d.Fehler, 'IPP Everywhere'):
             self.d.add('office', 'Kaputt', '192.0.2.91', [])
+        self.assertIn('IP-Adresse', self.d.explain('lpadmin: Unable to connect to Drucker-MFC.local:631: Temporary failure in name resolution'))
         self.assertIn('CUPS', self.d.explain('lpadmin: Unable to connect to server: Connection refused'))
         self.assertIn('CUPS', self.d.explain('lpstat: scheduler is not running'))
         self.assertIn('IPP Everywhere', self.d.explain('lpadmin: Unable to connect to printer; please try again in a few moments.'))
