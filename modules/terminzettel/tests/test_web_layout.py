@@ -105,7 +105,7 @@ class QrPositionTests(unittest.TestCase):
         self.assertEqual((width, text_x), (576, 0)); self.assertGreater(qr_x, 300)
         _, text_x, qr_x = self.page(render({"qr": {"position": "left"}}, {"calendar_qr": {"enabled": True}}))
         self.assertEqual(qr_x, 0); self.assertGreater(text_x, 64)
-        _, text_x, qr_x = self.page(render({"qr": {"position": "below", "width_dots": 200}, "appointments": {"size": "3x3"}},
+        _, text_x, qr_x = self.page(render({"qr": {"position": "below", "width_dots": 256}, "appointments": {"size": "3x3"}},
                                            {"calendar_qr": {"enabled": True}}))
         self.assertEqual(text_x, 0); self.assertGreater(qr_x, 0)
 
