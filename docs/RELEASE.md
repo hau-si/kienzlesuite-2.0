@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.19.9-beta.1
+
+- Installer: `libnss-mdns` wird mitinstalliert (trägt mDNS in die Namensauflösung ein) und der Avahi-Dienst eingeschaltet. Damit löst der Server Namen wie `Drucker.local` selbst auf; bisher scheiterte das Einrichten und Drucken mit „Temporary failure in name resolution“. Nach dem Update den Installer erneut ausführen. Nicht auf echter Hardware geprüft: Funktioniert mDNS im Praxisnetz nicht (z. B. gesperrt im Router), bleibt nur die IP-Adresse des Druckers.
+
 ## 0.19.8-beta.1
 
 - Drucker: Bereits angelegte Drucker der Suite, deren Adresse einen „.local“-Namen enthält, den der Server nicht auflösen kann, werden beim nächsten Lauf des Druckdienstes (z. B. beim Öffnen der Druckerseite oder bei der nächsten Anfrage) automatisch auf die IP-Adresse umgestellt. Das behebt den Fehler beim Testdruck „Der Name des Druckers lässt sich nicht auflösen“. Nicht an echter Hardware geprüft; die Auflösung braucht `avahi-utils` (Installer erneut ausführen).

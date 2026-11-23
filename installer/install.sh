@@ -97,7 +97,7 @@ DEBIAN_FRONTEND=noninteractive apt-get update -q
 wait_apt
 DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends \
   nginx php-fpm php-cli php-sqlite3 php-mbstring openssl qrencode python3 ca-certificates psmisc curl nftables iproute2 smbclient openssh-client restic cifs-utils \
-  cups cups-bsd cups-ipp-utils avahi-daemon avahi-utils samba unattended-upgrades
+  cups cups-bsd cups-ipp-utils avahi-daemon avahi-utils libnss-mdns samba unattended-upgrades
 
 phpv=$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')
 phpfpm=/usr/sbin/php-fpm$phpv
@@ -288,7 +288,7 @@ if [ -z "$nosystemd" ]; then
   systemctl enable --now kienzle-update.path kienzle-update-pruefen.timer kienzle-verbindungen.path kienzle-ablage.timer kienzle-sicherung.path kienzle-sicherung.timer kienzle-ueberblick.path kienzle-ueberblick.timer kienzle-drucker.path kienzle-drucker.timer kienzle-servername.path kienzle-module.path kienzle-module-pruefen.timer
   # Druckserver: CUPS und smbd; nmbd (NetBIOS) und der AD-Dienst werden nicht gebraucht.
   systemctl disable --now nmbd.service samba-ad-dc.service >/dev/null 2>&1 || true
-  systemctl enable cups.service smbd.service >/dev/null 2>&1 || true
+  systemctl enable avahi-daemon.service cups.service smbd.service >/dev/null 2>&1 || true
   for entry in "${conf_changed[@]}"; do
     unit=${entry%%:*}; dest=${entry#*:}
     if ! systemctl restart "$unit"; then
@@ -297,7 +297,7 @@ if [ -z "$nosystemd" ]; then
     fi
     rm -f -- "$dest.kienzle-vorher"
   done
-  systemctl start cups.service smbd.service >/dev/null 2>&1 || true
+  systemctl start avahi-daemon.service cups.service smbd.service >/dev/null 2>&1 || true
   if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q 'Status: active'; then
     echo 'Hinweis: ufw ist aktiv. Die Firewall der Suite (Verwaltung → Firewall) arbeitet unabhängig davon; bitte nur eine von beiden verwenden.'
   fi
