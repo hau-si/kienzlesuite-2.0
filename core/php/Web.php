@@ -1193,14 +1193,19 @@ final class Web {
         // T2med
         $body .= '<section><h2>T2med (FHIR)</h2><form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('t2med')
             . V::input('base_url', 'Adresse des FHIR-Servers', 'url', (string)($t2['base_url'] ?? ''), 'placeholder="https://t2med-server:16567/aps/fhir/api/r4"')
-            . '<label>Weitere erlaubte Start-Adressen (eine je Zeile)<textarea name="launch_urls" rows="2">' . V::h(implode("\n", array_diff((array)($t2['launch_urls'] ?? []), [(string)($t2['base_url'] ?? '')]))) . '</textarea></label>'
+            . '<label>Erlaubte fhirBasisUrl aus T2med – weitere Adressen (eine je Zeile)<textarea name="launch_urls" rows="2">' . V::h(implode("\n", array_diff((array)($t2['launch_urls'] ?? []), [(string)($t2['base_url'] ?? '')]))) . '</textarea></label>'
             . V::input('api_key', 'API-Schlüssel (Client Secret aus T2med)', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($t2['api_key_gesetzt'] ?? false))) . '"')
             . '<p class="muted small">In T2med heißt er „Client Secret“ und wird bei der Einrichtung des Drittanbieters nur einmal angezeigt. Ist er verloren, muss der Drittanbieter-Zugriff in T2med gelöscht und neu erstellt werden.</p>'
             . '<label>Zertifikat des T2med-Servers (PEM, optional)' . (($t2['zertifikat'] ?? '') !== '' ? ' – gespeichert, SHA-256 <code>' . V::h(substr((string)$t2['zertifikat'], 0, 16)) . '…</code>' : '')
             . '<textarea name="ca_pem" rows="3" placeholder="-----BEGIN CERTIFICATE-----"></textarea></label>'
             . V::checkbox('ca_entfernen', '1', 'Gespeichertes Zertifikat entfernen', false)
             . V::checkbox('pin', '1', 'Nur genau dieses Zertifikat annehmen (Pinning)', (bool)($t2['pin'] ?? false))
+            . '<p class="muted small">Die „erlaubte fhirBasisUrl“ ist die FHIR-Adresse, die T2med beim Aufruf mitschickt (Platzhalter fhirBasisUrl). Die Adresse des FHIR-Servers oben gilt immer als erlaubt; weitere Zeilen nur, wenn T2med sich anders meldet. Bei einer Ablehnung zeigt die Kasse den tatsächlich gesendeten Wert.</p>'
             . '<button>Speichern</button></form>'
+            . '<div class="box wide"><h3>Eintrag in T2med (Drittanbieter-Zugriffe verwalten → Neue URL hinzufügen)</h3>'
+            . '<p>Als Adresse genau so eintragen, mit den Platzhaltern, und eine Bezeichnung wie „Kartenzahlung“ vergeben:</p>'
+            . '<p><code class="secret">kienzle-sumup://?kontextId=${kontextId}&amp;fhirBasisUrl=${fhirBasisUrl}&amp;oAuthToken=${oAuthToken}</code></p>'
+            . '<p class="muted small">Ausführliche Anleitung mit Bildern: in der Kasse unter Einstellungen → Zahlung &amp; T2med. Der Starter muss auf dem Arbeitsplatz installiert sein.</p></div>'
             . ($t2 ? '<p>Zertifikat: ' . (($t2['zertifikat'] ?? '') !== '' ? '<code>' . V::h((string)$t2['zertifikat']) . '</code>' . ($t2['pin'] ? ' (fest hinterlegt)' : '') : '<strong>nicht hinterlegt</strong> (nur öffentlich beglaubigte Zertifikate werden angenommen)') . '</p>'
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('zertifikat-holen') . '<button>Zertifikat des Servers abrufen</button></form> '
                 . (($st['zertifikate']['t2med']['fingerprint'] ?? '') !== '' ? '<form method="post" action="/verwaltung/verbindungen" class="box">' . $this->hidden('zertifikat-uebernehmen', ['fingerprint' => (string)$st['zertifikate']['t2med']['fingerprint']])

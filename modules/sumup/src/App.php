@@ -52,7 +52,7 @@ final class App {
                 throw new Problem("Die von t2med übergebene FHIR-Adresse ist nicht freigegeben.\n" .
                     'Von t2med (fhirBasisUrl): ' . self::diagnosticAddress($url) . "\n" .
                     'Im Server erlaubt (launch_urls): ' . implode(', ', $shown) . "\n" .
-                    'Bitte unter Verwaltung → Verbindungen der Suite bei T2med die erlaubten Aufrufadressen prüfen. Gemeint ist die FHIR-Adresse, nicht die Adresse der Zahlungswebseite.');
+                    'Bitte unter Verwaltung → Verbindungen der Suite bei T2med „Erlaubte fhirBasisUrl aus T2med“ prüfen. Gemeint ist die FHIR-Adresse, nicht die Adresse der Zahlungswebseite.');
             }
         }
         $patient = $this->fhir->patient($context, $token);

@@ -265,7 +265,7 @@ function t2medSetupHelp() {
   ol.append(el('li', 'Auf Plus klicken, oben rechts mit dem Häkchen speichern und in der Liste davor auf „aktualisieren“ (Pfeile) klicken.'));
   ol.append(el('li', 'Dann „Funktionsleisten verwalten“: Konfiguration anlegen oder bearbeiten (Name, Benutzer, Benutzergruppe, Station), „Aktion hinzufügen“, die Aktion unter der vergebenen Bezeichnung suchen, Farbe und Kürzel oder Icon wählen und bestätigen.'));
   ol.append(el('li', 'Der Starter-Aufruf funktioniert erst, wenn auf dem Arbeitsplatz das Starter-Paket installiert ist (Karte „Arbeitsplätze einrichten“).'));
-  ol.append(el('li', 'Die FHIR-Adresse, die T2med beim Aufruf mitgibt, muss in der Suite unter Verwaltung → Verbindungen → T2med bei den erlaubten Aufrufadressen stehen. Bei einer Fehlermeldung zeigt die Seite die tatsächlichen Werte.'));
+  ol.append(el('li', 'Die FHIR-Adresse, die T2med beim Aufruf mitgibt, muss in der Suite unter Verwaltung → Verbindungen → T2med bei „Erlaubte fhirBasisUrl aus T2med“ stehen (die Adresse des FHIR-Servers gilt immer als erlaubt). Bei einer Fehlermeldung zeigt die Seite die tatsächlichen Werte.'));
   const guide = el('li'); guide.append('Mit Bildern: ', el('a', 'Anleitung „T2med einrichten“', null, {href: GUIDE_URL, target: '_blank', rel: 'noopener'})); ol.append(guide);
   d.append(ol); return d;
 }

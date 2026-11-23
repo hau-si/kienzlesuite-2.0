@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.2.4-beta.1
+
+- Begriffe zur T2med-Anbindung vereinheitlicht: „Erlaubte fhirBasisUrl aus T2med“ in Anleitung, Fehlermeldung und Dokumentation, wie auf der Verbindungsseite der Basis (Basis 0.20.4-beta.1).
+
 ## 2.2.3-beta.1
 
 - Einstellungen → T2med-Anbindung: Die Kasse zeigt, ob die T2med-Verbindung der Suite eingerichtet ist, und verlinkt direkt auf Verwaltung → Verbindungen. Dort lässt sich auch ein selbstsigniertes T2med-Zertifikat übernehmen (benötigt Basis 0.19.3-beta.1). Nicht an einer echten T2med-Installation geprüft.

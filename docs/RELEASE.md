@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.20.4-beta.1
+
+- Verbindungen → T2med: Die Adresse für den Eintrag in T2med (`kienzle-sumup://?kontextId=…`) steht jetzt direkt unter dem Formular. Das Feld heißt „Erlaubte fhirBasisUrl aus T2med – weitere Adressen“ und erklärt, dass hier die von T2med mitgeschickte FHIR-Adresse gemeint ist, nicht die Abrufadresse.
+
 ## 0.20.3-beta.1
 
 - Einrichtung: „Servername festgelegt“ gilt erst als erledigt, wenn die Schritte danach von Hand bestätigt sind: Namen im Router bzw. in der hosts-Datei eintragen, Suite unter dem neuen Namen öffnen und neu anmelden, Passkeys neu anlegen (oder keine vorhanden). Die zwei neuen Punkte stehen im Einrichtungs-Überblick neben dem bestehenden Punkt zum Servernamen.
