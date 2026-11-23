@@ -1,5 +1,10 @@
 # Terminzettel – Release-Notizen
 
+## 1.2.1-beta.1
+
+- Neu: Auf der Einstellungsseite steht „Letzte Druckaufträge“: Zeit, Art des Auftrags (PDF, PostScript, XPS, Text), Größe und Ergebnis („Bon an die Warteschlange übergeben“ oder die Fehlermeldung). Es werden nur feste Texte protokolliert, keine Patientendaten. Kommt nach dem Drucken aus T2med kein Eintrag, erreicht der Auftrag den virtuellen Drucker nicht.
+- Nicht auf der echten VM getestet.
+
 ## 1.2.0-beta.1
 
 - Die Papierbreite des Bondruckers (58/80 mm) kommt zentral aus der Basis (Verwaltung → Drucker → Wofür welcher Drucker?, ab Basis 0.21.0-beta.1); das Feld „Bondrucker-Modell“ entfällt, die Seite zeigt die eingestellte Breite an. Ändert sich die Breite, wird das gespeicherte Layout für den Druckdienst automatisch neu erzeugt. Bei einer älteren Basis gilt 58 mm.

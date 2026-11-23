@@ -33,6 +33,8 @@ final class Ansicht {
             . '<aside class="card"><h2>Vorschau (Beispieldaten)</h2><div id="vorschau" class="vorschau"><img id="bild" alt="Vorschau des Bons" hidden><p id="hinweis" class="muted">Wird geladen …</p></div><p id="ungespeichert" class="fehler" hidden>Ungespeicherte Änderungen: Die Vorschau zeigt den Stand des Formulars. Gedruckt wird erst nach „Speichern“.</p>'
             . '<form method="post" action="' . $h($base) . '/"><input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"><input type="hidden" name="aktion" value="testdruck">'
             . '<button class="zweit"' . ($queue === '' ? ' disabled' : '') . '>Beispiel-Terminzettel drucken</button></form></aside></div>'
+            . '<details open><summary>Letzte Druckaufträge</summary>' . (($log = Seite::protokoll()) ? '<pre>' . $h(implode("\n", $log)) . '</pre>'
+                : '<p class="muted">Noch kein Auftrag angekommen. Kommt nach dem Drucken aus T2med hier nichts an, erreicht der Auftrag den virtuellen Drucker „Terminzettel“ nicht (Arbeitsplatz, Treiber, Firewall).</p>') . '</details>'
             . '<details><summary>Drucker „Terminzettel“ auf den Arbeitsplätzen einrichten</summary><ol>'
             . '<li>Windows: Drucker hinzufügen → „Der gewünschte Drucker ist nicht aufgelistet“ → Freigegebenen Drucker über Namen auswählen: <code>' . $h($printer) . '</code>; Treiber „Microsoft IPP Class Driver“ oder „Generic / Text Only“ genügt.</li>'
             . '<li>Mac: Drucker hinzufügen → <strong>Terminzettel</strong> wählen, als Treiber <a href="' . $h($base) . '/assets/Terminzettel-PDF.ppd">Terminzettel-PDF.ppd</a> (heruntergeladen) verwenden.</li>'

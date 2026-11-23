@@ -60,6 +60,9 @@ check($modul->recht('layout') && !$modul->recht('anderes'), 'Rechte');
 check(($b['bonbreite'] ?? 0) === 58 && $modul->bonBreite() === 58, 'Breite 58 aus der Basis');
 check(json_decode((string)file_get_contents("$dir/layout.json"), true)['model'] === 'tm-m10', 'layout.json folgt der Papierbreite');
 
+file_put_contents("$dir/druckprotokoll.txt", "a\nb\nc\n");
+check(Seite::protokoll(2) === ['b', 'c'], 'Druckprotokoll');
+
 // Vorschau und Testdruck mit Ersatz für Python und lp
 $gelaufen = [];
 $r = Seite::beispiel($o, 'png', function (string $script, string $input) use (&$gelaufen) {

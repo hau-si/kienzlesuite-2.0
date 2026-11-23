@@ -87,6 +87,13 @@ final class Seite {
         return $out;
     }
 
+    /** Die letzten Zeilen des Druckprotokolls (Zeit, Art des Auftrags, Ergebnis; keine Patientendaten). */
+    public static function protokoll(int $zeilen = 12): array {
+        $text = (string)@file_get_contents(self::$data . '/druckprotokoll.txt', false, null, 0, 20000);
+        $all = $text === '' ? [] : array_values(array_filter(explode("\n", $text), static fn($l) => $l !== ''));
+        return array_slice($all, -$zeilen);
+    }
+
     /** Papierbreite des Bondruckers in mm (58 oder 80) laut Basis (Verwaltung → Drucker), aus basis.json. */
     public static function bonBreite(): int {
         $d = json_decode((string)@file_get_contents(self::$data . '/basis.json'), true);
