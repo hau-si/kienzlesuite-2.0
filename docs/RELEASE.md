@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.23
+
+- Gmail-Anleitung: Schritt „Branding“ ergänzt (App-Name, Support-E-Mail, Adressen für Startseite und Datenschutzerklärung, autorisierte Domain), den Google vor „In Produktion“ verlangt. Nur Text.
+
 ## 0.21.4-beta.22
 
 - Testbetrieb überall gelb gekennzeichnet (wie die offenen Punkte): neues Schild `tag test`/„Testbetrieb“ bei Letterxpress in den Verbindungen; „Live“ grün.
