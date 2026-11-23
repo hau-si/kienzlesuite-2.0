@@ -95,3 +95,13 @@
     if (/^#launch=[0-9a-f]{64}$/.test(hash)) location.replace(target + '/' + hash);
   })();
 })();
+
+// Verbindungen: Felder je nach Art (SMB/SFTP) ein- und ausblenden.
+document.addEventListener('DOMContentLoaded', function () {
+  const form = document.getElementById('ziel-form');
+  if (!form) return;
+  const art = form.elements.art;
+  const update = () => form.querySelectorAll('[data-nur]').forEach((el) => { el.hidden = el.dataset.nur !== art.value; });
+  art.addEventListener('change', update);
+  update();
+});

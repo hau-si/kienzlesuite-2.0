@@ -36,6 +36,10 @@ function test_anfragen(): void {
     $c->saveT2med(['base_url' => 'https://t2med.example.org/fhir', 'ca_entfernen' => true]);
     check(array_key_exists('ca_pem', req_v($env)['daten']), 'Zertifikat entfernen nicht übermittelt');
     problem(fn() => $c->saveT2med(['base_url' => 'http://t2med.example.org']), 422, 'http angenommen');
+    $c->fetchCertificate();
+    check(req_v($env)['action'] === 'zertifikat-holen', 'Zertifikat abrufen nicht übermittelt');
+    $c->acceptCertificate(str_repeat('ab', 32));
+    check(req_v($env)['fingerprint'] === str_repeat('ab', 32), 'Fingerabdruck beim Übernehmen nicht übermittelt');
     $c->saveMail(['host' => 'smtp.example.org', 'port' => '587', 'sicherheit' => 'starttls', 'benutzer' => 'p@example.org', 'passwort' => 'x', 'absender' => 'p@example.org']);
     check(req_v($env)['daten']['port'] === 587, 'Port nicht als Zahl');
     problem(fn() => $c->saveMail(['port' => '58a']), 422, 'Port ohne Zahl');

@@ -18,7 +18,7 @@ final class Connections {
         $s = is_array($s) ? $s : [];
         return ['t2med' => is_array($s['t2med'] ?? null) ? $s['t2med'] : null, 'mail' => is_array($s['mail'] ?? null) ? $s['mail'] : null,
             'ablage' => array_values(array_filter((array)($s['ablage'] ?? []), 'is_array')), 'tests' => (array)($s['tests'] ?? []),
-            'hostkeys' => (array)($s['hostkeys'] ?? []), 'nutzung' => array_values(array_filter((array)($s['nutzung'] ?? []), 'is_array')),
+            'hostkeys' => (array)($s['hostkeys'] ?? []), 'zertifikate' => (array)($s['zertifikate'] ?? []), 'nutzung' => array_values(array_filter((array)($s['nutzung'] ?? []), 'is_array')),
             'hinweise' => array_values(array_filter((array)($s['hinweise'] ?? []), 'is_string')), 'letzte' => is_array($s['letzte'] ?? null) ? $s['letzte'] : null,
             'sftp_schluessel' => (string)($s['sftp_schluessel'] ?? ''), 'pending' => is_file($this->request()), 'service' => is_file(self::$unit)];
     }
@@ -26,6 +26,7 @@ final class Connections {
     public function saveT2med(array $in): void {
         $launch = array_values(array_filter(array_map('trim', preg_split('/\R/', (string)($in['launch_urls'] ?? ''))), fn($u) => $u !== ''));
         $d = ['base_url' => trim((string)($in['base_url'] ?? '')), 'launch_urls' => $launch, 'api_key' => (string)($in['api_key'] ?? ''), 'pin' => ($in['pin'] ?? false) === true];
+        if (($in['api_key_entfernen'] ?? false) === true) $d['api_key_entfernen'] = true;
         if (trim((string)($in['ca_pem'] ?? '')) !== '' || ($in['ca_entfernen'] ?? false) === true) $d['ca_pem'] = trim((string)($in['ca_pem'] ?? ''));
         if (!preg_match('#^https://#', $d['base_url'])) throw new Problem('Adresse des FHIR-Servers: bitte mit https:// angeben.', 422);
         $this->write(['action' => 't2med', 'daten' => $d]);
@@ -69,6 +70,10 @@ final class Connections {
         if (!in_array($art, ['t2med', 'mail', 'ziel'], true)) throw new Problem('Unbekannte Prüfung.', 422);
         $this->write(['action' => 'pruefen', 'art' => $art, 'id' => $id]);
     }
+
+    public function fetchCertificate(): void { $this->write(['action' => 'zertifikat-holen']); }
+
+    public function acceptCertificate(string $fingerprint): void { $this->write(['action' => 'zertifikat-uebernehmen', 'fingerprint' => $fingerprint]); }
 
     public function fetchHostkey(string $id): void { $this->write(['action' => 'hostkey-holen', 'id' => $id]); }
 

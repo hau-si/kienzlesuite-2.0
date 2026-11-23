@@ -1,10 +1,10 @@
-# Kienzle-Suite: Angebot an Modulen täglich prüfen (zusammen mit den Updates der Basis).
+# Kienzle-Suite: Angebot an Modulen stündlich prüfen; neue Versionen installiert die Basis nachts.
 [Unit]
-Description=Kienzle-Suite Module täglich prüfen
+Description=Kienzle-Suite Module stündlich prüfen
 
 [Timer]
-OnCalendar=*-*-* 04:20
-RandomizedDelaySec=30m
+OnCalendar=hourly
+RandomizedDelaySec=10min
 Persistent=true
 
 [Install]

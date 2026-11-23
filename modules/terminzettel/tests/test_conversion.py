@@ -44,6 +44,29 @@ class ConversionTests(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
     @unittest.skipUnless(shutil.which("pdftotext"), "pdftotext fehlt")
+    def test_text_only_driver_ansi_and_utf8(self):
+        text = "TERMINE\nErika Müller\nTerminzeitpunkt          Termintyp\nDo. 17.09.2026, 09:00  Kontrolle Größe\n"
+        for encoding in ("utf-8", "cp1252"):
+            ticket = app.parse_t2med(app.extract_text(text.encode(encoding), {}))
+            self.assertEqual(ticket.patient, "Erika Müller")
+            self.assertEqual(ticket.appointments[0].kind, "Kontrolle Größe")
+
+    def test_job_log_keeps_last_lines_without_patient_data(self):
+        import tempfile
+        from pathlib import Path
+        old = app.DATA
+        with tempfile.TemporaryDirectory() as td:
+            app.DATA = Path(td)
+            try:
+                for i in range(45):
+                    app.job_log(f"Auftrag erhalten: {app.job_kind(b'%PDF-1')}, {i} Bytes")
+                lines = (Path(td) / app.LOG_FILE).read_text(encoding="utf-8").splitlines()
+            finally:
+                app.DATA = old
+        self.assertEqual(len(lines), 40)
+        self.assertTrue(lines[-1].endswith("PDF, 44 Bytes"))
+        self.assertEqual((app.job_kind(b"hallo"), app.job_kind(b"%!PS-Adobe"), app.job_kind(b"PK\x03\x04")), ("Text", "PostScript", "XPS"))
+
     def test_real_pdf(self):
         text = app.extract_text(pdf_fixture(), {})
         ticket = app.parse_t2med(text)

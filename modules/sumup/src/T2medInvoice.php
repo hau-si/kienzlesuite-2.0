@@ -54,7 +54,7 @@ final class T2medInvoice {
         self::$lastText = $ocr; self::$lastSource = 'Texterkennung';
         try {
             // Erkannter Text ist fehleranfälliger: Zahlbetrag-Gegenprobe ist hier Pflicht.
-            return self::parse($ocr, $maxCents, true, $labels, true);
+            return self::parse($ocr, $maxCents, true, $labels, true, true);
         } catch (Problem $e) {
             throw new Problem($e->getMessage() . ' (Texterkennung)', $e->http);
         }
@@ -128,14 +128,14 @@ final class T2medInvoice {
     }
 
     /** $loose: Wert darf nach einem Zeilenumbruch hinter der Beschriftung stehen (Lesereihenfolge, Texterkennung). */
-    public static function parse(string $text, int $maxCents, bool $requireTransfer = false, array $labels = [], bool $loose = false): array {
+    public static function parse(string $text, int $maxCents, bool $requireTransfer = false, array $labels = [], bool $loose = false, bool $ocr = false): array {
         if (!mb_check_encoding($text, 'UTF-8')) throw new Problem('Die Rechnung enthält keinen lesbaren Text.', 422);
         $text = str_replace(["\u{00a0}", "\r"], [' ', ''], $text);
         if (trim($text) === '') throw new Problem('Die Rechnung enthält keinen Text. Bitte als Text-PDF aus T2med drucken.', 422);
         $gap = $loose ? '[ \t]*\n?[ \t]*' : '[ \t]*';
         $eur = '[ \t]*(?:€|EUR)';
 
-        $number = self::single(self::all('number', $labels, $gap . '((?=[A-Za-z0-9\/._-]*\d)[A-Za-z0-9][A-Za-z0-9\/._-]{0,39})', $text), 'Rechnungsnummer', 'Re.-Nr.:');
+        $number = self::single(self::all('number', $labels, $gap . '((?=[A-Za-z0-9\/._-]*\d)[A-Za-z0-9][A-Za-z0-9\/._-]{0,39})', $text), 'Rechnungsnummer', 'Re.-Nr.:', $ocr);
         $date = self::date(self::single(self::all('date', $labels, $gap . '(\d{2}\.\d{2}\.\d{4})', $text), 'Rechnungsdatum', 'Re.-Datum:'));
         $total = self::cents(self::single(self::all('total', $labels, $gap . '(-?[\d.]+,\d{2})' . $eur, $text), 'Gesamtsumme', 'Gesamtsumme: … €'));
         // Gegenprobe mit dem Überweisungssatz, falls vorhanden.
@@ -191,8 +191,26 @@ final class T2medInvoice {
         return $fhir !== '' && ($pdf === $fhir || str_ends_with($pdf, ' ' . $fhir));
     }
 
-    private static function single(array $found, string $label, string $hint): string {
+    /** Vergleichsform für erkannte Rechnungsnummern: typische Verwechslungen der Texterkennung (O/0, I/l/1, S/5, B/8, Z/2) werden gleichgesetzt. */
+    private static function ocrKey(string $value): string {
+        return strtr(strtoupper($value), ['O' => '0', 'Q' => '0', 'I' => '1', 'L' => '1', 'S' => '5', 'B' => '8', 'Z' => '2']);
+    }
+
+    private static function single(array $found, string $label, string $hint, bool $fuzzy = false): string {
         $values = array_values(array_unique($found));
+        if ($fuzzy && count($values) > 1) {
+            // Texterkennung liest dieselbe Nummer (Kopf, Fuß, Folgeseiten) manchmal verschieden. Abweichungen um höchstens ein Zeichen
+            // gelten als dieselbe Nummer; es gilt die häufigste, bei Gleichstand die zuerst gelesene. Betrag und Patient werden ohnehin gegengeprüft.
+            $keys = array_map([self::class, 'ocrKey'], $values);
+            $same = true;
+            foreach ($keys as $a) foreach ($keys as $b) if (levenshtein($a, $b) > 1) $same = false;
+            if ($same) {
+                $counts = array_count_values($found);
+                arsort($counts);
+                $best = max($counts);
+                foreach ($found as $value) if ($counts[$value] === $best) return $value;
+            }
+        }
         if (count($values) === 0) throw new Problem($label . ' der Rechnung nicht gefunden (im PDF-Text fehlt die Bezeichnung „' . $hint . '“).', 422);
         if (count($values) > 1) throw new Problem($label . ' der Rechnung ist nicht eindeutig (' . count($values) . ' verschiedene Werte).', 422);
         return $values[0];

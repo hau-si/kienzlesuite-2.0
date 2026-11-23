@@ -27,8 +27,11 @@ except ImportError:
 
 def render(web, base=None):
     cfg = app.apply_overlay(base or {"calendar_qr": {"enabled": False}}, web)
-    with contextlib.redirect_stderr(io.StringIO()):
-        return app.render_escpos(app.parse_t2med(TEXT), cfg)
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err):
+        out = app.render_escpos(app.parse_t2med(TEXT), cfg)
+    render.last_stderr = err.getvalue()
+    return out
 
 
 class OverlayTests(unittest.TestCase):
@@ -88,7 +91,8 @@ class OverlayTests(unittest.TestCase):
 @unittest.skipUnless(HAS_QR, "qrcode nicht installiert")
 class QrPositionTests(unittest.TestCase):
     def page(self, raw):
-        start = raw.index(b"\x1bW")
+        start = raw.find(b"\x1bW")
+        self.assertGreaterEqual(start, 0, f"Kein Seitenmodus; Meldung: {render.last_stderr!r}")
         width = int.from_bytes(raw[start + 6:start + 8], "little")
         x_text = int.from_bytes(raw[raw.index(b"\x1b$", start) + 2:raw.index(b"\x1b$", start) + 4], "little")
         image = raw.index(b"\x1b*", start)
@@ -101,7 +105,7 @@ class QrPositionTests(unittest.TestCase):
         self.assertEqual((width, text_x), (576, 0)); self.assertGreater(qr_x, 300)
         _, text_x, qr_x = self.page(render({"qr": {"position": "left"}}, {"calendar_qr": {"enabled": True}}))
         self.assertEqual(qr_x, 0); self.assertGreater(text_x, 64)
-        _, text_x, qr_x = self.page(render({"qr": {"position": "below", "width_dots": 200}, "appointments": {"size": "3x3"}},
+        _, text_x, qr_x = self.page(render({"qr": {"position": "below", "width_dots": 256}, "appointments": {"size": "3x3"}},
                                            {"calendar_qr": {"enabled": True}}))
         self.assertEqual(text_x, 0); self.assertGreater(qr_x, 0)
 

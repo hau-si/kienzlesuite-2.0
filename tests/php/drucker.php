@@ -49,11 +49,14 @@ function test_seite(): void {
     [$b] = admin_browser($env);
     $b->web = fn() => $b->defaultWeb(null, null, null, null, $p);
     $page = $b->get('/verwaltung/drucker');
-    check($page->status === 200 && str_contains($page->body, 'Eingerichtete Drucker') && str_contains($page->body, 'Modul Beispielmodul'), 'Seite unvollständig');
+    check($page->status === 200 && str_contains($page->body, 'Virtuelle Drucker') && str_contains($page->body, 'Modul Beispielmodul') && str_contains($page->body, 'Anleitung: virtuelle Drucker an den Arbeitsplätzen') && str_contains($page->body, ':631/printers/'), 'Seite unvollständig');
     check(str_contains($page->body, 'Wofür welcher Drucker?'), 'Zuordnung fehlt');
     check($b->post('/verwaltung/drucker', ['aktion' => 'rollen', 'buero' => 'Gibtsnicht', 'bon' => ''])->status === 422, 'Unbekannter Drucker in der Zuordnung');
     check($b->post('/verwaltung/drucker', ['aktion' => 'rollen', 'buero' => 'Fremd', 'bon' => 'Bon'])->status === 303, 'Zuordnung speichern');
     check(json_decode((string)$env->db->setting('drucker.rollen'), true) === ['buero' => 'Fremd', 'bon' => 'Bon'], 'Zuordnung nicht gespeichert');
+    check($b->post('/verwaltung/drucker', ['aktion' => 'rollen', 'buero' => 'Fremd', 'bon' => 'Bon', 'bonbreite' => '70'])->status === 422, 'Ungültige Papierbreite');
+    check($b->post('/verwaltung/drucker', ['aktion' => 'rollen', 'buero' => 'Fremd', 'bon' => 'Bon', 'bonbreite' => '80'])->status === 303 && $env->db->setting('drucker.bonbreite') === '80', 'Papierbreite nicht gespeichert');
+    check(str_contains($b->get('/verwaltung/drucker')->body, 'Papierbreite des Bondruckers') && str_contains($b->get('/verwaltung/drucker')->body, '<option value="80" selected>'), 'Papierbreite nicht angezeigt');
     check(!str_contains($page->body, '<script>') && !str_contains($page->body, 'Von <b>') && !str_contains($page->body, 'A4 <i>'), 'nicht maskiert');
     check(substr_count($page->body, '>Entfernen<') === 1, 'Entfernen nur für eigene Drucker der Suite');
     $r = $b->post('/verwaltung/drucker', ['aktion' => 'freigabe', 'name' => 'Bon', 'samba' => '1', 'ipp' => '1']);

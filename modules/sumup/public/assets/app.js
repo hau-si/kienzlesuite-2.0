@@ -45,13 +45,14 @@ function updateTotal() {
   const ids=selectedIds();
   const sum = state.services.filter(s => ids.has(s.id)).reduce((total,s) => total+s.price_cents, 0) + manualCents();
   $('total').textContent = Number.isFinite(sum) ? euro(sum) : '—';
-  const cash = payMethod() === 'cash';
-  $('pay').textContent = cash ? (sum > 0 ? euro(sum) + ' bar erhalten – Rechnung erstellen' : 'Bar kassieren') : (sum > 0 ? euro(sum) + ' mit Karte kassieren' : 'Mit Karte kassieren');
-  $('pay').classList.toggle('cash', cash);
+  const method = payMethod(), cash = method === 'cash', transfer = method === 'transfer';
+  $('pay-transfer-label').hidden = !state.bank_ready;
+  $('pay').textContent = transfer ? (sum > 0 ? euro(sum) + ' per Überweisung – Rechnung erstellen' : 'Per Überweisung') : cash ? (sum > 0 ? euro(sum) + ' bar erhalten – Rechnung erstellen' : 'Bar kassieren') : (sum > 0 ? euro(sum) + ' mit Karte kassieren' : 'Mit Karte kassieren');
+  $('pay').classList.toggle('cash', cash || transfer);
   // Barzahlung braucht kein freies Terminal, aber Praxisdaten für die Rechnung.
-  $('pay').disabled = busy || (!cash && !!state.reader_payment) || (cash && !state.local_receipts) || !(sum > 0 && sum <= state.max_amount_cents);
-  $('pay-method-note').hidden = !(cash && !state.local_receipts);
-  $('pay-method-note').textContent = 'Für Barzahlungen bitte zuerst Praxisname und Anschrift unter Einstellungen eintragen.';
+  $('pay').disabled = busy || (!cash && !!state.reader_payment) || ((cash || transfer) && !state.local_receipts) || !(sum > 0 && sum <= state.max_amount_cents);
+  $('pay-method-note').hidden = !((cash || transfer) && !state.local_receipts);
+  $('pay-method-note').textContent = 'Für Bar und Überweisung bitte zuerst Praxisname und Anschrift unter Einstellungen eintragen.';
   document.querySelectorAll('.invoice-pay').forEach(b => b.disabled = busy || !!state.reader_payment);
 }
 let invoiceSeen = null, invoiceLater = new Set();
@@ -83,7 +84,7 @@ function renderInvoices() {
     card.onclick = pay('card');
     const cash = element('button','Bar bezahlt','secondary wide invoice-cash');
     cash.onclick = () => { if (confirm(euro(invoice.amount_cents)+' bar erhalten? Die Zahlung wird als bezahlt erfasst.')) pay('cash')(); };
-    const later = element('button','Später (Überweisung)','text-button invoice-later');
+    const later = element('button','Patient zahlt später (Überweisung)','text-button invoice-later');
     later.onclick = () => run(async() => {
       // Ist der Rechnungsdruck eingeschaltet, kommt die Rechnung jetzt einmal auf den Praxisdrucker (für die Überweisung).
       if (state.print?.t2med_auto && !invoice.printed_at) { const result = await api('invoice_later', {invoice_id: invoice.id}); if (result.message) message(result.message); }
@@ -264,7 +265,7 @@ function renderPayment() {
   $('receipt-data-note').hidden=!showing || p.payment_status!=='successful' || !p.local_receipt;
   renderReader();
   if (showing) manage(false);
-  for (const id of ['document','receipt','receipt-mail','receipt-print','receipt-share','retry','cancel','mock-controls','mock-fhir-label']) $(id).hidden=true;
+  for (const id of ['document','receipt','receipt-mail','receipt-print','receipt-share','retry','cancel','mock-controls','mock-fhir-label','transfer-box','confirm-transfer','switch-cash','switch-transfer','switch-later']) $(id).hidden=true;
   if(!showing || receiptPrintPayment!==p.id) { $('receipt-print-status').hidden=true; $('receipt-print').textContent='Beleg drucken'; }
   if(!showing || p.payment_status!=='successful' || receiptShare?.paymentId!==p.id) { $('receipt-share-panel').hidden=true; receiptShare=null; }
   if(!showing || p.payment_status!=='successful' || receiptRecipient?.paymentId!==p.id) {
@@ -273,11 +274,13 @@ function renderPayment() {
   clearTimeout(timer);
   if (!showing) return;
   // Bar bezahlte T2med-Rechnung: Quittung statt Rechnungsbeleg; kein SumUp-Link.
-  const quittung = p.method==='cash' && !p.local_receipt;
-  $('receipt').hidden=p.payment_status!=='successful';
-  $('receipt').textContent=quittung ? 'Quittung als PDF' : p.local_receipt ? 'Rechnung / Leistungsbeleg als PDF' : 'Zahlungsbeleg / PDF';
+  const quittung = ['cash','transfer'].includes(p.method) && !p.local_receipt;
+  const open=p.payment_status==='transfer_open';
+  $('receipt').hidden=p.payment_status!=='successful' && !open;
+  $('receipt').textContent=open ? 'Überweisungsdaten als PDF' : quittung ? 'Quittung als PDF' : p.local_receipt ? 'Rechnung / Leistungsbeleg als PDF' : 'Zahlungsbeleg / PDF';
   $('receipt-share').hidden=p.payment_status!=='successful' || quittung;
-  $('receipt-print').hidden=p.payment_status!=='successful' || !state.printing_enabled;
+  $('receipt-print').hidden=(p.payment_status!=='successful' && !open) || !state.printing_enabled;
+  if(open && !$('receipt-print').hidden) $('receipt-print').textContent='Überweisungsdaten drucken';
   if(quittung && !$('receipt-print').hidden) $('receipt-print').textContent='Quittung drucken';
   if(p.quittung_message) quittungNote[p.id]=p.quittung_message;
   if(quittung && quittungNote[p.id] && receiptPrintPayment!==p.id) { $('receipt-print-status').hidden=false; $('receipt-print-status').textContent='Quittung: '+quittungNote[p.id]; }
@@ -289,23 +292,35 @@ function renderPayment() {
   let title, description, symbol='…';
   if(p.doc_status==='written') {
     title='Vorgang abgeschlossen'; symbol='✓';
-    description=state.fhir_mock ? 'Testdokumentation gespeichert. Es wurde nichts in t2med geschrieben. Dieses Fenster kann geschlossen werden.' : 'Die Zahlung wurde in t2med dokumentiert. Dieses Fenster kann geschlossen werden.';
+    description=state.manual ? 'Die manuelle Zahlung ist abgeschlossen. Dieses Fenster kann geschlossen werden.' : state.fhir_mock ? 'Testdokumentation gespeichert. Es wurde nichts in t2med geschrieben. Dieses Fenster kann geschlossen werden.' : 'Die Zahlung wurde in t2med dokumentiert. Dieses Fenster kann geschlossen werden.';
   } else if(p.payment_status==='successful') {
-    title=p.method==='cash' ? 'Barzahlung erfasst' : 'Zahlung erfolgreich'; symbol='✓';
-    description='Mit „Dokumentation in der Akte“ wird die Zahlung in t2med dokumentiert und der Vorgang abgeschlossen.';
+    title=p.method==='cash' ? 'Barzahlung erfasst' : p.method==='transfer' ? 'Überweisung bestätigt' : 'Zahlung erfolgreich'; symbol='✓';
+    description=state.manual ? 'Mit „Vorgang abschließen“ ist die manuelle Zahlung erledigt. In T2med wird nichts dokumentiert.' : 'Mit „Dokumentation in der Akte“ wird die Zahlung in t2med dokumentiert und der Vorgang abgeschlossen.';
     $('document').hidden=false;
-    $('document').textContent=p.doc_status==='unknown' || p.doc_status==='writing' ? 'Dokumentation prüfen / erneut versuchen' : 'Dokumentation in der Akte';
+    $('document').textContent=p.doc_status==='unknown' || p.doc_status==='writing' ? 'Dokumentation prüfen / erneut versuchen' : state.manual ? 'Vorgang abschließen' : 'Dokumentation in der Akte';
     $('mock-fhir-label').hidden=!state.mock;
     $('mock-fhir-fail').checked=state.mock_document_fail;
+  } else if(p.payment_status==='transfer_open') {
+    title='Überweisung offen'; symbol='🏦';
+    description='Der Patient überweist mit den Kontodaten oder dem QR-Code. Sobald das Geld eingegangen ist, den Zahlungseingang bestätigen. Bis dahin kann auf eine andere Zahlart gewechselt werden.';
+    renderTransfer(p); $('confirm-transfer').hidden=false; $('switch-cash').hidden=false; $('cancel').hidden=false; $('cancel').textContent='Überweisung abbrechen';
   } else if(['failed','cancelled'].includes(p.payment_status)) {
-    title=p.payment_status==='failed'?'Zahlung nicht erfolgt':'Zahlung abgebrochen'; symbol='×'; description='Du kannst die Zahlung erneut starten.'; $('retry').hidden=false;
+    title=p.payment_status==='failed'?'Zahlung nicht erfolgt':'Zahlung abgebrochen'; symbol='×'; description='Du kannst die Zahlung erneut starten oder die Zahlart wechseln.'; $('retry').hidden=false;
+    $('switch-cash').hidden=false; $('switch-transfer').hidden=!state.bank_ready || !!p.t2med_invoice; $('switch-later').hidden=!p.t2med_invoice;
   } else {
     title=p.payment_status==='unknown' || p.payment_status==='starting'?'Zahlung wird geprüft':p.payment_status==='cancel_requested'?'Abbruch wird geprüft':'Zahlung läuft';
     description='Bitte den Hinweisen am Terminal folgen. Dieses Fenster bis zum Abschluss geöffnet lassen.';
-    $('cancel').hidden=false; $('mock-controls').hidden=!state.mock;
+    $('cancel').hidden=false; $('cancel').textContent='Zahlung abbrechen'; $('mock-controls').hidden=!state.mock;
     timer=setTimeout(poll,2200);
   }
   $('payment-title').textContent=title; $('payment-description').textContent=description; $('status-symbol').textContent=symbol;
+}
+function renderTransfer(p) {
+  const t = p.transfer; $('transfer-box').hidden = !t; if (!t) return;
+  // Das SVG stammt vom eigenen Server (Qr::svg) und enthält nur Formen.
+  $('transfer-qr').innerHTML = t.qr_svg;
+  const rows = [['Empfänger', t.holder], ['IBAN', t.iban], ['BIC', t.bic], ['Bank', t.bank], ['Betrag', euro(p.amount_cents)], ['Verwendungszweck', t.purpose]].filter(r => r[1]);
+  $('transfer-data').replaceChildren(...rows.flatMap(([k, v]) => [element('dt', k), element('dd', v)]));
 }
 function printChoice() { return $('print-box').hidden ? {} : {auto_print: $('auto-print').checked}; }
 function renderPrintBox() {
@@ -367,7 +382,7 @@ async function load() {
   $('welcome').hidden=true; $('workspace').hidden=false;
   $('mode').hidden=!state.mock && !state.fhir_mock;
   $('mode').textContent=state.mock?'TESTMODUS':state.fhir_mock?'T2MED TESTMODUS':'';
-  $('patient-name').textContent=state.patient.name;
+  $('patient-name').textContent=state.patient.name; document.querySelector('.patient .eyebrow').textContent=state.manual ? 'OHNE PATIENTENAKTE' : 'AKTUELLER PATIENT';
   $('patient-birth').textContent=state.patient.birthdate ? 'Geboren am '+state.patient.birthdate.split('-').reverse().join('.') : '';
   $('practice-hint').hidden=state.local_receipts;
   if(!$('service-date').value) $('service-date').value=state.today;
@@ -409,18 +424,34 @@ $('pay').onclick=()=>run(async()=>{
   document.querySelector('input[name="pay-method"][value="card"]').checked=true; renderPayment();
 });
 $('retry').onclick=()=>{ retrySelection=true; startRequest=null; renderPayment(); updateTotal(); };
+$('switch-cash').onclick=()=>run(async()=>{
+  if(!confirm(euro(state.payment.amount_cents)+' bar erhalten? Die Zahlung wird als bezahlt erfasst.')) return;
+  state.payment=await api('switch_method',{payment_id:state.payment.id,request_id:crypto.randomUUID(),method:'cash'}); retrySelection=false; renderPayment();
+});
+$('switch-transfer').onclick=()=>run(async()=>{ state.payment=await api('switch_method',{payment_id:state.payment.id,request_id:crypto.randomUUID(),method:'transfer'}); retrySelection=false; renderPayment(); });
+$('switch-later').onclick=()=>run(async()=>{
+  // T2med-Rechnung: Der Überweisungs-QR-Code steht auf der Rechnung. Wie „Patient zahlt später“ in der Rechnungsliste: Rechnung drucken (wenn eingeschaltet) und zurück zur Auswahl.
+  const id=state.payment.invoice_id, invoice=(state.invoices||[]).find(i=>i.id===id);
+  if(invoice && state.print?.t2med_auto && !invoice.printed_at) { const result=await api('invoice_later',{invoice_id:id}); if(result.message) message(result.message); }
+  if(id) invoiceLater.add(id);
+  retrySelection=true; startRequest=null; await load(); renderPayment(); updateTotal();
+});
+$('confirm-transfer').onclick=()=>run(async()=>{
+  if(!confirm('Ist der Betrag von '+euro(state.payment.amount_cents)+' auf dem Konto eingegangen? Die Zahlung wird dann als bezahlt erfasst.')) return;
+  state.payment=await api('confirm_transfer',{payment_id:state.payment.id}); renderPayment();
+});
 $('cancel').onclick=()=>run(async()=>{ state.payment=await api('cancel',{payment_id:state.payment.id}); });
 $('reader-cancel').onclick=()=>run(()=>refreshReader('reader_cancel'));
 $('reader-status').onclick=()=>run(()=>refreshReader('reader_status'));
 $('receipt').onclick=()=>{
-  if(busy || state?.payment?.payment_status!=='successful') return;
+  if(busy || !['successful','transfer_open'].includes(state?.payment?.payment_status)) return;
   const query=new URLSearchParams({v:visitId,p:state.payment.id});
   window.open(BASE+'receipt.php?'+query, '_blank', 'noopener,noreferrer');
 };
 function mailStatus(text) { $('receipt-mail-status').textContent=text; $('receipt-mail-status').hidden=!text; }
 function printStatus(text) { $('receipt-print-status').textContent=text; $('receipt-print-status').hidden=!text; }
 $('receipt-print').onclick=()=>run(async()=>{
-  if(!state.printing_enabled || state.payment?.payment_status!=='successful') return;
+  if(!state.printing_enabled || !['successful','transfer_open'].includes(state.payment?.payment_status)) return;
   const key='ks-print-'+visitId+'-'+state.payment.id;
   // Auch nach Neuladen wird bei verlorener Antwort derselbe Auftrag geprüft.
   let requestId=sessionStorage.getItem(key);
@@ -514,6 +545,11 @@ $('document').onclick=()=>run(async()=>{
 $('mock-success').onclick=()=>run(async()=>{ await api('mock',{payment_id:state.payment.id,status:'successful'}); await load(); });
 $('mock-fail').onclick=()=>run(async()=>{ await api('mock',{payment_id:state.payment.id,status:'failed'}); await load(); });
 $('mock-fhir-fail').onchange=()=>run(async()=>{ await api('mock',{document_fail:$('mock-fhir-fail').checked}); await load(); });
+$('manual-form').onsubmit=event=>{ event.preventDefault(); run(async()=>{
+  const key='ks-manual'; let request_id=sessionStorage.getItem(key); if(!request_id) { request_id=crypto.randomUUID(); sessionStorage.setItem(key,request_id); }
+  const result=await api('manual',{label:$('manual-label').value.trim(),amount:$('manual-amount').value.trim(),request_id});
+  sessionStorage.removeItem(key); location.href=result.url; location.reload();
+}); };
 $('demo').onclick=()=>run(async()=>{ const result=await api('demo'); location.href=result.url; location.reload(); });
 async function init() {
   // Start aus T2med: #launch=<code>. Musste sich der Benutzer erst an der Suite anmelden, hat die Basis den Code im Tab gemerkt.

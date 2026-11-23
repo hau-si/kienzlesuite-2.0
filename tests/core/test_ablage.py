@@ -267,6 +267,12 @@ class Verbindungen(Umgebung):
                        {'pin': True}, {'ca_pem': 'kein zertifikat'}):
             with self.subTest(change), self.assertRaises(self.vb.Fehler):
                 self.vb.set_t2med({}, {**self.T2MED, **change})
+        c3 = {'t2med': dict(c['t2med'], ca_pem='x')}
+        self.vb.set_t2med(c3, {**self.T2MED, 'api_key': '', 'api_key_entfernen': True})
+        self.assertEqual((c3['t2med']['api_key'], c3['t2med']['ca_pem']), ('', 'x'), 'Schlüssel entfernen darf das Zertifikat nicht löschen')
+        c2 = {}
+        self.vb.set_t2med(c2, {**self.T2MED, 'api_key': '  geheim-2 \t'})
+        self.assertEqual(c2['t2med']['api_key'], 'geheim-2', 'Leerzeichen am Rand bleiben im Schlüssel')
         self.vb.set_t2med(c, {**self.T2MED, 'api_key': ''})
         self.assertEqual(c['t2med']['api_key'], 'geheim-1', 'leerer Schlüssel überschreibt den gespeicherten')
 
@@ -323,6 +329,10 @@ class Verbindungen(Umgebung):
         self.assertTrue(s['tests']['ziel:sicherung']['ok'], s)
         s = self.request({'action': 'ziel', 'daten': {**self.SFTP, 'host': 'nas2.example.org'}})
         self.assertEqual(s['ablage'][0]['fingerprint'], '', 'Serverschlüssel bleibt bei neuem Server')
+        # Prüfen ohne bestätigten Schlüssel ruft ihn gleich ab, damit die Schaltfläche zum Übernehmen erscheint
+        s = self.request({'action': 'pruefen', 'art': 'ziel', 'id': 'sicherung'})
+        self.assertFalse(s['tests']['ziel:sicherung']['ok'])
+        self.assertTrue(s['hostkeys']['sicherung'], 'Schlüssel nicht abgerufen')
         self.request({'action': 'ziel', 'daten': {**self.SMB, 'passwort': ''}})
         self.assertEqual(json.loads((self.t / 'etc/ablage.json').read_text())['ziele'][1]['passwort'], '')
         self.request({'action': 'ziel', 'daten': self.SMB})
@@ -345,13 +355,25 @@ class Verbindungen(Umgebung):
         c = {}
         self.vb.set_t2med(c, {'base_url': base, 'api_key': 'api-schluessel-1', 'ca_pem': pem, 'pin': True})
         self.assertIn('CapabilityStatement', self.vb.test_t2med(c['t2med']))
-        with self.assertRaisesRegex(self.vb.Fehler, 'nicht wie ein FHIR'):
-            self.vb.test_t2med({**c['t2med'], 'api_key': 'falsch'})
+        self.assertIn('Token', self.vb.test_t2med({**c['t2med'], 'api_key': 'falsch'}))   # 401: Secret allein nicht prüfbar
         _, other = make_cert(self.t / '..' / self.t.name, 'anders') if False else make_cert(self.t, 'localhost2')
         with self.assertRaises(self.vb.Fehler):
             self.vb.test_t2med({**c['t2med'], 'ca_pem': other.read_text(), 'pin': False})   # fremde CA: TLS-Fehler
         with self.assertRaisesRegex(self.vb.Fehler, 'nicht erreichbar'):
             self.vb.test_t2med({**c['t2med'], 'ca_pem': ''})                                # ohne CA: unbekanntes Zertifikat
+        # Selbstsigniertes Zertifikat im Webinterface abrufen und nach Fingerabdruck-Prüfung fest übernehmen
+        self.registry()
+        self.request({'action': 't2med', 'daten': {'base_url': base, 'api_key': 'api-schluessel-1'}})
+        with self.assertRaisesRegex(self.vb.Fehler, 'Verbindungen'):
+            self.vb.test_t2med(json.loads((self.t / 'etc/konfiguration.json').read_text())['t2med'])
+        s = self.request({'action': 'zertifikat-holen'})
+        fp = s['zertifikate']['t2med']['fingerprint']
+        self.assertEqual(fp, __import__('hashlib').sha256(ssl.PEM_cert_to_DER_cert(pem)).hexdigest())
+        s = self.request({'action': 'zertifikat-uebernehmen', 'fingerprint': 'falsch'})
+        self.assertNotIn('zertifikat', s['t2med'] and s['t2med']['zertifikat'] or '')
+        s = self.request({'action': 'zertifikat-uebernehmen', 'fingerprint': fp})
+        self.assertEqual((s['t2med']['zertifikat'], s['t2med']['pin'], s['zertifikate']), (fp, True, {}))
+        self.assertIn('CapabilityStatement', self.vb.test_t2med(json.loads((self.t / 'etc/konfiguration.json').read_text())['t2med']))
 
     def test_mail_verbindung(self):
         calls = []

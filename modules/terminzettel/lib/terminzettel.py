@@ -91,6 +91,37 @@ def eprint(*args: object) -> None:
     print(*args, file=sys.stderr)
 
 
+LOG_FILE = "druckprotokoll.txt"
+
+
+def job_log(text: str) -> None:
+    """Kurzes Protokoll der letzten Aufträge für die Einstellungsseite (feste Texte, keine Patientendaten)."""
+    try:
+        path = DATA / LOG_FILE
+        try:
+            old = path.read_text(encoding="utf-8").splitlines()[-39:]
+        except OSError:
+            old = []
+        old.append(datetime.now().strftime("%d.%m.%Y %H:%M:%S") + "  " + text)
+        tmp = path.with_suffix(".neu")
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(old) + "\n")
+        os.replace(tmp, path)
+    except Exception:  # Protokoll ist nur Hilfe, nie Grund für einen Fehler
+        pass
+
+
+def job_kind(data: bytes) -> str:
+    if data.startswith(b"%PDF-"):
+        return "PDF"
+    if data.startswith(b"%!PS"):
+        return "PostScript"
+    if data.startswith(b"PK\x03\x04"):
+        return "XPS"
+    return "Text"
+
+
 def load_config(path: str, overlay: str | None = WEB_OVERLAY) -> dict[str, Any]:
     with open(path, "rb") as fh:
         cfg = tomllib.load(fh)
@@ -299,13 +330,18 @@ def extract_text(data: bytes, cfg: dict[str, Any]) -> str:
                     run_checked(["gs", "-q", "-dSAFER", "-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite",
                                  "-sOutputFile=" + str(pdf), str(source)], temp_dir=td)
                 else:
-                    run_checked(["gxps2pdf", str(source), str(pdf)], temp_dir=td)
+                    # Ubuntu liefert das Werkzeug aus libgxps-utils als „xpstopdf“; „gxps2pdf“ nur ältere Pakete.
+                    tool = "xpstopdf" if shutil.which("xpstopdf", path="/usr/bin:/bin") else "gxps2pdf"
+                    run_checked([tool, str(source), str(pdf)], temp_dir=td)
                 return extract_pdf_text(str(pdf), cfg, temp_dir=td)
     encoding = str(cfg.get("input", {}).get("text_encoding", "utf-8"))
-    try:
-        return data.decode(encoding, "strict")
-    except (UnicodeError, LookupError):
-        raise TicketError("Textkodierung ungültig. Bitte PDF oder PostScript verwenden.") from None
+    # Der Windows-Treiber „Generic / Text Only“ liefert ANSI (Windows-1252): Umlaute sind dann kein gültiges UTF-8.
+    for candidate in dict.fromkeys((encoding, "cp1252")):
+        try:
+            return data.decode(candidate, "strict")
+        except (UnicodeError, LookupError):
+            continue
+    raise TicketError("Textkodierung ungültig. Bitte PDF oder PostScript verwenden.")
 
 
 def read_spool(path: str) -> bytes:
@@ -808,19 +844,25 @@ def main() -> int:
                 data = fh.read(MAX_INPUT + 1)
         else:
             data = read_spool(args.input)
+            job_log(f"Auftrag erhalten: {job_kind(data)}, {len(data)} Bytes")
         cfg = load_config(args.config)
         payload = make_payload(data, cfg)
         if args.check:
             print("Belegprüfung erfolgreich.")
         else:
             send_cups(payload, cfg)
+            job_log("Bon an die Warteschlange „" + str(cfg.get("output", {}).get("queue", "")) + "“ übergeben")
         return 0
     except TicketError as exc:
         eprint("terminzettel: " + str(exc))
+        if not args.check:
+            job_log("Fehler: " + str(exc))
         return 1
     except (Exception, KeyboardInterrupt):
         # Fremde Fehlertexte können Beleginhalte enthalten. Keine Tracebacks oder Rohmeldungen.
         eprint("terminzettel: Verarbeitung fehlgeschlagen. Bitte Konfiguration und Drucker prüfen.")
+        if not args.check:
+            job_log("Fehler: Verarbeitung fehlgeschlagen")
         return 1
 
 

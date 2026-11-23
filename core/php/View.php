@@ -9,7 +9,7 @@ final class View {
     /** Menü der Seitenleiste: Gruppe => [Pfad => Bezeichnung]. Nur Admins sehen die Gruppen ab „Einrichten“. */
     public const MENU = [
         'Einrichten' => ['/verwaltung/einrichtung' => 'Überblick', '/verwaltung/server' => 'Server und Name', '/hilfe/arbeitsplatz' => 'Arbeitsplätze'],
-        'Praxis' => ['/verwaltung/benutzer' => 'Benutzer', '/verwaltung/drucker' => 'Drucker', '/verwaltung/verbindungen' => 'Verbindungen', '/verwaltung/sso' => 'Dienste'],
+        'Praxis' => ['/verwaltung/benutzer' => 'Benutzer', '/verwaltung/gruppen' => 'Gruppen', '/verwaltung/drucker' => 'Drucker', '/verwaltung/verbindungen' => 'Verbindungen', '/verwaltung/sso' => 'Dienste'],
         'Betrieb' => ['/verwaltung/sicherung' => 'Sicherung', '/verwaltung/updates' => 'Updates', '/verwaltung/module' => 'Module', '/verwaltung/firewall' => 'Firewall',
             '/verwaltung/zugang' => 'Zugang', '/verwaltung/protokoll' => 'Protokoll'],
     ];

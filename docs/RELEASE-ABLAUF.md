@@ -23,6 +23,16 @@ Den ausgegebenen Fingerabdruck in `README.md` eintragen. Wer installiert, vergle
 Solange in `installer/release-keys/` kein Schlüssel liegt, nimmt der Updater keine Releases an. Ausnahme:
 Beta-Versionen ohne Signatur, wenn ein Admin das im Beta-Kanal ausdrücklich zugelassen hat (siehe unten).
 
+## Beta-Kanal: automatische Vorabversionen
+
+- Entwicklungsstand liegt auf dem Zweig `beta`. Trägt `core/VERSION` oder `version` in `modules/<id>/module.toml` eine Vorabversion
+  (`0.20.0-beta.3`) und gibt es dazu noch kein Release, baut `.github/workflows/beta.yml` nach grünen Tests ein Prerelease
+  `<teil>-v<version>` (Archiv und Manifest, ohne Signatur) auf GitHub.
+- Server im Beta-Kanal (Verwaltung → Updates → Kanal) prüfen stündlich; neue Vorabversionen der Basis erscheinen unter Updates,
+  die der Module unter Verwaltung → Module. Installiert werden Module nachts von selbst, die Basis auf Knopfdruck.
+- Stabil: Endversion (ohne `-beta`) nach `main` bringen und dort den Tag setzen (nächster Abschnitt). Server im stabilen Kanal sehen
+  nur diese Releases.
+
 ## Je Release der Basis (über GitHub Actions)
 
 1. Version in `core/VERSION` erhöhen, `docs/RELEASE.md` ergänzen, alle Tests grün, committen und pushen.

@@ -145,7 +145,14 @@ function render(data) {
       buttons.append(test);
     }
     form.append(buttons);
-    if (section.id === 'fhir') form.append(t2medSetupHelp());
+    if (section.id === 'fhir') {
+      // Die T2med-Verbindung gehört der Suite: Stand zeigen und direkt zur Einrichtung verlinken.
+      const ok = !!(data.connections && data.connections.t2med);
+      const note = el('p', ok ? 'Die T2med-Verbindung der Suite ist eingerichtet. ' : 'Die T2med-Verbindung der Suite ist noch nicht eingerichtet. ', ok ? 'notice' : 'inline-error');
+      note.append(el('a', ok ? 'Verbindung prüfen (Verwaltung → Verbindungen)' : 'Jetzt in der Suite einrichten (Verwaltung → Verbindungen)', null, {href: '/verwaltung/verbindungen'}));
+      form.prepend(note);
+      form.append(t2medSetupHelp());
+    }
     form.oninput = form.onchange = event => {
       // Anderes Druckermodell: Breite leeren, der Server setzt die passende Breite.
       if (section.id === 'printing' && event.target.name === 'model' && form.elements.width_dots) form.elements.width_dots.value = '';
@@ -177,6 +184,7 @@ function renderInvoicePrinter(info) {
   const driver = el('li', 'Windows 11: Fehlt der Treiber „Microsoft IPP Class Driver“ oder akzeptiert Windows die Adresse nicht, PowerShell als Administrator öffnen und ausführen:');
   driver.append(el('pre', ippPowerShell('SumUp-Rechnung', info.url, info.ips, 'A4'), 'audit-list'));
   ol.append(driver);
+  ol.append(el('li', 'Druckereigenschaften lassen sich nicht öffnen („Das Handle ist ungültig“) oder der Druck bleibt aus: Die Windows-Einrichtung ist veraltet, z. B. nach Neueinrichtung des Servers. Drucker entfernen und mit dem PowerShell-Skript oben neu einrichten (es startet den Druckspooler neu und entfernt den alten Drucker). Eine Meldung beim Löschen alter Anschlüsse („Anschluss unbekannt“) ist harmlos. Möglichst die IP-Adresse statt des Namens verwenden.'));
   const mac = el('li'); mac.append(document.createTextNode('Mac: „SumUp-Rechnung“ hinzufügen, als Treiber die Datei '), el('a', 'SumUp-Rechnung-PDF.ppd', null, {href: BASE + 'assets/SumUp-Rechnung-PDF.ppd', download: 'SumUp-Rechnung-PDF.ppd'}), document.createTextNode(' wählen.'));
   ol.append(mac); box.append(ol);
 }
@@ -258,7 +266,7 @@ function t2medSetupHelp() {
   ol.append(el('li', 'Auf Plus klicken, oben rechts mit dem Häkchen speichern und in der Liste davor auf „aktualisieren“ (Pfeile) klicken.'));
   ol.append(el('li', 'Dann „Funktionsleisten verwalten“: Konfiguration anlegen oder bearbeiten (Name, Benutzer, Benutzergruppe, Station), „Aktion hinzufügen“, die Aktion unter der vergebenen Bezeichnung suchen, Farbe und Kürzel oder Icon wählen und bestätigen.'));
   ol.append(el('li', 'Der Starter-Aufruf funktioniert erst, wenn auf dem Arbeitsplatz das Starter-Paket installiert ist (Karte „Arbeitsplätze einrichten“).'));
-  ol.append(el('li', 'Die FHIR-Adresse, die T2med beim Aufruf mitgibt, muss in der Suite unter Verwaltung → Verbindungen → T2med bei den erlaubten Aufrufadressen stehen. Bei einer Fehlermeldung zeigt die Seite die tatsächlichen Werte.'));
+  ol.append(el('li', 'Die FHIR-Adresse, die T2med beim Aufruf mitgibt, muss in der Suite unter Verwaltung → Verbindungen → T2med bei „Erlaubte fhirBasisUrl aus T2med“ stehen (die Adresse des FHIR-Servers gilt immer als erlaubt). Bei einer Fehlermeldung zeigt die Seite die tatsächlichen Werte.'));
   const guide = el('li'); guide.append('Mit Bildern: ', el('a', 'Anleitung „T2med einrichten“', null, {href: GUIDE_URL, target: '_blank', rel: 'noopener'})); ol.append(guide);
   d.append(ol); return d;
 }
@@ -338,7 +346,7 @@ function ippByIp(url, ips) {
 }
 function ippPowerShell(queue, url, ips, paper) {
   const byIp = ippByIp(url, ips), use = byIp.length ? byIp[0].url : url;
-  return 'Enable-WindowsOptionalFeature -Online -FeatureName Printing-Foundation-InternetPrinting-Client -NoRestart\nAdd-PrinterDriver -Name "Microsoft IPP Class Driver"\n$url = "' + use + '"\nAdd-PrinterPort -Name $url -ErrorAction SilentlyContinue\nAdd-Printer -Name "' + queue + '" -DriverName "Microsoft IPP Class Driver" -PortName $url' + (paper ? '\nSet-PrintConfiguration -PrinterName "' + queue + '" -PaperSize ' + paper : '');
+  return 'Enable-WindowsOptionalFeature -Online -FeatureName Printing-Foundation-InternetPrinting-Client -NoRestart | Out-Null\n# Druckspooler neu starten und auf den laufenden Dienst warten; alten Drucker entfernen (behebt „Das Handle ist ungültig“)\nRestart-Service Spooler -Force\n(Get-Service Spooler).WaitForStatus(\'Running\', \'00:00:30\')\nStart-Sleep 3\nGet-Printer -Name "' + queue + '" -ErrorAction SilentlyContinue | Remove-Printer\nAdd-PrinterDriver -Name "Microsoft IPP Class Driver"\n$url = "' + use + '"\nAdd-PrinterPort -Name $url -ErrorAction SilentlyContinue\nAdd-Printer -Name "' + queue + '" -DriverName "Microsoft IPP Class Driver" -PortName $url';
 }
 function ippIpNote(url, ips) {
   const byIp = ippByIp(url, ips);

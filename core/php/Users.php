@@ -79,6 +79,12 @@ final class Users {
     /** @return array<string, array{admin:bool, rights:list<string>}> nur Module, die noch installiert sind */
     public function access(int $id): array {
         $out = [];
+        // Basis-Admins dürfen in jedem installierten Modul alles (Modul-Admin mit allen Rechten).
+        $base = $this->db->one('SELECT admin FROM users WHERE id=?', [$id]);
+        if ($base && (int)$base['admin'] === 1) {
+            foreach (array_keys($this->modules->all()) as $m) $out[$m] = ['admin' => true, 'rights' => array_values($this->modules->rightIds($m))];
+            return $out;
+        }
         foreach ($this->db->query('SELECT module,admin,rights FROM user_modules WHERE user_id=? ORDER BY module', [$id])->fetchAll() as $r) {
             if (!$this->modules->has($r['module'])) continue;
             $rights = json_decode($r['rights'], true);

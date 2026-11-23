@@ -110,6 +110,7 @@ class Praxisdrucker(Umgebung):
         # „Unable to query printer: Connection refused“ kommt vom Drucker, nicht von CUPS.
         with self.assertRaisesRegex(self.d.Fehler, 'IPP Everywhere'):
             self.d.add('office', 'Kaputt', '192.0.2.91', [])
+        self.assertIn('IP-Adresse', self.d.explain('lpadmin: Unable to connect to Drucker-MFC.local:631: Temporary failure in name resolution'))
         self.assertIn('CUPS', self.d.explain('lpadmin: Unable to connect to server: Connection refused'))
         self.assertIn('CUPS', self.d.explain('lpstat: scheduler is not running'))
         self.assertIn('IPP Everywhere', self.d.explain('lpadmin: Unable to connect to printer; please try again in a few moments.'))
@@ -117,6 +118,15 @@ class Praxisdrucker(Umgebung):
 
 
 class Virtuell(Umgebung):
+    def test_local_name_wird_auf_ip_umgestellt(self):
+        calls = []
+        q = [{'name': 'Bon', 'uri': 'socket://Drucker-X.local:9100', 'managed': True, 'modul': ''},
+             {'name': 'Fremd', 'uri': 'socket://Anderer.local:9100', 'managed': False, 'modul': ''}]
+        with mock.patch.object(self.d, 'queues', return_value=q), mock.patch.object(self.d.socket, 'getaddrinfo', side_effect=OSError), \
+                mock.patch.object(self.d, 'resolve_local', return_value='192.0.2.55'), mock.patch.object(self.d, 'run', side_effect=lambda *a, **k: calls.append(a) or ''):
+            self.d.heal_local()
+        self.assertEqual(calls, [('lpadmin', '-p', 'Bon', '-v', 'socket://192.0.2.55:9100')])
+
     def test_abgleich(self):
         self.registry(self.module())
         notes = self.d.sync()
@@ -202,7 +212,13 @@ class IppEverywhere(Umgebung):
         q = self.cups()['queues']['Beispiel-PDF']
         self.assertEqual(q['uri'], 'ipp://localhost:47100/ipp/print')
         call = next(c for c in self.cups()['calls'] if c[0] == 'lpadmin' and 'Beispiel-PDF' in c)
-        self.assertEqual(call[call.index('-m') + 1], 'everywhere')
+        # Durchreich-PPD statt „everywhere“: Windows bekommt nur PDF/PostScript angeboten (sonst Bild-PDF ohne Textebene).
+        self.assertNotIn('-m', call)
+        ppd = Path(call[call.index('-P') + 1])
+        text = ppd.read_text(encoding='utf-8')
+        self.assertIn('*cupsFilter2: "application/pdf application/pdf 0 -"', text)
+        self.assertNotIn('raster', text)
+        self.assertEqual(stat.S_IMODE(ppd.stat().st_mode), 0o644)
         self.assertIn(['restart', 'kienzle-drucker-beispiel-beispiel-pdf.service'], self.cups()['systemctl'])
         with mock.patch.object(self.d, '_port_open', return_value=True):
             self.assertEqual(self.d.sync(), [], 'zweiter Abgleich ändert etwas')

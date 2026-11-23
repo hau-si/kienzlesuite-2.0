@@ -120,13 +120,14 @@ function test_mitarbeiter_ohne_otp_und_rechte_je_modul(): void {
     check(str_contains($b->get('/')->body, 'href="/kasse/"') && !str_contains($b->last->body, 'href="/beispiel/"'), 'Menü zeigt falsche Module');
 }
 
-function test_basis_admin_sieht_module_nicht_automatisch(): void {
+function test_basis_admin_darf_in_modulen_alles(): void {
     $env = new Env();
     [$b, $id] = admin_browser($env);
-    check($b->get('/_auth/kasse')->status === 403, 'Basis-Admin hat automatisch Modulzugang');
-    $env->users->setAccess($id, 'kasse', true, []);
     $r = $b->get('/_auth/kasse');
-    check($r->status === 204 && $r->header('X-Kienzle-Rolle') === 'admin', 'Modul-Admin nicht weitergegeben');
+    check($r->status === 204 && $r->header('X-Kienzle-Rolle') === 'admin', 'Basis-Admin ist nicht automatisch Modul-Admin');
+    check($r->header('X-Kienzle-Rechte') !== '' && count(explode(',', $r->header('X-Kienzle-Rechte'))) === count($env->modules->rightIds('kasse')), 'Basis-Admin hat nicht alle Rechte');
+    [$uid] = $env->user('bert');
+    check($b->get('/_auth/kasse')->status === 204 && $env->users->access($uid) === [], 'Mitarbeiter ohne Zugang bekommt Zugang');
 }
 
 function test_modul_admin_braucht_otp(): void {
@@ -169,6 +170,21 @@ function test_benutzer_anlegen_rechte_und_link(): void {
     check($b->last->status === 422, 'unbekanntes Recht angenommen');
     $b->post('/verwaltung/benutzer/' . $carla['id'], ['display' => 'Carla', 'active' => '1', 'recht' => ['fremd:x']]);
     check($b->last->status === 422, 'unbekanntes Modul angenommen');
+    // Gruppen: Vorgaben Admin/Arzt/MFA, Anwenden beim Speichern, eigene Änderung
+    $b->get('/verwaltung/gruppen');
+    check($b->last->status === 200 && str_contains($b->last->body, '>MFA<') && str_contains($b->last->body, '>Arzt<') && str_contains($b->last->body, '>Admin<'), 'Vorgabe-Gruppen fehlen');
+    $b->post('/verwaltung/benutzer/' . $carla['id'], ['display' => 'Carla', 'active' => '1', 'gruppe' => 'Arzt']);
+    $acc = $env->users->access((int)$carla['id']);
+    check($acc['kasse']['admin'] === false && $acc['kasse']['rights'] === ['paid', 'catalog'] && $acc['beispiel']['rights'] === ['ansehen', 'bearbeiten'], 'Gruppe Arzt nicht angewendet: ' . json_encode($acc));
+    $b->post('/verwaltung/gruppen', ['aktion' => 'speichern', 'name' => 'Empfang', 'recht' => ['kasse:paid']]);
+    $b->post('/verwaltung/benutzer/' . $carla['id'], ['display' => 'Carla', 'active' => '1', 'gruppe' => 'Empfang']);
+    check(array_keys($env->users->access((int)$carla['id'])) === ['kasse'] && $env->users->access((int)$carla['id'])['kasse']['rights'] === ['paid'], 'eigene Gruppe nicht angewendet');
+    $b->post('/verwaltung/benutzer/' . $carla['id'], ['display' => 'Carla', 'active' => '1', 'gruppe' => 'Gibtsnicht']);
+    check($b->last->status === 422, 'unbekannte Gruppe angenommen');
+    $b->post('/verwaltung/gruppen', ['aktion' => 'speichern', 'name' => '<b>x</b>']);
+    check($b->last->status === 422, 'ungültiger Gruppenname angenommen');
+    $b->post('/verwaltung/gruppen', ['aktion' => 'zuruecksetzen', 'name' => 'Empfang']);
+    $b->post('/verwaltung/benutzer/' . $carla['id'], ['display' => 'Carla', 'active' => '1', 'recht' => ['kasse:paid', 'kasse:catalog', 'beispiel:ansehen']]);
     // Carla richtet ihr Passwort über den Link ein.
     $c = new Browser($env, '192.0.2.30');
     $c->post('/einrichten', ['t' => $m[1], 'password' => 'Sonnen-Uhr-Garten-3', 'password2' => 'Sonnen-Uhr-Garten-3']);

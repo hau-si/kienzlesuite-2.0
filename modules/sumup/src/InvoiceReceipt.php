@@ -51,7 +51,7 @@ final class InvoiceReceipt {
         if ($tax && ($tax['tax_id'] ?? '') !== '') $text('St.-Nr./USt-IdNr.: ' . $tax['tax_id'], false, 20);
         $rule();
         $text($invoice['title'], true);
-        $cash = ($payment['method'] ?? 'card') === 'cash';
+        $kind = $payment['method'] ?? 'card'; $cash = $kind !== 'card'; $transfer = $kind === 'transfer';
         $text($cash ? 'Rechnungsnummer:' : 'Rechnungsnummer (SumUp):'); $text($invoice['number'], false, 20);
         $text('Rechnungsdatum:'); $text($date($invoice['issued_date']));
         $y += 10;
@@ -86,8 +86,8 @@ final class InvoiceReceipt {
         $rule();
         if ($sumupReceipt === null) {
             $text('ZAHLUNGSBESTÄTIGUNG', true);
-            $amount($cash ? 'Bar bezahlt' : 'Bezahlt per Karte', $invoice['total_cents'], true);
-            $text($cash ? 'Betrag bar erhalten' : 'Status: ERFOLGREICH'); $text($payment['paid_date']);
+            $amount($transfer ? 'Überwiesen' : ($cash ? 'Bar bezahlt' : 'Bezahlt per Karte'), $invoice['total_cents'], true);
+            $text($transfer ? 'Betrag per Überweisung erhalten' : ($cash ? 'Betrag bar erhalten' : 'Status: ERFOLGREICH')); $text($payment['paid_date']);
             if (!$cash) {
                 $y += 8; $text('Zahlungsreferenz:', false, 20); $text($payment['reference'], false, 20);
                 $y += 8; $text('SumUp-Transaktion:', false, 20); $text($payment['transaction_id'], false, 20);
@@ -135,9 +135,48 @@ final class InvoiceReceipt {
         $rule();
         $text('Rechnungsbetrag:');
         $parts[] = '<text x="408" y="'.$y.'" text-anchor="end" font-size="30" font-weight="bold">'.htmlspecialchars(Money::format($d['amount_cents']), ENT_XML1, 'UTF-8').'</text>'; $y += 44;
-        $text('Betrag bar erhalten.', true);
+        $text(($d['method'] ?? 'cash') === 'transfer' ? 'Betrag per Überweisung erhalten.' : 'Betrag bar erhalten.', true);
         $rule();
         $text('Vielen Dank.');
+        $height = $y + 4;
+        return '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="52.5mm" height="'.($height / 8).'mm" viewBox="0 0 420 '.$height.'"><rect width="420" height="'.$height.'" fill="white"/><g fill="black" font-family="DejaVu Sans Mono, monospace">'.implode('', $parts).'</g></svg>';
+    }
+    /** Bon mit Kontodaten und EPC-QR-Code (Betrag, Verwendungszweck) zum Mitgeben bei einer offenen Überweisung. */
+    public static function transferNote(array $d): string {
+        $parts = []; $y = 28;
+        $text = static function (string $value, bool $bold = false, int $size = 22) use (&$parts, &$y): void {
+            $value = preg_replace('/[\x00-\x1f\x7f]/u', ' ', $value);
+            $width = (int)floor(396 / ($size * 0.61));
+            while ($value !== '') {
+                $line = mb_substr($value, 0, $width);
+                if (mb_strlen($value) > $width && ($space = mb_strrpos($line, ' ')) !== false && $space > (int)($width / 2)) $line = mb_substr($line, 0, $space);
+                $value = ltrim(mb_substr($value, mb_strlen($line)));
+                $parts[] = '<text x="12" y="'.$y.'" font-size="'.$size.'" font-weight="'.($bold ? 'bold' : 'normal').'">'.htmlspecialchars($line, ENT_XML1 | ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'</text>';
+                $y += $size + 8;
+            }
+        };
+        $rule = static function () use (&$parts, &$y): void { $y += 4; $parts[] = '<path d="M12 '.$y.' H408" stroke="black" stroke-width="1"/>'; $y += 34; };
+        if (!empty($d['mock'])) { $text('TESTBELEG', true); $text('KEINE ECHTE ZAHLUNG'); $rule(); }
+        if (($d['practice']['name'] ?? '') !== '') {
+            $text($d['practice']['name'], true, 24);
+            foreach (['street', 'city', 'contact'] as $key) $text($d['practice'][$key] ?? '');
+            $rule();
+        }
+        $text('ÜBERWEISUNG', true, 28); $y += 6;
+        $text('Betrag:'); 
+        $parts[] = '<text x="408" y="'.$y.'" text-anchor="end" font-size="30" font-weight="bold">'.htmlspecialchars(Money::format($d['amount_cents']), ENT_XML1, 'UTF-8').'</text>'; $y += 44;
+        $y += 6; $text('Empfänger:'); $text($d['bank']['holder'], true);
+        $y += 6; $text('IBAN:'); $text($d['bank']['iban'], true, 20);
+        if (($d['bank']['bic'] ?? '') !== '') { $y += 6; $text('BIC:'); $text($d['bank']['bic']); }
+        if (($d['bank']['bank'] ?? '') !== '') { $y += 6; $text('Bank:'); $text($d['bank']['bank']); }
+        $y += 6; $text('Verwendungszweck:'); $text($d['bank']['purpose'], true);
+        $rule();
+        [$path, $n] = Qr::path($d['epc']);
+        $size = 300; $scale = $size / ($n + 8);
+        $parts[] = '<g transform="translate(60 '.$y.') scale('.$scale.')"><rect width="'.($n + 8).'" height="'.($n + 8).'" fill="white"/><path transform="translate(4 4)" d="'.$path.'" fill="black" shape-rendering="crispEdges"/></g>';
+        $y += $size + 20;
+        $text('QR-Code mit der Banking-App scannen: Betrag und Verwendungszweck sind eingetragen.', false, 20);
+        $y += 6;
         $height = $y + 4;
         return '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="52.5mm" height="'.($height / 8).'mm" viewBox="0 0 420 '.$height.'"><rect width="420" height="'.$height.'" fill="white"/><g fill="black" font-family="DejaVu Sans Mono, monospace">'.implode('', $parts).'</g></svg>';
     }

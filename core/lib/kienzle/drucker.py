@@ -14,6 +14,7 @@ import ipaddress
 import json
 import os
 import re
+import shutil
 import socket
 import stat
 import subprocess
@@ -78,6 +79,37 @@ def _write(path: Path, data, mode: int = 0o644) -> None:
     os.replace(tmp, path)
 
 
+PPD_REV = 'durchreichen-1'
+
+
+def ppd_text(p: dict) -> str:
+    """PPD der CUPS-Warteschlange vor einem virtuellen Drucker: PDF und PostScript werden unverändert durchgereicht.
+    Mit „-m everywhere“ bietet CUPS zusätzlich Raster- und Bildformate an; der Windows-IPP-Treiber wählt dann ein Bildformat,
+    und das PDF hat keine Textebene mehr (Texterkennung nötig)."""
+    name = re.sub(r'[^A-Za-z0-9_-]', '', str(p['name'])) or 'Drucker'
+    label = re.sub(r'[^\x20-\x7e]', '?', f'Kienzle-Suite {p["name"]}')[:60].replace('"', "'")
+    paper = p.get('paper') if p.get('paper') in ('A4', 'A5', 'A6') else 'A4'          # nur das Papierformat des Moduls anbieten
+    sizes = tuple(s for s in (('A6', 298, 420), ('A5', 420, 595), ('A4', 595, 842)) if s[0] == paper)
+    lines = ['*PPD-Adobe: "4.3"', '*FormatVersion: "4.3"', '*FileVersion: "1.0"', '*LanguageVersion: English', '*LanguageEncoding: ISOLatin1',
+             f'*PCFileName: "{name[:8].upper()}.PPD"', '*Manufacturer: "Kienzle-Suite"', f'*Product: "({label})"', f'*ModelName: "{label}"',
+             f'*ShortNickName: "{label}"', f'*NickName: "{label} (PDF/PostScript)"', '*PSVersion: "(3010.000) 0"', '*LanguageLevel: "3"',
+             '*ColorDevice: False', '*DefaultColorSpace: Gray', '*FileSystem: False', '*Throughput: "1"', '*LandscapeOrientation: Plus90',
+             '*TTRasterizer: Type42', '*cupsVersion: 1.1', '*cupsManualCopies: True', '*cupsMaxCopies: 99',
+             '*cupsFilter: "application/vnd.cups-pdf 0 -"', '*cupsFilter2: "application/pdf application/pdf 0 -"',
+             '*cupsFilter2: "application/vnd.cups-pdf application/pdf 0 -"', '*cupsFilter2: "application/postscript application/postscript 0 -"',
+             '*cupsFilter2: "application/vnd.cups-postscript application/postscript 0 -"']
+    for key, label2 in (('PageSize', 'Original page size'), ('PageRegion', 'Original page region')):
+        lines += [f'*OpenUI *{key}/{label2}: PickOne', f'*OrderDependency: 10 AnySetup *{key}', f'*Default{key}: {paper}']
+        lines += [f'*{key} {n}/{n}: "<</PageSize[{w} {h}]>>setpagedevice"' for n, w, h in sizes]
+        lines.append(f'*CloseUI: *{key}')
+    lines.append(f'*DefaultImageableArea: {paper}')
+    lines += [f'*ImageableArea {n}/{n}: "0 0 {w} {h}"' for n, w, h in sizes]
+    lines.append(f'*DefaultPaperDimension: {paper}')
+    lines += [f'*PaperDimension {n}/{n}: "{w} {h}"' for n, w, h in sizes]
+    lines += ['*DefaultFont: Courier', '*Font Courier: Standard "(001.007)" Standard ROM', '']
+    return '\n'.join(lines)
+
+
 def _read(path: Path, default):
     try:
         return json.loads(path.read_text(encoding='utf-8'))
@@ -104,6 +136,9 @@ def explain(error: str) -> str:
     e = error.lower()
     # Zuerst Meldungen über den Drucker selbst: „lpadmin: Unable to query printer: Connection refused“ heißt, der *Drucker*
     # nimmt die automatische Einrichtung nicht an – CUPS läuft dann sehr wohl.
+    if 'name resolution' in e or 'nodename nor servname' in e or 'unknown host' in e:
+        return ('Der Name des Druckers lässt sich auf dem Server nicht auflösen (mDNS „.local“ geht oft nicht). '
+                'Bitte die IP-Adresse des Druckers eintragen, z. B. 192.0.2.80, und dem Drucker im Router eine feste Adresse geben.')
     if any(x in e for x in PRINTER_SIDE):
         return ('Der Drucker antwortet nicht auf die automatische Einrichtung (IPP Everywhere/AirPrint). Im Webmenü des Druckers '
                 '„IPP“ bzw. „AirPrint“ einschalten, oder die vollständige Adresse aus der Suche bzw. vom Drucker eintragen (z. B. ipp://192.0.2.80/ipp/print).')
@@ -257,6 +292,32 @@ def generic_driver() -> str | None:
     return None
 
 
+def resolve_local(host: str) -> str:
+    """Namen wie „Drucker.local“ (mDNS) in eine IP-Adresse auflösen; der Server hat oft kein mDNS im Namensdienst."""
+    try:
+        ipaddress.ip_address(host)
+        return host
+    except ValueError:
+        pass
+    if not host.lower().endswith('.local'):
+        return host
+    try:
+        socket.getaddrinfo(host, None)
+        return host
+    except OSError:
+        pass
+    tool = shutil.which('avahi-resolve-host-name', path='/usr/bin:/bin')
+    if tool:
+        try:
+            out = subprocess.run([tool, '-4', '-n', host], capture_output=True, text=True, timeout=15).stdout.split()
+            if len(out) >= 2 and re.match(r'^\d{1,3}(\.\d{1,3}){3}$', out[1]):
+                return out[1]
+        except (OSError, subprocess.SubprocessError):
+            pass
+    raise Fehler(f'Der Name „{host}“ lässt sich auf dem Server nicht auflösen. Bitte stattdessen die IP-Adresse des Druckers eintragen '
+                 '(am Drucker oder im Router nachsehen) und dem Drucker im Router eine feste Adresse geben.')
+
+
 def add(kind: str, name: str, addr: str, share: list[str]) -> str:
     spec = KINDS.get(kind)
     if not spec:
@@ -268,10 +329,14 @@ def add(kind: str, name: str, addr: str, share: list[str]) -> str:
     if re.match(r'^[a-z]+://', addr):
         if not URI.match(addr):
             raise Fehler('Diese Druckeradresse wird nicht unterstützt.')
+        m = re.match(r'^([a-z]+://(?:[^/@]*@)?)(\[[^\]]+\]|[^/:]+)(.*)$', addr)
+        if m and not addr.startswith(('dnssd:', 'usb:')) and not m.group(2).startswith('['):
+            addr = m.group(1) + resolve_local(m.group(2)) + m.group(3)
         uri = addr
     else:
         if not is_host(addr):
             raise Fehler('Bitte die IP-Adresse oder den Namen des Druckers eintragen, z. B. 192.0.2.80.')
+        addr = resolve_local(addr)
         if not probe(addr, spec['port']):
             raise Fehler(f'Unter {addr} antwortet kein ' + ('IPP-Drucker (Port 631)' if kind == 'office' else 'Bondrucker (Port 9100)')
                          + '. Ist der Drucker eingeschaltet, im Netzwerk und die Adresse richtig?')
@@ -497,11 +562,17 @@ def sync() -> list[str]:
                     _write(UNITS / unit, text, 0o644)
                 if changed or not _port_open(port):
                     _start_unit(unit, p, port)
-                uri, model = f'ipp://localhost:{port}/ipp/print', ['-m', 'everywhere']
-                for f in (old.get('backend'), old.get('ppd')):
-                    if f:
-                        Path(f).unlink(missing_ok=True)
-                entry = {'modul': p['modul'], 'scheme': p['scheme'], 'art': 'ipp', 'port': port, 'unit': unit}
+                ppd = PPDS / f'{p["scheme"]}.ppd'
+                ppd_new = ppd_text(p)
+                if not ppd.is_file() or ppd.read_text(encoding='utf-8') != ppd_new:
+                    _write(ppd, ppd_new, 0o644)
+                    changed = True
+                if old.get('modell') != PPD_REV:
+                    changed = True                    # Warteschlange von „everywhere“ auf die Durchreich-PPD umstellen
+                uri, model = f'ipp://localhost:{port}/ipp/print', ['-P', str(ppd)]
+                if old.get('backend'):
+                    Path(old['backend']).unlink(missing_ok=True)
+                entry = {'modul': p['modul'], 'scheme': p['scheme'], 'art': 'ipp', 'port': port, 'unit': unit, 'ppd': str(ppd), 'modell': PPD_REV}
             else:
                 ppd = PPDS / f'{p["scheme"]}.ppd'
                 changed = _install_file(base / p['ppd'], ppd, 0o644)
@@ -612,7 +683,26 @@ def set_status(**changes) -> dict:
     return s
 
 
+def heal_local() -> None:
+    """Von der Suite angelegte Warteschlangen, deren Adresse einen „.local“-Namen enthält, den der Server nicht auflöst, auf die IP umstellen."""
+    try:
+        for q in queues():
+            m = re.match(r'^((?:socket|ipp|ipps|lpd)://)([A-Za-z0-9._-]+\.local)(.*)$', q['uri'], re.I)
+            if not m or not q['managed'] or q['modul']:
+                continue
+            try:
+                socket.getaddrinfo(m.group(2), None)
+                continue
+            except OSError:
+                pass
+            ip = resolve_local(m.group(2))
+            run('lpadmin', '-p', q['name'], '-v', m.group(1) + ip + m.group(3), timeout=30)
+    except (Fehler, OSError, subprocess.SubprocessError):
+        pass
+
+
 def refresh() -> None:
+    heal_local()
     try:
         set_status(warteschlangen=[{k: q[k] for k in ('name', 'address', 'state', 'description', 'managed', 'modul', 'share')} for q in queues()],
                    auftraege=jobs()[:200], netz=network(), fehler='')

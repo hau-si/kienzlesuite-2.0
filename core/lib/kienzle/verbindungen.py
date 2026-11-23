@@ -124,10 +124,12 @@ def set_t2med(config: dict, d: dict) -> None:
         raise Fehler('Höchstens 10 Start-Adressen.')
     base = _url(d.get('base_url'), 'Adresse des FHIR-Servers')
     key = d.get('api_key', '')
+    clear = d.get('api_key_entfernen') is True
+    key = key.strip() if isinstance(key, str) else key   # beim Kopieren mitgenommene Leerzeichen am Rand
     if not isinstance(key, str) or len(key) > 300 or CONTROL.search(key):
         raise Fehler('API-Schlüssel ungültig.')
     config['t2med'] = {'base_url': base, 'launch_urls': sorted({_url(u, 'Start-Adresse') for u in launch} | {base}),
-                       'api_key': key if key else old.get('api_key', ''), 'ca_pem': _cert(d.get('ca_pem', '')) if 'ca_pem' in d else old.get('ca_pem', ''),
+                       'api_key': '' if clear else (key or old.get('api_key', '')), 'ca_pem': _cert(d.get('ca_pem', '')) if 'ca_pem' in d else old.get('ca_pem', ''),
                        'pin': d.get('pin') is True}
     if config['t2med']['pin'] and not config['t2med']['ca_pem']:
         raise Fehler('Zum festen Prüfen (Pinning) bitte das Zertifikat des T2med-Servers eintragen.')
@@ -229,6 +231,22 @@ def distribute(config: dict) -> list[str]:
     return notes
 
 
+def fetch_certificate(base_url: str) -> str:
+    """Zertifikat des T2med-Servers abrufen (ungeprüft; der Admin bestätigt es anhand des Fingerabdrucks)."""
+    url = urllib.parse.urlparse(base_url)
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    try:
+        with socket.create_connection((url.hostname, url.port or 443), timeout=10) as raw, ctx.wrap_socket(raw, server_hostname=url.hostname) as s:
+            der = s.getpeercert(binary_form=True)
+    except (OSError, ssl.SSLError) as e:
+        raise Fehler(f'T2med nicht erreichbar: {str(e)[:120]}') from None
+    if not der:
+        raise Fehler('Der Server liefert kein Zertifikat.')
+    return ssl.DER_cert_to_PEM_cert(der)
+
+
 # ---- Prüfen ------------------------------------------------------------------------------------------------------
 def test_t2med(c: dict) -> str:
     if not c:
@@ -236,6 +254,11 @@ def test_t2med(c: dict) -> str:
     ctx = ssl.create_default_context()
     if c.get('ca_pem'):
         ctx = ssl.create_default_context(cadata=c['ca_pem'])
+    if c.get('pin') and c.get('ca_pem'):
+        # Fest hinterlegtes Zertifikat: nur der Fingerabdruck zählt (auch selbstsigniert, auch bei IP-Adresse statt Namen)
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
     url = urllib.parse.urlparse(c['base_url'] + '/metadata')
     try:
         with socket.create_connection((url.hostname, url.port or 443), timeout=10) as raw, ctx.wrap_socket(raw, server_hostname=url.hostname) as s:
@@ -252,11 +275,25 @@ def test_t2med(c: dict) -> str:
                     break
                 data += chunk
     except (OSError, ssl.SSLError) as e:
-        raise Fehler(f'T2med nicht erreichbar: {str(e)[:120]}') from None
+        hint = ' Das Zertifikat lässt sich unter Verbindungen → T2med abrufen und nach Prüfung des Fingerabdrucks übernehmen.' if 'CERTIFICATE_VERIFY_FAILED' in str(e) else ''
+        raise Fehler(f'T2med nicht erreichbar: {str(e)[:120]}.{hint}') from None
     head, _, body = data.partition(b'\r\n\r\n')
     status = head.split(b' ', 2)[1:2]
+    code = status[0].decode('ascii', 'replace')[:3] if status else '?'
+    if code in ('401', '403'):
+        # T2med verlangt für die FHIR-Abfragen neben dem Client Secret (X-API-Key) das OAuth-Token, das es nur beim Aufruf aus der Akte mitgibt.
+        # Die Prüfung hat kein Token und kann das Secret deshalb nicht allein bestätigen; Server und Zertifikat sind aber in Ordnung.
+        return (f'T2med ist erreichbar und das Zertifikat stimmt (HTTP {code}). Das Client Secret lässt sich hier nicht allein prüfen, '
+                'weil T2med zusätzlich das Token verlangt, das es nur beim Öffnen der Kasse aus T2med mitgibt. Bitte die Kasse einmal aus T2med öffnen.')
+    if code == '404':
+        raise Fehler('T2med kennt diese Adresse nicht (HTTP 404). Der Pfad der FHIR-Adresse stimmt nicht, meist …/aps/fhir/api/r4.')
     if status != [b'200'] or b'CapabilityStatement' not in body:
-        raise Fehler('T2med antwortet, aber nicht wie ein FHIR-Server (/metadata).')
+        kind = ''
+        for line in head.split(b'\r\n')[1:]:
+            if line.lower().startswith(b'content-type:'):
+                kind = line.split(b':', 1)[1].strip().decode('ascii', 'replace')[:60]
+        raise Fehler(f'T2med antwortet (HTTP {code}{", " + kind if kind else ""}), aber nicht wie ein FHIR-Server unter {url.path}. '
+                     'Adresse (Port und Pfad) prüfen: sie muss auf die FHIR-Schnittstelle von T2med zeigen, nicht auf die Weboberfläche.')
     return 'FHIR-Server antwortet (CapabilityStatement).'
 
 
@@ -327,7 +364,8 @@ def view(config: dict, extra: dict | None = None) -> dict:
                 usage.append({'modul': m['module']['id'], 'name': m['module']['name'], 'verbindung': c['id'], 'zweck': c['purpose'], 'pflicht': c['required']})
     except (Fehler, OSError, ValueError):
         pass
-    out = {'zeit': int(time.time()), 'tests': old.get('tests', {}), 'hostkeys': old.get('hostkeys', {}), 'hinweise': old.get('hinweise', []),
+    out = {'zeit': int(time.time()), 'tests': old.get('tests', {}), 'hostkeys': old.get('hostkeys', {}), 'zertifikate': old.get('zertifikate', {}),
+           'hinweise': old.get('hinweise', []),
            't2med': {**{k: t2[k] for k in ('base_url', 'launch_urls', 'pin')}, 'api_key_gesetzt': bool(t2.get('api_key')), 'zertifikat': ca_fp} if t2 else None,
            'mail': {**{k: mail[k] for k in ('host', 'port', 'sicherheit', 'benutzer', 'absender')}, 'passwort_gesetzt': bool(mail.get('passwort'))} if mail else None,
            'ablage': [{**{k: v for k, v in t.items() if k != 'passwort'}, 'passwort_gesetzt': bool(t.get('passwort')),
@@ -429,6 +467,12 @@ def dispatch(config: dict, req: dict) -> str:
                 target = next((t for t in config['ablage'] if t['id'] == tid), None)
                 if not target:
                     raise Fehler('Ziel nicht gefunden.')
+                if target['art'] == 'sftp' and not target.get('hostkey'):
+                    # Noch kein Serverschlüssel bestätigt: gleich abrufen, damit unten die Schaltfläche zum Übernehmen erscheint.
+                    keys = ablage.scan_hostkey(target['host'], target['port'])
+                    view(config, {'hostkeys': {target['id']: [{'zeile': k, 'fingerprint': ablage.fingerprint(k), 'art': k.split()[1]} for k in keys]}})
+                    raise Fehler('Der Schlüssel des Servers ist noch nicht bestätigt. Er wurde abgerufen: Bitte unten den Fingerabdruck '
+                                 'mit der Anzeige des NAS vergleichen und auf „Übernehmen“ klicken, dann erneut prüfen.')
                 msg = ablage.test_target(target)
             else:
                 raise Fehler('Unbekannte Prüfung.')
@@ -437,6 +481,26 @@ def dispatch(config: dict, req: dict) -> str:
             raise Fehler(str(e)) from None
         _test_record(key, True, msg)
         return msg
+    if action == 'zertifikat-holen':
+        t2 = config.get('t2med')
+        if not t2:
+            raise Fehler('Bitte zuerst die Adresse des FHIR-Servers speichern.')
+        pem = fetch_certificate(t2['base_url'])
+        der = ssl.PEM_cert_to_DER_cert(pem)
+        view(config, {'zertifikate': {'t2med': {'pem': pem, 'fingerprint': hashlib.sha256(der).hexdigest()}}})
+        return 'Zertifikat des T2med-Servers abgerufen. Bitte den Fingerabdruck mit der Anzeige in T2med oder im Browser vergleichen und übernehmen.'
+    if action == 'zertifikat-uebernehmen':
+        status = json.loads((STATE / 'status.json').read_text(encoding='utf-8'))
+        cand = (status.get('zertifikate') or {}).get('t2med')
+        if not cand or not config.get('t2med') or cand.get('fingerprint') != req.get('fingerprint'):
+            raise Fehler('Kein abgerufenes Zertifikat mit diesem Fingerabdruck.')
+        config['t2med']['ca_pem'] = _cert(cand['pem'])
+        config['t2med']['pin'] = True
+        save(config)
+        status['zertifikate'].pop('t2med', None)
+        _write(STATE / 'status.json', status, 0o644)
+        view(config, {'hinweise': distribute(config)})
+        return 'Zertifikat des T2med-Servers übernommen; es wird ab jetzt fest geprüft.'
     if action == 'hostkey-holen':
         target = next((t for t in config['ablage'] if t['id'] == req.get('id') and t['art'] == 'sftp'), None)
         if not target:

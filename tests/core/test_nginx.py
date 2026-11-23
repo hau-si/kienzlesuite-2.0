@@ -37,6 +37,12 @@ class Vorlage(unittest.TestCase):
     def setUp(self):
         self.conf = nginx.render(HOSTS, registry())
 
+    def test_wartungsseite_statt_502(self):
+        self.assertIn('error_page 502 503 504 @wartung;', self.conf)
+        self.assertIn('location @wartung', self.conf)
+        self.assertIn('http-equiv="refresh" content="3"', self.conf)
+        self.assertIn('error_page 500 502 503 504 @wartung;', self.conf)   # auch in den Modulpfaden
+
     def test_nur_443_und_eigene_namen(self):
         self.assertNotIn('listen 80', self.conf)
         self.assertIn('server_name kienzle.example.org 192.0.2.5;', self.conf)

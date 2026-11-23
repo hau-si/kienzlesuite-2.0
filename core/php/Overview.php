@@ -10,7 +10,8 @@ namespace Kienzle\Core;
 final class Overview {
     public static string $state = '/var/lib/kienzle/ueberblick';
     public const MANUAL = ['ca' => 'Zertifizierungsstelle auf allen Arbeitsplätzen eingerichtet', 'codes' => 'Wiederherstellungscodes der Admins ausgedruckt und verwahrt',
-        'name' => 'Servername auf den Arbeitsplätzen bekannt (Router/DNS oder hosts-Datei)'];
+        'name' => 'Servername auf den Arbeitsplätzen bekannt (Router/DNS oder hosts-Datei)',
+        'anmeldung' => 'Suite unter dem neuen Namen geöffnet und neu angemeldet', 'passkeys' => 'Passkeys unter dem neuen Namen neu angelegt (oder keine vorhanden)'];
     /** Wo ein Punkt erledigt wird (wie im Einrichtungs-Überblick von kienzle-sumup). */
     public const PLACES = ['web' => ['In diesem Webfenster', 'Einstellungen dieses Servers'], 'pc' => ['Auf den Arbeitsplätzen', 'jeder PC der Praxis'],
         'nas' => ['Am NAS und im Router', 'Geräte im Praxisnetz']];
@@ -50,13 +51,18 @@ final class Overview {
         $out = [];
         $named = false;
         foreach ($this->config?->hostnames ?? [] as $h) if (!filter_var($h, FILTER_VALIDATE_IP) && str_contains($h, '.')) $named = true;
-        if ($this->config) $out[] = self::item('Servername festgelegt', $named ? 'done' : 'open', $named ? implode(', ', $this->config->hostnames) : 'Für Passkeys auf allen Arbeitsplätzen nötig', '/verwaltung/server');
+        // Der Name zählt erst als erledigt, wenn die Schritte danach (Router/hosts, neu anmelden, Passkeys) von Hand bestätigt sind.
+        $after = isset($manual['name'], $manual['anmeldung'], $manual['passkeys']);
+        if ($this->config) $out[] = self::item('Servername festgelegt', $named && $after ? 'done' : 'open',
+            !$named ? 'Für Passkeys auf allen Arbeitsplätzen nötig' : implode(', ', $this->config->hostnames) . ($after ? '' : ' – noch offen: Namen im Router/hosts eintragen, unter dem Namen neu anmelden, Passkeys neu anlegen (jeweils unten bestätigen)'), '/verwaltung/server');
         $out[] = self::item('Admin mit Authenticator-App', $admins && count($withOtp) === count($admins) ? 'done' : 'open',
             $admins ? count($withOtp) . ' von ' . count($admins) . ' Admins mit OTP' : 'Noch kein Admin', '/verwaltung/benutzer');
         $out[] = self::item('Mindestens zwei Admins (Vertretung)', count($admins) >= 2 ? 'done' : 'open', 'Fällt ein Admin aus, kommt sonst nur noch die Konsole weiter.', '/verwaltung/benutzer');
         $out[] = self::item('Wiederherstellungscodes für jeden Admin', $admins && count($codes) === count($admins) ? 'done' : 'open', 'Unter „Mein Zugang“ neu erzeugen', '/verwaltung/zugang');
         $out[] = self::item(self::MANUAL['codes'], isset($manual['codes']) ? 'done' : 'open', 'Bitte von Hand bestätigen', '/verwaltung/einrichtung', 'codes');
         $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['ca'], isset($manual['ca']) ? 'done' : 'open', 'Datei ca.crt als vertrauenswürdige Stammzertifizierungsstelle eintragen – Anleitung für Windows, Mac, iPhone und Android', '/hilfe/arbeitsplatz#zertifikat', 'ca');
+        $out[] = self::item(self::MANUAL['anmeldung'], isset($manual['anmeldung']) ? 'done' : 'open', 'Suite unter dem Namen aus „Server und Name“ öffnen, dort neu anmelden', '/verwaltung/server', 'anmeldung');
+        $out[] = self::item(self::MANUAL['passkeys'], isset($manual['passkeys']) ? 'done' : 'open', 'Unter „Mein Konto“ neu anlegen; sie gelten nur für den Namen, unter dem sie angelegt wurden', '/konto', 'passkeys');
         $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['name'], isset($manual['name']) ? 'done' : 'open', 'Einmal im Router bzw. DNS eintragen – oder auf jedem PC in der Datei hosts', '/hilfe/arbeitsplatz#name', 'name');
         if ($this->firewall) {
             $fw = $this->firewall->status()['state'];

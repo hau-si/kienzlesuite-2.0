@@ -1,7 +1,7 @@
 # T2med einrichten: Button „Kartenzahlung“ in der Funktionsleiste
 
 Einmalige Einrichtung in T2med. Die Bilder sind nachgezeichnet, mit Beispieldaten und Platzhalter-Adresse.
-Die Aufruf-Adresse steht in der Kasse unter *Einstellungen → Einrichtung → Zahlung & T2med* (zum Kopieren).
+Die Aufruf-Adresse steht in der Kasse unter *Einstellungen → Zahlung & T2med* und in der Basis unter *Verwaltung → Verbindungen → T2med* (zum Kopieren).
 
 ## 1. Drittanbieter-Zugriff anlegen
 
@@ -40,7 +40,7 @@ Die Aufruf-Adresse steht in der Kasse unter *Einstellungen → Einrichtung → Z
    ![Aktion](screenshots/t2med-6-aktion.png)
 
 Jetzt erscheint die Schaltfläche beim Patienten. Ein Klick schickt die Patientendaten per FHIR an die Suite.
-Der Starter-Aufruf funktioniert erst, wenn auf dem Arbeitsplatz das Starter-Paket installiert ist (Kasse → Einstellungen, Karte „Arbeitsplätze einrichten“). Die FHIR-Adresse, die T2med mitgibt, muss in der Suite unter *Verwaltung → Verbindungen → T2med* bei den erlaubten Aufrufadressen stehen; bei einer Fehlermeldung zeigt die Seite die tatsächlichen Werte.
+Der Starter-Aufruf funktioniert erst, wenn auf dem Arbeitsplatz das Starter-Paket installiert ist (Kasse → Einstellungen, Karte „Arbeitsplätze einrichten“). Die FHIR-Adresse, die T2med mitgibt, muss in der Suite unter *Verwaltung → Verbindungen → T2med* bei „Erlaubte fhirBasisUrl aus T2med“ stehen; bei einer Fehlermeldung zeigt die Seite die tatsächlichen Werte.
 
 ## 3. Drucker „SumUp-Rechnung“
 

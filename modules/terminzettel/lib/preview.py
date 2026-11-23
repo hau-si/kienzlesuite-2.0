@@ -224,8 +224,12 @@ def render_preview(overlay: dict, text: str | None = None) -> tuple[bytes, list[
     stderr, sys.stderr = sys.stderr, io.StringIO()
     try:
         payload = app.render_escpos(app.parse_t2med(text or sample_text()), cfg)
-        if "calendar QR" in sys.stderr.getvalue() and app.cfg_bool(cfg.get("calendar_qr", {}), "enabled", False):
-            notes.append("Kalender-QR konnte nicht erzeugt werden (zu groß für diese Schriftgröße, oder python3-qrcode fehlt).")
+        message = sys.stderr.getvalue()
+        if "calendar QR" in message and app.cfg_bool(cfg.get("calendar_qr", {}), "enabled", False):
+            if "too large" in message:
+                notes.append("Der Kalender-QR passt in dieser Größe nicht auf den Bon (zu viele Module für die Druckpunkte). Bitte eine größere QR-Größe, eine kleinere Termin-Schrift oder einen kürzeren Kalender-Titel wählen.")
+            else:
+                notes.append("Kalender-QR konnte nicht erzeugt werden (zu groß für diese Schriftgröße, oder python3-qrcode fehlt).")
     finally:
         sys.stderr = stderr
     interpreter = Interpreter(int(cfg.get("layout", {}).get("page_width_dots", 420)))

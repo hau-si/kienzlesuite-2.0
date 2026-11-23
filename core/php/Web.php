@@ -191,7 +191,8 @@ final class Web {
             . '<button>Anschrift speichern</button></form>'
             . '<h2>Danach</h2><ol class="steps"><li>Den Namen im Router eintragen – oder auf jedem PC in der Datei hosts: '
             . '<a href="/hilfe/arbeitsplatz#name">Anleitung</a>.</li><li>Die Suite unter <strong>' . V::h($address) . '</strong> öffnen und dort neu anmelden.</li>'
-            . '<li>Falls schon Passkeys eingerichtet sind: unter „Mein Konto“ neu anlegen (sie gelten für den alten Namen).</li></ol>';
+            . '<li>Falls schon Passkeys eingerichtet sind: unter „Mein Konto“ neu anlegen (sie gelten für den alten Namen).</li></ol>'
+            . '<p class="muted">Diese drei Schritte bestätigst du von Hand unter <a href="/verwaltung/einrichtung">Einrichtung</a>; erst dann gilt „Servername festgelegt“ als erledigt.</p>';
         $response = Response::html(V::page('Server und Name', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
         return $st['pending'] ? $response->with('Refresh', '3') : $response;
     }
@@ -360,7 +361,7 @@ final class Web {
             ->with('X-Kienzle-Rechte', implode(',', $access['rights']))
             ->with('X-Kienzle-Csrf', self::moduleCsrf($session['csrf'], $module))
             ->with('X-Kienzle-Bestaetigt', (string)(int)$session['confirmed_at'])
-            ->with('X-Kienzle-Drucker', rawurlencode(json_encode($this->printerRoles(), JSON_UNESCAPED_UNICODE)))
+            ->with('X-Kienzle-Drucker', rawurlencode(json_encode($this->printerRoles() + ['bonbreite' => $this->bonWidth()], JSON_UNESCAPED_UNICODE)))
             ->with('X-Kienzle-Praxis', rawurlencode(json_encode(['name' => $this->config->practice] + $this->address(), JSON_UNESCAPED_UNICODE)));
     }
 
@@ -383,7 +384,9 @@ final class Web {
             . V::checkbox('remember', '1', 'Dieses Gerät merken (bis zu 6 Monate, nur aus diesem Netz)', false)
             . '<button>Anmelden</button></form>'
             . ($this->passkeys ? '<div class="box" data-passkey-login data-next="' . V::h($weiter) . '"><p>Oder ohne Passwort:</p>'
-                . '<button type="button">Mit Passkey anmelden</button><p class="error" hidden></p></div>' : '');
+                . '<button type="button">Mit Passkey anmelden</button><p class="error" hidden></p></div>' : '')
+            . '<p class="muted">Warnt der Browser („Nicht sicher“) oder lässt sich die Adresse nicht öffnen? Dieser PC muss einmal eingerichtet werden (Zertifikat und Name): '
+            . '<a href="/hilfe/arbeitsplatz">Arbeitsplatz einrichten</a>.</p>';
         return Response::html(V::page('Anmelden', $body, null, $this->config->practice), $error ? 401 : 200);
     }
 
@@ -701,6 +704,7 @@ final class Web {
         $admin = (string)$this->session['login'];
         if ($r->path === '/verwaltung/benutzer') return $get ? $this->userList() : $this->userCreate($r, $admin);
         if ($r->path === '/verwaltung/benutzer/neu' && $get) return $this->userNew();
+        if ($r->path === '/verwaltung/gruppen') return $get ? $this->groupsPage() : $this->groupsAction($r, $admin);
         if (preg_match('#^/verwaltung/benutzer/(\d{1,9})(/link|/loeschen)?$#D', $r->path, $m)) {
             $id = (int)$m[1];
             $action = $m[2] ?? '';
@@ -790,6 +794,7 @@ final class Web {
             . '<form method="post" action="/verwaltung/benutzer/' . $id . '" class="box">' . V::csrf($this->session['csrf'])
             . '<p>Anmeldename: <strong>' . V::h($user['login']) . '</strong></p>'
             . V::input('display', 'Name', 'text', $user['display'])
+            . $this->groupSelect()
             . V::checkbox('admin', '1', 'Basis-Admin', (int)$user['admin'] === 1) . V::checkbox('active', '1', 'Konto aktiv', (int)$user['active'] === 1)
             . ($modules !== '' ? '<h2>Zugang zu Modulen</h2>' . $modules : '<p>Es sind noch keine Module installiert.</p>')
             . '<button>Speichern</button></form>'
@@ -800,13 +805,73 @@ final class Web {
         return Response::html(V::page('Benutzer ' . $user['login'], $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
     }
 
+    private function groupSelect(): string {
+        $opts = '<option value="">– nicht ändern, Haken unten gelten –</option>';
+        foreach (array_keys((new Groups($this->db, $this->modules))->all()) as $name) $opts .= '<option value="' . V::h($name) . '">' . V::h($name) . '</option>';
+        return '<label>Gruppe anwenden<select name="gruppe">' . $opts . '</select></label>'
+            . '<p class="muted small">Setzt beim Speichern die Modulrechte dieser Gruppe (<a href="/verwaltung/gruppen">Gruppen bearbeiten</a>). Danach lassen sich die Haken einzeln ändern.</p>';
+    }
+
+    private function groupBoxes(string $prefix, array $g): string {
+        $out = '';
+        foreach ($this->modules->all() as $mid => $_) {
+            $rights = '';
+            foreach ($this->modules->rights($mid) as $right) $rights .= V::checkbox('recht[]', $mid . ':' . $right['id'], $right['label'], in_array($mid . ':' . $right['id'], $g['rechte'], true));
+            $out .= '<fieldset><legend>' . V::h($this->modules->name($mid)) . '</legend>' . V::checkbox('modul_admin[]', $mid, 'Admin dieses Moduls', in_array($mid, $g['admin'], true)) . $rights . '</fieldset>';
+        }
+        return $out;
+    }
+
+    private function groupsPage(?string $error = null, ?string $notice = null): Response {
+        $groups = new Groups($this->db, $this->modules);
+        $body = V::error($error) . V::notice($notice)
+            . '<p>Gruppen sind Vorlagen für Modulrechte. Beim Bearbeiten eines Benutzers wählt man eine Gruppe, die Rechte werden dann übernommen. '
+            . 'Spätere Änderungen an einer Gruppe ändern bestehende Benutzer nicht. Basis-Admins dürfen in allen Modulen ohnehin alles.</p>';
+        foreach ($groups->all() as $name => $g) {
+            $body .= '<form method="post" action="/verwaltung/gruppen" class="box">' . V::csrf($this->session['csrf']) . '<input type="hidden" name="aktion" value="speichern"><input type="hidden" name="name" value="' . V::h($name) . '">'
+                . '<h2>' . V::h($name) . '</h2>' . $this->groupBoxes($name, $g) . '<button>Speichern</button></form>'
+                . '<form method="post" action="/verwaltung/gruppen" class="inline">' . V::csrf($this->session['csrf']) . '<input type="hidden" name="aktion" value="zuruecksetzen"><input type="hidden" name="name" value="' . V::h($name) . '">'
+                . '<button class="danger">' . (isset($groups->defaults()[$name]) ? 'Auf Vorgabe zurücksetzen' : 'Gruppe löschen') . '</button></form>';
+        }
+        $body .= '<h2>Neue Gruppe</h2><form method="post" action="/verwaltung/gruppen" class="box">' . V::csrf($this->session['csrf']) . '<input type="hidden" name="aktion" value="speichern">'
+            . V::input('name', 'Name der Gruppe', 'text', '', 'maxlength="30" required') . $this->groupBoxes('', ['admin' => [], 'rechte' => []]) . '<button>Anlegen</button></form>';
+        return Response::html(V::page('Gruppen', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+    }
+
+    private function groupsAction(Request $r, string $admin): Response {
+        $g = new Groups($this->db, $this->modules);
+        $name = trim($r->field('name', 30));
+        try {
+            if ($r->field('aktion', 20) === 'speichern') {
+                $g->set($name, $r->list('modul_admin'), $r->list('recht'));
+                $this->audit->write($admin, 'gruppe-gespeichert', $name);
+            } elseif ($r->field('aktion', 20) === 'zuruecksetzen') {
+                $g->reset($name);
+                $this->audit->write($admin, 'gruppe-zurueckgesetzt', $name);
+            } else {
+                throw new Problem('Unbekannte Aktion.', 422);
+            }
+        } catch (Problem $e) {
+            return $this->groupsPage($e->getMessage());
+        }
+        return $this->groupsPage(null, 'Gespeichert.');
+    }
+
     private function userSave(Request $r, int $id, string $admin): Response {
         $user = $this->users->find($id);
         if (!$user) throw new Problem('Benutzer nicht gefunden.', 404);
         $moduleAdmin = $r->list('modul_admin');
+        $entries = $r->list('recht');
+        $groupName = $r->field('gruppe', 30);
+        if ($groupName !== '') {
+            $g = (new Groups($this->db, $this->modules))->get($groupName);
+            if (!$g) return $this->userEdit($id, 'Unbekannte Gruppe.');
+            $moduleAdmin = $g['admin'];
+            $entries = $g['rechte'];
+        }
         $rights = [];
-        foreach ($r->list('recht') as $entry) {
-            [$m, $right] = array_pad(explode(':', $entry, 2), 2, '');
+        foreach ($entries as $entry) {
+            [$m, $right] = array_pad(explode(':', (string)$entry, 2), 2, '');
             $rights[$m][] = $right;
         }
         try {
@@ -980,6 +1045,8 @@ final class Web {
                     . '<p>Neue Version <strong>' . V::h($m['update']['version']) . '</strong>' . ($m['update']['source'] === 'github' ? ' (GitHub' . ($m['update']['signed'] === false ? ', nicht signiert' : '') . ')' : ' (mit der Basis geliefert)')
                     . '. Vorher wird ein Schnappschuss der Moduldaten angelegt; schlägt etwas fehl, springt das Modul zurück.</p><button' . $off . '>Aktualisieren</button></form>';
             }
+            else $body .= '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="pruefen"><p class="muted">Dieses Modul ist auf dem neuesten bekannten Stand. '
+                . '<button class="secondary"' . $off . '>Jetzt nach einem Update suchen</button></p></form>';
             $body .= '<details class="how"><summary>Entfernen</summary><form method="post" action="/verwaltung/module">' . $csrf . $hidden
                 . '<input type="hidden" name="aktion" value="entfernen"><label class="check"><input type="checkbox" name="daten" value="1"> Auch alle Daten des Moduls löschen (nicht rückgängig zu machen)</label>'
                 . '<p>Ohne Häkchen bleiben die Daten erhalten; eine spätere Installation übernimmt sie.</p><button class="danger"' . $off . '>Modul entfernen</button></form></details></div>';
@@ -1128,14 +1195,25 @@ final class Web {
         // T2med
         $body .= '<section><h2>T2med (FHIR)</h2><form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('t2med')
             . V::input('base_url', 'Adresse des FHIR-Servers', 'url', (string)($t2['base_url'] ?? ''), 'placeholder="https://t2med-server:16567/aps/fhir/api/r4"')
-            . '<label>Weitere erlaubte Start-Adressen (eine je Zeile)<textarea name="launch_urls" rows="2">' . V::h(implode("\n", array_diff((array)($t2['launch_urls'] ?? []), [(string)($t2['base_url'] ?? '')]))) . '</textarea></label>'
-            . V::input('api_key', 'API-Schlüssel', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($t2['api_key_gesetzt'] ?? false))) . '"')
+            . '<label>Erlaubte fhirBasisUrl aus T2med – weitere Adressen (eine je Zeile)<textarea name="launch_urls" rows="2">' . V::h(implode("\n", array_diff((array)($t2['launch_urls'] ?? []), [(string)($t2['base_url'] ?? '')]))) . '</textarea></label>'
+            . V::input('api_key', 'API-Schlüssel der FHIR-Schnittstelle', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($t2['api_key_gesetzt'] ?? false))) . '"')
+            . '<p class="muted small">Schlüssel der FHIR-Schnittstelle (wird als X-API-Key gesendet). Antwortet T2med mit „FHIR-API-Key fehlt oder ist ungültig“, passt der Wert nicht, z. B. wenn hier das Client Secret des Drittanbieters steht. Mit „Schlüssel entfernen“ nutzt die Kasse wie das alte Tool den hinterlegten T2med-Demo-Schlüssel.</p>'
+            . V::checkbox('api_key_entfernen', '1', 'Gespeicherten Schlüssel entfernen (Kasse nimmt den T2med-Demo-Schlüssel)', false)
             . '<label>Zertifikat des T2med-Servers (PEM, optional)' . (($t2['zertifikat'] ?? '') !== '' ? ' – gespeichert, SHA-256 <code>' . V::h(substr((string)$t2['zertifikat'], 0, 16)) . '…</code>' : '')
             . '<textarea name="ca_pem" rows="3" placeholder="-----BEGIN CERTIFICATE-----"></textarea></label>'
             . V::checkbox('ca_entfernen', '1', 'Gespeichertes Zertifikat entfernen', false)
             . V::checkbox('pin', '1', 'Nur genau dieses Zertifikat annehmen (Pinning)', (bool)($t2['pin'] ?? false))
+            . '<p class="muted small">Die „erlaubte fhirBasisUrl“ ist die FHIR-Adresse, die T2med beim Aufruf mitschickt (Platzhalter fhirBasisUrl). Die Adresse des FHIR-Servers oben gilt immer als erlaubt; weitere Zeilen nur, wenn T2med sich anders meldet. Bei einer Ablehnung zeigt die Kasse den tatsächlich gesendeten Wert.</p>'
             . '<button>Speichern</button></form>'
-            . ($t2 ? $this->testLine($st['tests'], 't2med') . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 't2med']) . '<button>Verbindung prüfen</button></form> '
+            . '<div class="box wide"><h3>Eintrag in T2med (Drittanbieter-Zugriffe verwalten → Neue URL hinzufügen)</h3>'
+            . '<p>Als Adresse genau so eintragen, mit den Platzhaltern, und eine Bezeichnung wie „Kartenzahlung“ vergeben:</p>'
+            . '<p><code class="secret">kienzle-sumup://?kontextId=${kontextId}&amp;fhirBasisUrl=${fhirBasisUrl}&amp;oAuthToken=${oAuthToken}</code></p>'
+            . '<p class="muted small">Ausführliche Anleitung mit Bildern: in der Kasse unter Einstellungen → Zahlung &amp; T2med. Der Starter muss auf dem Arbeitsplatz installiert sein.</p></div>'
+            . ($t2 ? '<p>Zertifikat: ' . (($t2['zertifikat'] ?? '') !== '' ? '<code>' . V::h((string)$t2['zertifikat']) . '</code>' . ($t2['pin'] ? ' (fest hinterlegt)' : '') : '<strong>nicht hinterlegt</strong> (nur öffentlich beglaubigte Zertifikate werden angenommen)') . '</p>'
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('zertifikat-holen') . '<button>Zertifikat des Servers abrufen</button></form> '
+                . (($st['zertifikate']['t2med']['fingerprint'] ?? '') !== '' ? '<form method="post" action="/verwaltung/verbindungen" class="box">' . $this->hidden('zertifikat-uebernehmen', ['fingerprint' => (string)$st['zertifikate']['t2med']['fingerprint']])
+                    . '<p>Abgerufen: SHA-256 <code>' . V::h((string)$st['zertifikate']['t2med']['fingerprint']) . '</code>. Nur übernehmen, wenn der Fingerabdruck mit dem Zertifikat des T2med-Servers übereinstimmt (z. B. im Browser unter „Zertifikat anzeigen“).</p><button>Übernehmen und fest hinterlegen</button></form>' : '')
+                . $this->testLine($st['tests'], 't2med') . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 't2med']) . '<button>Verbindung prüfen</button></form> '
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 't2med']) . '<button class="danger">Entfernen</button></form>' : '')
             . '</section>';
         // E-Mail
@@ -1161,7 +1239,7 @@ final class Web {
                 . V::h(($t['art'] === 'smb' ? '//' . $t['host'] . '/' . ($t['freigabe'] ?? '') : 'sftp://' . ($t['benutzer'] ?? '') . '@' . $t['host'] . ':' . ($t['port'] ?? 22)) . '/' . $t['ordner'])
                 . '</code></p>' . $this->testLine($st['tests'], 'ziel:' . $id);
             if ($t['art'] === 'sftp') {
-                $body .= '<p>Schlüssel des Servers: ' . (($t['fingerprint'] ?? '') !== '' ? '<code>' . V::h((string)$t['fingerprint']) . '</code>' : '<strong>noch nicht bestätigt</strong>') . '</p>'
+                $body .= '<p>Schlüssel des Servers: ' . (($t['fingerprint'] ?? '') !== '' ? '<code>' . V::h((string)$t['fingerprint']) . '</code>' : '<strong>noch nicht bestätigt</strong> – zuerst „Schlüssel des Servers abrufen“, dann den angezeigten Fingerabdruck mit dem NAS vergleichen und übernehmen.') . '</p>'
                     . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('hostkey-holen', ['id' => $id]) . '<button>Schlüssel des Servers abrufen</button></form> ';
                 foreach ((array)($st['hostkeys'][$id] ?? []) as $k) {
                     $body .= '<form method="post" action="/verwaltung/verbindungen" class="box">' . $this->hidden('hostkey-uebernehmen', ['id' => $id, 'fingerprint' => (string)$k['fingerprint']])
@@ -1172,15 +1250,28 @@ final class Web {
             $body .= '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'ziel', 'id' => $id]) . '<button>Verbindung prüfen</button></form> '
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('ziel-loeschen', ['id' => $id]) . '<button class="danger">Entfernen</button></form></div>';
         }
-        $body .= '<form method="post" action="/verwaltung/verbindungen" class="box wide"><h3>Ziel anlegen oder ändern</h3>' . $this->hidden('ziel')
-            . '<p>Gleiche Kennung = vorhandenes Ziel ändern (leeres Passwort = unverändert).</p>'
-            . V::input('id', 'Kennung (z. B. steuerbuero)', 'text', '', 'pattern="[a-z][a-z0-9-]{1,30}" required')
-            . V::input('name', 'Bezeichnung', 'text', '', 'required')
-            . '<label>Art<select name="art"><option value="smb">SMB (Windows-Freigabe)</option><option value="sftp">SFTP (empfohlen, falls das NAS es kann)</option></select></label>'
-            . V::input('host', 'Server (Name oder IP)', 'text', '', 'required') . V::input('freigabe', 'Freigabe (nur SMB)', 'text')
-            . V::input('port', 'Port (nur SFTP)', 'number', '22', 'min="1" max="65535"') . V::input('ordner', 'Basisordner (ohne Platzhalter)', 'text', '', 'placeholder="Kienzle"')
-            . V::input('benutzer', 'Benutzer', 'text', '', 'autocomplete="off"') . V::input('passwort', 'Passwort (nur SMB)', 'password', '', 'autocomplete="new-password"')
-            . V::input('domaene', 'Domäne (nur SMB, optional)', 'text') . V::checkbox('gast', '1', 'Gastzugang (nur SMB, nicht empfohlen)', false)
+        // Feld mit Tooltip; $nur = nur bei dieser Art sichtbar (smb | sftp), leer = immer.
+        $f = static fn(string $name, string $label, string $tip, string $type = 'text', string $value = '', string $extra = '', string $nur = '') => '<label' . ($nur !== '' ? ' data-nur="' . $nur . '"' : '') . '>'
+            . V::h($label) . ' <span class="hilfe" tabindex="0" role="note" aria-label="' . V::h($tip) . '" data-tip="' . V::h($tip) . '">i</span>'
+            . '<input type="' . $type . '" name="' . $name . '" value="' . V::h($value) . '" ' . $extra . '></label>';
+        $body .= '<form method="post" action="/verwaltung/verbindungen" class="box wide" id="ziel-form"><h3>Ziel anlegen oder ändern</h3>' . $this->hidden('ziel')
+            . '<p>Hier steht, wohin Module Dateien ablegen (z. B. Sicherungen, Export für das Steuerbüro). Beispiel: ein Synology-NAS. '
+            . '<strong>SFTP</strong> ist besser: Es meldet sich mit einem Schlüssel statt eines Passworts an, die Verbindung ist verschlüsselt und es braucht keine Windows-Freigabe. '
+            . '<strong>SMB</strong> nimmt man, wenn das Gerät nur Windows-Freigaben kann.</p>'
+            . '<p class="muted">Synology: SFTP unter Systemsteuerung → Dateidienste → FTP → „SFTP-Dienst aktivieren“ (Port 22), einen eigenen Benutzer mit Zugriff auf den Ordner anlegen und den öffentlichen Schlüssel von unten eintragen. '
+            . 'Für SMB genügt die Freigabe unter Systemsteuerung → Gemeinsamer Ordner. Menünamen können je nach DSM-Version abweichen und sind nicht gegen dein Gerät geprüft.</p>'
+            . '<label>Art <span class="hilfe" tabindex="0" role="note" aria-label="SFTP: Anmeldung per Schlüssel, empfohlen. SMB: Windows-Freigabe mit Benutzer und Passwort." data-tip="SFTP: Anmeldung per Schlüssel, empfohlen. SMB: Windows-Freigabe mit Benutzer und Passwort.">i</span>'
+            . '<select name="art"><option value="sftp">SFTP (empfohlen, z. B. Synology-NAS)</option><option value="smb">SMB (Windows-Freigabe)</option></select></label>'
+            . $f('id', 'Kennung', 'Kurzer interner Name ohne Leerzeichen, nur kleine Buchstaben, Ziffern und Bindestrich, z. B. „steuerbuero“ oder „nas-sicherung“. Module merken sich das Ziel unter dieser Kennung. Mit gleicher Kennung ändert man ein vorhandenes Ziel (leeres Passwort = unverändert).', 'text', '', 'pattern="[a-z][a-z0-9-]{1,30}" required placeholder="nas-sicherung"')
+            . $f('name', 'Bezeichnung', 'Anzeigename für dich und die Mitarbeiter, frei wählbar, z. B. „Synology im Serverraum“. Erscheint in den Auswahllisten der Module.', 'text', '', 'required placeholder="Synology im Serverraum"')
+            . $f('host', 'Server (Name oder IP)', 'Adresse des NAS im Praxisnetz, am besten die feste IP-Adresse (z. B. 192.0.2.20), weil Namen mit „.local“ auf dem Server oft nicht auflösbar sind.', 'text', '', 'required placeholder="192.0.2.20"')
+            . $f('freigabe', 'Freigabe', 'Name des freigegebenen Ordners auf dem NAS (bei Synology: Name unter „Gemeinsamer Ordner“), z. B. „praxis“.', 'text', '', 'placeholder="praxis"', 'smb')
+            . $f('port', 'Port', 'Port des SFTP-Dienstes. Meist 22; bei Synology 22, wenn nicht geändert.', 'number', '22', 'min="1" max="65535"', 'sftp')
+            . $f('ordner', 'Basisordner', 'Ordner auf dem Ziel, unter dem die Module ihre Dateien ablegen, z. B. „Kienzle“ (wird angelegt, wenn möglich). Ohne Platzhalter und ohne „..“.', 'text', '', 'placeholder="Kienzle"')
+            . $f('benutzer', 'Benutzer', 'Anmeldename am NAS. Besser ein eigener Benutzer nur für diese Ablage, der nur diesen Ordner schreiben darf.', 'text', '', 'autocomplete="off"')
+            . $f('passwort', 'Passwort', 'Passwort des NAS-Benutzers für SMB. Wird nach dem Speichern nie wieder angezeigt; leer lassen = unverändert. SFTP braucht kein Passwort, sondern den Schlüssel unten.', 'password', '', 'autocomplete="new-password"', 'smb')
+            . $f('domaene', 'Domäne (optional)', 'Nur bei einer Windows-Domäne nötig, sonst leer lassen.', 'text', '', '', 'smb')
+            . '<label class="check" data-nur="smb"><input type="checkbox" name="gast" value="1"> Gastzugang (nicht empfohlen) <span class="hilfe" tabindex="0" role="note" aria-label="Ohne Benutzer und Passwort, jeder im Netz kann dort schreiben." data-tip="Ohne Benutzer und Passwort, jeder im Netz kann dort schreiben. Nur für ein abgeschottetes Testgerät.">i</span></label>'
             . '<button>Ziel speichern</button></form>'
             . ($st['sftp_schluessel'] !== '' ? '<p>Für SFTP diesen öffentlichen Schlüssel beim NAS-Benutzer eintragen (z. B. <code>~/.ssh/authorized_keys</code>):</p><pre class="notes">' . V::h($st['sftp_schluessel']) . '</pre>' : '')
             . '</section>';
@@ -1199,7 +1290,7 @@ final class Web {
             switch ($f('aktion', 30)) {
                 case 't2med':
                     $c->saveT2med(['base_url' => $f('base_url'), 'launch_urls' => $f('launch_urls', 3000), 'api_key' => $f('api_key'), 'ca_pem' => $f('ca_pem', 20000),
-                        'ca_entfernen' => $f('ca_entfernen') === '1', 'pin' => $f('pin') === '1']);
+                        'ca_entfernen' => $f('ca_entfernen') === '1', 'api_key_entfernen' => $f('api_key_entfernen') === '1', 'pin' => $f('pin') === '1']);
                     $what = 't2med'; break;
                 case 'mail':
                     $c->saveMail(['host' => $f('host'), 'port' => $f('port', 10), 'sicherheit' => $f('sicherheit', 20), 'benutzer' => $f('benutzer'), 'passwort' => $f('passwort'), 'absender' => $f('absender')]);
@@ -1212,6 +1303,8 @@ final class Web {
                 case 'entfernen': $c->remove($f('was', 10)); $what = 'entfernt ' . $f('was', 10); break;
                 case 'pruefen': $c->test($f('art', 10), $f('id', 40)); $what = 'pruefen ' . $f('art', 10) . ' ' . $f('id', 40); break;
                 case 'testmail': $c->testMail($f('an', 300)); $what = 'testmail'; break;
+                case 'zertifikat-holen': $c->fetchCertificate(); $what = 'zertifikat-holen'; break;
+                case 'zertifikat-uebernehmen': $c->acceptCertificate($f('fingerprint', 100)); $what = 'zertifikat-uebernommen'; break;
                 case 'hostkey-holen': $c->fetchHostkey($f('id', 40)); $what = 'hostkey-holen ' . $f('id', 40); break;
                 case 'hostkey-uebernehmen': $c->acceptHostkey($f('id', 40), $f('fingerprint', 100)); $what = 'hostkey-uebernommen ' . $f('id', 40); break;
                 default: throw new Problem('Unbekannte Aktion.', 422);
@@ -1236,6 +1329,9 @@ final class Web {
 
     public const PRINTER_ROLES = ['buero' => 'Praxisdrucker (A4, Rechnungen)', 'bon' => 'Bondrucker (Belege)'];
 
+    /** Papierbreite des Bondruckers in mm (58 oder 80); gilt für alle Module. */
+    private function bonWidth(): int { return (int)$this->db->setting('drucker.bonbreite') === 80 ? 80 : 58; }
+
     /** Zuordnung Rolle → Warteschlange (Verwaltung → Drucker); nur noch vorhandene Warteschlangen. */
     private function printerRoles(): array {
         $d = json_decode((string)$this->db->setting('drucker.rollen'), true);
@@ -1252,21 +1348,28 @@ final class Web {
         $body = V::error($error) . ($st['last'] ? '<p class="' . (($st['last']['ok'] ?? false) ? 'notice' : 'error') . '">' . V::h((string)($st['last']['meldung'] ?? '')) . '</p>' : '')
             . ($busy ? '<p class="notice">Vorgang läuft …</p>' : '') . ($st['error'] !== '' ? '<p class="error">' . V::h($st['error']) . '</p>' : '')
             . (!$st['service'] ? '<p class="error">Der Druckerdienst ist nicht eingerichtet. Bitte den Installer ausführen.</p>' : '')
-            . '<p>Drucker werden einmal hier eingerichtet; alle Module können sie nutzen. Freigaben für die Arbeitsplätze wirken erst, '
+            . '<p>Drucker werden einmal hier eingerichtet; alle Module können sie nutzen. Echte Drucker brauchen keine Freigabe. Die Freigabe der virtuellen Drucker wirkt erst, '
             . 'wenn die <a href="/verwaltung/firewall">Firewall</a> Drucken (IPP 631 bzw. Windows-Freigabe 445) aus den Praxisnetzen zulässt.</p>';
-        $rows = '';
+        $rows = $virtualRows = '';
         foreach ($st['queues'] as $q) {
             $actions = '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('testseite', ['name' => $q['name']]) . '<button' . $dis . '>Testseite</button></form> ';
             if ($q['managed']) {
-                $actions .= '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('freigabe', ['name' => $q['name']]) . $this->shareBoxes($q['share'])
+                // Freigaben gibt es nur für die virtuellen Drucker der Module: Die Arbeitsplätze drucken dorthin, echte Drucker braucht kein Arbeitsplatz direkt.
+                if ($q['modul'] !== '') $actions .= '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('freigabe', ['name' => $q['name']]) . $this->shareBoxes($q['share'])
                     . '<button' . $dis . '>Freigabe speichern</button></form> ';
                 if ($q['modul'] === '') $actions .= '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('entfernen', ['name' => $q['name']])
                     . '<button class="danger"' . $dis . '>Entfernen</button></form>';
             }
-            $rows .= '<tr><td><strong>' . V::h($q['name']) . '</strong><br><small>' . V::h($q['description']) . '</small></td><td>' . V::h($q['address']) . '</td><td>'
+            $row = '<tr><td><strong>' . V::h($q['name']) . '</strong><br><small>' . V::h($q['description']) . '</small></td><td>' . V::h($q['address']) . '</td><td>'
                 . V::h($q['state']) . '</td><td>' . ($q['modul'] !== '' ? 'Modul ' . V::h($this->modules->name($q['modul'])) : ($q['managed'] ? 'Suite' : 'fremd')) . '</td><td>' . $actions . '</td></tr>';
+            if ($q['modul'] !== '') $virtualRows .= $row; else $rows .= $row;
         }
-        $body .= '<h2>Eingerichtete Drucker</h2>' . ($rows !== '' ? '<table><tr><th>Name</th><th>Adresse</th><th>Zustand</th><th>Von</th><th></th></tr>' . $rows . '</table>' : '<p>Noch keine.</p>');
+        $head = '<table><tr><th>Name</th><th>Adresse</th><th>Zustand</th><th>Von</th><th></th></tr>';
+        $body .= '<h2>Drucker</h2><p class="muted">Echte Drucker und Bondrucker, die in der Praxis stehen.</p>' . ($rows !== '' ? $head . $rows . '</table>' : '<p>Noch keine.</p>')
+            . '<h2>Virtuelle Drucker</h2><p class="muted">Legen Module an (z. B. „SumUp-Rechnung“, „Terminzettel“): In T2med oder anderen Programmen drucken, das Modul verarbeitet den Auftrag. Sie werden nicht von Hand angelegt.</p>'
+            . ($virtualRows !== '' ? $head . $virtualRows . '</table>' : '<p>Noch keine.</p>')
+            . $this->virtualPrinterHelp($st['queues'])
+            . '<form method="post" action="/verwaltung/drucker">' . $this->hidden('abgleichen') . '<button' . $dis . '>Virtuelle Drucker der Module abgleichen</button></form>';
         $roles = $this->printerRoles();
         $pick = '';
         foreach (self::PRINTER_ROLES as $k => $label) {
@@ -1274,7 +1377,9 @@ final class Web {
             foreach ($st['queues'] as $q) if ($q['modul'] === '') $opts .= '<option value="' . V::h($q['name']) . '"' . ($roles[$k] === $q['name'] ? ' selected' : '') . '>' . V::h($q['name']) . '</option>';
             $pick .= '<label>' . V::h($label) . '<select name="' . $k . '">' . $opts . '</select></label>';
         }
-        $body .= '<h2>Wofür welcher Drucker?</h2><p class="muted">Module drucken auf diese Zuordnung; in den Einstellungen der Module wird kein Drucker mehr gewählt.</p>'
+        $width = $this->bonWidth();
+        $pick .= '<label>Papierbreite des Bondruckers <span class="hilfe" tabindex="0" role="note" aria-label="Gilt für alle Module (Kasse, Terminzettel)." data-tip="Gilt für alle Module, die Bons drucken (Kasse, Terminzettel). 58 mm: Epson TM-m10, 80 mm: Epson TM-m30III.">?</span><select name="bonbreite"><option value="58"' . ($width === 58 ? ' selected' : '') . '>58 mm (Epson TM-m10)</option><option value="80"' . ($width === 80 ? ' selected' : '') . '>80 mm (Epson TM-m30III)</option></select></label>';
+        $body .= '<h2>Wofür welcher Drucker?</h2><p class="muted">Module drucken auf diese Zuordnung; in den Einstellungen der Module wird kein Drucker und keine Papierbreite mehr gewählt.</p>'
             . '<form method="post" action="/verwaltung/drucker" class="box">' . $this->hidden('rollen') . $pick . '<button>Zuordnung speichern</button></form>';
         $jobRows = '';
         foreach ($st['jobs'] as $j) {
@@ -1299,9 +1404,8 @@ final class Web {
         $body .= '<h2>Drucker von Hand eintragen</h2><form method="post" action="/verwaltung/drucker" class="box">' . $this->hidden('anlegen')
             . '<label>Art<select name="art">' . $kinds . '</select></label>'
             . V::input('adresse', 'IP-Adresse oder Name des Druckers', 'text', '', 'placeholder="192.0.2.80" required maxlength="300"')
-            . V::input('name', 'Name der Warteschlange (leer = Vorschlag)', 'text', '', 'maxlength="40"') . $this->shareBoxes([])
-            . '<button' . $dis . '>Anlegen</button></form>'
-            . '<form method="post" action="/verwaltung/drucker">' . $this->hidden('abgleichen') . '<button' . $dis . '>Virtuelle Drucker der Module abgleichen</button></form>';
+            . V::input('name', 'Name der Warteschlange (leer = Vorschlag)', 'text', '', 'maxlength="40"')
+            . '<button' . $dis . '>Anlegen</button></form>';
         $net = $st['net'];
         $body .= '<h2>Windows-Netz</h2>';
         $body .= '<p>Arbeitsgruppe: <strong>' . V::h($net['arbeitsgruppe']) . '</strong>. Hinweis: Windows 11 Pro lässt Gastzugriff auf Windows-Freigaben ab 24H2 '
@@ -1313,6 +1417,42 @@ final class Web {
         return $busy ? $response->with('Refresh', '3') : $response;
     }
 
+    /** Aufklappbare Anleitung: virtuelle Drucker der Module an den Arbeitsplätzen einrichten (Windows, Mac, T2med), im Format der Kasse. */
+    private function virtualPrinterHelp(array $queues): string {
+        $host = strtolower((string)preg_replace('/:\d+$/', '', (string)($_SERVER['HTTP_HOST'] ?? 'server')));
+        if (!$this->config->ownHost($host)) $host = 'server';
+        $ppd = ['terminzettel' => '/terminzettel/assets/Terminzettel-PDF.ppd', 'sumup' => '/kasse/assets/SumUp-Rechnung-PDF.ppd'];
+        $blocks = '';
+        foreach ($queues as $q) {
+            if ($q['modul'] === '') continue;
+            $name = (string)$q['name'];
+            $url = 'http://' . $host . ':631/printers/' . rawurlencode($name);
+            $paper = preg_match('/terminzettel/i', $name) ? 'A6' : 'A4';
+            $script = "Enable-WindowsOptionalFeature -Online -FeatureName Printing-Foundation-InternetPrinting-Client -NoRestart | Out-Null\n"
+                . "# Druckspooler neu starten und auf den laufenden Dienst warten; alten Drucker entfernen (behebt „Das Handle ist ungültig“)\n"
+                . "Restart-Service Spooler -Force\n(Get-Service Spooler).WaitForStatus('Running', '00:00:30')\nStart-Sleep 3\n"
+                . "Get-Printer -Name \"" . $name . "\" -ErrorAction SilentlyContinue | Remove-Printer\n"
+                . "Add-PrinterDriver -Name \"Microsoft IPP Class Driver\"\n\$url = \"" . $url . "\"\nAdd-PrinterPort -Name \$url -ErrorAction SilentlyContinue\n"
+                . "Add-Printer -Name \"" . $name . "\" -DriverName \"Microsoft IPP Class Driver\" -PortName \$url"
+               ;
+            $mac = isset($ppd[$q['modul']]) ? ' <a href="' . V::h($ppd[$q['modul']]) . '" download>PDF-Beschreibungsdatei (PPD) herunterladen</a>' : '';
+            $blocks .= '<h3>Drucker „' . V::h($name) . '“</h3><ol>'
+                . '<li>Windows: Drucker hinzufügen → „Freigegebenen Drucker über den Namen auswählen“: <code>' . V::h($url) . '</code> – Treiber „Microsoft IPP Class Driver“, Papier ' . $paper . '. '
+                . 'Per IP-Adresse (z. B. aus dem VPN) statt des Namens: <code>http://&lt;IP-Adresse&gt;:631/printers/' . V::h(rawurlencode($name)) . '</code>.</li>'
+                . '<li>Windows 11: Fehlt der Treiber „Microsoft IPP Class Driver“ oder akzeptiert Windows die Adresse nicht, PowerShell als Administrator öffnen und ausführen:<pre>' . V::h($script) . '</pre></li>'
+                . '<li>' . V::h('Druckereigenschaften lassen sich nicht öffnen („Das Handle ist ungültig“) oder der Druck bleibt aus: Die Windows-Einrichtung ist veraltet, z. B. nach Neueinrichtung des Servers. Drucker entfernen und mit dem PowerShell-Skript oben neu einrichten (es startet den Druckspooler neu und entfernt den alten Drucker). Eine Meldung beim Löschen alter Anschlüsse („Anschluss unbekannt“) ist harmlos. Möglichst die IP-Adresse statt des Namens verwenden.') . '</li>'
+                . '<li>Mac: „' . V::h($name) . '“ hinzufügen, als Treiber die Datei wählen.' . $mac . '</li></ol>';
+        }
+        if ($blocks === '') return '';
+        return '<details class="box"><summary><strong>Anleitung: virtuelle Drucker an den Arbeitsplätzen einrichten</strong></summary>'
+            . '<p>Nur die virtuellen Drucker der Module werden an den Arbeitsplätzen (T2med-PC) eingerichtet. Echte Drucker und der Bondrucker brauchen keine Freigabe und keine Einrichtung am Arbeitsplatz: die Module drucken von hier aus.</p>'
+            . '<p><strong>Voraussetzung:</strong> Haken bei „für Windows freigeben (Samba)“ bzw. „für macOS und andere freigeben (IPP)“ beim virtuellen Drucker und in der <a href="/verwaltung/firewall">Firewall</a> Drucken (IPP, Port 631) aus dem Praxisnetz erlauben. '
+            . 'Windows 11 Pro ab 24H2 lässt Gastzugriff auf Windows-Freigaben (Samba) nicht mehr zu: dort immer über IPP einrichten.</p>'
+            . $blocks
+            . '<h3>In T2med</h3><ul><li>„Terminzettel“: Einstellungen → Kalender → Terminliste (DIN A6), Drucker „Terminzettel“ wählen.</li>'
+            . '<li>„SumUp-Rechnung“: Rechnung aus T2med auf diesen Drucker drucken, sie erscheint danach beim Patienten in der Kasse.</li></ul></details>';
+    }
+
     private function saveRoles(Request $r): void {
         $names = array_column($this->pr()->status()['queues'], 'name');
         $out = [];
@@ -1322,6 +1462,9 @@ final class Web {
             $out[$k] = $v;
         }
         $this->db->store('drucker.rollen', json_encode($out, JSON_THROW_ON_ERROR));
+        $width = $r->field('bonbreite', 3);
+        if ($width !== '' && !in_array($width, ['58', '80'], true)) throw new Problem('Bitte 58 mm oder 80 mm als Papierbreite wählen.', 422);
+        if ($width !== '') $this->db->store('drucker.bonbreite', $width);
     }
 
     private function printersAction(Request $r, string $admin): Response {

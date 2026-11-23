@@ -143,7 +143,7 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
        Start zeigt „Kasse“, `/kasse/` öffnet die Kasse, „Testpatient öffnen (Testmodus)“ funktioniert, Mock-Zahlung gelingt.
 5. [ ] Als Admin des Moduls: `/kasse/settings.php` (Einstellungen). Praxisdaten speichern verlangt einmal die Bestätigung
        der Suite und kehrt danach zurück. Einrichtungs-Überblick der Suite zeigt die Punkte der Kasse.
-6. [ ] Verwaltung → Verbindungen: T2med eintragen (Adresse, API-Key, erlaubte Aufrufadressen). In der Kasse „T2med-Anbindung“
+6. [ ] Verwaltung → Verbindungen: T2med eintragen (Adresse, API-Key, erlaubte fhirBasisUrl aus T2med). In der Kasse „T2med-Anbindung“
        auf Live: kein Fehler; „T2med-Verbindung der Suite vorhanden“ im Überblick.
 7. [ ] Verwaltung → Drucker: „SumUp-Rechnung“ erscheint als Drucker des Moduls. Am Windows-PC als IPP-Drucker hinzufügen
        (`http://<server>:631/printers/SumUp-Rechnung`, Papier A4), aus T2med eine Testrechnung (Testpatient) drucken:

@@ -41,7 +41,7 @@ if [ "${ID:-}" != ubuntu ] || [ "${VERSION_ID:-}" != 26.04 ]; then
   echo "Die Kienzle-Suite unterstützt nur Ubuntu Server 26.04 LTS (gefunden: ${PRETTY_NAME:-unbekannt})."; exit 1
 fi
 [ -n "$nosystemd" ] || command -v systemctl >/dev/null || { echo 'systemd wird benötigt.'; exit 1; }
-[[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'core/VERSION ungültig.'; exit 1; }
+[[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ ]] || { echo 'core/VERSION ungültig.'; exit 1; }
 [ -z "$kanal" ] || [ "$kanal" = stabil ] || [ "$kanal" = beta ] || { echo 'Kanal: stabil oder beta.'; exit 2; }
 [ -z "$admin_reset" ] || [[ $admin_reset =~ ^[a-z0-9._-]{1,64}$ ]] || { echo "Ungültiger Benutzername: $admin_reset"; exit 2; }
 
@@ -97,7 +97,7 @@ DEBIAN_FRONTEND=noninteractive apt-get update -q
 wait_apt
 DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends \
   nginx php-fpm php-cli php-sqlite3 php-mbstring openssl qrencode python3 ca-certificates psmisc curl nftables iproute2 smbclient openssh-client restic cifs-utils \
-  cups cups-bsd cups-ipp-utils avahi-daemon samba unattended-upgrades
+  cups cups-bsd cups-ipp-utils avahi-daemon avahi-utils libnss-mdns samba unattended-upgrades
 
 phpv=$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')
 phpfpm=/usr/sbin/php-fpm$phpv
@@ -288,7 +288,7 @@ if [ -z "$nosystemd" ]; then
   systemctl enable --now kienzle-update.path kienzle-update-pruefen.timer kienzle-verbindungen.path kienzle-ablage.timer kienzle-sicherung.path kienzle-sicherung.timer kienzle-ueberblick.path kienzle-ueberblick.timer kienzle-drucker.path kienzle-drucker.timer kienzle-servername.path kienzle-module.path kienzle-module-pruefen.timer
   # Druckserver: CUPS und smbd; nmbd (NetBIOS) und der AD-Dienst werden nicht gebraucht.
   systemctl disable --now nmbd.service samba-ad-dc.service >/dev/null 2>&1 || true
-  systemctl enable cups.service smbd.service >/dev/null 2>&1 || true
+  systemctl enable avahi-daemon.service cups.service smbd.service >/dev/null 2>&1 || true
   for entry in "${conf_changed[@]}"; do
     unit=${entry%%:*}; dest=${entry#*:}
     if ! systemctl restart "$unit"; then
@@ -297,7 +297,7 @@ if [ -z "$nosystemd" ]; then
     fi
     rm -f -- "$dest.kienzle-vorher"
   done
-  systemctl start cups.service smbd.service >/dev/null 2>&1 || true
+  systemctl start avahi-daemon.service cups.service smbd.service >/dev/null 2>&1 || true
   if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q 'Status: active'; then
     echo 'Hinweis: ufw ist aktiv. Die Firewall der Suite (Verwaltung → Firewall) arbeitet unabhängig davon; bitte nur eine von beiden verwenden.'
   fi
@@ -323,7 +323,7 @@ if [ -n "$auto_names" ]; then
   echo "Verwaltung → Server festlegen."
 fi
 /opt/kienzle/core/current/bin/kienzle-ueberblick sammeln >/dev/null || echo 'Hinweis: Einrichtungs-Überblicke der Module nicht lesbar.'
-/opt/kienzle/core/current/bin/kienzle-module pruefen >/dev/null 2>&1 || true   # Angebot für Verwaltung → Module (GitHub darf fehlen)
+/opt/kienzle/core/current/bin/kienzle-module pruefen --sofort >/dev/null 2>&1 || true   # Angebot für Verwaltung → Module (GitHub darf fehlen)
 if [ -n "$admin_reset" ]; then /opt/kienzle/core/current/bin/kienzle-admin zuruecksetzen "$admin_reset"; fi
 if [ -n "$nosystemd" ] || [ -n "$update" ]; then exit 0; fi
 if ! /opt/kienzle/core/current/bin/kienzle-admin benutzer 2>/dev/null | grep -q 'Basis-Admin'; then

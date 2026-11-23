@@ -73,6 +73,12 @@ try {
     rejects(fn() => T2medInvoice::parse(invoiceText(transfer: '57,88'), 100000), 'Widersprüchlicher Zahlbetrag akzeptiert', 422);
     rejects(fn() => T2medInvoice::parse(invoiceText() . "Gesamtsumme: 12,00 €\n", 100000), 'Zweite Gesamtsumme akzeptiert', 422);
     rejects(fn() => T2medInvoice::parse(invoiceText() . "Re.-Nr.: RE2026-0043\n", 100000), 'Zweite Rechnungsnummer akzeptiert', 422);
+    // Texterkennung: dieselbe Nummer wird an zwei Stellen leicht verschieden gelesen (O/0), das ist dieselbe Nummer; Gleichstand: die zuerst gelesene.
+    $ocrText = invoiceText(number: 'RE2026-0042');
+    $ocrText = preg_replace('/Re\.-Nr\.: RE2026-0042/', 'Re.-Nr.: RE2O26-0042', $ocrText, 1);
+    check(T2medInvoice::parse($ocrText, 100000, true, [], true, true)['number'] === 'RE2026-0042', 'OCR: O/0-Abweichung nicht toleriert');
+    rejects(fn() => T2medInvoice::parse($ocrText, 100000, true, [], true), 'Ohne Texterkennung wurde eine abweichende Nummer akzeptiert', 422);
+    rejects(fn() => T2medInvoice::parse(invoiceText() . "Re.-Nr.: RE2026-0099\n", 100000, true, [], true, true), 'OCR: stark abweichende Nummer akzeptiert', 422);
     rejects(fn() => T2medInvoice::parse(invoiceText(patient: 'Erika Musterfrau'), 100000), 'Rechnung ohne Geburtsdatum akzeptiert', 422);
     rejects(fn() => T2medInvoice::parse(invoiceText(total: '-42,50', transfer: '-42,50'), 100000), 'Negative Rechnung (Gutschrift) akzeptiert', 422);
     rejects(fn() => T2medInvoice::parse(invoiceText(total: '2.000,00', transfer: '2.000,00'), 100000), 'Betrag über Maximum akzeptiert', 422);

@@ -1,5 +1,122 @@
 # Basis – Release-Notizen
 
+## 0.21.3-beta.3
+
+- README: aktueller Stand und Abschnitt „So sieht es aus“ mit Bildschirmfotos (Anmeldung, Benutzer, Gruppen, Sicherung auf das NAS per SFTP, Updater; nur erfundene Beispieldaten). Nur Dokumentation, kein Programmcode geändert.
+
+## 0.21.3-beta.2
+
+- Virtuelle Drucker bieten nur noch das Papierformat des Moduls an (neu in module.toml: `paper`, Vorgabe A4; Kasse A4, Terminzettel A6) statt A6/A5/A4/Letter. Nicht mit Windows getestet.
+
+## 0.21.3-beta.1
+
+- Virtuelle Drucker der Module (Kasse „SumUp-Rechnung“, „Terminzettel“): Die CUPS-Warteschlange wird nicht mehr mit „everywhere“, sondern mit einer mitgelieferten Durchreich-PPD angelegt (PDF und PostScript unverändert, wie im früheren Rechnungseingang). Vorher bot CUPS zusätzlich Raster- und Bildformate (pwg-raster, urf, pclm, jpeg, …) an; der Windows-IPP-Treiber wählte so ein Format, das PDF hatte keine Textebene und die Rechnung musste per Texterkennung gelesen werden (Fehler „Rechnungsnummer nicht eindeutig (Texterkennung)“). Bestehende Warteschlangen werden beim nächsten Abgleich (Installer bzw. „Virtuelle Drucker der Module abgleichen“) automatisch umgestellt. Echte Drucker bleiben unverändert.
+- Tests: tests/core/test_drucker.py. Nicht mit Windows/echtem T2med getestet.
+
+## 0.21.2-beta.3
+
+- Windows-Skript: „Set-PrintConfiguration -PaperSize“ entfernt (der IPP-Class-Treiber lehnt es ab; die Papiergröße kommt vom Drucker). Nicht getestet.
+
+## 0.21.2-beta.2
+
+- Windows-Skript korrigiert: Der Druckspooler wird nach dem Aktivieren der Windows-Funktion neu gestartet und es wird auf den laufenden Dienst gewartet (vorher „Spoolerdienst ist nicht erreichbar“). Nicht getestet.
+
+## 0.21.2-beta.1
+
+- Windows-Anleitung robuster: Das PowerShell-Skript startet den Druckspooler neu und entfernt zuerst den alten Drucker (behebt „Das Handle ist ungültig“ in den Druckereigenschaften); neuer Hinweis zur Fehlerbehebung. Nicht getestet (vom Anwender am Windows-PC bestätigt: Neueinrichtung per IPP-Adresse mit IPP-Class-Treiber funktioniert).
+
+## 0.21.1-beta.1
+
+- Verwaltung → Drucker: Die Anleitung für die virtuellen Drucker folgt dem Format der Kasse-Anleitung (SumUp-Rechnung): je Drucker Windows-Adresse mit „Microsoft IPP Class Driver“ (auch für den Terminzettel statt „Generic / Text Only“), Adresse per IP, PowerShell-Befehle, Mac mit PPD-Download. Nicht getestet (Tests auf Wunsch nicht ausgeführt).
+
+## 0.21.0-beta.1
+
+- Verwaltung → Drucker → „Wofür welcher Drucker?“: neu die **Papierbreite des Bondruckers** (58 mm Epson TM-m10 oder 80 mm TM-m30III). Sie gilt zentral für alle Module; die Module bekommen sie mit jeder Anfrage (`KienzleModul::bonBreite()`, ergänzende Schnittstelle, `core_api` bleibt 1).
+- Nicht auf der echten VM getestet.
+
+## 0.20.9-beta.1
+
+- Verwaltung → Drucker: Freigaben (Samba/IPP) gibt es nur noch für die virtuellen Drucker der Module; echte Drucker und der Bondrucker brauchen keine (Auswahl beim Anlegen entfällt, Hinweis im Text).
+- Neu: aufklappbare Anleitung „virtuelle Drucker an den Arbeitsplätzen einrichten“ unter den virtuellen Druckern (Windows per IPP mit Adresse und Treiber je Drucker, PowerShell-Befehle, Mac, T2med-Einstellung). Die Adresse enthält den Servernamen, unter dem die Seite aufgerufen wird.
+- Nicht auf der echten VM getestet.
+
+## 0.20.8-beta.1
+
+- T2med: Das Feld heißt „API-Schlüssel der FHIR-Schnittstelle“ (nicht mehr „Client Secret“); der Hinweis erklärt, dass T2med bei einem unpassenden Wert „FHIR-API-Key fehlt oder ist ungültig“ (HTTP 403) meldet. Neu: „Gespeicherten Schlüssel entfernen“, dann nimmt die Kasse wie das alte Tool den hinterlegten T2med-Demo-Schlüssel. Vermutung, nicht an echtem T2med bestätigt: Der Wert, der im alten Tool funktionierte, war der Demo-Schlüssel, nicht das Client Secret des Drittanbieters.
+
+## 0.20.7-beta.1
+
+- T2med: Leerzeichen und Tabulatoren am Rand des API-Schlüssels (Client Secret) werden beim Speichern entfernt; beim Kopieren aus T2med werden sie leicht mitgenommen und führen zu „FHIR-API-Key fehlt oder ist ungültig“.
+
+## 0.20.6-beta.1
+
+- Verwaltung → Module: Bei jedem installierten Modul ohne bekanntes Update gibt es den Knopf „Jetzt nach einem Update suchen“. Gibt es eine neue Version, erscheint danach „Aktualisieren“ (mit Schnappschuss der Moduldaten vorher, bei Fehlern springt das Modul zurück). An der Konsole: `sudo kienzle-module installieren <modul>` aktualisiert ein installiertes Modul, `sudo kienzle-module pruefen --sofort` sucht sofort nach Angeboten.
+
+## 0.20.5-beta.1
+
+- Behoben: Im Einrichtungs-Überblick stand bei Modulen „Überblick nicht lesbar: [Errno 2] No such file or directory: 'runuser'“, weil der Dienst `runuser` (liegt in /usr/sbin) nicht im Suchpfad fand. Überblick, Update-Haken und Sicherungs-Haken der Module verwenden jetzt den vollen Pfad. Nicht auf der VM geprüft.
+
+## 0.20.4-beta.1
+
+- Verbindungen → T2med: Die Adresse für den Eintrag in T2med (`kienzle-sumup://?kontextId=…`) steht jetzt direkt unter dem Formular. Das Feld heißt „Erlaubte fhirBasisUrl aus T2med – weitere Adressen“ und erklärt, dass hier die von T2med mitgeschickte FHIR-Adresse gemeint ist, nicht die Abrufadresse.
+
+## 0.20.3-beta.1
+
+- Einrichtung: „Servername festgelegt“ gilt erst als erledigt, wenn die Schritte danach von Hand bestätigt sind: Namen im Router bzw. in der hosts-Datei eintragen, Suite unter dem neuen Namen öffnen und neu anmelden, Passkeys neu anlegen (oder keine vorhanden). Die zwei neuen Punkte stehen im Einrichtungs-Überblick neben dem bestehenden Punkt zum Servernamen.
+
+## 0.20.2-beta.1
+
+- T2med: Das Feld heißt „API-Schlüssel (Client Secret aus T2med)“ mit Hinweis, dass T2med es nur einmal anzeigt (verloren = Drittanbieter-Zugriff in T2med löschen und neu erstellen).
+- Verbindungsprüfung: Antwortet T2med mit 401/403, meldet die Prüfung jetzt „erreichbar, Zertifikat stimmt, Secret nicht allein prüfbar“ statt „Zugriff abgelehnt“. Vermutung, nicht an echtem T2med bestätigt: T2med verlangt für die FHIR-Abfragen zusätzlich das OAuth-Token, das es nur beim Aufruf aus der Patientenakte mitgibt.
+
+## 0.20.1-beta.1
+
+- Verbindungen → Netzwerkspeicher: Das Formular „Ziel anlegen“ erklärt jede Angabe per Tooltip (Kennung, Bezeichnung, Server, Freigabe, Port, Basisordner, Benutzer, Passwort, Domäne), zeigt je nach Art nur die passenden Felder (SMB oder SFTP), empfiehlt SFTP und beschreibt kurz die Einrichtung an einem Synology-NAS (Menünamen nicht gegen ein echtes Gerät geprüft).
+- SFTP: „Verbindung prüfen“ ohne bestätigten Serverschlüssel ruft den Schlüssel jetzt gleich ab, sodass die Schaltfläche „Übernehmen“ erscheint; vorher stand nur „noch nicht bestätigt“ ohne Weg weiter.
+
+## 0.20.0-beta.1
+
+- Basis-Admins dürfen in jedem installierten Modul alles: Sie gelten dort als Modul-Admin mit allen Rechten, ohne dass Haken gesetzt sein müssen (Menü, Einstellungen und Zugriff der Module; auch die Haken in der Benutzerverwaltung erscheinen gesetzt).
+- Neu: Verwaltung → Gruppen. Vorgaben „Admin“ (Admin in allen Modulen, alle Rechte), „Arzt“ (alle Rechte) und „MFA“ (Kasse im Alltag: kassieren, bezahlt abhaken, Rechnungseingang). Gruppen sind änderbar, zurücksetzbar und um eigene ergänzbar. Beim Bearbeiten eines Benutzers übernimmt „Gruppe anwenden“ beim Speichern die Rechte der Gruppe; danach lassen sich die Haken einzeln ändern. Spätere Änderungen an einer Gruppe ändern bestehende Benutzer nicht. Ungeänderte Vorgaben schließen neue Module von selbst ein; die Gruppe „Admin“ macht in der Benutzerverwaltung zum Modul-Admin, was die Authenticator-App voraussetzt.
+- Nicht in einem echten Browser angesehen.
+
+## 0.19.9-beta.1
+
+- Installer: `libnss-mdns` wird mitinstalliert (trägt mDNS in die Namensauflösung ein) und der Avahi-Dienst eingeschaltet. Damit löst der Server Namen wie `Drucker.local` selbst auf; bisher scheiterte das Einrichten und Drucken mit „Temporary failure in name resolution“. Nach dem Update den Installer erneut ausführen. Nicht auf echter Hardware geprüft: Funktioniert mDNS im Praxisnetz nicht (z. B. gesperrt im Router), bleibt nur die IP-Adresse des Druckers.
+
+## 0.19.8-beta.1
+
+- Drucker: Bereits angelegte Drucker der Suite, deren Adresse einen „.local“-Namen enthält, den der Server nicht auflösen kann, werden beim nächsten Lauf des Druckdienstes (z. B. beim Öffnen der Druckerseite oder bei der nächsten Anfrage) automatisch auf die IP-Adresse umgestellt. Das behebt den Fehler beim Testdruck „Der Name des Druckers lässt sich nicht auflösen“. Nicht an echter Hardware geprüft; die Auflösung braucht `avahi-utils` (Installer erneut ausführen).
+
+## 0.19.7-beta.1
+
+- Anmeldeseite: Hinweis mit Link „Arbeitsplatz einrichten“ (Zertifikat und Servername je PC), für den Fall, dass der Browser „Nicht sicher“ meldet oder die Adresse nicht öffnet.
+
+## 0.19.6-beta.1
+
+- T2med-Prüfung: Statt „antwortet nicht wie ein FHIR-Server“ nennt die Meldung jetzt den HTTP-Status und die wahrscheinliche Ursache (Schlüssel abgelehnt, Pfad falsch, Adresse zeigt nicht auf die FHIR-Schnittstelle). Nicht an einer echten T2med-Installation geprüft.
+
+## 0.19.5-beta.1
+
+- Updates: Beim Anhalten und Neustarten der Basis zeigte nginx kurz „502 Bad Gateway“. Stattdessen erscheint jetzt eine Seite „Einen Moment bitte“, die sich alle 3 Sekunden selbst neu lädt, bis die Suite wieder antwortet (gilt auch für die Modulpfade). Nicht auf einer echten VM geprüft; nginx-Syntax läuft erst im CI-Integrationstest gegen echtes nginx.
+
+## 0.19.4-beta.1
+
+- Drucker: Die Seite trennt jetzt „Drucker“ (echte Drucker und Bondrucker) von „Virtuelle Drucker“ (von Modulen angelegt, mit dem Knopf zum Abgleichen).
+- Drucker einrichten: Namen wie `Drucker.local` (mDNS) löst der Server nun selbst in eine IP-Adresse auf (avahi-utils wird vom Installer mitinstalliert); gelingt das nicht, nennt die Meldung klar den Weg über die IP-Adresse statt „Temporary failure in name resolution“. Nicht an echten Druckern geprüft.
+
+## 0.19.3-beta.1
+
+- Verbindungen → T2med: Selbstsignierte Zertifikate lassen sich jetzt im Webinterface übernehmen. „Zertifikat des Servers abrufen“ holt das Zertifikat von T2med und zeigt den SHA-256-Fingerabdruck; nach dem Vergleich (z. B. im Browser unter „Zertifikat anzeigen“) hinterlegt „Übernehmen“ es fest (Pinning). Die Verbindung prüft dann nur noch diesen Fingerabdruck, auch wenn das Zertifikat selbstsigniert ist oder nicht auf den Servernamen lautet. Bei einem Zertifikatsfehler weist die Meldung auf diesen Weg hin.
+- Nicht an einer echten T2med-Installation geprüft, nur gegen einen lokalen Testserver mit eigenem Zertifikat.
+
+## 0.19.2-beta.1
+
+- **Beta-Kanal automatisch:** Der Zweig `beta` veröffentlicht Vorabversionen selbst (`.github/workflows/beta.yml`), `main` nur noch mit Tag.
+  Die Basis prüft stündlich nach Updates (bisher täglich); Module werden stündlich geprüft und nachts (02–05 Uhr) selbst installiert,
+  nach einem Basis-Update sofort.
+- Nur die Abläufe in den Workflows sind nicht auf GitHub erprobt, bis der erste Lauf auf `beta` grün war.
+
 ## 0.19.1
 
 - `web.einstellungen = "/"` ist erlaubt (Einstellungsseite auf der Startseite des Moduls). Das Modul Terminzettel 1.0.0 liegt mit im Release.
