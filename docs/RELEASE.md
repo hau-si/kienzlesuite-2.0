@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.20.2-beta.1
+
+- T2med: Das Feld heißt „API-Schlüssel (Client Secret aus T2med)“ mit Hinweis, dass T2med es nur einmal anzeigt (verloren = Drittanbieter-Zugriff in T2med löschen und neu erstellen).
+- Verbindungsprüfung: Antwortet T2med mit 401/403, meldet die Prüfung jetzt „erreichbar, Zertifikat stimmt, Secret nicht allein prüfbar“ statt „Zugriff abgelehnt“. Vermutung, nicht an echtem T2med bestätigt: T2med verlangt für die FHIR-Abfragen zusätzlich das OAuth-Token, das es nur beim Aufruf aus der Patientenakte mitgibt.
+
 ## 0.20.1-beta.1
 
 - Verbindungen → Netzwerkspeicher: Das Formular „Ziel anlegen“ erklärt jede Angabe per Tooltip (Kennung, Bezeichnung, Server, Freigabe, Port, Basisordner, Benutzer, Passwort, Domäne), zeigt je nach Art nur die passenden Felder (SMB oder SFTP), empfiehlt SFTP und beschreibt kurz die Einrichtung an einem Synology-NAS (Menünamen nicht gegen ein echtes Gerät geprüft).

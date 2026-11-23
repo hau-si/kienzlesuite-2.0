@@ -1193,7 +1193,8 @@ final class Web {
         $body .= '<section><h2>T2med (FHIR)</h2><form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('t2med')
             . V::input('base_url', 'Adresse des FHIR-Servers', 'url', (string)($t2['base_url'] ?? ''), 'placeholder="https://t2med-server:16567/aps/fhir/api/r4"')
             . '<label>Weitere erlaubte Start-Adressen (eine je Zeile)<textarea name="launch_urls" rows="2">' . V::h(implode("\n", array_diff((array)($t2['launch_urls'] ?? []), [(string)($t2['base_url'] ?? '')]))) . '</textarea></label>'
-            . V::input('api_key', 'API-Schlüssel', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($t2['api_key_gesetzt'] ?? false))) . '"')
+            . V::input('api_key', 'API-Schlüssel (Client Secret aus T2med)', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($t2['api_key_gesetzt'] ?? false))) . '"')
+            . '<p class="muted small">In T2med heißt er „Client Secret“ und wird bei der Einrichtung des Drittanbieters nur einmal angezeigt. Ist er verloren, muss der Drittanbieter-Zugriff in T2med gelöscht und neu erstellt werden.</p>'
             . '<label>Zertifikat des T2med-Servers (PEM, optional)' . (($t2['zertifikat'] ?? '') !== '' ? ' – gespeichert, SHA-256 <code>' . V::h(substr((string)$t2['zertifikat'], 0, 16)) . '…</code>' : '')
             . '<textarea name="ca_pem" rows="3" placeholder="-----BEGIN CERTIFICATE-----"></textarea></label>'
             . V::checkbox('ca_entfernen', '1', 'Gespeichertes Zertifikat entfernen', false)

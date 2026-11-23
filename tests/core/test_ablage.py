@@ -349,8 +349,7 @@ class Verbindungen(Umgebung):
         c = {}
         self.vb.set_t2med(c, {'base_url': base, 'api_key': 'api-schluessel-1', 'ca_pem': pem, 'pin': True})
         self.assertIn('CapabilityStatement', self.vb.test_t2med(c['t2med']))
-        with self.assertRaisesRegex(self.vb.Fehler, 'lehnt den Zugriff ab'):
-            self.vb.test_t2med({**c['t2med'], 'api_key': 'falsch'})
+        self.assertIn('Token', self.vb.test_t2med({**c['t2med'], 'api_key': 'falsch'}))   # 401: Secret allein nicht prüfbar
         _, other = make_cert(self.t / '..' / self.t.name, 'anders') if False else make_cert(self.t, 'localhost2')
         with self.assertRaises(self.vb.Fehler):
             self.vb.test_t2med({**c['t2med'], 'ca_pem': other.read_text(), 'pin': False})   # fremde CA: TLS-Fehler

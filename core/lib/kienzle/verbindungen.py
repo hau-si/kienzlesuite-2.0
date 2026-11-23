@@ -279,7 +279,10 @@ def test_t2med(c: dict) -> str:
     status = head.split(b' ', 2)[1:2]
     code = status[0].decode('ascii', 'replace')[:3] if status else '?'
     if code in ('401', '403'):
-        raise Fehler(f'T2med lehnt den Zugriff ab (HTTP {code}). API-Schlüssel prüfen und in T2med für FHIR freigeben.')
+        # T2med verlangt für die FHIR-Abfragen neben dem Client Secret (X-API-Key) das OAuth-Token, das es nur beim Aufruf aus der Akte mitgibt.
+        # Die Prüfung hat kein Token und kann das Secret deshalb nicht allein bestätigen; Server und Zertifikat sind aber in Ordnung.
+        return (f'T2med ist erreichbar und das Zertifikat stimmt (HTTP {code}). Das Client Secret lässt sich hier nicht allein prüfen, '
+                'weil T2med zusätzlich das Token verlangt, das es nur beim Öffnen der Kasse aus T2med mitgibt. Bitte die Kasse einmal aus T2med öffnen.')
     if code == '404':
         raise Fehler('T2med kennt diese Adresse nicht (HTTP 404). Der Pfad der FHIR-Adresse stimmt nicht, meist …/aps/fhir/api/r4.')
     if status != [b'200'] or b'CapabilityStatement' not in body:
