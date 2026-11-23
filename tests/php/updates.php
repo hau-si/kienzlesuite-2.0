@@ -61,6 +61,7 @@ function test_seite_und_menue(): void {
     $b->web = fn() => $b->defaultWeb(null, $up);
     $page = $b->get('/verwaltung/updates');
     check($page->status === 200 && str_contains($page->body, 'Basis 9.0.0') && str_contains($page->body, 'Zurück auf eine frühere Version'), 'Seite unvollständig');
+    check(str_contains($page->body, 'update-state new') && str_contains($page->body, 'Neue Version verfügbar: Basis 9.0.0') && !str_contains($page->body, '<h2>Verfügbar</h2>'), 'Statussymbol „neue Version“ fehlt oder eigene Karte „Verfügbar“');
     check(!str_contains($page->body, '<script>x') && str_contains($page->body, '&lt;script&gt;x'), 'Release-Notizen nicht maskiert');
     check(str_contains($b->get('/')->body, '<span class="badge" title="Neue Version verfügbar">1</span>'), 'Hinweis im Menü fehlt');
     $r = $b->post('/verwaltung/updates', ['aktion' => 'installieren', 'version' => '9.0.0']);

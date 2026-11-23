@@ -174,6 +174,17 @@ function test_verwaltung_braucht_bestaetigung_und_csrf(): void {
     check(str_contains($home, '<svg class="ico"'), 'Menüsymbole fehlen');
     $setup = $b->get('/verwaltung/einrichtung')->body;
     check(strpos($setup, 'Admin mit Authenticator-App') < strpos($setup, 'Servername festgelegt') && strpos($setup, 'Servername festgelegt') < strpos($setup, 'Mindestens zwei Admins') && str_contains($setup, 'tag opt">optional'), 'Einrichtung nicht geordnet oder ohne optional-Kennzeichnung');
+    // Update-Seite: Status als Symbol in einer einzigen Karte; roter Punkt am Logo; Einrichtungspunkte ignorieren.
+    check(str_contains($home, 'logo-dot'), 'Roter Punkt am Logo fehlt bei offener Einrichtung');
+    check(preg_match('/name="aktion" value="ignorieren"><input type="hidden" name="punkt" value="([0-9a-f]{12})"/', $setup, $mi) === 1, 'Ignorieren-Knopf fehlt');
+    $openBefore = $b->get('/')->body; preg_match('/(\\d+) von (\\d+) nötigen/', $openBefore, $c0);
+    $b->post('/verwaltung/einrichtung', ['aktion' => 'ignorieren', 'punkt' => $mi[1], 'an' => '1']);
+    preg_match('/(\\d+) von (\\d+) nötigen/', $b->get('/')->body, $c1);
+    check($c1[2] === (string)((int)$c0[2] - 1), 'Ignorierter Punkt zählt weiter als nötig');
+    check(str_contains($b->get('/verwaltung/einrichtung')->body, 'Wieder beachten'), '„Wieder beachten“ fehlt');
+    $b->post('/verwaltung/einrichtung', ['aktion' => 'ignorieren', 'punkt' => $mi[1], 'an' => '0']);
+    preg_match('/(\\d+) von (\\d+) nötigen/', $b->get('/')->body, $c2);
+    check($c2[2] === $c0[2], 'Wieder beachten wirkt nicht');
     $page = $b->get('/verwaltung/sicherheit')->body;
     check(str_contains($page, '<h2>Firewall</h2>') && str_contains($page, 'Zugang (Abmeldezeiten)') && str_contains($page, '<h2>Protokoll</h2>') && str_contains($page, 'name="idle_einheit"'), 'Sicherheit unvollständig');
     check($b->post('/verwaltung/zugang', ['idle' => '2', 'idle_einheit' => 'd', 'max' => '3', 'max_einheit' => 'd'])->status === 200 && $env->auth->idleSeconds() === 172800, 'Zugang in Tagen nicht gespeichert');

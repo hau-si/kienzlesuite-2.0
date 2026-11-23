@@ -16,6 +16,31 @@ final class Overview {
     public const PLACES = ['web' => ['In diesem Webfenster', 'Einstellungen dieses Servers'], 'pc' => ['Auf den Arbeitsplätzen', 'jeder PC der Praxis'],
         'nas' => ['Am NAS und im Router', 'Geräte im Praxisnetz']];
     private const KEY = 'ueberblick_manuell';
+    private const IGNORE = 'ueberblick_ignoriert';
+
+    public static function key(string $title): string { return substr(sha1($title), 0, 12); }
+
+    /** Schlüssel der Punkte, die ein Admin ignoriert (zählen nicht als offen). */
+    private function ignored(): array {
+        $m = json_decode((string)$this->db->setting(self::IGNORE), true);
+        return is_array($m) ? array_values(array_filter($m, 'is_string')) : [];
+    }
+
+    public function ignore(string $key, bool $on): void {
+        if (!preg_match('/^[0-9a-f]{12}$/', $key)) throw new Problem('Unbekannter Punkt.', 422);
+        $l = array_diff($this->ignored(), [$key]);
+        if ($on) $l[] = $key;
+        $this->db->store(self::IGNORE, json_encode(array_values($l), JSON_THROW_ON_ERROR));
+    }
+
+    private function flag(array $items): array {
+        $ig = $this->ignored();
+        foreach ($items as $k => $i) { $items[$k]['key'] = self::key($i['title']); $items[$k]['ignoriert'] = in_array($items[$k]['key'], $ig, true); }
+        return $items;
+    }
+
+    /** Zählt als noch zu erledigen: nicht fertig, nicht optional, nicht ignoriert. */
+    public static function needed(array $i): bool { return $i['state'] !== 'done' && !$i['optional'] && empty($i['ignoriert']); }
 
     public function __construct(private Database $db, private Users $users, private Modules $modules, private ?Firewall $firewall = null,
         private ?Updates $updates = null, private ?Connections $connections = null, private ?Backup $backup = null, private ?Config $config = null) {}
@@ -77,7 +102,7 @@ final class Overview {
             $items[$k]['rang'] = $rank($i) * 100 + $k;
         }
         usort($items, fn($a, $b) => $a['rang'] <=> $b['rang']);
-        return $items;
+        return $this->flag($items);
     }
 
     private function coreItems(): array {
@@ -147,15 +172,15 @@ final class Overview {
                 if ($link !== '' && ($path === '' || !str_starts_with($link, rtrim($path, '/')) || str_contains($link, '..'))) $link = '';
                 $items[] = ['optional' => !empty($i['optional'])] + self::item(mb_substr((string)($i['title'] ?? ''), 0, 120), $i['state'], mb_substr((string)($i['hint'] ?? ''), 0, 300), $link);
             }
-            $out[] = ['id' => $id, 'name' => $this->modules->name($id), 'items' => array_slice($items, 0, 30),
+            $out[] = ['id' => $id, 'name' => $this->modules->name($id), 'items' => $this->flag(array_slice($items, 0, 30)),
                 'fehler' => is_array($d) ? mb_substr((string)($d['fehler'] ?? ''), 0, 200) : 'Noch nicht gesammelt', 'zeit' => is_array($d) ? (int)($d['zeit'] ?? 0) : 0];
         }
         return $out;
     }
 
     public function open(): int {
-        $n = count(array_filter($this->core(), fn($i) => $i['state'] !== 'done' && !$i['optional']));
-        foreach ($this->modules() as $m) $n += count(array_filter($m['items'], fn($i) => $i['state'] !== 'done' && !$i['optional']));
+        $n = count(array_filter($this->core(), fn($i) => self::needed($i)));
+        foreach ($this->modules() as $m) $n += count(array_filter($m['items'], fn($i) => self::needed($i)));
         return $n;
 
     }
@@ -166,7 +191,7 @@ final class Overview {
         foreach ($this->modules() as $m) foreach ($m['items'] as $i) $items[] = $i;
         $out = [];
         foreach ($items as $i) {
-            if ($i['state'] === 'done' || $i['optional'] || $i['link'] === '') continue;
+            if (!self::needed($i) || $i['link'] === '') continue;
             $out[] = strtok($i['link'], '?#') ?: $i['link'];
         }
         return array_values(array_unique($out));
@@ -176,7 +201,7 @@ final class Overview {
     public function summary(): array {
         $all = $this->core();
         foreach ($this->modules() as $m) foreach ($m['items'] as $i) $all[] = $i;
-        $required = array_values(array_filter($all, fn($i) => !$i['optional']));
+        $required = array_values(array_filter($all, fn($i) => !$i['optional'] && empty($i['ignoriert'])));
         $open = array_values(array_filter($required, fn($i) => $i['state'] !== 'done'));
         return ['done' => count($required) - count($open), 'total' => count($required), 'next' => $open[0]['title'] ?? '', 'link' => $open[0]['link'] ?? '', 'errors' => count(array_filter($open, fn($i) => $i['state'] === 'error'))];
     }

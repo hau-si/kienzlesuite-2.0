@@ -1276,22 +1276,27 @@ final class Web {
         $working = $busy ? '<div class="working" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><div><strong>Update läuft – bitte nicht erneut starten und nichts anderes anklicken.</strong>'
             . '<p>' . V::h($st['state'] === 'requested' ? 'Der Auftrag wird übernommen …' : 'Aktueller Schritt: ' . $st['step']) . '. Die Seite lädt sich alle 5 Sekunden selbst neu und kann zwischendurch kurz nicht erreichbar sein. '
             . 'Erst wenn hier „fertig“ steht, ist das Update ganz durchgelaufen.</p></div></div>' : '';
-        $body = $working . V::error($error) . V::notice($notice)
-            . '<p>Installiert: <strong>Basis ' . V::h($st['installed']) . '</strong>. Zustand: ' . V::h($labels[$st['state']] ?? $st['state'])
-            . ($st['message'] !== '' ? ' – ' . V::h($st['message']) : '') . '</p>'
-            . (!$st['service'] ? '<p class="error">Der Update-Dienst ist nicht eingerichtet. Bitte den Installer ausführen.</p>' : '')
-            . '<p>Zuletzt geprüft: ' . V::date($st['checked_at']) . ($st['error'] ? ' – <span class="error">' . V::h($st['error']) . '</span>' : '') . '</p>'
-            . '<form method="post" action="/verwaltung/updates" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="pruefen"><button' . ($busy ? ' disabled' : '') . '>Jetzt nach Updates sehen</button></form>';
         $rows = '';
         foreach ($st['available'] as $a) {
-            $rows .= '<div class="box wide"><h2>Basis ' . V::h($a['version']) . ($a['prerelease'] ? ' <span class="tag">beta</span>' : '')
-                . (!$a['signed'] ? ' <span class="tag warn">nicht signiert</span>' : '') . '</h2>'
+            $rows .= '<div class="box wide"><h3>Basis ' . V::h($a['version']) . ($a['prerelease'] ? ' <span class="tag">beta</span>' : '')
+                . (!$a['signed'] ? ' <span class="tag warn">nicht signiert</span>' : '') . '</h3>'
                 . ($a['published'] !== '' ? '<p>Veröffentlicht: ' . V::h($a['published']) . '</p>' : '') . '<pre class="notes">' . V::h($a['notes']) . '</pre>'
                 . '<form method="post" action="/verwaltung/updates">' . $csrf . '<input type="hidden" name="aktion" value="installieren"><input type="hidden" name="version" value="' . V::h($a['version']) . '">'
                 . '<p>Vorher wird ein Schnappschuss der Daten angelegt. Schlägt etwas fehl, springt die Suite automatisch zurück. Die Seite ist einige Minuten nicht erreichbar.</p>'
                 . '<button' . ($busy ? ' disabled' : '') . '>Jetzt installieren</button></form></div>';
         }
-        $body .= '<h2>Verfügbar</h2><p class="muted">Module werden beim Update der Basis automatisch mit aktualisiert, sofern unter <a href="/verwaltung/module">Module</a> die automatische Aktualisierung eingeschaltet ist; das geschieht täglich nach der Prüfung. Ein gerade beschäftigtes Modul (z. B. bei laufender Zahlung) wird dabei übersprungen und am nächsten Tag erneut versucht.</p>' . ($rows !== '' ? $rows : '<p>Keine neuere Version.</p>');
+        $failed = $st['state'] === 'failed' || $st['error'];
+        $kind = $failed ? 'err' : ($st['available'] ? 'new' : 'ok');
+        $head = $failed ? 'Nicht erfolgreich' : ($st['available'] ? 'Neue Version verfügbar: Basis ' . $st['available'][0]['version'] : 'Aktuell – keine neuere Version');
+        $body = $working . V::error($error) . V::notice($notice)
+            . '<div class="update-state ' . $kind . '"><span class="big" aria-hidden="true">' . ($failed ? '!' : ($st['available'] ? '↑' : '✓')) . '</span><div><strong>' . V::h($head) . '</strong>'
+            . '<span class="muted">Installiert: Basis ' . V::h($st['installed']) . ' · Zustand: ' . V::h($labels[$st['state']] ?? $st['state'])
+            . ($st['message'] !== '' ? ' (' . V::h($st['message']) . ')' : '') . ' · Zuletzt geprüft: ' . V::date($st['checked_at']) . '</span></div></div>'
+            . ($st['error'] ? '<p class="error">' . V::h($st['error']) . '</p>' : '')
+            . (!$st['service'] ? '<p class="error">Der Update-Dienst ist nicht eingerichtet. Bitte den Installer ausführen.</p>' : '')
+            . '<form method="post" action="/verwaltung/updates" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="pruefen"><button class="secondary"' . ($busy ? ' disabled' : '') . '>Jetzt nach Updates sehen</button></form>'
+            . $rows
+            . '<p class="muted">Module werden beim Update der Basis automatisch mit aktualisiert, sofern unter <a href="/verwaltung/module">Module</a> die automatische Aktualisierung eingeschaltet ist; das geschieht täglich nach der Prüfung. Ein gerade beschäftigtes Modul (z. B. bei laufender Zahlung) wird dabei übersprungen und am nächsten Tag erneut versucht.</p>';
         $body .= '<h2>Kanal</h2><form method="post" action="/verwaltung/updates" class="box">' . $csrf . '<input type="hidden" name="aktion" value="kanal">'
             . '<label class="check"><input type="radio" name="kanal" value="stabil"' . ($st['channel'] === 'stabil' ? ' checked' : '') . '> Stabil (empfohlen)</label>'
             . '<label class="check"><input type="radio" name="kanal" value="beta"' . ($st['channel'] === 'beta' ? ' checked' : '') . '> Beta (Vorabversionen zum Testen)</label>'
@@ -1724,15 +1729,18 @@ final class Web {
     private function overviewList(array $items, bool $places = false): string {
         $rows = '';
         foreach ($items as $i) {
-            $class = ['done' => 'done', 'open' => 'open', 'error' => 'error', 'info' => 'info'][$i['state']] ?? 'open';
+            $class = ($i['state'] !== 'done' && !empty($i['ignoriert']) ? 'ignored ' : '') . ['done' => 'done', 'open' => 'open', 'error' => 'error', 'info' => 'info'][$i['state']] ?? 'open';
             $icon = ['done' => '✓', 'error' => '!', 'info' => 'i'][$i['state']] ?? '○';
             $title = $i['link'] !== '' ? '<a href="' . V::h($i['link']) . '">' . V::h($i['title']) . '</a>' : V::h($i['title']);
             $manual = !empty($i['manuell']) ? '<form method="post" action="/verwaltung/einrichtung" class="inline">'
                 . $this->hidden('bestaetigen', ['punkt' => $i['manuell'], 'erledigt' => $i['state'] === 'done' ? '0' : '1'])
                 . '<button class="secondary">' . ($i['state'] === 'done' ? 'Zurücknehmen' : 'Erledigt') . '</button></form>' : '';
             $chips = ($places ? '<span class="tag">' . V::h(Overview::PLACES[$i['ort'] ?? 'web'][0] ?? '') . '</span>' : '') . (!empty($i['optional']) ? '<span class="tag opt">optional</span>' : '');
+            $skip = $i['state'] !== 'done' && empty($i['optional']) && isset($i['key']) ? '<form method="post" action="/verwaltung/einrichtung" class="inline">'
+                . $this->hidden('ignorieren', ['punkt' => $i['key'], 'an' => !empty($i['ignoriert']) ? '0' : '1'])
+                . '<button class="secondary small">' . (!empty($i['ignoriert']) ? 'Wieder beachten' : 'Ignorieren') . '</button></form>' : '';
             $rows .= '<li class="' . $class . '"><span class="nr" aria-hidden="true"></span><span class="mark-icon" aria-hidden="true">' . $icon . '</span><span class="text">' . $title
-                . ($chips !== '' ? '<span class="chips">' . $chips . '</span>' : '') . ($i['hint'] !== '' ? '<small>' . V::h($i['hint']) . '</small>' : '') . '</span>' . $manual . '</li>';
+                . ($chips !== '' ? '<span class="chips">' . $chips . '</span>' : '') . ($i['hint'] !== '' ? '<small>' . V::h($i['hint']) . '</small>' : '') . '</span>' . $manual . $skip . '</li>';
         }
         return '<ol class="checklist">' . $rows . '</ol>';
     }
@@ -1761,6 +1769,9 @@ final class Web {
         if ($a === 'bestaetigen') {
             $this->ov()->confirm($r->field('punkt', 20), $r->field('erledigt') === '1');
             $this->audit->write($admin, 'einrichtung-' . ($r->field('erledigt') === '1' ? 'erledigt' : 'zurueck'), $r->field('punkt', 20));
+        } elseif ($a === 'ignorieren') {
+            $this->ov()->ignore($r->field('punkt', 20), $r->field('an') === '1');
+            $this->audit->write($admin, 'einrichtung-' . ($r->field('an') === '1' ? 'ignoriert' : 'beachtet'), $r->field('punkt', 20));
         } elseif ($a === 'neu') {
             $this->ov()->refresh();
         } else {
@@ -1939,7 +1950,7 @@ final class Web {
 
     private function openSteps(): int {
         try {
-            return count(array_filter($this->ov()->core(), fn($i) => in_array($i['state'], ['open', 'error'], true) && !$i['optional']));
+            return $this->ov()->open();
         } catch (\Throwable) {
             return 0;
         }
@@ -1967,7 +1978,7 @@ final class Web {
         }
         return ['apps' => $apps, 'settings' => $settings, 'login' => $this->session['login'], 'admin' => $admin, 'csrf' => $this->session['csrf'],
             'updates' => $admin && $this->updates ? $this->updates->count() : 0, 'module' => $admin && $this->store ? $this->store->count() : 0, 'sicherung' => $admin && $this->backup ? $this->backup->count() : 0,
-            'pfad' => $this->req?->path ?? '', 'einrichtung' => $admin ? $this->openSteps() : 0, 'offen' => $admin ? $this->openPaths() : []];
+            'pfad' => $this->req?->path ?? '', 'einrichtung' => $admin ? $this->openSteps() : 0, 'offenLogo' => $admin && $this->openSteps() > 0, 'offen' => $admin ? $this->openPaths() : []];
     }
 
     private function issuer(): string { return $this->config->practice !== '' ? 'Kienzle-Suite ' . $this->config->practice : 'Kienzle-Suite'; }

@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.15
+
+- Updates: Zustand, installierte und neue Version stehen in einer einzigen Karte mit Statussymbol (✓ aktuell, ↑ neue Version, ! Fehler); die Karte „Verfügbar“ entfällt.
+- Roter Punkt am K-Logo, solange die Einrichtung nicht abgeschlossen ist.
+- Einrichtung: Jeder nötige Punkt lässt sich „Ignorieren“ (und wieder beachten); ignorierte Punkte zählen nicht als offen. Nur mit Testdaten geprüft, nicht im Browser.
+
 ## 0.21.4-beta.14
 
 - Verwaltung → Module zeigt pro Modul den Zustand der Dienste („läuft“ / „gestoppt“) mit den Knöpfen „Starten“ bzw. „Neu starten“ und „Status der Dienste aktualisieren“. Der Status wird bei der täglichen Modulprüfung und auf Knopfdruck erneuert. Nur mit nachgebautem systemctl getestet, nicht auf dem echten Server (Ubuntu 26.04).
