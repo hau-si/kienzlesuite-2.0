@@ -33,7 +33,7 @@ final class SumUpClient {
             'total_amount' => ['currency' => 'EUR', 'minor_unit' => 2, 'value' => $payment['amount_cents']],
             // Bei T2med-Rechnungen erscheint die Rechnungsnummer in den SumUp-Umsätzen.
             // Keine Patientendaten; Abgleich weiterhin über die neutrale Referenz.
-            'description' => !empty($payment['t2med_invoice']) ? 'Rechnung ' . $payment['t2med_invoice'] : $payment['reference'],
+            'description' => !empty($payment['description']) ? mb_substr((string)$payment['description'], 0, 120) : (!empty($payment['t2med_invoice']) ? 'Rechnung ' . $payment['t2med_invoice'] : $payment['reference']),
             'affiliate' => ['app_id' => $this->config->get('sumup', 'app_id'),
                 'key' => $this->config->get('sumup', 'affiliate_key'), 'foreign_transaction_id' => $payment['reference']],
         ]);

@@ -1,5 +1,11 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.0-beta.3
+
+- Neu: **Manuelle Kartenzahlung** auf der Startseite der Kasse (ohne Patientenakte): Betreff und Betrag eingeben, die Zahlung startet am Kartenterminal; der Betreff wird als Beschreibung an SumUp übergeben (keine Patientendaten eintragen). „Vorgang abschließen“ beendet sie, es wird nichts in T2med geschrieben. Beleg und Rechnung wie bei anderen Zahlungen.
+- Auf der Startseite gibt es jetzt einen großen Knopf „Einstellungen der Kasse“.
+- Nicht mit echtem SumUp-Terminal getestet (nur Testmodus).
+
 ## 2.3.0-beta.2
 
 - Bei einer offenen Überweisung gibt es „Überweisungsdaten als PDF“ und „Überweisungsdaten drucken“: ein Bon mit Empfänger, IBAN, BIC, Betrag, Verwendungszweck und dem EPC-QR-Code zum Mitgeben (Bondrucker oder PDF). Der gedruckte QR-Code wurde mit einem OpenCV-Decoder gegengelesen; Druck auf echtem Bondrucker nicht getestet.

@@ -118,7 +118,7 @@ final class App {
     }
     public function state(array $visit, array $browser): array {
         $payment = $this->db->one('SELECT * FROM payments WHERE visit_id=? ORDER BY rowid DESC LIMIT 1', [$visit['id']]);
-        return ['visit_id' => $visit['id'], 'csrf' => $browser['csrf'],
+        return ['visit_id' => $visit['id'], 'csrf' => $browser['csrf'], 'manual' => self::isManual($visit),
             'patient' => ['name' => $visit['patient_name'], 'birthdate' => $visit['patient_birthdate']],
             'completed' => $visit['completed_at'] !== null,
             'services' => array_map(static fn($s) => ['vat' => (bool)$s['vat']] + $s, $this->db->query('SELECT id,label,price_cents,goae_code,factor,fee_type,on_request,vat,base_cents,default_reason FROM services WHERE active=1 ORDER BY label COLLATE NOCASE')->fetchAll()),
@@ -138,6 +138,27 @@ final class App {
             'letter' => ['enabled' => $this->letter->enabled(), 'mode' => $this->letter->mode()],
             'print' => $this->printSettings(),
             'max_amount_cents' => $this->config->get('app', 'max_amount_cents')];
+    }
+    private static function isManual(array $visit): bool { return str_starts_with((string)$visit['context_id'], 'manual-'); }
+    /**
+     * Manuelle Kartenzahlung ohne Patientenakte: Betreff und Betrag eingeben, die Zahlung startet am Terminal.
+     * Legt einen eigenen Vorgang an und liefert wie beim Start aus T2med einen einmaligen Startlink.
+     */
+    public function manualStart(array $input): array {
+        $label = trim(self::string($input, 'label', 80));
+        if (preg_match('/[\x00-\x1f\x7f]/', $label)) throw new Problem('Der Betreff enthält ungültige Zeichen.');
+        $amount = self::string($input, 'amount', 16);
+        $request = self::string($input, 'request_id', 64);
+        if (!preg_match('/^[A-Za-z0-9-]{16,64}$/D', $request)) throw new Problem('Ungültiger Vorgangsschlüssel.');
+        $id = self::id();
+        $this->db->query('INSERT INTO visits(id,context_id,patient_id,patient_name,patient_birthdate,patient_address,oauth_cipher,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?)',
+            [$id, 'manual-' . $id, 'manual', 'Manuelle Zahlung', '', '[]', $this->encrypt(''), time(), time() + $this->config->get('app', 'session_hours') * 3600]);
+        $visit = $this->db->one('SELECT * FROM visits WHERE id=?', [$id]);
+        try { $this->start($visit, ['services' => [], 'manual_amount' => $amount, 'manual_label' => $label, 'request_id' => $request, 'method' => 'card']); }
+        catch (\Throwable $e) { $this->db->query('DELETE FROM visits WHERE id=? AND NOT EXISTS (SELECT 1 FROM payments WHERE visit_id=visits.id)', [$id]); throw $e; }
+        $ticket = bin2hex(random_bytes(32));
+        $this->db->query('INSERT INTO launch_tickets(hash,visit_id,expires_at) VALUES(?,?,?)', [hash('sha256', $ticket), $id, time() + 300]);
+        return ['url' => rtrim($this->config->get('app', 'base_url'), '/') . '/#launch=' . $ticket];
     }
     private function editable(array $visit): void {
         if ($visit['completed_at'] !== null) throw new Problem('Dieser Vorgang ist bereits abgeschlossen.', 409);
@@ -169,6 +190,7 @@ final class App {
         // Alte gespeicherte Startanfragen behalten ihren bisherigen Idempotenzschlüssel.
         $payload = [$ids, $manual];
         if (array_key_exists('groups', $input) || array_key_exists('reasons', $input) || array_key_exists('service_date', $input)) $payload = [...$payload, $groups, $reasons, $dateInput];
+        if (($input['manual_label'] ?? '') !== '') $payload[] = 'label:' . self::string($input, 'manual_label', 80, false);
         if ($method !== 'card') $payload[] = $method;
         $hash = hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR));
         return $this->db->locked('reader', function () use ($visit, $request, $hash, $ids, $manual, $groups, $reasons, $date, $input, $method): array {
@@ -209,7 +231,7 @@ final class App {
                 usort($items, static fn($a, $b) => strnatcasecmp($a['goae_code'] ?: $a['label'], $b['goae_code'] ?: $b['label']));
                 if ($manual !== '') {
                     $cents = Money::cents($manual, $max); $amount += $cents;
-                    $items[] = ['id' => null, 'label' => 'Sonstiger Betrag', 'price_cents' => $cents, 'vat_rate' => Tax::rateFor($tax, $tax['manual_vat'])];
+                    $items[] = ['id' => null, 'label' => self::string($input, 'manual_label', 80, false) ?: 'Sonstiger Betrag', 'price_cents' => $cents, 'vat_rate' => Tax::rateFor($tax, $tax['manual_vat'])];
                 }
                 if ($amount <= 0 || $amount > $max) throw new Problem('Bitte Leistungen oder einen zulässigen Betrag auswählen.');
                 $hasGoae = count(array_filter($items, static fn($s) => ($s['goae_code'] ?? '') !== ''));
@@ -316,6 +338,9 @@ final class App {
     }
     // Aufrufer hält die Terminalsperre; die Zahlung ist bereits als 'starting' gespeichert.
     private function begin(array $payment): array {
+        // Manuelle Kartenzahlung ohne Patient: Betreff statt Referenz an SumUp (keine Patientendaten enthalten).
+        $context = (string)($this->db->one('SELECT context_id FROM visits WHERE id=?', [$payment['visit_id']])['context_id'] ?? '');
+        if (str_starts_with($context, 'manual-')) $payment['description'] = (string)(json_decode($payment['services_json'], true)[0]['label'] ?? '');
         try {
             $result = $this->sumup->start($payment);
             // Ein zweites Browserfenster könnte während des Starts bereits einen
@@ -786,6 +811,8 @@ final class App {
             $p = $this->payment($visit, $id);
             if ($p['doc_status'] === 'written') return $this->publicPayment($p);
             if ($p['payment_status'] !== 'successful') throw new Problem('Die Zahlung ist noch nicht als erfolgreich bestätigt.', 409);
+            // Manuelle Zahlung ohne Patientenakte: nur abschließen, nichts in T2med schreiben.
+            if (self::isManual($visit)) return $this->finish($p, 'manuell');
             if ($this->config->get('fhir', 'mode') === 'live' && $p['invoice_json'] && json_decode($p['invoice_json'], true, 32, JSON_THROW_ON_ERROR)['mock']) throw new Problem('Ein Testbeleg darf nicht in eine echte Patientenakte geschrieben werden.', 409);
             $token = $this->decrypt($visit['oauth_cipher']);
             $conditional = false;

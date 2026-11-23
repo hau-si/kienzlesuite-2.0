@@ -292,12 +292,12 @@ function renderPayment() {
   let title, description, symbol='…';
   if(p.doc_status==='written') {
     title='Vorgang abgeschlossen'; symbol='✓';
-    description=state.fhir_mock ? 'Testdokumentation gespeichert. Es wurde nichts in t2med geschrieben. Dieses Fenster kann geschlossen werden.' : 'Die Zahlung wurde in t2med dokumentiert. Dieses Fenster kann geschlossen werden.';
+    description=state.manual ? 'Die manuelle Zahlung ist abgeschlossen. Dieses Fenster kann geschlossen werden.' : state.fhir_mock ? 'Testdokumentation gespeichert. Es wurde nichts in t2med geschrieben. Dieses Fenster kann geschlossen werden.' : 'Die Zahlung wurde in t2med dokumentiert. Dieses Fenster kann geschlossen werden.';
   } else if(p.payment_status==='successful') {
     title=p.method==='cash' ? 'Barzahlung erfasst' : p.method==='transfer' ? 'Überweisung bestätigt' : 'Zahlung erfolgreich'; symbol='✓';
-    description='Mit „Dokumentation in der Akte“ wird die Zahlung in t2med dokumentiert und der Vorgang abgeschlossen.';
+    description=state.manual ? 'Mit „Vorgang abschließen“ ist die manuelle Zahlung erledigt. In T2med wird nichts dokumentiert.' : 'Mit „Dokumentation in der Akte“ wird die Zahlung in t2med dokumentiert und der Vorgang abgeschlossen.';
     $('document').hidden=false;
-    $('document').textContent=p.doc_status==='unknown' || p.doc_status==='writing' ? 'Dokumentation prüfen / erneut versuchen' : 'Dokumentation in der Akte';
+    $('document').textContent=p.doc_status==='unknown' || p.doc_status==='writing' ? 'Dokumentation prüfen / erneut versuchen' : state.manual ? 'Vorgang abschließen' : 'Dokumentation in der Akte';
     $('mock-fhir-label').hidden=!state.mock;
     $('mock-fhir-fail').checked=state.mock_document_fail;
   } else if(p.payment_status==='transfer_open') {
@@ -382,7 +382,7 @@ async function load() {
   $('welcome').hidden=true; $('workspace').hidden=false;
   $('mode').hidden=!state.mock && !state.fhir_mock;
   $('mode').textContent=state.mock?'TESTMODUS':state.fhir_mock?'T2MED TESTMODUS':'';
-  $('patient-name').textContent=state.patient.name;
+  $('patient-name').textContent=state.patient.name; document.querySelector('.patient .eyebrow').textContent=state.manual ? 'OHNE PATIENTENAKTE' : 'AKTUELLER PATIENT';
   $('patient-birth').textContent=state.patient.birthdate ? 'Geboren am '+state.patient.birthdate.split('-').reverse().join('.') : '';
   $('practice-hint').hidden=state.local_receipts;
   if(!$('service-date').value) $('service-date').value=state.today;
@@ -538,6 +538,11 @@ $('document').onclick=()=>run(async()=>{
 $('mock-success').onclick=()=>run(async()=>{ await api('mock',{payment_id:state.payment.id,status:'successful'}); await load(); });
 $('mock-fail').onclick=()=>run(async()=>{ await api('mock',{payment_id:state.payment.id,status:'failed'}); await load(); });
 $('mock-fhir-fail').onchange=()=>run(async()=>{ await api('mock',{document_fail:$('mock-fhir-fail').checked}); await load(); });
+$('manual-form').onsubmit=event=>{ event.preventDefault(); run(async()=>{
+  const key='ks-manual'; let request_id=sessionStorage.getItem(key); if(!request_id) { request_id=crypto.randomUUID(); sessionStorage.setItem(key,request_id); }
+  const result=await api('manual',{label:$('manual-label').value.trim(),amount:$('manual-amount').value.trim(),request_id});
+  sessionStorage.removeItem(key); location.href=result.url; location.reload();
+}); };
 $('demo').onclick=()=>run(async()=>{ const result=await api('demo'); location.href=result.url; location.reload(); });
 async function init() {
   // Start aus T2med: #launch=<code>. Musste sich der Benutzer erst an der Suite anmelden, hat die Basis den Code im Tab gemerkt.

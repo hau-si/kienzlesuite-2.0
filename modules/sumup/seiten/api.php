@@ -30,6 +30,9 @@ try {
         if ($app->config->get('sumup', 'mode') !== 'mock' || $app->config->get('fhir', 'mode') !== 'mock') throw new Problem('Testpatient nur im Testmodus.', 403);
         $result = $app->launch(['context_id' => 'demo', 'oauth_token' => '', 'fhir_base_url' => '']);
         $result['url'] = str_replace('/#launch=', ks_url('#launch='), $result['url']);
+    } elseif ($action === 'manual') {
+        $result = $app->manualStart($input);
+        $result['url'] = str_replace('/#launch=', ks_url('#launch='), $result['url']);
     } elseif ($action === 'exchange') {
         $result = $app->exchange(App::string($input, 'ticket', 64), $_COOKIE['ks_browser'] ?? null);
         setcookie('ks_browser', $result['cookie'], ['expires' => time() + $app->config->get('app', 'session_hours') * 3600,

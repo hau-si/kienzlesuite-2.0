@@ -81,6 +81,20 @@ try {
     // T2med-Rechnungen: nur Karte oder Bar.
     problem(fn() => $app->startInvoice($v1, ['request_id' => App::id(), 'invoice_id' => str_repeat('a', 32), 'method' => 'transfer']), 'Überweisung bei T2med-Rechnung akzeptiert', 400);
 
+    // Manuelle Kartenzahlung ohne Patientenakte: Betreff + Betrag, Abschluss ohne Schreiben in T2med.
+    problem(fn() => $app->manualStart(['label' => 'Test', 'amount' => '0', 'request_id' => App::id()]), 'Betrag 0 akzeptiert', 400);
+    $m = $app->manualStart(['label' => 'Selbstzahler-Leistung', 'amount' => '25,00', 'request_id' => App::id()]);
+    parse_str(parse_url($m['url'], PHP_URL_FRAGMENT), $mf); $me = $app->exchange($mf['launch'], null);
+    $mv = $app->visit($app->browser($me['cookie']), $me['visit_id']);
+    $ms = $app->state($mv, $app->browser($me['cookie']));
+    check($ms['manual'] === true && $ms['payment']['amount_cents'] === 2500 && $ms['payment']['method'] === 'card', 'Manuelle Zahlung falsch: ' . json_encode($ms['payment']));
+    $row = $app->db->one('SELECT services_json FROM payments WHERE id=?', [$ms['payment']['id']]);
+    check(str_contains($row['services_json'], 'Selbstzahler-Leistung'), 'Betreff nicht übernommen');
+    $app->mock($mv, ['payment_id' => $ms['payment']['id'], 'status' => 'successful']);
+    $md = $app->document($mv, $ms['payment']['id']);
+    check($md['doc_status'] === 'written' && $app->db->one('SELECT fhir_resource_id FROM payments WHERE id=?', [$ms['payment']['id']])['fhir_resource_id'] === 'manuell', 'Manueller Abschluss falsch');
+    check(!$app->db->one('SELECT 1 FROM mock_records WHERE payment_id=?', [$ms['payment']['id']]), 'Manuelle Zahlung wurde als Akteneintrag geschrieben');
+
     // Ohne Kontodaten keine Überweisung.
     $s2 = sys_get_temp_dir() . '/ks-transfer-' . bin2hex(random_bytes(6)); $dirs[] = $s2; mkdir($s2, 0700);
     $plain = new App(config($s2, false), new NoNetwork()); $plain->db->migrate();
