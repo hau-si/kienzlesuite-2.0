@@ -15,6 +15,22 @@ final class FhirClient {
         return $this->http->request($method, rtrim($this->config->get('fhir', 'base_url'), '/') . $path, $headers, $body,
             $this->config->get('fhir', 'ca_file', ''), $this->config->get('fhir', 'pin_certificate', false));
     }
+    /** Meldung zu einem fehlgeschlagenen Patientenabruf: HTTP-Status, wahrscheinliche Ursache und ggf. die Auskunft von t2med (OperationOutcome, ohne Patientendaten). */
+    private static function contextError(int $status, mixed $body): string {
+        $hint = match (true) {
+            $status === 401, $status === 403 => 'T2med lehnt den Zugriff ab. Das Client Secret in der Suite (Verwaltung → Verbindungen → T2med) prüfen und ob der Drittanbieter-Zugriff in T2med noch zu diesem Secret gehört; außerdem darf der Aufruf nicht älter sein: bitte frisch aus der Patientenakte öffnen.',
+            $status === 404 => 'Die Adresse oder der Kontext ist T2med unbekannt. Bitte frisch aus der Patientenakte öffnen und die FHIR-Adresse prüfen.',
+            $status === 0 => 'Keine Antwort von T2med.',
+            default => 'Bitte erneut aus t2med öffnen.',
+        };
+        $detail = '';
+        if (is_array($body) && ($body['resourceType'] ?? '') === 'OperationOutcome') {
+            $text = (string)($body['issue'][0]['details']['text'] ?? $body['issue'][0]['diagnostics'] ?? '');
+            $text = trim(preg_replace('/[\x00-\x1f\x7f]+/u', ' ', $text) ?? '');
+            if ($text !== '') $detail = ' Auskunft von T2med: ' . mb_substr($text, 0, 160);
+        }
+        return 'Patientenkontext konnte nicht aus t2med geladen werden (HTTP ' . $status . '). ' . $hint . $detail;
+    }
     public function patient(string $context, string $token): array {
         if ($this->config->get('fhir', 'mode') === 'mock') return ['id' => 'demo-' . $context, 'name' => 'Erika Musterfrau', 'birthdate' => '1980-04-12', 'email' => 'erika@example.invalid', 'address' => ['Musterstraße 1', '12345 Musterstadt']];
         try {
@@ -22,7 +38,7 @@ final class FhirClient {
         } catch (TransportError $e) {
             throw new Problem('Patient konnte nicht aus t2med geladen werden: ' . $e->getMessage(), 502);
         }
-        if ($result['status'] !== 200) throw new Problem('Patientenkontext konnte nicht aus t2med geladen werden. Bitte erneut aus t2med öffnen.', 502);
+        if ($result['status'] !== 200) throw new Problem(self::contextError((int)$result['status'], $result['body']), 502);
         $body = $result['body']; $patients = [];
         if (($body['resourceType'] ?? '') === 'Patient') $patients[] = $body;
         elseif (($body['resourceType'] ?? '') === 'Bundle') {

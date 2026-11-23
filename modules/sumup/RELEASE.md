@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.2.5-beta.1
+
+- Meldung „Patientenkontext konnte nicht aus t2med geladen werden“ nennt jetzt den HTTP-Status, die wahrscheinliche Ursache (Secret/Token, Kontext abgelaufen, Adresse) und die Auskunft von T2med, soweit sie keine Patientendaten enthält. Nicht an einer echten T2med-Installation geprüft.
+
 ## 2.2.4-beta.1
 
 - Begriffe zur T2med-Anbindung vereinheitlicht: „Erlaubte fhirBasisUrl aus T2med“ in Anleitung, Fehlermeldung und Dokumentation, wie auf der Verbindungsseite der Basis (Basis 0.20.4-beta.1).
