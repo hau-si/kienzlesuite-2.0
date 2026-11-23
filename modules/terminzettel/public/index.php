@@ -59,6 +59,12 @@ try {
             if ($aktion === 'speichern') {
                 Seite::speichern(Seite::pruefen($_POST));
                 $meldung = 'Gespeichert.';
+            } elseif ($aktion === 'logo') {
+                Seite::logoSpeichern(Seite::uploadBytes($_FILES['logo'] ?? null));
+                $meldung = 'Logo gespeichert. Es wird gedruckt, wenn „Logo drucken“ angehakt und das Layout gespeichert ist.';
+            } elseif ($aktion === 'logo-entfernen') {
+                Seite::logoEntfernen();
+                $meldung = 'Logo entfernt.';
             } elseif ($aktion === 'testdruck') {
                 Seite::testdruck($k, Seite::werte($k->praxis()));
                 $meldung = 'Beispiel-Terminzettel an den Bondrucker übergeben (gespeichertes Layout).';

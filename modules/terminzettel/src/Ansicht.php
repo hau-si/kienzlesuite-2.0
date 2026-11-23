@@ -6,19 +6,44 @@ namespace KienzleTerminzettel;
 final class Ansicht {
     public static function seite(string $base, array $values, string $csrf, string $queue, ?string $meldung, ?string $fehler, string $host): string {
         $h = 'tz_h';
-        $form = '';
-        foreach (Seite::schema() as $key => $f) {
-            $v = $values[$key];
-            $id = 'f-' . $key;
-            $tip = isset(Seite::HILFE[$key]) ? ' <span class="hilfe" tabindex="0" role="note" aria-label="' . $h(Seite::HILFE[$key]) . '" data-tip="' . $h(Seite::HILFE[$key]) . '">i</span>' : '';
-            $form .= match ($f[0]) {
-                'bool' => '<label class="check"><input type="checkbox" id="' . $id . '" name="' . $key . '" value="1"' . ($v ? ' checked' : '') . '> ' . $h($f[1]) . '</label>',
-                'choice' => '<label>' . $h($f[1]) . '<select id="' . $id . '" name="' . $key . '">' . implode('', array_map(
-                    fn($val, $label) => '<option value="' . $h((string)$val) . '"' . ((string)$val === $v ? ' selected' : '') . '>' . $h($label) . '</option>', array_keys($f[3]), $f[3])) . '</select></label>',
-                'text' => '<label>' . $h($f[1]) . '<textarea id="' . $id . '" name="' . $key . '" rows="4" maxlength="1000">' . $h($v) . '</textarea></label>',
-                default => '<label>' . $h($f[1]) . $tip . '<input id="' . $id . '" name="' . $key . '" value="' . $h($v) . '" maxlength="80"></label>',
-            };
-        }
+        $tip = static fn(string $key): string => isset(Seite::HILFE[$key]) ? ' <span class="hilfe" tabindex="0" role="note" aria-label="' . tz_h(Seite::HILFE[$key]) . '" data-tip="' . tz_h(Seite::HILFE[$key]) . '">i</span>' : '';
+        $text = fn(string $key, string $label, int $max = 80): string => '<label for="f-' . $key . '">' . $h($label) . $tip($key) . '</label><input id="f-' . $key . '" name="' . $key . '" value="' . $h((string)$values[$key]) . '" maxlength="' . $max . '">';
+        $area = fn(string $key, string $label, int $rows): string => '<label for="f-' . $key . '">' . $h($label) . '</label><textarea id="f-' . $key . '" name="' . $key . '" rows="' . $rows . '" maxlength="1000">' . $h((string)$values[$key]) . '</textarea>';
+        $check = fn(string $key, string $label): string => '<label class="check"><input type="checkbox" id="f-' . $key . '" name="' . $key . '" value="1"' . ($values[$key] ? ' checked' : '') . '> ' . $h($label) . '</label>';
+        // Kleine Auswahlleiste statt Aufklappliste: ein Klick, alle Möglichkeiten sichtbar.
+        $seg = function (string $key, array $options, string $name) use ($values, $h): string {
+            $o = '';
+            foreach ($options as $val => $label) {
+                [$kurz, $lang] = is_array($label) ? $label : [$label, $label];
+                $o .= '<label title="' . $h($lang) . '"><input type="radio" name="' . $key . '" value="' . $h((string)$val) . '"' . ((string)$val === (string)$values[$key] ? ' checked' : '') . '><span>' . $h($kurz) . '</span></label>';
+            }
+            return '<span class="seg" role="radiogroup" aria-label="' . $h($name) . '">' . $o . '</span>';
+        };
+        $groessen = [];
+        foreach (Seite::SIZES as $val => $label) $groessen[$val] = [str_replace('x', '×', $val), $label];
+        $fett = fn(string $key): string => '<label class="tog" title="Fett drucken"><input type="checkbox" name="' . $key . '" value="1"' . ($values[$key] ? ' checked' : '') . '><span><b>F</b>ett</span></label>';
+        $format = fn(string $sizeKey, string $boldKey, string $name): string => '<div class="fmt"><span class="sm">Schrift</span>' . $seg($sizeKey, $groessen, $name . ': Schriftgröße') . $fett($boldKey) . '</div>';
+        $logo = Seite::logoDaten();
+        $logoZeile = '<div class="logo"><div class="logo-bild">' . ($logo !== '' ? '<img src="' . $h($logo) . '" alt="Aktuelles Logo">' : '<span class="muted">Kein Logo</span>') . '</div><div>'
+            . '<input type="file" name="logo" accept="image/png,image/jpeg,image/gif" form="logoform" aria-label="Logo-Datei">'
+            . '<div class="aktionen"><button class="zweit klein" name="aktion" value="logo" form="logoform">Hochladen</button>'
+            . ($logo !== '' ? '<button class="zweit klein" name="aktion" value="logo-entfernen" form="logoform">Entfernen</button>' : '') . '</div>'
+            . '<p class="muted klein-text">PNG, JPEG oder GIF bis 2 MB. Wird in Schwarz-Weiß umgerechnet; einfache, kontrastreiche Logos drucken am besten. Beim Hochladen wird die Seite neu geladen: ungespeicherte Änderungen vorher speichern.</p></div></div>';
+        $form = '<section class="card">' . $check('enabled', 'Terminzettel aus T2med auf dem Bondrucker drucken') . '</section>'
+            . '<section class="card"><h2><span class="ico" aria-hidden="true">▣</span> Kopf</h2>'
+            . '<div class="teil"><h3>Logo</h3>' . $logoZeile . '<div class="fmt">' . $check('logo_enabled', 'Logo drucken') . '<span class="sm">Breite</span>' . $seg('logo_size', Seite::LOGO_SIZES, 'Logo: Breite') . '</div></div>'
+            . '<div class="teil"><h3>Praxisname</h3>' . $text('name_text', 'Erste Zeile') . $format('name_size', 'name_bold', 'Praxisname') . '</div>'
+            . '<div class="teil"><h3>Adressblock</h3>' . $area('address_text', 'Straße, Ort, Kontakt (eine Angabe je Zeile; leer = keiner)', 3) . $format('address_size', 'address_bold', 'Adressblock') . '</div></section>'
+            . '<section class="card"><h2><span class="ico" aria-hidden="true">▤</span> Termine</h2>'
+            . '<div class="teil"><h3>Überschrift</h3>' . $text('heading', 'Text') . '<div class="fmt"><span class="sm">Schrift</span>' . $seg('heading_size', $groessen, 'Überschrift: Schriftgröße') . '</div></div>'
+            . '<div class="teil"><h3>Terminliste</h3>' . $check('show_patient', 'Patientennamen drucken') . '<div class="fmt"><span class="sm">Schrift</span>' . $seg('appointment_size', $groessen, 'Termine: Schriftgröße') . '</div></div></section>'
+            . '<section class="card"><h2><span class="ico" aria-hidden="true">▥</span> Endtext</h2>' . $area('footer_text', 'Text unter den Terminen (leer = keiner)', 3)
+            . '<div class="fmt"><span class="sm">Schrift</span>' . $seg('footer_size', $groessen, 'Endtext: Schriftgröße') . '</div></section>'
+            . '<section class="card"><h2><span class="ico" aria-hidden="true">▦</span> Kalender-QR</h2>' . $check('qr_enabled', 'Kalender-QR je Termin drucken')
+            . '<div class="fmt"><span class="sm">Position</span>' . $seg('qr_position', ['below' => ['Unter', 'Unter dem Termin (mittig)'], 'right' => ['Rechts', 'Rechts neben dem Termin'], 'left' => ['Links', 'Links neben dem Termin']], 'Position des QR-Codes')
+            . '<span class="sm">Größe</span>' . $seg('qr_size', ['small' => 'Klein', 'medium' => 'Mittel', 'large' => 'Groß'], 'Größe des QR-Codes') . '</div>'
+            . $text('qr_summary', 'Kalender-Titel (Präfix)') . '</section>'
+            . '<section class="card">' . $check('cut', 'Bon abschneiden') . '<p><button>Speichern</button></p></section>';
         $printer = 'http://' . $host . ':631/printers/Terminzettel';
         return '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             . '<meta name="kienzle-csrf" content="' . $h($csrf) . '"><title>Terminzettel</title><link rel="stylesheet" href="' . $h($base) . '/assets/style.css"></head><body>'
@@ -27,9 +52,10 @@ final class Ansicht {
             . ($meldung ? '<p class="ok">' . $h($meldung) . '</p>' : '') . ($fehler ? '<p class="fehler">' . $h($fehler) . '</p>' : '')
             . ($queue === '' ? '<p class="fehler">Noch kein Bondrucker zugeordnet: Verwaltung → Drucker → „Wofür welcher Drucker?“.</p>'
                 : '<p class="muted">Bondrucker: <strong>' . $h($queue) . '</strong> (Verwaltung → Drucker).</p>')
-            . '<div class="gitter"><form method="post" action="' . $h($base) . '/" class="card" id="layout"><input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"><input type="hidden" name="aktion" value="speichern">'
+            . '<div class="gitter"><div><form method="post" action="' . $h($base) . '/" class="stack" id="layout"><input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"><input type="hidden" name="aktion" value="speichern">'
             . '<p class="muted">Papierbreite des Bondruckers: <strong>' . Seite::bonBreite() . ' mm</strong> – zentral einzustellen unter <a href="/verwaltung/drucker">Verwaltung → Drucker</a>.</p>'
-            . $form . '<p><button>Speichern</button></p></form>'
+            . $form . '</form>'
+            . '<form method="post" action="' . $h($base) . '/" enctype="multipart/form-data" id="logoform"><input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"></form></div>'
             . '<aside class="card"><h2>Vorschau (Beispieldaten)</h2><div id="vorschau" class="vorschau"><img id="bild" alt="Vorschau des Bons" hidden><p id="hinweis" class="muted">Wird geladen …</p></div><p id="ungespeichert" class="fehler" hidden>Ungespeicherte Änderungen: Die Vorschau zeigt den Stand des Formulars. Gedruckt wird erst nach „Speichern“.</p>'
             . '<form method="post" action="' . $h($base) . '/"><input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"><input type="hidden" name="aktion" value="testdruck">'
             . '<button class="zweit"' . ($queue === '' ? ' disabled' : '') . '>Beispiel-Terminzettel drucken</button></form></aside></div>'

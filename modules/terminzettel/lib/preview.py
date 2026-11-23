@@ -127,6 +127,19 @@ class Interpreter:
         if canvas is not None:
             canvas.paste(strip, (x, y - 23))
 
+    def raster(self, row_bytes: int, height: int, data: bytes):
+        """GS v 0 im Standardmodus (Logo): gesetzte Bits sind schwarz, Ausrichtung wie beim Text."""
+        if self.page is not None or not row_bytes or not height:
+            return
+        if self.line:
+            self.flush_line()
+        width = row_bytes * 8
+        image = self.Image.frombytes("1", (width, height), bytes(b ^ 0xFF for b in data[:row_bytes * height])).convert("L")
+        strip = self.Image.new("L", (self.width, height), 255)
+        x = 0 if self.align == 0 else (self.width - width) // 2 if self.align == 1 else self.width - width
+        strip.paste(image, (max(0, x), 0))
+        self.rows.append(strip)
+
     def run(self, data: bytes):
         i, n, pending = 0, len(data), bytearray()
 
@@ -193,6 +206,7 @@ class Interpreter:
                     self.cut = True; i += 3
                 elif c == ord("v") and data[i + 2] == ord("0"):
                     row_bytes = int.from_bytes(data[i + 4:i + 6], "little"); height = int.from_bytes(data[i + 6:i + 8], "little")
+                    self.raster(row_bytes, height, data[i + 8:i + 8 + row_bytes * height])
                     i += 8 + row_bytes * height
                 else:
                     i += 2

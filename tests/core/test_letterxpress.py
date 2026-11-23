@@ -31,7 +31,8 @@ class Letterxpress(unittest.TestCase):
         c = {'t2med': None, 'mail': None, 'ablage': [], 'letterxpress': {'username': 'u', 'api_key': 'k', 'modus': 'test'}}
         mods = [{'module': {'id': 'kasse'}, 'connections': [{'id': 'letterxpress'}]}, {'module': {'id': 'andere'}, 'connections': [{'id': 'mail'}]}]
         with mock.patch.object(v, '_write') as w, mock.patch.object(v, 'registry', return_value=mods), mock.patch.object(v, '_group_exists', return_value=True), \
-                mock.patch.object(v, 'KEYS', Path('/nonexistent-keys')), mock.patch.object(Path, 'exists', return_value=True), mock.patch.object(Path, 'is_dir', return_value=False):
+                mock.patch.object(v, 'KEYS', Path('/nonexistent-keys')), mock.patch.object(Path, 'exists', return_value=True), \
+                mock.patch.object(Path, 'is_dir', return_value=False):
             v.distribute(c)
         written = {Path(call.args[0]).name: call.args[1] for call in w.call_args_list}
         self.assertEqual(written['kasse.json']['letterxpress']['api_key'], 'k')

@@ -39,3 +39,32 @@ ol li { margin: 6px 0; }
 
 .hilfe { position: relative; display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: 4px; border-radius: 50%; background: var(--soft); color: var(--teal); font-size: 12px; font-weight: 700; cursor: help; vertical-align: middle; }
 .hilfe:hover::after, .hilfe:focus::after { content: attr(data-tip); position: absolute; left: 50%; bottom: 150%; transform: translateX(-30%); width: 260px; padding: 9px 11px; border-radius: 9px; background: #203c43; color: #fff; font-size: 13px; font-weight: 400; line-height: 1.4; z-index: 5; text-align: left; }
+
+/* Einstellungen: ein Block je Teil des Bons, Schrift als kleine Auswahlleiste. */
+.stack { display: grid; gap: 16px; }
+.stack > p { margin: 0; }
+.stack .card { padding: 16px 18px; }
+.card h2 { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.card h2 .ico { color: var(--teal); font-size: 17px; line-height: 1; }
+.teil { padding: 10px 0; border-top: 1px solid var(--line); }
+.teil:first-of-type { border-top: 0; padding-top: 0; }
+.teil h3 { margin: 0 0 2px; font-size: 13px; color: var(--muted); font-weight: 650; text-transform: uppercase; letter-spacing: .04em; }
+.teil label:not(.check):not(.tog) { margin-top: 8px; font-weight: 500; font-size: 13px; }
+.fmt { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px; }
+.fmt .sm { font-size: 12px; color: var(--muted); }
+.fmt .check { margin: 0; }
+.seg { display: inline-flex; border: 1px solid #c9d7d3; border-radius: 8px; overflow: hidden; background: #fff; }
+.seg label, .tog { position: relative; display: block; margin: 0; font-weight: 500; }
+.seg input[type=radio], .tog input[type=checkbox] { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
+.seg span, .tog span { display: block; padding: 3px 9px; min-height: 28px; line-height: 22px; font-size: 13px; cursor: pointer; user-select: none; }
+.seg label + label span { border-left: 1px solid var(--line); }
+.tog span { border: 1px solid #c9d7d3; border-radius: 8px; background: #fff; }
+.seg input:checked + span, .tog input:checked + span { background: var(--teal); color: #fff; }
+.seg input:focus-visible + span, .tog input:focus-visible + span { outline: 2px solid #a8d5c9; outline-offset: 1px; }
+.logo { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; margin-top: 6px; }
+.logo-bild { display: grid; place-items: center; width: 120px; min-height: 64px; padding: 6px; border: 1px dashed #c9d7d3; border-radius: 10px; background: #fff; }
+.logo-bild img { max-width: 100%; max-height: 90px; image-rendering: auto; }
+.logo input[type=file] { margin: 0 0 6px; padding: 6px; font-size: 13px; }
+.aktionen { display: flex; gap: 8px; }
+button.klein { min-height: 32px; padding: 4px 12px; font-size: 13px; }
+.klein-text { font-size: 12px; margin: 6px 0 0; max-width: 34em; }

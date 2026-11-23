@@ -229,7 +229,8 @@ def test_letterxpress(c: dict | None) -> str:
     """Zugangsdaten prüfen (Guthaben abfragen); es wird nichts gedruckt oder verschickt."""
     bal = letterxpress_balance(c)
     _balance_record('letterxpress', bal)
-    return 'Verbunden' + (f'. Guthaben: {bal:.2f} €' if bal is not None else '') + f'. Betrieb: {"Live (echter Postversand)" if c.get("modus") == "live" else "Test (nichts wird verschickt)"}.'
+    betrieb = 'Live (echter Postversand)' if c.get('modus') == 'live' else 'Test (nichts wird verschickt)'
+    return 'Verbunden' + (f'. Guthaben: {bal:.2f} €' if bal is not None else '') + f'. Betrieb: {betrieb}.'
 
 
 def balance_letterxpress(c: dict | None) -> str:
@@ -458,7 +459,8 @@ def _google_post(url: str, data: bytes, headers: dict) -> dict:
             err = json.loads(e.read(20000).decode('utf-8', 'replace'))
         except ValueError:
             err = {}
-        why = err.get('error_description') or (err.get('error') if isinstance(err.get('error'), str) else '') or ((err.get('error') or {}).get('message') if isinstance(err.get('error'), dict) else '') or ''
+        fehler = err.get('error')
+        why = err.get('error_description') or (fehler if isinstance(fehler, str) else '') or (fehler.get('message') if isinstance(fehler, dict) else '') or ''
         raise Fehler(f'Google lehnt ab (HTTP {e.code})' + (f': {CONTROL.sub(" ", str(why))[:160]}' if why else '') + '.') from None
     except (OSError, ValueError) as e:
         raise Fehler(f'Google nicht erreichbar: {str(e)[:100]}') from None
@@ -490,7 +492,8 @@ def set_gmail(config: dict, d: dict) -> None:
         out = _google_post(GOOGLE_TOKEN, data, {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'})
         refresh = out.get('refresh_token', '')
         if not refresh:
-            raise Fehler('Google hat kein Dauer-Token geliefert. Bitte die Anmeldung wiederholen und unter „Zugriff“ alles bestätigen (ggf. bei myaccount.google.com → Sicherheit den alten Zugriff entfernen).')
+            raise Fehler('Google hat kein Dauer-Token geliefert. Bitte die Anmeldung wiederholen und unter „Zugriff“ alles bestätigen '
+                         '(ggf. bei myaccount.google.com → Sicherheit den alten Zugriff entfernen).')
     if not refresh:
         raise Fehler('Noch nicht mit Google angemeldet: bitte auf „Mit Google verbinden“ klicken und den Code übernehmen.')
     config['mail'] = {'art': 'gmail', 'client_id': cid, 'client_secret': secret, 'refresh_token': refresh, 'absender': sender}
@@ -533,7 +536,8 @@ def send_mail(c: dict | None, to: list[str], subject: str, body: str) -> None:  
     if c.get('art') == 'gmail':
         import base64
         raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
-        _google_post(GMAIL_SEND, json.dumps({'raw': raw}).encode(), {'Authorization': 'Bearer ' + _gmail_access(c), 'Content-Type': 'application/json', 'Accept': 'application/json'})
+        kopf = {'Authorization': 'Bearer ' + _gmail_access(c), 'Content-Type': 'application/json', 'Accept': 'application/json'}
+        _google_post(GMAIL_SEND, json.dumps({'raw': raw}).encode(), kopf)
         return
     try:
         _smtp(c, lambda smtp: smtp.send_message(msg))
@@ -550,6 +554,14 @@ def test_mail_send(c: dict | None, to: str) -> str:
 
 
 # ---- Status ohne Geheimnisse -------------------------------------------------------------------------------------
+def _mail_status(mail: dict) -> dict:
+    """Mail-Verbindung für die Statusanzeige (ohne Passwort, Secret und Token)."""
+    if mail.get('art') == 'gmail':
+        return {'art': 'gmail', 'client_id': mail['client_id'], 'absender': mail['absender'],
+                'secret_gesetzt': bool(mail.get('client_secret')), 'verbunden': bool(mail.get('refresh_token'))}
+    return {'art': 'smtp', **{k: mail[k] for k in ('host', 'port', 'sicherheit', 'benutzer', 'absender')}, 'passwort_gesetzt': bool(mail.get('passwort'))}
+
+
 def view(config: dict, extra: dict | None = None) -> dict:
     try:
         old = json.loads((STATE / 'status.json').read_text(encoding='utf-8'))
@@ -572,8 +584,7 @@ def view(config: dict, extra: dict | None = None) -> dict:
     out = {'zeit': int(time.time()), 'tests': old.get('tests', {}), 'hostkeys': old.get('hostkeys', {}), 'zertifikate': old.get('zertifikate', {}),
            'hinweise': old.get('hinweise', []), 'guthaben': old.get('guthaben', {}),
            't2med': {**{k: t2[k] for k in ('base_url', 'launch_urls', 'pin')}, 'api_key_gesetzt': bool(t2.get('api_key')), 'zertifikat': ca_fp} if t2 else None,
-           'mail': ({'art': 'gmail', 'client_id': mail['client_id'], 'absender': mail['absender'], 'secret_gesetzt': bool(mail.get('client_secret')), 'verbunden': bool(mail.get('refresh_token'))}
-                    if mail.get('art') == 'gmail' else {'art': 'smtp', **{k: mail[k] for k in ('host', 'port', 'sicherheit', 'benutzer', 'absender')}, 'passwort_gesetzt': bool(mail.get('passwort'))}) if mail else None,
+           'mail': _mail_status(mail) if mail else None,
            'sms': {'anbieter': sms['anbieter'], 'absender': sms.get('absender', ''), 'schluessel_gesetzt': bool(sms.get('api_key'))} if sms else None,
            'letterxpress': {'username': lxp['username'], 'modus': lxp.get('modus', 'test'), 'schluessel_gesetzt': bool(lxp.get('api_key'))} if lxp else None,
            'ablage': [{**{k: v for k, v in t.items() if k != 'passwort'}, 'passwort_gesetzt': bool(t.get('passwort')),

@@ -19,7 +19,6 @@ class Wiederstart(unittest.TestCase):
 
     def systemctl(self, *args):
         self.calls.append(args)
-        name = args[1] if len(args) > 1 else ''
         code = 3 if args[0] == 'is-active' else 0   # eingeschaltet, aber nicht aktiv
         return subprocess.CompletedProcess(args, code)
 

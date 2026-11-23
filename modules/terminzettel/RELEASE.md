@@ -1,5 +1,11 @@
 # Terminzettel – Release-Notizen
 
+## 1.3.0-beta.1
+
+- Einstellungsseite neu geordnet: je ein Block für Kopf, Termine, Endtext, Kalender-QR und Drucken, in der Reihenfolge des Bons. Schriftgröße und Fett stehen als kleine Auswahlleiste direkt beim jeweiligen Text (statt vieler Aufklapplisten).
+- Praxisname (erste Zeile) und Adressblock sind jetzt getrennte Felder mit eigener Schrift. Bereits gespeicherte Einstellungen werden beim Öffnen automatisch aufgeteilt (erste Zeile des alten Kopfes = Praxisname, Rest = Adressblock; Größe und Fett bleiben erhalten).
+- Neu: Praxislogo. Auf der Einstellungsseite hochladen (PNG, JPEG oder GIF bis 2 MB); es wird in Schwarz-Weiß umgerechnet und oben mittig auf den Bon gedruckt, Breite Klein/Mittel/Groß, die Vorschau zeigt es mit. Ein Logo ohne lesbare Datei verhindert den Ausdruck nie. Nicht auf echtem Bondrucker getestet (Raster `GS v 0`, wie bisher bei anderen Grafiken).
+
 ## 1.2.4-beta.2
 
 - Windows-Skript: Anschluss und Drucker werden bis zu viermal angelegt (Pause nach dem Spooler-Neustart, sonst Fehler 0x800703eb), am Ende zeigt es den angelegten Drucker. Nicht getestet (auf dem Windows-PC des Anwenders klappte der Befehl `Add-Printer` beim zweiten Versuch).
