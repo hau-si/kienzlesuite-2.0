@@ -160,6 +160,18 @@ final class Overview {
 
     }
 
+    /** Seiten (Pfad ohne Anhang), auf denen noch ein nötiger Schritt offen ist – für die blaue Markierung im Menü. */
+    public function openPaths(): array {
+        $items = $this->core();
+        foreach ($this->modules() as $m) foreach ($m['items'] as $i) $items[] = $i;
+        $out = [];
+        foreach ($items as $i) {
+            if ($i['state'] === 'done' || $i['optional'] || $i['link'] === '') continue;
+            $out[] = strtok($i['link'], '?#') ?: $i['link'];
+        }
+        return array_values(array_unique($out));
+    }
+
     /** Kurzstand für die Startseite: erledigte und alle nötigen Schritte (ohne optionale) und der nächste offene. */
     public function summary(): array {
         $all = $this->core();

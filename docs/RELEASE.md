@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.11
+
+- Menü: Ein dezenter blauer Punkt hinter einem Menüeintrag zeigt, dass auf dieser Seite noch ein nötiger Schritt aus der Einrichtung offen ist (optionale Punkte zählen nicht); auch bei Modul-Einstellungen, wenn das Modul offene Schritte meldet.
+- Lange Seiten: Selten gebrauchte Abschnitte sind eingeklappt (Überschrift mit Pfeil bleibt sichtbar): Drucker suchen, Drucker von Hand eintragen, Wer nutzt was, Danach (Server), Zeitplan/Benachrichtigung/Aufbewahrung (Sicherung), Kanal und frühere Version (Updates), Protokolle, Dienst hinzufügen, Neue Gruppe. Abschnitte mit Fehlermeldung bleiben offen. Nicht im Browser angesehen.
+
 ## 0.21.4-beta.10
 
 - Fehler behoben: Ein Rückschritt des Updaters (automatisch nach fehlgeschlagenem Update oder von Hand) stellte die Datenbank als root wieder her; danach konnte der Dienst sie nicht mehr öffnen („Interner Fehler“, „Die Basis antwortet nicht“). Der Updater merkt sich jetzt beim Schnappschuss Besitzer und Gruppe aller Dateien und stellt sie beim Rückschritt wieder her (Schnappschüsse aus älteren Versionen: Besitzer des Zielordners).

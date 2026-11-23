@@ -1912,6 +1912,19 @@ final class Web {
     }
 
     // ---- Hilfen -------------------------------------------------------------------------------------------------
+    /** Seiten mit noch offenen Schritten; für Modul-Einstellungen zählt der Pfadanfang (z. B. /kasse). */
+    private function openPaths(): array {
+        try {
+            $paths = $this->ov()->openPaths();
+            foreach ($paths as $p) if (preg_match('#^(/[a-z0-9-]+)/#', $p, $m) && !str_starts_with($p, '/verwaltung') && !str_starts_with($p, '/hilfe')) {
+                foreach ($this->modules->all() as $id => $_) if (($u = $this->modules->settingsUrl($id)) !== null && str_starts_with($u, $m[1])) $paths[] = $u;
+            }
+            return array_values(array_unique($paths));
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
     private function openSteps(): int {
         try {
             return count(array_filter($this->ov()->core(), fn($i) => in_array($i['state'], ['open', 'error'], true) && !$i['optional']));
@@ -1942,7 +1955,7 @@ final class Web {
         }
         return ['apps' => $apps, 'settings' => $settings, 'login' => $this->session['login'], 'admin' => $admin, 'csrf' => $this->session['csrf'],
             'updates' => $admin && $this->updates ? $this->updates->count() : 0, 'module' => $admin && $this->store ? $this->store->count() : 0, 'sicherung' => $admin && $this->backup ? $this->backup->count() : 0,
-            'pfad' => $this->req?->path ?? '', 'einrichtung' => $admin ? $this->openSteps() : 0];
+            'pfad' => $this->req?->path ?? '', 'einrichtung' => $admin ? $this->openSteps() : 0, 'offen' => $admin ? $this->openPaths() : []];
     }
 
     private function issuer(): string { return $this->config->practice !== '' ? 'Kienzle-Suite ' . $this->config->practice : 'Kienzle-Suite'; }

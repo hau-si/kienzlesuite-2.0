@@ -165,6 +165,8 @@ function test_verwaltung_braucht_bestaetigung_und_csrf(): void {
     check(str_contains(implode("\n", $env->audit->recent()), 'neustart dienste'), 'Neustart nicht protokolliert');
     unlink($env->dir . '/anfragen/neustart.json');
     $home = $b->get('/')->body;
+    check(str_contains($home, 'todo-dot'), 'Keine blaue Markierung für offene Schritte im Menü');
+    check(str_contains($b->get('/verwaltung/drucker')->body, '<summary><h2>Drucker suchen</h2></summary>') || !str_contains($b->get('/verwaltung/drucker')->body, 'Drucker suchen'), 'Drucker suchen nicht eingeklappt');
     check(str_contains($home, 'setup-card') && str_contains($home, 'nötigen Schritten erledigt') && !str_contains($home, 'href="/verwaltung/einrichtung"><span>'), 'Einrichtungskarte auf der Startseite fehlt oder Menüpunkt noch da');
     check(str_contains($home, '<svg class="ico"'), 'Menüsymbole fehlen');
     $setup = $b->get('/verwaltung/einrichtung')->body;

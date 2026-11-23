@@ -13,6 +13,10 @@ final class View {
         'Betrieb' => ['/verwaltung/sicherung' => 'Sicherung', '/verwaltung/updates' => 'Updates', '/verwaltung/module' => 'Module', '/verwaltung/sicherheit' => 'Sicherheit'],
     ];
 
+    /** Abschnitte, die auf langen Seiten eingeklappt erscheinen, weil man sie selten braucht. */
+    public const COLLAPSED = ['Drucker suchen', 'Drucker von Hand eintragen', 'Wer nutzt was', 'Danach', 'Zeitplan', 'Benachrichtigung bei Fehlern', 'Aufbewahrung',
+        'Protokoll', 'Kanal', 'Zurück auf eine frühere Version', 'Dienst hinzufügen', 'Neue Gruppe'];
+
     /** Symbole der Menüeinträge (Linienzeichnungen 24×24); Schlüssel: Pfad ohne Anhang, sonst das Standardsymbol. */
     private const ICONS = [
         '/' => '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
@@ -47,7 +51,7 @@ final class View {
         $brand = '<a class="brand" href="/" title="Start"><span class="mark" aria-hidden="true">K</span><span><strong>Kienzle-Suite</strong>'
             . '<span class="sub">' . self::h($practice !== '' ? $practice : 'Praxis') . '</span></span></a>';
         $head = '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=10"><script src="/assets/core.js" defer></script></head><body'
+            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=11"><script src="/assets/core.js" defer></script></head><body'
             . (self::$starter !== '' ? ' data-starter="' . self::h(self::$starter) . '"' : '') . '>';
         if (!$nav) {
             return $head . '<div class="solo">' . $brand . '<main><h1>' . self::h($title) . '</h1>' . self::cards($body) . '</main></div></body></html>';
@@ -55,11 +59,13 @@ final class View {
         $path = (string)($nav['pfad'] ?? '');
         $badges = ['/verwaltung/einrichtung' => [(int)($nav['einrichtung'] ?? 0), 'Offene Punkte'], '/verwaltung/sicherung' => [(int)($nav['sicherung'] ?? 0), 'Hinweise zur Sicherung'],
             '/verwaltung/updates' => [(int)($nav['updates'] ?? 0), 'Neue Version verfügbar'], '/verwaltung/module' => [(int)($nav['module'] ?? 0), 'Neue Modulversion verfügbar']];
-        $link = function (string $href, string $label, ?string $icon = null) use ($path, $badges): string {
+        $link = function (string $href, string $label, ?string $icon = null) use ($path, $badges, $nav): string {
             $current = $path === $href || ($href !== '/' && str_starts_with($path, $href . '/'));
             [$n, $hint] = $badges[$href] ?? [0, ''];
+            $todo = in_array(strtok($href, '?#') ?: $href, (array)($nav['offen'] ?? []), true);
             return '<a href="' . $href . '"' . ($current ? ' class="current" aria-current="page"' : '') . '><span>' . ($icon ?? self::icon($href)) . self::h($label) . '</span>'
-                . ($n > 0 ? '<span class="badge" title="' . self::h($hint) . '">' . $n . '</span>' : '') . '</a>';
+                . ($n > 0 ? '<span class="badge" title="' . self::h($hint) . '">' . $n . '</span>' : '')
+                . ($todo ? '<span class="todo-dot" title="Hier muss noch etwas eingegeben oder bestätigt werden (siehe Einrichtung auf der Startseite)"></span>' : '') . '</a>';
         };
         $menu = '<nav class="menu" aria-label="Menü"><div class="menu-group">' . $link('/konto', 'Mein Konto') . '</div>';
         if (!empty($nav['apps'])) {
@@ -69,7 +75,8 @@ final class View {
         }
         if (!empty($nav['settings'])) {
             $menu .= '<div class="menu-group"><span class="menu-title">Einstellungen</span>';
-            foreach ($nav['settings'] as $href => $label) $menu .= '<a href="' . self::h($href) . '"><span>' . self::icon('settings') . self::h($label) . '</span></a>';
+            foreach ($nav['settings'] as $href => $label) $menu .= '<a href="' . self::h($href) . '"><span>' . self::icon('settings') . self::h($label) . '</span>'
+                . (in_array($href, (array)($nav['offen'] ?? []), true) ? '<span class="todo-dot" title="Hier muss noch etwas eingegeben oder bestätigt werden (siehe Einrichtung auf der Startseite)"></span>' : '') . '</a>';
             $menu .= '</div>';
         }
         $group = null;
@@ -101,7 +108,15 @@ final class View {
         while (preg_match('#^\s*(<p class="(?:error|notice)"[^>]*>.*?</p>)#s', $body, $m)) { $lead .= $m[1]; $body = substr($body, strlen($m[0])); }
         $parts = preg_split('#(?=<h2[ >])#', $body) ?: [$body];
         $out = $lead;
-        foreach ($parts as $part) if (trim($part) !== '') $out .= '<section class="card">' . $part . '</section>';
+        foreach ($parts as $part) {
+            if (trim($part) === '') continue;
+            // Selten gebrauchte Abschnitte klappen zu (Überschrift bleibt sichtbar); Abschnitte mit Fehlermeldung bleiben offen.
+            if (preg_match('#^\s*<h2>([^<]*)</h2>(.*)$#s', $part, $m) && in_array(html_entity_decode($m[1], ENT_QUOTES, 'UTF-8'), self::COLLAPSED, true) && !str_contains($part, 'class="error"')) {
+                $out .= '<section class="card"><details class="fold"><summary><h2>' . $m[1] . '</h2></summary>' . $m[2] . '</details></section>';
+                continue;
+            }
+            $out .= '<section class="card">' . $part . '</section>';
+        }
         return $out;
     }
 
