@@ -62,6 +62,12 @@ for t in critical reader-cancel invoice t2med-invoice letterxpress auto-print se
 done
 grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/sumup/module.toml | head -1)" modules/sumup/VERSION || { echo 'modules/sumup/VERSION passt nicht zu module.toml'; exit 1; }
 
+step 'Modul Terminzettel (modules/terminzettel/tests)'
+php modules/terminzettel/tests/seite.php
+(cd modules/terminzettel/tests && python3 -B -m unittest discover -s . -p 'test_*.py')
+grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/terminzettel/module.toml | head -1)" modules/terminzettel/VERSION || { echo 'modules/terminzettel/VERSION passt nicht zu module.toml'; exit 1; }
+sh -n modules/terminzettel/printer/kienzle-terminzettel && for h in modules/terminzettel/bin/*; do sh -n "$h"; done
+
 step 'module.toml: alle Module im Repository'
 core/bin/kienzle-modul-pruefen --alle modules
 

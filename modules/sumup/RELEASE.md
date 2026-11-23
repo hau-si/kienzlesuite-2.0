@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.2.1
+
+- Aufgeräumt: Hilfetexte zum Terminzettel entfernt (der Terminzettel ist ein eigenes Modul).
+
 ## 2.2.0
 
 - Der Drucker für Praxisdrucker (A4) und Bondrucker wird nicht mehr in der Kasse gewählt, sondern in der Basis

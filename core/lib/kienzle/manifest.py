@@ -258,7 +258,7 @@ class _Checker:
             self.error('web.starter', 'muss true oder false sein.')
             starter = False
         settings = t.get('einstellungen')
-        if settings is not None and (not isinstance(settings, str) or not re.fullmatch(r'/[A-Za-z0-9][A-Za-z0-9._-]{0,60}(/[A-Za-z0-9][A-Za-z0-9._-]{0,60}){0,3}', settings)):
+        if settings is not None and (not isinstance(settings, str) or not re.fullmatch(r'/|/[A-Za-z0-9][A-Za-z0-9._-]{0,60}(/[A-Za-z0-9][A-Za-z0-9._-]{0,60}){0,3}', settings)):
             self.error('web.einstellungen', 'muss ein Pfad unter dem Webpfad sein, z. B. „/settings.php“.')
             settings = None
         return {'path': path, 'upstream': upstream, 'protocol': protocol, 'entry': entry, 'starter': starter, 'einstellungen': settings}

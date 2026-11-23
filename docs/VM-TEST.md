@@ -153,3 +153,12 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
        Klick beim Patienten: Browser öffnet die Suite, nach der Anmeldung (falls nötig) die Kasse mit dem Patienten.
 9. [ ] Verwaltung → Module → Kasse → Entfernen ohne Häkchen: Kasse weg, `/var/lib/kienzle/sumup` bleibt; erneut installieren:
        Einstellungen und Leistungen sind wieder da.
+
+## Modul Terminzettel 1.0.0 (Basis ab 0.19.0)
+
+1. [ ] Verwaltung → Module → Terminzettel installieren (apt: Python-Pakete, Tesseract, Ghostscript). Danach erscheint „Terminzettel“ in der Seitenleiste unter „Anwendungen“ und „Einstellungen“.
+2. [ ] Verwaltung → Drucker: Bondrucker (Epson) einrichten, bei „Wofür welcher Drucker?“ als Bondrucker zuordnen. „Terminzettel“ erscheint als Drucker des Moduls.
+3. [ ] Einstellungen → Terminzettel: Vorschau erscheint und folgt den Änderungen; „Beispiel-Terminzettel drucken“ druckt einen Bon.
+4. [ ] Arbeitsplatz: Drucker „Terminzettel“ hinzufügen (Windows IPP `http://<server>:631/printers/Terminzettel`, Mac mit dem PDF-Treiber der Seite). In T2med ein Terminblatt drucken: Bon mit Terminen und Kalender-QR. Mit Handy-QR prüfen.
+5. [ ] Bild-PDF (Terminblatt als Scan) druckt über die Texterkennung; Firewall lässt Port 631 aus dem Praxisnetz zu.
+6. [ ] Modul entfernen: Drucker „Terminzettel“ verschwindet; Daten bleiben. Erneut installieren: Layout ist wieder da.

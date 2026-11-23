@@ -330,7 +330,6 @@ function staffMode(data) {
   if (!panel.children.length) panel.append(el('p', 'Für diesen Zugang sind keine Bereiche freigegeben. Bitte beim Administrator melden.', 'muted'));
   show('settings');
 }
-// ---- Terminzettel: Hinweise und Live-Vorschau -------------------------------------------
 let previewTimer = null, previewSeq = 0;
 // Druckeradresse (http://Name:631/printers/X) zusätzlich mit den IP-Adressen des Servers, z. B. für Zugriffe aus dem VPN.
 function ippByIp(url, ips) {

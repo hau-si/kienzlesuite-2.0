@@ -511,7 +511,7 @@ wie die Module (entschieden am 22.11.2026). **Stand:** umgesetzt in Basis 0.11.0
 ## Schritt 2 – Module
 
 **Stand 22.11.2026 (Basis 0.16.0):** Modulverwaltung der Basis (Verwaltung → Module) und das Modul **Kasse** (`sumup` 2.0.0,
-aus `rechnungseingang` 1.4.1-rechnung.57) sind umgesetzt. Offen: Terminzettel, Fax, Telefon, Kienzlezeit als Module.
+aus `rechnungseingang` 1.4.1-rechnung.57) sind umgesetzt. Terminzettel ist als Modul umgesetzt (modules/terminzettel 1.0.0). Offen: Fax, Telefon, Kienzlezeit als Module.
 
 ## Vorgaben für Schritt 2 (aus den Antworten vom 22.11.2026)
 

@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.19.1
+
+- `web.einstellungen = "/"` ist erlaubt (Einstellungsseite auf der Startseite des Moduls). Das Modul Terminzettel 1.0.0 liegt mit im Release.
+
 ## 0.19.0
 
 - **Drucker zentral zuordnen:** Verwaltung → Drucker hat den Abschnitt „Wofür welcher Drucker?“ (Praxisdrucker A4, Bondrucker).

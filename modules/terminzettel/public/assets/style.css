@@ -1,0 +1,14 @@
+body { font: 16px/1.45 system-ui, sans-serif; margin: 0; background: #f5f6f8; color: #1d2733; }
+main { max-width: 1100px; margin: 0 auto; padding: 1rem; }
+.gitter { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 1.5rem; align-items: start; }
+@media (max-width: 800px) { .gitter { grid-template-columns: 1fr; } }
+.box { background: #fff; border: 1px solid #d7dce2; border-radius: 8px; padding: 1rem; }
+label { display: block; margin: .7rem 0 .2rem; font-weight: 600; }
+label.check { font-weight: 400; display: flex; gap: .5rem; align-items: center; }
+input:not([type=checkbox]), select, textarea { display: block; width: 100%; box-sizing: border-box; padding: .45rem; margin-top: .2rem; font: inherit; }
+button { padding: .55rem 1.1rem; font: inherit; border: 0; border-radius: 6px; background: #1f6feb; color: #fff; cursor: pointer; }
+button.zweit { background: #55616f; } button[disabled] { opacity: .5; cursor: default; }
+aside { position: sticky; top: 1rem; } .vorschau { background: #fff; border: 1px solid #d7dce2; border-radius: 8px; padding: .5rem; margin-bottom: .8rem; text-align: center; }
+.vorschau img { max-width: 100%; image-rendering: pixelated; }
+.muted { color: #5b6673; } .ok { color: #1a7f37; font-weight: 600; } .fehler { color: #b3261e; font-weight: 600; }
+details { margin-top: 1.5rem; } code { word-break: break-all; }
