@@ -277,8 +277,18 @@ def test_t2med(c: dict) -> str:
         raise Fehler(f'T2med nicht erreichbar: {str(e)[:120]}.{hint}') from None
     head, _, body = data.partition(b'\r\n\r\n')
     status = head.split(b' ', 2)[1:2]
+    code = status[0].decode('ascii', 'replace')[:3] if status else '?'
+    if code in ('401', '403'):
+        raise Fehler(f'T2med lehnt den Zugriff ab (HTTP {code}). API-Schlüssel prüfen und in T2med für FHIR freigeben.')
+    if code == '404':
+        raise Fehler('T2med kennt diese Adresse nicht (HTTP 404). Der Pfad der FHIR-Adresse stimmt nicht, meist …/aps/fhir/api/r4.')
     if status != [b'200'] or b'CapabilityStatement' not in body:
-        raise Fehler('T2med antwortet, aber nicht wie ein FHIR-Server (/metadata).')
+        kind = ''
+        for line in head.split(b'\r\n')[1:]:
+            if line.lower().startswith(b'content-type:'):
+                kind = line.split(b':', 1)[1].strip().decode('ascii', 'replace')[:60]
+        raise Fehler(f'T2med antwortet (HTTP {code}{", " + kind if kind else ""}), aber nicht wie ein FHIR-Server unter {url.path}. '
+                     'Adresse (Port und Pfad) prüfen: sie muss auf die FHIR-Schnittstelle von T2med zeigen, nicht auf die Weboberfläche.')
     return 'FHIR-Server antwortet (CapabilityStatement).'
 
 

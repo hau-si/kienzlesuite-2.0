@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.19.6-beta.1
+
+- T2med-Prüfung: Statt „antwortet nicht wie ein FHIR-Server“ nennt die Meldung jetzt den HTTP-Status und die wahrscheinliche Ursache (Schlüssel abgelehnt, Pfad falsch, Adresse zeigt nicht auf die FHIR-Schnittstelle). Nicht an einer echten T2med-Installation geprüft.
+
 ## 0.19.5-beta.1
 
 - Updates: Beim Anhalten und Neustarten der Basis zeigte nginx kurz „502 Bad Gateway“. Stattdessen erscheint jetzt eine Seite „Einen Moment bitte“, die sich alle 3 Sekunden selbst neu lädt, bis die Suite wieder antwortet (gilt auch für die Modulpfade). Nicht auf einer echten VM geprüft; nginx-Syntax läuft erst im CI-Integrationstest gegen echtes nginx.
