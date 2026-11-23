@@ -323,6 +323,10 @@ class Verbindungen(Umgebung):
         self.assertTrue(s['tests']['ziel:sicherung']['ok'], s)
         s = self.request({'action': 'ziel', 'daten': {**self.SFTP, 'host': 'nas2.example.org'}})
         self.assertEqual(s['ablage'][0]['fingerprint'], '', 'Serverschlüssel bleibt bei neuem Server')
+        # Prüfen ohne bestätigten Schlüssel ruft ihn gleich ab, damit die Schaltfläche zum Übernehmen erscheint
+        s = self.request({'action': 'pruefen', 'art': 'ziel', 'id': 'sicherung'})
+        self.assertFalse(s['tests']['ziel:sicherung']['ok'])
+        self.assertTrue(s['hostkeys']['sicherung'], 'Schlüssel nicht abgerufen')
         self.request({'action': 'ziel', 'daten': {**self.SMB, 'passwort': ''}})
         self.assertEqual(json.loads((self.t / 'etc/ablage.json').read_text())['ziele'][1]['passwort'], '')
         self.request({'action': 'ziel', 'daten': self.SMB})

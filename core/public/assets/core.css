@@ -147,3 +147,8 @@ details.how[open] summary { border-bottom: 1px solid #edf0ee; margin-bottom: 10p
   .codes ol { columns: 1; }
 }
 @media print { aside.side, nav.menu, button, .button, form.inline { display: none !important; } body, :root { background: #fff; } .card { border: 0; box-shadow: none; padding: 0; } }
+
+/* Tooltips (Fragezeichen neben Feldern) und art-abhängige Felder */
+.hilfe { position: relative; display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: 4px; border-radius: 50%; background: var(--soft); color: var(--teal); font-size: 12px; font-weight: 700; cursor: help; vertical-align: middle; }
+.hilfe:hover::after, .hilfe:focus::after { content: attr(data-tip); position: absolute; left: 50%; bottom: 150%; transform: translateX(-30%); width: 280px; max-width: 80vw; padding: 9px 11px; border-radius: 9px; background: #203c43; color: #fff; font-size: 13px; font-weight: 400; line-height: 1.4; z-index: 5; text-align: left; }
+[data-nur][hidden] { display: none !important; }

@@ -1229,7 +1229,7 @@ final class Web {
                 . V::h(($t['art'] === 'smb' ? '//' . $t['host'] . '/' . ($t['freigabe'] ?? '') : 'sftp://' . ($t['benutzer'] ?? '') . '@' . $t['host'] . ':' . ($t['port'] ?? 22)) . '/' . $t['ordner'])
                 . '</code></p>' . $this->testLine($st['tests'], 'ziel:' . $id);
             if ($t['art'] === 'sftp') {
-                $body .= '<p>Schlüssel des Servers: ' . (($t['fingerprint'] ?? '') !== '' ? '<code>' . V::h((string)$t['fingerprint']) . '</code>' : '<strong>noch nicht bestätigt</strong>') . '</p>'
+                $body .= '<p>Schlüssel des Servers: ' . (($t['fingerprint'] ?? '') !== '' ? '<code>' . V::h((string)$t['fingerprint']) . '</code>' : '<strong>noch nicht bestätigt</strong> – zuerst „Schlüssel des Servers abrufen“, dann den angezeigten Fingerabdruck mit dem NAS vergleichen und übernehmen.') . '</p>'
                     . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('hostkey-holen', ['id' => $id]) . '<button>Schlüssel des Servers abrufen</button></form> ';
                 foreach ((array)($st['hostkeys'][$id] ?? []) as $k) {
                     $body .= '<form method="post" action="/verwaltung/verbindungen" class="box">' . $this->hidden('hostkey-uebernehmen', ['id' => $id, 'fingerprint' => (string)$k['fingerprint']])
@@ -1240,15 +1240,28 @@ final class Web {
             $body .= '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'ziel', 'id' => $id]) . '<button>Verbindung prüfen</button></form> '
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('ziel-loeschen', ['id' => $id]) . '<button class="danger">Entfernen</button></form></div>';
         }
-        $body .= '<form method="post" action="/verwaltung/verbindungen" class="box wide"><h3>Ziel anlegen oder ändern</h3>' . $this->hidden('ziel')
-            . '<p>Gleiche Kennung = vorhandenes Ziel ändern (leeres Passwort = unverändert).</p>'
-            . V::input('id', 'Kennung (z. B. steuerbuero)', 'text', '', 'pattern="[a-z][a-z0-9-]{1,30}" required')
-            . V::input('name', 'Bezeichnung', 'text', '', 'required')
-            . '<label>Art<select name="art"><option value="smb">SMB (Windows-Freigabe)</option><option value="sftp">SFTP (empfohlen, falls das NAS es kann)</option></select></label>'
-            . V::input('host', 'Server (Name oder IP)', 'text', '', 'required') . V::input('freigabe', 'Freigabe (nur SMB)', 'text')
-            . V::input('port', 'Port (nur SFTP)', 'number', '22', 'min="1" max="65535"') . V::input('ordner', 'Basisordner (ohne Platzhalter)', 'text', '', 'placeholder="Kienzle"')
-            . V::input('benutzer', 'Benutzer', 'text', '', 'autocomplete="off"') . V::input('passwort', 'Passwort (nur SMB)', 'password', '', 'autocomplete="new-password"')
-            . V::input('domaene', 'Domäne (nur SMB, optional)', 'text') . V::checkbox('gast', '1', 'Gastzugang (nur SMB, nicht empfohlen)', false)
+        // Feld mit Tooltip; $nur = nur bei dieser Art sichtbar (smb | sftp), leer = immer.
+        $f = static fn(string $name, string $label, string $tip, string $type = 'text', string $value = '', string $extra = '', string $nur = '') => '<label' . ($nur !== '' ? ' data-nur="' . $nur . '"' : '') . '>'
+            . V::h($label) . ' <span class="hilfe" tabindex="0" role="note" aria-label="' . V::h($tip) . '" data-tip="' . V::h($tip) . '">i</span>'
+            . '<input type="' . $type . '" name="' . $name . '" value="' . V::h($value) . '" ' . $extra . '></label>';
+        $body .= '<form method="post" action="/verwaltung/verbindungen" class="box wide" id="ziel-form"><h3>Ziel anlegen oder ändern</h3>' . $this->hidden('ziel')
+            . '<p>Hier steht, wohin Module Dateien ablegen (z. B. Sicherungen, Export für das Steuerbüro). Beispiel: ein Synology-NAS. '
+            . '<strong>SFTP</strong> ist besser: Es meldet sich mit einem Schlüssel statt eines Passworts an, die Verbindung ist verschlüsselt und es braucht keine Windows-Freigabe. '
+            . '<strong>SMB</strong> nimmt man, wenn das Gerät nur Windows-Freigaben kann.</p>'
+            . '<p class="muted">Synology: SFTP unter Systemsteuerung → Dateidienste → FTP → „SFTP-Dienst aktivieren“ (Port 22), einen eigenen Benutzer mit Zugriff auf den Ordner anlegen und den öffentlichen Schlüssel von unten eintragen. '
+            . 'Für SMB genügt die Freigabe unter Systemsteuerung → Gemeinsamer Ordner. Menünamen können je nach DSM-Version abweichen und sind nicht gegen dein Gerät geprüft.</p>'
+            . '<label>Art <span class="hilfe" tabindex="0" role="note" aria-label="SFTP: Anmeldung per Schlüssel, empfohlen. SMB: Windows-Freigabe mit Benutzer und Passwort." data-tip="SFTP: Anmeldung per Schlüssel, empfohlen. SMB: Windows-Freigabe mit Benutzer und Passwort.">i</span>'
+            . '<select name="art"><option value="sftp">SFTP (empfohlen, z. B. Synology-NAS)</option><option value="smb">SMB (Windows-Freigabe)</option></select></label>'
+            . $f('id', 'Kennung', 'Kurzer interner Name ohne Leerzeichen, nur kleine Buchstaben, Ziffern und Bindestrich, z. B. „steuerbuero“ oder „nas-sicherung“. Module merken sich das Ziel unter dieser Kennung. Mit gleicher Kennung ändert man ein vorhandenes Ziel (leeres Passwort = unverändert).', 'text', '', 'pattern="[a-z][a-z0-9-]{1,30}" required placeholder="nas-sicherung"')
+            . $f('name', 'Bezeichnung', 'Anzeigename für dich und die Mitarbeiter, frei wählbar, z. B. „Synology im Serverraum“. Erscheint in den Auswahllisten der Module.', 'text', '', 'required placeholder="Synology im Serverraum"')
+            . $f('host', 'Server (Name oder IP)', 'Adresse des NAS im Praxisnetz, am besten die feste IP-Adresse (z. B. 192.0.2.20), weil Namen mit „.local“ auf dem Server oft nicht auflösbar sind.', 'text', '', 'required placeholder="192.0.2.20"')
+            . $f('freigabe', 'Freigabe', 'Name des freigegebenen Ordners auf dem NAS (bei Synology: Name unter „Gemeinsamer Ordner“), z. B. „praxis“.', 'text', '', 'placeholder="praxis"', 'smb')
+            . $f('port', 'Port', 'Port des SFTP-Dienstes. Meist 22; bei Synology 22, wenn nicht geändert.', 'number', '22', 'min="1" max="65535"', 'sftp')
+            . $f('ordner', 'Basisordner', 'Ordner auf dem Ziel, unter dem die Module ihre Dateien ablegen, z. B. „Kienzle“ (wird angelegt, wenn möglich). Ohne Platzhalter und ohne „..“.', 'text', '', 'placeholder="Kienzle"')
+            . $f('benutzer', 'Benutzer', 'Anmeldename am NAS. Besser ein eigener Benutzer nur für diese Ablage, der nur diesen Ordner schreiben darf.', 'text', '', 'autocomplete="off"')
+            . $f('passwort', 'Passwort', 'Passwort des NAS-Benutzers für SMB. Wird nach dem Speichern nie wieder angezeigt; leer lassen = unverändert. SFTP braucht kein Passwort, sondern den Schlüssel unten.', 'password', '', 'autocomplete="new-password"', 'smb')
+            . $f('domaene', 'Domäne (optional)', 'Nur bei einer Windows-Domäne nötig, sonst leer lassen.', 'text', '', '', 'smb')
+            . '<label class="check" data-nur="smb"><input type="checkbox" name="gast" value="1"> Gastzugang (nicht empfohlen) <span class="hilfe" tabindex="0" role="note" aria-label="Ohne Benutzer und Passwort, jeder im Netz kann dort schreiben." data-tip="Ohne Benutzer und Passwort, jeder im Netz kann dort schreiben. Nur für ein abgeschottetes Testgerät.">i</span></label>'
             . '<button>Ziel speichern</button></form>'
             . ($st['sftp_schluessel'] !== '' ? '<p>Für SFTP diesen öffentlichen Schlüssel beim NAS-Benutzer eintragen (z. B. <code>~/.ssh/authorized_keys</code>):</p><pre class="notes">' . V::h($st['sftp_schluessel']) . '</pre>' : '')
             . '</section>';

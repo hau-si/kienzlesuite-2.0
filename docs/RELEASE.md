@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.20.1-beta.1
+
+- Verbindungen → Netzwerkspeicher: Das Formular „Ziel anlegen“ erklärt jede Angabe per Tooltip (Kennung, Bezeichnung, Server, Freigabe, Port, Basisordner, Benutzer, Passwort, Domäne), zeigt je nach Art nur die passenden Felder (SMB oder SFTP), empfiehlt SFTP und beschreibt kurz die Einrichtung an einem Synology-NAS (Menünamen nicht gegen ein echtes Gerät geprüft).
+- SFTP: „Verbindung prüfen“ ohne bestätigten Serverschlüssel ruft den Schlüssel jetzt gleich ab, sodass die Schaltfläche „Übernehmen“ erscheint; vorher stand nur „noch nicht bestätigt“ ohne Weg weiter.
+
 ## 0.20.0-beta.1
 
 - Basis-Admins dürfen in jedem installierten Modul alles: Sie gelten dort als Modul-Admin mit allen Rechten, ohne dass Haken gesetzt sein müssen (Menü, Einstellungen und Zugriff der Module; auch die Haken in der Benutzerverwaltung erscheinen gesetzt).

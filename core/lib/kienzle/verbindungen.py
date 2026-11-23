@@ -462,6 +462,11 @@ def dispatch(config: dict, req: dict) -> str:
                 target = next((t for t in config['ablage'] if t['id'] == tid), None)
                 if not target:
                     raise Fehler('Ziel nicht gefunden.')
+                if target['art'] == 'sftp' and not target.get('hostkey'):
+                    # Noch kein Serverschlüssel bestätigt: gleich abrufen, damit unten die Schaltfläche zum Übernehmen erscheint.
+                    keys = ablage.scan_hostkey(target['host'], target['port'])
+                    view(config, {'hostkeys': {target['id']: [{'zeile': k, 'fingerprint': ablage.fingerprint(k), 'art': k.split()[1]} for k in keys]}})
+                    raise Fehler('Der Schlüssel des Servers ist noch nicht bestätigt. Er wurde abgerufen: Bitte unten den Fingerabdruck mit der Anzeige des NAS vergleichen und auf „Übernehmen“ klicken, dann erneut prüfen.')
                 msg = ablage.test_target(target)
             else:
                 raise Fehler('Unbekannte Prüfung.')
