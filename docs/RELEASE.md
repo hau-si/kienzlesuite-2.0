@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.20.6-beta.1
+
+- Verwaltung → Module: Bei jedem installierten Modul ohne bekanntes Update gibt es den Knopf „Jetzt nach einem Update suchen“. Gibt es eine neue Version, erscheint danach „Aktualisieren“ (mit Schnappschuss der Moduldaten vorher, bei Fehlern springt das Modul zurück). An der Konsole: `sudo kienzle-module installieren <modul>` aktualisiert ein installiertes Modul, `sudo kienzle-module pruefen --sofort` sucht sofort nach Angeboten.
+
 ## 0.20.5-beta.1
 
 - Behoben: Im Einrichtungs-Überblick stand bei Modulen „Überblick nicht lesbar: [Errno 2] No such file or directory: 'runuser'“, weil der Dienst `runuser` (liegt in /usr/sbin) nicht im Suchpfad fand. Überblick, Update-Haken und Sicherungs-Haken der Module verwenden jetzt den vollen Pfad. Nicht auf der VM geprüft.
