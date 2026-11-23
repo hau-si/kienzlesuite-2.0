@@ -267,6 +267,9 @@ class Verbindungen(Umgebung):
                        {'pin': True}, {'ca_pem': 'kein zertifikat'}):
             with self.subTest(change), self.assertRaises(self.vb.Fehler):
                 self.vb.set_t2med({}, {**self.T2MED, **change})
+        c2 = {}
+        self.vb.set_t2med(c2, {**self.T2MED, 'api_key': '  geheim-2 \t'})
+        self.assertEqual(c2['t2med']['api_key'], 'geheim-2', 'Leerzeichen am Rand bleiben im Schlüssel')
         self.vb.set_t2med(c, {**self.T2MED, 'api_key': ''})
         self.assertEqual(c['t2med']['api_key'], 'geheim-1', 'leerer Schlüssel überschreibt den gespeicherten')
 

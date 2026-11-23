@@ -124,6 +124,7 @@ def set_t2med(config: dict, d: dict) -> None:
         raise Fehler('Höchstens 10 Start-Adressen.')
     base = _url(d.get('base_url'), 'Adresse des FHIR-Servers')
     key = d.get('api_key', '')
+    key = key.strip() if isinstance(key, str) else key   # beim Kopieren mitgenommene Leerzeichen am Rand
     if not isinstance(key, str) or len(key) > 300 or CONTROL.search(key):
         raise Fehler('API-Schlüssel ungültig.')
     config['t2med'] = {'base_url': base, 'launch_urls': sorted({_url(u, 'Start-Adresse') for u in launch} | {base}),

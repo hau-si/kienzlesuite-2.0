@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.20.7-beta.1
+
+- T2med: Leerzeichen und Tabulatoren am Rand des API-Schlüssels (Client Secret) werden beim Speichern entfernt; beim Kopieren aus T2med werden sie leicht mitgenommen und führen zu „FHIR-API-Key fehlt oder ist ungültig“.
+
 ## 0.20.6-beta.1
 
 - Verwaltung → Module: Bei jedem installierten Modul ohne bekanntes Update gibt es den Knopf „Jetzt nach einem Update suchen“. Gibt es eine neue Version, erscheint danach „Aktualisieren“ (mit Schnappschuss der Moduldaten vorher, bei Fehlern springt das Modul zurück). An der Konsole: `sudo kienzle-module installieren <modul>` aktualisiert ein installiertes Modul, `sudo kienzle-module pruefen --sofort` sucht sofort nach Angeboten.
