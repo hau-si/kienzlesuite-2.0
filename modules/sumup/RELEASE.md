@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.2-beta.1
+
+- Windows-Anleitung robuster: Das PowerShell-Skript startet den Druckspooler neu und entfernt zuerst den alten Drucker (behebt „Das Handle ist ungültig“ in den Druckereigenschaften); neuer Hinweis zur Fehlerbehebung. Nicht getestet (vom Anwender am Windows-PC bestätigt: Neueinrichtung per IPP-Adresse mit IPP-Class-Treiber funktioniert).
+
 ## 2.3.1-beta.1
 
 - Die Papierbreite des Bondruckers (58/80 mm) wird nicht mehr in den Kasse-Einstellungen gewählt, sondern zentral in der Basis (Verwaltung → Drucker → Wofür welcher Drucker?, ab Basis 0.21.0-beta.1). Die Felder „Modell“ und „Druckbreite in Punkten“ entfallen; bei einer älteren Basis gilt 58 mm.

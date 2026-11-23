@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.2-beta.1
+
+- Windows-Anleitung robuster: Das PowerShell-Skript startet den Druckspooler neu und entfernt zuerst den alten Drucker (behebt „Das Handle ist ungültig“ in den Druckereigenschaften); neuer Hinweis zur Fehlerbehebung. Nicht getestet (vom Anwender am Windows-PC bestätigt: Neueinrichtung per IPP-Adresse mit IPP-Class-Treiber funktioniert).
+
 ## 0.21.1-beta.1
 
 - Verwaltung → Drucker: Die Anleitung für die virtuellen Drucker folgt dem Format der Kasse-Anleitung (SumUp-Rechnung): je Drucker Windows-Adresse mit „Microsoft IPP Class Driver“ (auch für den Terminzettel statt „Generic / Text Only“), Adresse per IP, PowerShell-Befehle, Mac mit PPD-Download. Nicht getestet (Tests auf Wunsch nicht ausgeführt).

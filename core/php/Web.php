@@ -1428,7 +1428,8 @@ final class Web {
             $name = (string)$q['name'];
             $url = 'http://' . $host . ':631/printers/' . rawurlencode($name);
             $paper = preg_match('/terminzettel/i', $name) ? 'A6' : 'A4';
-            $script = "Enable-WindowsOptionalFeature -Online -FeatureName Printing-Foundation-InternetPrinting-Client -NoRestart\n"
+            $script = "# 1. Alte Einrichtung entfernen (behebt „Das Handle ist ungültig“)\nRestart-Service Spooler\nGet-Printer -Name \"" . $name . "\" -ErrorAction SilentlyContinue | Remove-Printer\n# 2. Neu einrichten\n"
+                . "Enable-WindowsOptionalFeature -Online -FeatureName Printing-Foundation-InternetPrinting-Client -NoRestart\n"
                 . "Add-PrinterDriver -Name \"Microsoft IPP Class Driver\"\n\$url = \"" . $url . "\"\nAdd-PrinterPort -Name \$url -ErrorAction SilentlyContinue\n"
                 . "Add-Printer -Name \"" . $name . "\" -DriverName \"Microsoft IPP Class Driver\" -PortName \$url"
                 . ($paper === 'A4' ? "\nSet-PrintConfiguration -PrinterName \"" . $name . "\" -PaperSize A4" : '');
@@ -1437,6 +1438,7 @@ final class Web {
                 . '<li>Windows: Drucker hinzufügen → „Freigegebenen Drucker über den Namen auswählen“: <code>' . V::h($url) . '</code> – Treiber „Microsoft IPP Class Driver“, Papier ' . $paper . '. '
                 . 'Per IP-Adresse (z. B. aus dem VPN) statt des Namens: <code>http://&lt;IP-Adresse&gt;:631/printers/' . V::h(rawurlencode($name)) . '</code>.</li>'
                 . '<li>Windows 11: Fehlt der Treiber „Microsoft IPP Class Driver“ oder akzeptiert Windows die Adresse nicht, PowerShell als Administrator öffnen und ausführen:<pre>' . V::h($script) . '</pre></li>'
+                . '<li>' . V::h('Druckereigenschaften lassen sich nicht öffnen („Das Handle ist ungültig“) oder der Druck bleibt aus: Die Windows-Einrichtung ist veraltet, z. B. nach Neueinrichtung des Servers. Drucker entfernen und mit dem PowerShell-Skript oben neu einrichten (es startet den Druckspooler neu und entfernt den alten Drucker). Eine Meldung beim Löschen alter Anschlüsse („Anschluss unbekannt“) ist harmlos. Möglichst die IP-Adresse statt des Namens verwenden.') . '</li>'
                 . '<li>Mac: „' . V::h($name) . '“ hinzufügen, als Treiber die Datei wählen.' . $mac . '</li></ol>';
         }
         if ($blocks === '') return '';

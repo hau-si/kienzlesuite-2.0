@@ -184,6 +184,7 @@ function renderInvoicePrinter(info) {
   const driver = el('li', 'Windows 11: Fehlt der Treiber „Microsoft IPP Class Driver“ oder akzeptiert Windows die Adresse nicht, PowerShell als Administrator öffnen und ausführen:');
   driver.append(el('pre', ippPowerShell('SumUp-Rechnung', info.url, info.ips, 'A4'), 'audit-list'));
   ol.append(driver);
+  ol.append(el('li', 'Druckereigenschaften lassen sich nicht öffnen („Das Handle ist ungültig“) oder der Druck bleibt aus: Die Windows-Einrichtung ist veraltet, z. B. nach Neueinrichtung des Servers. Drucker entfernen und mit dem PowerShell-Skript oben neu einrichten (es startet den Druckspooler neu und entfernt den alten Drucker). Eine Meldung beim Löschen alter Anschlüsse („Anschluss unbekannt“) ist harmlos. Möglichst die IP-Adresse statt des Namens verwenden.'));
   const mac = el('li'); mac.append(document.createTextNode('Mac: „SumUp-Rechnung“ hinzufügen, als Treiber die Datei '), el('a', 'SumUp-Rechnung-PDF.ppd', null, {href: BASE + 'assets/SumUp-Rechnung-PDF.ppd', download: 'SumUp-Rechnung-PDF.ppd'}), document.createTextNode(' wählen.'));
   ol.append(mac); box.append(ol);
 }
@@ -345,7 +346,7 @@ function ippByIp(url, ips) {
 }
 function ippPowerShell(queue, url, ips, paper) {
   const byIp = ippByIp(url, ips), use = byIp.length ? byIp[0].url : url;
-  return 'Enable-WindowsOptionalFeature -Online -FeatureName Printing-Foundation-InternetPrinting-Client -NoRestart\nAdd-PrinterDriver -Name "Microsoft IPP Class Driver"\n$url = "' + use + '"\nAdd-PrinterPort -Name $url -ErrorAction SilentlyContinue\nAdd-Printer -Name "' + queue + '" -DriverName "Microsoft IPP Class Driver" -PortName $url' + (paper ? '\nSet-PrintConfiguration -PrinterName "' + queue + '" -PaperSize ' + paper : '');
+  return '# 1. Alte Einrichtung entfernen (behebt „Das Handle ist ungültig“)\nRestart-Service Spooler\nGet-Printer -Name "' + queue + '" -ErrorAction SilentlyContinue | Remove-Printer\n# 2. Neu einrichten\nEnable-WindowsOptionalFeature -Online -FeatureName Printing-Foundation-InternetPrinting-Client -NoRestart\nAdd-PrinterDriver -Name "Microsoft IPP Class Driver"\n$url = "' + use + '"\nAdd-PrinterPort -Name $url -ErrorAction SilentlyContinue\nAdd-Printer -Name "' + queue + '" -DriverName "Microsoft IPP Class Driver" -PortName $url' + (paper ? '\nSet-PrintConfiguration -PrinterName "' + queue + '" -PaperSize ' + paper : '');
 }
 function ippIpNote(url, ips) {
   const byIp = ippByIp(url, ips);

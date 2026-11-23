@@ -1,5 +1,9 @@
 # Terminzettel – Release-Notizen
 
+## 1.2.3-beta.1
+
+- Windows-Anleitung robuster: Das PowerShell-Skript startet den Druckspooler neu und entfernt zuerst den alten Drucker (behebt „Das Handle ist ungültig“ in den Druckereigenschaften); neuer Hinweis zur Fehlerbehebung. Nicht getestet (vom Anwender am Windows-PC bestätigt: Neueinrichtung per IPP-Adresse mit IPP-Class-Treiber funktioniert).
+
 ## 1.2.2-beta.1
 
 - Die Anleitung auf der Einstellungsseite folgt dem Format der Kasse (SumUp-Rechnung): Windows mit „Microsoft IPP Class Driver“ (nicht mehr „Generic / Text Only“), Adresse per IP, PowerShell-Befehle, Mac mit PPD. Nicht getestet (Tests auf Wunsch nicht ausgeführt).
