@@ -1,5 +1,14 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.6
+
+- Updates: Während ein Update läuft, steht oben ein gelb hinterlegter, beim Scrollen mitlaufender Hinweis mit drehendem Symbol und dem aktuellen Schritt; die Knöpfe sind gesperrt, bis „fertig“ dasteht. Neu: Hinweis, dass Module beim Update automatisch mit aktualisiert werden, wenn unter Module die automatische Aktualisierung an ist. Nicht im Browser angesehen.
+
+## 0.21.4-beta.5
+
+- Menü links: Symbole vor allen Einträgen; „Start“ ist jetzt das Logo oben; „Neu starten“ (Dienste/Server) steht aufklappbar unten über „Abmelden“. Die Seitenleiste bleibt beim Scrollen stehen und läuft über die volle Höhe (vorher brach die Anzeige auf langen Seiten wie Updates um).
+- Einrichtung: nicht mehr im Menü, sondern als Karte mit Fortschritt auf der Startseite (nur Admins). Die Schritte stehen in der nötigen Reihenfolge, jeder mit Ort (Webfenster, Arbeitsplätze, NAS/Router) und Kennzeichnung „optional“; optionale Punkte zählen nicht für den Fortschritt. Als optional gelten: Passkeys, Schnappschüsse am NAS, Signaturprüfung der Updates. Nicht im Browser/auf dem Server angesehen.
+
 ## 0.21.4-beta.4
 
 - Neu im Menü links (nur Admins): aufklappbarer Punkt „Neu starten“ mit „Dienste neu starten“ (Webinterface, Module, nginx) und „Server neu starten“. Beides fragt erst auf einer eigenen Seite nach, wird protokolliert und läuft über einen neuen root-Dienst (kienzle-neustart.path); er wird vom Installer eingerichtet, also nach dem Update einmal `sudo bash installer/install.sh` ausführen. Nicht auf dem Server getestet, der Neustart selbst nur im Probelauf.

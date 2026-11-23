@@ -164,6 +164,11 @@ function test_verwaltung_braucht_bestaetigung_und_csrf(): void {
     check($b->post('/verwaltung/neustart', ['art' => 'dienste'])->status === 200 && is_file($env->dir . '/anfragen/neustart.json'), 'Neustart-Anfrage nicht geschrieben');
     check(str_contains(implode("\n", $env->audit->recent()), 'neustart dienste'), 'Neustart nicht protokolliert');
     unlink($env->dir . '/anfragen/neustart.json');
+    $home = $b->get('/')->body;
+    check(str_contains($home, 'setup-card') && str_contains($home, 'nötigen Schritten erledigt') && !str_contains($home, 'href="/verwaltung/einrichtung"><span>'), 'Einrichtungskarte auf der Startseite fehlt oder Menüpunkt noch da');
+    check(str_contains($home, '<svg class="ico"'), 'Menüsymbole fehlen');
+    $setup = $b->get('/verwaltung/einrichtung')->body;
+    check(strpos($setup, 'Admin mit Authenticator-App') < strpos($setup, 'Servername festgelegt') && strpos($setup, 'Servername festgelegt') < strpos($setup, 'Mindestens zwei Admins') && str_contains($setup, 'tag opt">optional'), 'Einrichtung nicht geordnet oder ohne optional-Kennzeichnung');
     $page = $b->get('/verwaltung/sicherheit')->body;
     check(str_contains($page, '<h2>Firewall</h2>') && str_contains($page, 'Zugang (Abmeldezeiten)') && str_contains($page, '<h2>Protokoll</h2>') && str_contains($page, 'name="idle_einheit"'), 'Sicherheit unvollständig');
     check($b->post('/verwaltung/zugang', ['idle' => '2', 'idle_einheit' => 'd', 'max' => '3', 'max_einheit' => 'd'])->status === 200 && $env->auth->idleSeconds() === 172800, 'Zugang in Tagen nicht gespeichert');

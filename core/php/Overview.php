@@ -39,11 +39,48 @@ final class Overview {
     }
 
     private static function item(string $title, string $state, string $hint, string $link, ?string $manual = null): array {
-        return ['title' => $title, 'state' => $state, 'hint' => $hint, 'link' => $link, 'manuell' => $manual, 'ort' => 'web'];
+        return ['title' => $title, 'state' => $state, 'hint' => $hint, 'link' => $link, 'manuell' => $manual, 'ort' => 'web', 'optional' => false];
     }
 
-    /** Punkte der Basis. */
+    /** Notwendige Reihenfolge der Basis-Schritte: Anfang des Titels => [Ort, optional]. Nicht aufgeführte Punkte kommen ans Ende. */
+    private const ORDER = [
+        'Admin mit Authenticator-App' => ['web', false],
+        'Servername festgelegt' => ['web', false],
+        'Servername auf den Arbeitsplätzen' => ['pc', false],
+        'Zertifizierungsstelle auf allen Arbeitsplätzen' => ['pc', false],
+        'Suite unter dem neuen Namen' => ['pc', false],
+        'Mindestens zwei Admins' => ['web', false],
+        'Wiederherstellungscodes für jeden Admin' => ['web', false],
+        'Wiederherstellungscodes der Admins ausgedruckt' => ['web', false],
+        'Passkeys unter dem neuen Namen' => ['pc', true],
+        'Firewall eingeschaltet' => ['web', false],
+        'Netzwerkspeicher eingetragen' => ['web', false],
+        'Datensicherung eingerichtet' => ['web', false],
+        'Schlüsselblatt gedruckt' => ['web', false],
+        'Letzte Sicherung erfolgreich' => ['web', false],
+        'Probe-Wiederherstellung erfolgreich' => ['web', false],
+        'Schreibgeschützte Schnappschüsse am NAS' => ['nas', true],
+        'Updates: kürzlich' => ['web', false],
+        'Updates: Signaturprüfung' => ['web', true],
+    ];
+
+    /** Punkte der Basis, in der Reihenfolge, in der sie erledigt werden sollten, mit Ort und Kennzeichnung „optional“. */
     public function core(): array {
+        $items = $this->coreItems();
+        $rank = static function (array $i): int {
+            $n = 0;
+            foreach (self::ORDER as $start => $_) { if (str_starts_with($i['title'], $start)) return $n; $n++; }
+            return 100;
+        };
+        foreach ($items as $k => $i) {
+            foreach (self::ORDER as $start => [$ort, $optional]) if (str_starts_with($i['title'], $start)) { $items[$k]['ort'] = $ort; $items[$k]['optional'] = $optional; break; }
+            $items[$k]['rang'] = $rank($i) * 100 + $k;
+        }
+        usort($items, fn($a, $b) => $a['rang'] <=> $b['rang']);
+        return $items;
+    }
+
+    private function coreItems(): array {
         $admins = array_filter($this->users->all(), fn($u) => $u['admin'] && $u['active']);
         $withOtp = array_filter($admins, fn($u) => $u['otp']);
         $codes = array_filter($admins, fn($u) => $this->users->recoveryLeft((int)$u['id']) > 0);
@@ -58,8 +95,8 @@ final class Overview {
         $out[] = self::item('Admin mit Authenticator-App', $admins && count($withOtp) === count($admins) ? 'done' : 'open',
             $admins ? count($withOtp) . ' von ' . count($admins) . ' Admins mit OTP' : 'Noch kein Admin', '/verwaltung/benutzer');
         $out[] = self::item('Mindestens zwei Admins (Vertretung)', count($admins) >= 2 ? 'done' : 'open', 'Fällt ein Admin aus, kommt sonst nur noch die Konsole weiter.', '/verwaltung/benutzer');
-        $out[] = self::item('Wiederherstellungscodes für jeden Admin', $admins && count($codes) === count($admins) ? 'done' : 'open', 'Unter „Mein Zugang“ neu erzeugen', '/verwaltung/zugang');
-        $out[] = self::item(self::MANUAL['codes'], isset($manual['codes']) ? 'done' : 'open', 'Bitte von Hand bestätigen', '/verwaltung/einrichtung', 'codes');
+        $out[] = self::item('Wiederherstellungscodes für jeden Admin', $admins && count($codes) === count($admins) ? 'done' : 'open', 'Unter „Mein Konto“ neu erzeugen', '/konto');
+        $out[] = self::item(self::MANUAL['codes'], isset($manual['codes']) ? 'done' : 'open', 'Auf Papier ausdrucken und sicher verwahren; danach hier bestätigen', '/verwaltung/einrichtung', 'codes');
         $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['ca'], isset($manual['ca']) ? 'done' : 'open', 'Datei ca.crt als vertrauenswürdige Stammzertifizierungsstelle eintragen – Anleitung für Windows, Mac, iPhone und Android', '/hilfe/arbeitsplatz#zertifikat', 'ca');
         $out[] = self::item(self::MANUAL['anmeldung'], isset($manual['anmeldung']) ? 'done' : 'open', 'Suite unter dem Namen aus „Server und Name“ öffnen, dort neu anmelden', '/verwaltung/server', 'anmeldung');
         $out[] = self::item(self::MANUAL['passkeys'], isset($manual['passkeys']) ? 'done' : 'open', 'Unter „Mein Konto“ neu anlegen; sie gelten nur für den Namen, unter dem sie angelegt wurden', '/konto', 'passkeys');
@@ -67,7 +104,7 @@ final class Overview {
         if ($this->firewall) {
             $fw = $this->firewall->status()['state'];
             $out[] = self::item('Firewall eingeschaltet und bestätigt', $fw === 'active' ? 'done' : ($fw === 'failed' ? 'error' : 'open'),
-                ['active' => 'aktiv', 'off' => 'aus', 'pending' => 'wartet auf Bestätigung', 'reverted' => 'zurückgenommen', 'failed' => 'Fehler', 'requested' => 'wird übernommen'][$fw] ?? $fw, '/verwaltung/firewall');
+                ['active' => 'aktiv', 'off' => 'aus', 'pending' => 'wartet auf Bestätigung', 'reverted' => 'zurückgenommen', 'failed' => 'Fehler', 'requested' => 'wird übernommen'][$fw] ?? $fw, '/verwaltung/sicherheit?bereich=firewall');
         }
         if ($this->updates) {
             $u = $this->updates->status();
@@ -108,7 +145,7 @@ final class Overview {
                 if (!is_array($i) || !in_array($i['state'] ?? '', ['done', 'open', 'error'], true)) continue;
                 $link = (string)($i['link'] ?? '');
                 if ($link !== '' && ($path === '' || !str_starts_with($link, rtrim($path, '/')) || str_contains($link, '..'))) $link = '';
-                $items[] = self::item(mb_substr((string)($i['title'] ?? ''), 0, 120), $i['state'], mb_substr((string)($i['hint'] ?? ''), 0, 300), $link);
+                $items[] = ['optional' => !empty($i['optional'])] + self::item(mb_substr((string)($i['title'] ?? ''), 0, 120), $i['state'], mb_substr((string)($i['hint'] ?? ''), 0, 300), $link);
             }
             $out[] = ['id' => $id, 'name' => $this->modules->name($id), 'items' => array_slice($items, 0, 30),
                 'fehler' => is_array($d) ? mb_substr((string)($d['fehler'] ?? ''), 0, 200) : 'Noch nicht gesammelt', 'zeit' => is_array($d) ? (int)($d['zeit'] ?? 0) : 0];
@@ -117,8 +154,18 @@ final class Overview {
     }
 
     public function open(): int {
-        $n = count(array_filter($this->core(), fn($i) => $i['state'] !== 'done'));
-        foreach ($this->modules() as $m) $n += count(array_filter($m['items'], fn($i) => $i['state'] !== 'done'));
+        $n = count(array_filter($this->core(), fn($i) => $i['state'] !== 'done' && !$i['optional']));
+        foreach ($this->modules() as $m) $n += count(array_filter($m['items'], fn($i) => $i['state'] !== 'done' && !$i['optional']));
         return $n;
+
+    }
+
+    /** Kurzstand für die Startseite: erledigte und alle nötigen Schritte (ohne optionale) und der nächste offene. */
+    public function summary(): array {
+        $all = $this->core();
+        foreach ($this->modules() as $m) foreach ($m['items'] as $i) $all[] = $i;
+        $required = array_values(array_filter($all, fn($i) => !$i['optional']));
+        $open = array_values(array_filter($required, fn($i) => $i['state'] !== 'done'));
+        return ['done' => count($required) - count($open), 'total' => count($required), 'next' => $open[0]['title'] ?? '', 'link' => $open[0]['link'] ?? '', 'errors' => count(array_filter($open, fn($i) => $i['state'] === 'error'))];
     }
 }

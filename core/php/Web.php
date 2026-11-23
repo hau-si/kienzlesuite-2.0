@@ -617,6 +617,17 @@ final class Web {
         $body = '<p>Angemeldet als <strong>' . V::h($this->session['display'] ?: $this->session['login']) . '</strong>.</p>'
             . ($items !== '' ? '<ul class="modules">' . $items . '</ul>' : '<p>Für dieses Konto sind noch keine Module freigegeben.'
                 . ((int)$this->session['user_admin'] === 1 ? ' Zugang zu Modulen vergeben Sie unter <a href="/verwaltung/benutzer">Benutzer</a>, auch für sich selbst.' : ' Bitte den Admin fragen.') . '</p>');
+        if ((int)$this->session['user_admin'] === 1) {
+            try {
+                $sum = $this->ov()->summary();
+                $pct = $sum['total'] ? (int)round(100 * $sum['done'] / $sum['total']) : 100;
+                $body = '<section class="card">' . $body . '</section>';
+                $body = '<a class="card setup-card" href="/verwaltung/einrichtung"><h2>Einrichtung ' . ($sum['done'] >= $sum['total'] ? '<span class="tag">fertig</span>' : '<span class="tag warn">' . ($sum['total'] - $sum['done']) . ' offen</span>') . '</h2>'
+                    . '<progress class="progress" value="' . $pct . '" max="100" aria-label="Fortschritt der Einrichtung">' . $pct . ' %</progress>'
+                    . '<p class="muted">' . $sum['done'] . ' von ' . $sum['total'] . ' nötigen Schritten erledigt.'
+                    . ($sum['next'] !== '' ? ' Als Nächstes: <strong>' . V::h($sum['next']) . '</strong>.' : '') . '</p></a>' . $body;
+            } catch (\Throwable) { /* ohne Überblick keine Karte */ }
+        }
         return Response::html(V::page('Start', $body, $this->nav(), $this->config->practice));
     }
 
@@ -1250,7 +1261,10 @@ final class Web {
         $csrf = V::csrf($this->session['csrf']);
         $busy = in_array($st['state'], ['running', 'requested'], true);
         $labels = ['idle' => 'bereit', 'requested' => 'Auftrag wird übernommen …', 'running' => 'Aktualisierung läuft (' . $st['step'] . ') …', 'done' => 'fertig', 'failed' => 'nicht erfolgreich'];
-        $body = V::error($error) . V::notice($notice)
+        $working = $busy ? '<div class="working" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><div><strong>Update läuft – bitte nicht erneut starten und nichts anderes anklicken.</strong>'
+            . '<p>' . V::h($st['state'] === 'requested' ? 'Der Auftrag wird übernommen …' : 'Aktueller Schritt: ' . $st['step']) . '. Die Seite lädt sich alle 5 Sekunden selbst neu und kann zwischendurch kurz nicht erreichbar sein. '
+            . 'Erst wenn hier „fertig“ steht, ist das Update ganz durchgelaufen.</p></div></div>' : '';
+        $body = $working . V::error($error) . V::notice($notice)
             . '<p>Installiert: <strong>Basis ' . V::h($st['installed']) . '</strong>. Zustand: ' . V::h($labels[$st['state']] ?? $st['state'])
             . ($st['message'] !== '' ? ' – ' . V::h($st['message']) : '') . '</p>'
             . (!$st['service'] ? '<p class="error">Der Update-Dienst ist nicht eingerichtet. Bitte den Installer ausführen.</p>' : '')
@@ -1265,7 +1279,7 @@ final class Web {
                 . '<p>Vorher wird ein Schnappschuss der Daten angelegt. Schlägt etwas fehl, springt die Suite automatisch zurück. Die Seite ist einige Minuten nicht erreichbar.</p>'
                 . '<button' . ($busy ? ' disabled' : '') . '>Jetzt installieren</button></form></div>';
         }
-        $body .= '<h2>Verfügbar</h2>' . ($rows !== '' ? $rows : '<p>Keine neuere Version.</p>');
+        $body .= '<h2>Verfügbar</h2><p class="muted">Module werden beim Update der Basis automatisch mit aktualisiert, sofern unter <a href="/verwaltung/module">Module</a> die automatische Aktualisierung eingeschaltet ist; das geschieht täglich nach der Prüfung. Ein gerade beschäftigtes Modul (z. B. bei laufender Zahlung) wird dabei übersprungen und am nächsten Tag erneut versucht.</p>' . ($rows !== '' ? $rows : '<p>Keine neuere Version.</p>');
         $body .= '<h2>Kanal</h2><form method="post" action="/verwaltung/updates" class="box">' . $csrf . '<input type="hidden" name="aktion" value="kanal">'
             . '<label class="check"><input type="radio" name="kanal" value="stabil"' . ($st['channel'] === 'stabil' ? ' checked' : '') . '> Stabil (empfohlen)</label>'
             . '<label class="check"><input type="radio" name="kanal" value="beta"' . ($st['channel'] === 'beta' ? ' checked' : '') . '> Beta (Vorabversionen zum Testen)</label>'
@@ -1695,7 +1709,7 @@ final class Web {
         return $this->overview ?? new Overview($this->db, $this->users, $this->modules, $this->firewall, $this->updates, $this->connections, $this->backup, $this->config);
     }
 
-    private function overviewList(array $items): string {
+    private function overviewList(array $items, bool $places = false): string {
         $rows = '';
         foreach ($items as $i) {
             $class = ['done' => 'done', 'open' => 'open', 'error' => 'error', 'info' => 'info'][$i['state']] ?? 'open';
@@ -1704,34 +1718,30 @@ final class Web {
             $manual = !empty($i['manuell']) ? '<form method="post" action="/verwaltung/einrichtung" class="inline">'
                 . $this->hidden('bestaetigen', ['punkt' => $i['manuell'], 'erledigt' => $i['state'] === 'done' ? '0' : '1'])
                 . '<button class="secondary">' . ($i['state'] === 'done' ? 'Zurücknehmen' : 'Erledigt') . '</button></form>' : '';
-            $rows .= '<li class="' . $class . '"><span class="mark-icon" aria-hidden="true">' . $icon . '</span><span class="text">' . $title
-                . ($i['hint'] !== '' ? '<small>' . V::h($i['hint']) . '</small>' : '') . '</span>' . $manual . '</li>';
+            $chips = ($places ? '<span class="tag">' . V::h(Overview::PLACES[$i['ort'] ?? 'web'][0] ?? '') . '</span>' : '') . (!empty($i['optional']) ? '<span class="tag opt">optional</span>' : '');
+            $rows .= '<li class="' . $class . '"><span class="nr" aria-hidden="true"></span><span class="mark-icon" aria-hidden="true">' . $icon . '</span><span class="text">' . $title
+                . ($chips !== '' ? '<span class="chips">' . $chips . '</span>' : '') . ($i['hint'] !== '' ? '<small>' . V::h($i['hint']) . '</small>' : '') . '</span>' . $manual . '</li>';
         }
-        return '<ul class="checklist">' . $rows . '</ul>';
+        return '<ol class="checklist">' . $rows . '</ol>';
     }
 
     private function overviewPage(): Response {
         $o = $this->ov();
         $core = $o->core();
         $modules = $o->modules();
-        $all = array_merge($core, ...array_map(fn($m) => $m['items'], $modules));
-        $done = count(array_filter($all, fn($i) => $i['state'] === 'done'));
-        $pct = $all ? (int)round(100 * $done / count($all)) : 100;
-        $body = '<p class="lead">' . $done . ' von ' . count($all) . ' Schritten erledigt</p>'
+        $sum = $o->summary();
+        $pct = $sum['total'] ? (int)round(100 * $sum['done'] / $sum['total']) : 100;
+        $body = '<p class="lead">' . $sum['done'] . ' von ' . $sum['total'] . ' nötigen Schritten erledigt <span class="muted">(optionale Punkte zählen nicht mit)</span></p>'
             . '<progress class="progress" value="' . $pct . '" max="100" aria-label="Fortschritt der Einrichtung">' . $pct . ' %</progress>'
-            . '<section class="card"><h2>Basis</h2><p class="muted">Diese Schritte sind nur einmal nötig, geordnet nach dem Ort, an dem sie erledigt werden. '
-            . 'Ein Klick auf einen Punkt öffnet die passende Seite.</p>';
-        foreach (Overview::PLACES as $place => [$label, $hint]) {
-            $items = array_values(array_filter($core, fn($i) => ($i['ort'] ?? 'web') === $place));
-            if ($items) $body .= '<h3 class="check-group">' . V::h($label) . ' <small>· ' . V::h($hint) . '</small></h3>' . $this->overviewList($items);
-        }
-        $body .= '</section>';
+            . '<section class="card"><h2>Basis</h2><p class="muted">In dieser Reihenfolge abarbeiten. Das Schild zeigt, wo der Schritt erledigt wird: '
+            . implode(', ', array_map(fn($p) => '<strong>' . V::h($p[0]) . '</strong> (' . V::h($p[1]) . ')', Overview::PLACES)) . '. Ein Klick auf einen Punkt öffnet die passende Seite.</p>'
+            . $this->overviewList($core, true) . '</section>';
         foreach ($modules as $m) {
             $body .= '<section class="card"><h2>' . V::h($m['name']) . '</h2>' . ($m['fehler'] !== '' ? '<p class="error">Überblick nicht lesbar: ' . V::h($m['fehler']) . '</p>' : '')
                 . ($m['items'] ? $this->overviewList($m['items']) : '') . ($m['zeit'] ? '<p class="muted">Stand ' . V::date($m['zeit']) . '</p>' : '') . '</section>';
         }
         if ($modules) $body .= '<form method="post" action="/verwaltung/einrichtung">' . $this->hidden('neu') . '<button class="secondary">Module neu prüfen</button></form>';
-        return Response::html(V::page('Überblick', $body, $this->nav(), $this->config->practice));
+        return Response::html(V::page('Einrichtung', $body, $this->nav(), $this->config->practice));
     }
 
     private function overviewAction(Request $r, string $admin): Response {
@@ -1904,7 +1914,7 @@ final class Web {
     // ---- Hilfen -------------------------------------------------------------------------------------------------
     private function openSteps(): int {
         try {
-            return count(array_filter($this->ov()->core(), fn($i) => in_array($i['state'], ['open', 'error'], true)));
+            return count(array_filter($this->ov()->core(), fn($i) => in_array($i['state'], ['open', 'error'], true) && !$i['optional']));
         } catch (\Throwable) {
             return 0;
         }

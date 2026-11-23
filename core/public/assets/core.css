@@ -6,8 +6,8 @@ body { margin: 0; font-size: 15px; line-height: 1.5; }
 a { color: var(--teal); }
 
 /* Aufbau (Entwurf B): Seitenleiste mit gegliedertem Menü, Inhalt rechts in Karten */
-.layout { display: flex; flex-wrap: wrap; align-items: stretch; min-height: 100vh; }
-aside.side { flex: 1 1 240px; max-width: 260px; background: #fff; border-right: 1px solid var(--line); padding: 24px 16px; display: flex; flex-direction: column; gap: 22px; }
+.layout { display: flex; flex-wrap: wrap; align-items: flex-start; min-height: 100vh; }
+aside.side { flex: 1 1 240px; max-width: 260px; position: sticky; top: 0; height: 100vh; overflow-y: auto; box-sizing: border-box; background: #fff; border-right: 1px solid var(--line); padding: 24px 16px; display: flex; flex-direction: column; gap: 22px; }
 .brand { display: flex; align-items: center; gap: 12px; padding: 0 8px; text-decoration: none; color: inherit; }
 .mark { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 13px; background: var(--teal); color: #fff; font-size: 21px; font-weight: 700; flex: none; }
 .brand strong { display: block; font-size: 17px; letter-spacing: -.4px; }
@@ -36,7 +36,7 @@ progress.progress::-moz-progress-bar { background: var(--teal); border-radius: 4
 ol.steps { padding-left: 22px; } ol.steps li { margin: 6px 0; }
 .lead { color: #6c817b; font-size: 14px; margin: -10px 0 14px; }
 @media (max-width: 760px) {
-  aside.side { max-width: none; flex-basis: 100%; border-right: 0; border-bottom: 1px solid var(--line); padding: 16px; gap: 12px; }
+  aside.side { position: static; height: auto; overflow: visible; max-width: none; flex-basis: 100%; border-right: 0; border-bottom: 1px solid var(--line); padding: 16px; gap: 12px; }
   nav.menu { flex-direction: row; flex-wrap: wrap; gap: 10px; }
   nav.menu .menu-group { flex-direction: row; flex-wrap: wrap; }
   nav.menu .menu-title { display: none; }
@@ -170,3 +170,49 @@ details.menu-fold > summary { cursor: pointer; list-style: none; }
 details.menu-fold > summary::-webkit-details-marker { display: none; }
 details.menu-fold > summary::after { content: " ▸"; }
 details.menu-fold[open] > summary::after { content: " ▾"; }
+
+/* Menüsymbole */
+.ico { width: 18px; height: 18px; flex: none; }
+nav.menu a > span:first-child { display: inline-flex; align-items: center; gap: 10px; }
+details.menu-fold > summary { display: flex; align-items: center; gap: 8px; }
+details.menu-fold > summary .ico { width: 16px; height: 16px; }
+details.menu-fold > a > span:first-child { padding-left: 4px; }
+/* Einrichtungskarte auf der Startseite und Reihenfolge der Schritte */
+a.setup-card { display: block; text-decoration: none; color: inherit; }
+a.setup-card:hover { border-color: var(--teal); }
+a.setup-card progress.progress { margin: 10px 0 8px; }
+ol.checklist { list-style: none; counter-reset: step; margin: 6px 0 0; padding: 0; }
+ol.checklist li { counter-increment: step; display: flex; align-items: baseline; gap: 10px; padding: 9px 0; border-bottom: 1px solid #edf0ee; font-size: 14px; }
+ol.checklist li:last-child { border-bottom: 0; }
+ol.checklist .nr::before { content: counter(step) "."; color: #738b85; font-weight: 700; min-width: 22px; display: inline-block; }
+ol.checklist .text { flex: 1; }
+ol.checklist small { display: block; }
+ol.checklist a { color: #203c43; text-decoration: none; }
+ol.checklist a:hover { text-decoration: underline; color: var(--teal); }
+ol.checklist .open a { font-weight: 650; }
+ol.checklist .done a { color: #55706a; }
+ol.checklist form.inline { margin: 0 0 0 auto; }
+ol.checklist form.inline button { min-height: 32px; padding: 4px 10px; font-size: 12px; }
+ol.checklist .mark-icon { flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-size: 13px; font-weight: 700; }
+ol.checklist .done .mark-icon { background: #e5f3ed; color: #16503f; }
+ol.checklist .open .mark-icon { background: #fff3ed; color: #c2410c; border: 1px solid #f0b9a3; }
+ol.checklist .error .mark-icon { background: #c2410c; color: #fff; }
+ol.checklist .info .mark-icon { background: var(--soft); color: var(--teal); }
+.chips { display: inline-flex; gap: 6px; margin-left: 6px; vertical-align: middle; }
+.tag.opt { background: #eef1ff; color: #3b4a9a; }
+
+/* Neu starten im Fuß der Seitenleiste; „Start“ ist das Logo oben */
+.side-foot details.menu-fold { margin-bottom: 8px; }
+.side-foot details.menu-fold > summary { color: var(--muted); font-size: 13px; font-weight: 600; padding: 6px 0; }
+.side-foot details.menu-fold > summary::after { content: ""; }
+.side-foot details.menu-fold > a { display: flex; align-items: center; gap: 10px; padding: 7px 8px 7px 24px; border-radius: 9px; color: #315f53; text-decoration: none; font-weight: 600; font-size: 14px; }
+.side-foot details.menu-fold > a:hover { background: var(--soft); }
+.side-foot details.menu-fold > a > span:first-child { display: inline-flex; align-items: center; gap: 10px; }
+.brand:hover strong { color: var(--teal); }
+
+/* Update läuft: gut sichtbarer Hinweis mit drehendem Symbol */
+.working { position: sticky; top: 0; z-index: 5; display: flex; gap: 14px; align-items: flex-start; margin: 0 0 18px; padding: 14px 18px; background: #fff8e6; border: 1px solid #ecd28a; border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.08); }
+.working p { margin: 4px 0 0; font-size: 14px; }
+.spinner { flex: none; width: 24px; height: 24px; border: 3px solid #ecd28a; border-top-color: var(--teal); border-radius: 50%; animation: kdrehen 0.9s linear infinite; }
+@keyframes kdrehen { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
