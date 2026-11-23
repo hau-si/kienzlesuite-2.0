@@ -54,6 +54,12 @@ def _fastcgi_common() -> list[str]:
             '        fastcgi_read_timeout 120s;']
 
 
+WARTUNG = ("'<!doctype html><html lang=\"de\"><head><meta charset=\"utf-8\"><meta http-equiv=\"refresh\" content=\"3\">"
+           "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Einen Moment bitte</title></head>"
+           "<body style=\"font-family:sans-serif;max-width:32em;margin:4em auto;padding:0 1em\"><h1>Einen Moment bitte</h1>"
+           "<p>Die Kienzle-Suite wird gerade aktualisiert oder neu gestartet. Diese Seite lädt sich automatisch neu.</p></body></html>'")
+
+
 def _module(m: dict) -> list[str]:
     mid = _safe(m['module']['id'])
     web = m['web']
@@ -65,7 +71,7 @@ def _module(m: dict) -> list[str]:
              f'        auth_request /_auth/{mid};']
     for var, _ in FORWARD:
         lines.append(f'        auth_request_set $kienzle_{var} $upstream_http_x_kienzle_{var};')
-    lines += ['        error_page 401 = @anmelden;', '        client_max_body_size 25m;']
+    lines += ['        error_page 401 = @anmelden;', '        error_page 500 502 503 504 @wartung;', '        client_max_body_size 25m;']
     if web['protocol'] == 'fastcgi':
         entry = _safe(web['entry'])
         lines += _fastcgi_common()
@@ -116,6 +122,8 @@ def render(hostnames: list[str], registry: dict) -> str:
            '    client_max_body_size 1m;', '    access_log off;  # keine Adressen mit Vorgangs- oder Patientenbezug protokollieren',
            '    add_header Strict-Transport-Security "max-age=31536000" always;', '',
            '    location @anmelden { return 303 /anmelden?weiter=$uri; }', '',
+           '    # Kurze Pause beim Update oder Neustart: statt „502 Bad Gateway“ eine Seite, die sich selbst neu lädt', '    error_page 502 503 504 @wartung;',
+           '    location @wartung {', '        default_type text/html;', f'        return 503 {WARTUNG};', '    }', '',
            '    # Prüfung für Module (nur intern über auth_request)', '    location ^~ /_auth/ {', '        internal;',
            '        fastcgi_pass_request_body off;', '        fastcgi_param CONTENT_LENGTH "";'] + _fastcgi_common() + [
            '        fastcgi_param REQUEST_URI $uri;  # sonst stünde hier die ursprüngliche Adresse',

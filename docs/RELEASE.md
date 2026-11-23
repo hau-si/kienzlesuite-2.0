@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.19.5-beta.1
+
+- Updates: Beim Anhalten und Neustarten der Basis zeigte nginx kurz „502 Bad Gateway“. Stattdessen erscheint jetzt eine Seite „Einen Moment bitte“, die sich alle 3 Sekunden selbst neu lädt, bis die Suite wieder antwortet (gilt auch für die Modulpfade). Nicht auf einer echten VM geprüft; nginx-Syntax läuft erst im CI-Integrationstest gegen echtes nginx.
+
 ## 0.19.4-beta.1
 
 - Drucker: Die Seite trennt jetzt „Drucker“ (echte Drucker und Bondrucker) von „Virtuelle Drucker“ (von Modulen angelegt, mit dem Knopf zum Abgleichen).
