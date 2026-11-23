@@ -11,6 +11,12 @@ final class Database {
         if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) {
             throw new \RuntimeException('Datenverzeichnis nicht verfügbar.');
         }
+        $file = $directory . '/core.sqlite';
+        foreach ([$file, $file . '-wal', $file . '-shm'] as $f) {
+            if (file_exists($f) && !is_writable($f)) {
+                throw new \RuntimeException('Die Datenbankdatei ' . basename($f) . ' ist für den Dienst nicht beschreibbar (Besitzer oder Rechte falsch). Reparatur: sudo chown -R ks-core:ks-core ' . $directory . ' && sudo chmod 700 ' . $directory);
+            }
+        }
         $this->pdo = new \PDO('sqlite:' . $directory . '/core.sqlite', null, null,
             [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION, \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC]);
         $this->pdo->exec('PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;');

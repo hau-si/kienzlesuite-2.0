@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.10
+
+- Fehler behoben: Ein Rückschritt des Updaters (automatisch nach fehlgeschlagenem Update oder von Hand) stellte die Datenbank als root wieder her; danach konnte der Dienst sie nicht mehr öffnen („Interner Fehler“, „Die Basis antwortet nicht“). Der Updater merkt sich jetzt beim Schnappschuss Besitzer und Gruppe aller Dateien und stellt sie beim Rückschritt wieder her (Schnappschüsse aus älteren Versionen: Besitzer des Zielordners).
+- Gehört die Datenbank nicht dem Dienst, nennt das Systemprotokoll jetzt die Ursache samt Reparaturbefehl statt einer allgemeinen PDO-Meldung.
+- Gleichzeitig Web-Update und `install.sh` zu starten bleibt zu vermeiden. Nur im Test mit Probeverzeichnissen geprüft, nicht mit einem echten Rückschritt auf dem Server.
+
 ## 0.21.4-beta.9
 
 - Interne Fehler: Das Systemprotokoll (`journalctl -t kienzle-core-php`) enthält jetzt zusätzlich die gekürzte Meldung der Ausnahme sowie Methode und Pfad der Anfrage (ohne Eingaben, Query-Teil abgeschnitten).

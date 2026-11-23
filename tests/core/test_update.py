@@ -217,6 +217,24 @@ class Updater(Umgebung):
         self.assertIn('Signatur, Manifest und alle Dateien geprüft', (self.t / 'state' / 'update.log').read_text())
         self.assertTrue((self.t / 'core' / 'releases' / '0.4.0' / 'installer' / 'install.sh').is_file())
 
+    def test_rueckschritt_stellt_besitzer_wieder_her(self):
+        """Der Rückschritt läuft als root; die Dateien dürfen danach nicht root gehören (sonst öffnet ks-core die Datenbank nicht mehr)."""
+        from unittest import mock
+        self.publish('0.4.0')
+        self.request({'action': 'installieren', 'version': '0.4.0'})
+        snap = self.up.latest_snapshot('0.3.0')
+        owners = json.loads((snap / 'besitz.json').read_text())
+        self.assertIn('daten', owners)
+        self.assertIn('einstellungen', owners)
+        with mock.patch.object(self.up.os, 'lchown') as chown:
+            self.up.restore(snap)
+        self.assertTrue(chown.called)
+        gesetzt = {Path(c.args[0]).name: (c.args[1], c.args[2]) for c in chown.call_args_list}
+        eigene = (os.getuid(), os.getgid())
+        for name in ('core.sqlite', 'secret.key', 'core.json'):
+            if name in gesetzt:
+                self.assertEqual(gesetzt[name], eigene)
+
     def test_sicherung_vor_dem_update(self):
         (self.t / 'sicherung').mkdir()
         (self.t / 'sicherung' / 'einstellungen.json').write_text('{"ziel": {"art": "lokal", "pfad": "/media/x"}}')
