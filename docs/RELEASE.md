@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.2
+
+- Neue Seite „Praxis und Daten“ (Verwaltung → Praxis): Anschrift, Kontodaten für Überweisungen (Kontoinhaber, IBAN mit Prüfziffer, BIC, Bank) und Steuerangaben (Steuernummer/USt-IdNr., Kleinunternehmerregelung) an einer Stelle; die Module übernehmen sie. Die Anschrift ist von „Server und Name“ hierher gezogen. Nicht auf dem Server getestet.
+
 ## 0.21.4-beta.1
 
 - Verwaltung entschlackt: „Sicherheit“ fasst Firewall, Zugang (Abmeldezeiten) und Protokoll in einer Karte mit aufklappbaren Abschnitten zusammen; „Benutzer und Gruppen“ stehen auf einer Seite. Die alten Adressen (/verwaltung/firewall, /zugang, /protokoll, /gruppen) funktionieren weiter.

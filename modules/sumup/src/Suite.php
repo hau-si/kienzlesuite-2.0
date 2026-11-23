@@ -141,6 +141,12 @@ final class Suite {
         $v['printing']['width_dots'] = Config::PRINTER_MODELS[$v['printing']['model']]['width_dots'];
         // Drucker richtet die Basis ein (Verwaltung → Drucker); das Modul druckt nur auf deren Warteschlangen.
         foreach (self::praxis() as $k => $val) $v['practice'][$k] = $val;
+        // Kontodaten und Steuerangaben gehören ebenfalls der Basis (Verwaltung → Praxis und Daten).
+        try {
+            $st = self::modul()->stammdaten();
+            foreach (['holder', 'iban', 'bic', 'bank_name'] as $f) $v['bank'][$f] = $st[$f];
+            $v['tax']['tax_id'] = $st['tax_id']; $v['tax']['small_business'] = $st['small_business'];
+        } catch (\Throwable) { /* ohne Basis-Angaben bleiben die Vorgaben */ }
         $rollen = self::druckerRollen();
         if ($rollen['bon'] !== '') $v['printing']['queue'] = $rollen['bon'];
         if ($rollen['buero'] !== '') $v['office_printing']['queue'] = $rollen['buero'];

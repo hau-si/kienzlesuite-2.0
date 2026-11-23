@@ -150,7 +150,6 @@ final class Web {
 
     private function serverPage(?string $error = null): Response {
         $st = $this->srv()->status();
-        $addr = $this->address();
         $ips = array_values(array_filter($st['names'], fn($n) => filter_var($n, FILTER_VALIDATE_IP)));
         $dns = array_values(array_filter($st['names'], fn($n) => !filter_var($n, FILTER_VALIDATE_IP)));
         // Erster Name mit bekannter Endung → Feld „Name“ und Auswahl der Endung; alles andere steht unter „Weitere Namen“.
@@ -183,12 +182,7 @@ final class Web {
             . V::checkbox('neue_ca', '1', 'Falls nötig: neue Zertifizierungsstelle erstellen', false)
             . V::checkbox('ohne_ip', '1', 'Nicht mehr über die IP-Adresse erreichbar', false) . '</details>'
             . '<button' . ($st['pending'] ? ' disabled' : '') . '>Speichern</button></form>'
-            . '<h2>Anschrift der Praxis</h2><p class="muted">Steht auf Rechnungen und Belegen. Die Module (z. B. die Kasse) übernehmen sie von hier.</p>'
-            . '<form method="post" action="/verwaltung/server">' . $this->hidden('anschrift')
-            . V::input('street', 'Straße und Hausnummer', 'text', $addr['street'], 'maxlength="80" autocomplete="street-address"')
-            . V::input('city', 'PLZ und Ort', 'text', $addr['city'], 'maxlength="80"')
-            . V::input('contact', 'Kontakt auf dem Beleg (optional, z. B. Telefon)', 'text', $addr['contact'], 'maxlength="120"')
-            . '<button>Anschrift speichern</button></form>'
+            . '<h2>Anschrift, Kontodaten und Steuer</h2><p class="muted">Stehen jetzt gemeinsam unter <a href="/verwaltung/praxis">Praxis und Daten</a>.</p>'
             . '<h2>Danach</h2><ol class="steps"><li>Den Namen im Router eintragen – oder auf jedem PC in der Datei hosts: '
             . '<a href="/hilfe/arbeitsplatz#name">Anleitung</a>.</li><li>Die Suite unter <strong>' . V::h($address) . '</strong> öffnen und dort neu anmelden.</li>'
             . '<li>Falls schon Passkeys eingerichtet sind: unter „Mein Konto“ neu anlegen (sie gelten für den alten Namen).</li></ol>'
@@ -205,24 +199,80 @@ final class Web {
         return $out;
     }
 
-    private function saveAddress(Request $r, string $admin): Response {
-        $in = [];
+    private const MASTER = ['holder' => 70, 'iban' => 42, 'bic' => 11, 'bank_name' => 100, 'tax_id' => 40];
+
+    /** Kontodaten und Steuerangaben der Praxis (Kontoinhaber, IBAN, BIC, Bank, Steuernummer/USt-IdNr., Kleinunternehmer). */
+    private function master(): array {
+        $d = json_decode((string)$this->db->setting('praxis.stammdaten'), true);
+        $out = [];
+        foreach (self::MASTER as $k => $_) $out[$k] = is_array($d) && is_string($d[$k] ?? null) ? $d[$k] : '';
+        $out['small_business'] = is_array($d) && ($d['small_business'] ?? false) === true;
+        return $out;
+    }
+
+    private function practicePage(?string $error = null, ?string $notice = null): Response {
+        $a = $this->address(); $m = $this->master();
+        $form = fn(string $kind, string $fields, string $button) => '<form method="post" action="/verwaltung/praxis">' . V::csrf($this->session['csrf'])
+            . '<input type="hidden" name="aktion" value="' . $kind . '">' . $fields . '<button>' . $button . '</button></form>';
+        $body = V::error($error) . V::notice($notice) . '<section class="card"><p class="muted">Diese Angaben gelten für alle Module (Rechnungen, Belege, Überweisungs-QR, Bons). Den Namen der Praxis änderst du unter <a href="/verwaltung/server">Server und Name</a> (Praxis: <strong>'
+            . V::h($this->config->practice !== '' ? $this->config->practice : 'noch nicht eingetragen') . '</strong>).</p>'
+            . '<details class="fold" open><summary><h2>Anschrift</h2></summary>' . $form('anschrift',
+                V::input('street', 'Straße und Hausnummer', 'text', $a['street'], 'maxlength="80" autocomplete="street-address"')
+                . V::input('city', 'PLZ und Ort', 'text', $a['city'], 'maxlength="80"')
+                . V::input('contact', 'Kontakt auf dem Beleg (optional, z. B. Telefon)', 'text', $a['contact'], 'maxlength="120"'), 'Anschrift speichern') . '</details>'
+            . '<details class="fold"><summary><h2>Kontodaten für Überweisungen</h2></summary>' . $form('konto',
+                V::input('holder', 'Kontoinhaber', 'text', $m['holder'], 'maxlength="70"')
+                . V::input('iban', 'IBAN', 'text', $m['iban'], 'maxlength="42" autocapitalize="characters"')
+                . V::input('bic', 'BIC (optional)', 'text', $m['bic'], 'maxlength="11"')
+                . V::input('bank_name', 'Bank (optional)', 'text', $m['bank_name'], 'maxlength="100"'), 'Kontodaten speichern') . '</details>'
+            . '<details class="fold"><summary><h2>Steuer</h2></summary>' . $form('steuer',
+                V::input('tax_id', 'Steuernummer oder USt-IdNr. (steht auf der Rechnung)', 'text', $m['tax_id'], 'maxlength="40"')
+                . V::checkbox('small_business', '1', 'Kleinunternehmerregelung (§ 19 UStG): keine Umsatzsteuer ausweisen', $m['small_business']), 'Steuerangaben speichern') . '</details></section>';
+        return Response::html(V::page('Praxis und Daten', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+    }
+
+    private function practiceSave(Request $r, string $admin): Response {
+        $kind = $r->field('aktion', 20);
         try {
-            foreach (['street' => 80, 'city' => 80, 'contact' => 120] as $k => $max) {
-                $v = trim($r->field($k, $max + 1));
-                if (mb_strlen($v) > $max || preg_match('/[\x00-\x1f\x7f<>]/', $v)) throw new Problem('Anschrift: Angaben zu lang oder mit unerlaubten Zeichen.', 422);
-                $in[$k] = $v;
+            if ($kind === 'anschrift') {
+                $in = [];
+                foreach (['street' => 80, 'city' => 80, 'contact' => 120] as $k => $max) {
+                    $v = trim($r->field($k, $max + 1));
+                    if (mb_strlen($v) > $max || preg_match('/[\x00-\x1f\x7f<>]/', $v)) throw new Problem('Anschrift: Angaben zu lang oder mit unerlaubten Zeichen.', 422);
+                    $in[$k] = $v;
+                }
+                $this->db->store('praxis.anschrift', json_encode($in, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+                $this->audit->write($admin, 'praxisanschrift', '');
+                return $this->practicePage(null, 'Anschrift gespeichert.');
             }
+            if (!in_array($kind, ['konto', 'steuer'], true)) throw new Problem('Unbekannte Aktion.', 400);
+            $m = $this->master();
+            foreach ($kind === 'konto' ? ['holder', 'iban', 'bic', 'bank_name'] : ['tax_id'] as $k) {
+                $v = trim($r->field($k, self::MASTER[$k] + 1));
+                if (mb_strlen($v) > self::MASTER[$k] || preg_match('/[\x00-\x1f\x7f<>]/', $v)) throw new Problem('Angaben zu lang oder mit unerlaubten Zeichen: ' . $k . '.', 422);
+                $m[$k] = $v;
+            }
+            if ($kind === 'steuer') $m['small_business'] = $r->field('small_business') === '1';
+            if ($m['iban'] !== '' && !self::validIban($m['iban'])) throw new Problem('Die IBAN ist ungültig (Prüfziffer stimmt nicht).', 422);
+            $this->db->store('praxis.stammdaten', json_encode($m, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+            $this->audit->write($admin, 'praxisdaten-gespeichert', $kind);
         } catch (Problem $e) {
-            return $this->serverPage($e->getMessage());
+            return $this->practicePage($e->getMessage());
         }
-        $this->db->store('praxis.anschrift', json_encode($in, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
-        $this->audit->write($admin, 'praxisanschrift', '');
-        return Response::redirect('/verwaltung/server');
+        return $this->practicePage(null, $kind === 'konto' ? 'Kontodaten gespeichert.' : 'Steuerangaben gespeichert.');
+    }
+
+    private static function validIban(string $iban): bool {
+        $iban = strtoupper((string)preg_replace('/\s+/', '', $iban));
+        if (!preg_match('/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/D', $iban)) return false;
+        $n = '';
+        foreach (str_split(substr($iban, 4) . substr($iban, 0, 4)) as $c) $n .= ctype_alpha($c) ? (string)(ord($c) - 55) : $c;
+        $rest = 0;
+        foreach (str_split($n, 7) as $part) $rest = (int)($rest . $part) % 97;
+        return $rest === 1;
     }
 
     private function serverSave(Request $r, string $admin): Response {
-        if ($r->field('aktion', 20) === 'anschrift') return $this->saveAddress($r, $admin);
         $short = strtolower(trim($r->field('kurzname', 60)));
         $suffix = $r->field('endung', 30);
         $names = '';
@@ -362,7 +412,7 @@ final class Web {
             ->with('X-Kienzle-Csrf', self::moduleCsrf($session['csrf'], $module))
             ->with('X-Kienzle-Bestaetigt', (string)(int)$session['confirmed_at'])
             ->with('X-Kienzle-Drucker', rawurlencode(json_encode($this->printerRoles() + ['bonbreite' => $this->bonWidth()], JSON_UNESCAPED_UNICODE)))
-            ->with('X-Kienzle-Praxis', rawurlencode(json_encode(['name' => $this->config->practice] + $this->address(), JSON_UNESCAPED_UNICODE)));
+            ->with('X-Kienzle-Praxis', rawurlencode(json_encode(['name' => $this->config->practice] + $this->address() + $this->master(), JSON_UNESCAPED_UNICODE)));
     }
 
     /** CSRF-Marke, die ein Modul in seine Formulare schreibt und mit X-Kienzle-Csrf vergleicht. */
@@ -722,6 +772,7 @@ final class Web {
         if ($r->path === '/verwaltung/updates') return $get ? $this->updatesPage() : $this->updatesAction($r, $admin);
         if ($r->path === '/verwaltung/module') return $get ? $this->modulesPage() : $this->modulesAction($r, $admin);
         if ($r->path === '/verwaltung/verbindungen') return $get ? $this->connectionsPage() : $this->connectionsAction($r, $admin);
+        if ($r->path === '/verwaltung/praxis') return $get ? $this->practicePage() : $this->practiceSave($r, $admin);
         if ($r->path === '/verwaltung/server') return $get ? $this->serverPage() : $this->serverSave($r, $admin);
         if ($r->path === '/verwaltung/sso') return $get ? $this->ssoPage() : $this->ssoAction($r, $admin);
         if ($r->path === '/verwaltung/drucker') return $get ? $this->printersPage() : $this->printersAction($r, $admin);

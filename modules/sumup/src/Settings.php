@@ -28,21 +28,15 @@ final class Settings {
                 'help' => 'Adresse, Schlüssel und Zertifikat von T2med stehen zentral unter Verwaltung → Verbindungen der Suite.'],
             'entry_code' => ['type' => 'string', 'label' => 'Aktenkürzel', 'default' => 'ZAHLUNG'],
         ]],
-        'practice' => ['label' => 'Belege (Praxisname und Anschrift: Verwaltung → Server und Name)', 'fields' => [
+        'practice' => ['label' => 'Belege (Praxisname: Verwaltung → Server und Name, Anschrift: Verwaltung → Praxis und Daten)', 'fields' => [
             'append_sumup_receipt' => ['type' => 'bool', 'label' => 'Originalen SumUp-Beleg statt lokaler Zahlungsbestätigung anhängen'],
         ]],
-        'bank' => ['label' => 'Überweisung (Kontodaten der Praxis)', 'fields' => [
-            'holder' => ['type' => 'string', 'label' => 'Kontoinhaber', 'default' => '', 'optional' => true],
-            'iban' => ['type' => 'string', 'label' => 'IBAN', 'default' => '', 'optional' => true],
-            'bic' => ['type' => 'string', 'label' => 'BIC (optional)', 'default' => '', 'optional' => true],
-            'bank_name' => ['type' => 'string', 'label' => 'Bank (optional)', 'default' => '', 'optional' => true],
+        'bank' => ['label' => 'Überweisung (Kontodaten: Verwaltung → Praxis und Daten)', 'fields' => [
             'purpose' => ['type' => 'string', 'label' => 'Verwendungszweck', 'default' => 'Rechnung {nummer}', 'optional' => true],
         ]],
-        'tax' => ['label' => 'Umsatzsteuer', 'fields' => [
-            'small_business' => ['type' => 'bool', 'label' => 'Kleinunternehmerregelung (§ 19 UStG): alle Rechnungen ohne MwSt.', 'default' => false],
+        'tax' => ['label' => 'Umsatzsteuer (Steuernummer und Kleinunternehmerregelung: Verwaltung → Praxis und Daten)', 'fields' => [
             'rate' => ['type' => 'percent', 'label' => 'MwSt.-Satz in Prozent', 'default' => 1900],
             'manual_vat' => ['type' => 'bool', 'label' => '„Sonstiger Betrag“ mit MwSt. berechnen', 'default' => false],
-            'tax_id' => ['type' => 'string', 'label' => 'Steuernummer oder USt-IdNr. (steht auf der Rechnung)', 'default' => '', 'optional' => true],
             'exempt_note' => ['type' => 'text', 'label' => 'Hinweis bei Positionen ohne MwSt. (optional)', 'default' => ''],
             'small_business_note' => ['type' => 'text', 'label' => 'Hinweis bei Kleinunternehmerregelung', 'default' => 'Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.'],
         ]],

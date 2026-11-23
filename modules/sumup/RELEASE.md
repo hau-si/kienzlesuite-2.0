@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.3
+
+- Kontodaten (Kontoinhaber, IBAN, BIC, Bank), Steuernummer und Kleinunternehmerregelung kommen jetzt zentral aus der Basis (Verwaltung → Praxis und Daten) und stehen nicht mehr in den Einstellungen der Kasse. Bisher hier eingetragene Werte werden nicht mehr verwendet: bitte einmal in der Basis eintragen. Voraussetzung: Basis 0.21.4-beta.2. Nicht auf dem Server getestet.
+
 ## 2.3.4-beta.2
 
 - Hinweis zum T2med-Demo-Schlüssel (kein eigener API-Schlüssel eintragen, sonst 403) in Einstellungshilfe.

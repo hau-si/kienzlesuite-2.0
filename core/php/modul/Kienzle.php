@@ -35,6 +35,15 @@ final class KienzleModul {
         return $out;
     }
 
+    /** Kontodaten und Steuerangaben der Basis (Verwaltung → Praxis und Daten): holder, iban, bic, bank_name, tax_id, small_business. */
+    public function stammdaten(): array {
+        $d = json_decode(rawurldecode((string)($this->server['KIENZLE_PRAXIS'] ?? '')), true);
+        $out = [];
+        foreach (['holder', 'iban', 'bic', 'bank_name', 'tax_id'] as $k) $out[$k] = is_array($d) && is_string($d[$k] ?? null) ? $d[$k] : '';
+        $out['small_business'] = is_array($d) && ($d['small_business'] ?? false) === true;
+        return $out;
+    }
+
     /** Zuordnung der Drucker (Verwaltung → Drucker): buero = Praxisdrucker (A4), bon = Bondrucker; leer = nicht zugeordnet. */
     public function druckerRollen(): array {
         $d = json_decode(rawurldecode((string)($this->server['KIENZLE_DRUCKER'] ?? '')), true);
