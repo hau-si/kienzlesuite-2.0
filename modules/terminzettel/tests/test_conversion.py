@@ -44,6 +44,13 @@ class ConversionTests(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
     @unittest.skipUnless(shutil.which("pdftotext"), "pdftotext fehlt")
+    def test_text_only_driver_ansi_and_utf8(self):
+        text = "TERMINE\nErika Müller\nTerminzeitpunkt          Termintyp\nDo. 17.09.2026, 09:00  Kontrolle Größe\n"
+        for encoding in ("utf-8", "cp1252"):
+            ticket = app.parse_t2med(app.extract_text(text.encode(encoding), {}))
+            self.assertEqual(ticket.patient, "Erika Müller")
+            self.assertEqual(ticket.appointments[0].kind, "Kontrolle Größe")
+
     def test_real_pdf(self):
         text = app.extract_text(pdf_fixture(), {})
         ticket = app.parse_t2med(text)

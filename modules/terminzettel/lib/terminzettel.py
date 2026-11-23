@@ -304,10 +304,13 @@ def extract_text(data: bytes, cfg: dict[str, Any]) -> str:
                     run_checked([tool, str(source), str(pdf)], temp_dir=td)
                 return extract_pdf_text(str(pdf), cfg, temp_dir=td)
     encoding = str(cfg.get("input", {}).get("text_encoding", "utf-8"))
-    try:
-        return data.decode(encoding, "strict")
-    except (UnicodeError, LookupError):
-        raise TicketError("Textkodierung ungültig. Bitte PDF oder PostScript verwenden.") from None
+    # Der Windows-Treiber „Generic / Text Only“ liefert ANSI (Windows-1252): Umlaute sind dann kein gültiges UTF-8.
+    for candidate in dict.fromkeys((encoding, "cp1252")):
+        try:
+            return data.decode(candidate, "strict")
+        except (UnicodeError, LookupError):
+            continue
+    raise TicketError("Textkodierung ungültig. Bitte PDF oder PostScript verwenden.")
 
 
 def read_spool(path: str) -> bytes:

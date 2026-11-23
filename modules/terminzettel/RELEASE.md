@@ -1,5 +1,11 @@
 # Terminzettel – Release-Notizen
 
+## 1.1.3-beta.1
+
+- Behoben: Druckt T2med mit dem Windows-Treiber „Generic / Text Only“ (reiner Text), wurde der Auftrag vom virtuellen Drucker „Terminzettel“ nicht angenommen, weil er nur PDF, PostScript und XPS erlaubte. Jetzt werden auch `text/plain` und rohe Aufträge (`application/octet-stream`, so sendet der Text-Treiber über Samba/IPP) angenommen.
+- Reiner Text aus dem Windows-Treiber (Windows-1252, Umlaute) wird erkannt, wenn er kein gültiges UTF-8 ist.
+- Nicht auf der echten VM mit T2med getestet. Nach dem Update den Drucker „Terminzettel“ neu synchronisieren lassen (Basis startet den virtuellen Drucker mit der neuen Formatliste).
+
 ## 1.1.2-beta.1
 
 - Behoben: Die Größe „Klein“ des Kalender-QR-Codes (160 Druckpunkte) war für den Kalendereintrag zu klein, der QR-Code wurde weder in der Vorschau noch beim Druck erzeugt. Die Größen sind jetzt Klein 224, Mittel 292 und Groß 384 Druckpunkte (je mindestens 3 Punkte pro Modul).
