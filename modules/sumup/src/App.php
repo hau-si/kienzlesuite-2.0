@@ -284,6 +284,7 @@ final class App {
             if ($this->db->one("SELECT id FROM payments WHERE visit_id=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful')", [$visit['id']])) throw new Problem('Für diesen Vorgang läuft bereits eine andere Zahlung.', 409);
             $t2med = !empty($source['inbox_id']);
             if ($t2med && !isset(array_column($this->openInvoices($fresh), null, 'id')[$source['inbox_id']])) throw new Problem('Diese Rechnung ist nicht mehr offen. Bitte Seite neu laden.', 409);
+            if ($t2med && $method === 'transfer') throw new Problem('Bei T2med-Rechnungen steht der Überweisungs-QR-Code bereits auf der Rechnung. Hier gibt es nur Karte oder Bar.', 409);
             if ($method === 'transfer' && !$this->bank->ready()) throw new Problem('Für Überweisungen bitte zuerst die Kontodaten unter Einstellungen → Überweisung eintragen.', 409);
             if (!$t2med && !$source['invoice_json']) throw new Problem('Für Bar und Überweisung wird eine Rechnung erstellt. Bitte zuerst Praxisname und Anschrift in den Einstellungen eintragen.', 409);
             $payment = $this->db->transaction(function () use ($source, $fresh, $request, $method): array {
@@ -485,7 +486,8 @@ final class App {
         $invoiceId = self::string($input, 'invoice_id', 32);
         if (!preg_match('/^[a-f0-9]{32}$/D', $invoiceId)) throw new Problem('Ungültige Rechnung.');
         $method = self::string($input, 'method', 8, false) ?: 'card';
-        if (!in_array($method, ['card', 'cash', 'transfer'], true)) throw new Problem('Ungültige Zahlungsart.');
+        // T2med-Rechnungen tragen ihren Überweisungs-QR-Code selbst; die Kasse bietet hier nur Karte und Bar.
+        if (!in_array($method, ['card', 'cash'], true)) throw new Problem('Ungültige Zahlungsart.');
         $hash = hash('sha256', json_encode($method !== 'card' ? ['t2med_invoice', $invoiceId, $method] : ['t2med_invoice', $invoiceId], JSON_THROW_ON_ERROR));
         return $this->db->locked('reader', function () use ($visit, $request, $hash, $invoiceId, $input, $method): array {
             $existing = $this->db->one('SELECT * FROM payments WHERE request_id=?', [$request]);
@@ -507,12 +509,8 @@ final class App {
                 $items = [['id' => null, 'label' => 'T2med-Rechnung ' . $invoice['invoice_number'] . ' vom ' . $date, 'price_cents' => $invoice['amount_cents']]];
                 $id = self::id();
                 $json = json_encode($items, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
-                if ($method === 'transfer' && !$this->bank->ready()) throw new Problem('Für Überweisungen bitte zuerst die Kontodaten unter Einstellungen → Überweisung eintragen.', 409);
                 $this->dropOpenTransfers($fresh['id']);
-                if ($method === 'transfer') {
-                    $this->db->query('INSERT INTO payments(id,visit_id,request_id,request_hash,reference,reader_id,amount_cents,services_json,payment_status,created_at,invoice_json,inbox_id,t2med_invoice,payment_method) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-                        [$id, $fresh['id'], $request, $hash, 'UEB-' . strtoupper($id), 'transfer', $invoice['amount_cents'], $json, 'transfer_open', time(), null, $invoice['id'], $invoice['invoice_number'], 'transfer']);
-                } elseif ($method === 'cash') {
+                if ($method === 'cash') {
                     // Bar bezahlt: sofort erfasst (kein Terminal). Die T2med-Rechnung bleibt die Rechnung; es gibt keinen eigenen Beleg.
                     $this->db->query('INSERT INTO payments(id,visit_id,request_id,request_hash,reference,reader_id,amount_cents,services_json,payment_status,created_at,paid_at,transaction_id,invoice_json,inbox_id,t2med_invoice,payment_method) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                         [$id, $fresh['id'], $request, $hash, 'BAR-' . strtoupper($id), $this->config->get('sumup', 'mode') === 'mock' ? 'mock-reader' : 'cash', $invoice['amount_cents'], $json,
@@ -527,7 +525,6 @@ final class App {
             });
             if ($method === 'card') return $this->begin($payment);
             $result = $this->publicPayment($payment);
-            if ($method === 'transfer') return $result;
             // Quittung automatisch auf dem Bondrucker; ein Druckfehler blockiert die Barzahlung nicht.
             if ($this->config->get('printing', 'enabled', false) && $this->config->get('printing', 'cash_receipt_auto', false)) {
                 try { $r = $this->receiptPrint($fresh ?? $visit, ['payment_id' => $payment['id'], 'request_id' => 'quittung-' . $payment['id']]); $result['quittung'] = $r['status']; $result['quittung_message'] = $r['message']; }
@@ -574,10 +571,11 @@ final class App {
     }
     public function receipt(array $visit, string $id): string {
         $payment = $this->payment($visit, $id);
-        if ($payment['payment_status'] !== 'successful') throw new Problem('Ein Beleg ist erst nach bestätigter erfolgreicher Zahlung verfügbar.', 409);
+        if (!in_array($payment['payment_status'], ['successful', 'transfer_open'], true)) throw new Problem('Ein Beleg ist erst nach bestätigter erfolgreicher Zahlung verfügbar.', 409);
         return ReceiptPdf::convert($this->receiptSource($payment));
     }
     private function receiptSource(array $payment): string {
+        if ($payment['payment_status'] === 'transfer_open') return $this->transferNote($payment);
         if (!$payment['invoice_json'] && in_array($payment['payment_method'] ?? 'card', ['cash', 'transfer'], true)) return $this->cashQuittung($payment);
         if (!$payment['invoice_json']) return $this->sumup->receiptSource($payment);
         $invoice = json_decode($payment['invoice_json'], true, 32, JSON_THROW_ON_ERROR);
@@ -589,6 +587,15 @@ final class App {
         return InvoiceReceipt::source($invoice, ['status' => $payment['payment_status'], 'paid_date' => $paid->format('d.m.Y H:i'),
             'reference' => $payment['reference'], 'transaction_id' => $number, 'mock' => $invoice['mock'], 'method' => $payment['payment_method'] ?? 'card'],
             !$cash && $this->config->get('practice', 'append_sumup_receipt', false) ? $this->sumup->receiptSource($payment) : null);
+    }
+    /** Bon mit Kontodaten und QR-Code für eine noch offene Überweisung. */
+    private function transferNote(array $payment): string {
+        if (!$this->bank->ready()) throw new Problem('Die Kontodaten fehlen (Einstellungen → Überweisung).', 409);
+        $info = $this->bank->info((int)$payment['amount_cents'], (string)($payment['t2med_invoice'] ?: $payment['reference']));
+        $practice = [];
+        if ($this->config->practiceReady()) foreach (['name', 'street', 'city', 'contact'] as $key) $practice[$key] = $this->config->get('practice', $key, '');
+        return InvoiceReceipt::transferNote(['mock' => $this->config->get('sumup', 'mode') === 'mock', 'practice' => $practice, 'amount_cents' => (int)$payment['amount_cents'],
+            'bank' => $info, 'epc' => $this->bank->epc((int)$payment['amount_cents'], $info['purpose'])]);
     }
     /** Quittung für eine bar bezahlte T2med-Rechnung (Betrag, Name, Datum, Rechnungsnummer, „bar erhalten“). */
     private function cashQuittung(array $payment): string {
@@ -620,7 +627,7 @@ final class App {
         // Druckaufträge auf diesem Server nacheinander übergeben.
         return $this->db->locked('receipt-print', function () use ($visit, $id, $request): array {
             $payment = $this->payment($visit, $id);
-            if ($payment['payment_status'] !== 'successful') throw new Problem('Drucken erst nach erfolgreicher Zahlung möglich.', 409);
+            if (!in_array($payment['payment_status'], ['successful', 'transfer_open'], true)) throw new Problem('Drucken erst nach erfolgreicher Zahlung möglich.', 409);
             $old = $this->db->one('SELECT * FROM receipt_prints WHERE request_id=?', [$request]);
             if ($old && $old['payment_id'] !== $id) throw new Problem('Druckschlüssel gehört zu einer anderen Zahlung.', 409);
             if ($old) return $this->printResult($old['status']);

@@ -80,18 +80,22 @@ final class Qr {
         return $best;
     }
 
-    /** SVG (viereckige Module, 4 Module Ruhezone) als Zeichenkette, ohne Größenangaben außer viewBox. */
-    public static function svg(string $data, string $attributes = ''): string {
+    /** Pfad (Einheit: ein Modul, ohne Ruhezone) und Kantenlänge der Matrix. */
+    public static function path(string $data): array {
         $matrix = self::matrix($data); $n = count($matrix); $path = '';
         foreach ($matrix as $y => $row) {
             for ($x = 0; $x < $n; $x++) {
                 if (!$row[$x]) continue;
                 $run = 1; while ($x + $run < $n && $row[$x + $run]) $run++;
-                $path .= 'M' . ($x + 4) . ' ' . ($y + 4) . 'h' . $run . 'v1h-' . $run . 'z'; $x += $run - 1;
+                $path .= 'M' . $x . ' ' . $y . 'h' . $run . 'v1h-' . $run . 'z'; $x += $run - 1;
             }
         }
-        $box = $n + 8;
-        return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' . $box . ' ' . $box . '" shape-rendering="crispEdges" ' . $attributes . '><rect width="' . $box . '" height="' . $box . '" fill="#fff"/><path d="' . $path . '" fill="#000"/></svg>';
+        return [$path, $n];
+    }
+    /** SVG (viereckige Module, 4 Module Ruhezone) als Zeichenkette, ohne Größenangaben außer viewBox. */
+    public static function svg(string $data, string $attributes = ''): string {
+        [$path, $n] = self::path($data); $box = $n + 8;
+        return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' . $box . ' ' . $box . '" shape-rendering="crispEdges" ' . $attributes . '><rect width="' . $box . '" height="' . $box . '" fill="#fff"/><path transform="translate(4 4)" d="' . $path . '" fill="#000"/></svg>';
     }
 
     private static function reedSolomon(array $data, int $ecLen): array {

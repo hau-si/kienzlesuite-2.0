@@ -17,6 +17,7 @@ function config(string $state, bool $bank = true): Config {
     $v['app']['state_dir'] = $state; $v['app']['launcher_key'] = str_repeat('a', 64); $v['app']['encryption_key'] = str_repeat('b', 64);
     $v['sumup'] = ['mode' => 'mock']; $v['fhir'] = ['mode' => 'mock', 'entry_code' => 'ZAHLUNG'];
     $v['practice'] = ['name' => 'Praxis Beispiel', 'street' => 'Musterstraße 1', 'city' => '12345 Musterstadt'];
+    $v['invoice_inbox'] = ['enabled' => true, 'key' => str_repeat('c', 64), 'max_age_days' => 14];
     if ($bank) $v['bank'] = ['holder' => 'Praxis Beispiel', 'iban' => 'DE02 1203 0000 0000 2020 51', 'bic' => 'BYLADEM1001', 'purpose' => 'Rechnung {nummer}'];
     return new Config($v);
 }
@@ -51,7 +52,7 @@ try {
     $t = $app->start($v1, ['services' => $ids, 'request_id' => App::id(), 'method' => 'transfer']);
     check($t['method'] === 'transfer' && $t['payment_status'] === 'transfer_open' && $t['invoice_number'] === null, 'Überweisung falsch gestartet: ' . json_encode($t));
     check(($t['transfer']['iban'] ?? '') === 'DE02 1203 0000 0000 2020 51' && str_contains($t['transfer']['qr_svg'], '<svg') && str_starts_with($t['transfer']['purpose'], 'Rechnung UEB-'), 'Überweisungsdaten falsch: ' . json_encode($t['transfer'] ?? null));
-    problem(fn() => $app->receipt($v1, $t['id']), 'Beleg vor Zahlungseingang', 409);
+    check(str_starts_with($app->receipt($v1, $t['id']), '%PDF'), 'Überweisungs-Bon (PDF) fehlt');
     // Wechsel auf bar: die offene Überweisung wird beendet, neue Barzahlung mit denselben Positionen.
     $cash = $app->switchMethod($v1, ['payment_id' => $t['id'], 'request_id' => App::id(), 'method' => 'cash']);
     check($cash['method'] === 'cash' && $cash['payment_status'] === 'successful' && $cash['amount_cents'] === 1500 && str_starts_with((string)$cash['invoice_number'], 'TEST-BAR-'), 'Wechsel auf bar falsch: ' . json_encode($cash));
@@ -76,6 +77,9 @@ try {
     $invoice = json_decode($row['invoice_json'], true); $invoice['number'] = $row['transaction_id']; $invoice['issued_date'] = date('Y-m-d');
     $text = html_entity_decode(strip_tags(str_replace('</text>', "\n", InvoiceReceipt::source($invoice, ['status' => 'successful', 'paid_date' => 'heute', 'reference' => $row['reference'], 'transaction_id' => $row['transaction_id'], 'mock' => true, 'method' => 'transfer']))), ENT_XML1, 'UTF-8');
     check(str_contains($text, 'Überwiesen') && str_contains($text, 'Überweisung') && str_contains($text, 'erhalten') && !str_contains($text, 'SumUp'), 'Überweisungsbeleg falsch: ' . $text);
+
+    // T2med-Rechnungen: nur Karte oder Bar.
+    problem(fn() => $app->startInvoice($v1, ['request_id' => App::id(), 'invoice_id' => str_repeat('a', 32), 'method' => 'transfer']), 'Überweisung bei T2med-Rechnung akzeptiert', 400);
 
     // Ohne Kontodaten keine Überweisung.
     $s2 = sys_get_temp_dir() . '/ks-transfer-' . bin2hex(random_bytes(6)); $dirs[] = $s2; mkdir($s2, 0700);

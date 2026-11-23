@@ -84,18 +84,13 @@ function renderInvoices() {
     card.onclick = pay('card');
     const cash = element('button','Bar bezahlt','secondary wide invoice-cash');
     cash.onclick = () => { if (confirm(euro(invoice.amount_cents)+' bar erhalten? Die Zahlung wird als bezahlt erfasst.')) pay('cash')(); };
-    if (state.bank_ready) {
-      const transfer = element('button','Per Überweisung (QR-Code anzeigen)','secondary wide invoice-transfer');
-      transfer.onclick = pay('transfer');
-      box.append(transfer);
-    }
     const later = element('button','Später (Überweisung)','text-button invoice-later');
     later.onclick = () => run(async() => {
       // Ist der Rechnungsdruck eingeschaltet, kommt die Rechnung jetzt einmal auf den Praxisdrucker (für die Überweisung).
       if (state.print?.t2med_auto && !invoice.printed_at) { const result = await api('invoice_later', {invoice_id: invoice.id}); if (result.message) message(result.message); }
       invoiceLater.add(invoice.id); await load();
     });
-    box.prepend(line, card, cash); box.append(later);
+    box.append(line, card, cash, later);
     if (invoice.printed_at) box.append(element('p', '🖨 Rechnung gedruckt am ' + new Date(invoice.printed_at * 1000).toLocaleString('de-DE', {dateStyle: 'short', timeStyle: 'short'}), 'muted invoice-letter-note'));
     if (state.letter?.enabled && invoice.letter?.postable) {
       const sent = invoice.letter || {};
@@ -280,10 +275,12 @@ function renderPayment() {
   if (!showing) return;
   // Bar bezahlte T2med-Rechnung: Quittung statt Rechnungsbeleg; kein SumUp-Link.
   const quittung = ['cash','transfer'].includes(p.method) && !p.local_receipt;
-  $('receipt').hidden=p.payment_status!=='successful';
-  $('receipt').textContent=quittung ? 'Quittung als PDF' : p.local_receipt ? 'Rechnung / Leistungsbeleg als PDF' : 'Zahlungsbeleg / PDF';
+  const open=p.payment_status==='transfer_open';
+  $('receipt').hidden=p.payment_status!=='successful' && !open;
+  $('receipt').textContent=open ? 'Überweisungsdaten als PDF' : quittung ? 'Quittung als PDF' : p.local_receipt ? 'Rechnung / Leistungsbeleg als PDF' : 'Zahlungsbeleg / PDF';
   $('receipt-share').hidden=p.payment_status!=='successful' || quittung;
-  $('receipt-print').hidden=p.payment_status!=='successful' || !state.printing_enabled;
+  $('receipt-print').hidden=(p.payment_status!=='successful' && !open) || !state.printing_enabled;
+  if(open && !$('receipt-print').hidden) $('receipt-print').textContent='Überweisungsdaten drucken';
   if(quittung && !$('receipt-print').hidden) $('receipt-print').textContent='Quittung drucken';
   if(p.quittung_message) quittungNote[p.id]=p.quittung_message;
   if(quittung && quittungNote[p.id] && receiptPrintPayment!==p.id) { $('receipt-print-status').hidden=false; $('receipt-print-status').textContent='Quittung: '+quittungNote[p.id]; }
@@ -309,7 +306,7 @@ function renderPayment() {
     renderTransfer(p); $('confirm-transfer').hidden=false; $('switch-cash').hidden=false; $('cancel').hidden=false; $('cancel').textContent='Überweisung abbrechen';
   } else if(['failed','cancelled'].includes(p.payment_status)) {
     title=p.payment_status==='failed'?'Zahlung nicht erfolgt':'Zahlung abgebrochen'; symbol='×'; description='Du kannst die Zahlung erneut starten oder die Zahlart wechseln.'; $('retry').hidden=false;
-    $('switch-cash').hidden=false; $('switch-transfer').hidden=!state.bank_ready;
+    $('switch-cash').hidden=false; $('switch-transfer').hidden=!state.bank_ready || !!p.t2med_invoice;
   } else {
     title=p.payment_status==='unknown' || p.payment_status==='starting'?'Zahlung wird geprüft':p.payment_status==='cancel_requested'?'Abbruch wird geprüft':'Zahlung läuft';
     description='Bitte den Hinweisen am Terminal folgen. Dieses Fenster bis zum Abschluss geöffnet lassen.';
@@ -440,14 +437,14 @@ $('cancel').onclick=()=>run(async()=>{ state.payment=await api('cancel',{payment
 $('reader-cancel').onclick=()=>run(()=>refreshReader('reader_cancel'));
 $('reader-status').onclick=()=>run(()=>refreshReader('reader_status'));
 $('receipt').onclick=()=>{
-  if(busy || state?.payment?.payment_status!=='successful') return;
+  if(busy || !['successful','transfer_open'].includes(state?.payment?.payment_status)) return;
   const query=new URLSearchParams({v:visitId,p:state.payment.id});
   window.open(BASE+'receipt.php?'+query, '_blank', 'noopener,noreferrer');
 };
 function mailStatus(text) { $('receipt-mail-status').textContent=text; $('receipt-mail-status').hidden=!text; }
 function printStatus(text) { $('receipt-print-status').textContent=text; $('receipt-print-status').hidden=!text; }
 $('receipt-print').onclick=()=>run(async()=>{
-  if(!state.printing_enabled || state.payment?.payment_status!=='successful') return;
+  if(!state.printing_enabled || !['successful','transfer_open'].includes(state.payment?.payment_status)) return;
   const key='ks-print-'+visitId+'-'+state.payment.id;
   // Auch nach Neuladen wird bei verlorener Antwort derselbe Auftrag geprüft.
   let requestId=sessionStorage.getItem(key);

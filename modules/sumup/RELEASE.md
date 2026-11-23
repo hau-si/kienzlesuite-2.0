@@ -1,11 +1,15 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.0-beta.2
+
+- Bei einer offenen Überweisung gibt es „Überweisungsdaten als PDF“ und „Überweisungsdaten drucken“: ein Bon mit Empfänger, IBAN, BIC, Betrag, Verwendungszweck und dem EPC-QR-Code zum Mitgeben (Bondrucker oder PDF). Der gedruckte QR-Code wurde mit einem OpenCV-Decoder gegengelesen; Druck auf echtem Bondrucker nicht getestet.
+
 ## 2.3.0-beta.1
 
 - Neu: Zahlart **Überweisung**. In den Einstellungen (Abschnitt „Überweisung“) werden Kontoinhaber, IBAN (mit Prüfziffernkontrolle), optional BIC und Bank sowie eine Vorlage für den Verwendungszweck fest hinterlegt (`{nummer}`, `{betrag}`).
 - Die Kasse zeigt für eine Überweisung die Kontodaten und einen **EPC-QR-Code („GiroCode“)** mit Betrag und Verwendungszweck; die Banking-App füllt die Überweisung damit selbst aus. Der QR-Code wird ohne externe Bibliothek im Modul erzeugt.
 - Eine Überweisung bleibt „offen“, bis der Zahlungseingang bestätigt wird; erst dann entstehen Rechnungsnummer (`UEB-JJJJ-NNNN`), Beleg bzw. Quittung und die Dokumentation in der Akte. Offene Überweisungen lassen sich abbrechen.
-- Nach fehlgeschlagener oder abgebrochener Zahlung (und bei offener Überweisung) kann direkt auf **Bar** oder **Überweisung** gewechselt werden – bei der Leistungsauswahl („IGeL“) wie bei T2med-Rechnungen; Positionen und Betrag werden übernommen. Bei T2med-Rechnungen gibt es zusätzlich den Knopf „Per Überweisung (QR-Code anzeigen)“, bei der Leistungsauswahl die dritte Zahlart.
+- Nach fehlgeschlagener oder abgebrochener Zahlung (und bei offener Überweisung) kann direkt auf **Bar** oder **Überweisung** gewechselt werden – bei der Leistungsauswahl („IGeL“) wie bei T2med-Rechnungen; Positionen und Betrag werden übernommen. Überweisung mit QR-Code gibt es nur bei internen Rechnungen der Leistungsauswahl (dritte Zahlart); bei T2med-Rechnungen steht der QR-Code schon auf der Rechnung, dort bleibt es bei Karte und Bar („Später (Überweisung)“ wie bisher).
 - Akteneintrag, Beleg und Steuerexport (neue Spalte „davon Überweisung“) kennzeichnen Überweisungen.
 - Nicht auf echter Hardware, nicht mit einer echten Banking-App getestet; der QR-Code wurde mit zwei OpenCV-Decodern gegengelesen.
 
