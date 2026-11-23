@@ -51,3 +51,7 @@ a.brand { color: inherit; text-decoration: none; display: flex; align-items: cen
 .transfer-box{display:grid;gap:12px;justify-items:center;margin:12px 0}.transfer-qr{width:220px;height:220px;max-width:70vw;border:1px solid #cad8d2;border-radius:8px;background:#fff}#transfer-data{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0;font-size:15px;text-align:left}#transfer-data dt{color:#5b6b66}#transfer-data dd{margin:0;font-weight:600;word-break:break-word}
 
 .manual-form{display:grid;gap:8px;margin:16px 0;padding-top:12px;border-top:1px solid var(--line)}.manual-form h2{margin:0;font-size:18px}.manual-form input{min-height:46px}a.button.wide{display:flex;justify-content:center;width:100%;min-height:52px;font-size:16px}a.settings-link{margin-top:8px}
+
+.checklist.numbered{counter-reset:schritt}.checklist.numbered li::before{counter-increment:schritt;content:counter(schritt) '.';flex:none;width:22px;color:#8a9b96;font-size:13px}
+.checklist .tag{display:inline-block;margin-left:4px;padding:1px 8px;border-radius:999px;background:#eef4f1;color:#37574f;font-size:11px;font-weight:600;white-space:nowrap}.checklist .tag.opt{background:#f3f6f5;color:#8a9b96}
+progress.progress{display:block;width:100%;height:8px;margin:6px 0 10px}

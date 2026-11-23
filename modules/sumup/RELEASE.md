@@ -1,5 +1,10 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.4
+
+- Einrichtung der Kasse im Aufbau der Basis: eine nummerierte Liste in der nötigen Reihenfolge (Suite, dann Kassen-PCs, dann T2med) mit Fortschrittsbalken und Schildern „In diesem Webfenster“, „Auf den Kassen-PCs“, „In T2med“ sowie „optional“.
+- Rechnungsnummern: Das eingetragene Kürzel wird auch bei Text-PDFs zugeordnet (z. B. wird „1IG2026-309“ zu „IG2026-309“), nicht nur nach Texterkennung. Voraussetzung: das Kürzel ist unter Rechnungseingang eingetragen. Nicht mit echten T2med-Rechnungen getestet.
+
 ## 2.3.4-beta.3
 
 - Kontodaten (Kontoinhaber, IBAN, BIC, Bank), Steuernummer und Kleinunternehmerregelung kommen jetzt zentral aus der Basis (Verwaltung → Praxis und Daten) und stehen nicht mehr in den Einstellungen der Kasse. Bisher hier eingetragene Werte werden nicht mehr verwendet: bitte einmal in der Basis eintragen. Voraussetzung: Basis 0.21.4-beta.2. Nicht auf dem Server getestet.

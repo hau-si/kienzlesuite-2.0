@@ -271,45 +271,44 @@ function t2medSetupHelp() {
   d.append(ol); return d;
 }
 
-/** Überblick der einmaligen Schritte; liefert die Zahl offener Pflichtpunkte. */
+/** Überblick der einmaligen Schritte in der Reihenfolge, in der sie nötig sind (wie die Einrichtung der Basis); liefert die Zahl offener Pflichtpunkte. */
+const PLACES = {web: 'In diesem Webfenster', pc: 'Auf den Kassen-PCs', t2med: 'In T2med'};
 function renderChecklist(data) {
   const invoiceQueue = !!(data.invoice_printer && data.invoice_printer.queue);
-  // Punkte der Kasse kommen vom Server (dieselben wie im Einrichtungs-Überblick der Suite).
-  const own = (data.setup || []).map(i => ({done: i.state === 'done', error: i.state === 'error', label: i.title, card: (i.link || '').split('#')[1] || 's-checklist', detail: i.hint}));
-  const groups = [
-    {title: 'In der Suite und hier', hint: 'Einstellungen dieses Servers', items: [
-      ...own,
-      {done: !!(data.sections.find(s => s.id === 'letterxpress')?.fields.find(f => f.key === 'enabled') || {}).value, optional: true, label: 'Rechnung per Post über Letterxpress versenden (optional)', card: 's-letterxpress'},
-      {done: !!(data.sections.find(s => s.id === 'invoice_export')?.fields.find(f => f.key === 'enabled') || {}).value, optional: true, label: 'Rechnungen im Netzwerkspeicher ablegen (optional, z. B. für die Steuerberatung)', card: 's-invoice_export'},
-    ]},
-    {title: 'Auf den Kassen-PCs', hint: 'Kassen- und Arbeitsplatzrechner', items: [
-      {info: true, label: 'Zertifikat der Suite einrichten (einmal je PC, siehe Arbeitsplatz einrichten der Suite)', card: 's-clients'},
-      ...(invoiceQueue ? [{info: true, label: 'Drucker „SumUp-Rechnung“ am Arbeitsplatz installieren (Windows: IPP-Drucker hinzufügen, Papier A4)', card: 'invoice-printer-help', detail: (data.invoice_printer && data.invoice_printer.url) || ''}] : []),
-    ]},
-    {title: 'In T2med', hint: 'Einstellungen in der Praxissoftware', items: [
-      {info: true, label: 'Drittanbieter-Zugriff mit Funktionsleisten-Button „Kartenzahlung“ anlegen (Aufruf-Adresse steht bei der T2med-Anbindung)', card: 's-fhir', href: GUIDE_URL, hrefLabel: 'Anleitung mit Bildern'},
-      ...(invoiceQueue ? [{info: true, label: 'Rechnungen in T2med auf den zuvor installierten Drucker „SumUp-Rechnung“ drucken', card: 'invoice-printer-help'}] : []),
-    ]},
+  const flag = key => !!(data.sections.find(s => s.id === key)?.fields.find(f => f.key === 'enabled') || {}).value;
+  // Punkte der Kasse kommen vom Server (dieselben wie im Einrichtungs-Überblick der Suite), schon in der nötigen Reihenfolge.
+  const own = (data.setup || []).map(i => ({ort: /Starter/.test(i.title) ? 'pc' : 'web', done: i.state === 'done', error: i.state === 'error', label: i.title, card: (i.link || '').split('#')[1] || 's-checklist', detail: i.hint}));
+  const web = own.filter(i => i.ort === 'web'), pc = own.filter(i => i.ort === 'pc');
+  const items = [
+    ...web,
+    {ort: 'web', done: flag('letterxpress'), optional: true, label: 'Rechnung per Post über Letterxpress versenden', card: 's-letterxpress'},
+    {ort: 'web', done: flag('invoice_export'), optional: true, label: 'Rechnungen im Netzwerkspeicher ablegen (z. B. für die Steuerberatung)', card: 's-invoice_export'},
+    {ort: 'pc', info: true, label: 'Zertifikat der Suite einrichten (einmal je PC, siehe Arbeitsplatz einrichten der Suite)', card: 's-clients'},
+    ...pc,
+    ...(invoiceQueue ? [{ort: 'pc', info: true, label: 'Drucker „SumUp-Rechnung“ am Arbeitsplatz installieren (Windows: IPP-Drucker hinzufügen, Papier A4)', card: 'invoice-printer-help', detail: (data.invoice_printer && data.invoice_printer.url) || ''}] : []),
+    {ort: 't2med', info: true, label: 'Drittanbieter-Zugriff mit Funktionsleisten-Button „Kartenzahlung“ anlegen (Aufruf-Adresse steht bei der T2med-Anbindung)', card: 's-fhir', href: GUIDE_URL, hrefLabel: 'Anleitung mit Bildern'},
+    ...(invoiceQueue ? [{ort: 't2med', info: true, label: 'Rechnungen in T2med auf den zuvor installierten Drucker „SumUp-Rechnung“ drucken', card: 'invoice-printer-help'}] : []),
   ];
-  const items = groups.flatMap(g => g.items);
   const list = $('checklist'); list.replaceChildren();
-  for (const group of groups) {
-    const heading = el('h3', group.title, 'check-group'); heading.append(el('small', ' · ' + group.hint)); list.append(heading);
-    const ul = el('ul', null, 'checklist');
-    for (const item of group.items) {
-      const li = el('li', null, item.info ? 'info' : item.done ? 'done' : item.error ? 'open error' : item.optional ? 'optional' : 'open');
-      li.append(el('span', item.info ? 'i' : item.done ? '✓' : item.error ? '!' : '○', 'mark-icon'));
-      const text = el('span'); text.append(el('a', item.label, null, {href: '#' + item.card}));
-      if (item.href) text.append(' · ', el('a', item.hrefLabel || 'Anleitung', null, {href: item.href, target: '_blank', rel: 'noopener'}));
-      if (item.detail) { text.append(el('br'), el('small', item.detail, 'mono')); }
-      li.append(text);
-      if (item.optional && !item.done) li.append(el('small', ' optional'));
-      ul.append(li);
-    }
-    list.append(ul);
+  const required = items.filter(i => !i.optional && !i.info);
+  const open = required.filter(i => !i.done).length;
+  const bar = el('progress', null, 'progress', {max: String(required.length || 1), value: String(required.length - open)});
+  list.append(el('p', (required.length - open) + ' von ' + required.length + ' nötigen Schritten erledigt (Hinweise für PC und T2med und optionale Punkte zählen nicht mit)', 'muted'), bar);
+  list.append(el('p', 'In dieser Reihenfolge abarbeiten. Das Schild zeigt, wo der Schritt erledigt wird: ' + Object.values(PLACES).join(', ') + '.', 'muted'));
+  const ol = el('ol', null, 'checklist numbered');
+  for (const item of items) {
+    const li = el('li', null, item.info ? 'info' : item.done ? 'done' : item.error ? 'open error' : item.optional ? 'optional' : 'open');
+    li.append(el('span', item.info ? 'i' : item.done ? '✓' : item.error ? '!' : '○', 'mark-icon'));
+    const text = el('span'); text.append(el('a', item.label, null, {href: '#' + item.card}));
+    if (item.href) text.append(' · ', el('a', item.hrefLabel || 'Anleitung', null, {href: item.href, target: '_blank', rel: 'noopener'}));
+    text.append(' ', el('span', PLACES[item.ort], 'tag'));
+    if (item.optional) text.append(' ', el('span', 'optional', 'tag opt'));
+    if (item.detail) { text.append(el('br'), el('small', item.detail, 'mono')); }
+    li.append(text);
+    ol.append(li);
   }
-  const open = items.filter(i => !i.done && !i.info && !i.optional).length;
-  lastOpenCards = items.filter(i => !i.done && !i.info && !i.optional).map(i => i.card);
+  list.append(ol);
+  lastOpenCards = required.filter(i => !i.done).map(i => i.card);
   badge('einrichtung', open);
   return open;
 }

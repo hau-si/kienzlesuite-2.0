@@ -236,3 +236,4 @@ button.small { padding: 4px 10px; font-size: 13px; }
 .update-state.new .big { background: #fff3ed; color: #c2410c; border: 1px solid #f0b9a3; }
 .update-state.err .big { background: #c2410c; color: #fff; }
 .update-state strong { font-size: 18px; display: block; }
+.setup-card.needs { border-left: 4px solid #dc2626; }

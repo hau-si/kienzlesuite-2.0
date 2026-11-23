@@ -1757,8 +1757,14 @@ final class Web {
             . implode(', ', array_map(fn($p) => '<strong>' . V::h($p[0]) . '</strong> (' . V::h($p[1]) . ')', Overview::PLACES)) . '. Ein Klick auf einen Punkt öffnet die passende Seite.</p>'
             . $this->overviewList($core, true) . '</section>';
         foreach ($modules as $m) {
-            $body .= '<section class="card"><h2>' . V::h($m['name']) . '</h2>' . ($m['fehler'] !== '' ? '<p class="error">Überblick nicht lesbar: ' . V::h($m['fehler']) . '</p>' : '')
-                . ($m['items'] ? $this->overviewList($m['items']) : '') . ($m['zeit'] ? '<p class="muted">Stand ' . V::date($m['zeit']) . '</p>' : '') . '</section>';
+            $need = array_filter($m['items'], fn($i) => Overview::needed($i));
+            $err = array_filter($need, fn($i) => $i['state'] === 'error');
+            $url = $this->modules->settingsUrl($m['id']);
+            $tag = $m['fehler'] !== '' ? '<span class="tag warn">nicht lesbar</span>' : ($need ? '<span class="tag warn">' . count($need) . ' offen' . ($err ? ', davon ' . count($err) . ' mit Fehler' : '') . '</span>' : '<span class="tag">fertig</span>');
+            $inner = '<h2>' . V::h($m['name']) . ' ' . $tag . '</h2><p class="muted">' . ($m['fehler'] !== '' ? 'Überblick nicht lesbar: ' . V::h($m['fehler']) . '. ' : '')
+                . ($need ? 'Die Einrichtung geschieht in den Einstellungen des Moduls: ' . V::h(implode(', ', array_map(fn($i) => $i['title'], array_slice(array_values($need), 0, 3)))) . (count($need) > 3 ? ' …' : '') . '.' : 'Alle nötigen Schritte sind erledigt.')
+                . ($m['zeit'] ? ' Stand ' . V::date($m['zeit']) . '.' : '') . '</p>';
+            $body .= $url !== null ? '<a class="card setup-card' . ($need ? ' needs' : '') . '" href="' . V::h($url) . '">' . $inner . '</a>' : '<section class="card">' . $inner . '</section>';
         }
         if ($modules) $body .= '<form method="post" action="/verwaltung/einrichtung">' . $this->hidden('neu') . '<button class="secondary">Module neu prüfen</button></form>';
         return Response::html(V::page('Einrichtung', $body, $this->nav(), $this->config->practice));

@@ -19,7 +19,7 @@ function test_ueberblick(): void {
     $p = $b->get('/verwaltung/einrichtung');
     check($p->status === 200 && str_contains($p->body, 'Admin mit Authenticator-App') && str_contains($p->body, '1 von 1 Admins mit OTP'), 'Punkte der Basis fehlen');
     check(str_contains($p->body, 'Mindestens zwei Admins') && str_contains($p->body, 'Datensicherung eingerichtet'), 'Vertretung oder Sicherung fehlt');
-    check(str_contains($p->body, 'Beispiel &lt;b&gt;eingerichtet') && !str_contains($p->body, 'Kaputt'), 'Überblick des Moduls falsch');
+    check(str_contains($p->body, '1 offen') && str_contains($p->body, 'Fremder Link') && !str_contains($p->body, 'Kaputt') && !str_contains($p->body, 'Beispiel &lt;b&gt;eingerichtet'), 'Überblick des Moduls falsch (Link-Karte mit Zähler erwartet)');
     check(!str_contains($p->body, '<a href="/verwaltung/benutzer">Fremder Link'), 'fremder Link aus dem Modul übernommen');
     check(str_contains($p->body, 'Noch nicht gesammelt'), 'fehlender Überblick nicht gemeldet');
     $r = $b->post('/verwaltung/einrichtung', ['aktion' => 'bestaetigen', 'punkt' => 'ca', 'erledigt' => '1']);

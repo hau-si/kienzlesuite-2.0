@@ -136,7 +136,7 @@ final class T2medInvoice {
         $eur = '[ \t]*(?:€|EUR)';
 
         $numbers = self::all('number', $labels, $gap . '((?=[A-Za-z0-9\/._-]*\d)[A-Za-z0-9][A-Za-z0-9\/._-]{0,39})', $text);
-        if ($ocr) $numbers = array_map(fn($n) => self::canonicalNumber($n, (array)($labels[self::LABEL_KEYS['prefix']] ?? [])), $numbers);
+        $numbers = array_map(fn($n) => self::canonicalNumber($n, (array)($labels[self::LABEL_KEYS['prefix']] ?? [])), $numbers);
         $number = self::single($numbers, 'Rechnungsnummer', 'Re.-Nr.:', $ocr);
         $date = self::date(self::single(self::all('date', $labels, $gap . '(\d{2}\.\d{2}\.\d{4})', $text), 'Rechnungsdatum', 'Re.-Datum:'));
         $total = self::cents(self::single(self::all('total', $labels, $gap . '(-?[\d.]+,\d{2})' . $eur, $text), 'Gesamtsumme', 'Gesamtsumme: … €'));

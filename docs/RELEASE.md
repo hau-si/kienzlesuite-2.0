@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.16
+
+- Einrichtung: Module erscheinen als eine einzige Karte mit Zähler („3 offen“, rot markiert, solange nötige Schritte offen sind); ein Klick führt in die Einstellungen des Moduls, wo die Schritte stehen. Nur mit Testdaten geprüft, nicht im Browser.
+
 ## 0.21.4-beta.15
 
 - Updates: Zustand, installierte und neue Version stehen in einer einzigen Karte mit Statussymbol (✓ aktuell, ↑ neue Version, ! Fehler); die Karte „Verfügbar“ entfällt.
