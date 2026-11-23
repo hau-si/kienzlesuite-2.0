@@ -244,3 +244,6 @@ details.fold > summary h3 { margin: 0; font-size: 15px; }
 /* Symbol vor Kartenüberschriften */
 .h-ico { width: 20px; height: 20px; vertical-align: -3px; margin-right: 8px; color: var(--teal); flex: none; }
 details.fold > summary h2 { display: inline-flex; align-items: center; }
+
+.tag.test { background: #fff0ca; color: #886100; }
+.h-ico.sm { width: 16px; height: 16px; margin-right: 4px; vertical-align: -2px; }

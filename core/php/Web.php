@@ -1351,6 +1351,13 @@ final class Web {
         return $this->connections;
     }
 
+    /** Letzter abgerufener Kontostand mit Zeit. */
+    private function balanceLine(?array $g): string {
+        if (!$g) return '<p class="muted">Guthaben noch nicht abgefragt.</p>';
+        $wert = isset($g['wert']) && is_numeric($g['wert']) ? number_format((float)$g['wert'], 2, ',', '.') . ' €' : 'unbekannt';
+        return '<p>' . V::symbol('coins') . ' Guthaben: <strong>' . V::h($wert) . '</strong> <span class="muted">(abgefragt ' . V::date((int)($g['zeit'] ?? 0)) . ')</span></p>';
+    }
+
     private function testLine(array $tests, string $key): string {
         $t = $tests[$key] ?? null;
         if (!is_array($t)) return '<p>Noch nicht geprüft.</p>';
@@ -1467,10 +1474,13 @@ final class Web {
             . '<form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('letterxpress')
             . $this->tipInput('username', 'Letterxpress Benutzername', 'Benutzername des Letterxpress-Kundenkontos.', 'text', (string)($lxp['username'] ?? ''), 'autocomplete="off" maxlength="200"')
             . $this->tipInput('api_key', 'Letterxpress API-Key', 'Im Letterxpress-Kundenbereich unter Mein Konto → Zugangsdaten → LXP API erzeugen. Er wird nach dem Speichern nie wieder angezeigt.', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($lxp['schluessel_gesetzt'] ?? false))) . '"')
+            . '<p>' . (($lxp['modus'] ?? 'test') === 'live' ? '<span class="tag ok">Live</span> Echter Postversand, kostenpflichtig.' : '<span class="tag warn">Testbetrieb</span> Nichts wird gedruckt oder verschickt.') . '</p>'
             . '<label>Betrieb' . $this->tip('Im Testbetrieb landen Aufträge nur im Postausgang bei Letterxpress (nach 7 Tagen gelöscht) und können dort geprüft werden. Erst nach einem gelungenen Test auf Live stellen.') . '<select name="modus"><option value="test"' . (($lxp['modus'] ?? 'test') !== 'live' ? ' selected' : '') . '>Test (nur Postausgang bei Letterxpress, nichts wird gedruckt oder verschickt)</option>'
             . '<option value="live"' . (($lxp['modus'] ?? '') === 'live' ? ' selected' : '') . '>Live (echter Postversand, kostenpflichtig)</option></select></label>'
             . '<button>Speichern</button></form>'
-            . ($lxp ? $this->testLine($st['tests'], 'letterxpress') . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'letterxpress']) . '<button>Zugang prüfen</button></form> '
+            . ($lxp ? $this->testLine($st['tests'], 'letterxpress') . $this->balanceLine($st['guthaben']['letterxpress'] ?? null)
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'letterxpress']) . '<button>Zugang prüfen</button></form> '
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'guthaben']) . '<button class="secondary">' . V::symbol('coins') . ' Guthaben abfragen</button></form> '
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'letterxpress']) . '<button class="danger">Entfernen</button></form>' : '')
             . '</section>';
         // Netzwerkspeicher

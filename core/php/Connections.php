@@ -18,7 +18,7 @@ final class Connections {
         $s = is_array($s) ? $s : [];
         return ['t2med' => is_array($s['t2med'] ?? null) ? $s['t2med'] : null, 'mail' => is_array($s['mail'] ?? null) ? $s['mail'] : null, 'sms' => is_array($s['sms'] ?? null) ? $s['sms'] : null,
             'letterxpress' => is_array($s['letterxpress'] ?? null) ? $s['letterxpress'] : null,
-            'ablage' => array_values(array_filter((array)($s['ablage'] ?? []), 'is_array')), 'tests' => (array)($s['tests'] ?? []),
+            'ablage' => array_values(array_filter((array)($s['ablage'] ?? []), 'is_array')), 'tests' => (array)($s['tests'] ?? []), 'guthaben' => (array)($s['guthaben'] ?? []),
             'hostkeys' => (array)($s['hostkeys'] ?? []), 'zertifikate' => (array)($s['zertifikate'] ?? []), 'nutzung' => array_values(array_filter((array)($s['nutzung'] ?? []), 'is_array')),
             'hinweise' => array_values(array_filter((array)($s['hinweise'] ?? []), 'is_string')), 'letzte' => is_array($s['letzte'] ?? null) ? $s['letzte'] : null,
             'sftp_schluessel' => (string)($s['sftp_schluessel'] ?? ''), 'pending' => is_file($this->request()), 'service' => is_file(self::$unit)];
@@ -125,7 +125,7 @@ final class Connections {
     }
 
     public function test(string $art, string $id = ''): void {
-        if (!in_array($art, ['t2med', 'mail', 'sms', 'letterxpress', 'ziel'], true)) throw new Problem('Unbekannte Prüfung.', 422);
+        if (!in_array($art, ['t2med', 'mail', 'sms', 'letterxpress', 'guthaben', 'ziel'], true)) throw new Problem('Unbekannte Prüfung.', 422);
         $this->write(['action' => 'pruefen', 'art' => $art, 'id' => $id]);
     }
 

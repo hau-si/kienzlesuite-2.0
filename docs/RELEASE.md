@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.22
+
+- Testbetrieb überall gelb gekennzeichnet (wie die offenen Punkte): neues Schild `tag test`/„Testbetrieb“ bei Letterxpress in den Verbindungen; „Live“ grün.
+- Verbindungen → Letterxpress: eigener Knopf „Guthaben abfragen“ mit Symbol; darüber steht der zuletzt abgefragte Wert mit Uhrzeit (auch nach „Zugang prüfen“). Nur mit nachgebautem Aufruf getestet, nicht gegen das echte Letterxpress. Der root-Dienst muss neu starten (normales Update genügt).
+
 ## 0.21.4-beta.21
 
 - Einheitliches Aussehen der Kartenüberschriften im ganzen Projekt: ein passendes Symbol davor und, wo es sinnvoll ist, ein Status-Schild dahinter („✓ eingerichtet“ / „nicht eingerichtet“, „✓ ausgefüllt“, „✓ aktiv“, „✓ gedruckt“ …): Verbindungen, Praxis und Daten, Mein Konto (Authenticator-App, Passkeys, Handynummer), Sicherheit (Firewall), Sicherung (Schutz vor Erpressungstrojanern, Schlüsselblatt, Benachrichtigung). Neue Seiten setzen dafür nur `View::$status`.

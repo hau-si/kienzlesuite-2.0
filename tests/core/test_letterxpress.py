@@ -37,13 +37,25 @@ class Letterxpress(unittest.TestCase):
         self.assertEqual(written['kasse.json']['letterxpress']['api_key'], 'k')
         self.assertNotIn('letterxpress', written['andere.json'])
 
+    def test_guthaben_wird_gemerkt(self):
+        c = {'username': 'u', 'api_key': 'k', 'modus': 'live'}
+        class Antwort:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self, n): return b'{"data": {"balance": 7.25}}'
+        with mock.patch('urllib.request.urlopen', return_value=Antwort()), mock.patch.object(v, '_balance_record') as rec:
+            self.assertEqual(v.balance_letterxpress(c), 'Guthaben bei Letterxpress: 7.25 €.')
+        rec.assert_called_once_with('letterxpress', 7.25)
+        with mock.patch.object(v, 'letterxpress_balance', return_value=None), mock.patch.object(v, '_balance_record'):
+            self.assertIn('kein Guthaben', v.balance_letterxpress(c))
+
     def test_pruefen(self):
         c = {'username': 'u', 'api_key': 'k', 'modus': 'test'}
         class Antwort:
             def __enter__(self): return self
             def __exit__(self, *a): return False
             def read(self, n): return b'{"data": {"balance": 12.5}}'
-        with mock.patch('urllib.request.urlopen', return_value=Antwort()) as call:
+        with mock.patch('urllib.request.urlopen', return_value=Antwort()) as call, mock.patch.object(v, '_balance_record'):
             msg = v.test_letterxpress(c)
         self.assertIn('12.50', msg)
         self.assertEqual(call.call_args[0][0].full_url, 'https://api.letterxpress.de/v3/balance')

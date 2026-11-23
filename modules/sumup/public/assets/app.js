@@ -381,7 +381,7 @@ async function load() {
   state=await api('state'); csrf=state.csrf;
   $('welcome').hidden=true; $('workspace').hidden=false;
   $('mode').hidden=!state.mock && !state.fhir_mock;
-  $('mode').textContent=state.mock?'TESTMODUS':state.fhir_mock?'T2MED TESTMODUS':'';
+  $('mode').textContent=state.mock?'TESTMODUS':state.fhir_mock?'T2MED TESTMODUS':'';$('mode').classList.toggle('test',/TESTMODUS/.test($('mode').textContent));
   $('patient-name').textContent=state.patient.name; document.querySelector('.patient .eyebrow').textContent=state.manual ? 'OHNE PATIENTENAKTE' : 'AKTUELLER PATIENT';
   $('patient-birth').textContent=state.patient.birthdate ? 'Geboren am '+state.patient.birthdate.split('-').reverse().join('.') : '';
   $('practice-hint').hidden=state.local_receipts;

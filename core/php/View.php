@@ -97,6 +97,12 @@ final class View {
         return $icon . $titleHtml . $tag;
     }
 
+    /** Kleines Symbol für Knöpfe und Zeilen (ohne Seitenbezug). */
+    public static function symbol(string $name): string {
+        $paths = ['coins' => '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/>'];
+        return '<svg class="h-ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . ($paths[$name] ?? '') . '</svg>';
+    }
+
     public static function icon(string $href, string $fallback = 'app'): string {
         $key = strtok($href, '?#') ?: $href;
         $svg = self::ICONS[$key] ?? self::ICONS[$fallback];
@@ -111,7 +117,7 @@ final class View {
         $brand = '<a class="brand" href="/" title="Start"><span class="mark" aria-hidden="true">K' . (!empty($nav['offenLogo']) ? '<span class="logo-dot" title="Die Einrichtung ist noch nicht abgeschlossen"></span>' : '') . '</span><span><strong>Kienzle-Suite</strong>'
             . '<span class="sub">' . self::h($practice !== '' ? $practice : 'Praxis') . '</span></span></a>';
         $head = '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=16"><script src="/assets/core.js" defer></script></head><body'
+            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=17"><script src="/assets/core.js" defer></script></head><body'
             . (self::$starter !== '' ? ' data-starter="' . self::h(self::$starter) . '"' : '') . '>';
         if (!$nav) {
             return $head . '<div class="solo">' . $brand . '<main><h1>' . self::h($title) . '</h1>' . self::cards($body) . '</main></div></body></html>';

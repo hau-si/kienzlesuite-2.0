@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.8
+
+- Testbetrieb gelb: Die Anzeige „TESTMODUS“/„T2MED TESTMODUS“ oben in der Kasse und den Einstellungen ist gelb; im Rechnungseingang steht bei Letterxpress im Testbetrieb ein gelbes Schild „TESTBETRIEB Post“. Nicht im Browser geprüft.
+
 ## 2.3.4-beta.7
 
 - E-Mail-Beleg: Wird in der Basis ein Gmail-Konto verbunden, versendet die Kasse Belege über die Gmail-Schnittstelle statt per SMTP. Voraussetzung: Basis 0.21.4-beta.20. Nicht mit einem echten Gmail-Konto getestet.

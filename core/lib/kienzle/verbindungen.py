@@ -194,8 +194,8 @@ def set_letterxpress(config: dict, d: dict) -> None:
     config['letterxpress'] = {'username': _text(d.get('username', ''), 'Benutzername', 200), 'api_key': key, 'modus': mode}
 
 
-def test_letterxpress(c: dict | None) -> str:
-    """Zugangsdaten prüfen (Guthaben abfragen); es wird nichts gedruckt oder verschickt."""
+def letterxpress_balance(c: dict | None) -> float | None:
+    """Guthaben bei Letterxpress abfragen (nichts wird gedruckt oder verschickt); None, wenn die Antwort keinen Betrag enthält."""
     if not c:
         raise Fehler('Letterxpress ist nicht eingerichtet.')
     import urllib.request
@@ -210,7 +210,32 @@ def test_letterxpress(c: dict | None) -> str:
         raise Fehler('Letterxpress hat unlesbar geantwortet.') from None
     data = out.get('data') if isinstance(out, dict) and isinstance(out.get('data'), dict) else {}
     bal = data.get('balance')
-    return 'Verbunden' + (f'. Guthaben: {float(bal):.2f} €' if isinstance(bal, (int, float)) else '') + f'. Betrieb: {"Live (echter Postversand)" if c.get("modus") == "live" else "Test (nichts wird verschickt)"}.'
+    return float(bal) if isinstance(bal, (int, float)) and not isinstance(bal, bool) else None
+
+
+def _balance_record(key: str, value: float | None) -> None:
+    """Letzten abgerufenen Wert samt Zeit merken (Anzeige auf der Verbindungsseite)."""
+    try:
+        old = json.loads((STATE / 'status.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        old = {}
+    g = old.get('guthaben', {})
+    g[key] = {'wert': value, 'zeit': int(time.time())}
+    old['guthaben'] = g
+    _write(STATE / 'status.json', old, 0o644)
+
+
+def test_letterxpress(c: dict | None) -> str:
+    """Zugangsdaten prüfen (Guthaben abfragen); es wird nichts gedruckt oder verschickt."""
+    bal = letterxpress_balance(c)
+    _balance_record('letterxpress', bal)
+    return 'Verbunden' + (f'. Guthaben: {bal:.2f} €' if bal is not None else '') + f'. Betrieb: {"Live (echter Postversand)" if c.get("modus") == "live" else "Test (nichts wird verschickt)"}.'
+
+
+def balance_letterxpress(c: dict | None) -> str:
+    bal = letterxpress_balance(c)
+    _balance_record('letterxpress', bal)
+    return f'Guthaben bei Letterxpress: {bal:.2f} €.' if bal is not None else 'Letterxpress hat kein Guthaben gemeldet.'
 
 
 def _sms_call(c: dict, path: str, payload: dict | None) -> dict:
@@ -545,7 +570,7 @@ def view(config: dict, extra: dict | None = None) -> dict:
     except (Fehler, OSError, ValueError):
         pass
     out = {'zeit': int(time.time()), 'tests': old.get('tests', {}), 'hostkeys': old.get('hostkeys', {}), 'zertifikate': old.get('zertifikate', {}),
-           'hinweise': old.get('hinweise', []),
+           'hinweise': old.get('hinweise', []), 'guthaben': old.get('guthaben', {}),
            't2med': {**{k: t2[k] for k in ('base_url', 'launch_urls', 'pin')}, 'api_key_gesetzt': bool(t2.get('api_key')), 'zertifikat': ca_fp} if t2 else None,
            'mail': ({'art': 'gmail', 'client_id': mail['client_id'], 'absender': mail['absender'], 'secret_gesetzt': bool(mail.get('client_secret')), 'verbunden': bool(mail.get('refresh_token'))}
                     if mail.get('art') == 'gmail' else {'art': 'smtp', **{k: mail[k] for k in ('host', 'port', 'sicherheit', 'benutzer', 'absender')}, 'passwort_gesetzt': bool(mail.get('passwort'))}) if mail else None,
@@ -671,6 +696,9 @@ def dispatch(config: dict, req: dict) -> str:
                 msg = test_sms(config.get('sms'))
             elif art == 'letterxpress':
                 msg = test_letterxpress(config.get('letterxpress'))
+            elif art == 'guthaben':
+                key = 'guthaben'
+                msg = balance_letterxpress(config.get('letterxpress'))
             elif art == 'testsms':
                 key = 'sms'
                 msg = test_sms_send(config.get('sms'), req.get('an'))

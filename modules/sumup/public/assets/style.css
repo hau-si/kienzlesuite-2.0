@@ -55,3 +55,5 @@ a.brand { color: inherit; text-decoration: none; display: flex; align-items: cen
 .checklist.numbered{counter-reset:schritt}.checklist.numbered li::before{counter-increment:schritt;content:counter(schritt) '.';flex:none;width:22px;color:#8a9b96;font-size:13px}
 .checklist .tag{display:inline-block;margin-left:4px;padding:1px 8px;border-radius:999px;background:#eef4f1;color:#37574f;font-size:11px;font-weight:600;white-space:nowrap}.checklist .tag.opt{background:#f3f6f5;color:#8a9b96}
 progress.progress{display:block;width:100%;height:8px;margin:6px 0 10px}
+
+.badge.test{background:#fff0ca;color:#886100}

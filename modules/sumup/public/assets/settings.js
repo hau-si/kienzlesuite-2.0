@@ -93,7 +93,7 @@ function applyVisibility(form, section) {
 function render(data) {
   csrf = data.csrf || csrf;
   $('mode').hidden = false;
-  $('mode').textContent = data.mode === 'live' ? (data.fhir_mode === 'live' ? 'LIVE' : 'LIVE · T2MED TESTMODUS') : 'TESTMODUS';
+  $('mode').textContent = data.mode === 'live' ? (data.fhir_mode === 'live' ? 'LIVE' : 'LIVE · T2MED TESTMODUS') : 'TESTMODUS'; $('mode').classList.toggle('test', /TESTMODUS/.test($('mode').textContent));
   $('mode').classList.toggle('live', data.mode === 'live');
   $('warning').hidden = !data.warning; $('warning').textContent = data.warning || '';
   renderInvoicePrinter(data.invoice_printer || {});
@@ -331,7 +331,7 @@ async function loadSettings() {
 // Mitarbeiter-Zugang: nur die freigegebenen Bereiche, keine Einstellungen oder Schlüssel.
 function staffMode(data) {
   csrf = csrf || ''; document.body.classList.add('staff');
-  $('mode').hidden = false; $('mode').textContent = data.mode === 'live' ? (data.fhir_mode === 'live' ? 'LIVE' : 'LIVE · T2MED TESTMODUS') : 'TESTMODUS'; $('mode').classList.toggle('live', data.mode === 'live');
+  $('mode').hidden = false; $('mode').textContent = data.mode === 'live' ? (data.fhir_mode === 'live' ? 'LIVE' : 'LIVE · T2MED TESTMODUS') : 'TESTMODUS'; $('mode').classList.toggle('test', /TESTMODUS/.test($('mode').textContent)); $('mode').classList.toggle('live', data.mode === 'live');
   $('tabs').hidden = true; $('sections').replaceChildren(); $('warning').hidden = true;
   const panel = $('tab-panels'); panel.replaceChildren(); panel.hidden = false;
   const rights = data.rights || [], can = r => rights.includes(r);
@@ -669,6 +669,7 @@ function renderInbox(data) {
       rows => rows.length + ' Rechnung(en) (' + euro(rows.reduce((a, r) => a + r.amount_cents, 0)) + ') ' + (data.letter_mode === 'live' ? 'jetzt per Post verschicken' : 'im TESTMODUS an Letterxpress übergeben (es wird nichts verschickt)') + '?\n\nDabei gehen die Rechnungen mit Patientendaten an Letterxpress. Bereits live gesendete Rechnungen werden nicht erneut gesendet.',
       r => r.postable && !(r.letter || {}).locked));
     bar.append(bulk('Auswahl löschen', 'inbox_delete_many', rows => rows.length + ' Rechnung(en) aus dem Eingang löschen?', r => r.deletable), countText);
+    if (data.letter_enabled && data.letter_mode !== 'live') bar.append(el('span', 'TESTBETRIEB Post', 'badge test', {title: 'Letterxpress im Testbetrieb: es wird nichts gedruckt oder verschickt'}));
     box.append(bar);
     const first = el('th'); first.append(toggleAll); head.append(first);
     for (const h of ['Eingang', 'Nummer', 'Betrag', 'Patient', 'Geb.', 'Status', ...(data.letter_enabled ? ['Post'] : []), '']) head.append(el('th', h));
