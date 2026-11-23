@@ -1358,6 +1358,16 @@ final class Web {
         return $out;
     }
 
+    /** Kleines „i“ mit Hilfetext (Tooltip bei Maus und Tastatur). */
+    private function tip(string $text): string {
+        return ' <span class="hilfe" tabindex="0" role="note" aria-label="' . V::h($text) . '" data-tip="' . V::h($text) . '">i</span>';
+    }
+
+    /** Eingabefeld mit Tooltip hinter der Beschriftung. */
+    private function tipInput(string $name, string $label, string $tip, string $type = 'text', string $value = '', string $extra = ''): string {
+        return '<label>' . V::h($label) . $this->tip($tip) . '<input type="' . $type . '" name="' . $name . '" value="' . V::h($value) . '" ' . $extra . '></label>';
+    }
+
     private function connectionsPage(?string $error = null): Response {
         $st = $this->con()->status();
         $t2 = $st['t2med'] ?? [];
@@ -1412,8 +1422,8 @@ final class Web {
         $sms = $st['sms'] ?? [];
         $body .= '<section><h2>SMS (seven.io)</h2><p class="muted">Für Einmalcodes als Ersatz bei der Admin-Anmeldung und später für Nachrichten der kienzlefon-App. Schlüssel unter seven.io → Entwickler → API-Schlüssel anlegen.</p>'
             . '<form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('sms')
-            . V::input('api_key', 'API-Schlüssel von seven.io', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($sms['schluessel_gesetzt'] ?? false))) . '"')
-            . V::input('absender', 'Absendername (optional, höchstens 11 Zeichen)', 'text', (string)($sms['absender'] ?? ''), 'maxlength="16" placeholder="Praxis"')
+            . $this->tipInput('api_key', 'API-Schlüssel von seven.io', 'Bei seven.io unter Entwickler → API-Schlüssel → „API-Key anlegen“: Label z. B. „Kienzle-Suite“, Umgebung Live (Sandbox verschickt nichts), Gültig bis Unbegrenzt, Zugriff auf Subaccounts aus. Berechtigungen nur „sms“ (Versand) und „balance“ (Schlüssel prüfen); alle anderen aus.', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($sms['schluessel_gesetzt'] ?? false))) . '"')
+            . $this->tipInput('absender', 'Absendername (optional, höchstens 11 Zeichen)', 'Erscheint beim Empfänger als Absender, z. B. „Praxis“. Nur Buchstaben und Ziffern, keine Leerzeichen; leer = Standard von seven.io.', 'text', (string)($sms['absender'] ?? ''), 'maxlength="16" placeholder="Praxis"')
             . '<button>Speichern</button></form>'
             . ($sms ? $this->testLine($st['tests'], 'sms') . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'sms']) . '<button>Schlüssel prüfen</button></form> '
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('testsms') . '<input type="tel" name="an" placeholder="01701234567" required maxlength="30" aria-label="Handynummer der Test-SMS"> <button>Test-SMS senden</button></form> '
@@ -1423,9 +1433,9 @@ final class Web {
         $lxp = $st['letterxpress'] ?? [];
         $body .= '<section><h2>Letterxpress (Briefversand)</h2><p class="muted">Rechnungen und Briefe per Post. Zugang unter letterxpress.de im Kundenkonto → API anlegen. Module, die Post versenden, nutzen diese Verbindung. Im Testbetrieb wird nichts gedruckt oder verschickt.</p>'
             . '<form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('letterxpress')
-            . V::input('username', 'Letterxpress Benutzername', 'text', (string)($lxp['username'] ?? ''), 'autocomplete="off" maxlength="200"')
-            . V::input('api_key', 'Letterxpress API-Key', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($lxp['schluessel_gesetzt'] ?? false))) . '"')
-            . '<label>Betrieb<select name="modus"><option value="test"' . (($lxp['modus'] ?? 'test') !== 'live' ? ' selected' : '') . '>Test (nur Postausgang bei Letterxpress, nichts wird gedruckt oder verschickt)</option>'
+            . $this->tipInput('username', 'Letterxpress Benutzername', 'Benutzername des Letterxpress-Kundenkontos.', 'text', (string)($lxp['username'] ?? ''), 'autocomplete="off" maxlength="200"')
+            . $this->tipInput('api_key', 'Letterxpress API-Key', 'Im Letterxpress-Kundenbereich unter Mein Konto → Zugangsdaten → LXP API erzeugen. Er wird nach dem Speichern nie wieder angezeigt.', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($lxp['schluessel_gesetzt'] ?? false))) . '"')
+            . '<label>Betrieb' . $this->tip('Im Testbetrieb landen Aufträge nur im Postausgang bei Letterxpress (nach 7 Tagen gelöscht) und können dort geprüft werden. Erst nach einem gelungenen Test auf Live stellen.') . '<select name="modus"><option value="test"' . (($lxp['modus'] ?? 'test') !== 'live' ? ' selected' : '') . '>Test (nur Postausgang bei Letterxpress, nichts wird gedruckt oder verschickt)</option>'
             . '<option value="live"' . (($lxp['modus'] ?? '') === 'live' ? ' selected' : '') . '>Live (echter Postversand, kostenpflichtig)</option></select></label>'
             . '<button>Speichern</button></form>'
             . ($lxp ? $this->testLine($st['tests'], 'letterxpress') . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'letterxpress']) . '<button>Zugang prüfen</button></form> '

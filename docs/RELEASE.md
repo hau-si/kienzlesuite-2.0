@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.19
+
+- Verbindungen: Hilfe-Tooltips (i) bei den Feldern von SMS (seven.io: welche Einstellungen und Berechtigungen der API-Key braucht – nur „sms“ und „balance“, Umgebung Live, unbegrenzt gültig) und Letterxpress. Nur Text, nicht im Browser geprüft.
+
 ## 0.21.4-beta.18
 
 - Verbindungen: neuer Abschnitt „Letterxpress (Briefversand)“ mit Benutzername, API-Key und Betrieb Test/Live, Prüfung (Guthaben) und Entfernen. Module melden die Verbindung `letterxpress` in ihrer module.toml an und bekommen die Zugangsdaten wie bei E-Mail. Erfordert einmal den Installer bzw. ein normales Update. Nur mit nachgebautem Aufruf getestet, nicht gegen das echte Letterxpress.
