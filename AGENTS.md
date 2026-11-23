@@ -31,3 +31,7 @@ Oberfläche, Hilfetexte, Dokumentation und Commit-Nachrichten auf Deutsch.
 ## Git
 
 - Nicht pushen und keine Tags setzen ohne ausdrückliche Zustimmung des Nutzers.
+- **Zweige:** Gepusht wird (nach Zustimmung) auf den Zweig `beta`, nie auf `main`. Auf `beta` tragen die geänderten Teile eine Vorabversion
+  (`0.20.0-beta.1`, `2.3.0-beta.2`; je Änderung hochzählen). `.github/workflows/beta.yml` veröffentlicht daraus nach grünen Tests
+  automatisch eine Vorabversion, die Server im Beta-Kanal selbst erkennen. `main` bekommt Änderungen nur als Stand mit Endversion
+  (ohne `-beta`) und einem Tag `<teil>-v<version>` durch den Nutzer (`release.yml`, stabiler Kanal).

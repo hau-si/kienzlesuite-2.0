@@ -2,12 +2,13 @@
 """Modulverwaltung der Kienzle-Suite (nur root).
 
   kienzle-module anwenden                       Anfrage des Webinterfaces verarbeiten (kienzle-module.path)
-  kienzle-module pruefen                        Angebot (mitgeliefert, GitHub) und Bestand neu ermitteln
+  kienzle-module pruefen [--sofort]                       Angebot (mitgeliefert, GitHub) und Bestand neu ermitteln
   kienzle-module liste                          installierte und verfügbare Module anzeigen
   kienzle-module installieren ID [VERSION]      an der Konsole installieren bzw. aktualisieren
   kienzle-module entfernen ID [--daten-loeschen]
 """
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'lib'))
@@ -18,9 +19,11 @@ def main(argv: list[str]) -> int:
     if argv == ['anwenden']:
         mo.handle()
         return 0
-    if argv == ['pruefen']:
+    if argv in (['pruefen'], ['pruefen', '--sofort']):
         s = mo.check()
-        mo.auto_update()
+        # Neue Versionen erkennt die Basis stündlich; selbst installiert werden sie nachts (oder mit --sofort, z. B. nach einem Basis-Update).
+        if argv == ['pruefen', '--sofort'] or 2 <= time.localtime().tm_hour < 5:
+            mo.auto_update()
         return 1 if s.get('error') else 0
     if argv == ['liste']:
         s = mo.check()

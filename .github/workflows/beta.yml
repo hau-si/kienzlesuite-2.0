@@ -1,0 +1,50 @@
+name: Beta-Release
+# Beta-Kanal: Jeder Stand auf dem Zweig „beta“, dessen Version eine Vorabversion ist (z. B. 0.20.0-beta.3), wird nach grünen
+# Tests automatisch als Vorabversion (Prerelease) veröffentlicht. Server im Beta-Kanal (Verwaltung → Updates → Kanal) erkennen
+# sie dadurch selbst. Stabile Versionen entstehen weiterhin nur durch einen Tag auf „main“ (release.yml).
+on:
+  push:
+    branches: [beta]
+permissions:
+  contents: write
+concurrency:
+  group: beta-release
+  cancel-in-progress: false
+jobs:
+  beta:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Neue Vorabversionen suchen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          : > teile.txt
+          check() {  # Teil, Version, Release-Notizen
+            case "$2" in *-*) ;; *) echo "$1 $2: keine Vorabversion, übersprungen."; return ;; esac
+            if gh release view "$1-v$2" >/dev/null 2>&1; then echo "$1 $2: schon veröffentlicht."; return; fi
+            echo "$1 $2 $3" >> teile.txt
+          }
+          check core "$(cat core/VERSION)" docs/RELEASE.md
+          for m in modules/*/; do
+            id=$(basename "$m"); [ "$id" = beispiel ] && continue
+            [ -f "$m/module.toml" ] || continue
+            check "$id" "$(sed -nE 's/^version = "([^"]+)"$/\1/p' "$m/module.toml" | head -1)" "$m/RELEASE.md"
+          done
+          cat teile.txt
+      - name: Tests
+        run: |
+          [ -s teile.txt ] || exit 0
+          sudo apt-get update && sudo apt-get install -y php-cli php-sqlite3 php-mbstring php-gd php-curl php-xml openssl librsvg2-bin poppler-utils qpdf fonts-dejavu-core ghostscript python3-openpyxl python3-pil python3-qrcode tesseract-ocr tesseract-ocr-deu
+          bash tests/run-all.sh
+      - name: Bauen und veröffentlichen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          while read -r part version notes; do
+            python3 -B scripts/release-bauen "$part" --kanal beta
+            awk -v v="## $version" '$0==v{f=1;next} /^## /{f=0} f' "$notes" > notizen.md
+            printf '\nVorabversion aus dem Zweig beta (Beta-Kanal). Noch ohne Signatur.\n' >> notizen.md
+            title="$part $version"; [ "$part" = core ] && title="Basis $version"
+            gh release create "$part-v$version" dist/"$part"-"$version".tar.gz dist/"$part"-"$version".manifest.json --target "$GITHUB_SHA" --prerelease --title "$title" --notes-file notizen.md
+          done < teile.txt

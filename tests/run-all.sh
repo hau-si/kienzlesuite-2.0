@@ -9,7 +9,7 @@ PYTHONPYCACHEPREFIX=$(mktemp -d); export PYTHONPYCACHEPREFIX; trap 'rm -rf -- "$
 step() { printf '\n== %s\n' "$*"; }
 
 step 'Versionsangaben'
-grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' core/VERSION || { echo 'core/VERSION ungültig'; exit 1; }
+grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$' core/VERSION || { echo 'core/VERSION ungültig'; exit 1; }
 grep -Eq "^## $(cat core/VERSION)\$" docs/RELEASE.md || { echo "docs/RELEASE.md: Abschnitt für $(cat core/VERSION) fehlt"; exit 1; }
 for m in modules/*/; do
   v=$(sed -nE 's/^version = "([^"]+)"$/\1/p' "$m/module.toml" | head -1)

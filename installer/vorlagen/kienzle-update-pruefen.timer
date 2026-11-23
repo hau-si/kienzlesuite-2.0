@@ -1,9 +1,9 @@
 [Unit]
-Description=Kienzle-Suite täglich nach Updates sehen
+Description=Kienzle-Suite stündlich nach Updates sehen
 
 [Timer]
-OnCalendar=daily
-RandomizedDelaySec=4h
+OnCalendar=hourly
+RandomizedDelaySec=10min
 Persistent=true
 
 [Install]

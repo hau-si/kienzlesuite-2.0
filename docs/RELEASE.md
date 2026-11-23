@@ -1,5 +1,12 @@
 # Basis – Release-Notizen
 
+## 0.19.2-beta.1
+
+- **Beta-Kanal automatisch:** Der Zweig `beta` veröffentlicht Vorabversionen selbst (`.github/workflows/beta.yml`), `main` nur noch mit Tag.
+  Die Basis prüft stündlich nach Updates (bisher täglich); Module werden stündlich geprüft und nachts (02–05 Uhr) selbst installiert,
+  nach einem Basis-Update sofort.
+- Nur die Abläufe in den Workflows sind nicht auf GitHub erprobt, bis der erste Lauf auf `beta` grün war.
+
 ## 0.19.1
 
 - `web.einstellungen = "/"` ist erlaubt (Einstellungsseite auf der Startseite des Moduls). Das Modul Terminzettel 1.0.0 liegt mit im Release.
