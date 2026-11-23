@@ -1,5 +1,10 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.1-beta.1
+
+- Die Papierbreite des Bondruckers (58/80 mm) wird nicht mehr in den Kasse-Einstellungen gewählt, sondern zentral in der Basis (Verwaltung → Drucker → Wofür welcher Drucker?, ab Basis 0.21.0-beta.1). Die Felder „Modell“ und „Druckbreite in Punkten“ entfallen; bei einer älteren Basis gilt 58 mm.
+- Nicht auf echtem Bondrucker getestet.
+
 ## 2.3.0-beta.3
 
 - Neu: **Manuelle Kartenzahlung** auf der Startseite der Kasse (ohne Patientenakte): Betreff und Betrag eingeben, die Zahlung startet am Kartenterminal; der Betreff wird als Beschreibung an SumUp übergeben (keine Patientendaten eintragen). „Vorgang abschließen“ beendet sie, es wird nichts in T2med geschrieben. Beleg und Rechnung wie bei anderen Zahlungen.

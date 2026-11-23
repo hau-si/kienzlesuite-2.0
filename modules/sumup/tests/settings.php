@@ -51,13 +51,12 @@ try {
     problem(fn() => Settings::save($db, $base, 'fhir', ['mode' => 'live', 'entry_code' => 'ZAHLUNG']), 'T2med live ohne Verbindung', 422);
     // Ungültige Eingaben: Klartext-Fehler, nichts gespeichert.
     problem(fn() => Settings::save($db, $base, 'app', ['max_amount_cents' => 'viel']), 'Ungültiger Betrag akzeptiert', 422);
-    problem(fn() => Settings::save($db, $base, 'printing', ['enabled' => true, 'model' => 'gibtsnicht']), 'Unbekanntes Druckermodell akzeptiert', 422);
     problem(fn() => Settings::save($db, $base, 'unbekannt', []), 'Unbekannter Bereich akzeptiert', 404);
     check(Settings::effective($base)->get('app', 'max_amount_cents') === 25000, 'Fehlerhafte Eingabe teilweise gespeichert');
 
     // Bondrucker TM-m30III: Breite nach Modell (Drucker der Suite folgt unten).
     Settings::save($db, $base, 'printing', ['enabled' => true, 'model' => 'tm-m30iii']);
-    check(Settings::effective($base)->get('printing', 'width_dots') === Config::PRINTER_MODELS['tm-m30iii']['width_dots'], 'Breite nicht nach Modell');
+    check(Settings::effective($base)->get('printing', 'model') === $base->get('printing', 'model'), 'Modell darf nicht mehr in der Kasse einstellbar sein (kommt aus der Basis)');
     // Überlagerung kann Grundwerte und Verbindungen nicht ersetzen (nur Felder der Oberfläche).
     check(Settings::merge(['fhir' => ['api_key' => 'aus-der-suite']], ['fhir' => ['api_key' => 'fremd'], 'app' => ['launcher_key' => 'x']]) === ['fhir' => ['api_key' => 'aus-der-suite']], 'Überlagerung ersetzt Grundwerte');
 

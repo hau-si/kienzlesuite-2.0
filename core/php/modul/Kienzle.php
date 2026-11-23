@@ -43,6 +43,12 @@ final class KienzleModul {
         return $out;
     }
 
+    /** Papierbreite des Bondruckers in Millimetern (58 oder 80), zentral unter Verwaltung → Drucker eingestellt. */
+    public function bonBreite(): int {
+        $d = json_decode(rawurldecode((string)($this->server['KIENZLE_DRUCKER'] ?? '')), true);
+        return is_array($d) && ($d['bonbreite'] ?? null) === 80 ? 80 : 58;
+    }
+
     public function csrf(): string { return (string)($this->server['KIENZLE_CSRF'] ?? ''); }
 
     /** CSRF-Marke einer schreibenden Anfrage prüfen (Formularfeld „csrf“ oder Kopfzeile X-Kienzle-Csrf des Browsers). */

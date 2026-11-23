@@ -20,7 +20,6 @@ final class Seite {
     public static function schema(): array {
         return [
             'enabled' => ['bool', 'Terminzettel aus T2med auf dem Bondrucker drucken', true],
-            'model' => ['choice', 'Bondrucker-Modell', 'tm-m10', ['tm-m10' => 'Epson TM-m10 (58 mm)', 'tm-m30iii' => 'Epson TM-m30III (80 mm)']],
             'header_text' => ['text', 'Kopf: erste Zeile Praxisname, darunter Adressbereich (leer = keiner)', ''],
             'header_first_size' => ['choice', 'Erste Zeile (Praxisname): Schriftgröße', '2x2', ['same' => 'Wie der Adressbereich'] + self::SIZES],
             'header_first_bold' => ['choice', 'Erste Zeile (Praxisname): fett', 'same', ['same' => 'Wie der Adressbereich', 'yes' => 'Fett', 'no' => 'Nicht fett']],
@@ -88,9 +87,16 @@ final class Seite {
         return $out;
     }
 
+    /** Papierbreite des Bondruckers in mm (58 oder 80) laut Basis (Verwaltung → Drucker), aus basis.json. */
+    public static function bonBreite(): int {
+        $d = json_decode((string)@file_get_contents(self::$data . '/basis.json'), true);
+        return is_array($d) && ($d['bonbreite'] ?? null) === 80 ? 80 : 58;
+    }
+    public static function modell(): string { return self::bonBreite() === 80 ? 'tm-m30iii' : 'tm-m10'; }
+
     /** Layout im Format von lib/terminzettel.py (apply_overlay). Der Drucker steht nicht darin, er kommt aus basis.json. */
     public static function overlay(array $values): array {
-        $o = ['enabled' => $values['enabled'], 'model' => $values['model'], 'cut' => $values['cut']];
+        $o = ['enabled' => $values['enabled'], 'model' => self::modell(), 'cut' => $values['cut']];
         $map = [
             'header_text' => ['header', 'text'], 'header_size' => ['header', 'size'], 'header_bold' => ['header', 'bold'],
             'heading' => ['heading', 'text'], 'heading_size' => ['heading', 'size'],
@@ -114,9 +120,13 @@ final class Seite {
 
     /** Bondrucker und Praxisdaten der Basis als basis.json übernehmen, damit der Druckdienst (ohne Web-Anfrage) sie kennt. */
     public static function syncBasis(\KienzleModul $k): void {
-        $neu = ['drucker' => $k->druckerRollen(), 'praxis' => $k->praxis()];
+        $neu = ['drucker' => $k->druckerRollen(), 'praxis' => $k->praxis(), 'bonbreite' => $k->bonBreite()];
         $alt = json_decode((string)@file_get_contents(self::$data . '/basis.json'), true);
-        if ($alt !== $neu) self::schreiben('basis.json', $neu);
+        if ($alt !== $neu) {
+            self::schreiben('basis.json', $neu);
+            // Andere Papierbreite: das gespeicherte Layout für den Druckdienst neu erzeugen.
+            if (is_file(self::$data . '/werte.json')) self::schreiben('layout.json', self::overlay(self::werte($neu['praxis'])));
+        }
         // Erster Besuch: Layout mit den Praxisdaten im Kopf anlegen, damit schon ohne Speichern gedruckt wird (danach frei änderbar).
         if (!is_file(self::$data . '/werte.json')) self::speichern(self::werte($neu['praxis']));
     }

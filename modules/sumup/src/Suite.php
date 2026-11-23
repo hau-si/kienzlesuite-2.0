@@ -90,7 +90,7 @@ final class Suite {
      * (ohne Anmeldung) sie nutzen kann.
      */
     public static function syncBasis(): void {
-        try { $k = self::modul(); $b = ['praxis' => $k->praxis(), 'drucker' => $k->druckerRollen()]; } catch (\Throwable) { return; }
+        try { $k = self::modul(); $b = ['praxis' => $k->praxis(), 'drucker' => $k->druckerRollen(), 'bonbreite' => $k->bonBreite()]; } catch (\Throwable) { return; }
         if (implode('', $b['praxis']) === '' && !array_filter($b['drucker'])) return;
         $file = self::$data . '/basis.json';
         $json = json_encode($b, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n";
@@ -114,6 +114,9 @@ final class Suite {
         return $out;
     }
 
+    /** Papierbreite des Bondruckers in mm (58 oder 80), zentral unter Verwaltung → Drucker. */
+    public static function bonBreite(): int { return (self::basis()['bonbreite'] ?? null) === 80 ? 80 : 58; }
+
     /** @return array{buero:string,bon:string} Warteschlangen laut Verwaltung → Drucker (leer = nicht zugeordnet). */
     public static function druckerRollen(): array {
         $d = self::basis()['drucker'] ?? [];
@@ -133,6 +136,9 @@ final class Suite {
         $v['app']['launcher_key'] = (string)$g['launcher_key'];
         $v['app']['encryption_key'] = (string)$g['encryption_key'];
         $v['invoice_inbox']['key'] = (string)$g['invoice_key'];
+        // Bondrucker-Breite kommt aus der Basis, nicht mehr aus den Einstellungen der Kasse.
+        $v['printing']['model'] = self::bonBreite() === 80 ? 'tm-m30iii' : 'tm-m10';
+        $v['printing']['width_dots'] = Config::PRINTER_MODELS[$v['printing']['model']]['width_dots'];
         // Drucker richtet die Basis ein (Verwaltung → Drucker); das Modul druckt nur auf deren Warteschlangen.
         foreach (self::praxis() as $k => $val) $v['practice'][$k] = $val;
         $rollen = self::druckerRollen();

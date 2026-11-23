@@ -1,5 +1,10 @@
 # Terminzettel – Release-Notizen
 
+## 1.2.0-beta.1
+
+- Die Papierbreite des Bondruckers (58/80 mm) kommt zentral aus der Basis (Verwaltung → Drucker → Wofür welcher Drucker?, ab Basis 0.21.0-beta.1); das Feld „Bondrucker-Modell“ entfällt, die Seite zeigt die eingestellte Breite an. Ändert sich die Breite, wird das gespeicherte Layout für den Druckdienst automatisch neu erzeugt. Bei einer älteren Basis gilt 58 mm.
+- Nicht auf echtem Bondrucker getestet.
+
 ## 1.1.3-beta.1
 
 - Behoben: Druckt T2med mit dem Windows-Treiber „Generic / Text Only“ (reiner Text), wurde der Auftrag vom virtuellen Drucker „Terminzettel“ nicht angenommen, weil er nur PDF, PostScript und XPS erlaubte. Jetzt werden auch `text/plain` und rohe Aufträge (`application/octet-stream`, so sendet der Text-Treiber über Samba/IPP) angenommen.

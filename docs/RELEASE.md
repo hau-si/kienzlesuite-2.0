@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.21.0-beta.1
+
+- Verwaltung → Drucker → „Wofür welcher Drucker?“: neu die **Papierbreite des Bondruckers** (58 mm Epson TM-m10 oder 80 mm TM-m30III). Sie gilt zentral für alle Module; die Module bekommen sie mit jeder Anfrage (`KienzleModul::bonBreite()`, ergänzende Schnittstelle, `core_api` bleibt 1).
+- Nicht auf der echten VM getestet.
+
 ## 0.20.9-beta.1
 
 - Verwaltung → Drucker: Freigaben (Samba/IPP) gibt es nur noch für die virtuellen Drucker der Module; echte Drucker und der Bondrucker brauchen keine (Auswahl beim Anlegen entfällt, Hinweis im Text).

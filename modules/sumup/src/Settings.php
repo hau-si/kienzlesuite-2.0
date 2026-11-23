@@ -50,10 +50,8 @@ final class Settings {
             'enabled' => ['type' => 'bool', 'label' => 'Belege per E-Mail senden', 'help' => 'Server, Zugang und Absender stehen zentral unter Verwaltung → Verbindungen der Suite.'],
             'from_name' => ['type' => 'string', 'label' => 'Absendername (z. B. Praxisname)', 'optional' => true],
         ]],
-        'printing' => ['label' => 'Bondrucker (welcher Drucker: Verwaltung → Drucker → Wofür welcher Drucker?)', 'fields' => [
+        'printing' => ['label' => 'Bondrucker (welcher Drucker und welche Papierbreite: Verwaltung → Drucker → Wofür welcher Drucker?)', 'fields' => [
             'enabled' => ['type' => 'bool', 'label' => 'Bondrucker verwenden („Beleg drucken“)'],
-            'model' => ['type' => 'choice', 'label' => 'Modell', 'choices' => ['tm-m10' => 'Epson TM-m10 (58 mm)', 'tm-m30iii' => 'Epson TM-m30III (80 mm)']],
-            'width_dots' => ['type' => 'int', 'label' => 'Druckbreite in Punkten (leer: passend zum Modell)', 'optional' => true],
             'cut' => ['type' => 'bool', 'label' => 'Bon schneiden', 'default' => true],
             'cash_receipt_auto' => ['type' => 'bool', 'label' => 'Quittung automatisch drucken bei Barzahlung', 'default' => false],
         ]],
@@ -180,9 +178,6 @@ final class Settings {
         }
         if ($section === 'mail' && ($values['enabled'] ?? false) && !Suite::connected('mail')) {
             throw new Problem('Für den E-Mail-Versand zuerst unter Verwaltung → Verbindungen den E-Mail-Versand einrichten.', 422);
-        }
-        if ($section === 'printing' && isset($values['model']) && !isset($values['width_dots'])) {
-            $values['width_dots'] = Config::PRINTER_MODELS[$values['model']]['width_dots'];
         }
         $overrides[$section] = $values;
         // Abhängigkeiten, die sonst eine Speicherung blockieren würden.

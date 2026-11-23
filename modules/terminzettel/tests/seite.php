@@ -16,17 +16,18 @@ register_shutdown_function(fn() => array_map('unlink', glob("$dir/*") ?: []) && 
 // Vorgaben und Eingabeprüfung
 $defaults = Seite::werte();
 check($defaults['qr_size'] === 'medium' && $defaults['enabled'] === true && $defaults['heading'] === 'IHRE TERMINE', 'Vorgaben');
-$in = ['enabled' => '1', 'model' => 'tm-m30iii', 'header_text' => "Praxis Beispiel\r\nMusterweg 1", 'header_first_size' => '2x2', 'header_first_bold' => 'yes', 'header_size' => '1x1',
+$in = ['enabled' => '1', 'header_text' => "Praxis Beispiel\r\nMusterweg 1", 'header_first_size' => '2x2', 'header_first_bold' => 'yes', 'header_size' => '1x1',
     'heading' => 'TERMINE', 'heading_size' => '2x2', 'show_patient' => '1', 'appointment_size' => '1x2', 'footer_text' => '', 'footer_size' => '1x1',
     'qr_enabled' => '1', 'qr_position' => 'below', 'qr_size' => 'large', 'qr_summary' => 'Termin Praxis', 'cut' => ''];
 $v = Seite::pruefen($in);
 check($v['header_text'] === "Praxis Beispiel\nMusterweg 1" && $v['header_bold'] === false && $v['cut'] === false && $v['show_patient'] === true, 'Eingabe falsch übernommen');
-wirft(fn() => Seite::pruefen(['model' => 'x'] + $in), 'ungültiges Modell');
 wirft(fn() => Seite::pruefen(['heading' => "A\x1bB"] + $in), 'Steuerzeichen in der Überschrift');
 wirft(fn() => Seite::pruefen(['header_text' => str_repeat('a', 1001)] + $in), 'zu langer Text');
 wirft(fn() => Seite::pruefen(['qr_size' => 'riesig'] + $in), 'ungültige QR-Größe');
 
-// Layout für den Druckdienst: ohne Drucker, mit abgeschaltetem Endtext
+// Layout für den Druckdienst: ohne Drucker, mit abgeschaltetem Endtext; Papierbreite kommt zentral aus der Basis
+file_put_contents("$dir/basis.json", '{"bonbreite":80}');
+check(Seite::bonBreite() === 80 && Seite::modell() === 'tm-m30iii', 'Papierbreite aus basis.json');
 $o = Seite::overlay($v);
 check(!array_key_exists('queue', $o) && $o['model'] === 'tm-m30iii' && $o['cut'] === false, 'Overlay: Kopf');
 check($o['header']['enabled'] === true && $o['header']['first_size'] === '2x2' && $o['header']['first_bold'] === true && $o['footer']['enabled'] === false, 'Overlay: Kopf und Fuß');
@@ -47,15 +48,17 @@ check(Seite::werte() === $v, 'Werte nicht zurückgelesen');
 check((fileperms("$dir/layout.json") & 0777) === 0600 && json_decode((string)file_get_contents("$dir/layout.json"), true) === $o, 'layout.json');
 file_put_contents("$dir/werte.json", '{"model":"boese","heading":5}');
 $k = Seite::werte();
-check($k['model'] === 'tm-m10' && $k['heading'] === 'IHRE TERMINE', 'Ungültige gespeicherte Werte fallen auf Vorgaben');
+check(!array_key_exists('model', $k) && $k['heading'] === 'IHRE TERMINE', 'Ungültige gespeicherte Werte fallen auf Vorgaben');
 
 // Basisdaten (Drucker, Praxis) aus den Kopfzeilen der Basis
 $modul = new KienzleModul('terminzettel', ['KIENZLE_ROLLE' => 'mitarbeiter', 'KIENZLE_RECHTE' => 'layout', 'KIENZLE_CSRF' => str_repeat('a', 64),
-    'KIENZLE_DRUCKER' => rawurlencode('{"buero":"Praxis-A4","bon":"Bon-1"}'), 'KIENZLE_PRAXIS' => rawurlencode('{"name":"Praxis Beispiel","street":"Musterweg 1","city":"","contact":""}')]);
+    'KIENZLE_DRUCKER' => rawurlencode('{"buero":"Praxis-A4","bon":"Bon-1","bonbreite":58}'), 'KIENZLE_PRAXIS' => rawurlencode('{"name":"Praxis Beispiel","street":"Musterweg 1","city":"","contact":""}')]);
 Seite::syncBasis($modul);
 $b = json_decode((string)file_get_contents("$dir/basis.json"), true);
 check(($b['drucker']['bon'] ?? '') === 'Bon-1' && ($b['praxis']['name'] ?? '') === 'Praxis Beispiel', 'basis.json');
 check($modul->recht('layout') && !$modul->recht('anderes'), 'Rechte');
+check(($b['bonbreite'] ?? 0) === 58 && $modul->bonBreite() === 58, 'Breite 58 aus der Basis');
+check(json_decode((string)file_get_contents("$dir/layout.json"), true)['model'] === 'tm-m10', 'layout.json folgt der Papierbreite');
 
 // Vorschau und Testdruck mit Ersatz für Python und lp
 $gelaufen = [];

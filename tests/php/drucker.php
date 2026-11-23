@@ -54,6 +54,9 @@ function test_seite(): void {
     check($b->post('/verwaltung/drucker', ['aktion' => 'rollen', 'buero' => 'Gibtsnicht', 'bon' => ''])->status === 422, 'Unbekannter Drucker in der Zuordnung');
     check($b->post('/verwaltung/drucker', ['aktion' => 'rollen', 'buero' => 'Fremd', 'bon' => 'Bon'])->status === 303, 'Zuordnung speichern');
     check(json_decode((string)$env->db->setting('drucker.rollen'), true) === ['buero' => 'Fremd', 'bon' => 'Bon'], 'Zuordnung nicht gespeichert');
+    check($b->post('/verwaltung/drucker', ['aktion' => 'rollen', 'buero' => 'Fremd', 'bon' => 'Bon', 'bonbreite' => '70'])->status === 422, 'Ungültige Papierbreite');
+    check($b->post('/verwaltung/drucker', ['aktion' => 'rollen', 'buero' => 'Fremd', 'bon' => 'Bon', 'bonbreite' => '80'])->status === 303 && $env->db->setting('drucker.bonbreite') === '80', 'Papierbreite nicht gespeichert');
+    check(str_contains($b->get('/verwaltung/drucker')->body, 'Papierbreite des Bondruckers') && str_contains($b->get('/verwaltung/drucker')->body, '<option value="80" selected>'), 'Papierbreite nicht angezeigt');
     check(!str_contains($page->body, '<script>') && !str_contains($page->body, 'Von <b>') && !str_contains($page->body, 'A4 <i>'), 'nicht maskiert');
     check(substr_count($page->body, '>Entfernen<') === 1, 'Entfernen nur für eigene Drucker der Suite');
     $r = $b->post('/verwaltung/drucker', ['aktion' => 'freigabe', 'name' => 'Bon', 'samba' => '1', 'ipp' => '1']);

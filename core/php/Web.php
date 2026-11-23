@@ -361,7 +361,7 @@ final class Web {
             ->with('X-Kienzle-Rechte', implode(',', $access['rights']))
             ->with('X-Kienzle-Csrf', self::moduleCsrf($session['csrf'], $module))
             ->with('X-Kienzle-Bestaetigt', (string)(int)$session['confirmed_at'])
-            ->with('X-Kienzle-Drucker', rawurlencode(json_encode($this->printerRoles(), JSON_UNESCAPED_UNICODE)))
+            ->with('X-Kienzle-Drucker', rawurlencode(json_encode($this->printerRoles() + ['bonbreite' => $this->bonWidth()], JSON_UNESCAPED_UNICODE)))
             ->with('X-Kienzle-Praxis', rawurlencode(json_encode(['name' => $this->config->practice] + $this->address(), JSON_UNESCAPED_UNICODE)));
     }
 
@@ -1329,6 +1329,9 @@ final class Web {
 
     public const PRINTER_ROLES = ['buero' => 'Praxisdrucker (A4, Rechnungen)', 'bon' => 'Bondrucker (Belege)'];
 
+    /** Papierbreite des Bondruckers in mm (58 oder 80); gilt für alle Module. */
+    private function bonWidth(): int { return (int)$this->db->setting('drucker.bonbreite') === 80 ? 80 : 58; }
+
     /** Zuordnung Rolle → Warteschlange (Verwaltung → Drucker); nur noch vorhandene Warteschlangen. */
     private function printerRoles(): array {
         $d = json_decode((string)$this->db->setting('drucker.rollen'), true);
@@ -1374,7 +1377,9 @@ final class Web {
             foreach ($st['queues'] as $q) if ($q['modul'] === '') $opts .= '<option value="' . V::h($q['name']) . '"' . ($roles[$k] === $q['name'] ? ' selected' : '') . '>' . V::h($q['name']) . '</option>';
             $pick .= '<label>' . V::h($label) . '<select name="' . $k . '">' . $opts . '</select></label>';
         }
-        $body .= '<h2>Wofür welcher Drucker?</h2><p class="muted">Module drucken auf diese Zuordnung; in den Einstellungen der Module wird kein Drucker mehr gewählt.</p>'
+        $width = $this->bonWidth();
+        $pick .= '<label>Papierbreite des Bondruckers <span class="hilfe" tabindex="0" role="note" aria-label="Gilt für alle Module (Kasse, Terminzettel)." data-tip="Gilt für alle Module, die Bons drucken (Kasse, Terminzettel). 58 mm: Epson TM-m10, 80 mm: Epson TM-m30III.">?</span><select name="bonbreite"><option value="58"' . ($width === 58 ? ' selected' : '') . '>58 mm (Epson TM-m10)</option><option value="80"' . ($width === 80 ? ' selected' : '') . '>80 mm (Epson TM-m30III)</option></select></label>';
+        $body .= '<h2>Wofür welcher Drucker?</h2><p class="muted">Module drucken auf diese Zuordnung; in den Einstellungen der Module wird kein Drucker und keine Papierbreite mehr gewählt.</p>'
             . '<form method="post" action="/verwaltung/drucker" class="box">' . $this->hidden('rollen') . $pick . '<button>Zuordnung speichern</button></form>';
         $jobRows = '';
         foreach ($st['jobs'] as $j) {
@@ -1453,6 +1458,9 @@ final class Web {
             $out[$k] = $v;
         }
         $this->db->store('drucker.rollen', json_encode($out, JSON_THROW_ON_ERROR));
+        $width = $r->field('bonbreite', 3);
+        if ($width !== '' && !in_array($width, ['58', '80'], true)) throw new Problem('Bitte 58 mm oder 80 mm als Papierbreite wählen.', 422);
+        if ($width !== '') $this->db->store('drucker.bonbreite', $width);
     }
 
     private function printersAction(Request $r, string $admin): Response {
