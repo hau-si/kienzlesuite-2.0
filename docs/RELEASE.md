@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.9
+
+- Interne Fehler: Das Systemprotokoll (`journalctl -t kienzle-core-php`) enthält jetzt zusätzlich die gekürzte Meldung der Ausnahme sowie Methode und Pfad der Anfrage (ohne Eingaben, Query-Teil abgeschnitten).
+- Der Neustart-Dienst (kienzle-neustart.path) steht in der open_basedir-Liste von PHP; sonst hätte die Seite ihn trotz Installation als „nicht eingerichtet“ gemeldet. Nach dem Update einmal `sudo bash installer/install.sh` (schreibt die PHP-Einstellung neu). Nicht auf dem Server getestet.
+
 ## 0.21.4-beta.8
 
 - Einrichtung: „Mindestens zwei Admins“, „Netzwerkspeicher eingetragen“ und „Probe-Wiederherstellung erfolgreich“ sind jetzt als optional gekennzeichnet und zählen nicht für den Fortschritt.
