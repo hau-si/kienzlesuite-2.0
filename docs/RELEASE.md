@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.21
+
+- Einheitliches Aussehen der Kartenüberschriften im ganzen Projekt: ein passendes Symbol davor und, wo es sinnvoll ist, ein Status-Schild dahinter („✓ eingerichtet“ / „nicht eingerichtet“, „✓ ausgefüllt“, „✓ aktiv“, „✓ gedruckt“ …): Verbindungen, Praxis und Daten, Mein Konto (Authenticator-App, Passkeys, Handynummer), Sicherheit (Firewall), Sicherung (Schutz vor Erpressungstrojanern, Schlüsselblatt, Benachrichtigung). Neue Seiten setzen dafür nur `View::$status`.
+- Gmail-Anleitung an die „Google Auth Platform“ von Google angepasst (Erste Schritte, Datenzugriff, Zielgruppe, Clients). Nur nach Googles Dokumentation geschrieben, nicht mit einem Konto durchgespielt.
+
 ## 0.21.4-beta.20
 
 - Verbindungen → E-Mail-Versand: neben dem SMTP-Server jetzt auch ein Gmail-Konto per OAuth (Gmail-Schnittstelle, nur Berechtigung „E-Mails senden“). Jede Praxis legt dazu einmal einen eigenen Google-Zugang an (Anleitung auf der Seite); die Anmeldung geschieht über Weiterleitung auf localhost und Einfügen der Adresse. Module bekommen `art = gmail` mit Client und Refresh-Token. Nur mit nachgebautem Google getestet, nicht mit einem echten Konto.

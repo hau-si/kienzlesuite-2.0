@@ -240,3 +240,7 @@ button.small { padding: 4px 10px; font-size: 13px; }
 .tag.ok { background: #e5f3ed; color: #16503f; }
 details.fold > summary .tag { margin-left: 4px; }
 details.fold > summary h3 { margin: 0; font-size: 15px; }
+
+/* Symbol vor Kartenüberschriften */
+.h-ico { width: 20px; height: 20px; vertical-align: -3px; margin-right: 8px; color: var(--teal); flex: none; }
+details.fold > summary h2 { display: inline-flex; align-items: center; }

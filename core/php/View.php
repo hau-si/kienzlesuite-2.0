@@ -37,6 +37,66 @@ final class View {
         '/verwaltung/neustart' => '<path d="M12 3v9"/><path d="M6.3 6.3a8 8 0 1011.4 0"/>',
     ];
 
+    /** Zeichen für Kartenüberschriften: Schlagwort im Titel => Symbol. Die erste Übereinstimmung zählt. */
+    private const HEADINGS = [
+        'Firewall' => '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+        'Erpressungstrojaner' => '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+        'Zugang (' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+        'Zeitplan' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+        'Protokoll' => '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+        'Passkeys' => '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>',
+        'Schlüsselblatt' => '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>',
+        'Authenticator' => '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>',
+        'Handynummer' => '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>',
+        'Passwort' => '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>',
+        'Kontodaten' => '<path d="M3 10l9-6 9 6M5 10v8M9 10v8M15 10v8M19 10v8M3 20h18"/>',
+        'Anschrift' => '<path d="M12 21s7-6 7-11a7 7 0 00-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+        'Steuer' => '<path d="M19 5L5 19"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/>',
+        'Name der Praxis' => '<path d="M4 21V5l8-2 8 2v16"/><path d="M9 21v-5h6v5M9 9h.01M15 9h.01M9 13h.01M15 13h.01"/>',
+        'T2med' => '<path d="M12 21s-8-5-8-11a4.5 4.5 0 018-2.8A4.5 4.5 0 0120 10c0 6-8 11-8 11z"/>',
+        'E-Mail' => '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+        'Benachrichtigung' => '<path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9M10 21h4"/>',
+        'SMS' => '<path d="M21 12a8 8 0 01-11.6 7.1L3 21l1.9-5.4A8 8 0 1121 12z"/>',
+        'Letterxpress' => '<path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/>',
+        'Netzwerkspeicher' => '<rect x="3" y="14" width="18" height="6" rx="1"/><path d="M5 14l3-9h8l3 9M7 17h.01"/>',
+        'Vorhandene Sicherungen' => '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
+        'Aufbewahrung' => '<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11h14V8M10 12h4"/>',
+        'Wer nutzt was' => '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 10h18M9 4v16"/>',
+        'Drucker' => '<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="1"/><path d="M7 14h10v7H7z"/>',
+        'Druckaufträge' => '<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="1"/><path d="M7 14h10v7H7z"/>',
+        'Benutzer' => '<circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-5.5 7-5.5s7 2 7 5.5"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14.5c2.3.6 4 2.3 4 5.5"/>',
+        'Gruppe' => '<circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-5.5 7-5.5s7 2 7 5.5"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14.5c2.3.6 4 2.3 4 5.5"/>',
+        'Gemerkte Geräte' => '<rect x="3" y="4" width="18" height="12" rx="1"/><path d="M8 20h8M12 16v4"/>',
+        'Netz' => '<circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 7v5M12 12l-6 5M12 12l6 5"/>',
+        'Ports' => '<circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 7v5M12 12l-6 5M12 12l6 5"/>',
+        'Dienst' => '<path d="M9 3v5M15 3v5"/><path d="M6 8h12v4a6 6 0 01-12 0z"/><path d="M12 18v3"/>',
+        'neu starten' => '<path d="M12 3v9"/><path d="M6.3 6.3a8 8 0 1011.4 0"/>',
+        'Installiert' => '<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
+        'Verfügbar' => '<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
+        'Kanal' => '<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
+        'Zurück auf' => '<path d="M3 7v6h6"/><path d="M3 13a9 9 0 109-9 9 9 0 00-7 3"/>',
+        'Einstellungen exportieren' => '<path d="M12 15V3M7 8l5-5 5 5M4 21h16"/>',
+        'Zugang zu Modulen' => '<path d="M12 3l9 5v8l-9 5-9-5V8z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+        'Art' => '<circle cx="12" cy="12" r="9"/>',
+    ];
+
+    /** Status-Schild hinter Kartenüberschriften: Titel => [erledigt, Text wenn ja, Text wenn nein]. Wird je Seite gesetzt und beim Aufbau der Karten verbraucht. */
+    public static array $status = [];
+
+    /** Überschrift mit Symbol davor und Status-Schild dahinter (einheitlich im ganzen Projekt). */
+    public static function heading(string $titleHtml): string {
+        $title = html_entity_decode(strip_tags($titleHtml), ENT_QUOTES, 'UTF-8');
+        $svg = null;
+        foreach (self::HEADINGS as $needle => $path) if (str_contains($title, $needle)) { $svg = $path; break; }
+        $icon = $svg !== null ? '<svg class="h-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . $svg . '</svg>' : '';
+        $tag = '';
+        if (isset(self::$status[$title])) {
+            [$ok, $yes, $no] = self::$status[$title] + [1 => 'eingerichtet', 2 => 'nicht eingerichtet'];
+            $tag = ' <span class="tag ' . ($ok ? 'ok' : 'opt') . '">' . ($ok ? '✓ ' . self::h($yes) : self::h($no)) . '</span>';
+        }
+        return $icon . $titleHtml . $tag;
+    }
+
     public static function icon(string $href, string $fallback = 'app'): string {
         $key = strtok($href, '?#') ?: $href;
         $svg = self::ICONS[$key] ?? self::ICONS[$fallback];
@@ -51,7 +111,7 @@ final class View {
         $brand = '<a class="brand" href="/" title="Start"><span class="mark" aria-hidden="true">K' . (!empty($nav['offenLogo']) ? '<span class="logo-dot" title="Die Einrichtung ist noch nicht abgeschlossen"></span>' : '') . '</span><span><strong>Kienzle-Suite</strong>'
             . '<span class="sub">' . self::h($practice !== '' ? $practice : 'Praxis') . '</span></span></a>';
         $head = '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=15"><script src="/assets/core.js" defer></script></head><body'
+            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=16"><script src="/assets/core.js" defer></script></head><body'
             . (self::$starter !== '' ? ' data-starter="' . self::h(self::$starter) . '"' : '') . '>';
         if (!$nav) {
             return $head . '<div class="solo">' . $brand . '<main><h1>' . self::h($title) . '</h1>' . self::cards($body) . '</main></div></body></html>';
@@ -103,7 +163,11 @@ final class View {
 
     /** Inhalt in Karten aufteilen: Jede Überschrift h2 beginnt eine neue Karte; Meldungen am Anfang bleiben darüber. */
     public static function cards(string $body): string {
-        if (str_contains($body, 'class="card')) return $body;
+        if (str_contains($body, 'class="card')) {
+            $body = preg_replace_callback('#<h2>([^<]*)</h2>#', fn($h) => '<h2>' . self::heading($h[1]) . '</h2>', $body) ?? $body;
+            self::$status = [];
+            return $body;
+        }
         $lead = '';
         while (preg_match('#^\s*(<p class="(?:error|notice)"[^>]*>.*?</p>)#s', $body, $m)) { $lead .= $m[1]; $body = substr($body, strlen($m[0])); }
         // Nur Überschriften auf oberster Ebene beginnen eine Karte; eine h2 in einem offenen div/form (z. B. Update-Kasten) darf den Aufbau nicht zerreißen.
@@ -124,11 +188,14 @@ final class View {
             if (trim($part) === '') continue;
             // Selten gebrauchte Abschnitte klappen zu (Überschrift bleibt sichtbar); Abschnitte mit Fehlermeldung bleiben offen.
             if (preg_match('#^\s*<h2>([^<]*)</h2>(.*)$#s', $part, $m) && in_array(html_entity_decode($m[1], ENT_QUOTES, 'UTF-8'), self::COLLAPSED, true) && !str_contains($part, 'class="error"')) {
-                $out .= '<section class="card"><details class="fold"><summary><h2>' . $m[1] . '</h2></summary>' . $m[2] . '</details></section>';
+                $out .= '<section class="card"><details class="fold"><summary><h2>' . self::heading($m[1]) . '</h2></summary>' . $m[2] . '</details></section>';
                 continue;
             }
             $out .= '<section class="card">' . $part . '</section>';
         }
+        // Alle noch schlichten Überschriften (auch in verschachtelten Abschnitten) mit Symbol und Status versehen.
+        $out = preg_replace_callback('#<h2>([^<]*)</h2>#', fn($h) => '<h2>' . self::heading($h[1]) . '</h2>', $out) ?? $out;
+        self::$status = [];
         return $out;
     }
 

@@ -229,6 +229,8 @@ final class Web {
             . '<details class="fold"><summary><h2>Steuer</h2></summary>' . $form('steuer',
                 V::input('tax_id', 'Steuernummer oder USt-IdNr. (steht auf der Rechnung)', 'text', $m['tax_id'], 'maxlength="40"')
                 . V::checkbox('small_business', '1', 'Kleinunternehmerregelung (§ 19 UStG): keine Umsatzsteuer ausweisen', $m['small_business']), 'Steuerangaben speichern') . '</details></section>';
+        $filled = fn(bool $ok) => [$ok, 'ausgefüllt', 'nicht ausgefüllt'];
+        V::$status = ['Anschrift' => $filled($a['street'] !== '' && $a['city'] !== ''), 'Kontodaten für Überweisungen' => $filled($m['iban'] !== ''), 'Steuer' => $filled($m['tax_id'] !== '' || $m['small_business'])];
         return Response::html(V::page('Praxis und Daten', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
     }
 
@@ -665,6 +667,8 @@ final class Web {
                 . '<button type="button">Passkey hinzufügen</button><p class="error" hidden></p></div></section>' : '')
             . '<section><h2>Gemerkte Geräte</h2>' . ($devices !== '' ? '<table><tr><th>Gerät</th><th>Zuletzt</th><th></th></tr>' . $devices . '</table>'
                 . '<form method="post" action="/konto/geraete">' . $csrf . '<input type="hidden" name="id" value="all"><button class="link">Alle abmelden</button></form>' : '<p>Keine.</p>') . '</section>';
+        V::$status = ['Authenticator-App' => [$otp, 'eingerichtet', 'nicht eingerichtet'], 'Passkeys' => [$keys !== '', 'eingerichtet', 'nicht eingerichtet'],
+            'Handynummer für SMS-Code (Ersatz)' => [$this->phoneOf($uid) !== '', 'hinterlegt', 'nicht hinterlegt']];
         return Response::html(V::page('Mein Konto', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
     }
 
@@ -1081,6 +1085,7 @@ final class Web {
             . '<details class="fold" id="firewall"' . ($open('firewall') ?: ($fwState === 'pending' ? ' open' : '')) . '><summary><h2>Firewall</h2></summary>' . self::stripCards(self::inner($fw)) . '</details>'
             . '<details class="fold" id="zugang"' . $open('zugang') . '><summary><h2>Zugang (Abmeldezeiten)</h2></summary>' . $this->accessBody() . '</details>'
             . '<details class="fold" id="protokoll"' . $open('protokoll') . '><summary><h2>Protokoll</h2></summary>' . self::stripCards(self::inner($log)) . '</details></section>';
+        V::$status = ['Firewall' => [$fwState === 'active', 'aktiv', $fwState === 'pending' ? 'wartet auf Bestätigung' : 'aus']];
         $response = Response::html(V::page('Sicherheit', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
         if (($refresh = $fw->header('Refresh')) !== null) $response->with('Refresh', $refresh);
         return $response;
@@ -1422,11 +1427,13 @@ final class Web {
             . '<button>Speichern</button></form>' . '</details>'
             . '<details class="fold"' . ($gmail || $pending ? ' open' : '') . '><summary><h3>Gmail-Konto (OAuth, ohne Passwort im Klartext)</h3></summary>'
             . '<p class="muted">Gilt für ein normales Gmail-Konto. Jede Praxis legt dafür einmalig einen eigenen Zugang bei Google an (kostenlos, ca. 10 Minuten). Gesendet wird nur über die Gmail-Schnittstelle mit der Berechtigung „E-Mails senden“; die Suite kann keine Postfächer lesen.</p>'
-            . '<ol class="muted"><li>Auf <strong>console.cloud.google.com</strong> mit dem Gmail-Konto anmelden und ein neues Projekt anlegen (Name z. B. „Kienzle-Suite“).</li>'
-            . '<li>Unter „APIs und Dienste“ → „Bibliothek“ die <strong>Gmail API</strong> aktivieren.</li>'
-            . '<li>Unter „OAuth-Zustimmungsbildschirm“ (neu: „Google Auth Platform“) die App einrichten: Nutzertyp <strong>Extern</strong>, App-Name und deine E-Mail-Adresse eintragen. Bei „Datenzugriff“/„Bereiche“ <code>https://www.googleapis.com/auth/gmail.send</code> hinzufügen. Dein Gmail-Konto als Testnutzer eintragen.</li>'
-            . '<li>Danach die App auf <strong>„In Produktion“ veröffentlichen</strong> (Zielgruppe → App veröffentlichen). Sonst läuft die Anmeldung nach 7 Tagen ab. Eine Prüfung durch Google ist dafür nicht nötig; bei der Anmeldung erscheint „Google hat diese App nicht überprüft“ – dort „Erweitert“ → „Weiter zu … (unsicher)“ wählen.</li>'
-            . '<li>Unter „Clients“/„Anmeldedaten“ eine <strong>OAuth-Client-ID vom Typ „Desktop-App“</strong> erstellen. Client-ID und Client-Secret hier eintragen. (Menünamen bei Google ändern sich öfter und sind nicht gegen dein Konto geprüft.)</li></ol>'
+            . '<ol class="muted"><li>Auf <strong>console.cloud.google.com</strong> mit dem Gmail-Konto anmelden und oben ein <strong>neues Projekt</strong> anlegen (Name z. B. „Kienzle-Suite“).</li>'
+            . '<li>Im Suchfeld oben „<strong>Gmail API</strong>“ suchen und <strong>Aktivieren</strong> klicken.</li>'
+            . '<li>Im Suchfeld „<strong>Google Auth Platform</strong>“ öffnen und <strong>Erste Schritte</strong> wählen: App-Name (z. B. „Kienzle-Suite“) und deine E-Mail-Adresse als Support-E-Mail eintragen, Zielgruppe <strong>Extern</strong>, Kontakt-E-Mail eintragen, Bedingungen bestätigen.</li>'
+            . '<li>Links <strong>Datenzugriff</strong> → „Bereiche hinzufügen oder entfernen“ → in „Bereiche manuell hinzufügen“ <code>https://www.googleapis.com/auth/gmail.send</code> eintragen, hinzufügen, <strong>Speichern</strong>.</li>'
+            . '<li>Links <strong>Zielgruppe</strong> → <strong>App veröffentlichen</strong> („In Produktion“ statt „Test“). Im Teststatus läuft die Anmeldung nach 7 Tagen ab. Google verlangt für diesen Bereich eine Überprüfung der App, lässt eine nicht überprüfte App für wenige Nutzer aber zu: Bei der Anmeldung erscheint „Google hat diese App nicht überprüft“ – dort <strong>Erweitert</strong> → „Weiter zu … (unsicher)“ wählen.</li>'
+            . '<li>Links <strong>Clients</strong> → <strong>Client erstellen</strong> → Anwendungstyp <strong>Desktop-App</strong>, Namen vergeben, <strong>Erstellen</strong>. Client-ID und Client-Secret kopieren (das Secret wird nur direkt nach dem Erstellen angezeigt) und unten eintragen.</li></ol>'
+            . '<p class="muted">Die Bezeichnungen bei Google ändern sich gelegentlich; sinngemäß gesucht werden: Branding/App-Informationen, Zielgruppe, Datenzugriff, Clients. Stimmt etwas nicht mit deiner Ansicht überein, bitte melden.</p>'
             . '<form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('gmail-start') . '<h4>Schritt 1: bei Google anmelden</h4>'
             . $this->tipInput('client_id', 'Client-ID', 'Endet meist auf .apps.googleusercontent.com.', 'text', (string)($pending['client_id'] ?? $mail['client_id'] ?? ''), 'autocomplete="off" maxlength="200"')
             . $this->tipInput('absender', 'Gmail-Adresse (Absender)', 'Das Konto, mit dem du dich bei Google anmeldest; von dort werden die E-Mails verschickt.', 'email', (string)($pending['absender'] ?? $mail['absender'] ?? ''), 'placeholder="praxis@gmail.com"')
@@ -1515,14 +1522,14 @@ final class Web {
         foreach ($st['nutzung'] as $u) $rows .= '<tr><td>' . V::h((string)$u['name']) . '</td><td>' . V::h((string)$u['verbindung']) . '</td><td>' . V::h((string)$u['zweck']) . '</td><td>' . (($u['pflicht'] ?? false) ? 'ja' : 'nein') . '</td></tr>';
         $body .= '<section><h2>Wer nutzt was</h2>' . ($rows !== '' ? '<table><tr><th>Modul</th><th>Verbindung</th><th>Wofür</th><th>Nötig</th></tr>' . $rows . '</table>' : '<p>Kein installiertes Modul nutzt eine zentrale Verbindung.</p>') . '</section>';
         $body = preg_replace('#(<p>Zugänge, die mehrere Module brauchen.*?</p>)#s', '<section class="card">$1</section>', $body, 1);
-        // Jeder Abschnitt klappt zu; eingerichtete tragen ein grünes „eingerichtet“, offene und fehlerhafte bleiben aufgeklappt.
+        // Jeder Abschnitt klappt zu; eingerichtete tragen ein grünes „✓ eingerichtet“, offene und fehlerhafte bleiben aufgeklappt.
         $done = ['T2med (FHIR)' => trim((string)($t2['base_url'] ?? '')) !== '', 'E-Mail-Versand' => $mail !== null && $mail !== [],
             'SMS (seven.io)' => !empty($st['sms']), 'Letterxpress (Briefversand)' => !empty($st['letterxpress']), 'Netzwerkspeicher' => !empty($st['ablage'])];
+        foreach ($done as $title => $ok) V::$status[$title] = [$ok, 'eingerichtet', 'nicht eingerichtet'];
         $body = preg_replace_callback('#<section><h2>([^<]*)</h2>(.*?)</section>#s', function (array $m) use ($done): string {
             $title = html_entity_decode($m[1], ENT_QUOTES, 'UTF-8');
-            $status = !array_key_exists($title, $done) ? '' : ($done[$title] ? ' <span class="tag ok">✓ eingerichtet</span>' : ' <span class="tag opt">nicht eingerichtet</span>');
             $open = array_key_exists($title, $done) && !$done[$title] || str_contains($m[2], 'class="error"');
-            return '<section class="card"><details class="fold"' . ($open ? ' open' : '') . '><summary><h2>' . $m[1] . '</h2>' . $status . '</summary>' . $m[2] . '</details></section>';
+            return '<section class="card"><details class="fold"' . ($open ? ' open' : '') . '><summary><h2>' . $m[1] . '</h2></summary>' . $m[2] . '</details></section>';
         }, $body);
         $response = Response::html(V::page('Verbindungen', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
         return $st['pending'] ? $response->with('Refresh', '2') : $response;
@@ -1886,7 +1893,9 @@ final class Web {
                 . V::input('pfad', 'Ordner', 'text', '', 'placeholder="/media/sicherung"')
                 . '<button' . $dis . '>Sicherung einrichten</button></form>';
             $body .= $this->exportSection($st, $dis);
-            $response = Response::html(V::page('Sicherung', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+            V::$status = ['Schutz vor Erpressungstrojanern' => [!in_array('Schreibgeschützte Schnappschüsse am NAS sind nicht als eingerichtet bestätigt (Schutz vor Erpressungstrojanern).', $st['warnungen'], true), 'bestätigt', 'nicht bestätigt'],
+            'Schlüsselblatt' => [!$st['blatt'], 'gedruckt', 'noch nicht gedruckt'], 'Benachrichtigung bei Fehlern' => [!empty($st['mail_an']), 'eingerichtet', 'nicht eingerichtet']];
+        $response = Response::html(V::page('Sicherung', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
             return $busy ? $response->with('Refresh', '3') : $response;
         }
         if ($st['blatt']) {
