@@ -1467,6 +1467,16 @@ final class Web {
         $rows = '';
         foreach ($st['nutzung'] as $u) $rows .= '<tr><td>' . V::h((string)$u['name']) . '</td><td>' . V::h((string)$u['verbindung']) . '</td><td>' . V::h((string)$u['zweck']) . '</td><td>' . (($u['pflicht'] ?? false) ? 'ja' : 'nein') . '</td></tr>';
         $body .= '<section><h2>Wer nutzt was</h2>' . ($rows !== '' ? '<table><tr><th>Modul</th><th>Verbindung</th><th>Wofür</th><th>Nötig</th></tr>' . $rows . '</table>' : '<p>Kein installiertes Modul nutzt eine zentrale Verbindung.</p>') . '</section>';
+        $body = preg_replace('#(<p>Zugänge, die mehrere Module brauchen.*?</p>)#s', '<section class="card">$1</section>', $body, 1);
+        // Jeder Abschnitt klappt zu; eingerichtete tragen ein grünes „eingerichtet“, offene und fehlerhafte bleiben aufgeklappt.
+        $done = ['T2med (FHIR)' => trim((string)($t2['base_url'] ?? '')) !== '', 'E-Mail-Versand (SMTP)' => trim((string)($mail['host'] ?? '')) !== '',
+            'SMS (seven.io)' => !empty($st['sms']), 'Netzwerkspeicher' => !empty($st['ablage'])];
+        $body = preg_replace_callback('#<section><h2>([^<]*)</h2>(.*?)</section>#s', function (array $m) use ($done): string {
+            $title = html_entity_decode($m[1], ENT_QUOTES, 'UTF-8');
+            $status = !array_key_exists($title, $done) ? '' : ($done[$title] ? ' <span class="tag ok">✓ eingerichtet</span>' : ' <span class="tag opt">nicht eingerichtet</span>');
+            $open = array_key_exists($title, $done) && !$done[$title] || str_contains($m[2], 'class="error"');
+            return '<section class="card"><details class="fold"' . ($open ? ' open' : '') . '><summary><h2>' . $m[1] . '</h2>' . $status . '</summary>' . $m[2] . '</details></section>';
+        }, $body);
         $response = Response::html(V::page('Verbindungen', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
         return $st['pending'] ? $response->with('Refresh', '2') : $response;
     }

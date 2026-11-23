@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.17
+
+- Verbindungen: Alle Abschnitte (T2med, E-Mail, SMS, Netzwerkspeicher, Wer nutzt was) lassen sich einklappen. Eingerichtete sind zugeklappt und tragen ein grünes „✓ eingerichtet“; noch nicht eingerichtete oder fehlerhafte bleiben aufgeklappt. Nur mit Testdaten geprüft, nicht im Browser.
+
 ## 0.21.4-beta.16
 
 - Einrichtung: Module erscheinen als eine einzige Karte mit Zähler („3 offen“, rot markiert, solange nötige Schritte offen sind); ein Klick führt in die Einstellungen des Moduls, wo die Schritte stehen. Nur mit Testdaten geprüft, nicht im Browser.

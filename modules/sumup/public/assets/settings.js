@@ -15,6 +15,11 @@ const SHOW = {
   'tax.rate': v => !v.small_business, 'tax.manual_vat': v => !v.small_business, 'tax.exempt_note': v => !v.small_business, 'tax.small_business_note': v => v.small_business,
 };
 
+/** Zeitstempel (Sekunden) als „TT.MM.JJ, HH:MM“. */
+function when(seconds) {
+  return seconds ? new Date(seconds * 1000).toLocaleString('de-DE', {dateStyle: 'short', timeStyle: 'short'}) : '';
+}
+
 function el(tag, text, cls, attrs) {
   const node = document.createElement(tag);
   if (text != null) node.textContent = text;

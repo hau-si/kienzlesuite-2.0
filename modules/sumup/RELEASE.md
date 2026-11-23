@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.5
+
+- Rechnungseingang: In der Liste stand in der Spalte „Eingang“ „[object Observable]“ statt Datum und Uhrzeit, weil die Datumsfunktion in der Einstellungsseite fehlte; behoben. Auch das Datum im Protokoll der abgelehnten Drucke ist davon betroffen gewesen. Nicht im Browser getestet.
+
 ## 2.3.4-beta.4
 
 - Einrichtung der Kasse im Aufbau der Basis: eine nummerierte Liste in der nötigen Reihenfolge (Suite, dann Kassen-PCs, dann T2med) mit Fortschrittsbalken und Schildern „In diesem Webfenster“, „Auf den Kassen-PCs“, „In T2med“ sowie „optional“.

@@ -62,6 +62,7 @@ function test_seite(): void {
     check($p->status === 200 && str_contains($p->body, 'value="https://t2med.example.org:16567/fhir"') && str_contains($p->body, 'gespeichert – leer lassen'), 'Seite unvollständig');
     check(!str_contains($p->body, '<script>') && !str_contains($p->body, 'Steuer<b>') && str_contains($p->body, 'Steuer&lt;b&gt;büro'), 'Inhalte nicht maskiert');
     check(str_contains($p->body, 'FHIR-Server antwortet') && str_contains($p->body, 'Patient lesen') && str_contains($p->body, 'ssh-ed25519 AAAATEST'), 'Prüfung, Nutzung oder SFTP-Schlüssel fehlen');
+    check(str_contains($p->body, '<details class="fold"><summary><h2>T2med (FHIR)</h2> <span class="tag ok">✓ eingerichtet</span>') && str_contains($p->body, '<details class="fold"><summary><h2>Wer nutzt was</h2>'), 'Verbindungen: Abschnitte nicht einklappbar oder ohne Status');
     $r = $b->post('/verwaltung/verbindungen', ['aktion' => 'ziel', 'id' => 'steuerbuero', 'name' => 'Steuerbüro', 'art' => 'smb', 'host' => 'nas.example.org', 'freigabe' => 'praxis',
         'ordner' => 'Kienzle', 'benutzer' => 'k', 'passwort' => '']);
     check($r->status === 303 && req_v($env)['daten']['passwort'] === '', 'Ziel speichern über die Seite');
