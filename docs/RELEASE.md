@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.3-beta.3
+
+- README: aktueller Stand und Abschnitt „So sieht es aus“ mit Bildschirmfotos (Anmeldung, Benutzer, Gruppen, Sicherung auf das NAS per SFTP, Updater; nur erfundene Beispieldaten). Nur Dokumentation, kein Programmcode geändert.
+
 ## 0.21.3-beta.2
 
 - Virtuelle Drucker bieten nur noch das Papierformat des Moduls an (neu in module.toml: `paper`, Vorgabe A4; Kasse A4, Terminzettel A6) statt A6/A5/A4/Letter. Nicht mit Windows getestet.
