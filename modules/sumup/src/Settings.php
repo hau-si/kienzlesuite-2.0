@@ -68,6 +68,7 @@ final class Settings {
             'label_date' => ['type' => 'list', 'label' => 'Eigene Textschnipsel vor dem Rechnungsdatum', 'optional' => true],
             'label_total' => ['type' => 'list', 'label' => 'Eigene Textschnipsel vor der Gesamtsumme', 'optional' => true],
             'label_transfer' => ['type' => 'list', 'label' => 'Eigene Textschnipsel vor dem Überweisungsbetrag (Gegenprobe)', 'optional' => true],
+            'number_prefix' => ['type' => 'list', 'label' => 'Kürzel der Rechnungsnummern (einer pro Zeile, z. B. IG)', 'optional' => true],
             'label_patient' => ['type' => 'list', 'label' => 'Eigene Textschnipsel vor Patient und Geburtsdatum', 'optional' => true],
         ]],
         'letterxpress' => ['label' => 'Letterxpress (Rechnung per Post)', 'fields' => [

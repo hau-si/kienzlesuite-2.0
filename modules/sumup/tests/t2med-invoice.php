@@ -332,6 +332,13 @@ try {
     $app->mock($v, ['payment_id' => $payment['id'], 'status' => 'successful']);
     check($app->document($v, $payment['id'])['invoice_export'] === null && $export->commands === [], 'Zahlung ohne App-Rechnung abgelegt');
 
+    // Kürzel-Zuordnung bei Texterkennung (mehrere Rechnungsgruppen).
+    $pre = ['IG', 'KV'];
+    foreach (['1IG2026-309', '16G2026-309', '162026-309', 'IG2026-309'] as $read) check(T2medInvoice::canonicalNumber($read, $pre) === 'IG2026-309', 'Kürzel nicht zugeordnet: ' . $read);
+    check(T2medInvoice::canonicalNumber('KV2026-12', $pre) === 'KV2026-12', 'zweites Kürzel verändert');
+    check(T2medInvoice::canonicalNumber('XY2026-5', $pre) === 'XY2026-5', 'unbekanntes Kürzel verändert');
+    check(T2medInvoice::canonicalNumber('1IG2026-309', []) === '1IG2026-309', 'ohne Kürzel verändert');
+
     echo "OK: T2med-Rechnung lesen, Patientenabgleich, Ersetzen, Doppelzahlungsschutz, Akteneintrag, neutrale SumUp-Daten und Ablage von T2med- und App-Rechnungen im Netzwerkordner.\n";
 } finally {
     foreach ($dirs as $dir) if (is_dir($dir)) { array_map('unlink', glob($dir . '/*') ?: []); @rmdir($dir); }

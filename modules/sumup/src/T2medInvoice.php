@@ -21,7 +21,7 @@ final class T2medInvoice {
         'transfer' => ['Betrag von', 'Zahlbetrag:'],
         'patient' => ['Patientin:', 'Patient:'],
     ];
-    public const LABEL_KEYS = ['number' => 'label_number', 'date' => 'label_date', 'total' => 'label_total', 'transfer' => 'label_transfer', 'patient' => 'label_patient'];
+    public const LABEL_KEYS = ['number' => 'label_number', 'date' => 'label_date', 'total' => 'label_total', 'transfer' => 'label_transfer', 'patient' => 'label_patient', 'prefix' => 'number_prefix'];
 
     public static function fromPdf(string $pdf, int $maxCents, array $labels = []): array {
         if (strlen($pdf) > self::MAX_PDF) throw new Problem('Die Rechnung ist zu groß.', 413);
@@ -135,7 +135,9 @@ final class T2medInvoice {
         $gap = $loose ? '[ \t]*\n?[ \t]*' : '[ \t]*';
         $eur = '[ \t]*(?:€|EUR)';
 
-        $number = self::single(self::all('number', $labels, $gap . '((?=[A-Za-z0-9\/._-]*\d)[A-Za-z0-9][A-Za-z0-9\/._-]{0,39})', $text), 'Rechnungsnummer', 'Re.-Nr.:', $ocr);
+        $numbers = self::all('number', $labels, $gap . '((?=[A-Za-z0-9\/._-]*\d)[A-Za-z0-9][A-Za-z0-9\/._-]{0,39})', $text);
+        if ($ocr) $numbers = array_map(fn($n) => self::canonicalNumber($n, (array)($labels[self::LABEL_KEYS['prefix']] ?? [])), $numbers);
+        $number = self::single($numbers, 'Rechnungsnummer', 'Re.-Nr.:', $ocr);
         $date = self::date(self::single(self::all('date', $labels, $gap . '(\d{2}\.\d{2}\.\d{4})', $text), 'Rechnungsdatum', 'Re.-Datum:'));
         $total = self::cents(self::single(self::all('total', $labels, $gap . '(-?[\d.]+,\d{2})' . $eur, $text), 'Gesamtsumme', 'Gesamtsumme: … €'));
         // Gegenprobe mit dem Überweisungssatz, falls vorhanden.
@@ -191,9 +193,28 @@ final class T2medInvoice {
         return $fhir !== '' && ($pdf === $fhir || str_ends_with($pdf, ' ' . $fhir));
     }
 
+    /**
+     * Rechnungsnummern der Form „Kürzel + Jahr + Bindestrich + laufende Nummer“ (z. B. IG2026-309): Das von der Texterkennung gelesene Kürzel
+     * (z. B. „1IG“, „16G“, „162“) wird dem eingestellten Kürzel zugeordnet, das ihm nach Verwechslungstabelle (I/1, G/6, O/0 …) am nächsten ist
+     * (höchstens ein Zeichen Unterschied). Gibt es mehrere gleich nahe Kürzel oder keins, bleibt die gelesene Nummer unverändert.
+     */
+    public static function canonicalNumber(string $number, array $prefixes): string {
+        if (!$prefixes || !preg_match('/^(.*?)(20\d{2}[-\/.]\d+)$/u', $number, $m)) return $number;
+        $read = self::ocrKey($m[1]);
+        $best = null; $bestDistance = 2; $tie = false;
+        foreach ($prefixes as $prefix) {
+            $prefix = trim((string)$prefix);
+            if ($prefix === '') continue;
+            $distance = levenshtein($read, self::ocrKey($prefix));
+            if ($distance < $bestDistance) { $best = $prefix; $bestDistance = $distance; $tie = false; }
+            elseif ($distance === $bestDistance && $best !== $prefix) $tie = true;
+        }
+        return ($best === null || $tie) ? $number : $best . $m[2];
+    }
+
     /** Vergleichsform für erkannte Rechnungsnummern: typische Verwechslungen der Texterkennung (O/0, I/l/1, S/5, B/8, Z/2) werden gleichgesetzt. */
     private static function ocrKey(string $value): string {
-        return strtr(strtoupper($value), ['O' => '0', 'Q' => '0', 'I' => '1', 'L' => '1', 'S' => '5', 'B' => '8', 'Z' => '2']);
+        return strtr(strtoupper($value), ['O' => '0', 'Q' => '0', 'I' => '1', 'L' => '1', 'S' => '5', 'B' => '8', 'Z' => '2', 'G' => '6']);
     }
 
     private static function single(array $found, string $label, string $hint, bool $fuzzy = false): string {
