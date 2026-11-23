@@ -145,7 +145,14 @@ function render(data) {
       buttons.append(test);
     }
     form.append(buttons);
-    if (section.id === 'fhir') form.append(t2medSetupHelp());
+    if (section.id === 'fhir') {
+      // Die T2med-Verbindung gehört der Suite: Stand zeigen und direkt zur Einrichtung verlinken.
+      const ok = !!(data.connections && data.connections.t2med);
+      const note = el('p', ok ? 'Die T2med-Verbindung der Suite ist eingerichtet. ' : 'Die T2med-Verbindung der Suite ist noch nicht eingerichtet. ', ok ? 'notice' : 'inline-error');
+      note.append(el('a', ok ? 'Verbindung prüfen (Verwaltung → Verbindungen)' : 'Jetzt in der Suite einrichten (Verwaltung → Verbindungen)', null, {href: '/verwaltung/verbindungen'}));
+      form.prepend(note);
+      form.append(t2medSetupHelp());
+    }
     form.oninput = form.onchange = event => {
       // Anderes Druckermodell: Breite leeren, der Server setzt die passende Breite.
       if (section.id === 'printing' && event.target.name === 'model' && form.elements.width_dots) form.elements.width_dots.value = '';

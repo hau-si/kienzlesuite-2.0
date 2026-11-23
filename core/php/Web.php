@@ -1135,7 +1135,11 @@ final class Web {
             . V::checkbox('ca_entfernen', '1', 'Gespeichertes Zertifikat entfernen', false)
             . V::checkbox('pin', '1', 'Nur genau dieses Zertifikat annehmen (Pinning)', (bool)($t2['pin'] ?? false))
             . '<button>Speichern</button></form>'
-            . ($t2 ? $this->testLine($st['tests'], 't2med') . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 't2med']) . '<button>Verbindung prüfen</button></form> '
+            . ($t2 ? '<p>Zertifikat: ' . (($t2['zertifikat'] ?? '') !== '' ? '<code>' . V::h((string)$t2['zertifikat']) . '</code>' . ($t2['pin'] ? ' (fest hinterlegt)' : '') : '<strong>nicht hinterlegt</strong> (nur öffentlich beglaubigte Zertifikate werden angenommen)') . '</p>'
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('zertifikat-holen') . '<button>Zertifikat des Servers abrufen</button></form> '
+                . (($st['zertifikate']['t2med']['fingerprint'] ?? '') !== '' ? '<form method="post" action="/verwaltung/verbindungen" class="box">' . $this->hidden('zertifikat-uebernehmen', ['fingerprint' => (string)$st['zertifikate']['t2med']['fingerprint']])
+                    . '<p>Abgerufen: SHA-256 <code>' . V::h((string)$st['zertifikate']['t2med']['fingerprint']) . '</code>. Nur übernehmen, wenn der Fingerabdruck mit dem Zertifikat des T2med-Servers übereinstimmt (z. B. im Browser unter „Zertifikat anzeigen“).</p><button>Übernehmen und fest hinterlegen</button></form>' : '')
+                . $this->testLine($st['tests'], 't2med') . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 't2med']) . '<button>Verbindung prüfen</button></form> '
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 't2med']) . '<button class="danger">Entfernen</button></form>' : '')
             . '</section>';
         // E-Mail
@@ -1212,6 +1216,8 @@ final class Web {
                 case 'entfernen': $c->remove($f('was', 10)); $what = 'entfernt ' . $f('was', 10); break;
                 case 'pruefen': $c->test($f('art', 10), $f('id', 40)); $what = 'pruefen ' . $f('art', 10) . ' ' . $f('id', 40); break;
                 case 'testmail': $c->testMail($f('an', 300)); $what = 'testmail'; break;
+                case 'zertifikat-holen': $c->fetchCertificate(); $what = 'zertifikat-holen'; break;
+                case 'zertifikat-uebernehmen': $c->acceptCertificate($f('fingerprint', 100)); $what = 'zertifikat-uebernommen'; break;
                 case 'hostkey-holen': $c->fetchHostkey($f('id', 40)); $what = 'hostkey-holen ' . $f('id', 40); break;
                 case 'hostkey-uebernehmen': $c->acceptHostkey($f('id', 40), $f('fingerprint', 100)); $what = 'hostkey-uebernommen ' . $f('id', 40); break;
                 default: throw new Problem('Unbekannte Aktion.', 422);

@@ -352,6 +352,19 @@ class Verbindungen(Umgebung):
             self.vb.test_t2med({**c['t2med'], 'ca_pem': other.read_text(), 'pin': False})   # fremde CA: TLS-Fehler
         with self.assertRaisesRegex(self.vb.Fehler, 'nicht erreichbar'):
             self.vb.test_t2med({**c['t2med'], 'ca_pem': ''})                                # ohne CA: unbekanntes Zertifikat
+        # Selbstsigniertes Zertifikat im Webinterface abrufen und nach Fingerabdruck-Prüfung fest übernehmen
+        self.registry()
+        self.request({'action': 't2med', 'daten': {'base_url': base, 'api_key': 'api-schluessel-1'}})
+        with self.assertRaisesRegex(self.vb.Fehler, 'Verbindungen'):
+            self.vb.test_t2med(json.loads((self.t / 'etc/konfiguration.json').read_text())['t2med'])
+        s = self.request({'action': 'zertifikat-holen'})
+        fp = s['zertifikate']['t2med']['fingerprint']
+        self.assertEqual(fp, __import__('hashlib').sha256(ssl.PEM_cert_to_DER_cert(pem)).hexdigest())
+        s = self.request({'action': 'zertifikat-uebernehmen', 'fingerprint': 'falsch'})
+        self.assertNotIn('zertifikat', s['t2med'] and s['t2med']['zertifikat'] or '')
+        s = self.request({'action': 'zertifikat-uebernehmen', 'fingerprint': fp})
+        self.assertEqual((s['t2med']['zertifikat'], s['t2med']['pin'], s['zertifikate']), (fp, True, {}))
+        self.assertIn('CapabilityStatement', self.vb.test_t2med(json.loads((self.t / 'etc/konfiguration.json').read_text())['t2med']))
 
     def test_mail_verbindung(self):
         calls = []

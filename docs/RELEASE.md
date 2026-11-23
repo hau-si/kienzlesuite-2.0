@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.19.3-beta.1
+
+- Verbindungen → T2med: Selbstsignierte Zertifikate lassen sich jetzt im Webinterface übernehmen. „Zertifikat des Servers abrufen“ holt das Zertifikat von T2med und zeigt den SHA-256-Fingerabdruck; nach dem Vergleich (z. B. im Browser unter „Zertifikat anzeigen“) hinterlegt „Übernehmen“ es fest (Pinning). Die Verbindung prüft dann nur noch diesen Fingerabdruck, auch wenn das Zertifikat selbstsigniert ist oder nicht auf den Servernamen lautet. Bei einem Zertifikatsfehler weist die Meldung auf diesen Weg hin.
+- Nicht an einer echten T2med-Installation geprüft, nur gegen einen lokalen Testserver mit eigenem Zertifikat.
+
 ## 0.19.2-beta.1
 
 - **Beta-Kanal automatisch:** Der Zweig `beta` veröffentlicht Vorabversionen selbst (`.github/workflows/beta.yml`), `main` nur noch mit Tag.

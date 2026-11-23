@@ -31,7 +31,7 @@ final class Module {
             ['title' => $config->get('sumup', 'mode') === 'live' ? 'SumUp live verbunden' : 'SumUp: noch Testmodus', 'state' => $config->get('sumup', 'mode') === 'live' ? 'done' : 'open',
                 'hint' => 'API-Key, Händlercode und Reader-ID eintragen, dann auf Live stellen', 'link' => $link('s-sumup')],
             ['title' => Suite::connected('t2med') ? 'T2med-Verbindung der Suite vorhanden' : 'T2med-Verbindung fehlt', 'state' => Suite::connected('t2med') ? 'done' : 'open',
-                'hint' => 'Verwaltung → Verbindungen der Suite (Adresse, API-Key, erlaubte Aufrufadressen)', 'link' => $link('s-fhir')],
+                'hint' => 'Verwaltung → Verbindungen der Suite (Adresse, API-Key, Zertifikat); der Link im Bereich „T2med-Anbindung“ führt direkt dorthin', 'link' => $link('s-fhir')],
             ['title' => $config->get('fhir', 'mode') === 'live' ? 'T2med-Anbindung live' : 'T2med-Anbindung noch im Testmodus', 'state' => $config->get('fhir', 'mode') === 'live' ? 'done' : 'open',
                 'hint' => 'Einstellungen → Zahlung & T2med', 'link' => $link('s-fhir')],
         ];
