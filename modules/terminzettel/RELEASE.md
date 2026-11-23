@@ -1,5 +1,10 @@
 # Terminzettel – Release-Notizen
 
+## 1.3.0-beta.2
+
+- Fehler behoben: Nach dem Update zeigte der Browser noch das alte Skript und den alten Stil (eine Stunde Zwischenspeicher). Das alte Skript las die neuen Auswahlleisten falsch (immer die größte Stufe), daher wirkte die Vorschau viel zu groß und die Seite zerstört. Skript und Stil tragen jetzt eine Versionskennung in der Adresse und laden nach jeder Änderung neu.
+- Formular kompakter: kleinere Auswahlleisten, „F“ statt „Fett“, weniger Abstand, Beschriftungen statt Zwischenüberschriften.
+
 ## 1.3.0-beta.1
 
 - Einstellungsseite neu geordnet: je ein Block für Kopf, Termine, Endtext, Kalender-QR und Drucken, in der Reihenfolge des Bons. Schriftgröße und Fett stehen als kleine Auswahlleiste direkt beim jeweiligen Text (statt vieler Aufklapplisten).

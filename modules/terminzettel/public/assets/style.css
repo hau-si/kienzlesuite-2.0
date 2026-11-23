@@ -68,3 +68,15 @@ ol li { margin: 6px 0; }
 .aktionen { display: flex; gap: 8px; }
 button.klein { min-height: 32px; padding: 4px 12px; font-size: 13px; }
 .klein-text { font-size: 12px; margin: 6px 0 0; max-width: 34em; }
+
+/* Kompakter: kleinere Auswahlleisten, weniger Abstand */
+.stack { gap: 12px; }
+.stack .card { padding: 12px 16px; }
+.teil { padding: 8px 0; }
+.teil label:not(.check):not(.tog) { margin: 6px 0 2px; font-size: 13px; }
+.teil input:not([type=checkbox]):not([type=radio]), .teil textarea { padding: 6px 9px; }
+.fmt { margin-top: 6px; }
+.seg span, .tog span { padding: 1px 7px; min-height: 24px; line-height: 22px; font-size: 12px; }
+.tog span { min-width: 28px; text-align: center; }
+.logo-bild { width: 88px; min-height: 52px; }
+.logo-bild img { max-height: 64px; }

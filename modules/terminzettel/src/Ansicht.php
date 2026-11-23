@@ -6,6 +6,8 @@ namespace KienzleTerminzettel;
 final class Ansicht {
     public static function seite(string $base, array $values, string $csrf, string $queue, ?string $meldung, ?string $fehler, string $host): string {
         $h = 'tz_h';
+        // Die Dateien werden eine Stunde zwischengespeichert: ändert sich der Inhalt, ändert sich die Adresse (sonst passen altes Skript und neue Seite nicht zusammen).
+        $v = static fn(string $f): string => '?v=' . substr((string)@md5_file(dirname(__DIR__) . '/public/assets/' . $f), 0, 8);
         $tip = static fn(string $key): string => isset(Seite::HILFE[$key]) ? ' <span class="hilfe" tabindex="0" role="note" aria-label="' . tz_h(Seite::HILFE[$key]) . '" data-tip="' . tz_h(Seite::HILFE[$key]) . '">i</span>' : '';
         $text = fn(string $key, string $label, int $max = 80): string => '<label for="f-' . $key . '">' . $h($label) . $tip($key) . '</label><input id="f-' . $key . '" name="' . $key . '" value="' . $h((string)$values[$key]) . '" maxlength="' . $max . '">';
         $area = fn(string $key, string $label, int $rows): string => '<label for="f-' . $key . '">' . $h($label) . '</label><textarea id="f-' . $key . '" name="' . $key . '" rows="' . $rows . '" maxlength="1000">' . $h((string)$values[$key]) . '</textarea>';
@@ -21,7 +23,7 @@ final class Ansicht {
         };
         $groessen = [];
         foreach (Seite::SIZES as $val => $label) $groessen[$val] = [str_replace('x', '×', $val), $label];
-        $fett = fn(string $key): string => '<label class="tog" title="Fett drucken"><input type="checkbox" name="' . $key . '" value="1"' . ($values[$key] ? ' checked' : '') . '><span><b>F</b>ett</span></label>';
+        $fett = fn(string $key): string => '<label class="tog" title="Fett drucken"><input type="checkbox" name="' . $key . '" value="1"' . ($values[$key] ? ' checked' : '') . '><span><b>F</b></span></label>';
         $format = fn(string $sizeKey, string $boldKey, string $name): string => '<div class="fmt"><span class="sm">Schrift</span>' . $seg($sizeKey, $groessen, $name . ': Schriftgröße') . $fett($boldKey) . '</div>';
         $logo = Seite::logoDaten();
         $logoZeile = '<div class="logo"><div class="logo-bild">' . ($logo !== '' ? '<img src="' . $h($logo) . '" alt="Aktuelles Logo">' : '<span class="muted">Kein Logo</span>') . '</div><div>'
@@ -31,12 +33,12 @@ final class Ansicht {
             . '<p class="muted klein-text">PNG, JPEG oder GIF bis 2 MB. Wird in Schwarz-Weiß umgerechnet; einfache, kontrastreiche Logos drucken am besten. Beim Hochladen wird die Seite neu geladen: ungespeicherte Änderungen vorher speichern.</p></div></div>';
         $form = '<section class="card">' . $check('enabled', 'Terminzettel aus T2med auf dem Bondrucker drucken') . '</section>'
             . '<section class="card"><h2><span class="ico" aria-hidden="true">▣</span> Kopf</h2>'
-            . '<div class="teil"><h3>Logo</h3>' . $logoZeile . '<div class="fmt">' . $check('logo_enabled', 'Logo drucken') . '<span class="sm">Breite</span>' . $seg('logo_size', Seite::LOGO_SIZES, 'Logo: Breite') . '</div></div>'
-            . '<div class="teil"><h3>Praxisname</h3>' . $text('name_text', 'Erste Zeile') . $format('name_size', 'name_bold', 'Praxisname') . '</div>'
-            . '<div class="teil"><h3>Adressblock</h3>' . $area('address_text', 'Straße, Ort, Kontakt (eine Angabe je Zeile; leer = keiner)', 3) . $format('address_size', 'address_bold', 'Adressblock') . '</div></section>'
+            . '<div class="teil">' . $logoZeile . '<div class="fmt">' . $check('logo_enabled', 'Logo drucken') . '<span class="sm">Breite</span>' . $seg('logo_size', Seite::LOGO_SIZES, 'Logo: Breite') . '</div></div>'
+            . '<div class="teil">' . $text('name_text', 'Praxisname (erste Zeile)') . $format('name_size', 'name_bold', 'Praxisname') . '</div>'
+            . '<div class="teil">' . $area('address_text', 'Adressblock (Straße, Ort, Kontakt, eine Angabe je Zeile)', 3) . $format('address_size', 'address_bold', 'Adressblock') . '</div></section>'
             . '<section class="card"><h2><span class="ico" aria-hidden="true">▤</span> Termine</h2>'
-            . '<div class="teil"><h3>Überschrift</h3>' . $text('heading', 'Text') . '<div class="fmt"><span class="sm">Schrift</span>' . $seg('heading_size', $groessen, 'Überschrift: Schriftgröße') . '</div></div>'
-            . '<div class="teil"><h3>Terminliste</h3>' . $check('show_patient', 'Patientennamen drucken') . '<div class="fmt"><span class="sm">Schrift</span>' . $seg('appointment_size', $groessen, 'Termine: Schriftgröße') . '</div></div></section>'
+            . '<div class="teil">' . $text('heading', 'Überschrift') . '<div class="fmt"><span class="sm">Schrift</span>' . $seg('heading_size', $groessen, 'Überschrift: Schriftgröße') . '</div></div>'
+            . '<div class="teil">' . $check('show_patient', 'Patientennamen drucken') . '<div class="fmt"><span class="sm">Terminliste</span>' . $seg('appointment_size', $groessen, 'Termine: Schriftgröße') . '</div></div></section>'
             . '<section class="card"><h2><span class="ico" aria-hidden="true">▥</span> Endtext</h2>' . $area('footer_text', 'Text unter den Terminen (leer = keiner)', 3)
             . '<div class="fmt"><span class="sm">Schrift</span>' . $seg('footer_size', $groessen, 'Endtext: Schriftgröße') . '</div></section>'
             . '<section class="card"><h2><span class="ico" aria-hidden="true">▦</span> Kalender-QR</h2>' . $check('qr_enabled', 'Kalender-QR je Termin drucken')
@@ -46,7 +48,7 @@ final class Ansicht {
             . '<section class="card">' . $check('cut', 'Bon abschneiden') . '<p><button>Speichern</button></p></section>';
         $printer = 'http://' . $host . ':631/printers/Terminzettel';
         return '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            . '<meta name="kienzle-csrf" content="' . $h($csrf) . '"><title>Terminzettel</title><link rel="stylesheet" href="' . $h($base) . '/assets/style.css"></head><body>'
+            . '<meta name="kienzle-csrf" content="' . $h($csrf) . '"><title>Terminzettel</title><link rel="stylesheet" href="' . $h($base) . '/assets/style.css' . $v('style.css') . '"></head><body>'
             . '<main><header class="top"><a class="brand" href="/"><span class="mark" aria-hidden="true">K</span><div><strong>Terminzettel</strong>'
             . '<span class="sub">Einstellungen · Kienzle-Suite</span></div></a></header>'
             . ($meldung ? '<p class="ok">' . $h($meldung) . '</p>' : '') . ($fehler ? '<p class="fehler">' . $h($fehler) . '</p>' : '')
@@ -68,6 +70,6 @@ final class Ansicht {
             . '<li>Mac: Drucker hinzufügen → <strong>Terminzettel</strong> wählen, als Treiber die Datei <a href="' . $h($base) . '/assets/Terminzettel-PDF.ppd" download>Terminzettel-PDF.ppd</a> verwenden.</li>'
             . '<li>In T2med unter Einstellungen → Kalender → Terminliste (DIN A6) den Drucker „Terminzettel“ wählen.</li>'
             . '<li>Voraussetzung: Die <a href="/verwaltung/firewall">Firewall</a> der Basis lässt Drucken (IPP, Port 631) aus dem Praxisnetz zu; beim virtuellen Drucker ist unter Verwaltung → Drucker die Freigabe (IPP) angehakt.</li></ol></details>'
-            . '</main><script src="' . $h($base) . '/assets/app.js"></script></body></html>';
+            . '</main><script src="' . $h($base) . '/assets/app.js' . $v('app.js') . '"></script></body></html>';
     }
 }
