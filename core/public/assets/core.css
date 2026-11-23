@@ -323,3 +323,24 @@ table.matrix tr.abw td.erg input { accent-color: #c28f00; }
 .punkt { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: middle; }
 .punkt.blau { background: #2d6aa8; }
 .punkt.gelb { background: #e8b800; }
+
+/* Einrichtungsliste: Gruppen, klare Zeilen, rote Punkte */
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 13px; color: var(--muted); margin: 6px 0 14px; }
+.legend .lg { font-weight: 650; }
+.legend .lg.done { color: #16503f; } .legend .lg.open { color: #c2410c; } .legend .lg.error { color: #b91c1c; } .legend .lg.info { color: #3b4a9a; }
+.card.group { padding-bottom: 6px; }
+.card.group h2 { display: flex; align-items: center; gap: 10px; }
+.tag.err { background: #fde2e2; color: #b91c1c; }
+.notice.warn, div.notice.warn { background: #fde8e8; color: #7f1d1d; border: 1px solid #f3b4b4; }
+ol.checklist li { border: 1px solid transparent; border-radius: 10px; padding: 10px 12px; margin: 4px 0; background: #fafcfb; align-items: center; }
+ol.checklist li.done { background: transparent; }
+ol.checklist li.open { background: #fff7f2; }
+ol.checklist li.error { background: #fdecec; border-color: #f3b4b4; border-left: 4px solid #dc2626; }
+ol.checklist li.error .mark-icon { background: #dc2626; color: #fff; }
+ol.checklist li.error a { color: #7f1d1d; font-weight: 700; }
+ol.checklist li.error small { color: #991b1b; }
+ol.checklist li.info { background: #f3f5ff; }
+ol.checklist .text { display: flex; flex-direction: column; gap: 2px; }
+ol.checklist .text .chips { display: inline-flex; gap: 6px; margin: 2px 0 0; }
+ol.checklist li { border-bottom: 1px solid transparent; }
+ol.checklist li:last-child { border-bottom: 1px solid transparent; }

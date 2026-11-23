@@ -174,7 +174,7 @@ function test_verwaltung_braucht_bestaetigung_und_csrf(): void {
     check(str_contains($home, 'setup-card') && str_contains($home, 'nötigen Schritten erledigt') && !str_contains($home, 'href="/verwaltung/einrichtung"><span>'), 'Einrichtungskarte auf der Startseite fehlt oder Menüpunkt noch da');
     check(str_contains($home, '<svg class="ico"'), 'Menüsymbole fehlen');
     $setup = $b->get('/verwaltung/einrichtung')->body;
-    check(strpos($setup, 'Admin mit Authenticator-App') < strpos($setup, 'Servername festgelegt') && strpos($setup, 'Servername festgelegt') < strpos($setup, 'Mindestens zwei Admins') && str_contains($setup, 'tag opt">optional'), 'Einrichtung nicht geordnet oder ohne optional-Kennzeichnung');
+    check(strpos($setup, 'Admin mit Authenticator-App') < strpos($setup, 'Mindestens zwei Admins') && strpos($setup, 'Mindestens zwei Admins') < strpos($setup, 'Servername festgelegt') && str_contains($setup, 'tag opt">optional'), 'Einrichtung nicht geordnet oder ohne optional-Kennzeichnung');
     // Update-Seite: Status als Symbol in einer einzigen Karte; roter Punkt am Logo; Einrichtungspunkte ignorieren.
     check(str_contains($home, 'logo-dot'), 'Roter Punkt am Logo fehlt bei offener Einrichtung');
     check(preg_match('/name="aktion" value="ignorieren"><input type="hidden" name="punkt" value="([0-9a-f]{12})"/', $setup, $mi) === 1, 'Ignorieren-Knopf fehlt');

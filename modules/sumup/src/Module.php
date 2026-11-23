@@ -55,8 +55,9 @@ final class Module {
         if ($config->get('invoice_export', 'enabled', false) && !isset(Suite::targets()[(string)$config->get('invoice_export', 'ziel', '')])) {
             $items[] = ['title' => 'Ablage: Ziel im Netzwerkspeicher fehlt', 'state' => 'error', 'hint' => 'Verwaltung → Verbindungen der Suite, dann hier wählen', 'link' => $link('s-invoice_export')];
         }
-        $items[] = ['title' => 'Starter auf den Kassen-PCs installieren', 'state' => self::clientsCurrent($config) ? 'done' : 'open',
-            'hint' => 'Einstellungen → Arbeitsplätze: Paket laden und auf jedem Kassen-PC einmal ausführen (nach einem neuen Serverzertifikat erneut)', 'link' => $link('s-clients')];
+        $stale = !self::clientsCurrent($config) && trim((string)@file_get_contents(rtrim((string)$config->get('app', 'state_dir'), '/') . '/starter-zertifikat')) !== '';
+        $items[] = ['title' => 'Starter auf den Kassen-PCs installieren', 'state' => self::clientsCurrent($config) ? 'done' : ($stale ? 'error' : 'open'),
+            'hint' => ($stale ? 'Erneut nötig: Serverzertifikat oder Servername hat sich geändert. ' : '') . 'Einstellungen → Arbeitsplätze: Paket laden und auf jedem Kassen-PC einmal ausführen (nach einem neuen Serverzertifikat erneut)', 'link' => $link('s-clients')];
         return $items;
     }
 

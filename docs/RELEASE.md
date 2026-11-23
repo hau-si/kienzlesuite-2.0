@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.30
+
+- Einrichtung: Die Liste ist in Gruppen gegliedert (Zugang und Konten, Servername und Arbeitsplätze, Datensicherung, Schutz und Updates), mit Zähler je Gruppe, Legende und klareren Zeilen.
+- Ändert man den Servernamen oder eine Adresse (Verwaltung → Server), werden alle davon abhängigen Punkte zurückgesetzt und rot angezeigt („Erneut nötig“): Servername auf den Arbeitsplätzen (Router/hosts), Neuanmeldung unter dem neuen Namen, Passkeys, Arbeitsplatz-Starter der Module (Zertifikat) und – falls vorhanden – Dienste mit Anmeldung über die Suite; bei „neue Zertifizierungsstelle“ zusätzlich die Zertifizierungsstelle auf den Arbeitsplätzen. Oben erscheint ein Hinweis; jeder Punkt wird einzeln wieder bestätigt. Das Ändern des Praxisnamens setzt nichts zurück.
+- Neue Einrichtungspunkte: „Arbeitsplatz-Starter … neu installiert“ und „Dienste mit Anmeldung … umgestellt“ (nur wenn Module mit Starter bzw. OIDC-Anbindung vorhanden sind).
+
 ## 0.21.4-beta.29
 
 - Benutzer und Gruppen: Gruppen sind jetzt feste Rollen. Wer einer Gruppe angehört, behält sie dauerhaft; ändert man die Gruppe (Rechte, Modul-Admin), gilt das sofort für alle Mitglieder. Mehrere Rollen pro Benutzer sind möglich.

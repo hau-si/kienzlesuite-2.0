@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.10
+
+- Einrichtungs-Überblick: „Starter auf den Kassen-PCs installieren“ steht rot („Erneut nötig“), wenn sich das Serverzertifikat geändert hat (z. B. nach einer Änderung des Servernamens), statt nur als offen.
+
 ## 2.3.4-beta.9
 
 - Hinweise in den Einstellungen verweisen auf „Verwaltung → Praxis“ (Praxisname, Anschrift, Konto, Steuer stehen dort gemeinsam; die Seite „Praxis und Daten“ heißt jetzt „Praxis“). Nur Text.

@@ -297,6 +297,14 @@ final class Web {
             throw $e;
         }
         $this->audit->write($admin, 'servername', strtolower(implode(' ', array_slice(preg_split('/[\s,;]+/', trim($names)) ?: [], 0, 10))));
+        $new = array_values(array_unique(array_filter(array_map(fn($n) => strtolower(trim($n)), preg_split('/[\s,;]+/', $names) ?: []))));
+        $old = array_map('strtolower', $this->config->hostnames);
+        sort($new);
+        sort($old);
+        if ($new !== $old || $r->field('neue_ca') === '1') {   // Name oder Adresse geändert: alles, was daran hängt, muss erneut erledigt werden (rot)
+            $this->ov()->nameChanged($r->field('neue_ca') === '1');
+            try { $this->ov()->refresh(); } catch (Problem) { /* Module werden beim nächsten Öffnen neu geprüft */ }
+        }
         return Response::redirect('/verwaltung/server');
     }
 
@@ -1932,11 +1940,20 @@ final class Web {
         $modules = $o->modules();
         $sum = $o->summary();
         $pct = $sum['total'] ? (int)round(100 * $sum['done'] / $sum['total']) : 100;
+        $again = count(array_filter($core, fn($i) => $i['state'] === 'error' && str_starts_with($i['hint'], 'Erneut nötig')));
         $body = '<p class="lead">' . $sum['done'] . ' von ' . $sum['total'] . ' nötigen Schritten erledigt <span class="muted">(optionale Punkte zählen nicht mit)</span></p>'
             . '<progress class="progress" value="' . $pct . '" max="100" aria-label="Fortschritt der Einrichtung">' . $pct . ' %</progress>'
-            . '<section class="card"><h2>Basis</h2><p class="muted">In dieser Reihenfolge abarbeiten. Das Schild zeigt, wo der Schritt erledigt wird: '
-            . implode(', ', array_map(fn($p) => '<strong>' . V::h($p[0]) . '</strong> (' . V::h($p[1]) . ')', Overview::PLACES)) . '. Ein Klick auf einen Punkt öffnet die passende Seite.</p>'
-            . $this->overviewList($core, true) . '</section>';
+            . ($again ? '<div class="notice warn"><p><strong>Der Servername wurde geändert.</strong> ' . $again . ' Punkt' . ($again === 1 ? '' : 'e') . ' unten stehen deshalb wieder rot und müssen erneut erledigt werden.</p></div>' : '')
+            . '<p class="legend"><span class="lg done">✓ erledigt</span><span class="lg open">○ offen</span><span class="lg error">! Fehler oder erneut nötig</span><span class="lg info">i optional</span>'
+            . ' · Orte: ' . implode(', ', array_map(fn($p) => '<strong>' . V::h($p[0]) . '</strong> (' . V::h($p[1]) . ')', Overview::PLACES)) . '</p>';
+        foreach (Overview::GROUPS as $gid => $glabel) {
+            $part = array_values(array_filter($core, fn($i) => ($i['gruppe'] ?? 'betrieb') === $gid));
+            if (!$part) continue;
+            $need = array_filter($part, fn($i) => Overview::needed($i));
+            $bad = array_filter($need, fn($i) => $i['state'] === 'error');
+            $tag = $bad ? '<span class="tag err">' . count($bad) . ' rot</span>' : ($need ? '<span class="tag warn">' . count($need) . ' offen</span>' : '<span class="tag ok">fertig</span>');
+            $body .= '<section class="card group"><h2>' . V::h($glabel) . ' ' . $tag . '</h2>' . $this->overviewList($part, true) . '</section>';
+        }
         foreach ($modules as $m) {
             $need = array_filter($m['items'], fn($i) => Overview::needed($i));
             $err = array_filter($need, fn($i) => $i['state'] === 'error');
