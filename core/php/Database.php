@@ -49,10 +49,16 @@ final class Database {
 
     public function one(string $sql, array $params = []): ?array { return $this->query($sql, $params)->fetch() ?: null; }
 
+    private int $depth = 0;
+
+    /** Verschachtelte Aufrufe laufen in der äußeren Transaktion mit (ein Fehler macht dann alles rückgängig). */
     public function transaction(callable $action): mixed {
+        if ($this->depth > 0) { $this->depth++; try { return $action(); } finally { $this->depth--; } }
+        $this->depth = 1;
         $this->pdo->exec('BEGIN IMMEDIATE');
         try { $result = $action(); $this->pdo->exec('COMMIT'); return $result; }
         catch (\Throwable $e) { $this->pdo->exec('ROLLBACK'); throw $e; }
+        finally { $this->depth = 0; }
     }
 
     public function setting(string $key): ?string {

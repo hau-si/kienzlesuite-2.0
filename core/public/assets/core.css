@@ -344,3 +344,17 @@ ol.checklist .text { display: flex; flex-direction: column; gap: 2px; }
 ol.checklist .text .chips { display: inline-flex; gap: 6px; margin: 2px 0 0; }
 ol.checklist li { border-bottom: 1px solid transparent; }
 ol.checklist li:last-child { border-bottom: 1px solid transparent; }
+
+/* Avatar und Profilkopf */
+.avatar { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: none; width: 52px; height: 52px; border-radius: 50%; background: #dcebe6; color: var(--teal); font-weight: 700; font-size: 18px; }
+.avatar.klein { width: 30px; height: 30px; font-size: 12px; vertical-align: middle; margin-right: 6px; }
+.avatar .rb { position: absolute; right: -4px; bottom: -4px; width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 1px solid var(--line); display: inline-flex; align-items: center; justify-content: center; }
+.avatar.klein .rb { width: 16px; height: 16px; right: -3px; bottom: -3px; }
+.avatar .rb .rolle { margin: 0; }
+.avatar .rb .ico { width: 14px; height: 14px; }
+.avatar.klein .rb .ico { width: 10px; height: 10px; }
+.profil { display: flex; align-items: center; gap: 16px; padding: 4px 0 14px; }
+.rollen-zeile { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.tag.rollentag { display: inline-flex; align-items: center; gap: 4px; background: #eaf2fb; color: #1f4f82; }
+.tag.rollentag .rolle { color: #1f4f82; margin: 0; }
+.tag.rollentag .ico { width: 14px; height: 14px; }

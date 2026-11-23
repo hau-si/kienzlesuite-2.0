@@ -90,6 +90,13 @@ final class Connections {
     /** Eine SMS über die zentrale Verbindung verschicken (der root-Dienst sendet; der Text darf einen Code enthalten, die Anfrage ist nur für ks-core und root lesbar). */
     public function sendSms(string $to, string $text): void { $this->write(['action' => 'sms-senden', 'an' => self::phone($to), 'text' => $text]); }
 
+    /** Eine E-Mail über die zentrale Verbindung verschicken (Bestätigungs- und Zurücksetzen-Links; der root-Dienst sendet). */
+    public function sendMail(string $to, string $subject, string $text): void {
+        $to = trim($to);
+        if (!filter_var($to, FILTER_VALIDATE_EMAIL) || strlen($to) > 254) throw new Problem('Bitte eine gültige E-Mail-Adresse eingeben.', 422);
+        $this->write(['action' => 'mail-senden', 'an' => $to, 'betreff' => $subject, 'text' => $text]);
+    }
+
     public function saveMail(array $in): void {
         $port = (string)($in['port'] ?? '');
         if (!ctype_digit($port)) throw new Problem('Port: bitte eine Zahl angeben (meist 587 oder 465).', 422);

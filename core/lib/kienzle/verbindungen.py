@@ -691,6 +691,9 @@ def dispatch(config: dict, req: dict) -> str:
     if action == 'sms-senden':
         send_sms(config.get('sms'), req.get('an'), req.get('text'))
         return 'SMS verschickt.'
+    if action == 'mail-senden':
+        send_mail(config.get('mail'), [req.get('an')], str(req.get('betreff') or ''), str(req.get('text') or ''))
+        return 'E-Mail verschickt.'
     if action == 'ziel':
         set_target(config, d)
         save(config)

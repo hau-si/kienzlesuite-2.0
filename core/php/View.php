@@ -15,7 +15,7 @@ final class View {
 
     /** Abschnitte, die auf langen Seiten eingeklappt erscheinen, weil man sie selten braucht. */
     public const COLLAPSED = ['Drucker suchen', 'Drucker von Hand eintragen', 'Wer nutzt was', 'Danach', 'Zeitplan', 'Benachrichtigung bei Fehlern', 'Aufbewahrung',
-        'Protokoll', 'Kanal', 'Passwort ändern', 'Handynummer für SMS-Code (Ersatz)', 'Authenticator-App', 'Passkeys', 'Gemerkte Geräte', 'Zurück auf eine frühere Version', 'Dienst hinzufügen', 'Neue Gruppe'];
+        'Protokoll', 'Kanal', 'E-Mail-Adresse', 'Passwort ändern', 'Handynummer für SMS-Code (Ersatz)', 'Authenticator-App', 'Passkeys', 'Gemerkte Geräte', 'Zurück auf eine frühere Version', 'Dienst hinzufügen', 'Neue Gruppe'];
 
     /** Symbole der Menüeinträge (Linienzeichnungen 24×24); Schlüssel: Pfad ohne Anhang, sonst das Standardsymbol. */
     private const ICONS = [
@@ -142,7 +142,7 @@ final class View {
         $brand = '<a class="brand" href="/" title="Start"><span class="mark" aria-hidden="true">K' . (!empty($nav['offenLogo']) ? '<span class="logo-dot" title="Die Einrichtung ist noch nicht abgeschlossen"></span>' : '') . '</span><span><strong>Kienzle-Suite</strong>'
             . '<span class="sub">' . self::h($practice !== '' ? $practice : 'Praxis') . '</span></span></a>';
         $head = '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=23"><script src="/assets/core.js" defer></script></head><body'
+            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=24"><script src="/assets/core.js" defer></script></head><body'
             . (self::$starter !== '' ? ' data-starter="' . self::h(self::$starter) . '"' : '') . '>';
         if (!$nav) {
             return $head . '<div class="solo">' . $brand . '<main><h1>' . self::h($title) . '</h1>' . self::cards($body) . '</main></div></body></html>';
@@ -246,6 +246,19 @@ final class View {
     public static function role(string $name): string {
         $key = match (strtolower($name)) { 'admin' => 'rolle:admin', 'arzt' => 'rolle:arzt', 'mfa' => 'rolle:mfa', default => 'rolle:gruppe' };
         return '<span class="rolle" title="' . self::h($name) . '">' . self::icon($key) . '</span>';
+    }
+
+    /** Avatar: Initialen im Kreis, unten rechts das Symbol der wichtigsten Rolle (Admin vor Arzt vor MFA vor sonstigen). $small für Listen. */
+    public static function avatar(string $name, array $roles, bool $admin = false, bool $small = false): string {
+        $words = preg_split('/\s+/u', trim($name)) ?: [];
+        $ini = '';
+        foreach (array_slice(array_filter($words), 0, 2) as $w) $ini .= mb_strtoupper(mb_substr($w, 0, 1));
+        $badge = '';
+        $pick = $admin ? 'Admin' : null;
+        foreach (['Admin', 'Arzt', 'MFA'] as $k) if ($pick === null && in_array($k, $roles, true)) $pick = $k;
+        $pick ??= $roles[0] ?? null;
+        if ($pick !== null) $badge = '<span class="rb">' . self::role($pick) . '</span>';
+        return '<span class="avatar' . ($small ? ' klein' : '') . '" aria-hidden="true">' . self::h($ini !== '' ? $ini : '?') . $badge . '</span>';
     }
 
     public static function checkbox(string $name, string $value, string $label, bool $checked, bool $disabled = false): string {

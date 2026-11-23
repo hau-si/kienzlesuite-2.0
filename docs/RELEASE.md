@@ -1,5 +1,12 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.31
+
+- Mein Konto: Profilkopf mit Avatar (Initialen, unten rechts das Symbol der wichtigsten Rolle: Admin, Arzt, MFA) und den Gruppen des Kontos als Rollen-Zeile; derselbe Avatar steht in der Benutzerliste.
+- Neu: E-Mail-Adresse im Konto. Sie gilt erst, nachdem der Link in der Bestätigungs-Mail geöffnet wurde (24 Stunden gültig, nur angemeldet, eine Adresse nur für ein Konto). Der Versand läuft über die E-Mail-Verbindung der Suite (neue Aktion „mail-senden“ im root-Dienst); ohne sie weist die Seite darauf hin.
+- Neu: „Passwort vergessen?“ auf der Anmeldeseite (nur sichtbar, wenn der E-Mail-Versand eingerichtet ist). Mit bestätigter Adresse kommt ein Link (3 Tage, einmal), unabhängig davon, ob die Adresse existiert, dieselbe Antwort; höchstens fünf Anfragen, dann Pause. Beim Verwenden werden – wie beim Admin-Link – Passwort, App, Passkeys und alle Anmeldungen zurückgesetzt. Admin-Konten mit Authenticator-App sind ausgenommen (nur Konsole).
+- Datenbank: Änderungen innerhalb einer Transaktion dürfen jetzt verschachtelt sein.
+
 ## 0.21.4-beta.30
 
 - Einrichtung: Die Liste ist in Gruppen gegliedert (Zugang und Konten, Servername und Arbeitsplätze, Datensicherung, Schutz und Updates), mit Zähler je Gruppe, Legende und klareren Zeilen.

@@ -60,6 +60,7 @@ final class Web {
             case '/anmelden': return $get ? $this->loginPage() : $this->login($r);
             case '/anmelden/passkey/optionen': return $this->passkeyLoginOptions();
             case '/anmelden/passkey': return $this->passkeyLogin($r);
+            case '/passwort-vergessen': return $get ? $this->forgotPage() : $this->forgot($r);
             case '/einrichten': return $get ? $this->setupPage($r->get('t', 60)) : $this->setup($r);
             case '/abmelden': if (!$get) return $this->logout($r); break;
             case '/hilfe/arbeitsplatz': if ($get) return $this->workstationHelp(); break;
@@ -80,6 +81,8 @@ final class Web {
             'POST /konto/otp' => fn() => $this->enroll($r),
             'POST /konto/codes' => fn() => $this->newCodes(),
             'POST /konto/telefon' => fn() => $this->savePhone($r),
+            'POST /konto/email' => fn() => $this->saveEmail($r),
+            'GET /konto/email-bestaetigen' => fn() => $this->confirmEmail($r),
             'POST /konto/geraete' => fn() => $this->revoke($r),
             'POST /konto/passkey/optionen' => fn() => $this->passkeyRegisterOptions(),
             'POST /konto/passkey' => fn() => $this->passkeyRegister($r),
@@ -453,6 +456,7 @@ final class Web {
             . '<button>Anmelden</button></form>'
             . ($this->passkeys ? '<div class="box" data-passkey-login data-next="' . V::h($weiter) . '"><p>Oder ohne Passwort:</p>'
                 . '<button type="button">Mit Passkey anmelden</button><p class="error" hidden></p></div>' : '')
+            . ($this->mailReady() ? '<p class="muted"><a href="/passwort-vergessen">Passwort vergessen?</a> Ein Link zum Neusetzen kommt per E-Mail, wenn im Konto eine Adresse bestätigt ist.</p>' : '')
             . '<p class="muted">Warnt der Browser („Nicht sicher“) oder lässt sich die Adresse nicht öffnen? Dieser PC muss einmal eingerichtet werden (Zertifikat und Name): '
             . '<a href="/hilfe/arbeitsplatz">Arbeitsplatz einrichten</a>.</p>';
         return Response::html(V::page('Anmelden', $body, null, $this->config->practice), $error ? 401 : 200);
@@ -571,6 +575,8 @@ final class Web {
             if ($r->field('password') !== $r->field('password2')) throw new Problem('Die Passwörter stimmen nicht überein.', 422);
             $id = $this->db->transaction(function () use ($info, $r, $token): int {
                 $id = $info['user_id'] ?? $this->users->create($r->field('login', 64), $r->field('display', 80), true);
+                // Link aus „Passwort vergessen“ (Konto hat noch Passwort, App, Passkeys): wie beim Admin-Link alles zurücksetzen und alle Geräte abmelden
+                if ($info['user_id'] && $this->users->find($id)['password_hash'] !== '') $this->users->resetCredentials($id);
                 $this->users->setPassword($id, $r->field('password'));
                 $this->users->redeemSetup($token);
                 return $id;
@@ -716,6 +722,72 @@ final class Web {
         return [$t, $pending];
     }
 
+    /** Ist der E-Mail-Versand der Suite eingerichtet? Ohne ihn gibt es weder Bestätigung noch „Passwort vergessen“. */
+    private function mailReady(): bool {
+        try { return $this->connections !== null && $this->connections->status()['mail'] !== null; } catch (Problem) { return false; }
+    }
+
+    private function forgotPage(?string $notice = null, ?string $error = null): Response {
+        $body = V::error($error) . V::notice($notice)
+            . ($notice ? '' : '<form method="post" action="/passwort-vergessen" class="box">'
+                . '<p>Gib die E-Mail-Adresse ein, die du unter „Mein Konto“ bestätigt hast. Dorthin schicken wir einen Link, mit dem du ein neues Passwort festlegst. Der Link gilt 3 Tage und nur einmal.</p>'
+                . V::input('email', 'E-Mail-Adresse', 'email', '', 'autocomplete="email" maxlength="254" required autofocus') . '<button>Link schicken</button></form>')
+            . '<p><a href="/anmelden">Zurück zur Anmeldung</a></p>';
+        return Response::html(V::page('Passwort vergessen', $body, null, $this->config->practice), $error ? 429 : 200);
+    }
+
+    private function forgot(Request $r): Response {
+        try {
+            if (!$this->mailReady()) throw new Problem('Der E-Mail-Versand ist auf diesem Server nicht eingerichtet. Bitte einen Admin um einen Einrichtungslink bitten.', 503);
+            $this->auth->throttle->check('reset');
+            $this->auth->throttle->fail('reset', 5);   // jede Anfrage zählt: so lässt sich niemand mit Mails überfluten
+            $user = $this->users->byEmail($r->field('email', 254));
+            // Immer dieselbe Antwort, damit sich nicht erraten lässt, welche Adressen es gibt. Admin-Konten (App-Pflicht) nur über die Konsole.
+            if ($user && (int)$user['active'] === 1 && !$this->users->needsOtp($user)) {
+                $url = 'https://' . $this->config->hostnames[0] . '/einrichten?t=' . $this->users->setupToken((int)$user['id']);
+                $this->con()->sendMail($this->users->email((int)$user['id']), 'Kienzle-Suite: Passwort neu festlegen',
+                    "Hallo " . ($user['display'] ?: $user['login']) . ",\n\nüber diesen Link legst du ein neues Passwort fest (3 Tage gültig, nur einmal verwendbar):\n\n" . $url
+                    . "\n\nWar das nicht deine Anfrage, kannst du diese Nachricht ignorieren. Dein Passwort bleibt, solange du den Link nicht verwendest.\n");
+                $this->audit->write($user['login'], 'passwort-link-per-mail');
+            }
+        } catch (Problem $e) {
+            if ($e->http === 429 || $e->http === 503) return $this->forgotPage(null, $e->getMessage());
+            throw $e;
+        }
+        return $this->forgotPage('Wenn zu dieser Adresse ein Konto gehört, ist ein Link unterwegs. Bitte auch im Spam-Ordner nachsehen.');
+    }
+
+    private function saveEmail(Request $r): Response {
+        $uid = (int)$this->session['user_id'];
+        $user = $this->users->find($uid);
+        try {
+            if (!$this->auth->confirmedRecently($this->session)) return $this->needConfirm('/konto');
+            $address = trim($r->field('email', 254));
+            if ($address === '') {
+                $this->users->emailRemove($uid);
+                $notice = 'E-Mail-Adresse entfernt.';
+            } else {
+                if (!$this->mailReady()) throw new Problem('Der E-Mail-Versand ist nicht eingerichtet (Verwaltung → Verbindungen). Ohne ihn lässt sich die Adresse nicht bestätigen.', 409);
+                $token = $this->users->emailStart($uid, $address);
+                $this->con()->sendMail($address, 'Kienzle-Suite: E-Mail-Adresse bestätigen', "Hallo " . ($user['display'] ?: $user['login']) . ",\n\nmit diesem Link bestätigst du diese Adresse für dein Konto (24 Stunden gültig). Du musst dazu angemeldet sein:\n\n"
+                    . 'https://' . $this->config->hostnames[0] . '/konto/email-bestaetigen?t=' . $token . "\n\nWar das nicht deine Anfrage, kannst du diese Nachricht ignorieren.\n");
+                $notice = 'Bestätigungslink an ' . $address . ' geschickt. Die Adresse gilt, sobald du den Link geöffnet hast.';
+            }
+        } catch (Problem $e) {
+            return $this->account($e->getMessage());
+        }
+        $this->audit->write($user['login'], 'email-geaendert');
+        return $this->account(null, $notice);
+    }
+
+    private function confirmEmail(Request $r): Response {
+        $uid = (int)$this->session['user_id'];
+        $address = $this->users->emailConfirm($uid, $r->get('t', 60));
+        if ($address === null) return $this->account('Der Bestätigungslink ist abgelaufen, ungültig oder gehört zu einem anderen Konto. Bitte die Adresse unter „E-Mail-Adresse“ noch einmal eintragen.');
+        $this->audit->write((string)$this->session['login'], 'email-bestaetigt');
+        return $this->account(null, 'E-Mail-Adresse ' . $address . ' bestätigt.');
+    }
+
     private function account(?string $error = null, ?string $notice = null): Response {
         $uid = (int)$this->session['user_id'];
         $user = $this->users->find($uid);
@@ -731,7 +803,21 @@ final class Web {
                 . '<form method="post" action="/konto/passkey/entfernen">' . $csrf . '<input type="hidden" name="id" value="' . V::h($k['id']) . '"><button class="link">Entfernen</button></form></td></tr>';
         }
         $otp = $this->users->hasOtp($user);
-        $body = V::error($error) . V::notice($notice)
+        $mail = $this->users->email($uid);
+        $pending = $this->users->emailPending($uid);
+        $roles = $this->users->roles($uid);
+        $chips = ((int)$user['admin'] === 1 ? '<span class="tag rollentag">' . V::role('Admin') . 'Basis-Admin</span>' : '')
+            . implode('', array_map(fn($n) => '<span class="tag rollentag">' . V::role($n) . V::h($n) . '</span>', $roles));
+        $profil = '<div class="profil">' . V::avatar($user['display'] ?: $user['login'], $roles, (int)$user['admin'] === 1)
+            . '<div><strong>' . V::h($user['display'] ?: $user['login']) . '</strong><div class="muted small">' . V::h($user['login']) . ($mail !== '' ? ' · ' . V::h($mail) : '') . '</div>'
+            . ($chips !== '' ? '<div class="rollen-zeile">' . $chips . '</div>' : '<div class="muted small">Keine Gruppe zugewiesen</div>') . '</div></div>';
+        $body = V::error($error) . V::notice($notice) . $profil
+            . '<h2>E-Mail-Adresse</h2><p>Mit einer bestätigten Adresse kannst du dir auf der Anmeldeseite selbst einen Link zum Neusetzen des Passworts schicken lassen'
+            . ($this->users->needsOtp($user) ? ' (für Admin-Konten mit Authenticator-App gilt das nicht: sie werden an der Server-Konsole zurückgesetzt)' : '') . '.'
+            . ($this->mailReady() ? '' : ' <strong>Der E-Mail-Versand ist noch nicht eingerichtet</strong> (Verwaltung → Verbindungen).') . '</p>'
+            . ($pending !== '' ? '<p class="notice">Wartet auf Bestätigung: ' . V::h($pending) . '. Den Link in der E-Mail öffnen.</p>' : '')
+            . '<form method="post" action="/konto/email" class="box">' . $csrf . V::input('email', 'E-Mail-Adresse (leer lassen zum Entfernen)', 'email', $mail !== '' ? $mail : $pending, 'maxlength="254" autocomplete="email" placeholder="name@praxis.de"')
+            . '<button>Bestätigungslink schicken</button></form>'
             . '<h2>Passwort ändern</h2><form method="post" action="/konto/passwort" class="box">' . $csrf
             . V::input('current', 'Bisheriges Passwort', 'password', '', 'autocomplete="current-password" required')
             . V::input('password', 'Neues Passwort', 'password', '', 'autocomplete="new-password" required')
@@ -750,7 +836,7 @@ final class Web {
                 . '<button type="button">Passkey hinzufügen</button><p class="error" hidden></p></div>' : '')
             . '<h2>Gemerkte Geräte</h2>' . ($devices !== '' ? '<table><tr><th>Gerät</th><th>Zuletzt</th><th></th></tr>' . $devices . '</table>'
                 . '<form method="post" action="/konto/geraete">' . $csrf . '<input type="hidden" name="id" value="all"><button class="link">Alle abmelden</button></form>' : '<p>Keine.</p>') . '';
-        V::$status = ['Authenticator-App' => [$otp, 'eingerichtet', 'nicht eingerichtet'], 'Passkeys' => [$keys !== '', 'eingerichtet', 'nicht eingerichtet'],
+        V::$status = ['E-Mail-Adresse' => [$mail !== '', 'bestätigt', $pending !== '' ? 'wartet auf Bestätigung' : 'nicht hinterlegt'], 'Authenticator-App' => [$otp, 'eingerichtet', 'nicht eingerichtet'], 'Passkeys' => [$keys !== '', 'eingerichtet', 'nicht eingerichtet'],
             'Handynummer für SMS-Code (Ersatz)' => [$this->phoneOf($uid) !== '', 'hinterlegt', 'nicht hinterlegt'],
             'Gemerkte Geräte' => [$devices !== '', 'vorhanden', 'keine']];
         return Response::html(V::page('Mein Konto', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
@@ -942,7 +1028,7 @@ final class Web {
             $roles = $u['admin'] ? ['Basis-Admin'] : [];
             foreach ($u['access'] as $m => $a) $roles[] = $this->modules->name($m) . ($a['admin'] ? ' (Admin)' : '');
             $icons = ($u['admin'] ? V::role('Admin') : '') . implode('', array_map([V::class, 'role'], $u['roles']));
-            $rows .= '<tr><td><a href="/verwaltung/benutzer/' . $u['id'] . '">' . V::h($u['login']) . '</a></td><td>' . V::h($u['display']) . '</td><td>' . $icons . ' ' . V::h(implode(', ', $roles) ?: '–')
+            $rows .= '<tr><td>' . V::avatar($u['display'] ?: $u['login'], $u['roles'], (bool)$u['admin'], true) . ' <a href="/verwaltung/benutzer/' . $u['id'] . '">' . V::h($u['login']) . '</a></td><td>' . V::h($u['display']) . '</td><td>' . $icons . ' ' . V::h(implode(', ', $roles) ?: '–')
                 . '</td><td>' . ($u['active'] ? ($u['password'] ? ($u['otp'] ? 'Passwort + App' : 'Passwort') : 'Einrichtung offen') : 'gesperrt') . '</td></tr>';
         }
         $groups = self::stripCards(self::inner($this->groupsPage()));

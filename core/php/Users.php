@@ -57,6 +57,52 @@ final class Users {
         $user = $this->require($id);
         if ((int)$user['admin'] === 1 && (int)$user['active'] === 1 && $this->activeAdmins() <= 1) throw new Problem('Der letzte Basis-Admin kann nicht gelöscht werden.', 409);
         $this->db->query('DELETE FROM users WHERE id=?', [$id]);
+        $this->db->query('DELETE FROM settings WHERE key IN (?,?)', ['mail.adresse.' . $id, 'mail.offen.' . $id]);
+    }
+
+    // ---- E-Mail-Adresse (für den Link „Passwort vergessen“) -------------------------------------------------------
+    public const MAIL_SECONDS = 86400;
+
+    /** Bestätigte E-Mail-Adresse oder ''. */
+    public function email(int $id): string { return (string)$this->db->setting('mail.adresse.' . $id); }
+
+    /** Konto zu einer bestätigten Adresse (Groß-/Kleinschreibung egal), sonst null. */
+    public function byEmail(string $address): ?array {
+        $row = $this->db->one("SELECT key FROM settings WHERE key LIKE 'mail.adresse.%' AND lower(value)=lower(?)", [trim($address)]);
+        return $row ? $this->find((int)substr($row['key'], strlen('mail.adresse.'))) : null;
+    }
+
+    /** Neue Adresse vormerken; liefert den Bestätigungs-Token für den Link in der E-Mail. */
+    public function emailStart(int $id, string $address): string {
+        $this->require($id);
+        $address = trim($address);
+        if (!filter_var($address, FILTER_VALIDATE_EMAIL) || strlen($address) > 254) throw new Problem('Bitte eine gültige E-Mail-Adresse eingeben.', 422);
+        $other = $this->byEmail($address);
+        if ($other && (int)$other['id'] !== $id) throw new Problem('Diese Adresse wird schon von einem anderen Konto verwendet.', 409);
+        $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
+        $this->db->store('mail.offen.' . $id, json_encode(['a' => $address, 'h' => hash('sha256', $token), 'e' => time() + self::MAIL_SECONDS], JSON_THROW_ON_ERROR));
+        return $token;
+    }
+
+    /** Link bestätigt → Adresse gilt; liefert sie, sonst null. */
+    public function emailConfirm(int $id, string $token): ?string {
+        $p = json_decode((string)$this->db->setting('mail.offen.' . $id), true);
+        if (!is_array($p) || (int)($p['e'] ?? 0) < time() || !hash_equals((string)($p['h'] ?? ''), hash('sha256', $token))) return null;
+        $other = $this->byEmail((string)$p['a']);
+        if ($other && (int)$other['id'] !== $id) return null;
+        $this->db->store('mail.adresse.' . $id, (string)$p['a']);
+        $this->db->query('DELETE FROM settings WHERE key=?', ['mail.offen.' . $id]);
+        return (string)$p['a'];
+    }
+
+    public function emailRemove(int $id): void {
+        $this->db->query('DELETE FROM settings WHERE key IN (?,?)', ['mail.adresse.' . $id, 'mail.offen.' . $id]);
+    }
+
+    /** Ausstehende (noch nicht bestätigte) Adresse oder ''. */
+    public function emailPending(int $id): string {
+        $p = json_decode((string)$this->db->setting('mail.offen.' . $id), true);
+        return is_array($p) && (int)($p['e'] ?? 0) >= time() ? (string)($p['a'] ?? '') : '';
     }
 
     public function activeAdmins(): int { return (int)$this->db->query('SELECT COUNT(*) FROM users WHERE admin=1 AND active=1')->fetchColumn(); }
