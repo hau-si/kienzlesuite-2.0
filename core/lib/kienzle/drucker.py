@@ -79,6 +79,36 @@ def _write(path: Path, data, mode: int = 0o644) -> None:
     os.replace(tmp, path)
 
 
+PPD_REV = 'durchreichen-1'
+
+
+def ppd_text(p: dict) -> str:
+    """PPD der CUPS-Warteschlange vor einem virtuellen Drucker: PDF und PostScript werden unverändert durchgereicht.
+    Mit „-m everywhere“ bietet CUPS zusätzlich Raster- und Bildformate an; der Windows-IPP-Treiber wählt dann ein Bildformat,
+    und das PDF hat keine Textebene mehr (Texterkennung nötig)."""
+    name = re.sub(r'[^A-Za-z0-9_-]', '', str(p['name'])) or 'Drucker'
+    label = re.sub(r'[^\x20-\x7e]', '?', f'Kienzle-Suite {p["name"]}')[:60].replace('"', "'")
+    sizes = (('A6', 298, 420), ('A5', 420, 595), ('A4', 595, 842), ('Letter', 612, 792))
+    lines = ['*PPD-Adobe: "4.3"', '*FormatVersion: "4.3"', '*FileVersion: "1.0"', '*LanguageVersion: English', '*LanguageEncoding: ISOLatin1',
+             f'*PCFileName: "{name[:8].upper()}.PPD"', '*Manufacturer: "Kienzle-Suite"', f'*Product: "({label})"', f'*ModelName: "{label}"',
+             f'*ShortNickName: "{label}"', f'*NickName: "{label} (PDF/PostScript)"', '*PSVersion: "(3010.000) 0"', '*LanguageLevel: "3"',
+             '*ColorDevice: False', '*DefaultColorSpace: Gray', '*FileSystem: False', '*Throughput: "1"', '*LandscapeOrientation: Plus90',
+             '*TTRasterizer: Type42', '*cupsVersion: 1.1', '*cupsManualCopies: True', '*cupsMaxCopies: 99',
+             '*cupsFilter: "application/vnd.cups-pdf 0 -"', '*cupsFilter2: "application/pdf application/pdf 0 -"',
+             '*cupsFilter2: "application/vnd.cups-pdf application/pdf 0 -"', '*cupsFilter2: "application/postscript application/postscript 0 -"',
+             '*cupsFilter2: "application/vnd.cups-postscript application/postscript 0 -"']
+    for key, label2 in (('PageSize', 'Original page size'), ('PageRegion', 'Original page region')):
+        lines += [f'*OpenUI *{key}/{label2}: PickOne', f'*OrderDependency: 10 AnySetup *{key}', f'*Default{key}: A4']
+        lines += [f'*{key} {n}/{"US Letter" if n == "Letter" else n}: "<</PageSize[{w} {h}]>>setpagedevice"' for n, w, h in sizes]
+        lines.append(f'*CloseUI: *{key}')
+    lines.append('*DefaultImageableArea: A4')
+    lines += [f'*ImageableArea {n}/{"US Letter" if n == "Letter" else n}: "0 0 {w} {h}"' for n, w, h in sizes]
+    lines.append('*DefaultPaperDimension: A4')
+    lines += [f'*PaperDimension {n}/{"US Letter" if n == "Letter" else n}: "{w} {h}"' for n, w, h in sizes]
+    lines += ['*DefaultFont: Courier', '*Font Courier: Standard "(001.007)" Standard ROM', '']
+    return '\n'.join(lines)
+
+
 def _read(path: Path, default):
     try:
         return json.loads(path.read_text(encoding='utf-8'))
@@ -531,11 +561,17 @@ def sync() -> list[str]:
                     _write(UNITS / unit, text, 0o644)
                 if changed or not _port_open(port):
                     _start_unit(unit, p, port)
-                uri, model = f'ipp://localhost:{port}/ipp/print', ['-m', 'everywhere']
-                for f in (old.get('backend'), old.get('ppd')):
-                    if f:
-                        Path(f).unlink(missing_ok=True)
-                entry = {'modul': p['modul'], 'scheme': p['scheme'], 'art': 'ipp', 'port': port, 'unit': unit}
+                ppd = PPDS / f'{p["scheme"]}.ppd'
+                ppd_new = ppd_text(p)
+                if not ppd.is_file() or ppd.read_text(encoding='utf-8') != ppd_new:
+                    _write(ppd, ppd_new, 0o644)
+                    changed = True
+                if old.get('modell') != PPD_REV:
+                    changed = True                    # Warteschlange von „everywhere“ auf die Durchreich-PPD umstellen
+                uri, model = f'ipp://localhost:{port}/ipp/print', ['-P', str(ppd)]
+                if old.get('backend'):
+                    Path(old['backend']).unlink(missing_ok=True)
+                entry = {'modul': p['modul'], 'scheme': p['scheme'], 'art': 'ipp', 'port': port, 'unit': unit, 'ppd': str(ppd), 'modell': PPD_REV}
             else:
                 ppd = PPDS / f'{p["scheme"]}.ppd'
                 changed = _install_file(base / p['ppd'], ppd, 0o644)

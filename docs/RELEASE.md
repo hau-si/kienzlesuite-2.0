@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.21.3-beta.1
+
+- Virtuelle Drucker der Module (Kasse „SumUp-Rechnung“, „Terminzettel“): Die CUPS-Warteschlange wird nicht mehr mit „everywhere“, sondern mit einer mitgelieferten Durchreich-PPD angelegt (PDF und PostScript unverändert, wie im früheren Rechnungseingang). Vorher bot CUPS zusätzlich Raster- und Bildformate (pwg-raster, urf, pclm, jpeg, …) an; der Windows-IPP-Treiber wählte so ein Format, das PDF hatte keine Textebene und die Rechnung musste per Texterkennung gelesen werden (Fehler „Rechnungsnummer nicht eindeutig (Texterkennung)“). Bestehende Warteschlangen werden beim nächsten Abgleich (Installer bzw. „Virtuelle Drucker der Module abgleichen“) automatisch umgestellt. Echte Drucker bleiben unverändert.
+- Tests: tests/core/test_drucker.py. Nicht mit Windows/echtem T2med getestet.
+
 ## 0.21.2-beta.3
 
 - Windows-Skript: „Set-PrintConfiguration -PaperSize“ entfernt (der IPP-Class-Treiber lehnt es ab; die Papiergröße kommt vom Drucker). Nicht getestet.

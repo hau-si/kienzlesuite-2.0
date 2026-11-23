@@ -212,7 +212,13 @@ class IppEverywhere(Umgebung):
         q = self.cups()['queues']['Beispiel-PDF']
         self.assertEqual(q['uri'], 'ipp://localhost:47100/ipp/print')
         call = next(c for c in self.cups()['calls'] if c[0] == 'lpadmin' and 'Beispiel-PDF' in c)
-        self.assertEqual(call[call.index('-m') + 1], 'everywhere')
+        # Durchreich-PPD statt „everywhere“: Windows bekommt nur PDF/PostScript angeboten (sonst Bild-PDF ohne Textebene).
+        self.assertNotIn('-m', call)
+        ppd = Path(call[call.index('-P') + 1])
+        text = ppd.read_text(encoding='utf-8')
+        self.assertIn('*cupsFilter2: "application/pdf application/pdf 0 -"', text)
+        self.assertNotIn('raster', text)
+        self.assertEqual(stat.S_IMODE(ppd.stat().st_mode), 0o644)
         self.assertIn(['restart', 'kienzle-drucker-beispiel-beispiel-pdf.service'], self.cups()['systemctl'])
         with mock.patch.object(self.d, '_port_open', return_value=True):
             self.assertEqual(self.d.sync(), [], 'zweiter Abgleich ändert etwas')
