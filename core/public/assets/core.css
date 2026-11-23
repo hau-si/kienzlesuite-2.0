@@ -300,3 +300,26 @@ ul.modules li { display: flex; align-items: center; justify-content: space-betwe
 .mod-menu button { width: 100%; }
 .mod-remove { display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
 .mod-remove button.danger { background: #a24435; color: #fff; border-color: #a24435; }
+
+/* Rollen und Rechte-Matrix (Benutzer bearbeiten) */
+.rolle { display: inline-flex; vertical-align: middle; color: var(--teal); margin-right: 4px; }
+.rolle .ico { width: 18px; height: 18px; }
+.rollen { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.rolle-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; background: #fff; cursor: pointer; }
+.rolle-chip:has(input:checked) { background: #dcebf8; border-color: #2d6aa8; }
+table.matrix { width: 100%; border-collapse: collapse; }
+table.matrix th, table.matrix td { padding: 6px 8px; text-align: center; border-bottom: 1px solid var(--line); }
+table.matrix th:first-child, table.matrix td:first-child { text-align: left; }
+table.matrix .gname { display: block; font-size: 11px; font-weight: 500; color: var(--muted); }
+table.matrix .gcol { color: #8aa3b8; }
+table.matrix .gcol.aktiv { color: #2d6aa8; font-weight: 700; }
+table.matrix .gcol:not(.aktiv) { opacity: .45; }
+table.matrix td.erg { background: #eef5fb; }
+table.matrix td.erg input { accent-color: #2d6aa8; width: 18px; height: 18px; }
+table.matrix .stift { display: none; color: #a07400; }
+table.matrix tr.abw td.erg { background: #fff1b8; }
+table.matrix tr.abw .stift { display: inline-flex; vertical-align: middle; }
+table.matrix tr.abw td.erg input { accent-color: #c28f00; }
+.punkt { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: middle; }
+.punkt.blau { background: #2d6aa8; }
+.punkt.gelb { background: #e8b800; }

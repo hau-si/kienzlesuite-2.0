@@ -206,6 +206,23 @@ function test_verwaltung_braucht_bestaetigung_und_csrf(): void {
     check($r->status === 403 && !$env->users->byLogin('carla'), 'Anlegen ohne gültige CSRF-Marke');
 }
 
+function test_rollen_matrix_speichern(): void {
+    $env = new Env();
+    [$b] = admin_browser($env);
+    $b->post('/verwaltung/benutzer', ['login' => 'dora', 'display' => 'Dora']);
+    $id = (int)$env->users->byLogin('dora')['id'];
+    // Rolle MFA, aber „paid“ einzeln abgewählt und „catalog“ einzeln dazu
+    $b->post('/verwaltung/benutzer/' . $id, ['display' => 'Dora', 'active' => '1', 'rollen_gesendet' => '1', 'rolle' => ['MFA'], 'recht' => ['kasse:catalog']]);
+    check($env->users->roles($id) === ['MFA'], 'Rolle nicht gespeichert');
+    check($env->users->overrides($id) === ['kasse:catalog' => true, 'kasse:paid' => false], 'Einzeländerungen falsch: ' . json_encode($env->users->overrides($id)));
+    $b->get('/verwaltung/benutzer/' . $id);
+    check(str_contains($b->last->body, 'class="matrix"') && str_contains($b->last->body, 'recht abw') && str_contains($b->last->body, 'data-rolle checked'), 'Matrix zeigt Rolle/Abweichung nicht');
+    $b->get('/verwaltung/benutzer');
+    check(str_contains($b->last->body, 'title="MFA"'), 'Rollen-Symbol fehlt in der Benutzerliste');
+    $b->post('/verwaltung/benutzer/' . $id, ['display' => 'Dora', 'active' => '1', 'rollen_gesendet' => '1', 'rolle' => ['Gibtesnicht']]);
+    check($b->last->status === 422, 'unbekannte Rolle angenommen');
+}
+
 function test_benutzer_anlegen_rechte_und_link(): void {
     $env = new Env();
     [$b] = admin_browser($env);
@@ -222,7 +239,7 @@ function test_benutzer_anlegen_rechte_und_link(): void {
     check($b->last->status === 422, 'unbekanntes Modul angenommen');
     // Gruppen: Vorgaben Admin/Arzt/MFA, Anwenden beim Speichern, eigene Änderung
     $b->get('/verwaltung/gruppen');
-    check($b->last->status === 200 && str_contains($b->last->body, '>MFA<') && str_contains($b->last->body, '>Arzt<') && str_contains($b->last->body, '>Admin<'), 'Vorgabe-Gruppen fehlen');
+    check($b->last->status === 200 && str_contains($b->last->body, ' MFA</h2>') && str_contains($b->last->body, ' Arzt</h2>') && str_contains($b->last->body, ' Admin</h2>'), 'Vorgabe-Gruppen fehlen');
     $b->post('/verwaltung/benutzer/' . $carla['id'], ['display' => 'Carla', 'active' => '1', 'gruppe' => 'Arzt']);
     $acc = $env->users->access((int)$carla['id']);
     check($acc['kasse']['admin'] === false && $acc['kasse']['rights'] === ['paid', 'catalog'] && $acc['beispiel']['rights'] === ['ansehen', 'bearbeiten'], 'Gruppe Arzt nicht angewendet: ' . json_encode($acc));

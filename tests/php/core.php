@@ -107,10 +107,43 @@ function test_einrichtungslink_ablauf_und_einmal(): void {
 function test_rechte_nur_installierter_module(): void {
     $env = new Env();
     [$id] = $env->user('bert');
-    $env->db->query("INSERT INTO user_modules(user_id,module,admin,rights) VALUES(?,?,0,'[\"paid\",\"erfunden\"]')", [$id, 'kasse']);
-    $env->db->query("INSERT INTO user_modules(user_id,module,admin,rights) VALUES(?,?,1,'[]')", [$id, 'entfernt']);
+    foreach (['kasse:paid', 'kasse:erfunden', 'entfernt:@admin'] as $perm) $env->db->query('INSERT INTO user_overrides(user_id,perm,allow) VALUES(?,?,1)', [$id, $perm]);
     check($env->users->access($id) === ['kasse' => ['admin' => false, 'rights' => ['paid']]], 'Rechte entfernter Module oder unbekannte Rechte weitergegeben');
     check(!$env->users->needsOtp($env->users->find($id)), 'Admin-Rolle eines entfernten Moduls verlangt OTP');
+}
+
+function test_rollen_folgen_der_gruppe_einzelrechte_bleiben(): void {
+    $env = new Env();
+    [$id] = $env->user('rita');
+    $g = new Kienzle\Core\Groups($env->db, $env->modules);
+    $env->users->setRoles($id, ['MFA']);
+    $mfa = $env->users->access($id);
+    check(isset($mfa['kasse']) && in_array('paid', $mfa['kasse']['rights'], true) && !$mfa['kasse']['admin'], 'Rolle MFA gibt kein Kasse-Recht');
+    // Einzeländerung: Recht „paid“ entziehen, nur das wird als Abweichung gespeichert
+    $env->users->setAccess($id, 'kasse', false, array_values(array_diff($mfa['kasse']['rights'], ['paid'])));
+    check($env->users->overrides($id) === ['kasse:paid' => false], 'Abweichung nicht einzeln gespeichert: ' . json_encode($env->users->overrides($id)));
+    // Gruppe ändert sich: Mitglied bekommt neues Recht, die Einzeländerung bleibt
+    $rechte = array_values(array_unique(array_merge($g->get('MFA')['rechte'], ['kasse:catalog'])));
+    $g->set('MFA', $g->get('MFA')['admin'], $rechte);
+    $after = $env->users->access($id);
+    check(!in_array('paid', $after['kasse']['rights'] ?? [], true), 'Einzelentzug nach Gruppenänderung verloren');
+    check(in_array('catalog', $after['kasse']['rights'] ?? [], true), 'Gruppenänderung erreicht Mitglied nicht');
+    check($env->users->members('MFA') === ['rita'], 'Mitglieder falsch');
+    $env->users->resetOverrides($id);
+    check(in_array('paid', $env->users->access($id)['kasse']['rights'], true), 'Zurück auf Rolle ohne Wirkung');
+    $env->users->setRoles($id, []);
+    check($env->users->access($id) === [], 'ohne Rolle noch Rechte');
+    try { $env->users->setRoles($id, ['Erfunden']); throw new LogicException('unbekannte Rolle angenommen'); } catch (Kienzle\Core\Problem) {}
+}
+
+function test_migration_alte_rechte_werden_einzelrechte(): void {
+    $env = new Env();
+    [$id] = $env->user('alt');
+    $env->db->query("INSERT INTO user_modules(user_id,module,admin,rights) VALUES(?,?,1,'[\"paid\"]')", [$id, 'kasse']);
+    $env->db->query('PRAGMA user_version=2');
+    $env->db->migrate();
+    check($env->users->roles($id) === [], 'Altbenutzer hat plötzlich eine Rolle');
+    check($env->users->access($id) === ['kasse' => ['admin' => true, 'rights' => ['paid']]], 'Alte Rechte nicht übernommen: ' . json_encode($env->users->access($id)));
 }
 
 function test_konfiguration(): void {

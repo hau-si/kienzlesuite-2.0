@@ -4,7 +4,7 @@ namespace Kienzle\Core;
 
 /** SQLite-Datenbank der Basis. Aufbau nach kienzle-suite-beta (src/Database.php). */
 final class Database {
-    public const VERSION = 2;
+    public const VERSION = 3;
     public readonly \PDO $pdo;
 
     public function __construct(public readonly string $directory) {
@@ -26,8 +26,17 @@ final class Database {
         $version = (int)$this->pdo->query('PRAGMA user_version')->fetchColumn();
         if ($version > self::VERSION) throw new \RuntimeException('Datenbank ist neuer als die Basis.');
         if ($version === self::VERSION) return;
-        $this->transaction(function (): void {
+        $this->transaction(function () use ($version): void {
             $this->pdo->exec((string)file_get_contents(__DIR__ . '/schema.sql'));
+            // Bis Version 2 gab es nur kopierte Rechte je Modul (user_modules): sie gelten jetzt als Einzelrechte ohne Rolle, nichts ändert sich für die Benutzer.
+            if ($version > 0 && $version < 3) {
+                foreach ($this->pdo->query('SELECT user_id,module,admin,rights FROM user_modules')->fetchAll() as $r) {
+                    $ins = $this->pdo->prepare('INSERT OR IGNORE INTO user_overrides(user_id,perm,allow) VALUES(?,?,1)');
+                    if ((int)$r['admin'] === 1) $ins->execute([$r['user_id'], $r['module'] . ':@admin']);
+                    $rights = json_decode((string)$r['rights'], true);
+                    foreach (is_array($rights) ? $rights : [] as $right) if (is_string($right)) $ins->execute([$r['user_id'], $r['module'] . ':' . $right]);
+                }
+            }
             $this->pdo->exec('PRAGMA user_version=' . self::VERSION);
         });
     }

@@ -20,13 +20,28 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at INTEGER NOT NULL
 );
 
--- Zugang je Modul: admin = Modul-Admin, rights = JSON-Liste der Rechte aus module.toml.
+-- Frühere Ablage des Zugangs je Modul (bis Basis 0.21.4-beta.28); wird beim Update in user_overrides übernommen und nicht mehr gelesen. admin = Modul-Admin, rights = JSON-Liste der Rechte aus module.toml.
 CREATE TABLE IF NOT EXISTS user_modules (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     module TEXT NOT NULL,
     admin INTEGER NOT NULL DEFAULT 0,
     rights TEXT NOT NULL DEFAULT '[]',
     PRIMARY KEY (user_id, module)
+);
+
+-- Rollen (Gruppen) eines Benutzers: gelten dauerhaft; ändert sich die Gruppe, ändern sich ihre Mitglieder mit.
+CREATE TABLE IF NOT EXISTS user_groups (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    grp TEXT NOT NULL,
+    PRIMARY KEY (user_id, grp)
+);
+
+-- Einzeländerungen gegenüber den Rollen: perm = „modul:recht“ oder „modul:@admin“, allow 1 = einzeln erlaubt, 0 = einzeln entzogen.
+CREATE TABLE IF NOT EXISTS user_overrides (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    perm TEXT NOT NULL,
+    allow INTEGER NOT NULL,
+    PRIMARY KEY (user_id, perm)
 );
 
 -- Wiederherstellungscodes: nur Prüfsumme, je einmal gültig.

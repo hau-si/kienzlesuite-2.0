@@ -19,6 +19,11 @@ final class View {
 
     /** Symbole der Menüeinträge (Linienzeichnungen 24×24); Schlüssel: Pfad ohne Anhang, sonst das Standardsymbol. */
     private const ICONS = [
+        'rolle:admin' => '<path d="M12 3l8 3v6c0 4.500-3.400 7.800-8 9-4.600-1.200-8-4.500-8-9V6z"/><path d="M8.500 12l2.500 2.500 4.500-5"/>',
+        'rolle:arzt' => '<path d="M6 3v6a4 4 0 008 0V3"/><path d="M5 3h2M13 3h2M10 13v2a4 4 0 008 0v-1"/><circle cx="18" cy="12" r="2"/>',
+        'rolle:mfa' => '<circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6 1.500 0 2.800.3 3.800.9"/><path d="M18 21l-3.500-3.500a2.300 2.300 0 013.500-3 2.300 2.300 0 013.500 3z"/>',
+        'rolle:gruppe' => '<circle cx="9" cy="8" r="3.500"/><path d="M2 20c0-3.500 3-5.500 7-5.500s7 2 7 5.500"/><path d="M16 4.500a3.500 3.500 0 010 7M18 15c2.500.7 4 2.300 4 5"/>',
+        'stift' => '<path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M14 7l3 3"/>',
         '/' => '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
         '/konto' => '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
         'app' => '<rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/>',
@@ -137,7 +142,7 @@ final class View {
         $brand = '<a class="brand" href="/" title="Start"><span class="mark" aria-hidden="true">K' . (!empty($nav['offenLogo']) ? '<span class="logo-dot" title="Die Einrichtung ist noch nicht abgeschlossen"></span>' : '') . '</span><span><strong>Kienzle-Suite</strong>'
             . '<span class="sub">' . self::h($practice !== '' ? $practice : 'Praxis') . '</span></span></a>';
         $head = '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=20"><script src="/assets/core.js" defer></script></head><body'
+            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=22"><script src="/assets/core.js" defer></script></head><body'
             . (self::$starter !== '' ? ' data-starter="' . self::h(self::$starter) . '"' : '') . '>';
         if (!$nav) {
             return $head . '<div class="solo">' . $brand . '<main><h1>' . self::h($title) . '</h1>' . self::cards($body) . '</main></div></body></html>';
@@ -235,6 +240,12 @@ final class View {
 
     public static function input(string $name, string $label, string $type = 'text', string $value = '', string $extra = ''): string {
         return '<label>' . self::h($label) . '<input type="' . $type . '" name="' . $name . '" value="' . self::h($value) . '" ' . $extra . '></label>';
+    }
+
+    /** Rollen-Symbol: Admin = Schild mit Haken, Arzt = Stethoskop, MFA = Person mit Herz, sonst Personengruppe. */
+    public static function role(string $name): string {
+        $key = match (strtolower($name)) { 'admin' => 'rolle:admin', 'arzt' => 'rolle:arzt', 'mfa' => 'rolle:mfa', default => 'rolle:gruppe' };
+        return '<span class="rolle" title="' . self::h($name) . '">' . self::icon($key) . '</span>';
     }
 
     public static function checkbox(string $name, string $value, string $label, bool $checked, bool $disabled = false): string {

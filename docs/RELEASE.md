@@ -1,5 +1,12 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.29
+
+- Benutzer und Gruppen: Gruppen sind jetzt feste Rollen. Wer einer Gruppe angehört, behält sie dauerhaft; ändert man die Gruppe (Rechte, Modul-Admin), gilt das sofort für alle Mitglieder. Mehrere Rollen pro Benutzer sind möglich.
+- Beim Benutzer gibt es eine Rechte-Matrix je Modul: Spalten = Rollen (✓ = die Rolle gewährt das Recht), letzte Spalte = Ergebnis für diesen Benutzer. Blau = von der Rolle, gelb mit Stift = einzeln geändert. Ein Klick ändert ein Recht einzeln, „zurück auf Rolle“ nimmt alle Einzeländerungen zurück.
+- Standardsymbole: Admin = Schild mit Haken, Arzt = Stethoskop, MFA = Person mit Herz (auch in der Benutzerliste und bei den Gruppen, dort mit der Mitgliederliste).
+- Update: bisherige Rechte werden als Einzelrechte ohne Rolle übernommen; für niemanden ändert sich der Zugang. Datenbank-Version 3 (neue Tabellen `user_groups`, `user_overrides`).
+
 ## 0.21.4-beta.28
 
 - Der Name der Praxis steht jetzt unter Verwaltung → Praxis (ganz oben, mit Status „✓ eingetragen“); die Seite „Server“ enthält nur noch den Namen des Servers. Die Seitentitel und das Menü heißen kurz „Server“ und „Praxis“ (vorher „Server und Name“ und „Praxis und Daten“). Beim Speichern des Praxisnamens bleiben die Servernamen unverändert; der Root-Dienst übernimmt die Änderung wie bisher.

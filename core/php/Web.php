@@ -933,7 +933,8 @@ final class Web {
         foreach ($this->users->all() as $u) {
             $roles = $u['admin'] ? ['Basis-Admin'] : [];
             foreach ($u['access'] as $m => $a) $roles[] = $this->modules->name($m) . ($a['admin'] ? ' (Admin)' : '');
-            $rows .= '<tr><td><a href="/verwaltung/benutzer/' . $u['id'] . '">' . V::h($u['login']) . '</a></td><td>' . V::h($u['display']) . '</td><td>' . V::h(implode(', ', $roles) ?: '–')
+            $icons = ($u['admin'] ? V::role('Admin') : '') . implode('', array_map([V::class, 'role'], $u['roles']));
+            $rows .= '<tr><td><a href="/verwaltung/benutzer/' . $u['id'] . '">' . V::h($u['login']) . '</a></td><td>' . V::h($u['display']) . '</td><td>' . $icons . ' ' . V::h(implode(', ', $roles) ?: '–')
                 . '</td><td>' . ($u['active'] ? ($u['password'] ? ($u['otp'] ? 'Passwort + App' : 'Passwort') : 'Einrichtung offen') : 'gesperrt') . '</td></tr>';
         }
         $groups = self::stripCards(self::inner($this->groupsPage()));
@@ -970,12 +971,33 @@ final class Web {
         if (!$user) throw new Problem('Benutzer nicht gefunden.', 404);
         $access = $this->users->access($id);
         $self = $id === (int)$this->session['user_id'];
+        $groups = (new Groups($this->db, $this->modules))->all();
+        $roles = $this->users->roles($id);
+        $chips = '';
+        foreach (array_keys($groups) as $name) $chips .= '<label class="rolle-chip">' . '<input type="checkbox" name="rolle[]" value="' . V::h($name) . '" data-rolle' . (in_array($name, $roles, true) ? ' checked' : '') . '> ' . V::role($name) . ' ' . V::h($name) . '</label>';
         $modules = '';
         foreach ($this->modules->all() as $mid => $m) {
             $a = $access[$mid] ?? ['admin' => false, 'rights' => []];
-            $rights = '';
-            foreach ($this->modules->rights($mid) as $right) $rights .= V::checkbox('recht[]', $mid . ':' . $right['id'], $right['label'], in_array($right['id'], $a['rights'], true));
-            $modules .= '<fieldset><legend>' . V::h($this->modules->name($mid)) . '</legend>' . V::checkbox('modul_admin[]', $mid, 'Admin dieses Moduls (braucht Authenticator-App)', $a['admin']) . $rights . '</fieldset>';
+            $head = '<th>Recht</th>';
+            foreach ($groups as $name => $_) $head .= '<th class="gcol" data-gcol="' . V::h($name) . '">' . V::role($name) . '<span class="gname">' . V::h($name) . '</span></th>';
+            $head .= '<th>Für ' . V::h($this->users->find($id)['login']) . '</th>';
+            $rows = [['@admin', 'Admin dieses Moduls (braucht Authenticator-App)', 'modul_admin[]', $mid, $a['admin']]];
+            foreach ($this->modules->rights($mid) as $right) $rows[] = [$right['id'], $right['label'], 'recht[]', $mid . ':' . $right['id'], in_array($right['id'], $a['rights'], true)];
+            $body = '';
+            foreach ($rows as [$rid, $label, $field, $value, $on]) {
+                $grants = [];
+                $cells = '';
+                foreach ($groups as $name => $g) {
+                    $has = $rid === '@admin' ? in_array($mid, $g['admin'], true) : in_array($mid . ':' . $rid, $g['rechte'], true);
+                    if ($has) $grants[] = $name;
+                    $cells .= '<td class="gcol' . ($has ? ' ja' : '') . '" data-gcol="' . V::h($name) . '">' . ($has ? '✓' : '') . '</td>';
+                }
+                $base = array_intersect($grants, $roles) !== [];
+                $abw = $on !== $base;
+                $body .= '<tr class="recht' . ($abw ? ' abw' : '') . '" data-grants="' . V::h(implode('|', $grants)) . '"><td>' . V::h($label) . '</td>' . $cells
+                    . '<td class="erg"><label class="check"><input type="checkbox" name="' . $field . '" value="' . V::h($value) . '"' . ($on ? ' checked' : '') . ' data-erg> <span class="stift" title="Einzeln geändert, weicht von der Rolle ab">' . V::icon('stift') . '</span></label></td></tr>';
+            }
+            $modules .= '<fieldset><legend>' . V::h($this->modules->name($mid)) . '</legend><table class="matrix"><tr>' . $head . '</tr>' . $body . '</table></fieldset>';
         }
         $url = 'https://' . $this->config->hostnames[0] . '/einrichten?t=';
         $body = V::error($error)
@@ -984,22 +1006,17 @@ final class Web {
             . '<form method="post" action="/verwaltung/benutzer/' . $id . '" class="box">' . V::csrf($this->session['csrf'])
             . '<p>Anmeldename: <strong>' . V::h($user['login']) . '</strong></p>'
             . V::input('display', 'Name', 'text', $user['display'])
-            . $this->groupSelect()
+            . '<h2>Rollen</h2><input type="hidden" name="rollen_gesendet" value="1"><div class="rollen">' . $chips . '</div>'
+            . '<p class="muted small">Die Rolle gilt dauerhaft: Ändert sich die <a href="/verwaltung/benutzer?bereich=gruppen">Gruppe</a>, ändern sich die Rechte aller Mitglieder mit. '
+            . '<span class="legende"><span class="punkt blau"></span> von der Rolle &nbsp; <span class="punkt gelb"></span> einzeln geändert</span></p>'
             . V::checkbox('admin', '1', 'Basis-Admin', (int)$user['admin'] === 1) . V::checkbox('active', '1', 'Konto aktiv', (int)$user['active'] === 1)
-            . ($modules !== '' ? '<h2>Zugang zu Modulen</h2>' . $modules : '<p>Es sind noch keine Module installiert.</p>')
+            . ($modules !== '' ? '<h2>Zugang zu Modulen</h2><p><button type="button" class="secondary" data-reset>Alle Einzeländerungen zurücknehmen (zurück auf Rolle)</button></p>' . $modules : '<p>Es sind noch keine Module installiert.</p>')
             . '<button>Speichern</button></form>'
             . (!$self && !$this->users->needsOtp($user) ? '<form method="post" action="/verwaltung/benutzer/' . $id . '/link" class="box">' . V::csrf($this->session['csrf'])
                 . '<p>Passwort vergessen? Ein neuer Einrichtungslink löscht das bisherige Passwort und meldet alle Geräte ab.</p><button>Neuen Einrichtungslink erzeugen</button></form>'
                 : (!$self ? '<p>Admin-Konten (Passwort oder Authenticator-App verloren) setzt man nur an der Server-Konsole zurück: <code>sudo kienzle-admin zuruecksetzen ' . V::h($user['login']) . '</code></p>' : ''))
             . (!$self ? '<form method="post" action="/verwaltung/benutzer/' . $id . '/loeschen" class="box">' . V::csrf($this->session['csrf']) . '<button class="danger">Benutzer löschen</button></form>' : '');
         return Response::html(V::page('Benutzer ' . $user['login'], $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
-    }
-
-    private function groupSelect(): string {
-        $opts = '<option value="">– nicht ändern, Haken unten gelten –</option>';
-        foreach (array_keys((new Groups($this->db, $this->modules))->all()) as $name) $opts .= '<option value="' . V::h($name) . '">' . V::h($name) . '</option>';
-        return '<label>Gruppe anwenden<select name="gruppe">' . $opts . '</select></label>'
-            . '<p class="muted small">Setzt beim Speichern die Modulrechte dieser Gruppe (<a href="/verwaltung/gruppen">Gruppen bearbeiten</a>). Danach lassen sich die Haken einzeln ändern.</p>';
     }
 
     private function groupBoxes(string $prefix, array $g): string {
@@ -1015,11 +1032,11 @@ final class Web {
     private function groupsPage(?string $error = null, ?string $notice = null): Response {
         $groups = new Groups($this->db, $this->modules);
         $body = V::error($error) . V::notice($notice)
-            . '<p>Gruppen sind Vorlagen für Modulrechte. Beim Bearbeiten eines Benutzers wählt man eine Gruppe, die Rechte werden dann übernommen. '
-            . 'Spätere Änderungen an einer Gruppe ändern bestehende Benutzer nicht. Basis-Admins dürfen in allen Modulen ohnehin alles.</p>';
+            . '<p>Gruppen sind dauerhafte Rollen: Wer einer Gruppe angehört, hat ihre Rechte, und jede Änderung hier gilt sofort für alle Mitglieder. '
+            . 'Beim Benutzer lassen sich einzelne Rechte abweichend erlauben oder entziehen. Basis-Admins dürfen in allen Modulen ohnehin alles.</p>';
         foreach ($groups->all() as $name => $g) {
             $body .= '<form method="post" action="/verwaltung/gruppen" class="box">' . V::csrf($this->session['csrf']) . '<input type="hidden" name="aktion" value="speichern"><input type="hidden" name="name" value="' . V::h($name) . '">'
-                . '<h2>' . V::h($name) . '</h2>' . $this->groupBoxes($name, $g) . '<button>Speichern</button></form>'
+                . '<h2>' . V::role($name) . ' ' . V::h($name) . '</h2><p class="muted small">Mitglieder: ' . V::h(implode(', ', $this->users->members($name)) ?: 'keine') . '</p>' . $this->groupBoxes($name, $g) . '<button>Speichern</button></form>'
                 . '<form method="post" action="/verwaltung/gruppen" class="inline">' . V::csrf($this->session['csrf']) . '<input type="hidden" name="aktion" value="zuruecksetzen"><input type="hidden" name="name" value="' . V::h($name) . '">'
                 . '<button class="danger">' . (isset($groups->defaults()[$name]) ? 'Auf Vorgabe zurücksetzen' : 'Gruppe löschen') . '</button></form>';
         }
@@ -1053,9 +1070,11 @@ final class Web {
         $moduleAdmin = $r->list('modul_admin');
         $entries = $r->list('recht');
         $groupName = $r->field('gruppe', 30);
-        if ($groupName !== '') {
+        $roles = $r->field('rollen_gesendet') === '1' ? array_map('strval', $r->list('rolle')) : null;
+        if ($groupName !== '') {   // älterer Weg: eine Gruppe als alleinige Rolle, ohne Einzeländerungen
             $g = (new Groups($this->db, $this->modules))->get($groupName);
             if (!$g) return $this->userEdit($id, 'Unbekannte Gruppe.');
+            $roles = [$groupName];
             $moduleAdmin = $g['admin'];
             $entries = $g['rechte'];
         }
@@ -1065,9 +1084,10 @@ final class Web {
             $rights[$m][] = $right;
         }
         try {
-            $this->db->transaction(function () use ($id, $r, $moduleAdmin, $rights): void {
+            $this->db->transaction(function () use ($id, $r, $moduleAdmin, $rights, $roles): void {
                 $self = $id === (int)$this->session['user_id'];
                 $this->users->update($id, $r->field('display', 80), $self || $r->field('admin') === '1', $self || $r->field('active') === '1');
+                if ($roles !== null) $this->users->setRoles($id, $roles);
                 foreach (array_keys($this->modules->all()) as $m) $this->users->setAccess($id, $m, in_array($m, $moduleAdmin, true), $rights[$m] ?? []);
                 foreach (array_diff(array_keys($rights), array_keys($this->modules->all())) as $unknown) throw new Problem('Unbekanntes Modul.', 422);
             });
