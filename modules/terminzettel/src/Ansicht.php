@@ -36,10 +36,11 @@ final class Ansicht {
             . '<details open><summary>Letzte Druckaufträge</summary>' . (($log = Seite::protokoll()) ? '<pre>' . $h(implode("\n", $log)) . '</pre>'
                 : '<p class="muted">Noch kein Auftrag angekommen. Kommt nach dem Drucken aus T2med hier nichts an, erreicht der Auftrag den virtuellen Drucker „Terminzettel“ nicht (Arbeitsplatz, Treiber, Firewall).</p>') . '</details>'
             . '<details><summary>Drucker „Terminzettel“ auf den Arbeitsplätzen einrichten</summary><ol>'
-            . '<li>Windows: Drucker hinzufügen → „Der gewünschte Drucker ist nicht aufgelistet“ → Freigegebenen Drucker über Namen auswählen: <code>' . $h($printer) . '</code>; Treiber „Microsoft IPP Class Driver“ oder „Generic / Text Only“ genügt.</li>'
-            . '<li>Mac: Drucker hinzufügen → <strong>Terminzettel</strong> wählen, als Treiber <a href="' . $h($base) . '/assets/Terminzettel-PDF.ppd">Terminzettel-PDF.ppd</a> (heruntergeladen) verwenden.</li>'
+            . '<li>Windows: Drucker hinzufügen → „Freigegebenen Drucker über den Namen auswählen“: <code>' . $h($printer) . '</code> – Treiber „Microsoft IPP Class Driver“, Papier A6. Per IP-Adresse (z. B. aus dem VPN) statt des Namens: <code>http://&lt;IP-Adresse&gt;:631/printers/Terminzettel</code>.</li>'
+            . '<li>Windows 11: Fehlt der Treiber „Microsoft IPP Class Driver“ oder akzeptiert Windows die Adresse nicht, PowerShell als Administrator öffnen und ausführen:<pre>' . $h("Enable-WindowsOptionalFeature -Online -FeatureName Printing-Foundation-InternetPrinting-Client -NoRestart\nAdd-PrinterDriver -Name \"Microsoft IPP Class Driver\"\n\$url = \"" . $printer . "\"\nAdd-PrinterPort -Name \$url -ErrorAction SilentlyContinue\nAdd-Printer -Name \"Terminzettel\" -DriverName \"Microsoft IPP Class Driver\" -PortName \$url") . '</pre></li>'
+            . '<li>Mac: Drucker hinzufügen → <strong>Terminzettel</strong> wählen, als Treiber die Datei <a href="' . $h($base) . '/assets/Terminzettel-PDF.ppd" download>Terminzettel-PDF.ppd</a> verwenden.</li>'
             . '<li>In T2med unter Einstellungen → Kalender → Terminliste (DIN A6) den Drucker „Terminzettel“ wählen.</li>'
-            . '<li>Voraussetzung: Die <a href="/verwaltung/firewall">Firewall</a> der Basis lässt Drucken (IPP, Port 631) aus dem Praxisnetz zu.</li></ol></details>'
+            . '<li>Voraussetzung: Die <a href="/verwaltung/firewall">Firewall</a> der Basis lässt Drucken (IPP, Port 631) aus dem Praxisnetz zu; beim virtuellen Drucker ist unter Verwaltung → Drucker die Freigabe (IPP) angehakt.</li></ol></details>'
             . '</main><script src="' . $h($base) . '/assets/app.js"></script></body></html>';
     }
 }

@@ -1417,34 +1417,34 @@ final class Web {
         return $busy ? $response->with('Refresh', '3') : $response;
     }
 
-    /** Aufklappbare Anleitung: virtuelle Drucker der Module an den Arbeitsplätzen einrichten (Windows, Mac, T2med). */
+    /** Aufklappbare Anleitung: virtuelle Drucker der Module an den Arbeitsplätzen einrichten (Windows, Mac, T2med), im Format der Kasse. */
     private function virtualPrinterHelp(array $queues): string {
         $host = strtolower((string)preg_replace('/:\d+$/', '', (string)($_SERVER['HTTP_HOST'] ?? 'server')));
         if (!$this->config->ownHost($host)) $host = 'server';
-        $items = $ps = '';
+        $ppd = ['terminzettel' => '/terminzettel/assets/Terminzettel-PDF.ppd', 'sumup' => '/kasse/assets/SumUp-Rechnung-PDF.ppd'];
+        $blocks = '';
         foreach ($queues as $q) {
             if ($q['modul'] === '') continue;
-            $url = 'http://' . $host . ':631/printers/' . rawurlencode((string)$q['name']);
-            $text = (bool)preg_match('/terminzettel/i', (string)$q['name']);
-            $driver = $text ? 'Generic / Text Only' : 'Microsoft IPP Class Driver';
-            $items .= '<li><strong>' . V::h($q['name']) . '</strong>: <code>' . V::h($url) . '</code> – Treiber „' . V::h($driver) . '“'
-                . ($text ? ' (T2med schickt reinen Text)' : ', Papier A4') . '</li>';
-            $ps .= 'Add-PrinterPort -Name "' . $url . '" -ErrorAction SilentlyContinue' . "\n"
-                . 'Add-Printer -Name "' . $q['name'] . '" -DriverName "' . $driver . '" -PortName "' . $url . '"' . "\n";
+            $name = (string)$q['name'];
+            $url = 'http://' . $host . ':631/printers/' . rawurlencode($name);
+            $paper = preg_match('/terminzettel/i', $name) ? 'A6' : 'A4';
+            $script = "Enable-WindowsOptionalFeature -Online -FeatureName Printing-Foundation-InternetPrinting-Client -NoRestart\n"
+                . "Add-PrinterDriver -Name \"Microsoft IPP Class Driver\"\n\$url = \"" . $url . "\"\nAdd-PrinterPort -Name \$url -ErrorAction SilentlyContinue\n"
+                . "Add-Printer -Name \"" . $name . "\" -DriverName \"Microsoft IPP Class Driver\" -PortName \$url"
+                . ($paper === 'A4' ? "\nSet-PrintConfiguration -PrinterName \"" . $name . "\" -PaperSize A4" : '');
+            $mac = isset($ppd[$q['modul']]) ? ' <a href="' . V::h($ppd[$q['modul']]) . '" download>PDF-Beschreibungsdatei (PPD) herunterladen</a>' : '';
+            $blocks .= '<h3>Drucker „' . V::h($name) . '“</h3><ol>'
+                . '<li>Windows: Drucker hinzufügen → „Freigegebenen Drucker über den Namen auswählen“: <code>' . V::h($url) . '</code> – Treiber „Microsoft IPP Class Driver“, Papier ' . $paper . '. '
+                . 'Per IP-Adresse (z. B. aus dem VPN) statt des Namens: <code>http://&lt;IP-Adresse&gt;:631/printers/' . V::h(rawurlencode($name)) . '</code>.</li>'
+                . '<li>Windows 11: Fehlt der Treiber „Microsoft IPP Class Driver“ oder akzeptiert Windows die Adresse nicht, PowerShell als Administrator öffnen und ausführen:<pre>' . V::h($script) . '</pre></li>'
+                . '<li>Mac: „' . V::h($name) . '“ hinzufügen, als Treiber die Datei wählen.' . $mac . '</li></ol>';
         }
-        if ($items === '') return '';
+        if ($blocks === '') return '';
         return '<details class="box"><summary><strong>Anleitung: virtuelle Drucker an den Arbeitsplätzen einrichten</strong></summary>'
             . '<p>Nur die virtuellen Drucker der Module werden an den Arbeitsplätzen (T2med-PC) eingerichtet. Echte Drucker und der Bondrucker brauchen keine Freigabe und keine Einrichtung am Arbeitsplatz: die Module drucken von hier aus.</p>'
-            . '<p><strong>Voraussetzung:</strong> Haken bei „für Windows freigeben (Samba)“ bzw. „für macOS und andere freigeben (IPP)“ beim virtuellen Drucker und in der <a href="/verwaltung/firewall">Firewall</a> Drucken (IPP, Port 631) aus dem Praxisnetz erlauben.</p>'
-            . '<h3>Windows (IPP, empfohlen)</h3><ol>'
-            . '<li>Einstellungen → Bluetooth &amp; Geräte → Drucker &amp; Scanner → Gerät hinzufügen → „Der gewünschte Drucker ist nicht aufgelistet“ → „Freigegebenen Drucker über den Namen auswählen“.</li>'
-            . '<li>Adresse und Treiber je Drucker:<ul>' . $items . '</ul></li>'
-            . '<li>Fehlt der Treiber oder nimmt Windows die Adresse nicht an: PowerShell als Administrator öffnen und ausführen (der Treiber „Generic / Text Only“ und der „Microsoft IPP Class Driver“ sind bei Windows dabei):<pre>'
-            . V::h("Enable-WindowsOptionalFeature -Online -FeatureName Printing-Foundation-InternetPrinting-Client -NoRestart\nAdd-PrinterDriver -Name \"Microsoft IPP Class Driver\" -ErrorAction SilentlyContinue\n" . $ps) . '</pre></li>'
-            . '<li>Windows 11 Pro ab 24H2 lässt Gastzugriff auf Windows-Freigaben (Samba) nicht mehr zu: dort immer über IPP wie oben einrichten.</li>'
-            . '<li>Hinweis zum Namen: Lässt sich der Servername nicht auflösen, statt dessen die IP-Adresse des Servers in die Adresse einsetzen.</li></ol>'
-            . '<h3>Mac</h3><ol><li>Drucker hinzufügen → IP-Drucker, Protokoll IPP, Adresse <code>' . V::h($host) . '</code>, Warteschlange <code>printers/&lt;Name&gt;</code>.</li>'
-            . '<li>Als Treiber die PDF-Beschreibungsdatei des Moduls verwenden (bei „SumUp-Rechnung“ und „Terminzettel“ auf der Einstellungsseite des Moduls zum Herunterladen).</li></ol>'
+            . '<p><strong>Voraussetzung:</strong> Haken bei „für Windows freigeben (Samba)“ bzw. „für macOS und andere freigeben (IPP)“ beim virtuellen Drucker und in der <a href="/verwaltung/firewall">Firewall</a> Drucken (IPP, Port 631) aus dem Praxisnetz erlauben. '
+            . 'Windows 11 Pro ab 24H2 lässt Gastzugriff auf Windows-Freigaben (Samba) nicht mehr zu: dort immer über IPP einrichten.</p>'
+            . $blocks
             . '<h3>In T2med</h3><ul><li>„Terminzettel“: Einstellungen → Kalender → Terminliste (DIN A6), Drucker „Terminzettel“ wählen.</li>'
             . '<li>„SumUp-Rechnung“: Rechnung aus T2med auf diesen Drucker drucken, sie erscheint danach beim Patienten in der Kasse.</li></ul></details>';
     }

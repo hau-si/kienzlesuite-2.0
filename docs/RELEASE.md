@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.1-beta.1
+
+- Verwaltung → Drucker: Die Anleitung für die virtuellen Drucker folgt dem Format der Kasse-Anleitung (SumUp-Rechnung): je Drucker Windows-Adresse mit „Microsoft IPP Class Driver“ (auch für den Terminzettel statt „Generic / Text Only“), Adresse per IP, PowerShell-Befehle, Mac mit PPD-Download. Nicht getestet (Tests auf Wunsch nicht ausgeführt).
+
 ## 0.21.0-beta.1
 
 - Verwaltung → Drucker → „Wofür welcher Drucker?“: neu die **Papierbreite des Bondruckers** (58 mm Epson TM-m10 oder 80 mm TM-m30III). Sie gilt zentral für alle Module; die Module bekommen sie mit jeder Anfrage (`KienzleModul::bonBreite()`, ergänzende Schnittstelle, `core_api` bleibt 1).

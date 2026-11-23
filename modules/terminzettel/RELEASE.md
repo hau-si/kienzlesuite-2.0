@@ -1,5 +1,9 @@
 # Terminzettel – Release-Notizen
 
+## 1.2.2-beta.1
+
+- Die Anleitung auf der Einstellungsseite folgt dem Format der Kasse (SumUp-Rechnung): Windows mit „Microsoft IPP Class Driver“ (nicht mehr „Generic / Text Only“), Adresse per IP, PowerShell-Befehle, Mac mit PPD. Nicht getestet (Tests auf Wunsch nicht ausgeführt).
+
 ## 1.2.1-beta.1
 
 - Neu: Auf der Einstellungsseite steht „Letzte Druckaufträge“: Zeit, Art des Auftrags (PDF, PostScript, XPS, Text), Größe und Ergebnis („Bon an die Warteschlange übergeben“ oder die Fehlermeldung). Es werden nur feste Texte protokolliert, keine Patientendaten. Kommt nach dem Drucken aus T2med kein Eintrag, erreicht der Auftrag den virtuellen Drucker nicht.
