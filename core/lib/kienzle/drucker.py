@@ -646,7 +646,26 @@ def set_status(**changes) -> dict:
     return s
 
 
+def heal_local() -> None:
+    """Von der Suite angelegte Warteschlangen, deren Adresse einen „.local“-Namen enthält, den der Server nicht auflöst, auf die IP umstellen."""
+    try:
+        for q in queues():
+            m = re.match(r'^((?:socket|ipp|ipps|lpd)://)([A-Za-z0-9._-]+\.local)(.*)$', q['uri'], re.I)
+            if not m or not q['managed'] or q['modul']:
+                continue
+            try:
+                socket.getaddrinfo(m.group(2), None)
+                continue
+            except OSError:
+                pass
+            ip = resolve_local(m.group(2))
+            run('lpadmin', '-p', q['name'], '-v', m.group(1) + ip + m.group(3), timeout=30)
+    except (Fehler, OSError, subprocess.SubprocessError):
+        pass
+
+
 def refresh() -> None:
+    heal_local()
     try:
         set_status(warteschlangen=[{k: q[k] for k in ('name', 'address', 'state', 'description', 'managed', 'modul', 'share')} for q in queues()],
                    auftraege=jobs()[:200], netz=network(), fehler='')

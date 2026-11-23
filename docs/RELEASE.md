@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.19.8-beta.1
+
+- Drucker: Bereits angelegte Drucker der Suite, deren Adresse einen „.local“-Namen enthält, den der Server nicht auflösen kann, werden beim nächsten Lauf des Druckdienstes (z. B. beim Öffnen der Druckerseite oder bei der nächsten Anfrage) automatisch auf die IP-Adresse umgestellt. Das behebt den Fehler beim Testdruck „Der Name des Druckers lässt sich nicht auflösen“. Nicht an echter Hardware geprüft; die Auflösung braucht `avahi-utils` (Installer erneut ausführen).
+
 ## 0.19.7-beta.1
 
 - Anmeldeseite: Hinweis mit Link „Arbeitsplatz einrichten“ (Zertifikat und Servername je PC), für den Fall, dass der Browser „Nicht sicher“ meldet oder die Adresse nicht öffnet.

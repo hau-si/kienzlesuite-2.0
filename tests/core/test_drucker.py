@@ -118,6 +118,15 @@ class Praxisdrucker(Umgebung):
 
 
 class Virtuell(Umgebung):
+    def test_local_name_wird_auf_ip_umgestellt(self):
+        calls = []
+        q = [{'name': 'Bon', 'uri': 'socket://Drucker-X.local:9100', 'managed': True, 'modul': ''},
+             {'name': 'Fremd', 'uri': 'socket://Anderer.local:9100', 'managed': False, 'modul': ''}]
+        with mock.patch.object(self.d, 'queues', return_value=q), mock.patch.object(self.d.socket, 'getaddrinfo', side_effect=OSError), \
+                mock.patch.object(self.d, 'resolve_local', return_value='192.0.2.55'), mock.patch.object(self.d, 'run', side_effect=lambda *a, **k: calls.append(a) or ''):
+            self.d.heal_local()
+        self.assertEqual(calls, [('lpadmin', '-p', 'Bon', '-v', 'socket://192.0.2.55:9100')])
+
     def test_abgleich(self):
         self.registry(self.module())
         notes = self.d.sync()
