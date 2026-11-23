@@ -1,5 +1,10 @@
 # Terminzettel – Release-Notizen
 
+## 1.1.1-beta.1
+
+- Neue Vorgaben: QR-Code mittig unter dem Termin, erste Zeile des Kopfes 2×2, Adressbereich 1×1, Termine 2×2. Bereits gespeicherte Layouts bleiben unverändert.
+- Tooltip beim Kalender-Titel (Präfix): erklärt, dass der Text im Kalendereintrag steht, der beim Scannen des QR-Codes entsteht.
+
 ## 1.1.0-beta.1
 
 - Gestaltung an die Suite angepasst (Petrol, Karten, Kopfzeile mit Logo, gleiche Knöpfe und Eingabefelder).

@@ -10,12 +10,13 @@ final class Ansicht {
         foreach (Seite::schema() as $key => $f) {
             $v = $values[$key];
             $id = 'f-' . $key;
+            $tip = isset(Seite::HILFE[$key]) ? ' <span class="hilfe" tabindex="0" role="note" aria-label="' . $h(Seite::HILFE[$key]) . '" data-tip="' . $h(Seite::HILFE[$key]) . '">i</span>' : '';
             $form .= match ($f[0]) {
                 'bool' => '<label class="check"><input type="checkbox" id="' . $id . '" name="' . $key . '" value="1"' . ($v ? ' checked' : '') . '> ' . $h($f[1]) . '</label>',
                 'choice' => '<label>' . $h($f[1]) . '<select id="' . $id . '" name="' . $key . '">' . implode('', array_map(
                     fn($val, $label) => '<option value="' . $h((string)$val) . '"' . ((string)$val === $v ? ' selected' : '') . '>' . $h($label) . '</option>', array_keys($f[3]), $f[3])) . '</select></label>',
                 'text' => '<label>' . $h($f[1]) . '<textarea id="' . $id . '" name="' . $key . '" rows="4" maxlength="1000">' . $h($v) . '</textarea></label>',
-                default => '<label>' . $h($f[1]) . '<input id="' . $id . '" name="' . $key . '" value="' . $h($v) . '" maxlength="80"></label>',
+                default => '<label>' . $h($f[1]) . $tip . '<input id="' . $id . '" name="' . $key . '" value="' . $h($v) . '" maxlength="80"></label>',
             };
         }
         $printer = 'http://' . $host . ':631/printers/Terminzettel';

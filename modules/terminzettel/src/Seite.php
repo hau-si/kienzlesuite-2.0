@@ -12,24 +12,28 @@ final class Seite {
     public static string $helper = '/opt/kienzle/core/current/php/modul/Kienzle.php';
     public const QR_SIZES = ['small' => 160, 'medium' => 256, 'large' => 320];
     private const SIZES = ['1x1' => 'Normal (1×1)', '1x2' => 'Hoch (1×2)', '2x1' => 'Breit (2×1)', '2x2' => 'Groß (2×2)', '2x3' => 'Groß und hoch (2×3)', '3x3' => 'Sehr groß (3×3)', '4x4' => 'Riesig (4×4)'];
+    /** Erklärungen als Tooltip neben der Beschriftung. */
+    public const HILFE = [
+        'qr_summary' => 'Dieser Text steht im Kalendereintrag, der beim Scannen des QR-Codes entsteht, vor dem Termintyp (z. B. „Termin Arztpraxis: Lufu“). Keine Patientennamen eintragen.',
+    ];
     /** Formularfelder: Typ, Beschriftung, Vorgabe (und Auswahl). */
     public static function schema(): array {
         return [
             'enabled' => ['bool', 'Terminzettel aus T2med auf dem Bondrucker drucken', true],
             'model' => ['choice', 'Bondrucker-Modell', 'tm-m10', ['tm-m10' => 'Epson TM-m10 (58 mm)', 'tm-m30iii' => 'Epson TM-m30III (80 mm)']],
             'header_text' => ['text', 'Kopf: erste Zeile Praxisname, darunter Adressbereich (leer = keiner)', ''],
-            'header_first_size' => ['choice', 'Erste Zeile (Praxisname): Schriftgröße', 'same', ['same' => 'Wie der Adressbereich'] + self::SIZES],
+            'header_first_size' => ['choice', 'Erste Zeile (Praxisname): Schriftgröße', '2x2', ['same' => 'Wie der Adressbereich'] + self::SIZES],
             'header_first_bold' => ['choice', 'Erste Zeile (Praxisname): fett', 'same', ['same' => 'Wie der Adressbereich', 'yes' => 'Fett', 'no' => 'Nicht fett']],
             'header_size' => ['choice', 'Adressbereich (übrige Zeilen): Schriftgröße', '1x1', self::SIZES],
             'header_bold' => ['bool', 'Adressbereich (übrige Zeilen): fett', true],
             'heading' => ['string', 'Überschrift', 'IHRE TERMINE'],
             'heading_size' => ['choice', 'Schriftgröße Überschrift', '2x2', self::SIZES],
             'show_patient' => ['bool', 'Patientennamen drucken', true],
-            'appointment_size' => ['choice', 'Schriftgröße Termine', '1x1', self::SIZES],
+            'appointment_size' => ['choice', 'Schriftgröße Termine', '2x2', self::SIZES],
             'footer_text' => ['text', 'Endtext (leer = keiner)', 'Können Sie einen Termin nicht wahrnehmen, sagen Sie bitte unbedingt Bescheid.'],
             'footer_size' => ['choice', 'Schriftgröße Endtext', '1x1', self::SIZES],
             'qr_enabled' => ['bool', 'Kalender-QR je Termin drucken', true],
-            'qr_position' => ['choice', 'Position des QR-Codes', 'right', ['right' => 'Rechts neben dem Termin', 'left' => 'Links neben dem Termin', 'below' => 'Unter dem Termin (mittig)']],
+            'qr_position' => ['choice', 'Position des QR-Codes', 'below', ['right' => 'Rechts neben dem Termin', 'left' => 'Links neben dem Termin', 'below' => 'Unter dem Termin (mittig)']],
             'qr_size' => ['choice', 'Größe des QR-Codes', 'medium', ['small' => 'Klein', 'medium' => 'Mittel', 'large' => 'Groß']],
             'qr_summary' => ['string', 'Kalender-Titel (Präfix)', 'Termin Arztpraxis'],
             'cut' => ['bool', 'Bon abschneiden', true],

@@ -36,3 +36,6 @@ details { margin-top: 22px; background: #fff; border: 1px solid var(--line); bor
 summary { cursor: pointer; font-weight: 650; }
 code { word-break: break-all; background: var(--soft); padding: 1px 5px; border-radius: 5px; font-size: 13px; }
 ol li { margin: 6px 0; }
+
+.hilfe { position: relative; display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: 4px; border-radius: 50%; background: var(--soft); color: var(--teal); font-size: 12px; font-weight: 700; cursor: help; vertical-align: middle; }
+.hilfe:hover::after, .hilfe:focus::after { content: attr(data-tip); position: absolute; left: 50%; bottom: 150%; transform: translateX(-30%); width: 260px; padding: 9px 11px; border-radius: 9px; background: #203c43; color: #fff; font-size: 13px; font-weight: 400; line-height: 1.4; z-index: 5; text-align: left; }

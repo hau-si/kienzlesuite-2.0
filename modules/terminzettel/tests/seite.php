@@ -32,6 +32,10 @@ check(!array_key_exists('queue', $o) && $o['model'] === 'tm-m30iii' && $o['cut']
 check($o['header']['enabled'] === true && $o['header']['first_size'] === '2x2' && $o['header']['first_bold'] === true && $o['footer']['enabled'] === false, 'Overlay: Kopf und Fuß');
 check($o['qr']['width_dots'] === 320 && $o['qr']['position'] === 'below' && $o['appointments']['size'] === '1x2', 'Overlay: QR');
 
+check($defaults['qr_position'] === 'below' && $defaults['header_first_size'] === '2x2' && $defaults['header_size'] === '1x1' && $defaults['appointment_size'] === '2x2', 'neue Vorgaben');
+$html0 = Ansicht::seite('/terminzettel', $defaults, 'tok', 'Bon-1', null, null, 'server');
+check(str_contains($html0, 'data-tip="Dieser Text steht im Kalendereintrag'), 'Tooltip Kalender-Titel fehlt');
+
 // Kopf aus den Praxisdaten der Basis vorbelegt (erfundene Daten), gespeicherter Kopf hat Vorrang
 $praxis = ['name' => 'Praxis Beispiel', 'street' => 'Musterweg 1', 'city' => '12345 Beispielstadt', 'contact' => ''];
 check(Seite::werte($praxis)['header_text'] === "Praxis Beispiel\nMusterweg 1\n12345 Beispielstadt", 'Kopf nicht aus Praxisdaten vorbelegt');
