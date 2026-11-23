@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.24
+
+- Verbindungen → E-Mail: Ist Gmail (oder SMTP) verbunden, zeigt ein grüner Balken „Mit Google verbunden: …“ und die Überschrift „✓ eingerichtet“; die Anmeldung (Anleitung, Schritt 1) ist dann unter „Erneut einrichten oder anderes Konto verbinden“ eingeklappt. Knopfreihe (Anmeldung prüfen, Testnachricht mit Empfängerfeld, Entfernen) steht in einer Zeile; das Feld bleibt mit seinem Knopf zusammen (auch bei SMS und Letterxpress).
+
 ## 0.21.4-beta.23
 
 - Gmail-Anleitung: Schritt „Branding“ ergänzt (App-Name, Support-E-Mail, Adressen für Startseite und Datenschutzerklärung, autorisierte Domain), den Google vor „In Produktion“ verlangt. Nur Text.

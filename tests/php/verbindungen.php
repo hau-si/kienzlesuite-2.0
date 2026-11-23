@@ -156,7 +156,7 @@ function test_gmail(): void {
     [$b2] = admin_browser($env2);
     $b2->web = fn() => $b2->defaultWeb(null, null, $c2);
     $page2 = $b2->get('/verwaltung/verbindungen')->body;
-    check(str_contains($page2, 'mit Google verbunden') && str_contains($page2, '✓ eingerichtet') && !str_contains($page2, 'GOCSPX'), 'Gmail-Status falsch');
+    check(str_contains($page2, 'status-ok">Mit Google verbunden: praxis@gmail.example') && str_contains($page2, 'Gmail-Konto (OAuth, ohne Passwort im Klartext) <span class="tag ok">✓ eingerichtet</span>') && str_contains($page2, 'Erneut einrichten oder anderes Konto verbinden') && !str_contains($page2, 'GOCSPX'), 'Gmail-Status falsch');
 }
 
 function test_testnachricht(): void {

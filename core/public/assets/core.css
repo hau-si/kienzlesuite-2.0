@@ -247,3 +247,11 @@ details.fold > summary h2 { display: inline-flex; align-items: center; }
 
 .tag.test { background: #fff0ca; color: #886100; }
 .h-ico.sm { width: 16px; height: 16px; margin-right: 4px; vertical-align: -2px; }
+
+/* Knopfreihe unter Verbindungen: alles in einer Zeile, Eingabefeld und zugehöriger Knopf bleiben zusammen */
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0 4px; }
+.actions form.inline { margin: 0; }
+form.inline.grp { flex-wrap: nowrap; }
+form.inline.grp > input { min-width: 220px; }
+.status-ok { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; background: #e5f3ed; color: #16503f; font-weight: 600; margin: 8px 0; }
+.status-ok::before { content: "✓"; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #16503f; color: #fff; font-size: 13px; }

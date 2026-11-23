@@ -1419,10 +1419,12 @@ final class Web {
         $sec = (string)($mail['sicherheit'] ?? 'starttls');
         $gmail = ($mail['art'] ?? '') === 'gmail';
         $pending = $this->con()->gmailPending();
-        $lead = $mail ? '<p class="' . (($gmail && empty($mail['verbunden'])) ? 'error' : 'ok') . '">' . ($gmail ? 'Gmail: ' . V::h((string)($mail['absender'] ?? '')) . ($mail['verbunden'] ? ' – mit Google verbunden' : ' – noch nicht angemeldet')
-            : 'SMTP-Server: ' . V::h((string)($mail['host'] ?? '')) . ' (' . V::h((string)($mail['absender'] ?? '')) . ')') . '</p>' : '';
+        $connected = $gmail && !empty($mail['verbunden']);
+        $reconnect = $connected && !$pending;
+        $lead = !$mail ? '' : ($gmail && !$connected ? '<p class="error">Gmail: ' . V::h((string)($mail['absender'] ?? '')) . ' – noch nicht angemeldet</p>'
+            : '<div class="status-ok">' . ($gmail ? 'Mit Google verbunden: ' . V::h((string)($mail['absender'] ?? '')) : 'SMTP-Server: ' . V::h((string)($mail['host'] ?? '')) . ' (' . V::h((string)($mail['absender'] ?? '')) . ')') . '</div>');
         $body .= '<section><h2>E-Mail-Versand</h2>' . $lead
-            . '<details class="fold"' . (!$gmail ? ' open' : '') . '><summary><h3>SMTP-Server (eigener Mailserver, z. B. Praxis-Domain)</h3></summary>'
+            . '<details class="fold"' . (!$gmail ? ' open' : '') . '><summary><h3>SMTP-Server (eigener Mailserver, z. B. Praxis-Domain)' . ($mail && !$gmail ? ' <span class="tag ok">✓ eingerichtet</span>' : ' <span class="tag opt">nicht eingerichtet</span>') . '</h3></summary>'
             . 'form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('mail')
             . V::input('host', 'SMTP-Server', 'text', (string)($mail['host'] ?? ''), 'placeholder="smtp.example.org"')
             . V::input('port', 'Port', 'number', (string)($mail['port'] ?? '587'), 'min="1" max="65535"')
@@ -1432,7 +1434,8 @@ final class Web {
             . V::input('passwort', 'Passwort', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($mail['passwort_gesetzt'] ?? false))) . '"')
             . V::input('absender', 'Absender', 'email', (string)($mail['absender'] ?? ''), 'placeholder="praxis@example.org"')
             . '<button>Speichern</button></form>' . '</details>'
-            . '<details class="fold"' . ($gmail || $pending ? ' open' : '') . '><summary><h3>Gmail-Konto (OAuth, ohne Passwort im Klartext)</h3></summary>'
+            . '<details class="fold"' . (($gmail && !$connected) || $pending ? ' open' : '') . '><summary><h3>Gmail-Konto (OAuth, ohne Passwort im Klartext)' . ($connected ? ' <span class="tag ok">✓ eingerichtet</span>' : ' <span class="tag opt">nicht eingerichtet</span>') . '</h3></summary>'
+            . ($reconnect ? '<details class="fold"><summary><h3>Erneut einrichten oder anderes Konto verbinden</h3></summary>' : '')
             . '<p class="muted">Gilt für ein normales Gmail-Konto. Jede Praxis legt dafür einmalig einen eigenen Zugang bei Google an (kostenlos, ca. 10 Minuten). Gesendet wird nur über die Gmail-Schnittstelle mit der Berechtigung „E-Mails senden“; die Suite kann keine Postfächer lesen.</p>'
             . '<ol class="muted"><li>Auf <strong>console.cloud.google.com</strong> mit dem Gmail-Konto anmelden und oben ein <strong>neues Projekt</strong> anlegen (Name z. B. „Kienzle-Suite“).</li>'
             . '<li>Im Suchfeld oben „<strong>Gmail API</strong>“ suchen und <strong>Aktivieren</strong> klicken.</li>'
@@ -1452,11 +1455,12 @@ final class Web {
                 . '<label>Adresse aus der Adresszeile<input type="text" name="adresse" required maxlength="2000" autocomplete="off" placeholder="http://localhost/?state=…&amp;code=…"></label>'
                 . V::input('client_secret', 'Client-Secret', 'password', '', 'autocomplete="new-password" required maxlength="200"')
                 . '<button>Verbinden</button></form><p class="muted">Die Anmeldung ist 30 Minuten gültig.</p></div>' : '')
+            . ($reconnect ? '</details>' : '')
             . '</details>'
 
-            . ($mail ? $this->testLine($st['tests'], 'mail') . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'mail']) . '<button>Anmeldung prüfen</button></form> '
-                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('testmail') . '<input type="email" name="an" placeholder="empfaenger@example.org" required maxlength="254" aria-label="Empfänger der Testnachricht"> <button>Testnachricht senden</button></form> '
-                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'mail']) . '<button class="danger">Entfernen</button></form>' : '')
+            . ($mail ? $this->testLine($st['tests'], 'mail') . '<div class="actions"><form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'mail']) . '<button>Anmeldung prüfen</button></form> '
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline grp">' . $this->hidden('testmail') . '<input type="email" name="an" placeholder="empfaenger@example.org" required maxlength="254" aria-label="Empfänger der Testnachricht"> <button>Testnachricht senden</button></form> '
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'mail']) . '<button class="danger">Entfernen</button></form></div>' : '')
             . '</section>';
         // SMS
         $sms = $st['sms'] ?? [];
@@ -1465,9 +1469,9 @@ final class Web {
             . $this->tipInput('api_key', 'API-Schlüssel von seven.io', 'Bei seven.io unter Entwickler → API-Schlüssel → „API-Key anlegen“: Label z. B. „Kienzle-Suite“, Umgebung Live (Sandbox verschickt nichts), Gültig bis Unbegrenzt, Zugriff auf Subaccounts aus. Berechtigungen nur „sms“ (Versand) und „balance“ (Schlüssel prüfen); alle anderen aus.', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($sms['schluessel_gesetzt'] ?? false))) . '"')
             . $this->tipInput('absender', 'Absendername (optional, höchstens 11 Zeichen)', 'Erscheint beim Empfänger als Absender, z. B. „Praxis“. Nur Buchstaben und Ziffern, keine Leerzeichen; leer = Standard von seven.io.', 'text', (string)($sms['absender'] ?? ''), 'maxlength="16" placeholder="Praxis"')
             . '<button>Speichern</button></form>'
-            . ($sms ? $this->testLine($st['tests'], 'sms') . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'sms']) . '<button>Schlüssel prüfen</button></form> '
-                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('testsms') . '<input type="tel" name="an" placeholder="01701234567" required maxlength="30" aria-label="Handynummer der Test-SMS"> <button>Test-SMS senden</button></form> '
-                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'sms']) . '<button class="danger">Entfernen</button></form>' : '')
+            . ($sms ? $this->testLine($st['tests'], 'sms') . '<div class="actions"><form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'sms']) . '<button>Schlüssel prüfen</button></form> '
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline grp">' . $this->hidden('testsms') . '<input type="tel" name="an" placeholder="01701234567" required maxlength="30" aria-label="Handynummer der Test-SMS"> <button>Test-SMS senden</button></form> '
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'sms']) . '<button class="danger">Entfernen</button></form></div>' : '')
             . '</section>';
         // Letterxpress
         $lxp = $st['letterxpress'] ?? [];
@@ -1480,9 +1484,9 @@ final class Web {
             . '<option value="live"' . (($lxp['modus'] ?? '') === 'live' ? ' selected' : '') . '>Live (echter Postversand, kostenpflichtig)</option></select></label>'
             . '<button>Speichern</button></form>'
             . ($lxp ? $this->testLine($st['tests'], 'letterxpress') . $this->balanceLine($st['guthaben']['letterxpress'] ?? null)
-                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'letterxpress']) . '<button>Zugang prüfen</button></form> '
+                . '<div class="actions"><form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'letterxpress']) . '<button>Zugang prüfen</button></form> '
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'guthaben']) . '<button class="secondary">' . V::symbol('coins') . ' Guthaben abfragen</button></form> '
-                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'letterxpress']) . '<button class="danger">Entfernen</button></form>' : '')
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'letterxpress']) . '<button class="danger">Entfernen</button></form></div>' : '')
             . '</section>';
         // Netzwerkspeicher
         $body .= '<section><h2>Netzwerkspeicher</h2>';
