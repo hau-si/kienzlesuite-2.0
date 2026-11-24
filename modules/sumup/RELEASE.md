@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.14
+
+- Anonymisierte Beispielrechnung im Aufbau der T2med-Liquidation (`tests/fixtures/t2med-beispielrechnung.pdf`, vollständig erfunden, mit Erzeugungsskript und Beschreibung) und ein Test, der sie mit dem Rechnungsleser prüft. Nur Tests und Dokumentation.
+
 ## 2.3.4-beta.13
 
 - Einrichtung in den Einstellungen im Stil der Basis: Themenblöcke als Ausklappzeilen mit Statuspunkt und Etikett („n rot“, „n offen“, „fertig“). Rotes (erneut nötig, Fehler) steht oben, dann Offenes, dann Fertiges; Rotes und Offenes ist aufgeklappt.

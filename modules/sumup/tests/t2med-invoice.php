@@ -85,6 +85,10 @@ try {
     rejects(fn() => T2medInvoice::parse('', 100000), 'Leere Rechnung akzeptiert', 422);
     rejects(fn() => T2medInvoice::fromPdf('kein pdf', 100000), 'Nicht-PDF akzeptiert', 415);
 
+    // Anonymisierte Beispielrechnung (fixtures/t2med-beispielrechnung.pdf, Aufbau der T2med-Liquidation, zwei Seiten, nur erfundene Angaben).
+    $sample = T2medInvoice::fromPdf((string)file_get_contents(__DIR__ . '/fixtures/t2med-beispielrechnung.pdf'), 1000000);
+    check($sample === ['number' => 'IG2026-0001', 'invoice_date' => '2026-05-28', 'amount_cents' => 7588, 'patient_name' => 'Max Mustermann', 'patient_birthdate' => '1990-01-01'], 'Beispielrechnung falsch gelesen');
+
     // Bild-PDF ohne Textebene: Texterkennung (nur, wenn pdftoppm und tesseract mit „deu“ vorhanden sind).
     $ocrReady = is_executable('/usr/bin/pdftoppm') || is_executable('/usr/local/bin/pdftoppm');
     $ocrReady = $ocrReady && (is_executable('/usr/bin/tesseract') || is_executable('/usr/local/bin/tesseract'));
