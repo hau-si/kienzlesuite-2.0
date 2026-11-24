@@ -54,4 +54,4 @@ main.modul { max-width: 1240px; margin: 0; padding: 32px 40px 48px; }
 button.klein { min-height: 32px; padding: 4px 12px; font-size: 13px; }
 .klein-text { font-size: 12px; margin: 6px 0 0; max-width: 34em; }
 .hilfe { position: relative; display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: 4px; border-radius: 50%; background: var(--soft); color: var(--teal); font-size: 12px; font-weight: 700; cursor: help; vertical-align: middle; }
-.hilfe:hover::after, .hilfe:focus::after { content: attr(data-tip); position: absolute; left: 50%; bottom: 150%; transform: translateX(-30%); width: 260px; padding: 9px 11px; border-radius: 9px; background: #203c43; color: #fff; font-size: 13px; font-weight: 400; line-height: 1.4; z-index: 5; text-align: left; }
+.hilfe:hover::after, .hilfe:focus::after { content: attr(data-tip); position: absolute; left: 50%; bottom: 150%; transform: translateX(calc(-50% + var(--tip-shift, 0px))); width: min(280px, calc(100vw - 24px)); padding: 9px 11px; border-radius: 9px; background: #203c43; color: #fff; font-size: 13px; font-weight: 400; line-height: 1.4; z-index: 5; text-align: left; }

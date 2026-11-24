@@ -42,7 +42,7 @@ function test_startseite_kacheln_und_guthaben(): void {
     [$b] = admin_browser($env);
     $b->web = function () use ($b, $c, $env, $sys) { $w = $b->defaultWeb(null, null, $c, new Backup($env->db, $env->modules)); $w->system = $sys; return $w; };
     $p = $b->get('/')->body;
-    check(str_contains($p, 'Server-Zustand') && str_contains($p, 'Speicherplatz') && str_contains($p, 'Arbeitsspeicher') && str_contains($p, '5 % ausgelastet') === false && str_contains($p, '10 % ausgelastet'), 'Kacheln für Speicher, RAM und CPU');
+    check(str_contains($p, 'Server-Zustand') && str_contains($p, 'Festplatte') && str_contains($p, 'Hochrechnung folgt') && str_contains($p, 'Arbeitsspeicher') && str_contains($p, '5 % ausgelastet') === false && str_contains($p, '10 % ausgelastet'), 'Kacheln für Speicher, RAM und CPU');
     check(str_contains($p, '<div class="tile bad"><span class="t-ico">') && str_contains($p, '90 °C'), 'Hohe Temperatur nicht als Warnung');
     check(str_contains($p, 'Letzte Sicherung') && str_contains($p, 'in Ordnung') && str_contains($p, 'href="/verwaltung/sicherung"'), 'Sicherungs-Kachel');
     check(str_contains($p, '12,50 €') && str_contains($p, 'Guthaben Letterxpress') && str_contains($p, 'Guthaben seven.io') && str_contains($p, '3,20 €') && str_contains($p, '<div class="tile warn">'), 'Guthaben (unter 5 € = gelb)');

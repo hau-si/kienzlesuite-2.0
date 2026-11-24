@@ -191,6 +191,7 @@ final class Web {
         $address = 'https://' . $short . $suffix . '/';
         $body = V::error($error) . ($st['last'] ? '<p class="' . (($st['last']['ok'] ?? false) ? 'notice' : 'error') . '">' . V::h((string)($st['last']['meldung'] ?? '')) . '</p>' : '')
             . ($st['pending'] ? '<p class="notice">Wird übernommen …</p>' : '')
+            . '<p class="muted">Auslastung von Prozessor und Arbeitsspeicher, Festplatte mit Hochrechnung des Platzbedarfs und die Guthaben stehen auf der <a href="/#server-zustand">Startseite unter „Server-Zustand“</a>.</p>'
             . '<h2>Servername</h2>'
             . '<form method="post" action="/verwaltung/server">' . $this->hidden('speichern')
             . '<label>Name des Servers<span class="name-row">'
@@ -711,7 +712,7 @@ final class Web {
             $server = '';
             try {
                 [$tiles, $pending] = $this->statusTiles();
-                if ($tiles !== '') $server = '<section class="card"><h2>Server-Zustand</h2><div class="tiles">' . $tiles . '</div></section>';
+                if ($tiles !== '') $server = '<section class="card" id="server-zustand"><h2>Server-Zustand</h2><div class="tiles">' . $tiles . '</div></section>';
             } catch (\Throwable) { /* ohne Werte keine Karte */ }
             $setup = '';
             try {
@@ -737,25 +738,50 @@ final class Web {
             . ($percent !== null ? '<progress class="progress" value="' . $percent . '" max="100" aria-label="' . V::h($label) . '">' . $percent . ' %</progress>' : '') . '</div>' . $extra . '</div>';
     }
 
+    /** Festplatte als breite Kachel: Balken für heute und – schraffiert – für die Hochrechnung in einem Jahr (Verlauf wird einmal je Tag gemerkt). */
+    private function diskTile(float $frei, float $gesamt): string {
+        $belegt = $gesamt - $frei;
+        $used = (int)round(100 * $belegt / $gesamt);
+        $prog = null;
+        try {
+            $alt = json_decode((string)$this->db->setting('system.verlauf'), true);
+            $punkte = SystemStatus::verlaufErgaenzen(is_array($alt) ? $alt : [], $belegt, time());
+            if ($punkte !== $alt) $this->db->store('system.verlauf', json_encode($punkte, JSON_THROW_ON_ERROR));
+            $prog = SystemStatus::prognose($punkte, $frei, time());
+        } catch (\Throwable) {
+        }
+        $zukunft = $prog !== null && $prog['pro_jahr'] > 0 ? min(100 - $used, (int)round(100 * $prog['pro_jahr'] / $gesamt)) : 0;
+        $level = $used >= 95 ? 'bad' : ($used >= 85 ? 'warn' : 'ok');
+        if ($prog === null) $text = 'Hochrechnung folgt: Der Zuwachs wird täglich gemessen und nach einigen Tagen berechnet.';
+        elseif ($prog['pro_jahr'] <= 0) $text = 'Kein Zuwachs messbar (Verlauf über ' . $prog['tage'] . ' Tage).';
+        else {
+            $rest = $prog['monate_rest'];
+            $text = 'Zuwachs etwa ' . SystemStatus::bytes($prog['pro_monat']) . ' pro Monat, gemessen über ' . $prog['tage'] . ' Tage. In 12 Monaten etwa ' . SystemStatus::bytes($belegt + $prog['pro_jahr']) . ' belegt'
+                . ($rest !== null && $rest < 120 ? ($rest >= 24 ? ', der Platz reicht noch rund ' . (int)round($rest / 12) . ' Jahre' : ', der Platz reicht noch rund ' . max(1, (int)round($rest)) . ' Monate') : '') . '.';
+        }
+        return '<div class="tile wide ' . $level . '"><span class="t-ico">' . V::icon('st:disk') . '</span><div class="t-body"><span class="t-label">Festplatte</span><strong class="t-val">' . $used . ' % belegt, ' . V::h(SystemStatus::bytes($frei)) . ' frei</strong>'
+            . '<div class="dbar" role="img" aria-label="Festplatte ' . $used . ' % belegt' . ($zukunft ? ', in 12 Monaten etwa ' . ($used + $zukunft) . ' %' : '') . '"><span class="dnow" style="width:' . $used . '%"></span>' . ($zukunft ? '<span class="dnext" style="left:' . $used . '%;width:' . $zukunft . '%"></span>' : '') . '</div>'
+            . '<div class="dkey"><span>heute ' . V::h(SystemStatus::bytes($belegt)) . '</span>' . ($zukunft ? '<span>in 12 Monaten etwa ' . V::h(SystemStatus::bytes($belegt + $prog['pro_jahr'])) . ' (' . ($used + $zukunft) . ' %)</span>' : '') . '<span>' . V::h(SystemStatus::bytes($gesamt)) . '</span></div>'
+            . '<small class="muted">' . V::h($text) . '</small></div></div>';
+    }
+
     /** Kacheln für den Server-Zustand und ob gerade eine Abfrage läuft. @return array{0:string,1:bool} */
     private function statusTiles(): array {
         $sys = ($this->system ?? new SystemStatus())->read();
         $t = '';
-        if ($sys['disk']) {
-            $used = (int)round(100 * (1 - $sys['disk']['frei'] / $sys['disk']['gesamt']));
-            $t .= $this->tile('st:disk', 'Speicherplatz', SystemStatus::bytes($sys['disk']['frei']) . ' frei', 'von ' . SystemStatus::bytes($sys['disk']['gesamt']) . ' (' . $used . ' % belegt)', $used >= 95 ? 'bad' : ($used >= 85 ? 'warn' : 'ok'), $used);
+        $lvl = fn(int $u): string => $u >= 95 ? 'bad' : ($u >= 85 ? 'warn' : 'ok');
+        if ($sys['cpu']) {
+            $p = $sys['cpu']['prozent'];
+            $t .= $this->tile('st:cpu', 'Prozessor', $p . ' % ausgelastet', 'Last ' . number_format($sys['cpu']['last'], 2, ',', '') . ' bei ' . $sys['cpu']['kerne'] . ($sys['cpu']['kerne'] === 1 ? ' Kern' : ' Kernen') . ' (Minutenmittel)', $lvl($p), $p);
         }
         if ($sys['ram']) {
             $used = (int)round(100 * (1 - $sys['ram']['frei'] / $sys['ram']['gesamt']));
-            $t .= $this->tile('st:ram', 'Arbeitsspeicher', SystemStatus::bytes($sys['ram']['frei']) . ' frei', 'von ' . SystemStatus::bytes($sys['ram']['gesamt']) . ' (' . $used . ' % belegt)', $used >= 95 ? 'bad' : ($used >= 85 ? 'warn' : 'ok'), $used);
+            $t .= $this->tile('st:ram', 'Arbeitsspeicher', $used . ' % belegt', SystemStatus::bytes($sys['ram']['gesamt'] - $sys['ram']['frei']) . ' von ' . SystemStatus::bytes($sys['ram']['gesamt']) . ', ' . SystemStatus::bytes($sys['ram']['frei']) . ' verfügbar', $lvl($used), $used);
         }
-        if ($sys['cpu']) {
-            $p = $sys['cpu']['prozent'];
-            $t .= $this->tile('st:cpu', 'Prozessor', $p . ' % ausgelastet', 'Last ' . number_format($sys['cpu']['last'], 2, ',', '') . ' bei ' . $sys['cpu']['kerne'] . ($sys['cpu']['kerne'] === 1 ? ' Kern' : ' Kernen') . ' (Minutenmittel)', $p >= 95 ? 'bad' : ($p >= 80 ? 'warn' : 'ok'), $p);
-        }
+        if ($sys['disk']) $t .= $this->diskTile($sys['disk']['frei'], $sys['disk']['gesamt']);
         if ($sys['temp'] !== null) $t .= $this->tile('st:temp', 'Temperatur', number_format($sys['temp'], 0, ',', '') . ' °C', 'höchster Messwert', $sys['temp'] >= 85 ? 'bad' : ($sys['temp'] >= 75 ? 'warn' : 'ok'));
         if ($sys['laufzeit'] !== null) $t .= $this->tile('st:zeit', 'Läuft seit', SystemStatus::dauer($sys['laufzeit']), 'seit dem letzten Neustart');
-        if ($this->backup) {
+        if ($this->backup) try {
             $b = $this->backup->status();
             $l = $b['letzte_sicherung'];
             if (!$b['eingerichtet']) $t .= $this->tile('st:backup', 'Letzte Sicherung', 'nicht eingerichtet', 'Ohne Sicherung gehen Daten bei einem Ausfall verloren.', 'warn', null, '', '/verwaltung/sicherung');
@@ -765,9 +791,10 @@ final class Web {
                 $ok = ($l['ok'] ?? false) === true;
                 $t .= $this->tile('st:backup', 'Letzte Sicherung', V::date((int)($l['zeit'] ?? 0)), $ok ? ($alt > 3 * 86400 ? 'Älter als drei Tage' : 'in Ordnung') : 'Fehlgeschlagen', !$ok ? 'bad' : ($alt > 3 * 86400 ? 'warn' : 'ok'), null, '', '/verwaltung/sicherung');
             }
+        } catch (\Throwable) {
         }
         $pending = false;
-        if ($this->connections) {
+        if ($this->connections) try {
             $st = $this->connections->status();
             $pending = (bool)$st['pending'];
             foreach (['letterxpress' => ['st:post', 'Guthaben Letterxpress', 'Brief-Versand'], 'sms' => ['st:sms', 'Guthaben seven.io', 'SMS-Versand']] as $key => [$icon, $label, $sub]) {
@@ -780,6 +807,7 @@ final class Web {
                     $pending ? 'wird abgefragt …' : ($g ? $sub . ', abgefragt ' . V::date((int)($g['zeit'] ?? 0)) : $sub . ': mit dem Pfeil abfragen'),
                     $wert !== null && $wert < 5 ? 'warn' : 'ok', null, $knopf);
             }
+        } catch (\Throwable) {
         }
         return [$t, $pending];
     }

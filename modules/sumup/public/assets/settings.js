@@ -383,6 +383,12 @@ function ippIpNote(url, ips) {
   return byIp.length ? 'Per IP-Adresse (z. B. aus dem VPN): ' + byIp.map(i => i.url + ' (' + i.name + ')').join(' oder ') + '. ' : '';
 }
 
+const CLIENT_STEPS = {
+  windows: ['ZIP-Datei mit Rechtsklick → „Alle extrahieren …“ entpacken.', '„install-windows.cmd“ doppelklicken. Bei „Windows hat den PC geschützt“: „Weitere Informationen“ → „Trotzdem ausführen“.',
+    'Die Zertifikatswarnung mit „Ja“ bestätigen – das Fenster liegt manchmal hinter anderen Fenstern (Taskleiste prüfen).', 'Fertig, wenn „Kienzle-SumUp eingerichtet“ erscheint.'],
+  macos: ['ZIP-Datei doppelklicken.', '„install-macos.command“ mit Rechtsklick → „Öffnen“ starten.', 'Mac-Passwort für das Zertifikat eingeben.'],
+  linux: ['ZIP-Datei entpacken.', 'Im entpackten Ordner im Terminal: bash install-linux.sh', 'server.crt im Browser als vertrauenswürdig importieren.'],
+};
 function guessSystem() { const p = navigator.userAgent; return /Windows/.test(p) ? 'windows' : /Mac OS X|Macintosh/.test(p) ? 'macos' : /Linux|X11/.test(p) ? 'linux' : 'windows'; }
 function renderClients(clients) {
   const box = $('client-downloads'); box.replaceChildren(); const steps = $('client-steps'); steps.replaceChildren();

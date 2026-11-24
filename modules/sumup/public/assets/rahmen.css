@@ -67,3 +67,6 @@ aside.side .brand { justify-content: flex-start; gap: 12px; }
 aside.side .brand strong { font-size: 17px; letter-spacing: -.4px; }
 aside.side .brand span:not(.mark) { margin-top: 0; }
 aside.side .brand .mark span { margin-top: 0; }
+
+/* Tooltips in Themenblöcken nicht am Blockrand abschneiden. */
+.setup-group { overflow: visible; }

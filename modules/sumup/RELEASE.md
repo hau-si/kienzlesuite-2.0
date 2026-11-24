@@ -1,5 +1,17 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.27
+
+- Behoben: Die Einstellungen der Kasse zeigten nur „CLIENT_STEPS is not defined“. Die Anleitung für die Arbeitsplatz-Pakete (Windows, Mac, Linux) fehlte im Skript und ist wieder da; ein Test prüft das jetzt.
+
+## 2.3.4-beta.26
+
+- Tooltips der Kasse (Einstellungen und eingebettete Kassenansicht) bleiben im sichtbaren Bereich; Themenblöcke schneiden sie nicht mehr am Rand ab.
+
+## 2.3.4-beta.25
+
+- Kassenansicht in der Startseite: kein waagerechter Scrollbalken mehr unter dem rechten Anzeigebereich (der eingebettete Rahmen schneidet Überstand ab). Ursache nicht am Bildschirm nachgestellt; nicht auf der echten VM geprüft.
+
 ## 2.3.4-beta.24
 
 - Seitenleiste der Suite in der Kasse: Stile der Kasse (Logo-Schrift, Abstand unter dem Namen) machten sie höher als in den anderen Modulen. Dadurch gab es einen Scrollbalken und beim Seitenwechsel einen Sprung. Beides ist behoben, die Leiste sieht wie im Terminzettel aus. Nicht auf der echten VM geprüft.

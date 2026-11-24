@@ -1,5 +1,17 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.42
+
+- Tooltips (Info-Zeichen „i“): Sie ragen nicht mehr über den Fensterrand. Reicht der Platz nicht, wird der ganze Tooltip verschoben (im Zweifel in die Mitte), nicht schmaler gemacht. Gilt für die Basis und die Module; nicht auf der echten VM geprüft.
+
+## 0.21.4-beta.41
+
+- Startseite, Server-Zustand: Prozessor und Arbeitsspeicher als Kacheln mit Balken (Prozent belegt). Die Festplatte ist eine breite Kachel: Der Balken zeigt den heutigen Stand und schraffiert die Hochrechnung für in 12 Monaten, dazu den Zuwachs pro Monat und wie lange der Platz reicht.
+- Die Hochrechnung braucht einen Verlauf: Beim Aufruf der Startseite wird einmal je Tag der belegte Platz gemerkt (bis zu 400 Tage). Gerechnet wird aus den letzten 90 Tagen; bis mindestens 3 Tage vorliegen, steht dort „Hochrechnung folgt“. Der Verlauf wächst nur an Tagen, an denen ein Admin die Startseite öffnet.
+- Die Seite „Server“ verweist auf den Server-Zustand der Startseite (er bleibt dort, wo alle Admins zuerst hinsehen).
+- Fällt eine Kachel (Sicherung, Guthaben) aus, verschwindet nicht mehr die ganze Karte „Server-Zustand“.
+- Nicht auf der echten VM geprüft.
+
 ## 0.21.4-beta.40
 
 - Arbeitsplatz einrichten: Der Hinweis zum Namen richtet sich nach dem eingestellten Servernamen (FRITZ!Box wird nur genannt, wenn der Name auf „.fritz.box“ endet).

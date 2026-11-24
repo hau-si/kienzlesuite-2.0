@@ -64,6 +64,8 @@ try {
     check(str_contains($html, 'Testpatient öffnen') && !preg_match('/id="demo"[^>]*hidden/', $html), 'Testpatient im Testmodus nicht angeboten');
     [$code] = page($root, staff_server(['paid']) + ['REQUEST_URI' => '/kasse/kassieren']);
     check($code === 403, 'Kasse ohne Recht „kassieren“');
+    $js = (string)file_get_contents(dirname(__DIR__) . '/public/assets/settings.js');
+    check(str_contains($js, 'const CLIENT_STEPS') && str_contains($js, 'CLIENT_STEPS[id]'), 'settings.js definiert CLIENT_STEPS (sonst bricht die Einstellungsseite ab)');
     [$code, $html] = page($root, staff_server(['inbox']) + ['REQUEST_URI' => '/kasse/settings.php']);
     check($code === 200 && str_contains($html, 'settings.js') && str_contains($html, 'id="letter-printer-help"'), 'Einstellungen für Mitarbeiter mit Recht nicht erreichbar');
     [$code] = page($root, staff_server(['paid', 'export', 'periods']) + ['REQUEST_URI' => '/kasse/settings.php']);

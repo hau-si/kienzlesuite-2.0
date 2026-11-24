@@ -1,5 +1,9 @@
 # Terminzettel – Release-Notizen
 
+## 1.3.0-beta.7
+
+- Tooltips bleiben im sichtbaren Bereich (verschoben statt schmaler).
+
 ## 1.3.0-beta.6
 
 - Verweis auf den Schritt „Virtuelle Drucker“ unter „Arbeitsplatz einrichten“ der Basis; die Anleitung auf der Seite bleibt.
