@@ -52,3 +52,12 @@ main.modul { max-width: 1400px; }
 .start-detail details.fold { margin-top: 12px; }
 .start-detail input { width: 100%; box-sizing: border-box; margin: 8px 0; }
 .storno-box { margin-top: 12px; display: grid; gap: 8px; }
+
+.vorgaenge .vg-bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+.vorgaenge .vg-nav { display: inline-flex; gap: 6px; align-items: center; }
+.vorgaenge .vg-filter { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 6px 0; }
+.vorgaenge .vg-filter input[type=search] { max-width: 240px; }
+.vorgaenge .vg-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.vorgaenge .vg-scroll { overflow-x: auto; }
+.vorgaenge td.num, .vorgaenge th.num { text-align: right; white-space: nowrap; }
+.vorgaenge tr.vg-storno td { color: #7a2e2e; }

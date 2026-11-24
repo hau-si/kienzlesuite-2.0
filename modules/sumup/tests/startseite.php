@@ -2,7 +2,7 @@
 declare(strict_types=1);
 // Startseite der Kasse: freie Eingabe ohne Patientenakte, Vorgang für eine Rechnung aus dem Eingang, Tageswerte, offene Rechnungen.
 require dirname(__DIR__) . '/src/bootstrap.php';
-use KienzleSumup\{App, Config, DocNumbers, Problem};
+use KienzleSumup\{App, Config, DocNumbers, Problem, Vorgaenge};
 
 function check(bool $ok, string $message): void { if (!$ok) throw new RuntimeException($message); }
 function rejects(callable $fn, string $message): void {
@@ -116,4 +116,46 @@ check($paid50['t2med'] === true && $paid50['amount_cents'] === 2000, 'T2med-Zahl
 $st3 = $a2->storno($paid50['id'], 'falscher Betrag');
 check($st3['original_number'] === 'RE2026-0050' && str_starts_with($st3['number'], 'ST-'), 'Storno einer T2med-Rechnung falsch');
 check((bool)array_filter($a2->openInbox(), fn($o) => $o['number'] === 'RE2026-0050'), 'Stornierte T2med-Rechnung ist nicht wieder offen');
+// 6. Offene Überweisungsrechnung stornieren (bekommt dafür erst jetzt ihre Nummer).
+[$ov2] = enter($a2, $a2->manualOpen()['url']);
+$c4 = $a2->start($ov2, ['services' => $ids, 'request_id' => App::id(), 'method' => 'cash']);
+$a2->db->query("UPDATE payments SET payment_status='transfer_open', paid_at=NULL, payment_method='transfer', doc_number='', transaction_id=NULL WHERE id=?", [$c4['id']]);
+$open4 = array_column($a2->processed(7), null, 'id')[$c4['id']];
+check($open4['open_transfer'] === true && $open4['storno'] === null, 'Offene Überweisung nicht als offen erkannt');
+$st4 = $a2->storno($c4['id'], 'Patient zahlt nicht');
+check(str_starts_with($st4['number'], 'ST-') && $st4['original_number'] !== '' && $st4['original_number'] === $a2->db->one('SELECT doc_number FROM payments WHERE id=?', [$c4['id']])['doc_number'], 'Storno der offenen Überweisung falsch');
+$after4 = array_column($a2->processed(7), null, 'id')[$c4['id']];
+check($after4['open_transfer'] === false && $after4['storno']['number'] === $st4['number'], 'Stornierte offene Überweisung bleibt offen');
+// 7. Vorgänge: Zeiträume, Liste, Abhaken, Excel.
+$vg = new Vorgaenge($a2->db, $a2->config);
+foreach (['tag', 'woche', 'monat', 'jahr'] as $art) {
+    $per = $vg->period($art, '2026-03-18');
+    check($per['to'] > $per['from'], 'Zeitraum falsch: ' . $art);
+}
+$w = $vg->period('woche', '2026-03-18'); $tzd = fn(int $t) => (new DateTimeImmutable('@' . $t))->setTimezone(new DateTimeZone($a2->config->get('app', 'timezone')))->format('Y-m-d');
+check($tzd($w['from']) === '2026-03-16' && $tzd($w['to']) === '2026-03-23', 'Woche beginnt nicht am Montag');
+check($tzd($vg->period('monat', '2026-02-10')['from']) === '2026-02-01' && $tzd($vg->period('monat', '2026-02-10')['to']) === '2026-03-01', 'Monat falsch');
+foreach (['quatsch', ''] as $badArt) { try { $vg->period($badArt, '2026-01-01'); throw new RuntimeException('Ungültige Zeitraumart akzeptiert'); } catch (Problem) {} }
+try { $vg->period('tag', '2026-02-31'); throw new RuntimeException('Ungültiges Datum akzeptiert'); } catch (Problem) {}
+$day = $vg->list('tag', date('Y-m-d'));
+$byNum = []; foreach ($day['items'] as $r) if ($r['source'] === 'payment') $byNum[$r['number']] = $r;
+check((bool)array_filter($day['items'], fn($r) => $r['number'] === 'RE2026-0050' && $r['source'] === 'inbox' && $r['status'] === 'offen'), 'Wieder offene T2med-Rechnung fehlt in den Vorgängen');
+check(isset($byNum['RE2026-0050']) && $byNum['RE2026-0050']['art'] === 'T2med' && $byNum['RE2026-0050']['status'] === 'storniert' && $byNum['RE2026-0050']['storno'] === $st3['number'], 'T2med-Storno fehlt in den Vorgängen');
+check(isset($byNum['R' . date('y') . '/' . date('m') . '-003']) && $byNum['R' . date('y') . '/' . date('m') . '-003']['art'] === 'IGeL' && $byNum['R' . date('y') . '/' . date('m') . '-003']['status'] === 'storniert', 'IGeL-Storno fehlt in den Vorgängen');
+$a2->storeInvoice(['number' => 'RE2026-0060', 'invoice_date' => date('Y-m-d'), 'amount_cents' => 700, 'patient_name' => 'Max Mustermann', 'patient_birthdate' => '1975-01-02']);
+$o60 = array_values(array_filter($vg->list('tag', date('Y-m-d'))['items'], fn($r) => $r['number'] === 'RE2026-0060'))[0];
+check($o60['source'] === 'inbox' && $o60['status'] === 'offen' && $o60['can_done'] === false, 'Offene T2med-Rechnung fehlt in den Vorgängen');
+// Abhaken: nur bezahlte T2med-Rechnung.
+[$dv] = enter($a2, $a2->inboxVisit($o60['id'])['url']);
+$a2->startInvoice($dv, ['invoice_id' => $o60['id'], 'method' => 'cash', 'request_id' => bin2hex(random_bytes(16))]);
+$p60 = array_values(array_filter($vg->list('tag', date('Y-m-d'))['items'], fn($r) => $r['number'] === 'RE2026-0060'))[0];
+check($p60['status'] === 'bezahlt' && $p60['can_done'] === true && $p60['done_date'] === '', 'Bezahlte T2med-Rechnung nicht abhakbar');
+check($vg->markDone([$p60['id']], true) === 1, 'Abhaken ohne Wirkung');
+$p60 = array_values(array_filter($vg->list('tag', date('Y-m-d'))['items'], fn($r) => $r['number'] === 'RE2026-0060'))[0];
+check($p60['done_date'] === date('Y-m-d'), 'Abhak-Datum fehlt');
+check($vg->markDone([$p60['id']], false) === 1, 'Haken entfernen ohne Wirkung');
+try { $vg->markDone(['nicht-hex'], true); throw new RuntimeException('Ungültige ID beim Abhaken akzeptiert'); } catch (Problem) {}
+$xlsx = $vg->workbook('tag', date('Y-m-d'), 'alle');
+check(str_starts_with($xlsx, 'PK') && strlen($xlsx) > 1000, 'Excel-Liste ungültig');
+check($vg->filename('monat', '2026-03-05') === 'Vorgaenge-2026-03.xlsx', 'Dateiname falsch');
 echo "Startseite der Kasse: ok\n";

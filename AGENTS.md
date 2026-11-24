@@ -38,7 +38,7 @@ Oberfläche, Hilfetexte, Dokumentation und Commit-Nachrichten auf Deutsch.
 
 ## Hinweise für neue Sitzungen (Stand 24.11.2026)
 
-**Stand:** Basis 0.21.4-beta.34, Kasse (`sumup`) 2.3.4-beta.18, Terminzettel 1.3.0-beta.2; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
+**Stand:** Basis 0.21.4-beta.34, Kasse (`sumup`) 2.3.4-beta.19, Terminzettel 1.3.0-beta.2; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
 (Basis 0.19.1). Der Nutzer testet auf einer echten Ubuntu-26.04-VM (Aktualisierung dort: `cd ~/kienzlesuite-2.0 && git pull && sudo bash installer/install.sh`,
 oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nicht ins Repository.
 
@@ -71,6 +71,7 @@ oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nich
 
 ### Nicht auf echter Hardware geprüft (der Nutzer testet auf der VM)
 
+- Kasse: Seite `/kasse/vorgaenge` (Klasse `Vorgaenge`, Tag/Woche/Monat/Jahr, Abhaken, Excel `vorgaenge-export.php`; ersetzt die Rechnungseingangsliste der Einstellungen), Storno auch für offene Überweisungen, Filter T2med/IGeL - noch nicht auf der VM geprüft.
 - Kasse: Storno (neue Stornonummer je Storno, Original bleibt; keine automatische Rückzahlung über SumUp), Nummernformat der IGeL-Rechnungen (`DocNumbers`), Reiter Bezahlt/Zurückgestellt - alles noch nicht auf der echten VM geprüft.
 - Kasse-Startseite (eingebettete Kassenansicht, Direktknöpfe an Rechnungen, Per Post, Tageswerte), Einrichtung als Ausklappzeilen, roter Zähler am Zahnrad.
 - Rahmen der Suite für Modulseiten, Menü-Kopfzeile, Mein Konto mit Avatar, Zahlencode per E-Mail (echter Mailversand, z. B. Gmail), Rechte-Matrix.

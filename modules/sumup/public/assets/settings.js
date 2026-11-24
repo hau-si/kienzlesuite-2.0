@@ -663,82 +663,8 @@ function renderInbox(data) {
   box.replaceChildren();
   if (!data.enabled) { box.append(el('p', '„T2med-Rechnungen übernehmen“ ist ausgeschaltet (Karte weiter unten).', 'muted')); return; }
   const euro = c => (c / 100).toLocaleString('de-DE', {style: 'currency', currency: 'EUR'});
-  if (!data.items.length) box.append(el('p', 'Noch keine Rechnung eingegangen.', 'muted'));
-  else {
-    const table = el('table', null, 'fw-table'), head = el('tr');
-    const selected = new Set();
-    const bar = el('div', null, 'row-buttons');
-    const countText = el('span', '', 'muted');
-    const toggleAll = el('input', null, null, {type: 'checkbox', 'aria-label': 'Alle auswählbaren Rechnungen markieren'});
-    const boxes = [];
-    const refresh = () => {
-      for (const b of bar.querySelectorAll('button')) b.disabled = selected.size === 0 || b.dataset.busy === '1';
-      countText.textContent = selected.size ? selected.size + ' ausgewählt' : 'Nichts ausgewählt';
-      toggleAll.checked = boxes.length > 0 && boxes.every(b => b.checked);
-    };
-    toggleAll.onchange = () => { for (const b of boxes) { b.checked = toggleAll.checked; b.onchange(); } };
-    const selectedRows = () => data.items.filter(r => selected.has(r.id));
-    const bulk = (label, action, ask, filter) => {
-      const b = el('button', label, 'secondary', {type: 'button'});
-      b.onclick = () => {
-        const rows = selectedRows().filter(filter);
-        if (!rows.length) { message('Für diese Aktion ist keine der markierten Rechnungen geeignet.'); return; }
-        if (!confirm(ask(rows))) return;
-        busy(b, async () => { const res = await api(action, {ids: rows.map(r => r.id)}); renderInbox(res); message(res.message); });
-      };
-      return b;
-    };
-    if (data.letter_enabled) bar.append(bulk('Auswahl per Post senden', 'inbox_letter_many',
-      rows => rows.length + ' Rechnung(en) (' + euro(rows.reduce((a, r) => a + r.amount_cents, 0)) + ') ' + (data.letter_mode === 'live' ? 'jetzt per Post verschicken' : 'im TESTMODUS an Letterxpress übergeben (es wird nichts verschickt)') + '?\n\nDabei gehen die Rechnungen mit Patientendaten an Letterxpress. Bereits live gesendete Rechnungen werden nicht erneut gesendet.',
-      r => r.postable && !(r.letter || {}).locked));
-    bar.append(bulk('Auswahl löschen', 'inbox_delete_many', rows => rows.length + ' Rechnung(en) aus dem Eingang löschen?', r => r.deletable), countText);
-    if (data.letter_enabled && data.letter_mode !== 'live') bar.append(el('span', 'TESTBETRIEB Post', 'badge test', {title: 'Letterxpress im Testbetrieb: es wird nichts gedruckt oder verschickt'}));
-    box.append(bar);
-    const first = el('th'); first.append(toggleAll); head.append(first);
-    for (const h of ['Eingang', 'Nummer', 'Betrag', 'Patient', 'Geb.', 'Status', ...(data.letter_enabled ? ['Post'] : []), '']) head.append(el('th', h));
-    table.append(head);
-    for (const r of data.items) {
-      const tr = el('tr');
-      const pick = el('td'), check = el('input', null, null, {type: 'checkbox', 'aria-label': 'Rechnung ' + r.number + ' auswählen'});
-      check.disabled = !(r.deletable || (data.letter_enabled && r.postable));
-      check.checked = false;
-      check.onchange = () => { if (check.checked) selected.add(r.id); else selected.delete(r.id); refresh(); };
-      if (!check.disabled) boxes.push(check);
-      pick.append(check); tr.append(pick);
-      const born = r.birthdate ? r.birthdate.split('-').reverse().join('.') : '';
-      for (const v of [when(r.received_at), r.number, euro(r.amount_cents), r.patient, born, inboxState[r.status] || r.status]) tr.append(el('td', v));
-      if (data.letter_enabled) {
-        const l = r.letter || {};
-        const cell = el('td');
-        if (l.status) {
-          const text = l.status === 'unknown' ? 'Postversand unklar – bitte den Postausgang bei Letterxpress prüfen' : (l.mode === 'live' ? 'Per Post gesendet am ' : 'Testbrief an Letterxpress am ') + when(l.sent_at);
-          const icon = el('span', l.status === 'unknown' ? '✉ ?' : '✉', 'post-glyph ' + (l.status === 'unknown' ? 'post-unknown' : l.mode === 'live' ? 'post-sent' : 'post-test'), {title: text, 'aria-label': text, role: 'img'});
-          cell.append(icon);
-        }
-        tr.append(cell);
-      }
-      const last = el('td');
-      if (data.letter_enabled && r.postable && !(r.letter || {}).locked) {
-        const l = r.letter || {};
-        const post = el('button', 'Per Post', 'secondary small-button', {type: 'button', 'aria-label': 'Rechnung ' + r.number + ' per Post senden'});
-        post.onclick = () => {
-          const live = data.letter_mode === 'live';
-          const text = 'Rechnung ' + r.number + ' (' + r.patient + ', ' + euro(r.amount_cents) + ') ' + (live ? 'jetzt per Post über Letterxpress versenden?' : 'im TESTMODUS an Letterxpress übergeben (es wird nichts verschickt)?') + '\n\nDabei gehen die Rechnung mit Patientendaten an Letterxpress.' + (live ? ' Das kostet Porto und Druck.' : '');
-          if (!confirm(text)) return;
-          busy(post, async () => { const res = await api('inbox_letter', {id: r.id}); renderInbox(res); message(res.message); });
-        };
-        last.append(post, ' ');
-      }
-      if (r.deletable) {
-        const del = el('button', 'Löschen', 'secondary small-button', {type: 'button', 'aria-label': 'Rechnung ' + r.number + ' löschen'});
-        del.onclick = () => { if (!confirm('Rechnung ' + r.number + ' (' + r.patient + ', ' + euro(r.amount_cents) + ') aus dem Eingang löschen?')) return; busy(del, async () => { const res = await api('inbox_delete', {id: r.id}); renderInbox(res); message(res.message); }); };
-        last.append(del);
-      }
-      tr.append(last); table.append(tr);
-    }
-    box.append(table);
-    refresh();
-  }
+  const link = el('a', 'Vorgänge öffnen', 'button secondary'); link.href = BASE + 'vorgaenge';
+  box.append(el('p', 'Die Liste der eingegangenen, bezahlten und stornierten Rechnungen mit Excel-Export und Abhaken steht jetzt unter „Vorgänge“ (' + data.items.length + ' Rechnungen zuletzt im Eingang).', 'muted'), link);
   if (data.rejected.length) {
     box.append(el('h3', 'Abgelehnte Drucke'));
     box.append(el('p', 'Diese Rechnungen kamen an, wurden aber nicht übernommen. Die Zeilenübersicht zeigt die erkannten Beschriftungen (Namen und Daten sind unkenntlich gemacht). Fehlt eine Beschriftung, trage sie unter „T2med-Rechnungen übernehmen“ als eigenen Textschnipsel ein.', 'muted small'));

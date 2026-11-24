@@ -8,7 +8,8 @@ const el = (tag, text, cls) => { const e = document.createElement(tag); if (text
 const FRISCH = 600;   // Sekunden: Rechnung gilt als „neu“, wenn sie in den letzten 10 Minuten aus T2med kam
 const FILTER = [['offen', 'Offen'], ['bezahlt', 'Bezahlt'], ['zurueckgestellt', 'Zurückgestellt'], ['alle', 'Alle']];
 const ART = {card: '💳 Karte', cash: '💶 Bar', transfer: '🏦 Überweisung'};
-let items = [], erledigt = [], jetzt = Math.floor(Date.now() / 1000), letter = false, aktiv = null, filter = 'offen', bekannt = null, ersterLauf = true;
+const ARTEN = [['alle', 'Alle'], ['t2med', 'T2med'], ['igel', 'IGeL']];
+let rechte = {}, art = 'alle', items = [], erledigt = [], jetzt = Math.floor(Date.now() / 1000), letter = false, aktiv = null, filter = 'offen', bekannt = null, ersterLauf = true;
 
 // Startlinks aus T2med (und der Testpatient) zeigen auf die Startadresse: gleich in die schlanke Kassenansicht weiterleiten.
 (() => {
@@ -26,7 +27,8 @@ async function api(action, data = {}) {
 }
 const gruppe = i => i.erledigt ? (i.open_transfer ? 'zurueckgestellt' : 'bezahlt') : (i.parked || i.transfer) ? 'zurueckgestellt' : 'offen';
 const zeit = i => i.erledigt ? i.at : i.received_at;
-const imFilter = i => filter === 'alle' || gruppe(i) === filter;
+const istT2med = i => !i.erledigt || i.t2med;
+const imFilter = i => (filter === 'alle' || gruppe(i) === filter) && (art === 'alle' || (art === 't2med') === istT2med(i));
 const alter = i => { const s = Math.max(0, jetzt - zeit(i)), m = Math.floor(s / 60), h = Math.floor(m / 60); return s < 90 ? 'gerade eben' : m < 60 ? 'vor ' + m + ' Min' : h < 24 ? 'vor ' + h + ' Std' : 'vor ' + Math.floor(h / 24) + ' Tg'; };
 const frisch = i => !i.erledigt && jetzt - i.received_at <= FRISCH;
 const frei = () => { aktiv = null; $('detail').hidden = true; $('work').hidden = false; $('work').src = BASE + 'kassieren?neu=1&t=' + Date.now(); anzeigen(); };
@@ -54,12 +56,12 @@ function detail(item) {
   if (item.storno) {
     const s = el('div', '', 'storno-box'); s.append(el('p', 'Storniert am ' + new Date(item.storno.at * 1000).toLocaleString('de-DE', {dateStyle: 'short', timeStyle: 'short'}) + ' mit Stornorechnung ' + item.storno.number + '. Die ursprüngliche Rechnung bleibt für die Buchhaltung erhalten.', 'tag warn'));
     const l = el('a', 'Stornorechnung (PDF)', 'button secondary'); l.href = BASE + 'beleg.php?s=' + encodeURIComponent(item.storno.id); l.target = '_blank'; l.rel = 'noopener'; s.append(l); box.append(s);
-  } else if (!item.open_transfer) {
-    const f = el('details', '', 'fold'); f.append(el('summary', 'Stornieren …'));
+  } else {
+    const f = el('details', '', 'fold'); f.append(el('summary', item.open_transfer ? 'Offene Rechnung stornieren …' : 'Stornieren …'));
     const grund = document.createElement('input'); grund.maxLength = 200; grund.placeholder = 'Grund (optional)'; grund.setAttribute('aria-label', 'Grund der Stornierung');
     const knopf = el('button', 'Stornorechnung mit neuer Nummer erstellen', 'secondary'); knopf.type = 'button';
     knopf.onclick = async () => {
-      if (!confirm('Rechnung ' + item.number + ' über ' + euro(item.amount_cents) + ' wirklich stornieren?\nEs entsteht eine Stornorechnung mit neuer Nummer. ' + (item.method === 'card' ? 'Die Kartenzahlung wird dabei NICHT automatisch erstattet (Rückzahlung am Terminal oder im SumUp-Konto).' : item.method === 'cash' ? 'Das Bargeld bitte dem Patienten zurückgeben.' : 'Eine Rückzahlung per Überweisung bitte selbst veranlassen.'))) return;
+      if (!confirm('Rechnung ' + item.number + ' über ' + euro(item.amount_cents) + ' wirklich stornieren?\nEs entsteht eine Stornorechnung mit neuer Nummer. ' + (item.open_transfer ? 'Es wurde noch nichts bezahlt; die offene Rechnung wird storniert.' : item.method === 'card' ? 'Die Kartenzahlung wird dabei NICHT automatisch erstattet (Rückzahlung am Terminal oder im SumUp-Konto).' : item.method === 'cash' ? 'Das Bargeld bitte dem Patienten zurückgeben.' : 'Eine Rückzahlung per Überweisung bitte selbst veranlassen.'))) return;
       try { await api('storno', {payment_id: item.id, note: grund.value}); await liste(); const neu = erledigt.find(x => x.id === item.id); if (neu) detail(neu); } catch (error) { alert(error.message); }
     };
     f.append(el('p', 'Die Rechnung bleibt für die Buchhaltung erhalten; es entsteht ein Stornobeleg mit eigener neuer Nummer. ' + (item.t2med ? 'Die T2med-Rechnung wird wieder offen.' : ''), 'muted small'), grund, knopf); box.append(f);
@@ -82,6 +84,7 @@ function zeile(invoice) {
   const mk = (text, fn) => { const b = el('button', text, 'text-button'); b.type = 'button'; b.onclick = fn; knoepfe.append(b); };
   mk(invoice.parked ? 'Zurückholen' : 'Zurückstellen', () => marke(invoice, 'parked', !invoice.parked));
   mk(invoice.transfer ? 'Nicht überwiesen' : 'Überwiesen', () => marke(invoice, 'transfer', !invoice.transfer));
+  if (rechte.inbox) mk('Löschen', async () => { if (!confirm('Rechnung ' + invoice.number + ' (' + (invoice.patient || 'Patient') + ', ' + euro(invoice.amount_cents) + ') aus dem Eingang löschen?')) return; try { await api('inbox_delete', {invoice_id: invoice.id}); await liste(); } catch (error) { alert(error.message); } });
   meta.append(knoepfe);
   box.append(kopf, meta);
   return box;
@@ -100,7 +103,9 @@ function zeileErledigt(item) {
 function anzeigen() {
   const suche = $('inv-search').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const alle = [...items, ...erledigt].sort((a, b) => zeit(b) - zeit(a)), zaehl = {offen: 0, bezahlt: 0, zurueckgestellt: 0, alle: alle.length};
-  for (const i of alle) zaehl[gruppe(i)]++;
+  for (const i of alle) if (art === 'alle' || (art === 't2med') === istT2med(i)) { zaehl[gruppe(i)]++; }
+  zaehl.alle = alle.filter(i => art === 'alle' || (art === 't2med') === istT2med(i)).length;
+  $('kinds').replaceChildren(...ARTEN.map(([id, text]) => { const b = el('button', text, 'start-tab' + (id === art ? ' on' : '')); b.type = 'button'; b.onclick = () => { art = id; anzeigen(); }; return b; }));
   $('tabs').replaceChildren(...FILTER.map(([id, text]) => {
     const b = el('button', text + ' ' + zaehl[id], 'start-tab' + (id === filter ? ' on' : '')); b.type = 'button'; b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(id === filter));
     b.onclick = () => { filter = id; anzeigen(); }; return b;
@@ -115,7 +120,7 @@ async function liste() {
   try {
     const result = await api('open_inbox'); items = result.items || [];
     try { erledigt = ((await api('processed')).items || []).map(x => ({...x, erledigt: true})); } catch { erledigt = []; } letter = !!(result.letter && result.letter.enabled);
-    jetzt = result.now || Math.floor(Date.now() / 1000);
+    jetzt = result.now || Math.floor(Date.now() / 1000); rechte = result.rights || {};
     items.sort((a, b) => b.received_at - a.received_at);
     // Die neueste Rechnung ist zuerst vorgewählt; später eingehende nur, wenn gerade nichts in Arbeit ist (nie mitten im Vorgang umschalten).
     const offen = items.filter(i => gruppe(i) === 'offen'), neueste = offen[0];

@@ -225,9 +225,9 @@ final class App {
     // --- Fortlaufende Nummern, Verarbeitete Rechnungen, Storno ---------------------------------
     private function zone(): \DateTimeZone { return new \DateTimeZone($this->config->get('app', 'timezone')); }
     /** In der App erzeugte Rechnung (IGeL/GOÄ, nicht T2med) bekommt beim Bezahlen ihre fortlaufende Nummer nach eingestelltem Format. */
-    private function numberIssued(string $id): void {
+    private function numberIssued(string $id, bool $open = false): void {
         $p = $this->db->one('SELECT * FROM payments WHERE id=?', [$id]);
-        if (!$p || $p['payment_status'] !== 'successful' || !$p['invoice_json'] || $p['t2med_invoice'] !== null || ($p['doc_number'] ?? '') !== '') return;
+        if (!$p || !($p['payment_status'] === 'successful' || ($open && $p['payment_status'] === 'transfer_open')) || !$p['invoice_json'] || $p['t2med_invoice'] !== null || ($p['doc_number'] ?? '') !== '') return;
         $run = function () use ($id): void {
             $row = $this->db->one('SELECT doc_number FROM payments WHERE id=?', [$id]);
             if (($row['doc_number'] ?? '') !== '') return;
@@ -241,11 +241,11 @@ final class App {
     /** Alle verarbeiteten Zahlungen der letzten Tage für die Startseite (bezahlt per Karte/Bar, Überweisung zurückgestellt, Stornos). */
     public function processed(int $days = 7): array {
         $rows = $this->db->query("SELECT p.*, v.patient_name AS pname, s.id AS sid, s.number AS snumber, s.created_at AS sat FROM payments p JOIN visits v ON v.id=p.visit_id LEFT JOIN stornos s ON s.payment_id=p.id
-            WHERE p.payment_status IN ('successful','transfer_open') AND COALESCE(p.paid_at,p.created_at) >= CAST(? AS INTEGER) ORDER BY COALESCE(p.paid_at,p.created_at) DESC LIMIT 300", [time() - $days * 86400])->fetchAll();
+            WHERE (p.payment_status IN ('successful','transfer_open') OR p.storno_at IS NOT NULL) AND COALESCE(p.paid_at,p.created_at) >= CAST(? AS INTEGER) ORDER BY COALESCE(p.paid_at,p.created_at) DESC LIMIT 300", [time() - $days * 86400])->fetchAll();
         $out = [];
         foreach ($rows as $p) {
             $out[] = ['id' => $p['id'], 'number' => self::displayNumber($p), 'patient' => (string)$p['pname'], 'amount_cents' => (int)($p['corrected_cents'] ?? $p['amount_cents']),
-                'method' => (string)($p['payment_method'] ?: 'card'), 'at' => (int)($p['paid_at'] ?? $p['created_at']), 'open_transfer' => $p['payment_status'] === 'transfer_open',
+                'method' => (string)($p['payment_method'] ?: 'card'), 'at' => (int)($p['paid_at'] ?? $p['created_at']), 'open_transfer' => $p['payment_status'] === 'transfer_open' && $p['storno_at'] === null,
                 't2med' => $p['t2med_invoice'] !== null, 'storno' => $p['sid'] ? ['id' => $p['sid'], 'number' => $p['snumber'], 'at' => (int)$p['sat']] : null];
         }
         return $out;
@@ -260,9 +260,9 @@ final class App {
         $note = trim(preg_replace('/\s+/u', ' ', $note));
         if (mb_strlen($note) > 200 || preg_match('/[\x00-\x1f]/', $note)) throw new Problem('Der Grund darf höchstens 200 Zeichen lang sein.', 422);
         return $this->db->locked('storno-' . $paymentId, function () use ($paymentId, $note): array {
-            $this->numberIssued($paymentId);
+            $this->numberIssued($paymentId, true);   // eine offene Überweisungsrechnung bekommt für das Storno erst jetzt ihre Nummer
             $p = $this->db->one('SELECT p.*, v.patient_name AS pname FROM payments p JOIN visits v ON v.id=p.visit_id WHERE p.id=?', [$paymentId]);
-            if (!$p || $p['payment_status'] !== 'successful') throw new Problem('Nur bezahlte Rechnungen lassen sich stornieren.', 409);
+            if (!$p || !in_array($p['payment_status'], ['successful', 'transfer_open'], true)) throw new Problem('Nur bezahlte oder offene Rechnungen lassen sich stornieren.', 409);
             if ($p['storno_at'] !== null) throw new Problem('Diese Rechnung ist schon storniert.', 409);
             {
                 return $this->db->transaction(function () use ($p, $note): array {
@@ -271,7 +271,8 @@ final class App {
                     $sid = self::id(); $amount = (int)($p['corrected_cents'] ?? $p['amount_cents']);
                     $this->db->query('INSERT INTO stornos(id,payment_id,number,original_number,amount_cents,method,note,created_at,patient_name) VALUES(?,?,?,?,?,?,?,?,?)',
                         [$sid, $p['id'], $number, self::displayNumber($p), $amount, $p['payment_method'] ?: 'card', $note, time(), (string)$p['pname']]);
-                    $this->db->query('UPDATE payments SET storno_at=?, voided_at=COALESCE(voided_at,?), correction_note=? WHERE id=?', [time(), time(), mb_substr('Storniert mit ' . $number . ($note !== '' ? ': ' . $note : ''), 0, 200), $p['id']]);
+                    // Eine offene Überweisung ist damit erledigt (keine Zahlung mehr zu erwarten); bezahlte Zahlungen behalten ihren Status.
+                    $this->db->query("UPDATE payments SET payment_status=CASE WHEN payment_status='transfer_open' THEN 'cancelled' ELSE payment_status END, storno_at=?, voided_at=COALESCE(voided_at,?), correction_note=? WHERE id=?", [time(), time(), mb_substr('Storniert mit ' . $number . ($note !== '' ? ': ' . $note : ''), 0, 200), $p['id']]);
                     return ['id' => $sid, 'number' => $number, 'original_number' => self::displayNumber($p), 'amount_cents' => $amount, 'method' => $p['payment_method'] ?: 'card'];
                 });
             }

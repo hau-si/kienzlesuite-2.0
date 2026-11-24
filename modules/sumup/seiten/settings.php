@@ -40,7 +40,7 @@ ob_start();
 <div id="invoice-printer-status"></div>
 </section>
 <section class="card settings-card" id="s-inbox-list"><h2>Rechnungseingang</h2>
-<p class="muted">Von T2med auf „SumUp-Rechnung“ gedruckte Rechnungen. Mit Name und Geburtsdatum des Patienten (nur nach Anmeldung sichtbar). Nicht bezahlte Rechnungen lassen sich löschen. „Offen“ heißt: Wird beim passenden Patienten zum Kassieren angeboten.</p>
+<p class="muted">Die Rechnungsliste steht jetzt unter „Vorgänge“ (Startseite der Kasse). Hier erscheinen nur Rechnungen, die der Drucker „SumUp-Rechnung“ angenommen, aber nicht übernommen hat.</p>
 <div class="row-buttons"><button id="inbox-load" class="secondary" type="button">Aktualisieren</button></div>
 <div id="inbox-box"><p class="muted">Wird geladen …</p></div></section>
 <section class="card settings-card" id="s-catalog"><h2>Leistungen und GOÄ-Positionen</h2>

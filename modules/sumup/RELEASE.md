@@ -1,5 +1,13 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.19
+
+- **Neue Seite „Vorgänge“** (Startseite → „📋 Vorgänge & Export“): alle T2med-Rechnungen und IGeL-Zahlungen eines **Tages, einer Woche, eines Monats oder eines Jahres** (mit Blättern ◀ ▶ und Datumswahl) als übersichtliche Liste mit Art (T2med/IGeL), Nummer, Patient, Zahlungsart, Status (bezahlt, offen, zurückgestellt, storniert) und Betrag, dazu Filter nach Art und Status, Namenssuche und Summe. **Excel-Export** der angezeigten Liste (Recht „Excel-Listen“).
+- **Abhaken bei T2med-Rechnungen**: Spalte „In T2med“ zeigt, ob die bezahlte Rechnung in T2med als abgerechnet markiert wurde; mehrere markieren und abhaken oder Haken entfernen (Recht „Bezahlt-Liste abhaken“).
+- Diese Liste **ersetzt die alte Rechnungseingangsliste** in den Einstellungen; dort bleiben nur der Hinweis und die abgelehnten Drucke. Rechnungen aus dem Eingang löschen geht jetzt über „Löschen“ an der Rechnung in der Startseite (Recht „Rechnungseingang“). Das Versenden per Post bleibt an der einzelnen Rechnung; der Sammelversand entfällt.
+- **Offene Rechnungen lassen sich stornieren** (z. B. IGeL mit Überweisung, die noch nicht bezahlt ist): Die Rechnung bekommt dafür ihre Nummer und eine Stornorechnung mit neuer Nummer.
+- In den Listen der Startseite lässt sich zusätzlich nach **Art T2med / IGeL** filtern.
+
 ## 2.3.4-beta.18
 
 - **Verarbeitete Rechnungen der letzten 7 Tage** stehen links in der Liste: neue Reiter **Offen · Bezahlt · Zurückgestellt · Alle**. „Bezahlt“ zeigt Karte, Bar und bezahlte Überweisungen (mit Symbol je Zahlungsart, T2med-Rechnungen und IGeL), „Zurückgestellt“ zeigt zurückgestellte und per Überweisung offene Rechnungen. Der frühere Reiter „Überwiesen“ ist darin aufgegangen.
