@@ -121,6 +121,12 @@ wirft(fn() => Seite::testdruck(new KienzleModul('terminzettel', ['KIENZLE_DRUCKE
 
 // Ansicht: Eingaben werden maskiert, kein Inline-Skript
 $html = Ansicht::seite('/terminzettel', ['heading' => '<script>x</script>'] + Seite::werte(), 'tok', 'Bon-1', null, '<b>Fehler</b>', 'server');
-check(!str_contains($html, '<script>x') && !str_contains($html, '<b>Fehler') && str_contains($html, 'Bon-1') && substr_count($html, '<script') === 1 && str_contains($html, 'src="/terminzettel/assets/app.js?v='), 'Ansicht maskiert nicht');
-check(preg_match('#assets/style\.css\?v=[0-9a-f]{8}"#', $html) === 1 && preg_match('#assets/app\.js\?v=[0-9a-f]{8}"#', $html) === 1, 'Skript und Stil ohne Versionsanhang: Zwischenspeicher zeigt nach einem Update alte Dateien');
+check(!str_contains($html, '<script>x') && !str_contains($html, '<b>Fehler') && str_contains($html, 'Bon-1') && !str_contains($html, '<script') && !str_contains($html, '<html'), 'Ansicht maskiert nicht oder enthält ein Skript/ein eigenes Dokument');
+$kopf = Ansicht::kopf('/terminzettel', 'tok"x');
+check(substr_count($kopf, '<script') === 1 && str_contains($kopf, 'src="/terminzettel/assets/app.js?v=') && str_contains($kopf, 'assets/style.css?v=') && str_contains($kopf, 'content="tok&quot;x"'), 'Kopf: Stil, Skript, CSRF-Marke');
+check(str_contains($html, '<details class="fold" open>') && str_contains($html, 'class="tz-rechts"') && str_contains($html, 'form="layout"'), 'Ansicht: Ausklappzeilen, Vorschau rechts, Speichern im Kopf');
+$k = new KienzleModul('terminzettel', ['KIENZLE_MENUE' => rawurlencode('{"apps":{"/terminzettel/":"Terminzettel"},"ids":{"/terminzettel/":"terminzettel"},"admin":true,"login":"anna"}'), 'REQUEST_URI' => '/terminzettel/']);
+$seite = $k->rahmen('Terminzettel', $html, ['roh' => true, 'kopf' => $kopf]);
+check(str_contains($seite, '<aside class="side">') && str_contains($seite, 'href="/terminzettel/"') && str_contains($seite, 'assets/app.js?v=') && str_contains($seite, 'Bon-1'), 'Seite im Rahmen der Suite mit Seitenleiste');
+check(preg_match('#assets/style\.css\?v=[0-9a-f]{8}"#', $kopf) === 1 && preg_match('#assets/app\.js\?v=[0-9a-f]{8}"#', $kopf) === 1, 'Skript und Stil ohne Versionsanhang: Zwischenspeicher zeigt nach einem Update alte Dateien');
 echo "OK: Terminzettel-Einstellungen, Layout, Ablage und Vorschau.\n";

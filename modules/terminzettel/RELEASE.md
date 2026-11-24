@@ -1,5 +1,11 @@
 # Terminzettel – Release-Notizen
 
+## 1.3.0-beta.3
+
+- Die Einstellungsseite steht jetzt im Rahmen der Suite: Die Seitenleiste mit dem Menü bleibt links sichtbar (wie bei der Kasse), die eigene Kopfzeile entfällt.
+- Neu aufgebaut: Kopf, Termine, Endtext, Kalender-QR, Letzte Druckaufträge und die Einrichtung der Arbeitsplätze sind Ausklappzeilen im Stil der Basis. Die Vorschau mit „Beispiel-Terminzettel drucken“ bleibt rechts stehen, auch beim Scrollen. „Speichern“ steht oben rechts.
+- Das eigene Stylesheet ist kleiner, weil Karten, Knöpfe und Hintergrund jetzt von der Basis kommen. Funktionen und Rechte unverändert.
+
 ## 1.3.0-beta.2
 
 - Fehler behoben: Nach dem Update zeigte der Browser noch das alte Skript und den alten Stil (eine Stunde Zwischenspeicher). Das alte Skript las die neuen Auswahlleisten falsch (immer die größte Stufe), daher wirkte die Vorschau viel zu groß und die Seite zerstört. Skript und Stil tragen jetzt eine Versionskennung in der Adresse und laden nach jeder Änderung neu.

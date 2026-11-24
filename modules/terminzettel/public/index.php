@@ -79,7 +79,7 @@ try {
     $host = preg_replace('/:\d+$/', '', $host);
     header('Content-Type: text/html; charset=utf-8');
     header('Cache-Control: no-store');
-    echo Ansicht::seite($base, Seite::werte($k->praxis()), $k->csrf(), $k->druckerRollen()['bon'], $meldung, $fehler, $host);
+    echo $k->rahmen('Terminzettel', Ansicht::seite($base, Seite::werte($k->praxis()), $k->csrf(), $k->druckerRollen()['bon'], $meldung, $fehler, $host), ['roh' => true, 'kopf' => Ansicht::kopf($base, $k->csrf())]);
 } catch (Throwable $e) {
     http_response_code(500);
     echo 'Der Terminzettel ist gerade nicht erreichbar.';
