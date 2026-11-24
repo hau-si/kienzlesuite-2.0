@@ -38,7 +38,7 @@ Oberfläche, Hilfetexte, Dokumentation und Commit-Nachrichten auf Deutsch.
 
 ## Hinweise für neue Sitzungen (Stand 24.11.2026)
 
-**Stand:** Basis 0.21.4-beta.33, Kasse (`sumup`) 2.3.4-beta.13, Terminzettel 1.3.0-beta.2; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
+**Stand:** Basis 0.21.4-beta.34, Kasse (`sumup`) 2.3.4-beta.15, Terminzettel 1.3.0-beta.2; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
 (Basis 0.19.1). Der Nutzer testet auf einer echten Ubuntu-26.04-VM (Aktualisierung dort: `cd ~/kienzlesuite-2.0 && git pull && sudo bash installer/install.sh`,
 oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nicht ins Repository.
 

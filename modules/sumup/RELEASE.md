@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.15
+
+- In der Startseite eingebettete Kassenansicht: Marke „Kasse“ und Willkommenskarte werden dort nicht mehr doppelt gezeigt.
+
 ## 2.3.4-beta.14
 
 - Anonymisierte Beispielrechnung im Aufbau der T2med-Liquidation (`tests/fixtures/t2med-beispielrechnung.pdf`, vollständig erfunden, mit Erzeugungsskript und Beschreibung) und ein Test, der sie mit dem Rechnungsleser prüft. Nur Tests und Dokumentation.

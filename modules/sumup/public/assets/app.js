@@ -561,6 +561,7 @@ function autoAction(invoiceId, action) {
 }
 async function init() {
   const query = new URL(location.href).searchParams, auto = {invoice: query.get('rechnung'), action: query.get('aktion')};
+  if (query.get('neu') || query.get('rechnung')) { $('welcome').hidden = true; document.querySelector('.top .brand').hidden = true; }   // eingebettet in der Startseite: gleich die Arbeitsfläche zeigen, nicht die Willkommenskarte
   // Start aus T2med: #launch=<code>. Musste sich der Benutzer erst an der Suite anmelden, hat die Basis den Code im Tab gemerkt.
   let hash=location.hash.slice(1);
   try { if(!hash.startsWith('launch=')) hash=(sessionStorage.getItem('kienzle-launch')||'').slice(1); sessionStorage.removeItem('kienzle-launch'); } catch { /* ohne sessionStorage */ }

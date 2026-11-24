@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.34
+
+- Dokumentation: README und Bildschirmfotos auf den aktuellen Stand gebracht (neu: Übersicht, Mein Konto, Gruppen, Einrichtung, Verbindungen, Kasse-Startseite und -Einstellungen); die Bilder entstehen jetzt reproduzierbar mit `scripts/bildschirmfotos.sh` (erfundene Daten, Vorschau der Kasse in `scripts/kasse-vorschau/`). AGENTS.md enthält den vollständigen Stand für neue Sitzungen. Keine Funktionsänderung.
+
 ## 0.21.4-beta.33
 
 - Mein Konto: Die E-Mail-Adresse wird jetzt mit einem Zahlencode bestätigt (16 Ziffern in Vierergruppen, z. B. 1234-5678-9012-3456) statt mit einem Link, denn ein Link ist im lokalen Netz oft nicht erreichbar. Der Code wird in Mein Konto eingegeben, gilt eine Stunde und ist nach fünf falschen Eingaben verbraucht. Der Link zum Zurücksetzen des Passworts („Passwort vergessen?“) bleibt unverändert.
