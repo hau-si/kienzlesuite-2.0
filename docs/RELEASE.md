@@ -1,5 +1,15 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.40
+
+- Arbeitsplatz einrichten: Der Hinweis zum Namen richtet sich nach dem eingestellten Servernamen (FRITZ!Box wird nur genannt, wenn der Name auf „.fritz.box“ endet).
+- Neuer Schritt „Virtuelle Drucker einrichten“ (nach Zertifikat und Name, vor dem Kassen-Starter; nur wenn Module virtuelle Drucker anbieten), mit der vollständigen Anleitung je Drucker (Windows, PowerShell-Skript, Mac, T2med). Die Anleitung bei Verwaltung → Drucker bleibt unverändert.
+- Verweise darauf in der Einrichtungsübersicht der Basis.
+- Nicht getestet und nicht auf der echten VM geprüft.
+- Einrichtung: Neuer Punkt „Virtuelle Drucker der Module auf den Arbeitsplätzen eingerichtet“ (nur wenn ein Modul virtuelle Drucker anbietet; wird nach einer Namensänderung wieder offen). Der Punkt „Arbeitsplatz-Starter“ führt jetzt in die Einstellungen des Moduls.
+- Blauer Punkt: Er stand bei „Module“, obwohl der offene Punkt (Starter) beim Modul zu erledigen war. Er erscheint jetzt beim Modul selbst; die Seite „Module“ nennt außerdem, welche Einrichtungspunkte offen sind (bei der Basis und je Modul).
+- SMS (seven.io): Die Guthabenabfrage liest den Betrag jetzt auch, wenn er als Text („20,50“) oder als Objekt (amount/balance) kommt; bisher stand dann „unbekannt“. Nicht mit dem echten Konto geprüft.
+
 ## 0.21.4-beta.39
 
 - **Virtuelle Drucker: IPP immer an, Samba optional.** Verwaltung → Drucker zeigt jeden virtuellen Drucker als Karte: IPP-Adresse mit Knopf „Kopieren“, „Freigabe per IPP: immer an“, ein Schalter „Windows-Freigabe (Samba, alt)“ (speichert sofort, Erläuterung im Hinweis „i“: standardmäßig aus, von neuem Windows nicht mehr unterstützt, IPP ist der Standardweg für alle Betriebssysteme) und „Testseite“. Das Häkchen für IPP und „Freigabe speichern“ entfallen.

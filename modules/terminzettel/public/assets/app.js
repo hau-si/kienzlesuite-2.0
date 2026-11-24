@@ -44,3 +44,13 @@
   form.addEventListener('change', refresh);
   refresh();
 })();
+
+// Sprung von der Einrichtungsübersicht (…/#drucker): den passenden Bereich aufklappen.
+(() => {
+  const open = () => {
+    const el = location.hash.length > 1 ? document.getElementById(decodeURIComponent(location.hash.slice(1))) : null;
+    if (el && el.tagName === 'DETAILS') { el.open = true; el.scrollIntoView(); }
+  };
+  open();
+  window.addEventListener('hashchange', open);
+})();

@@ -25,7 +25,7 @@ ob_start();
 <div id="sections" hidden></div>
 <section class="card settings-card" id="s-checklist"><h2>Einrichtung – Überblick</h2><p class="muted">Diese Schritte sind nur einmal nötig, geordnet nach dem Ort, an dem sie erledigt werden. Ein Klick auf einen Punkt öffnet die passende Einstellung.</p><div id="checklist"></div></section>
 <section class="card settings-card" id="s-clients"><h2>Arbeitsplätze einrichten</h2>
-<p>Auf dem Kassen-PC diese Seite öffnen, an der Suite anmelden und das passende Paket laden. Es enthält die Einrichtung des Starters, mit dem T2med die Kasse öffnet. Das Zertifikat der Suite vorher einmal einrichten: <a href="/hilfe/arbeitsplatz">Arbeitsplatz einrichten</a>.</p>
+<p>Auf dem Kassen-PC diese Seite öffnen, an der Suite anmelden und das passende Paket laden. Es enthält die Einrichtung des Starters, mit dem T2med die Kasse öffnet. Das Zertifikat der Suite vorher einmal einrichten: <a href="/hilfe/arbeitsplatz">Arbeitsplatz einrichten</a>. Dort steht auch, wie die virtuellen Drucker „SumUp-Rechnung“ und „Letterxpress“ am PC eingerichtet werden (<a href="/hilfe/arbeitsplatz#drucker">Schritt „Virtuelle Drucker“</a>).</p>
 <div id="client-downloads" class="row-buttons"></div>
 <div id="client-steps" class="steps"></div>
 <p class="muted small">Die Pakete enthalten den Starter-Schlüssel der Praxis: nicht per E-Mail verschicken, nach der Einrichtung löschen. Der Starter prüft genau das aktuelle Serverzertifikat der Suite; bekommt der Server ein neues Zertifikat (neuer Name, Erneuerung nach gut zwei Jahren), das Paket auf jedem Kassen-PC erneut ausführen.</p></section>

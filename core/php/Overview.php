@@ -12,6 +12,7 @@ final class Overview {
     public const MANUAL = ['ca' => 'Zertifizierungsstelle auf allen Arbeitsplätzen eingerichtet', 'codes' => 'Wiederherstellungscodes der Admins ausgedruckt und verwahrt',
         'name' => 'Servername auf den Arbeitsplätzen bekannt (Router/DNS oder hosts-Datei)',
         'anmeldung' => 'Suite unter dem neuen Namen geöffnet und neu angemeldet', 'passkeys' => 'Passkeys unter dem neuen Namen neu angelegt (oder keine vorhanden)',
+        'drucker' => 'Virtuelle Drucker der Module auf den Arbeitsplätzen eingerichtet',
         'starter' => 'Arbeitsplatz-Starter der Module auf den Arbeitsplätzen neu installiert (Verknüpfungen enthalten den Servernamen)',
         'dienste' => 'Dienste mit Anmeldung über die Suite (OIDC) auf den neuen Namen umgestellt'];
     /** Gruppen der Basis-Liste in der Reihenfolge der Anzeige. */
@@ -63,7 +64,7 @@ final class Overview {
      * bis es erneut bestätigt ist. Bei einer neuen Zertifizierungsstelle muss sie auch auf den Arbeitsplätzen neu eingespielt werden.
      */
     public function nameChanged(bool $newCa): void {
-        $keys = ['name', 'anmeldung', 'passkeys', 'starter', 'dienste'] + ($newCa ? [5 => 'ca'] : []);
+        $keys = ['name', 'anmeldung', 'passkeys', 'drucker', 'starter', 'dienste'] + ($newCa ? [9 => 'ca'] : []);
         $m = $this->manual();
         $a = $this->again();
         foreach ($keys as $k) { unset($m[$k]); $a[$k] = time(); }
@@ -109,6 +110,7 @@ final class Overview {
         'Zertifizierungsstelle auf allen Arbeitsplätzen' => ['pc', false, 'name'],
         'Suite unter dem neuen Namen' => ['pc', false, 'name'],
         'Passkeys unter dem neuen Namen' => ['pc', true, 'name'],
+        'Virtuelle Drucker der Module' => ['pc', false, 'name'],
         'Arbeitsplatz-Starter' => ['pc', false, 'name'],
         'Dienste mit Anmeldung' => ['web', false, 'name'],
         'Netzwerkspeicher eingetragen' => ['web', true, 'sicherung'],
@@ -161,8 +163,14 @@ final class Overview {
         $out[] = self::item(self::MANUAL['anmeldung'], isset($manual['anmeldung']) ? 'done' : 'open', 'Suite unter dem Namen aus „Server“ öffnen, dort neu anmelden', '/verwaltung/server', 'anmeldung');
         $out[] = self::item(self::MANUAL['passkeys'], isset($manual['passkeys']) ? 'done' : 'open', 'Unter „Mein Konto“ neu anlegen; sie gelten nur für den Namen, unter dem sie angelegt wurden', '/konto', 'passkeys');
         $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['name'], isset($manual['name']) ? 'done' : 'open', 'Einmal im Router bzw. DNS eintragen – oder auf jedem PC in der Datei hosts', '/hilfe/arbeitsplatz#name', 'name');
-        if (array_filter($this->modules->all(), fn($m) => !empty($m['web']['starter']))) {
-            $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['starter'], isset($manual['starter']) ? 'done' : 'open', 'In den Einstellungen des Moduls (z. B. Kasse → Arbeitsplätze) das Paket neu laden und auf jedem Arbeitsplatz ausführen', '/verwaltung/module', 'starter');
+        if (array_filter($this->modules->all(), fn($m) => !empty($m['printers']))) {
+            $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['drucker'], isset($manual['drucker']) ? 'done' : 'open', 'Auf jedem PC, von dem T2med druckt, die virtuellen Drucker (z. B. Terminzettel, SumUp-Rechnung) hinzufügen – Anleitung unter „Arbeitsplatz einrichten“', '/hilfe/arbeitsplatz#drucker', 'drucker');
+        }
+        $starterId = array_key_first(array_filter($this->modules->all(), fn($m) => !empty($m['web']['starter'])));
+        if ($starterId !== null) {
+            // Link in die Einstellungen des Moduls (dort liegt das Paket), nicht auf die Modulseite: so erscheint der blaue Punkt beim Modul.
+            $starterLink = ($this->modules->settingsUrl((string)$starterId) ?? '/verwaltung/module') . ($this->modules->settingsUrl((string)$starterId) !== null ? '#s-clients' : '');
+            $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['starter'], isset($manual['starter']) ? 'done' : 'open', 'In den Einstellungen des Moduls (z. B. Kasse → Arbeitsplätze) das Paket neu laden und auf jedem Arbeitsplatz ausführen', $starterLink, 'starter');
         }
         if ((int)($this->db->one('SELECT COUNT(*) AS n FROM oidc_clients')['n'] ?? 0) > 0) {
             $out[] = self::item(self::MANUAL['dienste'], isset($manual['dienste']) ? 'done' : 'open', 'Die Anmelde-Adresse (Issuer) heißt jetzt https://' . ($this->config?->hostnames[0] ?? '') . '; in den angebundenen Diensten (Modulen) ändern', '/verwaltung/module', 'dienste');

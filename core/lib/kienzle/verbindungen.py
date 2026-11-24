@@ -260,10 +260,26 @@ def sms_balance(c: dict | None) -> float | None:
     """Guthaben bei seven.io abfragen (es wird nichts verschickt) und samt Zeit merken; None, wenn kein Betrag gemeldet wird."""
     if not c:
         raise Fehler('SMS ist nicht eingerichtet.')
-    wert = _sms_call(c, 'balance', None).get('wert')
-    bal = float(wert) if isinstance(wert, (int, float)) and not isinstance(wert, bool) else None
+    bal = _sms_betrag(_sms_call(c, 'balance', None))
     _balance_record('sms', bal)
     return bal
+
+
+def _sms_betrag(antwort: dict) -> float | None:
+    """Betrag aus der Antwort von seven.io lesen: Zahl, Text („20.50“, „20,50“) oder Objekt mit amount/balance/value."""
+    wert = antwort.get('wert') if 'wert' in antwort else next((antwort[k] for k in ('amount', 'balance', 'value', 'credit') if k in antwort), None)
+    if isinstance(wert, dict):
+        return _sms_betrag(wert)
+    if isinstance(wert, bool):
+        return None
+    if isinstance(wert, (int, float)):
+        return float(wert)
+    if isinstance(wert, str):
+        try:
+            return float(wert.strip().replace('€', '').replace(',', '.'))
+        except ValueError:
+            return None
+    return None
 
 
 def test_sms(c: dict | None) -> str:

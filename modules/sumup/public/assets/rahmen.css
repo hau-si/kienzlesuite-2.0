@@ -61,3 +61,9 @@ main.modul { max-width: 1400px; }
 .vorgaenge .vg-scroll { overflow-x: auto; }
 .vorgaenge td.num, .vorgaenge th.num { text-align: right; white-space: nowrap; }
 .vorgaenge tr.vg-storno td { color: #7a2e2e; }
+
+/* Die Seitenleiste der Suite darf nicht von den Kassenstilen verändert werden (sonst ist sie höher als in anderen Modulen: Scrollbalken und Sprung beim Seitenwechsel). */
+aside.side .brand { justify-content: flex-start; gap: 12px; }
+aside.side .brand strong { font-size: 17px; letter-spacing: -.4px; }
+aside.side .brand span:not(.mark) { margin-top: 0; }
+aside.side .brand .mark span { margin-top: 0; }

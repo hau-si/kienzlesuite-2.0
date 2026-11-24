@@ -74,6 +74,10 @@ final class Module {
         if ($config->get('invoice_export', 'enabled', false) && !isset(Suite::targets()[(string)$config->get('invoice_export', 'ziel', '')])) {
             $items[] = ['title' => 'Ablage: Ziel im Netzwerkspeicher fehlt', 'state' => 'error', 'hint' => 'Verwaltung → Verbindungen der Suite, dann hier wählen', 'link' => $link('s-invoice_export')];
         }
+        $items[] = ['title' => 'Rechnung per Post über Letterxpress versenden', 'state' => $config->get('letterxpress', 'enabled', false) ? 'done' : 'open', 'optional' => true,
+            'hint' => 'Einstellungen → Praxis & Rechnungen (Sammelversand aus T2med über den Drucker „Letterxpress“)', 'link' => $link('s-letterxpress')];
+        $items[] = ['title' => 'Rechnungen im Netzwerkspeicher ablegen (z. B. für die Steuerberatung)', 'state' => $config->get('invoice_export', 'enabled', false) ? 'done' : 'open', 'optional' => true,
+            'hint' => 'Einstellungen → Praxis & Rechnungen', 'link' => $link('s-invoice_export')];
         $stale = !self::clientsCurrent($config) && trim((string)@file_get_contents(rtrim((string)$config->get('app', 'state_dir'), '/') . '/starter-zertifikat')) !== '';
         $items[] = ['title' => 'Starter auf den Kassen-PCs installieren', 'state' => self::clientsCurrent($config) ? 'done' : ($stale ? 'error' : 'open'),
             'hint' => ($stale ? 'Erneut nötig: Serverzertifikat oder Servername hat sich geändert. ' : '') . 'Einstellungen → Arbeitsplätze: Paket laden und auf jedem Kassen-PC einmal ausführen (nach einem neuen Serverzertifikat erneut)', 'link' => $link('s-clients')];

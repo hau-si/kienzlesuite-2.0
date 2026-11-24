@@ -308,14 +308,11 @@ const PLACES = {web: 'In diesem Webfenster', pc: 'Auf den Kassen-PCs', t2med: 'I
 function renderChecklist(data) {
   const invoiceQueue = !!(data.invoice_printer && data.invoice_printer.queue);
   const letterQueue = !!(data.letter_printer && data.letter_printer.queue && data.letter_printer.enabled);
-  const flag = key => !!(data.sections.find(s => s.id === key)?.fields.find(f => f.key === 'enabled') || {}).value;
   // Punkte der Kasse kommen vom Server (dieselben wie im Einrichtungs-Überblick der Suite), schon in der nötigen Reihenfolge.
-  const own = (data.setup || []).map(i => ({ort: /Starter/.test(i.title) ? 'pc' : 'web', done: i.state === 'done', error: i.state === 'error', label: i.title, card: (i.link || '').split('#')[1] || 's-checklist', detail: i.hint}));
+  const own = (data.setup || []).map(i => ({optional: !!i.optional, ort: /Starter/.test(i.title) ? 'pc' : 'web', done: i.state === 'done', error: i.state === 'error', label: i.title, card: (i.link || '').split('#')[1] || 's-checklist', detail: i.hint}));
   const web = own.filter(i => i.ort === 'web'), pc = own.filter(i => i.ort === 'pc');
   const items = [
     ...web,
-    {ort: 'web', done: flag('letterxpress'), optional: true, label: 'Rechnung per Post über Letterxpress versenden', card: 's-letterxpress'},
-    {ort: 'web', done: flag('invoice_export'), optional: true, label: 'Rechnungen im Netzwerkspeicher ablegen (z. B. für die Steuerberatung)', card: 's-invoice_export'},
     {ort: 'pc', info: true, label: 'Zertifikat der Suite einrichten (einmal je PC, siehe Arbeitsplatz einrichten der Suite)', card: 's-clients'},
     ...pc,
     ...(invoiceQueue ? [{ort: 'pc', info: true, label: 'Drucker „SumUp-Rechnung“ am Arbeitsplatz installieren (Windows: IPP-Drucker hinzufügen, Papier A4)', card: 'invoice-printer-help', detail: (data.invoice_printer && data.invoice_printer.url) || ''}] : []),

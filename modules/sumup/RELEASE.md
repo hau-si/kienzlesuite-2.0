@@ -1,5 +1,14 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.24
+
+- Seitenleiste der Suite in der Kasse: Stile der Kasse (Logo-Schrift, Abstand unter dem Namen) machten sie höher als in den anderen Modulen. Dadurch gab es einen Scrollbalken und beim Seitenwechsel einen Sprung. Beides ist behoben, die Leiste sieht wie im Terminzettel aus. Nicht auf der echten VM geprüft.
+
+## 2.3.4-beta.23
+
+- Einstellungen → Arbeitsplätze verweist auf den neuen Schritt „Virtuelle Drucker“ unter „Arbeitsplatz einrichten“ der Basis.
+- Einrichtungs-Überblick der Suite enthält jetzt auch die optionalen Punkte „Rechnung per Post über Letterxpress“ und „Rechnungen im Netzwerkspeicher ablegen“ (in den Einstellungen kommen sie von dort).
+
 ## 2.3.4-beta.22
 
 - Die virtuellen Drucker „SumUp-Rechnung“ und „Letterxpress“ werden nur noch per IPP freigegeben (`share = ["ipp"]`); Samba schaltet der Admin bei Bedarf unter Verwaltung → Drucker ein.

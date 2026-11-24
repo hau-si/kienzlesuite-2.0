@@ -124,7 +124,8 @@ $html = Ansicht::seite('/terminzettel', ['heading' => '<script>x</script>'] + Se
 check(!str_contains($html, '<script>x') && !str_contains($html, '<b>Fehler') && str_contains($html, 'Bon-1') && !str_contains($html, '<script') && !str_contains($html, '<html'), 'Ansicht maskiert nicht oder enthält ein Skript/ein eigenes Dokument');
 $kopf = Ansicht::kopf('/terminzettel', 'tok"x');
 check(substr_count($kopf, '<script') === 1 && str_contains($kopf, 'src="/terminzettel/assets/app.js?v=') && str_contains($kopf, 'assets/style.css?v=') && str_contains($kopf, 'content="tok&quot;x"'), 'Kopf: Stil, Skript, CSRF-Marke');
-check(str_contains($html, '<details class="fold" open>') && str_contains($html, 'class="tz-rechts"') && str_contains($html, 'form="layout"'), 'Ansicht: Ausklappzeilen, Vorschau rechts, Speichern im Kopf');
+check(str_contains($html, '<details class="fold">') && !str_contains($html, '<details class="fold" open>') && str_contains($html, 'class="tz-rechts"') && str_contains($html, 'class="tz-speichern"') && !str_contains($html, 'name="enabled"') && str_contains($html, '<svg'), 'Ansicht: zugeklappte Zeilen, Vorschau rechts, Speichern unten, kein Aktiv-Haken, Symbole');
+check(Seite::pruefen(array_map(static fn($f) => $f[0] === 'choice' ? array_key_first($f[3]) : '', Seite::schema()))['enabled'] === true, 'Bondruck immer aktiv');
 $k = new KienzleModul('terminzettel', ['KIENZLE_MENUE' => rawurlencode('{"apps":{"/terminzettel/":"Terminzettel"},"ids":{"/terminzettel/":"terminzettel"},"admin":true,"login":"anna"}'), 'REQUEST_URI' => '/terminzettel/']);
 $seite = $k->rahmen('Terminzettel', $html, ['roh' => true, 'kopf' => $kopf]);
 check(str_contains($seite, '<aside class="side">') && str_contains($seite, 'href="/terminzettel/"') && str_contains($seite, 'assets/app.js?v=') && str_contains($seite, 'Bon-1'), 'Seite im Rahmen der Suite mit Seitenleiste');

@@ -59,6 +59,7 @@ final class Seite {
         if (is_array($d) && !array_key_exists('name_text', $d) && !array_key_exists('address_text', $d) && is_string($d['header_text'] ?? null)) $d = self::ausAltemKopf($d);
         $out = [];
         foreach (self::schema() as $k => $f) $out[$k] = is_array($d) && array_key_exists($k, $d) && self::passt($f, $d[$k]) ? $d[$k] : $f[2];
+        $out['enabled'] = true; // Bondruck ist mit dem Modul immer aktiv
         if (!is_array($d) || (!array_key_exists('name_text', $d) && !array_key_exists('address_text', $d))) {
             $kopf = self::kopfAusPraxis($praxis);
             $out['name_text'] = $kopf['name'];
@@ -95,6 +96,7 @@ final class Seite {
         $out = [];
         foreach (self::schema() as $k => $f) {
             $raw = $in[$k] ?? null;
+            if ($k === 'enabled') { $out[$k] = true; continue; }
             if ($f[0] === 'bool') { $out[$k] = $raw === '1' || $raw === true || $raw === 'on'; continue; }
             $v = is_string($raw) ? str_replace(["\r\n", "\r"], "\n", $raw) : '';
             $v = trim($v, "\n ");
@@ -116,6 +118,28 @@ final class Seite {
         $text = (string)@file_get_contents(self::$data . '/druckprotokoll.txt', false, null, 0, 20000);
         $all = $text === '' ? [] : array_values(array_filter(explode("\n", $text), static fn($l) => $l !== ''));
         return array_slice($all, -$zeilen);
+    }
+
+    /**
+     * Einrichtungs-Überblick für die Suite (docs/MODULE-TOML.md, [setup] overview). Gelesen werden nur die abgelegten Dateien:
+     * basis.json (Bondrucker, Praxisdaten) und das Druckprotokoll (ein Terminzettel aus T2med ist angekommen).
+     * @return list<array{title:string,state:string,hint:string,link:string,optional?:bool}>
+     */
+    public static function ueberblick(): array {
+        $basis = json_decode((string)@file_get_contents(self::$data . '/basis.json'), true);
+        $bon = is_array($basis) ? (string)($basis['drucker']['bon'] ?? '') : '';
+        $werte = self::werte(is_array($basis) ? (array)($basis['praxis'] ?? []) : []);
+        $name = trim($werte['name_text']) !== '';
+        $angekommen = array_filter(self::protokoll(50), static fn($l) => str_contains($l, 'Bon an die Warteschlange')) !== [];
+        return [
+            ['title' => 'Bondrucker für den Terminzettel zugeordnet', 'state' => $bon !== '' ? 'done' : 'open',
+                'hint' => 'Verwaltung → Drucker → „Wofür welcher Drucker?“ (Bondrucker wählen)', 'link' => '/terminzettel/'],
+            ['title' => 'Terminzettel: Praxisname im Kopf', 'state' => $name ? 'done' : 'open', 'optional' => true,
+                'hint' => 'Einstellungen → Kopf: Praxisname, Adresse und Logo für den Bon', 'link' => '/terminzettel/#kopf'],
+            ['title' => 'Terminzettel aus T2med am Bondrucker angekommen', 'state' => $angekommen ? 'done' : 'open',
+                'hint' => 'Am Arbeitsplatz den Drucker „Terminzettel“ einrichten (Anleitung: Arbeitsplatz einrichten → Virtuelle Drucker) und in T2med unter Einstellungen → Kalender → Terminliste (DIN A6) wählen; dann einen Terminzettel drucken',
+                'link' => '/terminzettel/#drucker'],
+        ];
     }
 
     /** Papierbreite des Bondruckers in mm (58 oder 80) laut Basis (Verwaltung → Drucker), aus basis.json. */

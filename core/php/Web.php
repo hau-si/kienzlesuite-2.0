@@ -118,6 +118,14 @@ final class Web {
         $ips = array_values(array_filter($this->config->hostnames, fn($n) => filter_var($n, FILTER_VALIDATE_IP)));
         $name = array_values(array_filter($this->config->hostnames, fn($n) => !filter_var($n, FILTER_VALIDATE_IP)))[0] ?? 'kienzle.praxis.internal';
         $ip = $ips[0] ?? '192.0.2.10';
+        if (str_ends_with($name, '.fritz.box')) {
+            $routerText = '<p>Der Name <code>' . V::h($name) . '</code> endet auf „.fritz.box“: Eine FRITZ!Box kennt Geräte im Netz automatisch unter ihrem Rechnernamen. '
+                . 'Dann muss der Rechnername des Servers genau zu diesem Namen passen (Verwaltung → Server).</p>'
+                . '<p>Anderer Router oder ein eigener DNS-Server: den Namen <code>' . V::h($name) . '</code> mit der Adresse <code>' . V::h($ip) . '</code> eintragen (meist die IT).</p>';
+        } else {
+            $routerText = '<p>Den Namen <code>' . V::h($name) . '</code> mit der Adresse <code>' . V::h($ip) . '</code> im Router oder einem eigenen DNS-Server eintragen (meist die IT). '
+                . 'Manche Router kennen Geräte im Netz auch automatisch unter ihrem Rechnernamen mit einer eigenen Endung; dann unter Verwaltung → Server genau diesen Namen mit der Endung des Routers wählen.</p>';
+        }
         $body = '<p class="lead">Zwei Dinge braucht jeder PC der Praxis einmal: Er muss der Suite vertrauen (Zertifikat) und ihren Namen kennen.</p>'
             . '<h2 id="zertifikat">1. Der Suite vertrauen (Zertifikat)</h2>'
             . '<p>Ohne diesen Schritt zeigt der Browser „Nicht sicher“. Die Datei ist kein Programm, sondern der Ausweis der Suite.</p>'
@@ -138,18 +146,23 @@ final class Web {
             . 'Zertifizierungsstellen → Importieren → „Dieser CA vertrauen, um Websites zu identifizieren“.</li></ol></details>'
             . '<h2 id="name">2. Den Namen der Suite bekannt machen</h2>'
             . '<p>Die Suite heißt <strong>' . V::h($name) . '</strong> und hat die Adresse <strong>' . V::h($ip) . '</strong>. Damit der Name funktioniert, gibt es zwei Wege:</p>'
-            . '<details class="how" open><summary>Einmal im Router (empfohlen, gilt für alle PCs)</summary><p>Viele Router kennen Geräte im Netz automatisch unter ihrem Rechnernamen, '
-            . 'eine FRITZ!Box z. B. als <code>rechnername.fritz.box</code>. Dann unter „Server“ genau diesen Namen mit der Endung „.fritz.box“ wählen. '
-            . 'Andere Router oder ein eigener DNS-Server: den Namen <code>' . V::h($name) . '</code> mit der Adresse <code>' . V::h($ip) . '</code> eintragen (meist die IT).</p></details>'
+            . '<details class="how" open><summary>Einmal im Router (empfohlen, gilt für alle PCs)</summary>' . $routerText . '</details>'
             . '<details class="how"><summary>Oder auf jedem PC in der Datei hosts</summary><ol class="steps">'
             . '<li>Windows: Startmenü → „Editor“ mit der rechten Maustaste → <strong>Als Administrator ausführen</strong>.</li>'
             . '<li>Datei → Öffnen → <code>C:\Windows\System32\drivers\etc\hosts</code> (unten „Alle Dateien“ wählen).</li>'
             . '<li>Am Ende diese Zeile einfügen und speichern:<br><code>' . V::h($ip . '   ' . $name) . '</code></li>'
             . '<li>Mac: im Terminal <code>sudo nano /etc/hosts</code>, dieselbe Zeile ergänzen, speichern.</li></ol></details>'
             . '<p>Danach die Suite unter <a href="https://' . V::h($name) . '/">https://' . V::h($name) . '/</a> öffnen.</p>';
+        // Virtuelle Drucker der Module (nur wenn vorhanden): nach Zertifikat und Name, vor dem Starter.
+        $nr = 3;
+        $drucker = $this->virtualPrinterHelp($this->printers ? $this->printers->status()['queues'] : [], true);
+        if ($drucker !== '') {
+            $body .= '<h2 id="drucker">' . $nr++ . '. Virtuelle Drucker einrichten</h2>'
+                . '<p>Nur für PCs, von denen aus T2med auf die virtuellen Drucker der Module druckt. Zuerst Schritt 1 und 2 erledigen: Die Drucker-Adresse enthält den Namen der Suite.</p>' . $drucker;
+        }
         // Ist die Kasse installiert, braucht jeder PC, an dem aus T2med kassiert wird, zusätzlich den Starter (Paket aus den Kasse-Einstellungen).
         if (($starter = $this->modules->starterPath()) !== '') {
-            $body .= '<h2 id="starter">3. Kasse: Starter für T2med installieren</h2>'
+            $body .= '<h2 id="starter">' . $nr . '. Kasse: Starter für T2med installieren</h2>'
                 . '<p>Damit der Knopf in T2med die Kasse öffnet, braucht jeder Kassen-PC einmal den <strong>Starter</strong>. Das Paket lädt ein Admin der Kasse und führt es auf dem PC einmal aus.</p>'
                 . '<p class="row-buttons"><a class="button" href="' . V::h($starter) . '/settings.php#s-clients">Starter der Kasse einrichten</a></p>'
                 . '<p class="muted">Zuerst Schritt 1 und 2 erledigen: Der Starter prüft das Zertifikat der Suite und braucht ihren Namen.</p>';
@@ -1506,7 +1519,20 @@ final class Web {
                 . '<div class="mod-foot"><form method="post" action="/verwaltung/module">' . $csrf . '<input type="hidden" name="aktion" value="installieren"><input type="hidden" name="id" value="' . V::h($m['id']) . '">'
                 . '<button' . $off . '>' . V::icon('st:herunter') . ' Installieren</button></form></div></div>';
         }
-        $body .= '<h2>Module</h2>' . ($tiles !== '' ? '<div class="mod-grid">' . $tiles . '</div>' : '<p>Noch keine Module installiert, und es sind keine weiteren verfügbar.</p>');
+        // Erklärung zum blauen Punkt: offene Einrichtungspunkte, die hier (oder bei einem Modul) zu erledigen sind.
+        $hinweise = '';
+        if ($this->overview) {
+            $here = array_filter($this->overview->core(), fn($i) => Overview::needed($i) && strtok($i['link'], '?#') === '/verwaltung/module');
+            if ($here) $hinweise .= '<p class="notice">Hier noch offen: ' . V::h(implode('; ', array_map(fn($i) => $i['title'], $here))) . ' – <a href="/verwaltung/einrichtung">Einrichtung</a>.</p>';
+            foreach ($this->overview->modules() as $om) {
+                $need = array_filter($om['items'], fn($i) => Overview::needed($i));
+                if (!$need) continue;
+                $u = $this->modules->settingsUrl($om['id']);
+                $hinweise .= '<p class="notice"><span class="todo-dot" aria-hidden="true"></span> ' . V::h($om['name']) . ': noch ' . count($need) . ' Einrichtungspunkt' . (count($need) === 1 ? '' : 'e') . ' offen'
+                    . ($u !== null ? ' – <a href="' . V::h($u) . '">Einstellungen öffnen</a>' : '') . '.</p>';
+            }
+        }
+        $body .= $hinweise . '<h2>Module</h2>' . ($tiles !== '' ? '<div class="mod-grid">' . $tiles . '</div>' : '<p>Noch keine Module installiert, und es sind keine weiteren verfügbar.</p>');
         $body .= '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="status"><button class="secondary"' . $off . '>Status der Dienste aktualisieren</button></form> '
             . '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="pruefen"><button class="secondary"' . $off . '>Nach Modulen sehen</button></form> '
             . '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="automatisch"><input type="hidden" name="an" value="' . ($st['auto'] ? '0' : '1') . '">'
@@ -2015,7 +2041,7 @@ final class Web {
     }
 
     /** Aufklappbare Anleitung: virtuelle Drucker der Module an den Arbeitsplätzen einrichten (Windows, Mac, T2med), im Format der Kasse. */
-    private function virtualPrinterHelp(array $queues): string {
+    private function virtualPrinterHelp(array $queues, bool $inline = false): string {
         $host = $this->printerHost();
         $ppd = ['Terminzettel' => '/terminzettel/assets/Terminzettel-PDF.ppd', 'SumUp-Rechnung' => '/kasse/assets/SumUp-Rechnung-PDF.ppd', 'Letterxpress' => '/kasse/assets/Letterxpress-PDF.ppd'];
         $blocks = '';
@@ -2044,14 +2070,14 @@ final class Web {
                 . '<li>Mac: „' . V::h($name) . '“ hinzufügen, als Treiber die Datei wählen.' . $mac . '</li></ol>';
         }
         if ($blocks === '') return '';
-        return '<details class="box"><summary><strong>Anleitung: virtuelle Drucker an den Arbeitsplätzen einrichten</strong></summary>'
+        return ($inline ? '<div class="box">' : '<details class="box"><summary><strong>Anleitung: virtuelle Drucker an den Arbeitsplätzen einrichten</strong></summary>')
             . '<p>Nur die virtuellen Drucker der Module werden an den Arbeitsplätzen (T2med-PC) eingerichtet. Echte Drucker und der Bondrucker brauchen keine Freigabe und keine Einrichtung am Arbeitsplatz: die Module drucken von hier aus.</p>'
             . '<p><strong>Voraussetzung:</strong> In der <a href="/verwaltung/firewall">Firewall</a> Drucken (IPP, Port 631) aus dem Praxisnetz erlauben. IPP ist bei jedem virtuellen Drucker immer freigegeben und der Standardweg für Windows, Mac und alle anderen. '
             . 'Die Windows-Freigabe (Samba) ist optional und standardmäßig aus; neues Windows (ab 11 24H2) unterstützt sie nicht mehr.</p>'
             . $blocks
             . '<h3>In T2med</h3><ul><li>„Terminzettel“: Einstellungen → Kalender → Terminliste (DIN A6), Drucker „Terminzettel“ wählen.</li>'
             . '<li>„SumUp-Rechnung“: Rechnung aus T2med auf diesen Drucker drucken, sie erscheint danach beim Patienten in der Kasse.</li>'
-            . '<li>„Letterxpress“: Für den Sammelversand per Post in T2med vorübergehend den Rechnungsdrucker auf diesen Drucker umstellen; jede Rechnung geht sofort an Letterxpress.</li></ul></details>';
+            . '<li>„Letterxpress“: Für den Sammelversand per Post in T2med vorübergehend den Rechnungsdrucker auf diesen Drucker umstellen; jede Rechnung geht sofort an Letterxpress.</li></ul>' . ($inline ? '</div>' : '</details>');
     }
 
     private function saveRoles(Request $r): void {
@@ -2129,7 +2155,8 @@ final class Web {
             . '<progress class="progress" value="' . $pct . '" max="100" aria-label="Fortschritt der Einrichtung">' . $pct . ' %</progress>'
             . ($again ? '<div class="notice warn"><p><strong>Der Servername wurde geändert.</strong> ' . $again . ' Punkt' . ($again === 1 ? '' : 'e') . ' unten stehen deshalb wieder rot und müssen erneut erledigt werden.</p></div>' : '')
             . '<p class="legend"><span class="lg done">✓ erledigt</span><span class="lg open">○ offen</span><span class="lg error">! Fehler oder erneut nötig</span><span class="lg info">i optional</span>'
-            . ' · Orte: ' . implode(', ', array_map(fn($p) => '<strong>' . V::h($p[0]) . '</strong> (' . V::h($p[1]) . ')', Overview::PLACES)) . '</p>';
+            . ' · Orte: ' . implode(', ', array_map(fn($p) => '<strong>' . V::h($p[0]) . '</strong> (' . V::h($p[1]) . ')', Overview::PLACES)) . '</p>'
+            . ($this->virtualPrinterHelp($this->printers ? $this->printers->status()['queues'] : [], true) !== '' ? '<p class="muted">Arbeitsplätze: Zertifikat, Name und die virtuellen Drucker der Module (für T2med) richtest du auf jedem PC nach <a href="/hilfe/arbeitsplatz#drucker">Arbeitsplatz einrichten</a> ein.</p>' : '');
         foreach (Overview::GROUPS as $gid => $glabel) {
             $part = array_values(array_filter($core, fn($i) => ($i['gruppe'] ?? 'betrieb') === $gid));
             if (!$part) continue;

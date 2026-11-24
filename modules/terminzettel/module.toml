@@ -4,7 +4,7 @@
 [module]
 id = "terminzettel"
 name = "Terminzettel"
-version = "1.3.0-beta.4"
+version = "1.3.0-beta.6"
 core_api = "1"
 description = "Terminblatt aus T2med als Bon auf dem Bondrucker: virtueller Drucker „Terminzettel“, Layout mit Vorschau, Kalender-QR je Termin."
 
@@ -35,6 +35,9 @@ share = ["ipp"]
 [backup]
 paths = ["/var/lib/kienzle/terminzettel"]
 settings = ["/var/lib/kienzle/terminzettel/layout.json"]
+
+[setup]
+overview = "bin/setup-overview"
 
 [hooks]
 install = "bin/install"

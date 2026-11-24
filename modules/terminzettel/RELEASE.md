@@ -1,5 +1,18 @@
 # Terminzettel – Release-Notizen
 
+## 1.3.0-beta.6
+
+- Verweis auf den Schritt „Virtuelle Drucker“ unter „Arbeitsplatz einrichten“ der Basis; die Anleitung auf der Seite bleibt.
+- Neuer Einrichtungs-Überblick (`bin/setup-overview`): Bondrucker zugeordnet, Praxisname im Kopf (optional), erster Terminzettel aus T2med am Bondrucker angekommen. Die Bereiche „Kopf“ und „Drucker“ klappen beim Sprung aus der Übersicht auf.
+
+## 1.3.0-beta.5
+
+- Der Haken „Terminzettel … drucken“ entfällt: Der Bondruck ist mit dem Modul immer aktiv.
+- Kurze Beschreibung oben (Terminliste A6 aus T2med → virtueller Drucker → Bondrucker).
+- Alle Bereiche sind standardmäßig zugeklappt; neue Tabler-Symbole statt Zeichen.
+- „Speichern“ sitzt in einer unten mitlaufenden Leiste statt oben in der Ecke.
+- Nicht auf der echten VM geprüft (Aussehen der Symbole, mitlaufende Leiste).
+
 ## 1.3.0-beta.4
 
 - Der virtuelle Drucker „Terminzettel“ wird nur noch per IPP freigegeben; Samba ist optional (Verwaltung → Drucker).
