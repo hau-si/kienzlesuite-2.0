@@ -20,11 +20,12 @@ ob_start();
 ?>
 <header class="seitenkopf"><div><p class="eyebrow">Kasse</p><h1>Kassieren</h1></div><span class="start-tools"><span id="day-stats" class="muted small"></span><?php if ($einstellungen): ?><a class="button secondary" href="<?= $base ?>einstellungen">⚙ Einstellungen<span id="setup-count" class="zaehler" hidden></span></a><?php endif; ?></span></header>
 <div class="start-grid">
-<section class="start-left" aria-label="Kassieren"><div class="start-bar"><strong id="work-title">Freie Eingabe · IGeL · GOÄ</strong><button id="work-new" class="text-button" type="button">Neuer Vorgang</button></div>
-<iframe id="work" class="work-frame" title="Kassieren" src="<?= $base ?>kassieren?neu=1"></iframe></section>
-<aside class="start-right" aria-label="Offene Rechnungen"><h2>Offene T2med-Rechnungen</h2>
-<p id="inbox-empty" class="muted" hidden>Keine offenen Rechnungen.</p><div id="inbox"></div>
-<p class="muted small">Rechnungen aus T2med erscheinen hier, sobald sie auf „SumUp-Rechnung“ gedruckt wurden. Das Abhaken als bezahlt steht in den Einstellungen.</p></aside>
+<aside class="start-left" aria-label="Rechnungen"><div class="start-tabs" id="tabs" role="tablist"></div>
+<input id="inv-search" class="inv-search" type="search" placeholder="Name suchen" autocomplete="off" aria-label="Rechnungen nach Namen suchen">
+<button id="free-entry" class="free-entry" type="button">Freie Eingabe (IGeL, GOÄ)</button>
+<div id="inbox" class="inbox-list"></div><p id="inbox-empty" class="muted small" hidden>Keine Rechnungen in dieser Ansicht.</p>
+<p class="muted small start-hint">Rechnungen aus T2med erscheinen hier, sobald sie auf „SumUp-Rechnung“ gedruckt wurden. „Zurückstellen“ blendet eine Rechnung aus der Liste „Offen“ aus, ohne sie zu drucken.</p></aside>
+<section class="start-right" aria-label="Kassieren"><iframe id="work" class="work-frame" title="Kassieren" src="about:blank"></iframe></section>
 </div>
 <footer>Kasse v<?= $version ?> · auf Grundlage von kienzle-sumup von Dr. Thomas Kienzle</footer>
 <?php

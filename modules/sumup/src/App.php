@@ -186,6 +186,14 @@ final class App {
         return $out;
     }
     /** Alle offenen eingegangenen T2med-Rechnungen für die Startseite (mit Patientenname; nur für Benutzer mit Recht „inbox“ oder „letter“). */
+    /** Marke an einer Rechnung im Eingang setzen oder löschen: „parked“ (zurückgestellt, ohne Drucken) oder „transfer“ (überwiesen). */
+    public function inboxTag(string $invoiceId, string $tag, bool $on): array {
+        if (!preg_match('/^[a-f0-9]{32}$/D', $invoiceId)) throw new Problem('Ungültige Rechnung.', 422);
+        $column = ['parked' => 'parked_at', 'transfer' => 'transfer_at'][$tag] ?? throw new Problem('Ungültige Marke.', 422);
+        if (!$this->db->one('SELECT 1 AS x FROM invoice_inbox WHERE id=?', [$invoiceId])) throw new Problem('Diese Rechnung gibt es nicht (mehr).', 404);
+        $this->db->query("UPDATE invoice_inbox SET $column=? WHERE id=?", [$on ? time() : null, $invoiceId]);
+        return ['id' => $invoiceId, 'tag' => $tag, 'on' => $on];
+    }
     public function letterEnabled(): bool { return $this->letter->enabled(); }
     public function openInbox(): array {
         if (!$this->config->get('invoice_inbox', 'enabled', false)) return [];
@@ -193,7 +201,7 @@ final class App {
         foreach (InboxOverview::build($this->db, $this->config)['items'] as $i) {
             if ($i['status'] !== 'offen') continue;
             $out[] = ['id' => $i['id'], 'number' => $i['number'], 'invoice_date' => $i['invoice_date'], 'amount_cents' => $i['amount_cents'], 'patient' => $i['patient'], 'birthdate' => $i['birthdate'],
-                'postable' => $i['postable'], 'letter' => $i['letter']];
+                'postable' => $i['postable'], 'letter' => $i['letter'], 'received_at' => $i['received_at'], 'parked' => $i['parked'], 'transfer' => $i['transfer'], 'printed' => $i['printed']];
         }
         return $out;
     }
@@ -643,6 +651,7 @@ final class App {
         $this->editable($fresh);
         $open = array_column($this->openInvoices($fresh), null, 'id');
         if (!isset($open[$invoiceId])) throw new Problem('Diese Rechnung ist nicht mehr offen oder gehört nicht zu diesem Patienten. Bitte Seite neu laden.', 409);
+        $this->db->query('UPDATE invoice_inbox SET transfer_at=COALESCE(transfer_at, ?) WHERE id=?', [time(), $invoiceId]);
         $settings = $this->printSettings();
         if (!$settings['t2med_auto']) return ['printed' => false, 'printed_at' => null, 'message' => ''];
         return $this->db->locked('invoice-later-' . $invoiceId, function () use ($invoiceId, $settings): array {

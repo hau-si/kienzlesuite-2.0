@@ -38,7 +38,7 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 
 ![Verbindungen](docs/screenshots/verbindungen.png)
 
-**Kasse – Startseite:** Links die Kasse für freie Eingabe, IGeL und GOÄ (auch ohne T2med-Rechnung, Name und Geburtsdatum optional), rechts die offenen T2med-Rechnungen mit Direktwahl Karte, Bar, Überweisung oder Per Post (Letterxpress) und die Tageswerte. Aus T2med startet die Kasse weiterhin schlank ohne Menü.
+**Kasse – Startseite:** Links die Rechnungen aus T2med mit Filter (offen, zurückgestellt, überwiesen), Namenssuche und Marken; die neueste ist vorgewählt, Karte ist vorbelegt, ein Klick kassiert. „Zurückstellen“ blendet eine Rechnung aus der Liste aus, ohne sie zu drucken. Rechts die Kasse für freie Eingabe, IGeL und GOÄ (Suche nach Ziffer oder Namen, auch ohne T2med-Rechnung) in zwei Spalten ohne Scrollen. Aus T2med startet die Kasse weiterhin schlank ohne Menü.
 
 ![Kasse](docs/screenshots/kasse-start.png)
 

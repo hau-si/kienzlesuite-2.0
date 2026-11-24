@@ -13,6 +13,7 @@ final class InboxOverview {
             $status = $pay ? ($pay['payment_status'] === 'successful' ? 'bezahlt' : 'am Terminal') : ($row['superseded_at'] ? 'ersetzt' : ($row['received_at'] < $limit ? 'abgelaufen' : 'offen'));
             $items[] = ['id' => $row['id'], 'number' => $row['invoice_number'], 'invoice_date' => $row['invoice_date'], 'amount_cents' => (int)$row['amount_cents'],
                 'received_at' => (int)$row['received_at'], 'status' => $status, 'patient' => $row['patient_name'], 'birthdate' => $row['patient_birthdate'],
+                'parked' => $row['parked_at'] !== null, 'transfer' => $row['transfer_at'] !== null, 'printed' => $row['printed_at'] !== null,
                 'deletable' => !in_array($status, ['bezahlt', 'am Terminal'], true),
                 'letter' => Letterxpress::state($row), 'postable' => $status === 'offen' && $row['pdf'] !== null];
         }

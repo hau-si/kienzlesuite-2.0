@@ -16,11 +16,13 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-sr
 $version = ks_h(trim((string)file_get_contents(dirname(__DIR__) . '/VERSION')));
 $csrf = ks_h(Suite::modul()->csrf());
 $base = ks_h(Suite::base() . '/');
+// Eingebettet in der Startseite (…?neu=1 für freie Eingabe, …?rechnung=<id> für eine T2med-Rechnung): kompakte Arbeitsfläche ohne Kopf.
+$modus = isset($_GET['rechnung']) ? 'embed rechnung' : (isset($_GET['neu']) ? 'embed frei' : '');
 ?>
 <!doctype html>
 <html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="kienzle-csrf" content="<?= $csrf ?>"><title>Kasse · Kienzle-Suite</title><link rel="stylesheet" href="<?= $base ?>assets/style.css?v=<?= $version ?>"><script src="<?= $base ?>assets/goae-calc.js?v=<?= $version ?>" defer></script><script src="<?= $base ?>assets/app.js?v=<?= $version ?>" defer></script></head>
-<body data-base="<?= $base ?>"><main>
+<meta name="kienzle-csrf" content="<?= $csrf ?>"><title>Kasse · Kienzle-Suite</title><link rel="stylesheet" href="<?= $base ?>assets/style.css?v=<?= $version ?>"><link rel="stylesheet" href="<?= $base ?>assets/embed.css?v=<?= $version ?>"><script src="<?= $base ?>assets/goae-calc.js?v=<?= $version ?>" defer></script><script src="<?= $base ?>assets/app.js?v=<?= $version ?>" defer></script></head>
+<body class="<?= $modus ?>" data-base="<?= $base ?>"><main>
 <header class="top"><a class="brand" href="/"><span class="mark" aria-hidden="true">K</span><div><strong>Kasse</strong><span>Kienzle-Suite · T2med</span></div></a><span id="mode" class="badge" hidden>TESTMODUS</span></header>
 <section id="welcome" class="card"><h1>Kartenzahlung</h1><p>Bitte diese Seite aus der Patientenakte in T2med öffnen.</p><form id="manual-form" class="manual-form" autocomplete="off"><h2>Manuelle Kartenzahlung</h2><p class="muted small">Ohne Patientenakte: Betreff und Betrag werden an SumUp übergeben und die Zahlung startet am Kartenterminal. Keine Patientendaten eintragen.</p><label for="manual-label">Betreff</label><input id="manual-label" maxlength="80" required placeholder="z. B. Selbstzahler-Leistung"><label for="manual-amount">Betrag in Euro</label><input id="manual-amount" inputmode="decimal" maxlength="12" required placeholder="z. B. 25,00"><button class="primary wide" type="submit">Kartenzahlung starten</button></form><a class="button secondary wide settings-link" href="<?= $base ?>settings.php">⚙ Einstellungen der Kasse</a><button id="demo" class="secondary"<?= $demo ? '' : ' hidden' ?>>Testpatient öffnen (Testmodus)</button></section>
 <div id="workspace" hidden>
@@ -36,11 +38,12 @@ $base = ks_h(Suite::base() . '/');
 <p class="muted small">T2med-Rechnungen werden immer auf dem Praxisdrucker gedruckt.</p>
 <button type="button" id="print-settings-save" class="secondary">Speichern</button></div></div>
 <div id="invoices-section" class="invoices" hidden><h2>Offene T2med-Rechnung</h2><div id="invoices"></div><p class="muted">Rechnungsnummer und Betrag stammen aus der in T2med auf „SumUp-Rechnung“ gedruckten Rechnung. Nur Betrag und Rechnungsnummer gehen an SumUp.</p></div>
-<div class="section-heading"><h2>Leistungen</h2><button type="button" id="manage-toggle" class="text-button" aria-expanded="false">Leistungen verwalten</button></div>
+<div class="col-left"><div class="section-heading"><h2>Leistungen</h2><a id="catalog-gear" class="gear" href="<?= $base ?>einstellungen#leistungen" target="_top" title="Leistungsliste bearbeiten" aria-label="Leistungsliste bearbeiten">⚙</a><button type="button" id="manage-toggle" class="text-button" aria-expanded="false">Leistungen verwalten</button></div>
+<input id="service-search" class="service-search" type="search" placeholder="Suchen: Ziffer oder Name" autocomplete="off" aria-label="Leistungen suchen">
 <p id="practice-hint" class="muted" hidden>Für eigene Leistungsbelege und GOÄ-Rechnungen bitte Praxisname und Anschrift in den Einstellungen eintragen.</p>
 <div id="groups-section" hidden><h3>Kombinationen</h3><div id="groups"></div><p class="muted">Gemeinsame Einzelleistungen werden nur einmal berechnet.</p><h3>Einzelleistungen</h3></div>
 <div id="services"></div><p id="empty" class="muted" hidden>Noch keine Leistungen angelegt. Über „Leistungen verwalten“ kannst du beginnen.</p>
-<div id="basket" class="basket" hidden><h3>Ausgewählte Positionen</h3><div id="basket-lines"></div></div>
+</div><div class="col-right"><div id="basket" class="basket" hidden><h3>Ausgewählte Positionen</h3><div id="basket-lines"></div></div>
 <label class="date-label" for="service-date">Leistungsdatum</label><input id="service-date" type="date" required>
 <div class="manual"><label for="manual">Sonstiger Betrag <span class="muted">optional</span></label><div class="amount-input"><input id="manual" type="text" inputmode="decimal" placeholder="0,00" autocomplete="off" maxlength="12"><span>€</span></div></div>
 <div class="total"><span>Gesamt</span><strong id="total">0,00 €</strong></div>
@@ -51,7 +54,7 @@ $base = ks_h(Suite::base() . '/');
 <button id="reader-status" class="text-button">Status prüfen</button>
 </div>
 <div id="pay-method" class="pay-method" role="radiogroup" aria-label="Zahlungsart"><label><input type="radio" name="pay-method" value="card" checked><span>💳 Karte (SumUp)</span></label><label><input type="radio" name="pay-method" value="cash"><span>💶 Bar</span></label><label id="pay-transfer-label" hidden><input type="radio" name="pay-method" value="transfer"><span>🏦 Überweisung</span></label></div><p id="pay-method-note" class="muted small" hidden></p>
-<button id="pay" class="primary wide" disabled>Mit Karte kassieren</button></section>
+<button id="pay" class="primary wide" disabled>Mit Karte kassieren</button></div></section>
 <section id="manager" class="card" hidden><div class="section-heading"><h2>Leistungen verwalten</h2><button id="manage-close" class="text-button">Fertig</button></div><div id="manage-list"></div>
 <form id="service-form"><input id="service-id" type="hidden"><label for="service-label">Bezeichnung</label><input id="service-label" required maxlength="160" placeholder="z. B. Attest"><label for="service-price">Preis in Euro</label><input id="service-price" required inputmode="decimal" placeholder="10,00" maxlength="12">
 <label class="check-label" id="service-vat-row"><input id="service-vat" type="checkbox"> <span id="service-vat-label">mit MwSt. (im Preis enthalten)</span></label><p id="service-vat-note" class="muted small" hidden></p>

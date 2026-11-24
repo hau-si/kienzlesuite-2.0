@@ -88,7 +88,7 @@ function renderInvoices() {
     const later = element('button','Patient zahlt später (Überweisung)','text-button invoice-later');
     later.onclick = () => run(async() => {
       // Ist der Rechnungsdruck eingeschaltet, kommt die Rechnung jetzt einmal auf den Praxisdrucker (für die Überweisung).
-      if (state.print?.t2med_auto && !invoice.printed_at) { const result = await api('invoice_later', {invoice_id: invoice.id}); if (result.message) message(result.message); }
+      const result = await api('invoice_later', {invoice_id: invoice.id}); if (result.message) message(result.message);
       invoiceLater.add(invoice.id); await load();
     });
     box.append(line, card, cash, later);
@@ -137,7 +137,11 @@ function vatText(s) {
 function serviceDescription(s) {
   return [s.goae_code ? 'GOÄ '+s.goae_code+' · Faktor '+s.factor.replace('.',',') : '', vatText(s)].filter(Boolean).join(' · ');
 }
+// Für die Startseite: „in Arbeit“ (Auswahl, Betrag oder laufende Zahlung), damit sie nicht mitten im Vorgang auf eine neue Rechnung umschaltet.
+function markDirty() { document.body.dataset.dirty = (selected.size || selectedGroups.size || $('manual').value.trim() || (typeof state !== 'undefined' && state && state.payment)) ? '1' : ''; }
+$('manual').addEventListener('input', markDirty);
 function renderBasket() {
+  markDirty();
   const ids=selectedIds(); $('basket-lines').replaceChildren(); $('basket').hidden=!ids.size;
   for(const s of state.services.filter(s=>ids.has(s.id))) {
     const row=element('div','','basket-line'), line=element('div','','position');
@@ -154,6 +158,14 @@ function renderBasket() {
   }
   updateTotal();
 }
+// Suche in der Leistungsliste: Ziffer oder Namensteile (alle Wörter müssen vorkommen); ausgewählte Positionen bleiben immer sichtbar.
+function filterServices() {
+  const terms = ($('service-search').value || '').toLowerCase().split(/\s+/).filter(Boolean);
+  for (const row of document.querySelectorAll('#services > label, #groups > label')) {
+    const text = row.dataset.search || '', checked = row.querySelector('input')?.checked;
+    row.hidden = terms.length > 0 && !checked && !terms.every(t => text.includes(t));
+  }
+}
 function renderServices() {
   $('services').replaceChildren(); $('manage-list').replaceChildren(); $('groups').replaceChildren(); $('group-list').replaceChildren(); $('group-members').replaceChildren();
   const active = new Set(state.services.map(s => s.id)); selected = new Set([...selected].filter(id => active.has(id)));
@@ -164,6 +176,7 @@ function renderServices() {
     const label = element('label','','service'); const checkbox = document.createElement('input'); checkbox.type='checkbox'; checkbox.checked=selected.has(service.id);
     checkbox.addEventListener('change', () => { checkbox.checked ? selected.add(service.id) : selected.delete(service.id); startRequest=null; renderBasket(); });
     const name=element('span',service.label,'label'); if(serviceDescription(service)) name.append(element('small',serviceDescription(service),'muted'));
+    label.dataset.search = [service.label, service.goae_code, serviceDescription(service)].join(' ').toLowerCase();
     label.append(checkbox, name, element('span',euro(service.price_cents),'price')); $('services').append(label);
     const row = element('div','','manage-row'); row.append(element('span', service.label+' · '+euro(service.price_cents)+(serviceDescription(service)?' · '+serviceDescription(service):'')));
     const edit = element('button','Bearbeiten','text-button'); edit.onclick=() => {
@@ -183,6 +196,7 @@ function renderServices() {
     const label=element('label','','service'), checkbox=document.createElement('input'); checkbox.type='checkbox'; checkbox.checked=selectedGroups.has(group.id);
     checkbox.onchange=()=>{checkbox.checked?selectedGroups.add(group.id):selectedGroups.delete(group.id);startRequest=null;renderBasket();};
     const name=element('span',group.label,'label'); name.append(element('small',state.services.filter(s=>group.services.includes(s.id)).map(s=>s.label).join(', '),'muted'));
+    label.dataset.search = [group.label, ...state.services.filter(s=>group.services.includes(s.id)).map(s=>s.label+' '+s.goae_code)].join(' ').toLowerCase();
     label.append(checkbox,name,element('span',euro(sum),'price')); $('groups').append(label);
     const row=element('div','','manage-row'); row.append(element('span',group.label+' · '+euro(sum)));
     const edit=element('button','Bearbeiten','text-button'); edit.onclick=()=>{
@@ -197,6 +211,7 @@ function renderServices() {
     row.append(edit,del); $('group-list').append(row);
   }
   renderBasket();
+  filterServices();
 }
 function renderVatOption() {
   const tax=state.tax||{small_business:false,rate:1900}, rate=(tax.rate/100).toLocaleString('de-DE');
@@ -388,7 +403,8 @@ async function load() {
   $('free-patient').hidden=!state.manual; $('practice-hint').hidden=state.local_receipts;
   if(!$('service-date').value) $('service-date').value=state.today;
   $('service-date').max=state.today;
-  renderVatOption(); renderServices(); renderInvoices(); renderPrintBox(); renderPayment();
+  renderVatOption(); renderServices(); renderInvoices(); renderPrintBox(); renderPayment(); markDirty();
+  if (window.parent !== window) parent.postMessage('ks-refresh', location.origin);   // Startseite: Rechnungsliste aktualisieren
 }
 async function poll() {
   if(busy) { timer=setTimeout(poll,2200); return; }
@@ -553,6 +569,7 @@ $('manual-form').onsubmit=event=>{ event.preventDefault(); run(async()=>{
 }); };
 $('demo').onclick=()=>run(async()=>{ const result=await api('demo'); location.href=result.url; location.reload(); });
 // Aus der Startseite: gewünschte Zahlungsart einer Rechnung gleich auslösen (die Abfragen bleiben wie bei Klick auf den Knopf).
+$('service-search').addEventListener('input', filterServices);
 function autoAction(invoiceId, action) {
   const box = document.querySelector('.invoice[data-id="'+invoiceId+'"]'); if (!box) { message('Diese Rechnung ist nicht mehr offen.'); return; }
   const sel = {card:'.invoice-pay', cash:'.invoice-cash', later:'.invoice-later', post:'.invoice-letter'}[action];

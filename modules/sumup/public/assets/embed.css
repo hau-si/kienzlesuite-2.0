@@ -1,0 +1,47 @@
+/* Kassenansicht eingebettet in die Startseite (Klassen embed + frei bzw. rechnung am body): kompakt, zwei Spalten, ohne Kopf und Fuß. */
+.gear { display: none; }
+body.embed { background: transparent; margin: 0; }
+.embed main { max-width: none; margin: 0; padding: 4px 2px; }
+.embed .top, .embed footer, .embed #welcome { display: none; }
+.embed .card { box-shadow: none; border: 0; background: transparent; padding: 0; margin: 0; }
+.embed .patient { padding: 0 0 8px; margin: 0; }
+.embed .patient .eyebrow { display: none; }
+.embed.frei .patient h1, .embed.frei #patient-birth { display: none; }
+.embed .free-patient { display: grid; grid-template-columns: minmax(0, 1fr) 170px; grid-template-rows: auto auto; grid-auto-flow: column; gap: 2px 10px; max-width: none; margin: 0 0 8px; }
+.embed .free-patient label { font-size: 12px; margin: 0; }
+.embed .free-patient input { margin: 0; padding: 7px 10px; }
+.embed #selection { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 14px; align-items: start; }
+.embed .col-left, .embed .col-right { background: #fff; border: 1px solid #d9e3df; border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.embed .col-left { display: flex; flex-direction: column; }
+.embed .section-heading { margin: 0 0 6px; }
+.embed .section-heading h2 { font-size: 16px; margin: 0; }
+.embed #manage-toggle { display: none; }
+.embed .gear { display: inline-grid; place-items: center; width: 30px; height: 30px; margin-left: auto; border-radius: 8px; border: 1px solid #d9e3df; color: inherit; text-decoration: none; font-size: 17px; }
+.embed .gear:hover { background: #eef4f1; }
+.embed .service-search { margin: 0 0 6px; padding: 8px 10px; }
+.embed #services, .embed #groups { overflow-y: auto; max-height: calc(100vh - 250px); scrollbar-width: thin; }
+.embed .service { padding: 4px 4px; min-height: 40px; gap: 10px; }
+.embed .service .label { display: flex; align-items: baseline; gap: 4px 8px; flex-wrap: wrap; font-size: 14px; }
+.embed .service .label small { display: inline; font-size: 12px; margin: 0; }
+.embed #selection > .print-box { grid-column: 1 / -1; order: 9; margin: 0; }
+.embed .col-right .date-label { margin: 0; font-size: 12px; }
+.embed .col-right input { margin-top: 2px; }
+.embed .total { margin: 8px 0; }
+.embed .pay-method { margin: 6px 0; }
+.embed .basket { margin: 0 0 6px; }
+.embed .basket h3 { margin: 0 0 4px; font-size: 13px; }
+.service-search { width: 100%; box-sizing: border-box; }
+/* Rechnung aus dem Eingang: Angaben links, große Zahlungsknöpfe rechts */
+.embed.rechnung .col-left, .embed.rechnung .col-right { display: none; }
+.embed.rechnung #selection { display: block; }
+.embed.rechnung .patient { background: #fff; border: 1px solid #d9e3df; border-radius: 12px; padding: 12px 16px; margin-bottom: 12px; }
+.embed.rechnung .patient h1 { font-size: 22px; margin: 0; }
+.embed.rechnung #invoices-section { margin: 0; }
+.embed.rechnung #invoices-section h2, .embed.rechnung #invoices-section > p { display: none; }
+.embed.rechnung .invoice { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 8px 18px; background: #fff; border: 1px solid #d9e3df; border-radius: 12px; padding: 14px 16px; }
+.embed.rechnung .invoice-line { grid-column: 1; grid-row: 1 / span 4; display: flex; flex-direction: column; gap: 6px; font-size: 16px; }
+.embed.rechnung .invoice-line strong { font-size: 30px; }
+.embed.rechnung .invoice > :not(.invoice-line) { grid-column: 2; margin: 0; }
+.embed.rechnung .invoice .invoice-letter-note { grid-column: 1; grid-row: 5; }
+.embed.rechnung .invoice-pay { padding: 16px 12px; font-size: 17px; }
+.embed.rechnung .invoice-later, .embed.rechnung .invoice-letter { text-align: center; border: 1px solid #d9e3df; border-radius: 10px; padding: 9px; }

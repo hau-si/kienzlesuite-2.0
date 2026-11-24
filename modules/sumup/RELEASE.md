@@ -1,5 +1,14 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.16
+
+- Startseite der Kasse neu gestaltet, ohne Scrollen: links die Rechnungen aus dem Eingang, rechts die Kassenansicht in zwei Spalten (Leistungen und Zahlung). Die Marke „Kasse“ in der Arbeitsfläche entfällt.
+- Rechnungsliste: Filter **Offen / Zurückgestellt / Überwiesen / Alle** mit Zählern, Namenssuche, Marken je Rechnung („neu · vor 3 Min“ für Rechnungen der letzten 10 Minuten, „zurückgestellt“, „überwiesen“, „per Post“). Neueste Rechnung zuerst; beim Öffnen der Startseite ist die neueste offene Rechnung vorgewählt, **Karte ist vorbelegt** (ein Klick kassiert). Eine später aus T2med eintreffende Rechnung wird nur dann automatisch vorgewählt, wenn gerade nichts in Arbeit ist.
+- **Zurückstellen** (neu): die Rechnung bleibt im Rechnungseingang, verschwindet aber aus der Liste „Offen“ und lässt sich unter „Zurückgestellt“ direkt anklicken und bezahlen. „Überwiesen“ lässt sich von Hand setzen und wird bei „Patient zahlt später (Überweisung)“ automatisch gesetzt (diese Taste druckt weiterhin, falls eingestellt).
+- Freie Eingabe: Suche nach GOÄ-Ziffer oder Namensteilen in der Leistungsliste (mehrere Wörter, alle müssen vorkommen), Zahnrad oben rechts in der Liste führt zur Bearbeitung der Leistungen.
+- Rechnungen aus dem Eingang sieht jeder mit dem Recht „Kassieren“ (bisher zusätzlich „Rechnungseingang“ nötig); die Einstellungen bleiben an ihre Rechte gebunden.
+- Intern: neue Spalten `parked_at` und `transfer_at`, neue API-Aktion `inbox_tag`; eingebettete Ansicht mit `embed.css`.
+
 ## 2.3.4-beta.15
 
 - In der Startseite eingebettete Kassenansicht: Marke „Kasse“ und Willkommenskarte werden dort nicht mehr doppelt gezeigt.

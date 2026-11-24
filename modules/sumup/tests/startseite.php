@@ -35,9 +35,21 @@ rejects(fn() => $app->inboxVisit(str_repeat('0', 32)), 'Unbekannte Rechnung akze
 check($iv['patient_name'] === 'Erika Musterfrau' && $iv['patient_birthdate'] === '1980-04-12', 'Vorgang ohne Patient der Rechnung');
 $invoices = $app->state($iv, $ib)['invoices'];
 check(count($invoices) === 1 && $invoices[0]['id'] === $open[0]['id'] && $invoices[0]['amount_cents'] === 4250, 'Rechnung wird im Vorgang nicht angeboten');
+$o = $app->openInbox()[0];
+check($o['parked'] === false && $o['transfer'] === false && $o['received_at'] > time() - 60, 'Neue Rechnung hat Marken oder falsche Eingangszeit');
+// Marken: zurückgestellt und überwiesen bleiben im Eingang, lassen sich setzen und wieder löschen.
+$app->inboxTag($open[0]['id'], 'parked', true);
+check($app->openInbox()[0]['parked'] === true && count($app->openInbox()) === 1, 'Zurückgestellte Rechnung verschwindet aus dem Eingang');
+$app->inboxTag($open[0]['id'], 'parked', false);
+check($app->openInbox()[0]['parked'] === false, 'Marke „zurückgestellt“ nicht löschbar');
+rejects(fn() => $app->inboxTag($open[0]['id'], 'unsinn', true), 'Unbekannte Marke akzeptiert');
+rejects(fn() => $app->inboxTag(str_repeat('0', 32), 'parked', true), 'Unbekannte Rechnung akzeptiert');
 // Zweiter Aufruf nutzt denselben offenen Vorgang.
 [$iv2] = enter($app, $app->inboxVisit($open[0]['id'])['url']);
 check($iv2['id'] === $iv['id'], 'Für dieselbe Rechnung entstand ein zweiter Vorgang');
+// „Überweisung“ (später zahlen) markiert die Rechnung als überwiesen; sie bleibt im Eingang.
+$app->invoiceLater($iv, ['invoice_id' => $open[0]['id']]);
+check($app->openInbox()[0]['transfer'] === true, 'Überweisung wird nicht als Marke gespeichert');
 // 3. Bar bezahlen → Tageswerte, Rechnung nicht mehr offen.
 $app->startInvoice($iv, ['invoice_id' => $open[0]['id'], 'method' => 'cash', 'request_id' => bin2hex(random_bytes(16))]);
 $stats = $app->dayStats();

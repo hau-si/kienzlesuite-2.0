@@ -57,7 +57,7 @@ try {
 
     // Seiten: Kasse nur mit Recht „kassieren“, Einstellungen nur mit Rechten, unbekannte Adressen 404, Dateien aus assets.
     [$code, $html] = page($root, admin_server(['REQUEST_URI' => '/kasse/']));
-    check($code === 200 && str_contains($html, '/kasse/assets/start.js') && str_contains($html, 'kassieren?neu=1') && str_contains($html, 'name="kienzle-csrf" content="' . TEST_CSRF . '"'), 'Startseite der Kasse fehlt');
+    check($code === 200 && str_contains($html, '/kasse/assets/start.js') && str_contains($html, 'id="inv-search"') && str_contains($html, 'id="work"') && str_contains($html, 'name="kienzle-csrf" content="' . TEST_CSRF . '"'), 'Startseite der Kasse fehlt');
     $server = admin_server(['REQUEST_URI' => '/kasse/kassieren']);
     [$code, $html] = page($root, $server);
     check($code === 200 && str_contains($html, 'data-base="/kasse/"') && str_contains($html, 'name="kienzle-csrf" content="' . TEST_CSRF . '"') && str_contains($html, '/kasse/assets/app.js'), 'Kasse nicht unter /kasse/');

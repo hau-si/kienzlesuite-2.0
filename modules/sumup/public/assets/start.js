@@ -1,17 +1,20 @@
 'use strict';
-// Startseite der Kasse: offene T2med-Rechnungen mit Direktwahl der Zahlungsart, Tageswerte, Wechsel des Vorgangs links.
+// Startseite der Kasse: links die Rechnungen aus dem Eingang (Filter, Namenssuche, Marken), rechts die Kassenansicht als eingebettete Seite.
 const BASE = document.body.dataset.base || '/';
 const SUITE_CSRF = (document.querySelector('meta[name="kienzle-csrf"]') || {}).content || '';
 const $ = id => document.getElementById(id);
 const euro = cents => new Intl.NumberFormat('de-DE', {style: 'currency', currency: 'EUR'}).format(cents / 100);
 const el = (tag, text, cls) => { const e = document.createElement(tag); if (text) e.textContent = text; if (cls) e.className = cls; return e; };
+const FRISCH = 600;   // Sekunden: Rechnung gilt als „neu“, wenn sie in den letzten 10 Minuten aus T2med kam
+const FILTER = [['offen', 'Offen'], ['zurueckgestellt', 'Zurückgestellt'], ['ueberwiesen', 'Überwiesen'], ['alle', 'Alle']];
+let items = [], jetzt = Math.floor(Date.now() / 1000), letter = false, aktiv = null, filter = 'offen', bekannt = null, ersterLauf = true;
+
 // Startlinks aus T2med (und der Testpatient) zeigen auf die Startadresse: gleich in die schlanke Kassenansicht weiterleiten.
 (() => {
   let hash = location.hash;
   try { if (!hash.startsWith('#launch=')) hash = sessionStorage.getItem('kienzle-launch') || ''; } catch { hash = ''; }
   if (hash.startsWith('#launch=')) { try { sessionStorage.removeItem('kienzle-launch'); } catch { /* ohne sessionStorage */ } location.replace(BASE + 'kassieren' + hash); }
 })();
-let aktiv = null;
 
 async function api(action, data = {}) {
   const response = await fetch(BASE + 'api.php', {method: 'POST', credentials: 'same-origin', cache: 'no-store',
@@ -20,36 +23,70 @@ async function api(action, data = {}) {
   if (!response.ok || result.error) throw new Error(result.error || 'Anfrage fehlgeschlagen.');
   return result;
 }
-function neuerVorgang() { aktiv = null; $('work-title').textContent = 'Freie Eingabe · IGeL · GOÄ'; $('work').src = BASE + 'kassieren?neu=1&t=' + Date.now(); markieren(); }
-function markieren() { document.querySelectorAll('.start-inv').forEach(box => box.classList.toggle('aktiv', box.dataset.id === aktiv)); }
+const gruppe = i => i.parked ? 'zurueckgestellt' : i.transfer ? 'ueberwiesen' : 'offen';
+const imFilter = i => filter === 'alle' || gruppe(i) === filter;
+const alter = i => { const s = Math.max(0, jetzt - i.received_at), m = Math.floor(s / 60), h = Math.floor(m / 60); return s < 90 ? 'gerade eben' : m < 60 ? 'vor ' + m + ' Min' : h < 24 ? 'vor ' + h + ' Std' : 'vor ' + Math.floor(h / 24) + ' Tg'; };
+const frisch = i => jetzt - i.received_at <= FRISCH;
+const frei = () => { aktiv = null; $('work').src = BASE + 'kassieren?neu=1&t=' + Date.now(); anzeigen(); };
+
 async function oeffnen(invoice, aktion) {
   try {
     const result = await api('inbox_visit', {invoice_id: invoice.id});
-    const ticket = result.url.split('#')[1] || '';
-    aktiv = invoice.id; $('work-title').textContent = 'Rechnung ' + invoice.number + ' · ' + invoice.patient;
-    $('work').src = BASE + 'kassieren?' + new URLSearchParams({rechnung: invoice.id, aktion}).toString() + '#' + ticket;
-    markieren();
+    aktiv = invoice.id;
+    const params = new URLSearchParams({rechnung: invoice.id}); if (aktion) params.set('aktion', aktion);
+    $('work').src = BASE + 'kassieren?' + params.toString() + '#' + (result.url.split('#')[1] || '');
+    anzeigen();
   } catch (error) { alert(error.message); }
 }
-function zeile(invoice, letter) {
-  const box = el('div', '', 'start-inv'); box.dataset.id = invoice.id;
-  const kopf = el('div', '', 'start-inv-head');
-  kopf.append(el('strong', invoice.patient || 'Patient'), el('strong', euro(invoice.amount_cents)));
-  const datum = invoice.invoice_date ? invoice.invoice_date.split('-').reverse().join('.') : '';
-  box.append(kopf, el('p', 'Rechnung ' + invoice.number + (datum ? ' vom ' + datum : ''), 'muted'));
-  const knoepfe = el('div', '', 'start-pay');
-  const mk = (text, aktion, cls) => { const b = el('button', text, cls || 'secondary'); b.type = 'button'; b.onclick = () => oeffnen(invoice, aktion); knoepfe.append(b); };
-  mk('💳 Karte', 'card', 'primary'); mk('💶 Bar', 'cash'); mk('🏦 Überweisung', 'later');
-  if (letter && invoice.postable) mk('✉ Per Post', 'post');
-  box.append(knoepfe);
+async function marke(invoice, tag, an) {
+  try { await api('inbox_tag', {invoice_id: invoice.id, tag, on: an}); await liste(); } catch (error) { alert(error.message); }
+}
+function zeile(invoice) {
+  const box = el('div', '', 'start-inv' + (invoice.id === aktiv ? ' aktiv' : '')); box.dataset.id = invoice.id;
+  const kopf = el('button', '', 'start-inv-main'); kopf.type = 'button'; kopf.onclick = () => oeffnen(invoice);
+  const name = el('span', '', 'start-inv-name'); name.append(el('strong', invoice.patient || 'Patient'), el('span', 'Rechnung ' + invoice.number, 'muted small'));
+  kopf.append(name, el('strong', euro(invoice.amount_cents), 'start-inv-amount'));
+  const meta = el('div', '', 'start-inv-meta');
+  if (frisch(invoice)) meta.append(el('span', 'neu · ' + alter(invoice), 'tag ok')); else meta.append(el('span', alter(invoice), 'muted small'));
+  if (invoice.parked) meta.append(el('span', 'zurückgestellt', 'tag warn'));
+  if (invoice.transfer) meta.append(el('span', 'überwiesen', 'tag info'));
+  if (invoice.letter && invoice.letter.status === 'sent') meta.append(el('span', 'per Post', 'tag info'));
+  const knoepfe = el('span', '', 'start-inv-actions');
+  const mk = (text, fn) => { const b = el('button', text, 'text-button'); b.type = 'button'; b.onclick = fn; knoepfe.append(b); };
+  mk(invoice.parked ? 'Zurückholen' : 'Zurückstellen', () => marke(invoice, 'parked', !invoice.parked));
+  mk(invoice.transfer ? 'Nicht überwiesen' : 'Überwiesen', () => marke(invoice, 'transfer', !invoice.transfer));
+  meta.append(knoepfe);
+  box.append(kopf, meta);
   return box;
 }
+function anzeigen() {
+  const suche = $('inv-search').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const zaehl = {offen: 0, zurueckgestellt: 0, ueberwiesen: 0, alle: items.length};
+  for (const i of items) zaehl[gruppe(i)]++;
+  $('tabs').replaceChildren(...FILTER.map(([id, text]) => {
+    const b = el('button', text + ' ' + zaehl[id], 'start-tab' + (id === filter ? ' on' : '')); b.type = 'button'; b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(id === filter));
+    b.onclick = () => { filter = id; anzeigen(); }; return b;
+  }));
+  const sichtbar = items.filter(i => imFilter(i) && suche.every(t => ((i.patient || '') + ' ' + i.number).toLowerCase().includes(t)));
+  $('inbox').replaceChildren(...sichtbar.map(zeile));
+  $('inbox-empty').hidden = sichtbar.length > 0;
+  $('free-entry').classList.toggle('aktiv', aktiv === null);
+}
+function inArbeit() { try { return $('work').contentDocument.body.dataset.dirty === '1'; } catch { return false; } }
 async function liste() {
   try {
-    const result = await api('open_inbox'), items = result.items || [];
-    $('inbox').replaceChildren(...items.map(i => zeile(i, result.letter && result.letter.enabled)));
-    $('inbox-empty').hidden = items.length > 0; markieren();
-  } catch (error) { $('inbox-empty').hidden = false; $('inbox-empty').textContent = error.message; }
+    const result = await api('open_inbox'); items = result.items || []; letter = !!(result.letter && result.letter.enabled);
+    jetzt = result.now || Math.floor(Date.now() / 1000);
+    items.sort((a, b) => b.received_at - a.received_at);
+    // Die neueste Rechnung ist zuerst vorgewählt; später eingehende nur, wenn gerade nichts in Arbeit ist (nie mitten im Vorgang umschalten).
+    const offen = items.filter(i => gruppe(i) === 'offen'), neueste = offen[0];
+    const neu = neueste && bekannt && !bekannt.has(neueste.id);
+    bekannt = new Set(items.map(i => i.id));
+    if (neueste && (ersterLauf || (neu && frisch(neueste) && aktiv === null && !inArbeit()))) oeffnen(neueste);
+    if (ersterLauf && !neueste) frei();
+    ersterLauf = false;
+    anzeigen();
+  } catch (error) { if (ersterLauf) { ersterLauf = false; frei(); } $('inbox-empty').hidden = false; $('inbox-empty').textContent = error.message; }
 }
 async function tag() {
   try {
@@ -61,6 +98,8 @@ async function einrichtung() {
   const z = $('setup-count'); if (!z) return;
   try { const r = await api('setup_count'); z.hidden = !r.count; z.textContent = String(r.count); z.title = r.red ? r.red + ' Punkt(e) erneut nötig oder fehlerhaft' : 'Offene Einrichtungspunkte'; } catch { /* nur Beiwerk */ }
 }
-$('work-new').onclick = neuerVorgang;
+$('free-entry').onclick = frei;
+$('inv-search').addEventListener('input', anzeigen);
+window.addEventListener('message', event => { if (event.origin === location.origin && event.data === 'ks-refresh') { liste(); tag(); } });
 liste(); tag(); einrichtung();
 setInterval(() => { if (!document.hidden) { liste(); tag(); } }, 15000);
