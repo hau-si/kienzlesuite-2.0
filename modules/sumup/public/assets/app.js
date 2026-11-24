@@ -101,12 +101,14 @@ function renderInvoices() {
     const go = element('button', '', 'primary wide invoice-go');
     const labels = {card: euro(invoice.amount_cents) + ' mit Karte kassieren', cash: euro(invoice.amount_cents) + ' bar erhalten', later: 'Überweisung: Rechnung zurückstellen und drucken', post: 'Per Post senden (Letterxpress)'};
     const radios = {};
+    // Die Liste wird alle paar Sekunden neu aufgebaut: eine von Hand gewählte Zahlart bleibt erhalten, „Karte“ ist nur die Vorauswahl.
+    const chosen = options.some(o => o[0] === chosenMethod.get(invoice.id)) ? chosenMethod.get(invoice.id) : 'card';
     for (const [value, text] of options) {
-      const l = document.createElement('label'), r = document.createElement('input'); r.type = 'radio'; r.name = 'inv-method-' + invoice.id; r.value = value; r.checked = value === 'card';
-      r.onchange = () => { go.textContent = labels[value]; go.classList.toggle('cash', value !== 'card'); };
+      const l = document.createElement('label'), r = document.createElement('input'); r.type = 'radio'; r.name = 'inv-method-' + invoice.id; r.value = value; r.checked = value === chosen;
+      r.onchange = () => { chosenMethod.set(invoice.id, value); go.textContent = labels[value]; go.classList.toggle('cash', value !== 'card'); };
       radios[value] = r; l.append(r, element('span', text)); chips.append(l);
     }
-    go.textContent = labels.card;
+    go.textContent = labels[chosen]; go.classList.toggle('cash', chosen !== 'card');
     go.onclick = () => {
       const value = Object.keys(radios).find(k => radios[k].checked);
       const target = {card, cash, later}[value] || box.querySelector('.invoice-letter');
@@ -141,6 +143,7 @@ function renderInvoices() {
   }
   updateTotal();
 }
+const chosenMethod = new Map();   // Rechnungs-ID → von Hand gewählte Zahlart (übersteht das Neuaufbauen der Liste)
 // Neue gedruckte Rechnungen erscheinen ohne Neuladen, solange kein Zahlungsvorgang angezeigt wird.
 setInterval(async () => {
   if (busy || document.hidden || !$('payment').hidden || !state?.patient) return;

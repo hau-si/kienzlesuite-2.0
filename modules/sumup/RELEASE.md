@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.30
+
+- Kassenansicht: Eine von Hand gewählte Zahlart (Bar, Überweisung, Per Post) **springt nicht mehr nach einigen Sekunden auf „Karte“ zurück**. Ursache war die automatische Aktualisierung alle 10 Sekunden, die die Auswahl neu aufbaute. „Karte“ ist nur noch die Vorauswahl; die Wahl wird je Rechnung gemerkt, solange die Seite offen ist. Nicht im Browser geprüft.
+
 ## 2.3.4-beta.29
 
 - **Nicht erkannte T2med-Rechnungen von Hand nachbearbeiten** (Kasse → Einstellungen → Rechnungseingang → „Abgelehnte Drucke“ → „Von Hand nachbearbeiten“): Die Rechnung wird in der Seite gesucht, und zu Rechnungsnummer, Datum, Gesamtbetrag (mit Zahlbetrag) sowie Patient und Geburtsdatum erscheint je ein **Bildausschnitt** der Rechnung neben einem Eingabefeld mit Vorschlag (gelesen, unsicher oder nicht gefunden; bei mehreren Werten zum Anklicken). Bei Bild-PDFs per Texterkennung, sonst aus der Textebene. Darunter lässt sich die ganze Rechnung ansehen. „Übernehmen und zuordnen“ prüft die Eingaben (Datum, Betrag im erlaubten Bereich, Nummer, Name), legt die Rechnung in den Rechnungseingang und löscht die PDF; „Verwerfen“ löscht sie ebenfalls.
