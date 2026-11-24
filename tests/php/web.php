@@ -148,6 +148,23 @@ function test_basis_admin_darf_in_modulen_alles(): void {
     check(str_contains($seite, 'class="badge" title="Neue Version verfügbar">2<') && str_contains($seite, 'class="logo-dot"'), 'Zähler fehlen in der Seitenleiste des Moduls');
 }
 
+function test_anzeigename_im_konto_aendern(): void {
+    $env = new Env();
+    [$b, $id] = admin_browser($env);
+    $seite = $b->get('/konto')->body;
+    check(str_contains($seite, 'action="/konto/name"') && str_contains($seite, '<details class="fold">') && str_contains($seite, 'Namen speichern'), 'Konto: Namensfeld oder Ausklappzeilen fehlen');
+    $b->post('/konto/name', ['display' => "  Anna Beispiel\x01 "]);
+    check($env->users->find($id)['display'] === 'Anna Beispiel' && str_contains($b->last->body, 'Name gespeichert.') && str_contains($b->last->body, 'value="Anna Beispiel"'), 'Anzeigename nicht gespeichert');
+    $login = $env->users->find($id)['login'];
+    check($login !== 'Anna Beispiel', 'Benutzername darf sich nicht ändern');
+    $b->post('/konto/name', ['display' => str_repeat('a', 81)]);
+    check($b->last->status === 422 && $env->users->find($id)['display'] === 'Anna Beispiel', 'Zu langer Name wird angenommen');
+    $b->post('/konto/name', ['display' => '']);
+    check($env->users->find($id)['display'] === '', 'Name lässt sich nicht leeren');
+    $b->get('/konto');
+    check(str_contains($b->last->body, 'Benutzername ' . $login), 'Benutzername wird nicht angezeigt');
+}
+
 function test_modul_admin_braucht_otp(): void {
     $env = new Env();
     [$id] = $env->user('bert');
@@ -205,7 +222,7 @@ function test_verwaltung_braucht_bestaetigung_und_csrf(): void {
     check($c2[2] === $c0[2], 'Wieder beachten wirkt nicht');
     $prax = $b->get('/verwaltung/praxis')->body;
     check(str_contains($prax, 'class="h-ico"') && str_contains($prax, 'Anschrift <span class="tag opt">nicht ausgefüllt</span>') && str_contains($prax, 'Kontodaten für Überweisungen <span class="tag ok">✓ ausgefüllt</span>'), 'Praxis und Daten: Symbole oder Statusschilder fehlen');
-    check(str_contains($b->get('/konto')->body, 'Authenticator-App <span class="tag ok">✓ eingerichtet</span>'), 'Konto: Statusschild der Authenticator-App fehlt');
+    check(str_contains($b->get('/konto')->body, 'Authenticator-App</h2><span class="tag ok fold-status">eingerichtet</span>'), 'Konto: Statusschild der Authenticator-App fehlt');
     $page = $b->get('/verwaltung/sicherheit')->body;
     check(str_contains($page, 'Firewall <span class="tag') && str_contains($page, 'Zugang (Abmeldezeiten)') && str_contains($page, 'Protokoll</h2>') && str_contains($page, 'name="idle_einheit"'), 'Sicherheit unvollständig');
     check($b->post('/verwaltung/zugang', ['idle' => '2', 'idle_einheit' => 'd', 'max' => '3', 'max_einheit' => 'd'])->status === 200 && $env->auth->idleSeconds() === 172800, 'Zugang in Tagen nicht gespeichert');

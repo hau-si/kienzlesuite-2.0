@@ -82,6 +82,7 @@ final class Web {
             'POST /konto/codes' => fn() => $this->newCodes(),
             'POST /konto/telefon' => fn() => $this->savePhone($r),
             'POST /konto/email' => fn() => $this->saveEmail($r),
+            'POST /konto/name' => fn() => $this->saveName($r),
             'POST /konto/email-code' => fn() => $this->confirmEmail($r),
             'POST /konto/geraete' => fn() => $this->revoke($r),
             'POST /konto/passkey/optionen' => fn() => $this->passkeyRegisterOptions(),
@@ -850,39 +851,61 @@ final class Web {
         $roles = $this->users->roles($uid);
         $chips = ((int)$user['admin'] === 1 ? '<span class="tag rollentag">' . V::role('Admin') . 'Basis-Admin</span>' : '')
             . implode('', array_map(fn($n) => '<span class="tag rollentag">' . V::role($n) . V::h($n) . '</span>', $roles));
-        $profil = '<div class="profil">' . V::avatar($user['display'] ?: $user['login'], $roles, (int)$user['admin'] === 1)
-            . '<div><strong>' . V::h($user['display'] ?: $user['login']) . '</strong><div class="muted small">' . V::h($user['login']) . ($mail !== '' ? ' · ' . V::h($mail) : '') . '</div>'
-            . ($chips !== '' ? '<div class="rollen-zeile">' . $chips . '</div>' : '<div class="muted small">Keine Gruppe zugewiesen</div>') . '</div></div>';
-        $body = V::error($error) . V::notice($notice) . $profil
-            . '<h2>E-Mail-Adresse</h2><p>Mit einer bestätigten Adresse kannst du dir auf der Anmeldeseite selbst einen Link zum Neusetzen des Passworts schicken lassen'
-            . ($this->users->needsOtp($user) ? ' (für Admin-Konten mit Authenticator-App gilt das nicht: sie werden an der Server-Konsole zurückgesetzt)' : '') . '.'
+        $name = (string)($user['display'] ?: $user['login']);
+        $needsOtp = $this->users->needsOtp($user);
+        $phone = $this->phoneOf($uid);
+        // Profil mit änderbarem Anzeigenamen (der Benutzername zum Anmelden bleibt)
+        $profil = '<section class="card konto"><div class="profil">' . V::avatar($name, $roles, (int)$user['admin'] === 1) . '<div class="profil-text">'
+            . '<form method="post" action="/konto/name" class="name-form">' . $csrf . '<label class="sr-only" for="k-name">Anzeigename</label>'
+            . '<input id="k-name" name="display" value="' . V::h((string)$user['display']) . '" maxlength="80" placeholder="' . V::h((string)$user['login']) . '" autocomplete="name"><button class="secondary">Namen speichern</button></form>'
+            . '<div class="muted small">Benutzername ' . V::h($user['login']) . ($mail !== '' ? ' · ' . V::h($mail) : '') . '</div>'
+            . ($chips !== '' ? '<div class="rollen-zeile">' . $chips . '</div>' : '<div class="muted small">Keine Gruppe zugewiesen</div>') . '</div></div></section>';
+        $fold = static fn(string $title, string $tag, string $inner, bool $open = false): string => '<details class="fold"' . ($open ? ' open' : '') . '><summary><h2>' . $title . '</h2>' . $tag . '</summary><div class="fold-body">' . $inner . '</div></details>';
+        $ok = static fn(bool $good, string $yes, string $no): string => '<span class="tag ' . ($good ? 'ok' : 'warn') . ' fold-status">' . V::h($good ? $yes : $no) . '</span>';
+        $folds = $fold('E-Mail-Adresse', $ok($mail !== '', 'bestätigt', $pending !== '' ? 'wartet auf Bestätigung' : 'nicht hinterlegt'),
+            '<p class="muted">Mit einer bestätigten Adresse kannst du dir auf der Anmeldeseite selbst einen Link zum Neusetzen des Passworts schicken lassen'
+            . ($needsOtp ? ' (für Admin-Konten mit Authenticator-App gilt das nicht: sie werden an der Server-Konsole zurückgesetzt)' : '') . '.'
             . ($this->mailReady() ? '' : ' <strong>Der E-Mail-Versand ist noch nicht eingerichtet</strong> (Verwaltung → Verbindungen).') . '</p>'
             . ($pending !== '' ? '<p class="notice">Wartet auf Bestätigung: ' . V::h($pending) . '. Den Code aus der E-Mail hier eingeben.</p><form method="post" action="/konto/email-code" class="box">' . $csrf
                 . V::input('code', 'Bestätigungscode (z. B. 1234-5678-9012-3456)', 'text', '', 'inputmode="numeric" autocomplete="one-time-code" maxlength="24" required placeholder="0000-0000-0000-0000"') . '<button>Code bestätigen</button></form>' : '')
             . '<form method="post" action="/konto/email" class="box">' . $csrf . V::input('email', 'E-Mail-Adresse (leer lassen zum Entfernen)', 'email', $mail !== '' ? $mail : $pending, 'maxlength="254" autocomplete="email" placeholder="name@praxis.de"')
-            . '<button>Bestätigungscode schicken</button></form>'
-            . '<h2>Passwort ändern</h2><form method="post" action="/konto/passwort" class="box">' . $csrf
+            . '<button>Bestätigungscode schicken</button></form>', $pending !== '');
+        $folds .= $fold('Passwort ändern', '', '<form method="post" action="/konto/passwort" class="box">' . $csrf
             . V::input('current', 'Bisheriges Passwort', 'password', '', 'autocomplete="current-password" required')
             . V::input('password', 'Neues Passwort', 'password', '', 'autocomplete="new-password" required')
             . V::input('password2', 'Neues Passwort wiederholen', 'password', '', 'autocomplete="new-password" required')
-            . '<button>Ändern</button></form>'
-            . ($this->users->needsOtp($user) ? '<h2>Handynummer für SMS-Code (Ersatz)</h2><p>Hast du die Authenticator-App nicht dabei, kann ein Code per SMS geschickt werden. Das geht nur, wenn unter Verwaltung → Verbindungen SMS eingerichtet ist.</p>'
-                . '<form method="post" action="/konto/telefon" class="box">' . $csrf . V::input('telefon', 'Handynummer (leer lassen zum Entfernen)', 'tel', $this->phoneOf($uid), 'maxlength="30" placeholder="01701234567" autocomplete="tel"')
-                . '<button>Speichern</button></form>' : '')
-            . '<h2>Authenticator-App</h2><p>' . ($otp ? 'Eingerichtet. Übrige Wiederherstellungscodes: ' . $this->users->recoveryLeft($uid) . '.' : 'Nicht eingerichtet' . ($this->users->needsOtp($user) ? ' (für Admins Pflicht).' : '.')) . '</p>'
+            . '<button>Ändern</button></form>');
+        if ($needsOtp) $folds .= $fold('Handynummer für SMS-Code (Ersatz)', $ok($phone !== '', 'hinterlegt', 'nicht hinterlegt'),
+            '<p class="muted">Hast du die Authenticator-App nicht dabei, kann ein Code per SMS geschickt werden. Das geht nur, wenn unter Verwaltung → Verbindungen SMS eingerichtet ist.</p>'
+            . '<form method="post" action="/konto/telefon" class="box">' . $csrf . V::input('telefon', 'Handynummer (leer lassen zum Entfernen)', 'tel', $phone, 'maxlength="30" placeholder="01701234567" autocomplete="tel"')
+            . '<button>Speichern</button></form>');
+        $folds .= $fold('Authenticator-App', $ok($otp, 'eingerichtet', 'nicht eingerichtet'),
+            '<p>' . ($otp ? 'Eingerichtet. Übrige Wiederherstellungscodes: ' . $this->users->recoveryLeft($uid) . '.' : 'Nicht eingerichtet' . ($needsOtp ? ' (für Admins Pflicht).' : '.')) . '</p>'
             . '<p><a class="button" href="/konto/otp">' . ($otp ? 'Neu einrichten' : 'Einrichten') . '</a></p>'
-            . ($otp ? '<form method="post" action="/konto/codes">' . $csrf . '<button>Neue Wiederherstellungscodes erzeugen</button></form>' : '') . ''
-            . ($this->passkeys ? '<h2>Passkeys</h2><p>Anmelden ohne Passwort mit Fingerabdruck, Gesicht oder PIN des Geräts. Funktioniert nur unter der Adresse <code>'
-                . V::h($this->passkeys->origin()) . '</code>.' . ($this->users->needsOtp($user) ? ' Die Authenticator-App bleibt als Rückfall nötig.' : '') . '</p>'
-                . ($keys !== '' ? '<table><tr><th>Passkey</th><th>Zuletzt</th><th></th></tr>' . $keys . '</table>' : '<p>Noch kein Passkey.</p>')
-                . '<div class="box" data-passkey-register data-csrf="' . V::h($this->session['csrf']) . '">' . V::input('label', 'Bezeichnung', 'text', '', 'maxlength="60" placeholder="z. B. Laptop Empfang"')
-                . '<button type="button">Passkey hinzufügen</button><p class="error" hidden></p></div>' : '')
-            . '<h2>Gemerkte Geräte</h2>' . ($devices !== '' ? '<table><tr><th>Gerät</th><th>Zuletzt</th><th></th></tr>' . $devices . '</table>'
-                . '<form method="post" action="/konto/geraete">' . $csrf . '<input type="hidden" name="id" value="all"><button class="link">Alle abmelden</button></form>' : '<p>Keine.</p>') . '';
-        V::$status = ['E-Mail-Adresse' => [$mail !== '', 'bestätigt', $pending !== '' ? 'wartet auf Bestätigung' : 'nicht hinterlegt'], 'Authenticator-App' => [$otp, 'eingerichtet', 'nicht eingerichtet'], 'Passkeys' => [$keys !== '', 'eingerichtet', 'nicht eingerichtet'],
-            'Handynummer für SMS-Code (Ersatz)' => [$this->phoneOf($uid) !== '', 'hinterlegt', 'nicht hinterlegt'],
-            'Gemerkte Geräte' => [$devices !== '', 'vorhanden', 'keine']];
+            . ($otp ? '<form method="post" action="/konto/codes">' . $csrf . '<button class="secondary">Neue Wiederherstellungscodes erzeugen</button></form>' : ''));
+        if ($this->passkeys) $folds .= $fold('Passkeys', $ok($keys !== '', 'eingerichtet', 'nicht eingerichtet'),
+            '<p class="muted">Anmelden ohne Passwort mit Fingerabdruck, Gesicht oder PIN des Geräts. Funktioniert nur unter der Adresse <code>' . V::h($this->passkeys->origin()) . '</code>.'
+            . ($needsOtp ? ' Die Authenticator-App bleibt als Rückfall nötig.' : '') . '</p>'
+            . ($keys !== '' ? '<table><tr><th>Passkey</th><th>Zuletzt</th><th></th></tr>' . $keys . '</table>' : '<p>Noch kein Passkey.</p>')
+            . '<div class="box" data-passkey-register data-csrf="' . V::h($this->session['csrf']) . '">' . V::input('label', 'Bezeichnung', 'text', '', 'maxlength="60" placeholder="z. B. Laptop Empfang"')
+            . '<button type="button">Passkey hinzufügen</button><p class="error" hidden></p></div>');
+        $folds .= $fold('Gemerkte Geräte', '<span class="tag fold-status">' . ($devices !== '' ? count($this->auth->devices($uid, $this->token)) : 0) . '</span>',
+            $devices !== '' ? '<table><tr><th>Gerät</th><th>Zuletzt</th><th></th></tr>' . $devices . '</table><form method="post" action="/konto/geraete">' . $csrf . '<input type="hidden" name="id" value="all"><button class="link">Alle abmelden</button></form>' : '<p>Keine.</p>');
+        $body = V::error($error) . V::notice($notice) . $profil . '<section class="card konto">' . $folds . '</section>';
+        V::$status = [];
         return Response::html(V::page('Mein Konto', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+    }
+
+    private function saveName(Request $r): Response {
+        $uid = (int)$this->session['user_id'];
+        $user = $this->users->find($uid);
+        try {
+            $this->users->rename($uid, $r->field('display', 120));
+        } catch (Problem $e) {
+            return $this->account($e->getMessage());
+        }
+        $this->audit->write($user['login'], 'name-geaendert');
+        return $this->account(null, 'Name gespeichert.');
     }
 
     private function savePhone(Request $r): Response {

@@ -83,7 +83,7 @@ function test_seitenleiste_und_konto_einklappbar(): void {
     foreach (['Passwort ändern', 'Authenticator-App', 'Gemerkte Geräte'] as $titel) {
         check(preg_match('#<details class="fold"><summary><h2>[^<]*(?:<svg.*?</svg>)?' . preg_quote($titel, '#') . '#s', $k) === 1, 'Konto: „' . $titel . '“ nicht einklappbar');
     }
-    check(preg_match('#<summary><h2>.*?Authenticator-App <span class="tag ok">✓ eingerichtet</span>#s', $k) === 1, 'Konto: Status im eingeklappten Kopf');
+    check(preg_match('#<summary><h2>.*?Authenticator-App</h2><span class="tag ok fold-status">eingerichtet</span>#s', $k) === 1, 'Konto: Status im eingeklappten Kopf');
 }
 
 run_tests();

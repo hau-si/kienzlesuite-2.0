@@ -44,6 +44,12 @@ final class Users {
         return (int)$this->db->pdo->lastInsertId();
     }
 
+    /** Anzeigename ändern (das eigene Konto); der Benutzername zum Anmelden bleibt. Leer = Benutzername wird angezeigt. */
+    public function rename(int $id, string $display): void {
+        $this->require($id);
+        $this->db->query('UPDATE users SET display=?, updated_at=? WHERE id=?', [self::display($display), time(), $id]);
+    }
+
     public function update(int $id, string $display, bool $admin, bool $active): void {
         $user = $this->require($id);
         if ((!$admin || !$active) && (int)$user['admin'] === 1 && (int)$user['active'] === 1 && $this->activeAdmins() <= 1) {

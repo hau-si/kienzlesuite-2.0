@@ -379,3 +379,17 @@ ol.checklist li:last-child { border-bottom: 1px solid transparent; }
 /* Abmelden-Link in Modulseiten (dort gibt es keine Sitzungs-Marke für ein Formular) */
 .side-foot a.link { display: block; padding: 8px 6px; font-size: 13px; font-weight: 600; text-decoration: none; color: var(--teal); }
 main.modul { max-width: 940px; }
+
+/* Mein Konto: Profil mit änderbarem Namen, Sicherheit als Ausklappzeilen mit Statusmarke */
+.konto .profil { padding: 0; align-items: flex-start; }
+.konto .profil-text { flex: 1; min-width: 0; }
+.konto .name-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 4px; }
+.konto .name-form input { max-width: 260px; margin: 0; }
+.konto details.fold > summary h2 { font-size: 16px; }
+.konto details.fold > summary .fold-status { margin-left: auto; }
+.konto details.fold > summary::before { order: 3; margin-left: 8px; }
+.konto details.fold > summary { flex-wrap: nowrap; }
+.konto .fold-body { padding: 4px 0 16px; }
+.konto .fold-body .box { margin-top: 10px; }
+.konto .fold-body table { width: 100%; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

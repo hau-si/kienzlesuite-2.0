@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.37
+
+- „Mein Konto“ aufgeräumt: Oben steht das Profil, dort lässt sich jetzt der **Anzeigename ändern** (leer lassen zeigt den Benutzernamen; der Benutzername zum Anmelden bleibt). Darunter sind E-Mail-Adresse, Passwort, Handynummer (SMS-Ersatz, nur Admins), Authenticator-App, Passkeys und gemerkte Geräte Ausklappzeilen mit Statusmarke („bestätigt“, „nicht eingerichtet“ …) statt sieben Blöcken mit langem Text. Wartet eine E-Mail-Adresse auf Bestätigung, ist diese Zeile geöffnet.
+
 ## 0.21.4-beta.36
 
 - Die Seitenleiste in den Modulen (Kasse, Terminzettel) sieht jetzt aus wie in der Verwaltung: Für Admins zeigt sie die roten Zähler (Updates, Module, Sicherung), den Punkt am Logo bei offener Einrichtung und den orangen Punkt an Modulen mit offener Einstellung. Mitarbeiter sehen davon nichts, wie bisher.

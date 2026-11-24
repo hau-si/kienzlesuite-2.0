@@ -17,7 +17,7 @@ function test_konto_profilkopf_und_email_bestaetigen(): void {
     $b->web = fn() => $b->defaultWeb(null, null, $c);
     $p = $b->get('/konto')->body;
     check(str_contains($p, 'class="avatar"') && str_contains($p, 'Basis-Admin') && str_contains($p, 'E-Mail-Adresse'), 'Profilkopf mit Avatar und Rolle fehlt');
-    check(preg_match('#<summary><h2>.*?E-Mail-Adresse <span class="tag[^"]*">[^<]*nicht hinterlegt#s', $p) === 1, 'Status der E-Mail-Adresse im Kopf');
+    check(preg_match('#<summary><h2>.*?E-Mail-Adresse</h2><span class="tag[^"]*">nicht hinterlegt#s', $p) === 1, 'Status der E-Mail-Adresse im Kopf');
     $env->users->setRoles((int)$env->users->byLogin('anna')['id'], ['Arzt']);
     $p = $b->get('/konto')->body;
     check(str_contains($p, '<span class="tag rollentag"><span class="rolle" title="Arzt">') && str_contains($p, 'class="rb"'), 'Gruppe Arzt nicht als Rolle/Avatar-Symbol sichtbar');
