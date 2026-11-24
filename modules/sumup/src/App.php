@@ -139,6 +139,64 @@ final class App {
             'print' => $this->printSettings(),
             'max_amount_cents' => $this->config->get('app', 'max_amount_cents')];
     }
+    /** Einmaliger Startlink (5 Minuten) für einen Vorgang, wie beim Start aus T2med. */
+    private function ticketUrl(string $visitId): string {
+        $ticket = bin2hex(random_bytes(32));
+        $this->db->query('INSERT INTO launch_tickets(hash,visit_id,expires_at) VALUES(?,?,?)', [hash('sha256', $ticket), $visitId, time() + 300]);
+        return rtrim($this->config->get('app', 'base_url'), '/') . '/#launch=' . $ticket;
+    }
+    /**
+     * Leerer Vorgang ohne Patientenakte für die Startseite der Kasse: Leistungen (GOÄ/IGeL) oder ein freier Betrag, Karte, Bar oder Überweisung.
+     * Name und Geburtsdatum des Patienten sind beim Bezahlen optional (siehe start()).
+     */
+    public function manualOpen(): array {
+        $id = self::id();
+        $this->db->query('INSERT INTO visits(id,context_id,patient_id,patient_name,patient_birthdate,patient_address,oauth_cipher,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?)',
+            [$id, 'manual-' . $id, 'manual', 'Manuelle Zahlung', '', '[]', $this->encrypt(''), time(), time() + $this->config->get('app', 'session_hours') * 3600]);
+        return ['url' => $this->ticketUrl($id)];
+    }
+    /**
+     * Vorgang für den Patienten einer eingegangenen T2med-Rechnung, damit Karte, Bar oder „Patient zahlt später“ wie beim Start aus T2med laufen.
+     * Nur für offene, nicht ersetzte Rechnungen innerhalb der Aufbewahrungsfrist.
+     */
+    public function inboxVisit(string $invoiceId): array {
+        if (!preg_match('/^[a-f0-9]{32}$/D', $invoiceId)) throw new Problem('Ungültige Rechnung.');
+        $row = $this->db->one('SELECT * FROM invoice_inbox WHERE id=? AND superseded_at IS NULL', [$invoiceId]);
+        $limit = time() - $this->config->get('invoice_inbox', 'max_age_days', 14) * 86400;
+        if (!$row || (int)$row['received_at'] < $limit) throw new Problem('Diese Rechnung ist nicht mehr offen.', 409);
+        $paid = $this->db->one("SELECT 1 AS x FROM payments WHERE t2med_invoice=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') LIMIT 1", [$row['invoice_number']]);
+        if ($paid) throw new Problem('Diese Rechnung ist schon bezahlt oder wird gerade kassiert.', 409);
+        $visit = $this->db->one('SELECT * FROM visits WHERE context_id=? AND completed_at IS NULL ORDER BY created_at DESC LIMIT 1', ['inbox-' . $invoiceId]);
+        $id = $visit['id'] ?? self::id();
+        $expires = time() + $this->config->get('app', 'session_hours') * 3600;
+        if ($visit) $this->db->query('UPDATE visits SET expires_at=? WHERE id=?', [$expires, $id]);
+        else $this->db->query('INSERT INTO visits(id,context_id,patient_id,patient_name,patient_birthdate,patient_address,oauth_cipher,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?)',
+            [$id, 'inbox-' . $invoiceId, 'inbox', $row['patient_name'], $row['patient_birthdate'], '[]', $this->encrypt(''), time(), $expires]);
+        return ['url' => $this->ticketUrl($id)];
+    }
+    /** Einnahmen von heute (bezahlte Zahlungen, ohne stornierte): Summe und Anzahl je Zahlart. */
+    public function dayStats(): array {
+        $tz = new \DateTimeZone($this->config->get('app', 'timezone'));
+        $from = (new \DateTimeImmutable('today', $tz))->getTimestamp();
+        $out = ['total_cents' => 0, 'card' => 0, 'cash' => 0];
+        foreach ($this->db->query("SELECT amount_cents, corrected_cents, payment_method FROM payments WHERE payment_status='successful' AND voided_at IS NULL AND paid_at>=?", [$from])->fetchAll() as $p) {
+            $out['total_cents'] += (int)($p['corrected_cents'] ?? $p['amount_cents']);
+            $out[$p['payment_method'] === 'cash' ? 'cash' : 'card']++;
+        }
+        return $out;
+    }
+    /** Alle offenen eingegangenen T2med-Rechnungen für die Startseite (mit Patientenname; nur für Benutzer mit Recht „inbox“ oder „letter“). */
+    public function letterEnabled(): bool { return $this->letter->enabled(); }
+    public function openInbox(): array {
+        if (!$this->config->get('invoice_inbox', 'enabled', false)) return [];
+        $out = [];
+        foreach (InboxOverview::build($this->db, $this->config)['items'] as $i) {
+            if ($i['status'] !== 'offen') continue;
+            $out[] = ['id' => $i['id'], 'number' => $i['number'], 'invoice_date' => $i['invoice_date'], 'amount_cents' => $i['amount_cents'], 'patient' => $i['patient'], 'birthdate' => $i['birthdate'],
+                'postable' => $i['postable'], 'letter' => $i['letter']];
+        }
+        return $out;
+    }
     private static function isManual(array $visit): bool { return str_starts_with((string)$visit['context_id'], 'manual-'); }
     /**
      * Manuelle Kartenzahlung ohne Patientenakte: Betreff und Betrag eingeben, die Zahlung startet am Terminal.
@@ -193,6 +251,14 @@ final class App {
         if (($input['manual_label'] ?? '') !== '') $payload[] = 'label:' . self::string($input, 'manual_label', 80, false);
         if ($method !== 'card') $payload[] = $method;
         $hash = hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR));
+        // Freie Eingabe ohne Patientenakte: Name (und Geburtsdatum) für Beleg bzw. Rechnung, solange noch nichts bezahlt wurde.
+        if (self::isManual($visit) && trim(self::string($input, 'patient_name', 80, false)) !== '') {
+            $name = trim(self::string($input, 'patient_name', 80, false));
+            $birth = trim(self::string($input, 'patient_birthdate', 10, false));
+            if (preg_match('/[\x00-\x1f\x7f<>]/', $name)) throw new Problem('Der Name enthält ungültige Zeichen.');
+            if ($birth !== '' && (!($d = \DateTimeImmutable::createFromFormat('!Y-m-d', $birth)) || $d->format('Y-m-d') !== $birth || $birth > date('Y-m-d'))) throw new Problem('Bitte ein gültiges Geburtsdatum angeben.');
+            $this->db->query('UPDATE visits SET patient_name=?, patient_birthdate=? WHERE id=? AND completed_at IS NULL AND NOT EXISTS (SELECT 1 FROM payments WHERE visit_id=visits.id)', [$name, $birth, $visit['id']]);
+        }
         return $this->db->locked('reader', function () use ($visit, $request, $hash, $ids, $manual, $groups, $reasons, $date, $input, $method): array {
             $existing = $this->db->one('SELECT * FROM payments WHERE request_id=?', [$request]);
             if ($existing) {

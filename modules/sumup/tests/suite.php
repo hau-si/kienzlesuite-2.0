@@ -56,11 +56,13 @@ try {
     check(in_array('T2med-Verbindung der Suite vorhanden', array_column($items, 'title'), true), 'T2med-Verbindung nicht erkannt');
 
     // Seiten: Kasse nur mit Recht „kassieren“, Einstellungen nur mit Rechten, unbekannte Adressen 404, Dateien aus assets.
-    $server = admin_server(['REQUEST_URI' => '/kasse/']);
+    [$code, $html] = page($root, admin_server(['REQUEST_URI' => '/kasse/']));
+    check($code === 200 && str_contains($html, '/kasse/assets/start.js') && str_contains($html, 'kassieren?neu=1') && str_contains($html, 'name="kienzle-csrf" content="' . TEST_CSRF . '"'), 'Startseite der Kasse fehlt');
+    $server = admin_server(['REQUEST_URI' => '/kasse/kassieren']);
     [$code, $html] = page($root, $server);
     check($code === 200 && str_contains($html, 'data-base="/kasse/"') && str_contains($html, 'name="kienzle-csrf" content="' . TEST_CSRF . '"') && str_contains($html, '/kasse/assets/app.js'), 'Kasse nicht unter /kasse/');
     check(str_contains($html, 'Testpatient öffnen') && !preg_match('/id="demo"[^>]*hidden/', $html), 'Testpatient im Testmodus nicht angeboten');
-    [$code] = page($root, staff_server(['paid']) + ['REQUEST_URI' => '/kasse/']);
+    [$code] = page($root, staff_server(['paid']) + ['REQUEST_URI' => '/kasse/kassieren']);
     check($code === 403, 'Kasse ohne Recht „kassieren“');
     [$code, $html] = page($root, staff_server(['paid']) + ['REQUEST_URI' => '/kasse/settings.php']);
     check($code === 200 && str_contains($html, 'settings.js'), 'Einstellungen für Mitarbeiter mit Recht nicht erreichbar');

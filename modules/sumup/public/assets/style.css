@@ -57,3 +57,4 @@ a.brand { color: inherit; text-decoration: none; display: flex; align-items: cen
 progress.progress{display:block;width:100%;height:8px;margin:6px 0 10px}
 
 .badge.test{background:#fff0ca;color:#886100}
+.free-patient{margin-top:10px;display:grid;gap:4px;max-width:420px}

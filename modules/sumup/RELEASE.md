@@ -1,5 +1,11 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.12
+
+- Neue Startseite der Kasse (im Rahmen der Suite, zwei Spalten): Links steht gleich die Eingabemaske für Leistungen, IGeL und GOÄ bereit – auch ohne T2med-Rechnung, mit frei eingebbarem Betrag, Name und Geburtsdatum (beides optional) und der vorhandenen Kartenzahlung, Bar und Überweisung. Rechts die offenen T2med-Rechnungen mit Direktwahl **Karte, Bar, Überweisung oder Per Post (Letterxpress)** sowie die Tageswerte.
+- Die schlanke Ansicht für den Start aus T2med liegt jetzt unter „…/kassieren“ (weiterhin ohne Menü); der Starter ändert sich nicht.
+- Intern: neue Aktionen `manual_open`, `inbox_visit`, `open_inbox`, `day_stats`; Anzeige der Kasse darf im Rahmen der Suite (gleiche Herkunft) eingebettet werden.
+
 ## 2.3.4-beta.11
 
 - Die Einstellungen der Kasse stehen jetzt im Rahmen der Suite: Seitenleiste mit der Kasse als aktivem Eintrag, Kopf „Kasse – Einstellungen“, gleiche Schrift und Abstände wie die übrigen Seiten. Die Kassieren-Ansicht (aus T2med) bleibt schlank und ohne Menü.
