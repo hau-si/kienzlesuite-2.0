@@ -46,6 +46,9 @@ try {
             $antwort(['error' => $e->getMessage()], 422);
         } catch (RuntimeException $e) {
             $antwort(['error' => $e->getMessage()], 500);
+        } catch (Throwable $e) {
+            error_log('signatur pad-hochladen: ' . get_class($e) . ': ' . $e->getMessage());
+            $antwort(['error' => 'Interner Fehler (' . get_class($e) . '): ' . $e->getMessage()], 500);
         }
     }
     if ($rel !== '/' && $rel !== '') { http_response_code(404); echo 'Nicht gefunden.'; exit; }

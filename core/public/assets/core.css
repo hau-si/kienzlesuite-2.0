@@ -176,7 +176,16 @@ details.menu-fold[open] > summary::after { content: " ▾"; }
 nav.menu a > span:first-child { display: inline-flex; align-items: center; gap: 10px; }
 details.menu-fold > summary { display: flex; align-items: center; gap: 8px; }
 details.menu-fold > summary .ico { width: 16px; height: 16px; }
-details.menu-fold > a > span:first-child { padding-left: 4px; }
+details.menu-fold > a > span:first-child, details.menu-fold > .menu-app > a > span:first-child { padding-left: 4px; }
+/* Reihenfolge der Anwendungen ändern (Pfeile erscheinen nur nach „Reihenfolge ändern“) */
+.menu-app { display: flex; align-items: center; gap: 4px; }
+.menu-app > a { flex: 1 1 auto; min-width: 0; }
+.menu-move { display: none; gap: 2px; flex: none; }
+details.sortieren .menu-move { display: inline-flex; }
+.menu-move button { min-height: 0; width: 26px; height: 26px; padding: 0; border-radius: 7px; background: var(--soft); color: #315f53; font-size: 10px; }
+.menu-move button:disabled { opacity: .3; }
+button.menu-sort { min-height: 0; padding: 4px 10px; margin-top: 2px; align-self: flex-start; font-size: 12px; font-weight: 600; color: var(--muted); text-decoration: none; }
+details.sortieren button.menu-sort { color: var(--teal); }
 /* Einrichtungskarte auf der Startseite und Reihenfolge der Schritte */
 a.setup-card { display: block; text-decoration: none; color: inherit; }
 a.setup-card:hover { border-color: var(--teal); }

@@ -77,7 +77,9 @@ function test_seitenleiste_und_konto_einklappbar(): void {
     [$b] = admin_browser($env);
     $b->web = fn() => $b->defaultWeb(null, null, $c);
     $p = $b->get('/')->body;
-    check(substr_count($p, '<span class="menu-title">Einstellungen</span>') === 0 && str_contains($p, '<details class="menu-group menu-fold" open><summary class="menu-title">Anwendungen</summary>'), 'Seitenleiste: eine Gruppe Anwendungen, einklappbar');
+    check(substr_count($p, '<span class="menu-title">Einstellungen</span>') === 0 && str_contains($p, '<details class="menu-group menu-fold" data-menu="anwendungen" open><summary class="menu-title">Anwendungen</summary>'), 'Seitenleiste: eine Gruppe Anwendungen, einklappbar');
+    check(str_contains($p, '<details class="menu-group menu-fold" data-menu="praxis" open><summary class="menu-title">Praxis</summary>') && str_contains($p, '<details class="menu-group menu-fold" data-menu="betrieb" open><summary class="menu-title">Betrieb</summary>'), 'Seitenleiste: Praxis und Betrieb einklappbar');
+    check(substr_count($p, 'class="menu-app"') === substr_count($p, 'data-richtung="-1"') && substr_count($p, 'class="menu-app"') >= 2 && str_contains($p, 'data-sortieren'), 'Seitenleiste: je Anwendung Pfeile und ein Knopf „Reihenfolge ändern“');
     check(preg_match('#<a href="/[a-z]+/"[^>]*><span><svg class="ico"#', $p) === 1, 'Symbol vor dem Modul in der Seitenleiste');
     $k = $b->get('/konto')->body;
     foreach (['Passwort ändern', 'Authenticator-App', 'Gemerkte Geräte'] as $titel) {

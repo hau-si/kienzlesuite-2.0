@@ -87,6 +87,7 @@ class Vorlage(unittest.TestCase):
 
     def test_interne_pfade(self):
         auth = block(self.conf, 'location ^~ /_auth/ {')
+        self.assertIn('client_max_body_size 25m;', auth)  # sonst 413 schon bei der Anmeldeprüfung großer Uploads
         self.assertIn('internal;', auth)
         self.assertGreater(auth.index('fastcgi_param REQUEST_URI $uri;'), auth.index('include fastcgi_params;'))   # überschreibt den Vorgabewert
         h = block(self.conf, 'location = /_health {')

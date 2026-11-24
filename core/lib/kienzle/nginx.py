@@ -125,7 +125,9 @@ def render(hostnames: list[str], registry: dict) -> str:
            '    # Kurze Pause beim Update oder Neustart: statt „502 Bad Gateway“ eine Seite, die sich selbst neu lädt', '    error_page 502 503 504 @wartung;',
            '    location @wartung {', '        default_type text/html;', f'        return 503 {WARTUNG};', '    }', '',
            '    # Prüfung für Module (nur intern über auth_request)', '    location ^~ /_auth/ {', '        internal;',
-           '        fastcgi_pass_request_body off;', '        fastcgi_param CONTENT_LENGTH "";'] + _fastcgi_common() + [
+           '        # Der Körper der Anfrage geht nicht an die Prüfung, nginx prüft aber auch hier die Größe: ohne diese Zeile gälte das Limit',
+           '        # des Servers (1m) und Uploads in Modulen (bis 25m) scheiterten schon an der Anmeldeprüfung mit 413.',
+           '        client_max_body_size 25m;', '        fastcgi_pass_request_body off;', '        fastcgi_param CONTENT_LENGTH "";'] + _fastcgi_common() + [
            '        fastcgi_param REQUEST_URI $uri;  # sonst stünde hier die ursprüngliche Adresse',
            f'        fastcgi_param SCRIPT_FILENAME {CORE_ROOT}/public/index.php;', f'        fastcgi_pass unix:{CORE_SOCKET};', '    }', '',
            '    location = /_health {', '        allow 127.0.0.1;', '        allow ::1;', '        deny all;'] + _fastcgi_common() + [

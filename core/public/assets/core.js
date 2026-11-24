@@ -164,3 +164,76 @@ document.addEventListener('change', function (e) {
   document.addEventListener('focusin', on);
   document.addEventListener('click', on);
 })();
+
+// Seitenleiste: Gruppen (Anwendungen, Praxis, Betrieb) einklappen und die Reihenfolge der Anwendungen ändern.
+// Beides wird im Browser gemerkt (localStorage, je Browser); die Gruppe mit der aktuellen Seite bleibt offen.
+(function () {
+  'use strict';
+  var ZU = 'kienzle.menu.zu', REIHE = 'kienzle.menu.apps';
+  function lies(k) { try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+  function merke(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* Speicher gesperrt: Einstellung gilt nur für diese Seite */ } }
+  var gruppen = [].slice.call(document.querySelectorAll('nav.menu details[data-menu]'));
+  var apps = document.querySelector('nav.menu details[data-menu="anwendungen"]');
+  var schmal = window.matchMedia && window.matchMedia('(max-width: 760px)').matches;   // dort sind die Überschriften ausgeblendet: nichts einklappen
+  var bereit = false;
+
+  // Reihenfolge der Anwendungen: gemerkte zuerst, neue Anwendungen hinten in der Reihenfolge des Servers.
+  function sortiere() {
+    if (!apps) return;
+    var reihe = lies(REIHE);
+    var items = [].slice.call(apps.querySelectorAll('.menu-app'));
+    var rang = function (e) { var i = reihe.indexOf(e.getAttribute('data-app')); return i < 0 ? 1e6 : i; };
+    var ziel = apps.querySelector('.menu-sort');
+    items.map(function (e, i) { return { e: e, r: rang(e), i: i }; }).sort(function (a, b) { return a.r - b.r || a.i - b.i; })
+      .forEach(function (x) { apps.insertBefore(x.e, ziel); });
+    pfeile();
+  }
+  function pfeile() {
+    if (!apps) return;
+    var items = [].slice.call(apps.querySelectorAll('.menu-app'));
+    items.forEach(function (e, i) {
+      var knoepfe = e.querySelectorAll('.menu-move button');
+      if (knoepfe.length === 2) { knoepfe[0].disabled = i === 0; knoepfe[1].disabled = i === items.length - 1; }
+    });
+  }
+  function speichereReihe() { merke(REIHE, [].slice.call(apps.querySelectorAll('.menu-app')).map(function (e) { return e.getAttribute('data-app'); })); }
+
+  if (apps) {
+    sortiere();
+    apps.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('button') : null;
+      if (!b) return;
+      if (b.hasAttribute('data-sortieren')) {
+        var an = apps.classList.toggle('sortieren');
+        b.textContent = an ? 'Fertig' : 'Reihenfolge ändern';
+        return;
+      }
+      var r = b.getAttribute('data-richtung');
+      if (r !== '-1' && r !== '1') return;
+      var zeile = b.closest('.menu-app');
+      var nachbar = r === '-1' ? zeile.previousElementSibling : zeile.nextElementSibling;
+      if (!nachbar || !nachbar.classList.contains('menu-app')) return;
+      if (r === '-1') apps.insertBefore(zeile, nachbar); else apps.insertBefore(nachbar, zeile);
+      speichereReihe();
+      pfeile();
+      b.focus();
+    });
+  }
+
+  // Gruppen: zugeklappte merken; die Gruppe mit der aktuellen Seite wird nie zugeklappt.
+  if (!schmal) {
+    var zu = lies(ZU);
+    gruppen.forEach(function (g) {
+      if (zu.indexOf(g.getAttribute('data-menu')) >= 0 && !g.querySelector('a.current')) g.open = false;
+    });
+    gruppen.forEach(function (g) {
+      g.addEventListener('toggle', function () {
+        if (!bereit) return;
+        var liste = lies(ZU).filter(function (n) { return n !== g.getAttribute('data-menu'); });
+        if (!g.open) liste.push(g.getAttribute('data-menu'));
+        merke(ZU, liste);
+      });
+    });
+  }
+  setTimeout(function () { bereit = true; }, 0);
+})();

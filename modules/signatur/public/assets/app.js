@@ -24,12 +24,21 @@
     status.textContent = 'Wird hochgeladen und geprüft …';
     fetch(los.getAttribute('data-ziel'), { method: 'POST', credentials: 'same-origin', body: datei,
       headers: { 'Content-Type': 'application/octet-stream', 'X-Kienzle-CSRF': meta ? meta.content : '', 'X-Lizenz': '1' } })
-      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-      .then(function (x) {
-        if (x.ok) { status.textContent = 'Fertig. Die Seite wird neu geladen …'; setTimeout(function () { location.hash = '#pad'; location.reload(); }, 700); }
-        else { status.textContent = (x.j && x.j.error) || 'Das Hochladen hat nicht geklappt.'; los.disabled = false; }
+      .then(function (r) {
+        // Antwort als Text lesen: Kommt keine JSON-Antwort (z. B. Fehlerseite des Servers), steht der Status in der Meldung.
+        return r.text().then(function (t) {
+          var j = null;
+          try { j = JSON.parse(t); } catch (e) { j = null; }
+          return { ok: r.ok, status: r.status, j: j, text: t };
+        });
       })
-      .catch(function () { status.textContent = 'Keine Verbindung zum Server. Bitte noch einmal versuchen.'; los.disabled = false; });
+      .then(function (x) {
+        if (x.ok && x.j && x.j.ok) { status.textContent = 'Fertig. Die Seite wird neu geladen …'; setTimeout(function () { location.hash = '#pad'; location.reload(); }, 700); return; }
+        if (x.j && x.j.error) status.textContent = x.j.error;
+        else status.textContent = 'Der Server hat nicht wie erwartet geantwortet (HTTP ' + x.status + '): ' + x.text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
+        los.disabled = false;
+      })
+      .catch(function (e) { status.textContent = 'Die Verbindung wurde unterbrochen (' + (e && e.message ? e.message : 'unbekannt') + '). Bitte noch einmal versuchen; steht das wieder da, bitte die Meldung weitergeben.'; los.disabled = false; });
   });
   window.addEventListener('hashchange', oeffneAusAdresse);
   oeffneAusAdresse();

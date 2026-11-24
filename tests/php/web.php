@@ -118,7 +118,7 @@ function test_mitarbeiter_ohne_otp_und_rechte_je_modul(): void {
     check(str_contains($seite, '<aside class="side">') && str_contains($seite, 'href="/kasse/" class="current"') && str_contains($seite, '<p id="inhalt">Hallo</p>') && str_contains($seite, '/kasse/assets/x.css')
         && !str_contains($seite, '/verwaltung/server') && !str_contains($seite, 'action="/abmelden"') && str_contains($seite, 'class="modul"'), 'Rahmen für Modulseiten falsch');
     $start = $b->get('/')->body;
-    check(str_contains($start, '<summary class="menu-title">Anwendungen</summary>') && !str_contains($start, '<span class="menu-title">Einstellungen</span>'), 'Anwendungen fehlen oder Einstellungen stehen doppelt in der Seitenleiste');
+    check(str_contains($start, '<summary class="menu-title">Anwendungen</summary>') && str_contains($start, 'data-menu="anwendungen"') && !str_contains($start, '<span class="menu-title">Einstellungen</span>'), 'Anwendungen fehlen oder Einstellungen stehen doppelt in der Seitenleiste');
     check($b->get('/_auth/beispiel')->status === 403, 'Zugang zu nicht freigegebenem Modul');
     $env->users->setAccess($id, 'kasse', false, []);
     $env->db->store('erstadmin:kasse', (string)$id);

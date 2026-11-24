@@ -1,5 +1,14 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.49
+
+- Seitenleiste: Die Gruppen **Praxis** und **Betrieb** lassen sich wie **Anwendungen** einklappen (Pfeil an der Überschrift). Die Gruppe mit der aktuellen Seite bleibt immer offen.
+- Seitenleiste: Die Reihenfolge der **Anwendungen** (Module) ist frei wählbar: unter den Modulen auf „Reihenfolge ändern“ klicken, mit ▲ ▼ verschieben, „Fertig“. Zugeklappte Gruppen und Reihenfolge merkt sich der Browser (je Browser, nicht je Benutzerkonto); neue Module erscheinen hinten. Gilt in der Basis und in allen Modulseiten. Auf schmalen Bildschirmen (Handy) bleiben alle Gruppen offen. Nicht im Browser geprüft.
+
+## 0.21.4-beta.48
+
+- Uploads in Modulen über 1 MB scheiterten mit „client intended to send too large body“: Die Anmeldeprüfung (`/_auth/…`) fiel auf das Limit des Servers von 1 MB zurück, obwohl die Module bis 25 MB zulassen. Betrifft das Hochladen der Pad-Software im Modul Signatur (6,8 MB). Das Limit gilt jetzt auch dort mit 25 MB. Nach dem Update erzeugt die Basis die nginx-Einstellungen neu (`sudo bash installer/install.sh` oder Verwaltung → Module). Nicht auf dem Server geprüft.
+
 ## 0.21.4-beta.47
 
 - PowerShell-Skript für die virtuellen Drucker (Arbeitsplatz einrichten): Fehler werden nicht mehr verschluckt. Das Skript meldet, wenn Windows nach dem Einschalten der IPP-Funktion neu starten muss, wenn der Server unter dem Namen oder auf Port 631 nicht erreichbar ist, und nennt am Ende den Grund, falls der Drucker nicht angelegt wurde. Nicht an einem Windows-PC geprüft.

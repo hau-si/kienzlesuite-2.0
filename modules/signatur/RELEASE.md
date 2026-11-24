@@ -1,5 +1,8 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.4
+- Pad-Software hochladen: Meldungen bei Fehlern genauer. Kommt keine JSON-Antwort, steht der HTTP-Status mit dem Anfang der Antwort da; interne Fehler des Servers werden mit Typ und Text gemeldet und ins Protokoll geschrieben. Nicht auf der VM geprüft.
+
 ## 0.1.0-beta.3
 - Pad-Software: Die Anleitung auf der Seite beschreibt das Hochladen Schritt für Schritt (Herunterladen, nicht entpacken, Lizenz, Hochladen, Ergebnis, Neue Version) mit direktem Link zur Version 9.0.1. Nicht auf der VM geprüft.
 
