@@ -1,5 +1,17 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.47
+
+- PowerShell-Skript für die virtuellen Drucker (Arbeitsplatz einrichten): Fehler werden nicht mehr verschluckt. Das Skript meldet, wenn Windows nach dem Einschalten der IPP-Funktion neu starten muss, wenn der Server unter dem Namen oder auf Port 631 nicht erreichbar ist, und nennt am Ende den Grund, falls der Drucker nicht angelegt wurde. Nicht an einem Windows-PC geprüft.
+
+## 0.21.4-beta.46
+
+- Startseite → Server-Zustand: Prozessor, Arbeitsspeicher, Festplatte (mit Hochrechnung), Temperatur und Laufzeit fehlten auf dem echten Server ganz. Ursache: Die PHP-Einstellung `open_basedir` der Basis erlaubte weder `/proc` noch `/sys` noch den Plattenordner; die Tests liefen nur mit Testordnern. Jetzt sind genau diese Dateien lesend freigegeben (`installer/vorlagen/php-fpm-core.conf`), die Platte wird in `/var/lib/kienzle/core` gemessen, und ein Test prüft die Vorlage. **Nach dem Update einmal `sudo bash installer/install.sh`**, das schreibt die PHP-Einstellung neu; danach erscheinen die Kacheln. Nicht auf dem Server geprüft.
+
+## 0.21.4-beta.45
+
+- Das neue Modul heißt **Signatur** (vorher „Unterschrift“, Kennung `signatur`, Adresse `/signatur`). Seitenleisten-Symbol angepasst. Wer „Unterschrift“ 0.1.0-beta.1 schon installiert hat, entfernt es und installiert „Signatur“ neu; es gab noch keine Daten, die erhalten bleiben müssten. Nicht auf der VM geprüft.
+
 ## 0.21.4-beta.44
 
 - Neues Modul **Unterschrift** (0.1.0-beta.1) liegt bei: Vorlagen und Vorgänge für Dokumente am Unterschriftenpad. Symbol in der Seitenleiste ergänzt. Pad-Anbindung und Rückschreiben nach T2med folgen; nicht auf der echten VM geprüft.

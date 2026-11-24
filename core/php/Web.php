@@ -2085,16 +2085,21 @@ final class Web {
             $name = (string)$q['name'];
             $url = 'http://' . $host . ':631/printers/' . rawurlencode($name);
             $paper = preg_match('/terminzettel/i', $name) ? 'A6' : 'A4';
-            $script = "Enable-WindowsOptionalFeature -Online -FeatureName Printing-Foundation-InternetPrinting-Client -NoRestart | Out-Null\n"
+            $script = "# Windows-Funktion fürs Drucken über IPP einschalten; nach dem ersten Einschalten kann ein Neustart von Windows nötig sein\n"
+                . "\$f = Enable-WindowsOptionalFeature -Online -FeatureName Printing-Foundation-InternetPrinting-Client -NoRestart\n"
+                . "if (\$f.RestartNeeded) { Write-Warning 'Windows bitte neu starten und dieses Skript danach noch einmal ausführen.' }\n"
+                . "# Ist der Server im Netz erreichbar (Name und Port 631)?\n"
+                . "if (-not (Test-NetConnection -ComputerName \"" . $host . "\" -Port 631 -InformationLevel Quiet)) { Write-Warning 'Server unter diesem Namen nicht erreichbar (Name oder Firewall, Port 631). Statt des Namens die IP-Adresse des Servers verwenden.' }\n"
                 . "# Druckspooler neu starten und auf den laufenden Dienst warten; alten Drucker entfernen (behebt „Das Handle ist ungültig“)\n"
                 . "Restart-Service Spooler -Force\n(Get-Service Spooler).WaitForStatus('Running', '00:00:30')\nStart-Sleep 3\n"
                 . "Get-Printer -Name \"" . $name . "\" -ErrorAction SilentlyContinue | Remove-Printer\n"
-                . "Add-PrinterDriver -Name \"Microsoft IPP Class Driver\"\n\$url = \"" . $url . "\"\n"
+                . "Add-PrinterDriver -Name \"Microsoft IPP Class Driver\"\n\$url = \"" . $url . "\"\n\$fehler = ''\n"
                 . "# Anschluss und Drucker anlegen, bis zu viermal (direkt nach dem Neustart des Spoolers ist der Anschluss manchmal noch nicht nutzbar)\n"
                 . "for (\$i = 1; \$i -le 4 -and -not (Get-Printer -Name \"" . $name . "\" -ErrorAction SilentlyContinue); \$i++) {\n"
-                . "  Add-PrinterPort -Name \$url -ErrorAction SilentlyContinue\n  Start-Sleep 3\n"
-                . "  Add-Printer -Name \"" . $name . "\" -DriverName \"Microsoft IPP Class Driver\" -PortName \$url -ErrorAction SilentlyContinue\n}\n"
-                . "Get-Printer -Name \"" . $name . "\" | Select-Object Name, DriverName, PortName"
+                . "  if (-not (Get-PrinterPort -Name \$url -ErrorAction SilentlyContinue)) { try { Add-PrinterPort -Name \$url -ErrorAction Stop } catch { \$fehler = \$_.Exception.Message } }\n  Start-Sleep 3\n"
+                . "  try { Add-Printer -Name \"" . $name . "\" -DriverName \"Microsoft IPP Class Driver\" -PortName \$url -ErrorAction Stop } catch { \$fehler = \$_.Exception.Message }\n}\n"
+                . "if (Get-Printer -Name \"" . $name . "\" -ErrorAction SilentlyContinue) { Get-Printer -Name \"" . $name . "\" | Select-Object Name, DriverName, PortName }\n"
+                . "else { Write-Warning ('Drucker nicht angelegt. Grund: ' + \$fehler) }"
                ;
             $mac = isset($ppd[$name]) ? ' <a href="' . V::h($ppd[$name]) . '" download>PDF-Beschreibungsdatei (PPD) herunterladen</a>' : '';
             $blocks .= '<h3>Drucker „' . V::h($name) . '“</h3><ol>'

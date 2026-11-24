@@ -7,7 +7,7 @@ namespace Kienzle\Core;
  * Liest nur /proc und /sys (kein Befehl, keine Rechte nötig); fehlt ein Wert (z. B. Temperatur in einer VM), bleibt er null.
  */
 final class SystemStatus {
-    public function __construct(private string $proc = '/proc', private string $sys = '/sys', private string $dir = '/var/lib/kienzle') {}
+    public function __construct(private string $proc = '/proc', private string $sys = '/sys', private string $dir = '/var/lib/kienzle/core') {}
 
     /** @return array{disk:?array{frei:float,gesamt:float},ram:?array{frei:float,gesamt:float},cpu:?array{last:float,kerne:int,prozent:int},temp:?float,laufzeit:?int} */
     public function read(): array {

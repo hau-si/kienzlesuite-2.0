@@ -1,22 +1,22 @@
 <?php
 declare(strict_types=1);
 /**
- * Einstieg des Moduls „Unterschrift“ (nginx → php-fpm als ks-unterschrift). Die Basis hat die Anmeldung vorher geprüft
+ * Einstieg des Moduls „Signatur“ (nginx → php-fpm als ks-signatur). Die Basis hat die Anmeldung vorher geprüft
  * (auth_request) und Benutzer, Rolle und Rechte als KIENZLE_* übergeben.
  */
 require_once dirname(__DIR__) . '/src/bootstrap.php';
-use KienzleUnterschrift\{Ansicht, Seite};
+use KienzleSignatur\{Ansicht, Pad, Seite};
 
 header('X-Frame-Options: DENY');
 header('X-Content-Type-Options: nosniff');
 header_remove('X-Powered-By');
 $root = dirname(__DIR__);
-$base = preg_match('#^/[a-z0-9-]{1,31}$#D', (string)($_SERVER['KIENZLE_PFAD'] ?? '')) ? (string)$_SERVER['KIENZLE_PFAD'] : '/unterschrift';
+$base = preg_match('#^/[a-z0-9-]{1,31}$#D', (string)($_SERVER['KIENZLE_PFAD'] ?? '')) ? (string)$_SERVER['KIENZLE_PFAD'] : '/signatur';
 $path = (string)parse_url((string)($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
 $rel = str_starts_with($path, $base . '/') ? substr($path, strlen($base)) : '/';
 
 try {
-    $k = us_modul();
+    $k = sg_modul();
     $darfVorgang = $k->recht('vorgaenge');
     $darfVorlage = $k->recht('vorlagen');
     if (!$darfVorgang && !$darfVorlage) $k->verweigern();
@@ -29,6 +29,24 @@ try {
         header('Cache-Control: private, max-age=3600');
         readfile($file);
         exit;
+    }
+    if ($rel === '/pad-hochladen') {
+        // Roher Upload (nicht multipart): Für die PHP-Instanz der Module ist file_uploads aus.
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        $antwort = static function (array $d, int $code = 200): never { http_response_code($code); echo json_encode($d, JSON_UNESCAPED_UNICODE); exit; };
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') $antwort(['error' => 'Nur POST.'], 405);
+        if (!$k->istAdmin()) $antwort(['error' => 'Nur Admins dürfen die Pad-Software hochladen.'], 403);
+        if (!$k->csrfGueltig($_SERVER['HTTP_X_KIENZLE_CSRF'] ?? null)) $antwort(['error' => 'Sitzung abgelaufen. Bitte die Seite neu laden.'], 403);
+        try {
+            $bytes = (string)file_get_contents('php://input', false, null, 0, Pad::MAX_ZIP + 1);
+            $stand = Pad::installieren($bytes, $k->benutzer(), ($_SERVER['HTTP_X_LIZENZ'] ?? '') === '1');
+            $antwort(['ok' => true, 'version' => $stand['version']]);
+        } catch (InvalidArgumentException $e) {
+            $antwort(['error' => $e->getMessage()], 422);
+        } catch (RuntimeException $e) {
+            $antwort(['error' => $e->getMessage()], 500);
+        }
     }
     if ($rel !== '/' && $rel !== '') { http_response_code(404); echo 'Nicht gefunden.'; exit; }
     header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
@@ -55,6 +73,9 @@ try {
             } elseif ($aktion === 'vorlage-loeschen' && $darfVorlage) {
                 Seite::vorlageLoeschen((int)($_POST['id'] ?? 0));
                 $meldung = 'Vorlage gelöscht.';
+            } elseif ($aktion === 'pad-entfernen' && $k->istAdmin()) {
+                Pad::entfernen();
+                $meldung = 'Pad-Software entfernt.';
             } else {
                 throw new InvalidArgumentException('Unbekannte Aktion oder fehlendes Recht.');
             }
@@ -65,8 +86,8 @@ try {
     Seite::aufraeumen();
     header('Content-Type: text/html; charset=utf-8');
     header('Cache-Control: no-store');
-    echo $k->rahmen('Unterschrift', Ansicht::seite($k->csrf(), Seite::vorgaenge(), Seite::vorlagen(), $darfVorgang, $darfVorlage, $meldung, $fehler, $bearbeite), ['roh' => true, 'kopf' => Ansicht::kopf($base, $k->csrf())]);
+    echo $k->rahmen('Signatur', Ansicht::seite($k->csrf(), Seite::vorgaenge(), Seite::vorlagen(), $darfVorgang, $darfVorlage, $meldung, $fehler, $bearbeite, $k->istAdmin() ? Pad::status() : null), ['roh' => true, 'kopf' => Ansicht::kopf($base, $k->csrf())]);
 } catch (Throwable $e) {
     http_response_code(500);
-    echo 'Die Unterschrift-Seite ist gerade nicht erreichbar.';
+    echo 'Die Signatur-Seite ist gerade nicht erreichbar.';
 }

@@ -1,14 +1,14 @@
 <?php
 declare(strict_types=1);
-// Haken des Moduls (laufen als ks-unterschrift, nie als root): install, update, remove, busy, health.
+// Haken des Moduls (laufen als ks-signatur, nie als root): install, update, remove, busy, health.
 require_once dirname(__DIR__) . '/src/bootstrap.php';
-use KienzleUnterschrift\Speicher;
+use KienzleSignatur\Speicher;
 
 $haken = (string)($argv[1] ?? '');
 try {
     if ($haken === 'install' || $haken === 'update') {
         Speicher::pdo();
-        echo "Unterschrift bereit.\n";
+        echo "Signatur bereit.\n";
         exit(0);
     }
     if ($haken === 'remove' || $haken === 'busy') exit(0); // Daten bleiben; offene Vorgänge liegen in der Datenbank

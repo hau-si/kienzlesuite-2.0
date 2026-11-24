@@ -44,7 +44,7 @@ final class View {
         'start:einrichtung' => '<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2h9"/>',
         'modul:sumup' => '<rect x="4" y="13" width="16" height="7" rx="1"/><path d="M7 13V6h10v7M9 9h6M8 17h.01M12 17h.01M16 17h.01"/>',
         'modul:terminzettel' => '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',
-        'modul:unterschrift' => '<path d="M3 17c3-4 4-8 6-8s0 6 2 6 2-4 4-4 1 3 3 3 3-1 3-1"/><path d="M3 21h18"/>',
+        'modul:signatur' => '<path d="M3 17c3-4 4-8 6-8s0 6 2 6 2-4 4-4 1 3 3 3 3-1 3-1"/><path d="M3 21h18"/>',
         'st:disk' => '<rect x="3" y="14" width="18" height="6" rx="1"/><path d="M5 14l3-9h8l3 9M7 17h.01"/>',
         'st:ram' => '<rect x="3" y="8" width="18" height="8" rx="1"/><path d="M7 16v3M11 16v3M15 16v3M7 8V5M11 8V5M15 8V5"/>',
         'st:cpu' => '<rect x="6" y="6" width="12" height="12" rx="1"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>',

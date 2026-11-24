@@ -1,9 +1,9 @@
 <?php
 declare(strict_types=1);
-namespace KienzleUnterschrift;
+namespace KienzleSignatur;
 
 /**
- * Fachlogik des Moduls unterschrift: Vorlagen mit Platzhaltern, Vorgänge mit Status. Die Seite selbst (Ansicht, index.php)
+ * Fachlogik des Moduls signatur: Vorlagen mit Platzhaltern, Vorgänge mit Status. Die Seite selbst (Ansicht, index.php)
  * ruft nur diese Funktionen. Alle Eingaben werden hier geprüft; Fehler als InvalidArgumentException mit lesbarem Text.
  */
 final class Seite {
@@ -164,10 +164,14 @@ final class Seite {
 
     public static function ueberblick(): array {
         $musterOffen = (int)self::pdo()->query('SELECT COUNT(*) FROM vorlagen WHERE muster=1 AND aktiv=1')->fetchColumn();
+        $pad = Pad::status()['installiert'];
         return [
+            ['title' => 'Pad-Software von signotec hochladen', 'state' => $pad ? 'done' : 'open',
+             'hint' => $pad ? 'Die Bibliotheken von signotec sind hinterlegt.' : 'Die Software für das Unterschriftenpad liegt nicht bei und muss einmal von einem Admin hochgeladen werden.',
+             'link' => '/signatur/#pad'],
             ['title' => 'Vertragstexte der Praxis anpassen', 'state' => $musterOffen > 0 ? 'open' : 'done',
              'hint' => $musterOffen > 0 ? 'Die mitgelieferten Mustertexte sind nur Beispiele. Bitte prüfen und für Ihre Praxis ändern oder abschalten.' : 'Alle aktiven Vorlagen wurden von der Praxis bearbeitet.',
-             'link' => '/unterschrift/#vorlagen'],
+             'link' => '/signatur/#vorlagen'],
         ];
     }
 }

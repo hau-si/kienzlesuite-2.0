@@ -1,3 +1,0 @@
-#!/bin/sh
-# Haken „install“ des Moduls unterschrift (läuft als ks-unterschrift).
-exec /usr/bin/php "$(dirname "$0")/../lib/haken.php" install

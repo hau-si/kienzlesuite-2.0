@@ -1,38 +1,38 @@
-# Unterschrift: Dokumente (IGeL-Vertrag, Aufklärung, Datenschutz) am Unterschriftenpad unterschreiben lassen und als PDF
+# Signatur: Dokumente (IGeL-Vertrag, Aufklärung, Datenschutz) am Unterschriftenpad unterschreiben lassen und als PDF
 # in die T2med-Akte zurückschreiben. Stand dieser Fassung: Vorlagen und Vorgänge; Pad-Anbindung und Rückschreiben folgen.
 
 [module]
-id = "unterschrift"
-name = "Unterschrift"
-version = "0.1.0-beta.1"
+id = "signatur"
+name = "Signatur"
+version = "0.1.0-beta.3"
 core_api = "1"
 description = "Verträge, Aufklärungen und Datenschutzerklärungen am Unterschriftenpad unterschreiben lassen, auch zeitversetzt, und als PDF in T2med ablegen."
 
 [system]
-packages = ["php-fpm", "php-cli", "php-sqlite3", "php-mbstring"]
-user = "ks-unterschrift"
-data = "/var/lib/kienzle/unterschrift"
+packages = ["php-fpm", "php-cli", "php-sqlite3", "php-mbstring", "php-zip"]
+user = "ks-signatur"
+data = "/var/lib/kienzle/signatur"
 
 [web]
-path = "/unterschrift"
-upstream = "unix:/run/kienzle/unterschrift/web.sock"
+path = "/signatur"
+upstream = "unix:/run/kienzle/signatur/web.sock"
 protocol = "fastcgi"
 entry = "public/index.php"
 
 [[rights]]
 id = "vorgaenge"
-label = "Unterschrift: Vorgänge anlegen, ansehen und abbrechen"
+label = "Signatur: Vorgänge anlegen, ansehen und abbrechen"
 
 [[rights]]
 id = "vorlagen"
-label = "Unterschrift: Vorlagen und Vertragstexte ändern"
+label = "Signatur: Vorlagen und Vertragstexte ändern"
 
 [[connections]]
 id = "t2med"
 purpose = "Unterschriebenes PDF in die T2med-Akte schreiben (FHIR)"
 
 [backup]
-paths = ["/var/lib/kienzle/unterschrift"]
+paths = ["/var/lib/kienzle/signatur"]
 
 [setup]
 overview = "bin/setup-overview"

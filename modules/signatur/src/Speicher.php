@@ -1,16 +1,16 @@
 <?php
 declare(strict_types=1);
-namespace KienzleUnterschrift;
+namespace KienzleSignatur;
 
 /** SQLite-Datenbank des Moduls (Vorlagen und Vorgänge); Schema über user_version. */
 final class Speicher {
-    public static string $data = '/var/lib/kienzle/unterschrift';
+    public static string $data = '/var/lib/kienzle/signatur';
     private static ?\PDO $pdo = null;
     private static string $pfad = '';
     public const VERSION = 1;
 
     public static function pdo(): \PDO {
-        $datei = self::$data . '/unterschrift.db';
+        $datei = self::$data . '/signatur.db';
         if (self::$pdo && self::$pfad === $datei) return self::$pdo;
         if (!is_dir(self::$data) && !mkdir(self::$data, 0700, true) && !is_dir(self::$data)) throw new \RuntimeException('Datenordner nicht anlegbar.');
         $pdo = new \PDO('sqlite:' . $datei, null, null, [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION, \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC]);

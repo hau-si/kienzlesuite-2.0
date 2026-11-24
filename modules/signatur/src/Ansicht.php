@@ -1,21 +1,21 @@
 <?php
 declare(strict_types=1);
-namespace KienzleUnterschrift;
+namespace KienzleSignatur;
 
-/** HTML der Seite „Unterschrift“ (Basis-Rahmen, Karten und Knöpfe kommen von core.css). */
+/** HTML der Seite „Signatur“ (Basis-Rahmen, Karten und Knöpfe kommen von core.css). */
 final class Ansicht {
     public static function kopf(string $base, string $csrf): string {
         $v = static fn(string $f): string => '?v=' . substr((string)@md5_file(dirname(__DIR__) . '/public/assets/' . $f), 0, 8);
-        return '<meta name="kienzle-csrf" content="' . us_h($csrf) . '"><link rel="stylesheet" href="' . us_h($base) . '/assets/style.css' . $v('style.css') . '">'
-            . '<script src="' . us_h($base) . '/assets/app.js' . $v('app.js') . '" defer></script>';
+        return '<meta name="kienzle-csrf" content="' . sg_h($csrf) . '"><link rel="stylesheet" href="' . sg_h($base) . '/assets/style.css' . $v('style.css') . '">'
+            . '<script src="' . sg_h($base) . '/assets/app.js' . $v('app.js') . '" defer></script>';
     }
 
     private static function datum(int $t): string { return $t > 0 ? date('d.m.Y H:i', $t) : '–'; }
 
-    public static function seite(string $csrf, array $vorgaenge, array $vorlagen, bool $darfVorgang, bool $darfVorlage, ?string $meldung, ?string $fehler, ?array $bearbeite = null): string {
-        $h = 'us_h';
+    public static function seite(string $csrf, array $vorgaenge, array $vorlagen, bool $darfVorgang, bool $darfVorlage, ?string $meldung, ?string $fehler, ?array $bearbeite = null, ?array $pad = null): string {
+        $h = 'sg_h';
         $csrfFeld = '<input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '">';
-        $o = '<div class="us"><div class="seitenkopf"><div><h1>Unterschrift</h1></div></div>'
+        $o = '<div class="us"><div class="seitenkopf"><div><h1>Signatur</h1></div></div>'
             . '<p class="us-intro muted">Dokumente am Unterschriftenpad unterschreiben lassen: Vorgang anlegen, der Patient unterschreibt sofort oder später, das PDF kommt in die T2med-Akte. '
             . 'Die Anbindung des Pads und das Ablegen in T2med sind noch nicht eingebaut; Vorlagen und Vorgänge können schon vorbereitet werden.</p>';
         if ($meldung) $o .= '<p class="ok" role="status">' . $h($meldung) . '</p>';
@@ -60,11 +60,36 @@ final class Ansicht {
         $o .= '</section>';
 
         if ($darfVorlage) $o .= self::vorlagen($csrfFeld, $vorlagen, $bearbeite);
+        if ($pad !== null) $o .= self::pad($csrfFeld, $pad);
         return $o . '</div>';
     }
 
+    /** Bereich „Pad-Software“ nur für Admins: Anleitung, Lizenzhinweis, Upload der ZIP-Datei von signotec. */
+    private static function pad(string $csrfFeld, array $pad): string {
+        $h = 'sg_h';
+        $stand = $pad['installiert']
+            ? '<p class="ok" role="status">Installiert' . ($pad['version'] !== '' ? ': signoPAD-API Linux ' . $h($pad['version']) : '') . ($pad['zeit'] > 0 ? ', hochgeladen am ' . $h(date('d.m.Y H:i', (int)$pad['zeit'])) : '') . ($pad['von'] !== '' ? ' von ' . $h($pad['von']) : '') . '.</p>'
+            : '<p class="muted">Noch nicht hochgeladen. Ohne diese Software kann das Pad nicht angesprochen werden.</p>';
+        $o = '<details class="fold" id="pad"><summary><h2>Pad-Software von signotec</h2></summary><div class="us-body">' . $stand
+            . '<p>Die Software zum Ansprechen des Unterschriftenpads liefern wir nicht mit. Sie laden sie bei signotec herunter und hier hoch. So geht es:</p>'
+            . '<ol class="us-schritte">'
+            . '<li><strong>Herunterladen:</strong> Auf Ihrem Computer bei signotec das Paket <strong>signoPAD-API Linux</strong> herunterladen, eine ZIP-Datei mit dem Namen <code>signoPAD-API_Linux_9.0.1.zip</code> (die Versionsnummer kann neuer sein, rund 7 MB). Direkt: <a href="https://backend.signotec.com/wp-content/uploads/2025/11/signoPAD-API_Linux_9.0.1.zip" target="_blank" rel="noopener noreferrer">Version 9.0.1</a>; neuere Versionen auf <a href="https://www.signotec.com/en/help-centre/signopad-api/" target="_blank" rel="noopener noreferrer">signotec: signoPAD-API</a> unter Download für Linux. Es muss die Linux-Fassung sein, nicht Windows, Java oder Web.</li>'
+            . '<li><strong>Nicht entpacken:</strong> Die ZIP-Datei bleibt, wie sie ist. Das Modul sucht sich daraus selbst die zwei nötigen Bibliotheken <code>libSTPadLib.so</code> und <code>libSTCPImageEngine.so</code> (Linux, 64 Bit) und den Lizenztext des Herstellers; alles andere wird verworfen.</li>'
+            . '<li><strong>Lizenz lesen:</strong> Laut signotec ist die Nutzung kostenlos, solange nicht mehr als 50 Unterschriftenpads eingesetzt werden. Den Lizenzvertrag finden Sie in der ZIP-Datei im Ordner <code>licenses</code> (<code>signotec endnutzer lizenzvertrag.txt</code>).</li>'
+            . '<li><strong>Hochladen:</strong> Unten auf „Datei auswählen“ klicken, die ZIP-Datei wählen, den Haken zum Lizenzvertrag setzen und auf „Hochladen“ klicken. Die Datei darf höchstens 8 MB groß sein.</li>'
+            . '<li><strong>Ergebnis:</strong> Unter dem Knopf erscheint „Wird hochgeladen und geprüft“, dann lädt sich die Seite neu und oben steht grün „Installiert: signoPAD-API Linux 9.0.1“ mit Datum und Ihrem Namen. Bei einem Fehler steht der Grund unter dem Knopf (z. B. „keine ZIP-Datei“ oder „In der ZIP-Datei fehlt …“); es wird dann nichts übernommen.</li>'
+            . '<li><strong>Neue Version:</strong> Dieselben Schritte noch einmal; die alte Fassung wird ersetzt. „Pad-Software entfernen“ löscht die Bibliotheken wieder.</li>'
+            . '</ol>'
+            . '<div class="us-upload"><label for="pad-datei">ZIP-Datei von signotec</label><input type="file" id="pad-datei" accept=".zip,application/zip">'
+            . '<label class="check"><input type="checkbox" id="pad-lizenz"> Ich habe den Lizenzvertrag von signotec gelesen und akzeptiere ihn.</label>'
+            . '<div class="aktionen"><button class="primary" type="button" id="pad-los" data-ziel="pad-hochladen">Hochladen</button></div>'
+            . '<p id="pad-status" class="muted" role="status" aria-live="polite"></p></div>';
+        if ($pad['installiert']) $o .= '<form method="post" class="inline us-loeschen">' . $csrfFeld . '<input type="hidden" name="aktion" value="pad-entfernen"><button class="danger small" type="submit" data-bestaetigen="Pad-Software entfernen? Das Pad lässt sich danach nicht mehr ansprechen.">Pad-Software entfernen</button></form>';
+        return $o . '</div></details>';
+    }
+
     private static function vorlagen(string $csrfFeld, array $vorlagen, ?array $bearbeite): string {
-        $h = 'us_h';
+        $h = 'sg_h';
         $platz = implode(' ', array_map(fn($k) => '<code>{{' . $h($k) . '}}</code>', array_keys(Seite::PLATZHALTER)));
         $o = '<details class="fold" id="vorlagen"' . ($bearbeite ? ' open' : '') . '><summary><h2>Vorlagen und Vertragstexte</h2></summary><div class="us-body">'
             . '<p class="muted">Platzhalter im Text: ' . $platz . '. Sie werden beim Anlegen des Vorgangs eingesetzt; der Text bleibt danach unverändert. '
@@ -80,7 +105,7 @@ final class Ansicht {
     }
 
     private static function vorlagenForm(string $csrfFeld, array $v): string {
-        $h = 'us_h';
+        $h = 'sg_h';
         $id = (int)$v['id'];
         $art = '';
         foreach (Seite::ARTEN as $k => $l) $art .= '<option value="' . $h($k) . '"' . ($k === $v['art'] ? ' selected' : '') . '>' . $h($l) . '</option>';

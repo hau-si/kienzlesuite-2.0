@@ -48,6 +48,17 @@ class Vorlagen(unittest.TestCase):
             self.assertIn(f'/etc/systemd/system/kienzle-{unit}.path', basedir)
         self.assertFalse([e for e in basedir if not e.endswith('/') and not Path(e).name], 'Vorsilben gelten in PHP nicht')
 
+    def test_php_darf_serverwerte_lesen(self):
+        # Ohne diese Einträge sieht die Startseite keine Werte für Prozessor, Arbeitsspeicher, Festplatte (open_basedir).
+        text = (VORLAGEN / 'php-fpm-core.conf').read_text()
+        basedir = re.search(r'^php_admin_value\[open_basedir\] = (.*)$', text, re.M).group(1).split(':')
+        for e in ('/proc/meminfo', '/proc/loadavg', '/proc/cpuinfo', '/proc/uptime', '/sys/class/thermal/', '/sys/class/hwmon/', '/sys/devices/'):
+            self.assertIn(e, basedir)
+        # Der Standardordner für die Plattenmessung liegt innerhalb einer erlaubten Angabe.
+        php = (ROOT / 'core' / 'php' / 'SystemStatus.php').read_text()
+        ordner = re.search(r"private string \$dir = '([^']+)'", php).group(1).rstrip('/') + '/'
+        self.assertTrue(any(ordner.startswith(e) for e in basedir if e.endswith('/')), ordner)
+
     def test_autoinstall(self):
         text = (ROOT / 'installer' / 'autoinstall.yaml').read_text()
         self.assertTrue(text.startswith('#cloud-config\n'))
