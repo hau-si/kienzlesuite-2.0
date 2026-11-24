@@ -437,7 +437,10 @@ final class Web {
             ->with('X-Kienzle-Praxis', rawurlencode(json_encode(['name' => $this->config->practice] + $this->address() + $this->master(), JSON_UNESCAPED_UNICODE)));
     }
 
-    /** Schlankes Menü für die Seitenleiste in Modulseiten: nur Anwendungen des Benutzers (ohne Zähler, damit die Prüfung jeder Modul-Anfrage schnell bleibt). */
+    /**
+     * Menü für die Seitenleiste in Modulseiten: Anwendungen des Benutzers, für Admins zusätzlich die Zähler (Updates, Module, Sicherung, Einrichtung) und
+     * die offenen Einstellungen wie in der Basis. Die Zähler werden 30 Sekunden zwischengespeichert, damit die Prüfung jeder Modul-Anfrage schnell bleibt.
+     */
     private function moduleMenu(int $uid, bool $admin, string $login): string {
         $apps = $meta = [];
         foreach ($this->users->access($uid) as $id => $_) {
@@ -445,7 +448,34 @@ final class Web {
             $apps[$p . '/'] = $this->modules->name($id);
             $meta[$p . '/'] = $id;
         }
-        return rawurlencode(json_encode(['apps' => $apps, 'ids' => $meta, 'admin' => $admin, 'login' => $login], JSON_UNESCAPED_UNICODE));
+        $out = ['apps' => $apps, 'ids' => $meta, 'admin' => $admin, 'login' => $login];
+        if ($admin) {
+            $h = $this->menuHints();
+            $out['zaehler'] = $h['zaehler'];
+            $out['offen'] = $h['offen'];
+            $out['todo'] = [];
+            foreach ($this->users->access($uid) as $id => $a) {
+                if (($p = $this->modules->webPath($id)) !== null && $a['admin'] && ($u = $this->modules->settingsUrl($id)) !== null && in_array($u, $h['offen'], true)) $out['todo'][] = $p . '/';
+            }
+        }
+        return rawurlencode(json_encode($out, JSON_UNESCAPED_UNICODE));
+    }
+
+    /** Zähler und offene Einstellungen für die Seitenleiste der Module (kurz zwischengespeichert). */
+    private function menuHints(): array {
+        try {
+            $c = json_decode((string)$this->db->setting('menue.hinweise'), true);
+            if (is_array($c) && is_int($c['t'] ?? null) && time() - $c['t'] < 30 && is_array($c['zaehler'] ?? null) && is_array($c['offen'] ?? null)) return $c;
+        } catch (\Throwable) {
+        }
+        $c = ['t' => time(), 'zaehler' => [
+            'updates' => $this->updates ? $this->updates->count() : 0, 'module' => $this->store ? $this->store->count() : 0,
+            'sicherung' => $this->backup ? $this->backup->count() : 0, 'einrichtung' => $this->openSteps()], 'offen' => $this->openPaths()];
+        try {
+            $this->db->store('menue.hinweise', json_encode($c));
+        } catch (\Throwable) {
+        }
+        return $c;
     }
 
     /** CSRF-Marke, die ein Modul in seine Formulare schreibt und mit X-Kienzle-Csrf vergleicht. */

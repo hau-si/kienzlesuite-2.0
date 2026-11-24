@@ -36,7 +36,13 @@ final class KienzleModul {
         }
         $ids = [];
         foreach (is_array($d['ids'] ?? null) ? $d['ids'] : [] as $href => $id) if (isset($apps[$href]) && is_string($id)) $ids[$href] = $id;
-        return ['apps' => $apps, 'ids' => $ids, 'admin' => is_array($d) && ($d['admin'] ?? false) === true, 'login' => is_array($d) && is_string($d['login'] ?? null) ? $d['login'] : $this->benutzer()];
+        $z = [];
+        foreach (['updates', 'module', 'sicherung', 'einrichtung'] as $n) $z[$n] = is_array($d) && is_array($d['zaehler'] ?? null) && is_int($d['zaehler'][$n] ?? null) ? max(0, min(99, $d['zaehler'][$n])) : 0;
+        $offen = [];
+        foreach (is_array($d['offen'] ?? null) ? $d['offen'] : [] as $p) if (is_string($p) && preg_match('#^/[A-Za-z0-9/_?=&.-]{1,120}$#D', $p)) $offen[] = $p;
+        $todo = [];
+        foreach (is_array($d['todo'] ?? null) ? $d['todo'] : [] as $p) if (is_string($p) && isset($apps[$p])) $todo[] = $p;
+        return ['apps' => $apps, 'ids' => $ids, 'todo' => $todo, 'zaehler' => $z, 'offen' => $offen, 'admin' => is_array($d) && ($d['admin'] ?? false) === true, 'login' => is_array($d) && is_string($d['login'] ?? null) ? $d['login'] : $this->benutzer()];
     }
 
     /**
@@ -49,8 +55,10 @@ final class KienzleModul {
         require_once $file;
         $m = $this->menue();
         $nav = ['apps' => $m['apps'], 'appmeta' => array_map(fn($id) => ['id' => $id, 'todo' => false], $m['ids']), 'settings' => [], 'login' => $m['login'], 'admin' => $m['admin'],
-            'csrf' => '', 'updates' => 0, 'module' => 0, 'sicherung' => 0, 'einrichtung' => 0, 'offenLogo' => false, 'offen' => [],
+            'csrf' => '', 'updates' => $m['zaehler']['updates'], 'module' => $m['zaehler']['module'], 'sicherung' => $m['zaehler']['sicherung'], 'einrichtung' => $m['zaehler']['einrichtung'],
+            'offenLogo' => $m['admin'] && $m['zaehler']['einrichtung'] > 0, 'offen' => $m['offen'],
             'pfad' => (string)parse_url((string)($this->server['REQUEST_URI'] ?? '/'), PHP_URL_PATH)];
+        foreach ($nav['appmeta'] as $href => $meta) $nav['appmeta'][$href]['todo'] = in_array($href, $m['todo'], true);
         return \Kienzle\Core\View::page($titel, $inhalt, $nav, $this->praxis()['name'], null, $extra);
     }
 

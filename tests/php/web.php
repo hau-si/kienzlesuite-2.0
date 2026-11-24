@@ -137,6 +137,15 @@ function test_basis_admin_darf_in_modulen_alles(): void {
     check($r->header('X-Kienzle-Rechte') !== '' && count(explode(',', $r->header('X-Kienzle-Rechte'))) === count($env->modules->rightIds('kasse')), 'Basis-Admin hat nicht alle Rechte');
     [$uid] = $env->user('bert');
     check($b->get('/_auth/kasse')->status === 204 && $env->users->access($uid) === [], 'Mitarbeiter ohne Zugang bekommt Zugang');
+    // Seitenleiste in Modulen wie in der Basis: Admins bekommen Zähler und offene Punkte, zwischengespeichert; Mitarbeiter nichts davon
+    $menu = json_decode(rawurldecode((string)$r->header('X-Kienzle-Menue')), true);
+    check(is_array($menu) && $menu['admin'] === true && isset($menu['zaehler']['updates'], $menu['zaehler']['einrichtung']) && is_array($menu['offen']) && is_array($menu['todo']), 'Menü der Module ohne Zähler für Admins');
+    $env->db->store('menue.hinweise', json_encode(['t' => time(), 'zaehler' => ['updates' => 2, 'module' => 1, 'sicherung' => 0, 'einrichtung' => 3], 'offen' => ['/kasse/']]));
+    $menu = json_decode(rawurldecode((string)$b->get('/_auth/kasse')->header('X-Kienzle-Menue')), true);
+    check($menu['zaehler'] === ['updates' => 2, 'module' => 1, 'sicherung' => 0, 'einrichtung' => 3], 'Zähler nicht aus dem Zwischenspeicher');
+    $k = new KienzleModul('kasse', ['KIENZLE_MENUE' => $b->last->header('X-Kienzle-Menue'), 'KIENZLE_BENUTZER' => 'admin', 'REQUEST_URI' => '/kasse/']);
+    $seite = $k->rahmen('Kasse', '<p>x</p>', ['roh' => true]);
+    check(str_contains($seite, 'class="badge" title="Neue Version verfügbar">2<') && str_contains($seite, 'class="logo-dot"'), 'Zähler fehlen in der Seitenleiste des Moduls');
 }
 
 function test_modul_admin_braucht_otp(): void {

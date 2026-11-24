@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.36
+
+- Die Seitenleiste in den Modulen (Kasse, Terminzettel) sieht jetzt aus wie in der Verwaltung: Für Admins zeigt sie die roten Zähler (Updates, Module, Sicherung), den Punkt am Logo bei offener Einrichtung und den orangen Punkt an Modulen mit offener Einstellung. Mitarbeiter sehen davon nichts, wie bisher.
+- Die Zähler werden 30 Sekunden zwischengespeichert, damit die Prüfung jeder Modul-Anfrage schnell bleibt. Die Modul-Hilfsklasse (`KienzleModul::menue()`) liefert sie mit; vorhandene Module brauchen keine Änderung.
+
 ## 0.21.4-beta.35
 
 - Modulübersicht neu gestaltet: Das **Logo** der Kachel öffnet das Modul (kleines ↗ am Logo), der Knopf „Öffnen“ entfällt. Ein **rundes Pfeil-Symbol** unter dem Namen dient für beides: mit neuer Version steht dort „Auf 2.x aktualisieren“, sonst „aktuell“ mit einem Rundpfeil zum Suchen nach Updates („Nach Update suchen“ im Menü entfällt).
