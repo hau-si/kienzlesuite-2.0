@@ -75,7 +75,7 @@ final class FhirClient {
             'Zahlung am ' . $paid->format('d.m.Y') . ' um ' . $paid->format('H:i') . ($transfer ? ' Uhr per Überweisung eingegangen.' : ($cash ? ' Uhr bar erhalten.' : ' Uhr über SumUp erfolgreich.')) . "\n" . 'Transaktionsreferenz: ' . $payment['reference'];
         if (!empty($payment['invoice_json'])) {
             $invoice = json_decode($payment['invoice_json'], true, 32, JSON_THROW_ON_ERROR);
-            $text .= ($cash || $transfer ? "\nRechnungsnummer: " : "\nRechnungsnummer (SumUp): ") . ($payment['transaction_id'] ?? '') . "\nLeistungsdatum: " . $invoice['service_date'];
+            $text .= (($payment['doc_number'] ?? '') !== '' ? "\nRechnungsnummer: " . $payment['doc_number'] . ($cash || $transfer ? '' : "\nSumUp-Transaktion: " . ($payment['transaction_id'] ?? '')) : ($cash || $transfer ? "\nRechnungsnummer: " : "\nRechnungsnummer (SumUp): ") . ($payment['transaction_id'] ?? '')) . "\nLeistungsdatum: " . $invoice['service_date'];
         }
         return ['resourceType' => 'Observation',
             'meta' => ['profile' => ['https://fhir.t2med.de/StructureDefinition/FhirApiObservationFreitext|1.0.0']],

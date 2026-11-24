@@ -97,7 +97,7 @@ try {
     $http->missingId=true;
     check($app->poll($v,$p['id'])['payment_status']==='pending','Erfolg ohne Rechnungsnummer angenommen');
     $http->missingId=false; $db->query('UPDATE payments SET checked_at=0 WHERE id=?',[$p['id']]);
-    $p=$app->poll($v,$p['id']); check($p['invoice_number']==='c31a51a8-02c8-42a9-a831-7df089a04b36','Rechnungsnummer nicht SumUp-Transaktions-ID');
+    $p=$app->poll($v,$p['id']); check($p['invoice_number']==='IGEL-'.date('Y').'-0001' && $db->one('SELECT transaction_id FROM payments WHERE id=?',[$p['id']])['transaction_id']==='c31a51a8-02c8-42a9-a831-7df089a04b36','Rechnungsnummer nicht nach Format, SumUp-Transaktions-ID gespeichert');
     check($p['paid_at']===strtotime($http->timestamp),'Zeitpunkt des Statusabrufs ersetzt SumUp-Zahlungszeit');
     $calls=count($http->calls); $pdf=$app->receipt($v,$p['id']);
     check(str_starts_with($pdf,'%PDF-') && count($http->calls)===$calls,'Lokaler PDF-Beleg benötigt SumUp oder ist kein PDF');
@@ -125,7 +125,7 @@ try {
     check($db->one('SELECT invoice_json FROM payments WHERE id=?',[$p['id']])['invoice_json']===$saved['invoice_json'],'Beleg nach Änderung nicht stabil');
     $app->document($v,$p['id']);
     $record=json_decode($db->one('SELECT resource_json FROM mock_records WHERE payment_id=?',[$p['id']])['resource_json'],true)['valueString'];
-    foreach (['GOÄ 250, Faktor 1,8','Blutentnahme','Rechnungsnummer (SumUp): '.$p['invoice_number'],'Leistungsdatum: 2026-09-01'] as $text) check(str_contains($record,$text),'Rechnungsangabe fehlt im Akteneintrag');
+    foreach (['GOÄ 250, Faktor 1,8','Blutentnahme','Rechnungsnummer: '.$p['invoice_number'],'Leistungsdatum: 2026-09-01'] as $text) check(str_contains($record,$text),'Rechnungsangabe fehlt im Akteneintrag');
 
     // Begründung gehört zum Patientenfall; Faktor ist reine Zusatzangabe zum Festpreis.
     $app->saveService($v2,['label'=>'Beratung','price'=>'12,34','goae_code'=>'1','factor'=>'3,0']);

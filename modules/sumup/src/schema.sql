@@ -74,3 +74,13 @@ CREATE TABLE IF NOT EXISTS admin_sessions (
     token_hash TEXT PRIMARY KEY, csrf TEXT NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, role TEXT NOT NULL DEFAULT 'admin',
     remember INTEGER NOT NULL DEFAULT 0, net TEXT NOT NULL DEFAULT '', label TEXT NOT NULL DEFAULT '', last_used INTEGER NOT NULL DEFAULT 0, confirmed_at INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS doc_numbers (
+    number TEXT PRIMARY KEY, kind TEXT NOT NULL, payment_id TEXT, created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS stornos (
+    id TEXT PRIMARY KEY, payment_id TEXT NOT NULL REFERENCES payments(id), number TEXT NOT NULL UNIQUE,
+    original_number TEXT NOT NULL DEFAULT '', amount_cents INTEGER NOT NULL, method TEXT NOT NULL DEFAULT '',
+    note TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, patient_name TEXT NOT NULL DEFAULT '', invoice_json TEXT
+);
+CREATE INDEX IF NOT EXISTS stornos_payment ON stornos(payment_id);

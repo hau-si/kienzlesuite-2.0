@@ -41,7 +41,7 @@ if (preg_match('#^/hilfe/bilder/([a-z0-9-]{1,60}\.png)$#D', $rel, $m) && is_file
 }
 
 $pages = ['/' => 'start.php', '/index.php' => 'start.php', '/kassieren' => 'index.php', '/api.php' => 'api.php', '/settings.php' => 'settings.php', '/einstellungen' => 'settings.php',
-    '/settings-api.php' => 'settings-api.php', '/receipt.php' => 'receipt.php', '/tax-export.php' => 'tax-export.php',
+    '/settings-api.php' => 'settings-api.php', '/receipt.php' => 'receipt.php', '/beleg.php' => 'beleg.php', '/tax-export.php' => 'tax-export.php',
     '/client-download.php' => 'client-download.php', '/hilfe/t2med' => 'hilfe-t2med.php'];
 if (!isset($pages[$rel])) {
     http_response_code(404);

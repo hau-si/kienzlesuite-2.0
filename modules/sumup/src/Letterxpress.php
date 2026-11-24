@@ -77,7 +77,7 @@ final class Letterxpress {
         return $this->db->locked('letterxpress-' . $inboxId, function () use ($inboxId): array {
             $row = $this->db->one('SELECT * FROM invoice_inbox WHERE id=?', [$inboxId]);
             if (!$row) throw new Problem('Diese Rechnung gibt es nicht (mehr).', 404);
-            if ($this->db->one("SELECT 1 AS x FROM payments WHERE (inbox_id=? OR t2med_invoice=?) AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') LIMIT 1", [$inboxId, $row['invoice_number']]))
+            if ($this->db->one("SELECT 1 AS x FROM payments WHERE (inbox_id=? OR t2med_invoice=?) AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') AND storno_at IS NULL LIMIT 1", [$inboxId, $row['invoice_number']]))
                 throw new Problem('Diese Rechnung ist bezahlt oder wird gerade kassiert und wird nicht mehr per Post verschickt.', 409);
             if (self::locked($row)) throw new Problem($row['lxp_status'] === 'unknown'
                 ? 'Der Versand dieser Rechnung ist unklar. Bitte zuerst den Postausgang bei Letterxpress prüfen.' : 'Diese Rechnung wurde bereits per Post gesendet.', 409);

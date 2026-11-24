@@ -26,7 +26,7 @@ try {
     $state = sys_get_temp_dir() . '/ks-cash-' . bin2hex(random_bytes(6)); $dirs[] = $state; mkdir($state, 0700);
     $app = new App(config($state), new NoNetwork());
     $app->db->migrate();
-    check((int)$app->db->query('PRAGMA user_version')->fetchColumn() === 19, 'Datenbank nicht auf Version 19');
+    check((int)$app->db->query('PRAGMA user_version')->fetchColumn() === 20, 'Datenbank nicht auf Version 20');
     $visit = function () use ($app): array {
         $launch = $app->launch(['context_id' => 'ctx-' . bin2hex(random_bytes(4)), 'oauth_token' => '', 'fhir_base_url' => '']);
         parse_str(parse_url($launch['url'], PHP_URL_FRAGMENT), $f); $e = $app->exchange($f['launch'], null);
@@ -43,12 +43,12 @@ try {
     problem(fn() => $app->start($v2, ['services' => $ids, 'request_id' => App::id()]), 'Zweite Kartenzahlung trotz belegtem Terminal', 409);
     $request = App::id();
     $cash = $app->start($v2, ['services' => $ids, 'request_id' => $request, 'method' => 'cash']);
-    check($cash['method'] === 'cash' && $cash['payment_status'] === 'successful' && $cash['invoice_number'] === 'TEST-BAR-' . date('Y') . '-0001', 'Barzahlung falsch: ' . json_encode($cash));
+    check($cash['method'] === 'cash' && $cash['payment_status'] === 'successful' && $cash['invoice_number'] === 'TEST-IGEL-' . date('Y') . '-0001', 'Barzahlung falsch: ' . json_encode($cash));
     check($app->start($v2, ['services' => $ids, 'request_id' => $request, 'method' => 'cash'])['id'] === $cash['id'], 'Wiederholte Anfrage nicht idempotent');
     problem(fn() => $app->start($v2, ['services' => $ids, 'request_id' => $request]), 'Gleicher Schlüssel mit anderer Zahlungsart akzeptiert', 409);
     problem(fn() => $app->start($visit(), ['services' => $ids, 'request_id' => App::id(), 'method' => 'scheck']), 'Unbekannte Zahlungsart akzeptiert', 400);
     $cash2 = $app->start($visit(), ['services' => $ids, 'request_id' => App::id(), 'method' => 'cash']);
-    check($cash2['invoice_number'] === 'TEST-BAR-' . date('Y') . '-0002', 'Nummern nicht fortlaufend');
+    check($cash2['invoice_number'] === 'TEST-IGEL-' . date('Y') . '-0002', 'Nummern nicht fortlaufend');
 
     // Beleg, Akteneintrag und Abschluss.
     $row = $app->db->one('SELECT * FROM payments WHERE id=?', [$cash['id']]);

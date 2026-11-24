@@ -165,7 +165,7 @@ final class App {
         $row = $this->db->one('SELECT * FROM invoice_inbox WHERE id=? AND superseded_at IS NULL', [$invoiceId]);
         $limit = time() - $this->config->get('invoice_inbox', 'max_age_days', 14) * 86400;
         if (!$row || (int)$row['received_at'] < $limit) throw new Problem('Diese Rechnung ist nicht mehr offen.', 409);
-        $paid = $this->db->one("SELECT 1 AS x FROM payments WHERE t2med_invoice=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') LIMIT 1", [$row['invoice_number']]);
+        $paid = $this->db->one("SELECT 1 AS x FROM payments WHERE t2med_invoice=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') AND storno_at IS NULL LIMIT 1", [$row['invoice_number']]);
         if ($paid) throw new Problem('Diese Rechnung ist schon bezahlt oder wird gerade kassiert.', 409);
         // Hat t2med den Patienten kürzlich per FHIR übergeben, läuft die Zahlung über diesen Vorgang (mit Rückschrieb in die Akte).
         $linked = $this->linkedVisit((string)$row['patient_name'], (string)$row['patient_birthdate']);
@@ -221,6 +221,77 @@ final class App {
             if (T2medInvoice::matches(['patient_name' => $name, 'patient_birthdate' => $birthdate], (string)$v['patient_name'], (string)$v['patient_birthdate'])) return $v;
         }
         return null;
+    }
+    // --- Fortlaufende Nummern, Verarbeitete Rechnungen, Storno ---------------------------------
+    private function zone(): \DateTimeZone { return new \DateTimeZone($this->config->get('app', 'timezone')); }
+    /** In der App erzeugte Rechnung (IGeL/GOÄ, nicht T2med) bekommt beim Bezahlen ihre fortlaufende Nummer nach eingestelltem Format. */
+    private function numberIssued(string $id): void {
+        $p = $this->db->one('SELECT * FROM payments WHERE id=?', [$id]);
+        if (!$p || $p['payment_status'] !== 'successful' || !$p['invoice_json'] || $p['t2med_invoice'] !== null || ($p['doc_number'] ?? '') !== '') return;
+        $run = function () use ($id): void {
+            $row = $this->db->one('SELECT doc_number FROM payments WHERE id=?', [$id]);
+            if (($row['doc_number'] ?? '') !== '') return;
+            $number = DocNumbers::issue($this->db, 'igel', (string)$this->config->get('numbers', 'igel_format', DocNumbers::DEFAULT_IGEL), new \DateTimeImmutable('now', $this->zone()), $this->config->get('sumup', 'mode') === 'mock', $id);
+            $this->db->query('UPDATE payments SET doc_number=? WHERE id=?', [$number, $id]);
+        };
+        if ($this->db->inTransaction) $run(); else $this->db->transaction($run);
+    }
+    /** Anzeigenummer einer Zahlung: T2med-Nummer, eigene Rechnungsnummer oder (ältere Einträge) Transaktionsnummer. */
+    private static function displayNumber(array $p): string { return (string)($p['t2med_invoice'] ?: ($p['doc_number'] ?: ($p['transaction_id'] ?: $p['reference']))); }
+    /** Alle verarbeiteten Zahlungen der letzten Tage für die Startseite (bezahlt per Karte/Bar, Überweisung zurückgestellt, Stornos). */
+    public function processed(int $days = 7): array {
+        $rows = $this->db->query("SELECT p.*, v.patient_name AS pname, s.id AS sid, s.number AS snumber, s.created_at AS sat FROM payments p JOIN visits v ON v.id=p.visit_id LEFT JOIN stornos s ON s.payment_id=p.id
+            WHERE p.payment_status IN ('successful','transfer_open') AND COALESCE(p.paid_at,p.created_at) >= CAST(? AS INTEGER) ORDER BY COALESCE(p.paid_at,p.created_at) DESC LIMIT 300", [time() - $days * 86400])->fetchAll();
+        $out = [];
+        foreach ($rows as $p) {
+            $out[] = ['id' => $p['id'], 'number' => self::displayNumber($p), 'patient' => (string)$p['pname'], 'amount_cents' => (int)($p['corrected_cents'] ?? $p['amount_cents']),
+                'method' => (string)($p['payment_method'] ?: 'card'), 'at' => (int)($p['paid_at'] ?? $p['created_at']), 'open_transfer' => $p['payment_status'] === 'transfer_open',
+                't2med' => $p['t2med_invoice'] !== null, 'storno' => $p['sid'] ? ['id' => $p['sid'], 'number' => $p['snumber'], 'at' => (int)$p['sat']] : null];
+        }
+        return $out;
+    }
+    /**
+     * Zahlung stornieren (Karte, Bar, Überweisung; IGeL und T2med-Rechnungen): Es entsteht ein eigener Stornobeleg mit neuer Nummer.
+     * Die ursprüngliche Zahlung bleibt für die Buchhaltung unverändert erhalten, zählt aber nicht mehr in Tageswerten und Steuerliste;
+     * eine T2med-Rechnung wird wieder offen. Eine Rückzahlung an den Patienten (Karte: Terminal/SumUp) erfolgt nicht automatisch.
+     */
+    public function storno(string $paymentId, string $note): array {
+        if (!preg_match('/^[a-f0-9]{32}$/D', $paymentId)) throw new Problem('Ungültige Zahlung.', 422);
+        $note = trim(preg_replace('/\s+/u', ' ', $note));
+        if (mb_strlen($note) > 200 || preg_match('/[\x00-\x1f]/', $note)) throw new Problem('Der Grund darf höchstens 200 Zeichen lang sein.', 422);
+        return $this->db->locked('storno-' . $paymentId, function () use ($paymentId, $note): array {
+            $this->numberIssued($paymentId);
+            $p = $this->db->one('SELECT p.*, v.patient_name AS pname FROM payments p JOIN visits v ON v.id=p.visit_id WHERE p.id=?', [$paymentId]);
+            if (!$p || $p['payment_status'] !== 'successful') throw new Problem('Nur bezahlte Rechnungen lassen sich stornieren.', 409);
+            if ($p['storno_at'] !== null) throw new Problem('Diese Rechnung ist schon storniert.', 409);
+            {
+                return $this->db->transaction(function () use ($p, $note): array {
+                    $now = new \DateTimeImmutable('now', $this->zone());
+                    $number = DocNumbers::issue($this->db, 'storno', (string)$this->config->get('numbers', 'storno_format', DocNumbers::DEFAULT_STORNO), $now, $this->config->get('sumup', 'mode') === 'mock', $p['id']);
+                    $sid = self::id(); $amount = (int)($p['corrected_cents'] ?? $p['amount_cents']);
+                    $this->db->query('INSERT INTO stornos(id,payment_id,number,original_number,amount_cents,method,note,created_at,patient_name) VALUES(?,?,?,?,?,?,?,?,?)',
+                        [$sid, $p['id'], $number, self::displayNumber($p), $amount, $p['payment_method'] ?: 'card', $note, time(), (string)$p['pname']]);
+                    $this->db->query('UPDATE payments SET storno_at=?, voided_at=COALESCE(voided_at,?), correction_note=? WHERE id=?', [time(), time(), mb_substr('Storniert mit ' . $number . ($note !== '' ? ': ' . $note : ''), 0, 200), $p['id']]);
+                    return ['id' => $sid, 'number' => $number, 'original_number' => self::displayNumber($p), 'amount_cents' => $amount, 'method' => $p['payment_method'] ?: 'card'];
+                });
+            }
+        });
+    }
+    /** PDF einer verarbeiteten Zahlung (Rechnung/Beleg) für die Startseite. */
+    public function processedPdf(string $paymentId): string {
+        if (!preg_match('/^[a-f0-9]{32}$/D', $paymentId)) throw new Problem('Ungültige Zahlung.', 422);
+        $this->numberIssued($paymentId);
+        $payment = $this->db->one('SELECT * FROM payments WHERE id=?', [$paymentId]) ?? throw new Problem('Zahlung nicht gefunden.', 404);
+        if (!in_array($payment['payment_status'], ['successful', 'transfer_open'], true)) throw new Problem('Für diese Zahlung gibt es keinen Beleg.', 409);
+        return ReceiptPdf::convert($this->receiptSource($payment));
+    }
+    public function stornoPdf(string $stornoId): string {
+        if (!preg_match('/^[a-f0-9]{32}$/D', $stornoId)) throw new Problem('Ungültiger Stornobeleg.', 422);
+        $s = $this->db->one('SELECT * FROM stornos WHERE id=?', [$stornoId]) ?? throw new Problem('Stornobeleg nicht gefunden.', 404);
+        $practice = [];
+        if ($this->config->practiceReady()) foreach (['name', 'street', 'city', 'contact'] as $key) $practice[$key] = $this->config->get('practice', $key, '');
+        return ReceiptPdf::convert(InvoiceReceipt::storno(['mock' => $this->config->get('sumup', 'mode') === 'mock', 'practice' => $practice, 'number' => $s['number'], 'original_number' => $s['original_number'],
+            'date' => (new \DateTimeImmutable('@' . $s['created_at']))->setTimezone($this->zone())->format('d.m.Y H:i'), 'patient' => $s['patient_name'], 'note' => $s['note'], 'amount_cents' => (int)$s['amount_cents']]));
     }
     private static function isManual(array $visit): bool { return str_starts_with((string)$visit['context_id'], 'manual-'); }
     /**
@@ -292,7 +363,7 @@ final class App {
             }
             $fresh = $this->db->one('SELECT * FROM visits WHERE id=?', [$visit['id']]);
             $this->editable($fresh);
-            $pending = $this->db->one("SELECT * FROM payments WHERE visit_id=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful')", [$visit['id']]);
+            $pending = $this->db->one("SELECT * FROM payments WHERE visit_id=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') AND storno_at IS NULL", [$visit['id']]);
             if ($pending) return $this->publicPayment($pending);
             // Barzahlung braucht kein Terminal.
             if ($method === 'card' && $this->readerPayment($visit)) throw new Problem('Das Terminal ist belegt. Du kannst den anderen Vorgang unten prüfen oder abbrechen.', 409);
@@ -350,6 +421,7 @@ final class App {
                     // Bar: sofort bezahlt, eigene fortlaufende Rechnungsnummer je Jahr (Testmodus getrennt).
                     $this->db->query('INSERT INTO payments(id,visit_id,request_id,request_hash,reference,reader_id,amount_cents,services_json,payment_status,created_at,paid_at,transaction_id,invoice_json,payment_method) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                         [$id, $visit['id'], $request, $hash, 'BAR-' . strtoupper($id), 'cash', $amount, json_encode($items, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE), 'successful', time(), time(), $this->cashNumber(), $invoice, 'cash']);
+                    $this->numberIssued($id);
                 } else {
                     $this->db->query('INSERT INTO payments(id,visit_id,request_id,request_hash,reference,reader_id,amount_cents,services_json,payment_status,created_at,invoice_json) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
                         [$id, $visit['id'], $request, $hash, 'POS-' . strtoupper($id), $this->config->get('sumup', 'reader_id') ?: 'mock-reader', $amount, json_encode($items, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE), 'starting', time(), $invoice]);
@@ -394,7 +466,7 @@ final class App {
             $this->editable($fresh);
             $source = $this->payment($visit, $id);
             if (!in_array($source['payment_status'], ['failed', 'cancelled', 'transfer_open'], true)) throw new Problem('Die Zahlungsart kann nur nach einer nicht erfolgten oder abgebrochenen Zahlung gewechselt werden. Bitte den laufenden Vorgang zuerst abbrechen.', 409);
-            if ($this->db->one("SELECT id FROM payments WHERE visit_id=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful')", [$visit['id']])) throw new Problem('Für diesen Vorgang läuft bereits eine andere Zahlung.', 409);
+            if ($this->db->one("SELECT id FROM payments WHERE visit_id=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') AND storno_at IS NULL", [$visit['id']])) throw new Problem('Für diesen Vorgang läuft bereits eine andere Zahlung.', 409);
             $t2med = !empty($source['inbox_id']);
             if ($t2med && !isset(array_column($this->openInvoices($fresh), null, 'id')[$source['inbox_id']])) throw new Problem('Diese Rechnung ist nicht mehr offen. Bitte Seite neu laden.', 409);
             if ($t2med && $method === 'transfer') throw new Problem('Bei T2med-Rechnungen steht der Überweisungs-QR-Code bereits auf der Rechnung. Hier gibt es nur Karte oder Bar.', 409);
@@ -424,6 +496,7 @@ final class App {
             $this->db->transaction(function () use ($id): void {
                 $this->db->query("UPDATE payments SET payment_status='successful',paid_at=?,transaction_id=? WHERE id=? AND payment_status='transfer_open'", [time(), $this->cashNumber('transfer'), $id]);
             });
+            $this->numberIssued($id);
             return $this->publicPayment($this->db->one('SELECT * FROM payments WHERE id=?', [$id]));
         });
     }
@@ -479,7 +552,7 @@ final class App {
             $this->purgeInbox();
             $number = $invoice['number'];
             // Eine bereits bezahlte oder gerade laufende Rechnung nie erneut anbieten.
-            $paid = $this->db->one("SELECT payment_status FROM payments WHERE t2med_invoice=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') LIMIT 1", [$number]);
+            $paid = $this->db->one("SELECT payment_status FROM payments WHERE t2med_invoice=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') AND storno_at IS NULL LIMIT 1", [$number]);
             if ($paid) throw new Problem($paid['payment_status'] === 'successful' ? 'Rechnung ' . $number . ' ist bereits per Karte bezahlt.' : 'Rechnung ' . $number . ' wird gerade am Terminal kassiert.', 409);
             // Erneuter Druck derselben Rechnungsnummer ersetzt die ältere Fassung.
             $this->db->query('UPDATE invoice_inbox SET superseded_at=? WHERE invoice_number=? AND superseded_at IS NULL', [time(), $number]);
@@ -586,7 +659,7 @@ final class App {
         if (!$this->config->get('invoice_inbox', 'enabled', false) || $visit['patient_birthdate'] === '') return [];
         $limit = time() - $this->config->get('invoice_inbox', 'max_age_days', 14) * 86400;
         $rows = $this->db->query("SELECT i.id,i.invoice_number,i.invoice_date,i.amount_cents,i.patient_name,i.patient_birthdate,i.lxp_status,i.lxp_sent_at,i.lxp_mode,i.lxp_job_id,i.lxp_error,i.printed_at,(i.pdf IS NOT NULL) AS has_pdf FROM invoice_inbox i WHERE i.superseded_at IS NULL AND i.received_at >= ? AND i.patient_birthdate=?
-            AND NOT EXISTS (SELECT 1 FROM payments p WHERE p.t2med_invoice=i.invoice_number AND p.payment_status IN ('starting','pending','unknown','cancel_requested','successful'))
+            AND NOT EXISTS (SELECT 1 FROM payments p WHERE p.t2med_invoice=i.invoice_number AND p.payment_status IN ('starting','pending','unknown','cancel_requested','successful') AND p.storno_at IS NULL)
             ORDER BY i.received_at DESC", [$limit, $visit['patient_birthdate']])->fetchAll();
         $result = [];
         foreach ($rows as $row) {
@@ -613,7 +686,7 @@ final class App {
             }
             $fresh = $this->db->one('SELECT * FROM visits WHERE id=?', [$visit['id']]);
             $this->editable($fresh);
-            $pending = $this->db->one("SELECT * FROM payments WHERE visit_id=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful')", [$visit['id']]);
+            $pending = $this->db->one("SELECT * FROM payments WHERE visit_id=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') AND storno_at IS NULL", [$visit['id']]);
             if ($pending) return $this->publicPayment($pending);
             if ($method === 'card' && $this->readerPayment($visit)) throw new Problem('Das Terminal ist belegt. Du kannst den anderen Vorgang unten prüfen oder abbrechen.', 409);
             $payment = $this->db->transaction(function () use ($fresh, $request, $hash, $invoiceId, $input, $method): array {
@@ -696,13 +769,13 @@ final class App {
         if (!$payment['invoice_json'] && in_array($payment['payment_method'] ?? 'card', ['cash', 'transfer'], true)) return $this->cashQuittung($payment);
         if (!$payment['invoice_json']) return $this->sumup->receiptSource($payment);
         $invoice = json_decode($payment['invoice_json'], true, 32, JSON_THROW_ON_ERROR);
-        $number = $payment['transaction_id'] ?? '';
+        $number = ($payment['doc_number'] ?? '') !== '' ? $payment['doc_number'] : ($payment['transaction_id'] ?? '');
         if ($number === '') throw new Problem('Die SumUp-Transaktions-ID für die Rechnungsnummer fehlt. Bitte den Zahlungsstatus prüfen.', 409);
         $paid = (new \DateTimeImmutable('@' . $payment['paid_at']))->setTimezone(new \DateTimeZone($invoice['timezone']));
         $invoice['number'] = $number; $invoice['issued_date'] = $paid->format('Y-m-d');
         $cash = ($payment['payment_method'] ?? 'card') !== 'card';
         return InvoiceReceipt::source($invoice, ['status' => $payment['payment_status'], 'paid_date' => $paid->format('d.m.Y H:i'),
-            'reference' => $payment['reference'], 'transaction_id' => $number, 'mock' => $invoice['mock'], 'method' => $payment['payment_method'] ?? 'card'],
+            'reference' => $payment['reference'], 'transaction_id' => (string)$payment['transaction_id'], 'mock' => $invoice['mock'], 'method' => $payment['payment_method'] ?? 'card'],
             !$cash && $this->config->get('practice', 'append_sumup_receipt', false) ? $this->sumup->receiptSource($payment) : null);
     }
     /** Bon mit Kontodaten und QR-Code für eine noch offene Überweisung. */
@@ -839,6 +912,7 @@ final class App {
             };
             $this->db->query('UPDATE payments SET payment_status=?,paid_at=COALESCE(paid_at,?),transaction_id=COALESCE(?,transaction_id),error_message=? WHERE id=?',
                 [$status, $status === 'successful' ? ($result['paid_at'] ?? time()) : null, $result['transaction_id'] ?? null, $error, $id]);
+            if ($status === 'successful') $this->numberIssued($id);
         } catch (TransportError $e) {
             $this->db->query('UPDATE payments SET error_message=? WHERE id=?', [$e->getMessage(), $id]);
             throw $e;
@@ -960,6 +1034,7 @@ final class App {
             $p = $this->payment($visit, $id);
             if (!in_array($p['payment_status'], ['pending', 'starting', 'unknown', 'cancel_requested'], true)) throw new Problem('Testzahlung ist bereits abgeschlossen.', 409);
             $this->db->query("UPDATE payments SET payment_status=?,paid_at=?,transaction_id=?,error_message='' WHERE id=?", [$status, $status === 'successful' ? time() : null, $status === 'successful' ? 'TEST-' . $id : null, $id]);
+            if ($status === 'successful') $this->numberIssued($id);
         });
     }
     // --- Rechnung automatisch drucken ----------------------------------------------------
@@ -1073,7 +1148,7 @@ final class App {
     }
     private function publicPayment(array $p): array {
         return array_intersect_key($p, array_flip(['id', 'amount_cents', 'currency', 'reference', 'payment_status', 'doc_status', 'paid_at', 'error_message'])) +
-            ['method' => $p['payment_method'] ?? 'card', 'local_receipt' => !empty($p['invoice_json']), 'invoice_number' => !empty($p['invoice_json']) && $p['payment_status'] === 'successful' ? $p['transaction_id'] : null,
+            ['method' => $p['payment_method'] ?? 'card', 'local_receipt' => !empty($p['invoice_json']), 'invoice_number' => !empty($p['invoice_json']) && $p['payment_status'] === 'successful' ? (($p['doc_number'] ?? '') !== '' ? $p['doc_number'] : $p['transaction_id']) : null,
              'transfer' => ($p['payment_method'] ?? 'card') === 'transfer' && $p['payment_status'] === 'transfer_open' && $this->bank->ready()
                  ? $this->bank->info((int)$p['amount_cents'], (string)($p['t2med_invoice'] ?: $p['reference'])) : null,
              'invoice_id' => $p['inbox_id'] ?? null, 't2med_invoice' => $p['t2med_invoice'] ?? null, 'invoice_export' => $this->exportState($p), 'invoice_print' => $this->printState($p)];

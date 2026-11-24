@@ -6,8 +6,9 @@ const $ = id => document.getElementById(id);
 const euro = cents => new Intl.NumberFormat('de-DE', {style: 'currency', currency: 'EUR'}).format(cents / 100);
 const el = (tag, text, cls) => { const e = document.createElement(tag); if (text) e.textContent = text; if (cls) e.className = cls; return e; };
 const FRISCH = 600;   // Sekunden: Rechnung gilt als „neu“, wenn sie in den letzten 10 Minuten aus T2med kam
-const FILTER = [['offen', 'Offen'], ['zurueckgestellt', 'Zurückgestellt'], ['ueberwiesen', 'Überwiesen'], ['alle', 'Alle']];
-let items = [], jetzt = Math.floor(Date.now() / 1000), letter = false, aktiv = null, filter = 'offen', bekannt = null, ersterLauf = true;
+const FILTER = [['offen', 'Offen'], ['bezahlt', 'Bezahlt'], ['zurueckgestellt', 'Zurückgestellt'], ['alle', 'Alle']];
+const ART = {card: '💳 Karte', cash: '💶 Bar', transfer: '🏦 Überweisung'};
+let items = [], erledigt = [], jetzt = Math.floor(Date.now() / 1000), letter = false, aktiv = null, filter = 'offen', bekannt = null, ersterLauf = true;
 
 // Startlinks aus T2med (und der Testpatient) zeigen auf die Startadresse: gleich in die schlanke Kassenansicht weiterleiten.
 (() => {
@@ -23,16 +24,17 @@ async function api(action, data = {}) {
   if (!response.ok || result.error) throw new Error(result.error || 'Anfrage fehlgeschlagen.');
   return result;
 }
-const gruppe = i => i.parked ? 'zurueckgestellt' : i.transfer ? 'ueberwiesen' : 'offen';
+const gruppe = i => i.erledigt ? (i.open_transfer ? 'zurueckgestellt' : 'bezahlt') : (i.parked || i.transfer) ? 'zurueckgestellt' : 'offen';
+const zeit = i => i.erledigt ? i.at : i.received_at;
 const imFilter = i => filter === 'alle' || gruppe(i) === filter;
-const alter = i => { const s = Math.max(0, jetzt - i.received_at), m = Math.floor(s / 60), h = Math.floor(m / 60); return s < 90 ? 'gerade eben' : m < 60 ? 'vor ' + m + ' Min' : h < 24 ? 'vor ' + h + ' Std' : 'vor ' + Math.floor(h / 24) + ' Tg'; };
-const frisch = i => jetzt - i.received_at <= FRISCH;
-const frei = () => { aktiv = null; $('work').src = BASE + 'kassieren?neu=1&t=' + Date.now(); anzeigen(); };
+const alter = i => { const s = Math.max(0, jetzt - zeit(i)), m = Math.floor(s / 60), h = Math.floor(m / 60); return s < 90 ? 'gerade eben' : m < 60 ? 'vor ' + m + ' Min' : h < 24 ? 'vor ' + h + ' Std' : 'vor ' + Math.floor(h / 24) + ' Tg'; };
+const frisch = i => !i.erledigt && jetzt - i.received_at <= FRISCH;
+const frei = () => { aktiv = null; $('detail').hidden = true; $('work').hidden = false; $('work').src = BASE + 'kassieren?neu=1&t=' + Date.now(); anzeigen(); };
 
 async function oeffnen(invoice, aktion) {
   try {
     const result = await api('inbox_visit', {invoice_id: invoice.id});
-    aktiv = invoice.id;
+    aktiv = invoice.id; $('detail').hidden = true; $('work').hidden = false;
     const params = new URLSearchParams({rechnung: invoice.id}); if (aktion) params.set('aktion', aktion);
     $('work').src = BASE + 'kassieren?' + params.toString() + '#' + (result.url.split('#')[1] || '');
     anzeigen();
@@ -41,7 +43,31 @@ async function oeffnen(invoice, aktion) {
 async function marke(invoice, tag, an) {
   try { await api('inbox_tag', {invoice_id: invoice.id, tag, on: an}); await liste(); } catch (error) { alert(error.message); }
 }
+function detail(item) {
+  aktiv = item.id; $('work').hidden = true; const box = $('detail'); box.hidden = false; box.replaceChildren();
+  const pdf = BASE + 'beleg.php?p=' + encodeURIComponent(item.id);
+  box.append(el('h2', (item.t2med ? 'T2med-Rechnung ' : 'Rechnung ') + item.number), el('p', (item.patient || 'Patient') + ' · ' + euro(item.amount_cents) + ' · ' + (ART[item.method] || item.method)));
+  box.append(el('p', (item.open_transfer ? 'Überweisung offen (zurückgestellt) seit ' : 'Bezahlt am ') + new Date(item.at * 1000).toLocaleString('de-DE', {dateStyle: 'short', timeStyle: 'short'}), 'muted'));
+  const aktionen = el('div', '', 'actions');
+  const a = el('a', 'Rechnung / Beleg (PDF)', 'button secondary'); a.href = pdf; a.target = '_blank'; a.rel = 'noopener'; aktionen.append(a);
+  box.append(aktionen);
+  if (item.storno) {
+    const s = el('div', '', 'storno-box'); s.append(el('p', 'Storniert am ' + new Date(item.storno.at * 1000).toLocaleString('de-DE', {dateStyle: 'short', timeStyle: 'short'}) + ' mit Stornorechnung ' + item.storno.number + '. Die ursprüngliche Rechnung bleibt für die Buchhaltung erhalten.', 'tag warn'));
+    const l = el('a', 'Stornorechnung (PDF)', 'button secondary'); l.href = BASE + 'beleg.php?s=' + encodeURIComponent(item.storno.id); l.target = '_blank'; l.rel = 'noopener'; s.append(l); box.append(s);
+  } else if (!item.open_transfer) {
+    const f = el('details', '', 'fold'); f.append(el('summary', 'Stornieren …'));
+    const grund = document.createElement('input'); grund.maxLength = 200; grund.placeholder = 'Grund (optional)'; grund.setAttribute('aria-label', 'Grund der Stornierung');
+    const knopf = el('button', 'Stornorechnung mit neuer Nummer erstellen', 'secondary'); knopf.type = 'button';
+    knopf.onclick = async () => {
+      if (!confirm('Rechnung ' + item.number + ' über ' + euro(item.amount_cents) + ' wirklich stornieren?\nEs entsteht eine Stornorechnung mit neuer Nummer. ' + (item.method === 'card' ? 'Die Kartenzahlung wird dabei NICHT automatisch erstattet (Rückzahlung am Terminal oder im SumUp-Konto).' : item.method === 'cash' ? 'Das Bargeld bitte dem Patienten zurückgeben.' : 'Eine Rückzahlung per Überweisung bitte selbst veranlassen.'))) return;
+      try { await api('storno', {payment_id: item.id, note: grund.value}); await liste(); const neu = erledigt.find(x => x.id === item.id); if (neu) detail(neu); } catch (error) { alert(error.message); }
+    };
+    f.append(el('p', 'Die Rechnung bleibt für die Buchhaltung erhalten; es entsteht ein Stornobeleg mit eigener neuer Nummer. ' + (item.t2med ? 'Die T2med-Rechnung wird wieder offen.' : ''), 'muted small'), grund, knopf); box.append(f);
+  }
+  anzeigen();
+}
 function zeile(invoice) {
+  if (invoice.erledigt) return zeileErledigt(invoice);
   const box = el('div', '', 'start-inv' + (invoice.id === aktiv ? ' aktiv' : '')); box.dataset.id = invoice.id;
   const kopf = el('button', '', 'start-inv-main'); kopf.type = 'button'; kopf.onclick = () => oeffnen(invoice);
   const name = el('span', '', 'start-inv-name'); name.append(el('strong', invoice.patient || 'Patient'), el('span', 'Rechnung ' + invoice.number, 'muted small'));
@@ -60,15 +86,26 @@ function zeile(invoice) {
   box.append(kopf, meta);
   return box;
 }
+function zeileErledigt(item) {
+  const box = el('div', '', 'start-inv' + (item.id === aktiv ? ' aktiv' : '')); box.dataset.id = item.id;
+  const kopf = el('button', '', 'start-inv-main'); kopf.type = 'button'; kopf.onclick = () => detail(item);
+  const name = el('span', '', 'start-inv-name'); name.append(el('strong', item.patient || 'Patient'), el('span', 'Rechnung ' + item.number, 'muted small'));
+  kopf.append(name, el('strong', euro(item.amount_cents), 'start-inv-amount'));
+  const meta = el('div', '', 'start-inv-meta');
+  meta.append(el('span', alter(item), 'muted small'), el('span', item.open_transfer ? '🏦 Überweisung offen' : ART[item.method] || item.method, item.open_transfer ? 'tag warn' : 'tag ok'));
+  if (item.t2med) meta.append(el('span', 'T2med', 'tag info'));
+  if (item.storno) meta.append(el('span', 'storniert · ' + item.storno.number, 'tag err'));
+  box.append(kopf, meta); return box;
+}
 function anzeigen() {
   const suche = $('inv-search').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const zaehl = {offen: 0, zurueckgestellt: 0, ueberwiesen: 0, alle: items.length};
-  for (const i of items) zaehl[gruppe(i)]++;
+  const alle = [...items, ...erledigt].sort((a, b) => zeit(b) - zeit(a)), zaehl = {offen: 0, bezahlt: 0, zurueckgestellt: 0, alle: alle.length};
+  for (const i of alle) zaehl[gruppe(i)]++;
   $('tabs').replaceChildren(...FILTER.map(([id, text]) => {
     const b = el('button', text + ' ' + zaehl[id], 'start-tab' + (id === filter ? ' on' : '')); b.type = 'button'; b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(id === filter));
     b.onclick = () => { filter = id; anzeigen(); }; return b;
   }));
-  const sichtbar = items.filter(i => imFilter(i) && suche.every(t => ((i.patient || '') + ' ' + i.number).toLowerCase().includes(t)));
+  const sichtbar = alle.filter(i => imFilter(i) && suche.every(t => ((i.patient || '') + ' ' + i.number).toLowerCase().includes(t)));
   $('inbox').replaceChildren(...sichtbar.map(zeile));
   $('inbox-empty').hidden = sichtbar.length > 0;
   $('free-entry').classList.toggle('aktiv', aktiv === null);
@@ -76,7 +113,8 @@ function anzeigen() {
 function inArbeit() { try { return $('work').contentDocument.body.dataset.dirty === '1'; } catch { return false; } }
 async function liste() {
   try {
-    const result = await api('open_inbox'); items = result.items || []; letter = !!(result.letter && result.letter.enabled);
+    const result = await api('open_inbox'); items = result.items || [];
+    try { erledigt = ((await api('processed')).items || []).map(x => ({...x, erledigt: true})); } catch { erledigt = []; } letter = !!(result.letter && result.letter.enabled);
     jetzt = result.now || Math.floor(Date.now() / 1000);
     items.sort((a, b) => b.received_at - a.received_at);
     // Die neueste Rechnung ist zuerst vorgewählt; später eingehende nur, wenn gerade nichts in Arbeit ist (nie mitten im Vorgang umschalten).

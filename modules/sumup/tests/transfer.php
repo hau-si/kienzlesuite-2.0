@@ -70,7 +70,7 @@ try {
     check($open['payment_status'] === 'transfer_open' && $open['amount_cents'] === 1500, 'Wechsel auf Überweisung falsch');
     check($app->switchMethod($v2, ['payment_id' => $card['id'], 'request_id' => $request, 'method' => 'transfer'])['id'] === $open['id'], 'Wechsel nicht idempotent');
     $done = $app->confirmTransfer($v2, $open['id']);
-    check($done['payment_status'] === 'successful' && $done['invoice_number'] === 'TEST-UEB-' . date('Y') . '-0001', 'Bestätigung falsch: ' . json_encode($done));
+    check($done['payment_status'] === 'successful' && $done['invoice_number'] === 'TEST-IGEL-' . date('Y') . '-0001', 'Bestätigung falsch: ' . json_encode($done));
     problem(fn() => $app->confirmTransfer($v2, $open['id']), 'Zweite Bestätigung akzeptiert', 409);
     check(str_starts_with($app->receipt($v2, $open['id']), '%PDF'), 'Kein PDF für Überweisung');
     $row = $app->db->one('SELECT * FROM payments WHERE id=?', [$open['id']]);

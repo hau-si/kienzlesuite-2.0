@@ -1,5 +1,12 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.18
+
+- **Verarbeitete Rechnungen der letzten 7 Tage** stehen links in der Liste: neue Reiter **Offen · Bezahlt · Zurückgestellt · Alle**. „Bezahlt“ zeigt Karte, Bar und bezahlte Überweisungen (mit Symbol je Zahlungsart, T2med-Rechnungen und IGeL), „Zurückgestellt“ zeigt zurückgestellte und per Überweisung offene Rechnungen. Der frühere Reiter „Überwiesen“ ist darin aufgegangen.
+- **Storno bei allen Zahlungsarten** (Karte, Bar, Überweisung; IGeL und T2med-Rechnungen): Klick auf eine verarbeitete Rechnung → „Stornieren …“. Es entsteht eine **Stornorechnung mit eigener neuer Nummer** (PDF); die ursprüngliche Rechnung bleibt unverändert für die Buchhaltung erhalten, zählt aber nicht mehr in Tageswerten und Steuerliste. Eine stornierte T2med-Rechnung wird wieder offen. Die Rückzahlung selbst (Karte am Terminal/im SumUp-Konto, Bargeld, Überweisung) erfolgt nicht automatisch; die Abfrage vor dem Storno weist darauf hin.
+- **Rechnungsnummern für IGeL-Leistungen frei gestaltbar** unter Einstellungen → „Rechnungsnummern“: Platzhalter `{JJJJ}`, `{JJ}`, `{MM}`, `{NNNN}` (Voreinstellung `IGEL-{JJJJ}-{NNNN}`); ebenso das Format der Stornonummer (`STORNO-{JJJJ}-{NNNN}`). Die Nummer wird beim Bezahlen vergeben, gilt für Karte, Bar und Überweisung (bisher: SumUp-Transaktions-ID bzw. BAR-/UEB-Nummern), zählt jährlich neu, wenn das Jahr im Format steht, und wird nie ein zweites Mal vergeben. Bereits bezahlte ältere Rechnungen behalten ihre Nummer.
+- Intern: Datenbankversion 20 (Tabellen `doc_numbers`, `stornos`, Spalten `doc_number`, `storno_at`), neue API-Aktionen `processed` und `storno`, neue Seite `beleg.php` für die PDFs.
+
 ## 2.3.4-beta.17
 
 - **Patient aus T2med wird gemerkt**: Hat T2med den Patienten kürzlich per FHIR an die Kasse übergeben und liegt eine passende T2med-Rechnung vor (Name + Geburtsdatum), läuft die Zahlung über diesen Vorgang. Karte, Bar und auch IGeL-Zahlungen werden dann wie beim Start aus T2med in der Akte dokumentiert.

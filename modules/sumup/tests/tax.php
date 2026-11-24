@@ -49,7 +49,7 @@ try {
     $state = sys_get_temp_dir() . '/ks-tax-' . bin2hex(random_bytes(6)); $dirs[] = $state; mkdir($state, 0700);
     $app = new App(config($state, ['rate' => 1900, 'tax_id' => '12/345/67890', 'exempt_note' => 'Umsatzsteuerfreie Heilbehandlung.']));
     $app->db->migrate();
-    check((int)$app->db->query('PRAGMA user_version')->fetchColumn() === 19, 'Datenbank nicht auf Version 19');
+    check((int)$app->db->query('PRAGMA user_version')->fetchColumn() === 20, 'Datenbank nicht auf Version 20');
     [$v] = (function () use ($app) {
         $launch = $app->launch(['context_id' => 'setup', 'oauth_token' => '', 'fhir_base_url' => '']);
         parse_str(parse_url($launch['url'], PHP_URL_FRAGMENT), $f); $e = $app->exchange($f['launch'], null);

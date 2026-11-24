@@ -95,6 +95,8 @@ final class Config {
             $this->cupsTarget('office_printing');
             if (!in_array($this->get('office_printing', 'media', 'A4'), ['A4', 'Letter'], true)) throw new \RuntimeException('office_printing.media muss A4 oder Letter sein.');
         }
+        DocNumbers::validate((string)$this->get('numbers', 'igel_format', DocNumbers::DEFAULT_IGEL), 'numbers.igel_format');
+        DocNumbers::validate((string)$this->get('numbers', 'storno_format', DocNumbers::DEFAULT_STORNO), 'numbers.storno_format');
         if (!is_bool($this->get('invoice_inbox', 'enabled', false))) throw new \RuntimeException('invoice_inbox.enabled muss true oder false sein.');
         if ($this->get('invoice_inbox', 'enabled', false)) {
             if (!preg_match('/^[a-f0-9]{64}$/D', (string)$this->get('invoice_inbox', 'key'))) throw new \RuntimeException('invoice_inbox.key muss 32 zufällige Bytes als Hex enthalten.');

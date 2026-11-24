@@ -9,7 +9,7 @@ final class InboxOverview {
         $limit = time() - $config->get('invoice_inbox', 'max_age_days', 14) * 86400;
         $items = [];
         foreach ($db->query('SELECT * FROM invoice_inbox ORDER BY received_at DESC LIMIT 30')->fetchAll() as $row) {
-            $pay = $db->one("SELECT payment_status FROM payments WHERE t2med_invoice=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') ORDER BY created_at DESC LIMIT 1", [$row['invoice_number']]);
+            $pay = $db->one("SELECT payment_status FROM payments WHERE t2med_invoice=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') AND storno_at IS NULL ORDER BY created_at DESC LIMIT 1", [$row['invoice_number']]);
             $status = $pay ? ($pay['payment_status'] === 'successful' ? 'bezahlt' : 'am Terminal') : ($row['superseded_at'] ? 'ersetzt' : ($row['received_at'] < $limit ? 'abgelaufen' : 'offen'));
             $items[] = ['id' => $row['id'], 'number' => $row['invoice_number'], 'invoice_date' => $row['invoice_date'], 'amount_cents' => (int)$row['amount_cents'],
                 'received_at' => (int)$row['received_at'], 'status' => $status, 'patient' => $row['patient_name'], 'birthdate' => $row['patient_birthdate'],
@@ -26,7 +26,7 @@ final class InboxOverview {
         if (!preg_match('/^[a-f0-9]{32}$/D', $id)) throw new Problem('Ungültige Auswahl.', 422);
         $row = $db->one('SELECT invoice_number FROM invoice_inbox WHERE id=?', [$id]);
         if (!$row) throw new Problem('Diese Rechnung gibt es nicht (mehr).', 404);
-        $busy = $db->one("SELECT 1 AS x FROM payments WHERE (inbox_id=? OR t2med_invoice=?) AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') LIMIT 1", [$id, $row['invoice_number']]);
+        $busy = $db->one("SELECT 1 AS x FROM payments WHERE (inbox_id=? OR t2med_invoice=?) AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') AND storno_at IS NULL LIMIT 1", [$id, $row['invoice_number']]);
         if ($busy) throw new Problem('Bezahlte oder gerade kassierte Rechnungen bleiben erhalten.', 409);
         $db->query('DELETE FROM invoice_inbox WHERE id=?', [$id]);
     }

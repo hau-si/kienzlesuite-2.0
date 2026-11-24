@@ -48,6 +48,10 @@ try {
         $items = array_diff(Suite::rights(), ['kassieren']) ? \KienzleSumup\Module::overview($app->config) : [];
         $result = ['count' => count(array_filter($items, static fn($i) => ($i['state'] ?? '') === 'error' || (($i['state'] ?? '') === 'open' && empty($i['optional'])))),
             'red' => count(array_filter($items, static fn($i) => ($i['state'] ?? '') === 'error'))];
+    } elseif ($action === 'processed') {
+        $result = ['items' => $app->processed(7), 'now' => time()];
+    } elseif ($action === 'storno') {
+        $result = $app->storno(App::string($input, 'payment_id', 32), (string)($input['note'] ?? ''));
     } elseif ($action === 'open_inbox') {
         $result = ['items' => $app->openInbox(), 'now' => time(), 'letter' => ['enabled' => $app->letterEnabled()]];
     } elseif ($action === 'exchange') {

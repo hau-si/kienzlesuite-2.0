@@ -38,7 +38,7 @@ Oberfläche, Hilfetexte, Dokumentation und Commit-Nachrichten auf Deutsch.
 
 ## Hinweise für neue Sitzungen (Stand 24.11.2026)
 
-**Stand:** Basis 0.21.4-beta.34, Kasse (`sumup`) 2.3.4-beta.17, Terminzettel 1.3.0-beta.2; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
+**Stand:** Basis 0.21.4-beta.34, Kasse (`sumup`) 2.3.4-beta.18, Terminzettel 1.3.0-beta.2; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
 (Basis 0.19.1). Der Nutzer testet auf einer echten Ubuntu-26.04-VM (Aktualisierung dort: `cd ~/kienzlesuite-2.0 && git pull && sudo bash installer/install.sh`,
 oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nicht ins Repository.
 
@@ -61,7 +61,7 @@ oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nich
 - **Mein Konto:** Profilkopf mit Avatar und Gruppen; E-Mail-Adresse wird per **Zahlencode** bestätigt (16 Ziffern, 1 Stunde, 5 Versuche, beta.33), „Passwort vergessen?“ schickt dagegen einen Link.
 - **Module im Rahmen der Suite (beta.32):** nginx `auth_request` → `/_auth/<modul>` liefert `X-Kienzle-*`-Kopfzeilen (Benutzer, Name, Rolle, Rechte, Csrf, Bestaetigt, Drucker, Praxis, Menue) → FastCGI `KIENZLE_*`. PHP-Helfer `core/php/modul/Kienzle.php` (`KienzleModul`: `benutzer`, `rechte`, `recht`, `praxis`, `csrf`, `menue()`, `rahmen()`); Beschreibung in `docs/MODUL-SCHNITTSTELLE.md`.
 - **Kasse (`modules/sumup`)**: `public/index.php` ist der Router (Tabelle `$pages`; Dateien aus `public/assets`), Seiten in `seiten/`, Logik in `src/` (`App.php` Besuche, Startlinks, Zahlungen, Rechnungseingang; `SettingsPage.php`; `Suite.php`; `InboxOverview.php`; `Module.php` Einrichtungs-Überblick).
-  - `/kasse/` = **Startseite** (`seiten/start.php`, im Rahmen der Suite, `assets/start.js`): links die Rechnungen aus dem Eingang (Filter Offen/Zurückgestellt/Überwiesen/Alle, Namenssuche, Marken `parked`/`transfer` über API `inbox_tag`, Neueste vorgewählt, „neu“ = letzte 10 Minuten), rechts die Kassenansicht als eingebettete Seite: `kassieren?neu=1` (freie Eingabe/IGeL/GOÄ ohne Patientenakte, zwei Spalten Leistungen | Zahlung, Suche nach Ziffer/Name, Zahnrad zu den Einstellungen) oder `kassieren?rechnung=<id>&aktion=…#launch=<ticket>` (Rechnung mit Karte vorgewählt). Die eingebettete Ansicht erkennt der PHP-Code an `body.embed` (`assets/embed.css`) und meldet per `postMessage('ks-refresh')` Änderungen an die Startseite. Oben rechts: Tageswerte und Zahnrad mit rotem Zähler (`setup_count`).
+  - `/kasse/` = **Startseite** (`seiten/start.php`, im Rahmen der Suite, `assets/start.js`): links die Rechnungen aus dem Eingang (Filter Offen/Bezahlt/Zurückgestellt/Alle inkl. verarbeiteter Zahlungen der letzten 7 Tage (API `processed`, Detailansicht mit PDF und Storno über `storno`, `beleg.php`), Namenssuche, Marken `parked`/`transfer` über API `inbox_tag`, Neueste vorgewählt, „neu“ = letzte 10 Minuten), rechts die Kassenansicht als eingebettete Seite: `kassieren?neu=1` (freie Eingabe/IGeL/GOÄ ohne Patientenakte, zwei Spalten Leistungen | Zahlung, Suche nach Ziffer/Name, Zahnrad zu den Einstellungen) oder `kassieren?rechnung=<id>&aktion=…#launch=<ticket>` (Rechnung mit Karte vorgewählt). Die eingebettete Ansicht erkennt der PHP-Code an `body.embed` (`assets/embed.css`) und meldet per `postMessage('ks-refresh')` Änderungen an die Startseite. Oben rechts: Tageswerte und Zahnrad mit rotem Zähler (`setup_count`).
   - `/kasse/kassieren` = schlanke Ansicht ohne Menü (`seiten/index.php`, `assets/app.js`), so startet T2med über den Starter (`#launch=<ticket>`; die Startseite leitet solche Links dorthin weiter). X-Frame-Options ist `SAMEORIGIN`, damit die Startseite sie einbetten darf.
   - API: `seiten/api.php` (Aktionen u. a. `manual_open`, `inbox_visit`, `open_inbox`, `day_stats`, `setup_count`; verlangt Suite-CSRF `X-Kienzle-Csrf`, Vorgangsaktionen zusätzlich `X-CSRF-Token` des Browser-Cookies `ks_browser`), `seiten/settings-api.php` für die Einstellungen.
   - Einstellungen (`seiten/settings.php`, `assets/settings.js`): im Rahmen; Einrichtung als Ausklappzeilen im Stil der Basis, Rotes zuerst.
@@ -71,6 +71,7 @@ oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nich
 
 ### Nicht auf echter Hardware geprüft (der Nutzer testet auf der VM)
 
+- Kasse: Storno (neue Stornonummer je Storno, Original bleibt; keine automatische Rückzahlung über SumUp), Nummernformat der IGeL-Rechnungen (`DocNumbers`), Reiter Bezahlt/Zurückgestellt - alles noch nicht auf der echten VM geprüft.
 - Kasse-Startseite (eingebettete Kassenansicht, Direktknöpfe an Rechnungen, Per Post, Tageswerte), Einrichtung als Ausklappzeilen, roter Zähler am Zahnrad.
 - Rahmen der Suite für Modulseiten, Menü-Kopfzeile, Mein Konto mit Avatar, Zahlencode per E-Mail (echter Mailversand, z. B. Gmail), Rechte-Matrix.
 - Wirkt die Durchreich-PPD des virtuellen Druckers (Basis 0.21.3)? Prüfen: `ipptool -tv ipp://localhost:631/printers/SumUp-Rechnung get-printer-attributes.test | grep document-format-supported` (kein `pwg-raster`/`urf`/`jpeg`).

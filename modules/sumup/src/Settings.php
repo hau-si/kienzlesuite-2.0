@@ -31,6 +31,10 @@ final class Settings {
         'practice' => ['label' => 'Belege (Praxisname und Anschrift: Verwaltung → Praxis)', 'fields' => [
             'append_sumup_receipt' => ['type' => 'bool', 'label' => 'Originalen SumUp-Beleg statt lokaler Zahlungsbestätigung anhängen'],
         ]],
+        'numbers' => ['label' => 'Rechnungsnummern (in der App erzeugte Rechnungen und Stornos)', 'fields' => [
+            'igel_format' => ['type' => 'string', 'label' => 'Format der Rechnungsnummer für IGeL-Leistungen', 'default' => 'IGEL-{JJJJ}-{NNNN}', 'help' => 'Platzhalter: {JJJJ} Jahr, {JJ} Jahr zweistellig, {MM} Monat, {NNNN} laufende Nummer (Anzahl der N = Mindeststellen). Beispiel: IGEL-{JJJJ}-{NNNN} ergibt IGEL-2026-0001. Enthält das Format das Jahr, beginnt die Zählung jedes Jahr neu. Vergebene Nummern werden nie wieder verwendet. Gilt für Karte, Bar und Überweisung; T2med-Rechnungen behalten ihre T2med-Nummer.'],
+            'storno_format' => ['type' => 'string', 'label' => 'Format der Nummer einer Stornorechnung', 'default' => 'STORNO-{JJJJ}-{NNNN}', 'help' => 'Jede Stornierung bekommt eine eigene neue Nummer; die stornierte Rechnung bleibt für die Buchhaltung erhalten.'],
+        ]],
         'bank' => ['label' => 'Überweisung (Kontodaten: Verwaltung → Praxis)', 'fields' => [
             'purpose' => ['type' => 'string', 'label' => 'Verwendungszweck', 'default' => 'Rechnung {nummer}', 'optional' => true],
         ]],

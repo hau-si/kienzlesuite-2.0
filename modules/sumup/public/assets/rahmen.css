@@ -45,3 +45,10 @@ main.modul { max-width: 1400px; }
 .setup-group .mark-icon.error { background: #c2410c; color: #fff; }
 .setup-group.fold > .settings-card { margin: 0; padding: 14px 0; border: 0; border-bottom: 1px solid #edf0ee; border-radius: 0; box-shadow: none; background: transparent; }
 .setup-group.fold > .settings-card:last-child { border-bottom: 0; }
+
+.start-detail { padding: 16px 20px; overflow: auto; }
+.start-detail h2 { margin: 0 0 4px; }
+.start-detail .actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+.start-detail details.fold { margin-top: 12px; }
+.start-detail input { width: 100%; box-sizing: border-box; margin: 8px 0; }
+.storno-box { margin-top: 12px; display: grid; gap: 8px; }
