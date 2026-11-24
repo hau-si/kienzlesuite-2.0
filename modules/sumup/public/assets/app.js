@@ -54,6 +54,7 @@ function updateTotal() {
   $('pay-method-note').hidden = !((cash || transfer) && !state.local_receipts);
   $('pay-method-note').textContent = 'Für Bar und Überweisung bitte zuerst Praxisname und Anschrift unter Einstellungen eintragen.';
   document.querySelectorAll('.invoice-pay').forEach(b => b.disabled = busy || !!state.reader_payment);
+  document.querySelectorAll('.invoice-go').forEach(b => b.disabled = busy || (!!state.reader_payment && !!document.querySelector('input[name^="inv-method-"][value="card"]:checked')));
 }
 let invoiceSeen = null, invoiceLater = new Set();
 function invoiceRequest(invoice, method) {
@@ -91,7 +92,27 @@ function renderInvoices() {
       const result = await api('invoice_later', {invoice_id: invoice.id}); if (result.message) message(result.message);
       invoiceLater.add(invoice.id); await load();
     });
-    box.append(line, card, cash, later);
+    // Einheitliche Zahlungswahl wie in der freien Eingabe: Chips mit Symbolen + ein Knopf. Die Einzelknöpfe bleiben (versteckt) als Auslöser.
+    for (const b of [card, cash, later]) b.hidden = true;
+    const chips = element('div', '', 'pay-method'); chips.setAttribute('role', 'radiogroup'); chips.setAttribute('aria-label', 'Zahlungsart');
+    const options = [['card', '💳 Karte (SumUp)'], ['cash', '💶 Bar'], ['later', '🏦 Überweisung']];
+    const canPost = !!(state.letter?.enabled && invoice.letter?.postable && !invoice.letter?.locked);
+    if (canPost) options.push(['post', '✉ Per Post']);
+    const go = element('button', '', 'primary wide invoice-go');
+    const labels = {card: euro(invoice.amount_cents) + ' mit Karte kassieren', cash: euro(invoice.amount_cents) + ' bar erhalten', later: 'Überweisung: Rechnung zurückstellen und drucken', post: 'Per Post senden (Letterxpress)'};
+    const radios = {};
+    for (const [value, text] of options) {
+      const l = document.createElement('label'), r = document.createElement('input'); r.type = 'radio'; r.name = 'inv-method-' + invoice.id; r.value = value; r.checked = value === 'card';
+      r.onchange = () => { go.textContent = labels[value]; go.classList.toggle('cash', value !== 'card'); };
+      radios[value] = r; l.append(r, element('span', text)); chips.append(l);
+    }
+    go.textContent = labels.card;
+    go.onclick = () => {
+      const value = Object.keys(radios).find(k => radios[k].checked);
+      const target = {card, cash, later}[value] || box.querySelector('.invoice-letter');
+      if (target) target.click();
+    };
+    box.append(line, chips, go, card, cash, later);
     if (invoice.printed_at) box.append(element('p', '🖨 Rechnung gedruckt am ' + new Date(invoice.printed_at * 1000).toLocaleString('de-DE', {dateStyle: 'short', timeStyle: 'short'}), 'muted invoice-letter-note'));
     if (state.letter?.enabled && invoice.letter?.postable) {
       const sent = invoice.letter || {};
@@ -104,7 +125,7 @@ function renderInvoices() {
         icon.title = stamp; box.append(icon);
       }
       if (!sent.locked) {
-        const post = element('button', 'Per Post senden (Letterxpress)', 'text-button invoice-letter');
+        const post = element('button', 'Per Post senden (Letterxpress)', 'text-button invoice-letter'); post.hidden = true;
         post.onclick = () => run(async() => {
           const live = state.letter.mode === 'live';
           const text = 'Rechnung ' + invoice.number + ' über ' + euro(invoice.amount_cents) + ' für ' + state.patient.name + ' ' + (live ? 'jetzt per Post über Letterxpress versenden?' : 'im TESTMODUS an Letterxpress übergeben (es wird nichts verschickt)?')
@@ -399,6 +420,7 @@ async function load() {
   $('mode').hidden=!state.mock && !state.fhir_mock;
   $('mode').textContent=state.mock?'TESTMODUS':state.fhir_mock?'T2MED TESTMODUS':'';$('mode').classList.toggle('test',/TESTMODUS/.test($('mode').textContent));
   $('patient-name').textContent=state.patient.name; document.querySelector('.patient .eyebrow').textContent=state.manual ? 'OHNE PATIENTENAKTE' : 'AKTUELLER PATIENT';
+  $('patient-link').hidden=!state.t2med;
   $('patient-birth').textContent=state.patient.birthdate ? 'Geboren am '+state.patient.birthdate.split('-').reverse().join('.') : '';
   $('free-patient').hidden=!state.manual; $('practice-hint').hidden=state.local_receipts;
   if(!$('service-date').value) $('service-date').value=state.today;
@@ -576,6 +598,12 @@ function autoAction(invoiceId, action) {
   const button = sel && box.querySelector(sel);
   if (button) button.click(); else if (action === 'post') message('Per Post senden ist für diese Rechnung nicht möglich (Letterxpress aus oder Anschrift fehlt).');
 }
+document.querySelectorAll('.work-tab').forEach(b => b.onclick = () => {
+  document.body.dataset.tab = b.dataset.tab;
+  document.querySelectorAll('.work-tab').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+  if (b.dataset.tab === 'igel') $('service-search').focus();
+  if (window.parent !== window) parent.postMessage('ks-refresh', location.origin);
+});
 async function init() {
   const query = new URL(location.href).searchParams, auto = {invoice: query.get('rechnung'), action: query.get('aktion')};
   if (query.get('neu') || query.get('rechnung')) { $('welcome').hidden = true; document.querySelector('.top .brand').hidden = true; }   // eingebettet in der Startseite: gleich die Arbeitsfläche zeigen, nicht die Willkommenskarte

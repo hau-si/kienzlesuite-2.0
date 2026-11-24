@@ -1,5 +1,12 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.17
+
+- **Patient aus T2med wird gemerkt**: Hat T2med den Patienten kürzlich per FHIR an die Kasse übergeben und liegt eine passende T2med-Rechnung vor (Name + Geburtsdatum), läuft die Zahlung über diesen Vorgang. Karte, Bar und auch IGeL-Zahlungen werden dann wie beim Start aus T2med in der Akte dokumentiert.
+- Kopfzeile der Rechnungsansicht zeigt den Patienten, bei Verbindung mit ❤ **T2med**; in der Rechnungsliste steht dieselbe Marke.
+- Neuer Umschalter **T2med-Rechnung | IGeL-Leistungen**: für denselben Patienten lassen sich zusätzlich IGeL-Leistungen kassieren.
+- Zahlungsknöpfe der T2med-Rechnung vereinheitlicht: dieselben Symbolfelder wie in der freien Eingabe (💳 Karte, 💶 Bar, 🏦 Überweisung, ✉ Per Post) und ein großer Knopf.
+
 ## 2.3.4-beta.16
 
 - Startseite der Kasse neu gestaltet, ohne Scrollen: links die Rechnungen aus dem Eingang, rechts die Kassenansicht in zwei Spalten (Leistungen und Zahlung). Die Marke „Kasse“ in der Arbeitsfläche entfällt.

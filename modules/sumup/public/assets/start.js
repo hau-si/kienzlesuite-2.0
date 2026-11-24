@@ -48,6 +48,7 @@ function zeile(invoice) {
   kopf.append(name, el('strong', euro(invoice.amount_cents), 'start-inv-amount'));
   const meta = el('div', '', 'start-inv-meta');
   if (frisch(invoice)) meta.append(el('span', 'neu · ' + alter(invoice), 'tag ok')); else meta.append(el('span', alter(invoice), 'muted small'));
+  if (invoice.t2med) { const h = el('span', '❤ T2med', 'tag ok'); h.title = 'Patient ist mit T2med verbunden: Zahlungen werden in der Akte dokumentiert'; meta.append(h); }
   if (invoice.parked) meta.append(el('span', 'zurückgestellt', 'tag warn'));
   if (invoice.transfer) meta.append(el('span', 'überwiesen', 'tag info'));
   if (invoice.letter && invoice.letter.status === 'sent') meta.append(el('span', 'per Post', 'tag info'));

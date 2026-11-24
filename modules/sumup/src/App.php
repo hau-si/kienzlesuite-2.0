@@ -121,6 +121,7 @@ final class App {
         return ['visit_id' => $visit['id'], 'csrf' => $browser['csrf'], 'manual' => self::isManual($visit),
             'patient' => ['name' => $visit['patient_name'], 'birthdate' => $visit['patient_birthdate']],
             'completed' => $visit['completed_at'] !== null,
+            't2med' => !self::isManual($visit) && $visit['patient_id'] !== 'inbox' && $visit['oauth_cipher'] !== '',
             'services' => array_map(static fn($s) => ['vat' => (bool)$s['vat']] + $s, $this->db->query('SELECT id,label,price_cents,goae_code,factor,fee_type,on_request,vat,base_cents,default_reason FROM services WHERE active=1 ORDER BY label COLLATE NOCASE')->fetchAll()),
             'tax' => array_intersect_key(Tax::settings($this->config), ['small_business' => 1, 'rate' => 1, 'manual_vat' => 1]),
             'groups' => array_map(static fn($g) => ['id' => $g['id'], 'label' => $g['label'], 'services' => json_decode($g['service_ids_json'], true, 32, JSON_THROW_ON_ERROR)], $this->db->query('SELECT * FROM service_groups WHERE active=1 ORDER BY label COLLATE NOCASE')->fetchAll()),
@@ -166,6 +167,12 @@ final class App {
         if (!$row || (int)$row['received_at'] < $limit) throw new Problem('Diese Rechnung ist nicht mehr offen.', 409);
         $paid = $this->db->one("SELECT 1 AS x FROM payments WHERE t2med_invoice=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') LIMIT 1", [$row['invoice_number']]);
         if ($paid) throw new Problem('Diese Rechnung ist schon bezahlt oder wird gerade kassiert.', 409);
+        // Hat t2med den Patienten kürzlich per FHIR übergeben, läuft die Zahlung über diesen Vorgang (mit Rückschrieb in die Akte).
+        $linked = $this->linkedVisit((string)$row['patient_name'], (string)$row['patient_birthdate']);
+        if ($linked) {
+            $this->db->query('UPDATE visits SET expires_at=? WHERE id=?', [time() + $this->config->get('app', 'session_hours') * 3600, $linked['id']]);
+            return ['url' => $this->ticketUrl($linked['id'])];
+        }
         $visit = $this->db->one('SELECT * FROM visits WHERE context_id=? AND completed_at IS NULL ORDER BY created_at DESC LIMIT 1', ['inbox-' . $invoiceId]);
         $id = $visit['id'] ?? self::id();
         $expires = time() + $this->config->get('app', 'session_hours') * 3600;
@@ -201,9 +208,19 @@ final class App {
         foreach (InboxOverview::build($this->db, $this->config)['items'] as $i) {
             if ($i['status'] !== 'offen') continue;
             $out[] = ['id' => $i['id'], 'number' => $i['number'], 'invoice_date' => $i['invoice_date'], 'amount_cents' => $i['amount_cents'], 'patient' => $i['patient'], 'birthdate' => $i['birthdate'],
-                'postable' => $i['postable'], 'letter' => $i['letter'], 'received_at' => $i['received_at'], 'parked' => $i['parked'], 'transfer' => $i['transfer'], 'printed' => $i['printed']];
+                'postable' => $i['postable'], 'letter' => $i['letter'], 'received_at' => $i['received_at'], 'parked' => $i['parked'], 'transfer' => $i['transfer'], 'printed' => $i['printed'],
+                't2med' => $this->linkedVisit((string)$i['patient'], (string)$i['birthdate']) !== null];
         }
         return $out;
+    }
+    /** Jüngster noch gültiger, aus t2med per FHIR gestarteter Vorgang (mit Zugriff auf die Akte), der zu Name und Geburtsdatum passt. */
+    private function linkedVisit(string $name, string $birthdate): ?array {
+        if ($birthdate === '' || $name === '') return null;
+        $rows = $this->db->query("SELECT * FROM visits WHERE completed_at IS NULL AND expires_at>? AND oauth_cipher<>'' AND patient_id NOT IN ('manual','inbox') AND context_id NOT LIKE 'manual-%' AND context_id NOT LIKE 'inbox-%' ORDER BY created_at DESC LIMIT 50", [time()])->fetchAll();
+        foreach ($rows as $v) {
+            if (T2medInvoice::matches(['patient_name' => $name, 'patient_birthdate' => $birthdate], (string)$v['patient_name'], (string)$v['patient_birthdate'])) return $v;
+        }
+        return null;
     }
     private static function isManual(array $visit): bool { return str_starts_with((string)$visit['context_id'], 'manual-'); }
     /**

@@ -55,4 +55,17 @@ $app->startInvoice($iv, ['invoice_id' => $open[0]['id'], 'method' => 'cash', 're
 $stats = $app->dayStats();
 check($stats['total_cents'] === 4250 && $stats['cash'] === 1 && $stats['card'] === 0, 'Tageswerte nach Barzahlung falsch');
 check($app->openInbox() === [], 'Bezahlte Rechnung noch offen');
+// 4. Patient aus T2med (FHIR) gemerkt: die passende Rechnung läuft über diesen Vorgang (mit Akte), andere Patienten nicht.
+$app->storeInvoice(['number' => 'RE2026-0043', 'invoice_date' => date('Y-m-d'), 'amount_cents' => 1500, 'patient_name' => 'Erika Musterfrau', 'patient_birthdate' => '1980-04-12']);
+$app->storeInvoice(['number' => 'RE2026-0044', 'invoice_date' => date('Y-m-d'), 'amount_cents' => 900, 'patient_name' => 'Max Mustermann', 'patient_birthdate' => '1975-01-02']);
+$byNumber = []; foreach ($app->openInbox() as $o) $byNumber[$o['number']] = $o;
+check($byNumber['RE2026-0043']['t2med'] === false, 'Ohne FHIR-Vorgang als T2med-verbunden markiert');
+[$fv, $fb] = enter($app, $app->launch(['context_id' => 'ctx-fhir1', 'oauth_token' => '', 'fhir_base_url' => '']) ['url']);
+check($app->state($fv, $fb)['t2med'] === true, 'FHIR-Vorgang nicht als T2med-verbunden erkannt');
+$byNumber = []; foreach ($app->openInbox() as $o) $byNumber[$o['number']] = $o;
+check($byNumber['RE2026-0043']['t2med'] === true && $byNumber['RE2026-0044']['t2med'] === false, 'T2med-Marke an falscher Rechnung');
+[$lv, $lb] = enter($app, $app->inboxVisit($byNumber['RE2026-0043']['id'])['url']);
+check($lv['id'] === $fv['id'] && $app->state($lv, $lb)['t2med'] === true, 'Rechnung nutzt nicht den gemerkten FHIR-Vorgang');
+[$ov, $ob] = enter($app, $app->inboxVisit($byNumber['RE2026-0044']['id'])['url']);
+check($ov['id'] !== $fv['id'] && $app->state($ov, $ob)['t2med'] === false, 'Fremder Patient erhielt den FHIR-Vorgang');
 echo "Startseite der Kasse: ok\n";
