@@ -1,5 +1,5 @@
 /* Terminzettel im Rahmen der Suite: Seitenleiste, Hintergrund, Karten und Knöpfe kommen von core.css; hier nur die Teile der Einstellungsseite. */
-main.modul { max-width: 1240px; margin: 0; padding: 32px 40px 48px; }
+main.modul { max-width: 1260px; margin: 0; padding: 32px 40px 48px; }
 .seitenkopf { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
 .seitenkopf h1 { margin: 6px 0 0; }
 .start-tools { display: flex; align-items: center; gap: 14px; }
@@ -8,7 +8,7 @@ main.modul { max-width: 1240px; margin: 0; padding: 32px 40px 48px; }
 .tz .fehler { color: var(--error); background: #fbeeea; }
 .tz code { word-break: break-all; background: var(--soft); padding: 1px 5px; border-radius: 5px; font-size: 13px; }
 .tz ol li { margin: 6px 0; }
-.tz-gitter { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); gap: 14px; align-items: start; }
+.tz-gitter { display: grid; grid-template-columns: minmax(0, 860px) minmax(260px, 300px); gap: 14px; align-items: start; }
 .tz-links { min-width: 0; }
 .tz-rechts { position: sticky; top: 16px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
 .tz-rechts h2 { font-size: 15px; margin: 0 0 8px; }

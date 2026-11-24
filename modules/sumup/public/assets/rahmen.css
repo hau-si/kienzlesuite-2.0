@@ -1,6 +1,8 @@
 /* Kasse-Einstellungen im Rahmen der Suite: Seitenleiste, Hintergrund und Kopf kommen von core.css; hier nur Angleichungen an die Seitenstile der Kasse. */
 main.modul { max-width: 1240px; margin: 0; padding: 32px 40px 48px; }
 main.modul .settings-main, main.modul .settings-card { max-width: none; }
+/* Einstellungsseiten haben dieselbe Breite wie die Seiten der Basis; Startseite und Vorgänge bleiben breit. */
+main.modul:has(#settings) { max-width: 940px; }
 .seitenkopf { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
 .seitenkopf h1 { margin: 6px 0 0; }
 main.modul footer { text-align: left; padding: 8px 0 0; color: #7e918a; font-size: 12px; }

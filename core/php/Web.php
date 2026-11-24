@@ -712,7 +712,7 @@ final class Web {
             $server = '';
             try {
                 [$tiles, $pending] = $this->statusTiles();
-                if ($tiles !== '') $server = '<section class="card" id="server-zustand"><h2>Server-Zustand</h2><div class="tiles">' . $tiles . '</div></section>';
+                if ($tiles !== '') $server = '<section class="card" id="server-zustand"><h2>Server-Zustand</h2>' . $tiles . '</section>';
             } catch (\Throwable) { /* ohne Werte keine Karte */ }
             $setup = '';
             try {
@@ -768,28 +768,28 @@ final class Web {
     /** Kacheln für den Server-Zustand und ob gerade eine Abfrage läuft. @return array{0:string,1:bool} */
     private function statusTiles(): array {
         $sys = ($this->system ?? new SystemStatus())->read();
-        $t = '';
+        $grp = ['Server' => '', 'Betrieb' => '', 'Dienste' => ''];
         $lvl = fn(int $u): string => $u >= 95 ? 'bad' : ($u >= 85 ? 'warn' : 'ok');
         if ($sys['cpu']) {
             $p = $sys['cpu']['prozent'];
-            $t .= $this->tile('st:cpu', 'Prozessor', $p . ' % ausgelastet', 'Last ' . number_format($sys['cpu']['last'], 2, ',', '') . ' bei ' . $sys['cpu']['kerne'] . ($sys['cpu']['kerne'] === 1 ? ' Kern' : ' Kernen') . ' (Minutenmittel)', $lvl($p), $p);
+            $grp['Server'] .= $this->tile('st:cpu', 'Prozessor', $p . ' % ausgelastet', 'Last ' . number_format($sys['cpu']['last'], 2, ',', '') . ' bei ' . $sys['cpu']['kerne'] . ($sys['cpu']['kerne'] === 1 ? ' Kern' : ' Kernen') . ' (Minutenmittel)', $lvl($p), $p);
         }
         if ($sys['ram']) {
             $used = (int)round(100 * (1 - $sys['ram']['frei'] / $sys['ram']['gesamt']));
-            $t .= $this->tile('st:ram', 'Arbeitsspeicher', $used . ' % belegt', SystemStatus::bytes($sys['ram']['gesamt'] - $sys['ram']['frei']) . ' von ' . SystemStatus::bytes($sys['ram']['gesamt']) . ', ' . SystemStatus::bytes($sys['ram']['frei']) . ' verfügbar', $lvl($used), $used);
+            $grp['Server'] .= $this->tile('st:ram', 'Arbeitsspeicher', $used . ' % belegt', SystemStatus::bytes($sys['ram']['gesamt'] - $sys['ram']['frei']) . ' von ' . SystemStatus::bytes($sys['ram']['gesamt']) . ', ' . SystemStatus::bytes($sys['ram']['frei']) . ' verfügbar', $lvl($used), $used);
         }
-        if ($sys['disk']) $t .= $this->diskTile($sys['disk']['frei'], $sys['disk']['gesamt']);
-        if ($sys['temp'] !== null) $t .= $this->tile('st:temp', 'Temperatur', number_format($sys['temp'], 0, ',', '') . ' °C', 'höchster Messwert', $sys['temp'] >= 85 ? 'bad' : ($sys['temp'] >= 75 ? 'warn' : 'ok'));
-        if ($sys['laufzeit'] !== null) $t .= $this->tile('st:zeit', 'Läuft seit', SystemStatus::dauer($sys['laufzeit']), 'seit dem letzten Neustart');
+        if ($sys['disk']) $grp['Server'] .= $this->diskTile($sys['disk']['frei'], $sys['disk']['gesamt']);
+        if ($sys['temp'] !== null) $grp['Server'] .= $this->tile('st:temp', 'Temperatur', number_format($sys['temp'], 0, ',', '') . ' °C', 'höchster Messwert', $sys['temp'] >= 85 ? 'bad' : ($sys['temp'] >= 75 ? 'warn' : 'ok'));
+        if ($sys['laufzeit'] !== null) $grp['Betrieb'] .= $this->tile('st:zeit', 'Läuft seit', SystemStatus::dauer($sys['laufzeit']), 'seit dem letzten Neustart');
         if ($this->backup) try {
             $b = $this->backup->status();
             $l = $b['letzte_sicherung'];
-            if (!$b['eingerichtet']) $t .= $this->tile('st:backup', 'Letzte Sicherung', 'nicht eingerichtet', 'Ohne Sicherung gehen Daten bei einem Ausfall verloren.', 'warn', null, '', '/verwaltung/sicherung');
-            elseif (!$l) $t .= $this->tile('st:backup', 'Letzte Sicherung', 'noch keine', 'Die erste Sicherung steht noch aus.', 'warn', null, '', '/verwaltung/sicherung');
+            if (!$b['eingerichtet']) $grp['Betrieb'] .= $this->tile('st:backup', 'Letzte Sicherung', 'nicht eingerichtet', 'Ohne Sicherung gehen Daten bei einem Ausfall verloren.', 'warn', null, '', '/verwaltung/sicherung');
+            elseif (!$l) $grp['Betrieb'] .= $this->tile('st:backup', 'Letzte Sicherung', 'noch keine', 'Die erste Sicherung steht noch aus.', 'warn', null, '', '/verwaltung/sicherung');
             else {
                 $alt = time() - (int)($l['zeit'] ?? 0);
                 $ok = ($l['ok'] ?? false) === true;
-                $t .= $this->tile('st:backup', 'Letzte Sicherung', V::date((int)($l['zeit'] ?? 0)), $ok ? ($alt > 3 * 86400 ? 'Älter als drei Tage' : 'in Ordnung') : 'Fehlgeschlagen', !$ok ? 'bad' : ($alt > 3 * 86400 ? 'warn' : 'ok'), null, '', '/verwaltung/sicherung');
+                $grp['Betrieb'] .= $this->tile('st:backup', 'Letzte Sicherung', V::date((int)($l['zeit'] ?? 0)), $ok ? ($alt > 3 * 86400 ? 'Älter als drei Tage' : 'in Ordnung') : 'Fehlgeschlagen', !$ok ? 'bad' : ($alt > 3 * 86400 ? 'warn' : 'ok'), null, '', '/verwaltung/sicherung');
             }
         } catch (\Throwable) {
         }
@@ -803,12 +803,14 @@ final class Web {
                 $wert = is_array($g) && isset($g['wert']) && is_numeric($g['wert']) ? (float)$g['wert'] : null;
                 $knopf = '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'guthaben', 'id' => $key === 'sms' ? 'sms' : '', 'zurueck' => 'start'])
                     . '<button class="icon-btn" title="Guthaben jetzt abfragen" aria-label="' . V::h($label) . ' aktualisieren"' . ($pending ? ' disabled' : '') . '>' . V::icon('st:aktualisieren') . '</button></form>';
-                $t .= $this->tile($icon, $label, $wert !== null ? number_format($wert, 2, ',', '.') . ' €' : ($g ? 'unbekannt' : 'noch nicht abgefragt'),
+                $grp['Dienste'] .= $this->tile($icon, $label, $wert !== null ? number_format($wert, 2, ',', '.') . ' €' : ($g ? 'unbekannt' : 'noch nicht abgefragt'),
                     $pending ? 'wird abgefragt …' : ($g ? $sub . ', abgefragt ' . V::date((int)($g['zeit'] ?? 0)) : $sub . ': mit dem Pfeil abfragen'),
                     $wert !== null && $wert < 5 ? 'warn' : 'ok', null, $knopf);
             }
         } catch (\Throwable) {
         }
+        $t = '';
+        foreach ($grp as $title => $tiles) if ($tiles !== '') $t .= '<h3 class="tiles-title">' . V::h($title) . '</h3><div class="tiles">' . $tiles . '</div>';
         return [$t, $pending];
     }
 
@@ -1143,13 +1145,13 @@ final class Web {
             $roles = $u['admin'] ? ['Basis-Admin'] : [];
             foreach ($u['access'] as $m => $a) $roles[] = $this->modules->name($m) . ($a['admin'] ? ' (Admin)' : '');
             $icons = ($u['admin'] ? V::role('Admin') : '') . implode('', array_map([V::class, 'role'], $u['roles']));
-            $rows .= '<tr><td>' . V::avatar($u['display'] ?: $u['login'], $u['roles'], (bool)$u['admin'], true) . ' <a href="/verwaltung/benutzer/' . $u['id'] . '">' . V::h($u['login']) . '</a></td><td>' . V::h($u['display']) . '</td><td>' . $icons . ' ' . V::h(implode(', ', $roles) ?: '–')
+            $rows .= '<tr><td class="nowrap">' . V::avatar($u['display'] ?: $u['login'], $u['roles'], (bool)$u['admin'], true) . ' <a href="/verwaltung/benutzer/' . $u['id'] . '">' . V::h($u['login']) . '</a></td><td class="nowrap">' . V::h($u['display']) . '</td><td>' . $icons . ' ' . V::h(implode(', ', $roles) ?: '–')
                 . '</td><td>' . ($u['active'] ? ($u['password'] ? ($u['otp'] ? 'Passwort + App' : 'Passwort') : 'Einrichtung offen') : 'gesperrt') . '</td></tr>';
         }
         $groups = self::stripCards(self::inner($this->groupsPage()));
         return Response::html(V::page('Benutzer und Gruppen', V::notice($notice) . '<section class="card"><details class="fold" open><summary><h2>Benutzer</h2></summary>'
             . '<p><a class="button" href="/verwaltung/benutzer/neu">Benutzer anlegen</a></p>'
-            . '<table><tr><th>Anmeldename</th><th>Name</th><th>Zugang</th><th>Anmeldung</th></tr>' . $rows . '</table></details>'
+            . '<table class="user-table"><tr><th>Anmeldename</th><th>Name</th><th>Zugang</th><th>Anmeldung</th></tr>' . $rows . '</table></details>'
             . '<details class="fold" id="gruppen"' . (str_contains((string)($this->req?->query['bereich'] ?? ''), 'gruppen') ? ' open' : '') . '><summary><h2>Gruppen</h2></summary>' . $groups . '</details></section>',
             $this->nav(), $this->config->practice));
     }
@@ -1492,8 +1494,9 @@ final class Web {
         $actions = ['installieren' => 'Installation', 'aktualisieren' => 'Aktualisierung', 'entfernen' => 'Entfernen'];
         $body = V::error($error);
         if ($busy) {
-            $body .= '<p class="notice">' . ($st['running'] ? V::h(($actions[$st['running']['action']] ?? 'Vorgang') . ' von „' . $st['running']['id'] . '“ läuft …')
-                : 'Auftrag wird übernommen …') . ' Das kann einige Minuten dauern (Pakete werden geladen). Die Seite aktualisiert sich selbst.</p>';
+            $what = $st['running'] ? V::h(($actions[$st['running']['action']] ?? 'Vorgang') . ' von „' . $st['running']['id'] . '“ läuft …') : 'Auftrag wird übernommen …';
+            $body .= '<div class="working" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><div><strong>' . $what . '</strong>'
+                . '<p>Das kann einige Minuten dauern (Pakete werden geladen). Danach werden die Dienste des Moduls automatisch neu gestartet. Bitte nichts anderes anklicken; die Seite lädt sich selbst neu.</p></div></div>';
         } elseif ($st['last']) {
             $body .= $st['last']['ok'] ? V::notice($st['last']['message']) : V::error('Nicht erfolgreich: ' . $st['last']['message']);
         }

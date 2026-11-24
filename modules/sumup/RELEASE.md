@@ -1,5 +1,16 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.32
+
+- **Zahlungsversuch verwerfen (IGeL):** Nach „Zahlung nicht erfolgt“ oder „Zahlung abgebrochen“ gibt es zusätzlich zu „Erneut versuchen“ den Knopf **Verwerfen**, solange noch keine Rechnungsnummer vergeben wurde. Er setzt Auswahl und Betrag zurück; die erfolglosen Versuche verschwinden aus der Ansicht, bleiben aber mit Status „discarded“ in der Datenbank. Nicht möglich bei bezahlten oder überwiesenen Zahlungen (Nummer vergeben) und bei T2med-Rechnungen. Neuer Test `tests/discard.php`. Nicht im Browser geprüft.
+
+## 2.3.4-beta.31
+
+- **Zahlart springt nicht mehr zurück:** Die Rechnungsliste in der Kassenansicht wird nur noch neu gezeichnet, wenn sich die Rechnungen geändert haben (vorher alle 10 Sekunden). Eine gewählte Zahlart (z. B. „Per Post“) und der Fokus bleiben stehen. Gilt für Start aus T2med (FHIR) wie für die Ansicht mit Seitenleiste.
+- **Zahlungsknöpfe an festem Platz:** Karte, Bar, Überweisung und Per Post stehen in einem festen Raster aus vier Spalten; beim Wechsel zwischen IGeL- und T2med-Rechnung ändern sich Lage und Breite nicht mehr.
+- Einstellungen: „Wird geladen …“ statt leerer Seite, Breite wie die Seiten der Basis (940 px; Startseite und Vorgänge bleiben breit).
+- Nicht im Browser geprüft.
+
 ## 2.3.4-beta.30
 
 - Kassenansicht: Eine von Hand gewählte Zahlart (Bar, Überweisung, Per Post) **springt nicht mehr nach einigen Sekunden auf „Karte“ zurück**. Ursache war die automatische Aktualisierung alle 10 Sekunden, die die Auswahl neu aufbaute. „Karte“ ist nur noch die Vorauswahl; die Wahl wird je Rechnung gemerkt, solange die Seite offen ist. Nicht im Browser geprüft.

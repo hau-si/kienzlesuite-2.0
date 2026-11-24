@@ -263,7 +263,10 @@ form.inline.grp > input { min-width: 220px; }
 .status-ok::before { content: "✓"; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #16503f; color: #fff; font-size: 13px; }
 
 /* Startseite: Server-Zustand als Kacheln, Module mit Symbol */
-.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(15.5rem, 1fr)); gap: 12px; }
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.tiles-title { margin: 18px 0 8px; font-size: 12px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); }
+.tiles-title:first-of-type { margin-top: 6px; }
+@media (max-width: 900px) { .tiles { grid-template-columns: repeat(auto-fill, minmax(15.5rem, 1fr)); } }
 .tile { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
 .tile .t-ico { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: var(--soft); color: var(--teal); }
 .tile .t-ico .ico { width: 20px; height: 20px; }
@@ -398,7 +401,7 @@ main.modul { max-width: 940px; }
 .konto .name-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 4px; }
 .konto .name-form input { max-width: 260px; margin: 0; }
 .konto details.fold > summary h2 { font-size: 16px; }
-.konto details.fold > summary .fold-status { margin-left: auto; }
+.konto details.fold > summary h2 { margin-right: auto; }
 .konto details.fold > summary::before { order: 3; margin-left: 8px; }
 .konto details.fold > summary { flex-wrap: nowrap; }
 .konto .fold-body { padding: 4px 0 16px; }
@@ -433,3 +436,11 @@ main.modul { max-width: 940px; }
 .name-edit .stift { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: var(--muted); }
 .name-edit > summary:hover .stift, .name-edit > summary:focus-visible .stift { background: var(--soft); color: var(--teal); }
 .name-edit[open] .name-form { margin-top: 6px; }
+
+/* Benutzerliste: Avatar und Anmeldename in einer Zeile, Name ohne Umbruch, Zugang darf umbrechen */
+.user-table td { vertical-align: middle; }
+.user-table td.nowrap { white-space: nowrap; }
+.user-table .avatar.klein { vertical-align: middle; }
+
+/* Meldung, die hinter den angeklickten Block gewandert ist */
+.notice.nahe, .error.nahe { margin: 10px 0; }

@@ -68,10 +68,10 @@ async function rawApi(action, data = {}) {
   return result;
 }
 function message(text, error) {
-  const m = $('message'); m.hidden = !text; m.textContent = text || ''; m.classList.toggle('error', !!error);
+  if (text && $('lade')) $('lade').hidden = true; const m = $('message'); m.hidden = !text; m.textContent = text || ''; m.classList.toggle('error', !!error);
   if (text) window.scrollTo({top: 0, behavior: 'smooth'});
 }
-function show(view) { for (const id of ['settings']) if ($(id)) $(id).hidden = id !== view; }
+function show(view) { if ($('lade')) $('lade').hidden = true; for (const id of ['settings']) if ($(id)) $(id).hidden = id !== view; }
 
 function values(form, section) {
   const out = {};

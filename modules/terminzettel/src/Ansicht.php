@@ -62,7 +62,7 @@ final class Ansicht {
             . '<p class="muted klein-text">Unten auf dem Bon steht ein QR-Code. Wer ihn mit dem Handy scannt, bekommt eine vorbereitete E-Mail an die Praxis (Empfänger, Betreff und Text wie unten) und kann den Termin damit absagen. Keine Patientendaten eintragen.</p>'
             . $check('cancel_enabled', 'Absage-QR unten auf dem Bon drucken')
             . $text('cancel_to', 'Empfänger (E-Mail-Adresse der Praxis)') . $text('cancel_subject', 'Betreff', 100)
-            . $area('cancel_body', 'Nachrichtentext (höchstens 400 Zeichen)', 5) . $text('cancel_caption', 'Text über dem QR-Code')
+            . $area('cancel_body', 'Nachrichtentext (höchstens 400 Zeichen)', 5) . $text('cancel_caption', 'Aufforderung im Balken über dem QR-Code')
             . '<div class="fmt"><span class="sm">Größe</span>' . $seg('cancel_size', ['small' => 'Klein', 'medium' => 'Mittel', 'large' => 'Groß'], 'Größe des Absage-QR-Codes') . '</div></div></details>'
             . '<div class="tz-zeile">' . $check('cut', 'Bon abschneiden') . '</div>';
         $printer = 'http://' . $host . ':631/printers/vTermine';

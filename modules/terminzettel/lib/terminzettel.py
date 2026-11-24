@@ -729,19 +729,90 @@ def cancel_mailto(cancel: dict[str, Any]) -> bytes:
             + "&body=" + quote(body, safe="")).encode("ascii")
 
 
+FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+
+
+def _bar_lines(caption: str) -> list[str]:
+    """Aufforderung für den Balken in höchstens zwei Zeilen: nach dem ersten Fragezeichen, sonst nach der Wortmitte."""
+    text = " ".join(caption.split())
+    head, sep, rest = text.partition("?")
+    if sep and rest.strip():
+        return [head.strip() + "?", rest.strip()]
+    words = text.split()
+    if len(words) < 3:
+        return [text]
+    half = len(words) // 2
+    return [" ".join(words[:half]), " ".join(words[half:])]
+
+
+def cancel_block_image(qr_image, caption: str):
+    """Absage-Block als 1-Bit-Bild: oben ein runder schwarzer Balken mit Kalender-Symbol und der Aufforderung (zwei Zeilen),
+    darunter der QR-Code in dickem, rundem Rahmen. Balken und Rahmen sind gleich breit."""
+    from PIL import Image, ImageDraw, ImageFont
+    frame, pad, gap = 6, 10, 10
+    qw, qh = qr_image.size
+    width = qw + 2 * (frame + pad)
+    top = 0
+    bar = None
+    if caption:
+        lines = _bar_lines(caption)
+        icon = 38
+        room = width - 2 * 14 - icon - 12
+        size = 30
+        while size > 13:
+            font = ImageFont.truetype(FONT_BOLD, size)
+            if max(font.getlength(line) for line in lines) <= room:
+                break
+            size -= 1
+        font = ImageFont.truetype(FONT_BOLD, size)
+        line_height = int(size * 1.25)
+        bar_h = max(icon + 20, line_height * len(lines) + 20)
+        bar = (lines, font, line_height, bar_h, icon)
+        top = bar_h + gap
+    height = top + qh + 2 * (frame + pad)
+    img = Image.new("L", (width, height), 255)
+    d = ImageDraw.Draw(img)
+    if bar:
+        lines, font, line_height, bar_h, icon = bar
+        d.rounded_rectangle((0, 0, width - 1, bar_h - 1), radius=18, fill=0)
+        ix, iy = 14, (bar_h - icon) // 2
+        d.rounded_rectangle((ix, iy + 5, ix + icon - 1, iy + icon - 1), radius=5, outline=255, width=3)
+        d.line((ix, iy + 15, ix + icon - 1, iy + 15), fill=255, width=3)
+        for px in (ix + 10, ix + icon - 11):
+            d.line((px, iy, px, iy + 9), fill=255, width=3)
+        cx, cy, k = ix + icon // 2, iy + 26, 5
+        d.line((cx - k, cy - k, cx + k, cy + k), fill=255, width=3)
+        d.line((cx - k, cy + k, cx + k, cy - k), fill=255, width=3)
+        tx = ix + icon + 12
+        y = (bar_h - line_height * len(lines)) // 2
+        for line in lines:
+            d.text((tx, y + (line_height - font.size) // 2 - 1), line, font=font, fill=255)
+            y += line_height
+    d.rounded_rectangle((0, top, width - 1, height - 1), radius=24, outline=0, width=frame)
+    img.paste(qr_image.convert("L"), (frame + pad, top + frame + pad))
+    return img.convert("1", dither=Image.NONE)
+
+
 def append_cancel_qr(r: EscPosRenderer, cfg: dict[str, Any]) -> None:
-    """QR-Code unten auf dem Bon: öffnet eine vorbereitete E-Mail zum Absagen. Ein Fehler darf den Ausdruck nie verhindern."""
+    """Absage-QR auf dem Bon: Balken mit der Aufforderung oben, darunter der QR-Code im runden Rahmen; er öffnet eine vorbereitete
+    E-Mail zum Absagen. Ein Fehler darf den Ausdruck nie verhindern (ohne Schrift oder Bildbibliothek gibt es Text und schlichten QR)."""
     cancel = cfg.get("cancel_qr", {})
     if not isinstance(cancel, dict) or not cfg_bool(cancel, "enabled", False):
         return
     try:
         from calendar_qr import build_qr_image
         from escpos import raster_image
-        image = build_qr_image(cancel_mailto(cancel), {"max_width_dots": min(int(cancel.get("width_dots", 292)), r.page_width)})
-        r.line("")
         caption = str(cancel.get("caption", "")).strip()
-        if caption:
-            r.wrapped(caption, align="center", bold=True, size=r.sizes["footer"])
+        # 32 Punkte für Rahmen und Abstand (2 × (6 + 10)): Der ganze Block darf höchstens 384 Punkte breit sein (Rastergrenze).
+        room = min(int(cancel.get("width_dots", 292)), r.page_width - 32, 352)
+        qr = build_qr_image(cancel_mailto(cancel), {"max_width_dots": max(64, room)})
+        r.line("")
+        try:
+            image = cancel_block_image(qr, caption)
+        except Exception:
+            image = qr
+            if caption:
+                r.wrapped(caption, align="center", bold=True, size=r.sizes["footer"])
         r.set_align("center")
         r.raw(raster_image(image))
     except Exception:

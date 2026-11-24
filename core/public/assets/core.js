@@ -79,6 +79,39 @@
 
   document.querySelectorAll('[data-print]').forEach((b) => b.addEventListener('click', () => window.print()));
 
+  // Rückmeldung bleibt bei der Aktion: Nach dem Absenden eines Formulars zeigt der Server die Meldung oben auf der Seite.
+  // Hier wird sie direkt hinter den Block mit dem angeklickten Knopf gesetzt (und ins Bild gerollt), statt ganz oben zu stehen.
+  (function meldungNahe() {
+    const KEY = 'kienzle.meldung';
+    document.addEventListener('submit', (e) => {
+      const form = e.target;
+      if (!(form instanceof HTMLFormElement) || (form.method || '').toLowerCase() !== 'post') return;
+      try {
+        sessionStorage.setItem(KEY, JSON.stringify({
+          path: location.pathname, index: Array.prototype.indexOf.call(document.forms, form), action: form.getAttribute('action') || '',
+          knopf: e.submitter ? (e.submitter.name || '') + '=' + (e.submitter.value || '') : '', at: Date.now(),
+        }));
+      } catch (err) { /* ohne sessionStorage bleibt die Meldung oben */ }
+    }, true);
+    const start = () => {
+      let ziel = null;
+      try { ziel = JSON.parse(sessionStorage.getItem(KEY) || 'null'); sessionStorage.removeItem(KEY); } catch (err) { return; }
+      if (!ziel || ziel.path !== location.pathname || Date.now() - ziel.at > 30000) return;
+      const meldung = document.querySelector('main > p.notice[role=status], main > p.error');
+      if (!meldung || meldung.closest('.working')) return;
+      let form = document.forms[ziel.index];
+      if (!form || (form.getAttribute('action') || '') !== ziel.action) form = Array.prototype.find.call(document.forms, (f) => (f.getAttribute('action') || '') === ziel.action);
+      if (!form) return;
+      const block = form.closest('.mod-card, .box, .vp-karte, section.card, .fold-body') || form;
+      const offen = block.closest('details');
+      if (offen) offen.open = true;
+      meldung.classList.add('nahe');
+      block.insertAdjacentElement(block.matches('.fold-body, section.card') ? 'beforeend' : 'afterend', meldung);
+      meldung.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+  })();
+
   // Arbeitsplatz-Starter (z. B. Kasse aus T2med): Der Starter öffnet https://<server>/#launch=<einmaliger Code>.
   // Ohne Anmeldung den Code bis nach der Anmeldung im Tab merken, danach an das Modul weitergeben (data-starter).
   (function starter() {

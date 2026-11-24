@@ -15,7 +15,7 @@ final class Ansicht {
     public static function seite(string $csrf, array $vorgaenge, array $vorlagen, bool $darfVorgang, bool $darfVorlage, ?string $meldung, ?string $fehler, ?array $bearbeite = null, ?array $pad = null): string {
         $h = 'sg_h';
         $csrfFeld = '<input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '">';
-        $o = '<div class="us"><div class="seitenkopf"><div><h1>Signatur</h1></div></div>'
+        $o = '<div class="us"><div class="seitenkopf"><div><p class="eyebrow">Signatur</p><h1>Unterschriften</h1></div></div>'
             . '<p class="us-intro muted">Dokumente am Unterschriftenpad unterschreiben lassen: Vorgang anlegen, der Patient unterschreibt sofort oder später, das PDF kommt in die T2med-Akte. '
             . 'Die Anbindung des Pads und das Ablegen in T2med sind noch nicht eingebaut; Vorlagen und Vorgänge können schon vorbereitet werden.</p>';
         if ($meldung) $o .= '<p class="ok" role="status">' . $h($meldung) . '</p>';

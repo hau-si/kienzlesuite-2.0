@@ -92,6 +92,7 @@ try {
             'print_settings' => $app->savePrintSettings($visit, $input),
             'status' => $app->poll($visit, App::string($input, 'payment_id', 32)),
             'cancel' => $app->cancel($visit, App::string($input, 'payment_id', 32)),
+            'discard' => $app->discard($visit, App::string($input, 'payment_id', 32)),
             'reader_status' => $app->readerAction($visit, App::string($input, 'payment_id', 32)),
             'reader_cancel' => $app->readerAction($visit, App::string($input, 'payment_id', 32), true),
             'document' => $app->document($visit, App::string($input, 'payment_id', 32)),

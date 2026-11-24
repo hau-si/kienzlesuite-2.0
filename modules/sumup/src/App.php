@@ -117,7 +117,7 @@ final class App {
         return $visit;
     }
     public function state(array $visit, array $browser): array {
-        $payment = $this->db->one('SELECT * FROM payments WHERE visit_id=? ORDER BY rowid DESC LIMIT 1', [$visit['id']]);
+        $payment = $this->db->one("SELECT * FROM payments WHERE visit_id=? AND payment_status<>'discarded' ORDER BY rowid DESC LIMIT 1", [$visit['id']]);
         return ['visit_id' => $visit['id'], 'csrf' => $browser['csrf'], 'manual' => self::isManual($visit),
             'patient' => ['name' => $visit['patient_name'], 'birthdate' => $visit['patient_birthdate']],
             'completed' => $visit['completed_at'] !== null,
@@ -984,6 +984,19 @@ final class App {
         }
         return $this->db->one('SELECT * FROM payments WHERE id=?', [$payment['id']]);
     }
+    /** Nicht erfolgte oder abgebrochene Zahlung einer selbst erzeugten Rechnung, für die noch keine Rechnungsnummer vergeben wurde (Karte/Bar ohne Erfolg). */
+    private static function discardable(array $p): bool {
+        return in_array($p['payment_status'], ['failed', 'cancelled'], true) && ($p['doc_number'] ?? '') === '' && ($p['t2med_invoice'] ?? null) === null && ($p['storno_at'] ?? null) === null;
+    }
+    /** Verwerfen: Die erfolglosen Versuche dieses Vorgangs verschwinden aus der Ansicht (Status „discarded“); die Datensätze bleiben für die Nachvollziehbarkeit erhalten. */
+    public function discard(array $visit, string $id): array {
+        return $this->db->locked('payment-' . $id, function () use ($visit, $id): array {
+            $this->editable($this->db->one('SELECT * FROM visits WHERE id=?', [$visit['id']]));
+            if (!self::discardable($this->payment($visit, $id))) throw new Problem('Diese Zahlung kann nicht verworfen werden (Rechnungsnummer vergeben oder noch aktiv).', 409);
+            $this->db->query("UPDATE payments SET payment_status='discarded' WHERE visit_id=? AND payment_status IN ('failed','cancelled') AND (doc_number IS NULL OR doc_number='') AND t2med_invoice IS NULL AND storno_at IS NULL", [$visit['id']]);
+            return ['discarded' => true];
+        });
+    }
     public function cancel(array $visit, string $id): array {
         return $this->db->locked('reader', fn() => $this->db->locked('payment-' . $id, function () use ($visit, $id): array {
             return $this->publicPayment($this->cancelPayment($this->payment($visit, $id)));
@@ -1197,7 +1210,7 @@ final class App {
             ['method' => $p['payment_method'] ?? 'card', 'local_receipt' => !empty($p['invoice_json']), 'invoice_number' => !empty($p['invoice_json']) && $p['payment_status'] === 'successful' ? (($p['doc_number'] ?? '') !== '' ? $p['doc_number'] : $p['transaction_id']) : null,
              'transfer' => ($p['payment_method'] ?? 'card') === 'transfer' && $p['payment_status'] === 'transfer_open' && $this->bank->ready()
                  ? $this->bank->info((int)$p['amount_cents'], (string)($p['t2med_invoice'] ?: $p['reference'])) : null,
-             'invoice_id' => $p['inbox_id'] ?? null, 't2med_invoice' => $p['t2med_invoice'] ?? null, 'invoice_export' => $this->exportState($p), 'invoice_print' => $this->printState($p)];
+             'invoice_id' => $p['inbox_id'] ?? null, 't2med_invoice' => $p['t2med_invoice'] ?? null, 'discardable' => self::discardable($p), 'invoice_export' => $this->exportState($p), 'invoice_print' => $this->printState($p)];
     }
     private function exportState(array $p): ?array {
         if (!$this->export->enabled()) return null;

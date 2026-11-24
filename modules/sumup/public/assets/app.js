@@ -56,7 +56,8 @@ function updateTotal() {
   document.querySelectorAll('.invoice-pay').forEach(b => b.disabled = busy || !!state.reader_payment);
   document.querySelectorAll('.invoice-go').forEach(b => b.disabled = busy || (!!state.reader_payment && !!document.querySelector('input[name^="inv-method-"][value="card"]:checked')));
 }
-let invoiceSeen = null, invoiceLater = new Set();
+let invoiceSeen = null, invoiceLater = new Set(), renderedInvoices = '';
+const invoiceSignature = list => JSON.stringify((list || []).map(i => [i.id, i.number, i.amount_cents, i.printed_at, i.letter]));
 function invoiceRequest(invoice, method) {
   const key = 'ks-invoice-'+visitId;
   // Schlüssel vor dem Netzaufruf speichern; bei verlorener Antwort denselben Vorgang prüfen.
@@ -66,6 +67,7 @@ function invoiceRequest(invoice, method) {
   return [key, request];
 }
 function renderInvoices() {
+  renderedInvoices = invoiceSignature(state.invoices);
   const all = state.invoices || [], list = all.filter(i => !invoiceLater.has(i.id));
   const fresh = invoiceSeen === null ? new Set() : new Set(list.filter(i => !invoiceSeen.has(i.id)).map(i => i.id));
   invoiceSeen = new Set(all.map(i => i.id));
@@ -147,7 +149,8 @@ const chosenMethod = new Map();   // Rechnungs-ID → von Hand gewählte Zahlart
 // Neue gedruckte Rechnungen erscheinen ohne Neuladen, solange kein Zahlungsvorgang angezeigt wird.
 setInterval(async () => {
   if (busy || document.hidden || !$('payment').hidden || !state?.patient) return;
-  try { const s = await api('state'); state.invoices = s.invoices; renderInvoices(); } catch {}
+  // Nur neu zeichnen, wenn sich die Rechnungen wirklich geändert haben: sonst verliert eine gerade gewählte Zahlart (und der Fokus) ihren Platz.
+  try { const s = await api('state'); if (invoiceSignature(s.invoices) === renderedInvoices) return; state.invoices = s.invoices; renderInvoices(); } catch {}
 }, 10000);
 function selectedIds() {
   const ids=new Set(selected);
@@ -315,7 +318,7 @@ function renderPayment() {
   $('receipt-data-note').hidden=!showing || p.payment_status!=='successful' || !p.local_receipt;
   renderReader();
   if (showing) manage(false);
-  for (const id of ['document','receipt','receipt-mail','receipt-print','receipt-share','retry','cancel','mock-controls','mock-fhir-label','transfer-box','confirm-transfer','switch-cash','switch-transfer','switch-later']) $(id).hidden=true;
+  for (const id of ['document','receipt','receipt-mail','receipt-print','receipt-share','retry','discard','cancel','mock-controls','mock-fhir-label','transfer-box','confirm-transfer','switch-cash','switch-transfer','switch-later']) $(id).hidden=true;
   if(!showing || receiptPrintPayment!==p.id) { $('receipt-print-status').hidden=true; $('receipt-print').textContent='Beleg drucken'; }
   if(!showing || p.payment_status!=='successful' || receiptShare?.paymentId!==p.id) { $('receipt-share-panel').hidden=true; receiptShare=null; }
   if(!showing || p.payment_status!=='successful' || receiptRecipient?.paymentId!==p.id) {
@@ -355,7 +358,7 @@ function renderPayment() {
     description='Der Patient überweist mit den Kontodaten oder dem QR-Code. Sobald das Geld eingegangen ist, den Zahlungseingang bestätigen. Bis dahin kann auf eine andere Zahlart gewechselt werden.';
     renderTransfer(p); $('confirm-transfer').hidden=false; $('switch-cash').hidden=false; $('cancel').hidden=false; $('cancel').textContent='Überweisung abbrechen';
   } else if(['failed','cancelled'].includes(p.payment_status)) {
-    title=p.payment_status==='failed'?'Zahlung nicht erfolgt':'Zahlung abgebrochen'; symbol='×'; description='Du kannst die Zahlung erneut starten oder die Zahlart wechseln.'; $('retry').hidden=false;
+    title=p.payment_status==='failed'?'Zahlung nicht erfolgt':'Zahlung abgebrochen'; symbol='×'; description='Du kannst die Zahlung erneut starten oder die Zahlart wechseln.'; $('retry').hidden=false; $('discard').hidden=!p.discardable;
     $('switch-cash').hidden=false; $('switch-transfer').hidden=!state.bank_ready || !!p.t2med_invoice; $('switch-later').hidden=!p.t2med_invoice;
   } else {
     title=p.payment_status==='unknown' || p.payment_status==='starting'?'Zahlung wird geprüft':p.payment_status==='cancel_requested'?'Abbruch wird geprüft':'Zahlung läuft';
@@ -474,6 +477,14 @@ $('pay').onclick=()=>run(async()=>{
   retrySelection=false; state.reader_payment=null; readerMessage='';
   sessionStorage.removeItem('ks-start-'+visitId); startRequest=null;
   document.querySelector('input[name="pay-method"][value="card"]').checked=true; renderPayment();
+});
+$('discard').onclick=()=>run(async()=>{
+  if(!confirm('Diesen Zahlungsversuch verwerfen? Es ist noch keine Rechnungsnummer vergeben; die Eingaben werden zurückgesetzt.')) return;
+  await api('discard',{payment_id:state.payment.id});
+  retrySelection=false; startRequest=null; selected.clear(); selectedGroups.clear(); reasons={}; $('manual').value='';
+  try { sessionStorage.removeItem('ks-start-'+visitId); } catch {}
+  document.querySelector('input[name="pay-method"][value="card"]').checked=true;
+  await load();
 });
 $('retry').onclick=()=>{ retrySelection=true; startRequest=null; renderPayment(); updateTotal(); };
 $('switch-cash').onclick=()=>run(async()=>{

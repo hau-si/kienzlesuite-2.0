@@ -18,6 +18,7 @@ ob_start();
 <header class="seitenkopf"><div><p class="eyebrow">Kasse</p><h1>Einstellungen</h1></div><span id="mode" class="badge" hidden></span></header>
 <p id="message" class="notice" role="status" hidden></p>
 
+<p id="lade" class="muted" role="status">Wird geladen …</p>
 <div id="settings" hidden>
 <nav id="tabs" class="tab-bar" role="tablist" aria-label="Bereiche"><span id="update-bell" hidden></span></nav>
 <p id="warning" class="inline-error" hidden></p>

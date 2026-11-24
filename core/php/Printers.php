@@ -40,7 +40,7 @@ final class Printers {
         $n = is_array($s['netz'] ?? null) ? $s['netz'] : [];
         $net = ['arbeitsgruppe' => mb_substr((string)($n['arbeitsgruppe'] ?? 'WORKGROUP'), 0, 15)];
         return ['queues' => $queues, 'found' => $found, 'jobs' => $jobs, 'net' => $net, 'searched' => (int)($s['gesucht'] ?? 0), 'error' => mb_substr((string)($s['fehler'] ?? ''), 0, 300),
-            'last' => is_array($s['letzte'] ?? null) ? $s['letzte'] : null, 'pending' => is_file($this->request()), 'service' => is_file(self::$unit)];
+            'last' => is_array($s['letzte'] ?? null) ? View::frisch($s['letzte']) : null, 'pending' => is_file($this->request()), 'service' => is_file(self::$unit)];
     }
 
     public function search(): void { $this->write(['action' => 'suchen']); }

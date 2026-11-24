@@ -1,5 +1,16 @@
 # Terminzettel – Release-Notizen
 
+## 1.3.0-beta.12
+
+- **Absage-QR neu gestaltet:** Oben ein runder schwarzer **Balken** mit Kalender-Symbol und der Aufforderung in zwei Zeilen, darunter der QR-Code in **dickem, rundem Rahmen**; Balken und Rahmen sind gleich breit. Der Satz „Termin absagen: Code mit dem Handy scannen“ entfällt.
+- Neuer Standardtext der Aufforderung: **„Verhindert? Bitte absagen.“** (der alte Standardtext wird bei bestehenden Einstellungen automatisch ersetzt; selbst geänderte Texte bleiben). Das Feld heißt jetzt „Aufforderung im Balken über dem QR-Code“.
+- Fehler behoben, den es sonst beim größten QR-Code gegeben hätte: Der Block (QR plus Rahmen) darf höchstens 384 Punkte breit sein; der QR-Code wird dafür passend verkleinert.
+- Ohne Schrift oder Bildbibliothek bleibt es beim bisherigen Text über einem schlichten QR-Code. Neuer Test `test_absage_block.py`; echte Ausgabe mit `python3-qrcode` und am Bondrucker nicht geprüft.
+
+## 1.3.0-beta.11
+
+- Einstellungen: Die Formularspalte hat dieselbe Breite wie die Seiten der Basis (860 px), die Vorschau steht rechts daneben. Nicht im Browser geprüft.
+
 ## 1.3.0-beta.10
 
 - **Logo-Upload hing beim Hochladen** (Chrome drehte ewig, keine Meldung): Das Logo wird jetzt wie die Pad-Software der Signatur **roh per fetch** gesendet (kein Multipart-Formular mehr), Fehler und Erfolg stehen unter dem Knopf, danach lädt die Seite neu. `uploads = true` ist nicht mehr nötig und wurde wieder entfernt. Die genaue Ursache des Hängens ist nicht geklärt (nicht reproduzierbar ohne VM); der neue Weg ist der, der bei der Signatur auf der VM funktioniert.

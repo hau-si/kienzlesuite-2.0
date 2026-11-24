@@ -75,7 +75,7 @@ final class View {
         'Protokoll' => '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
         'Passkeys' => '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>',
         'Schlüsselblatt' => '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>',
-        'Authenticator' => '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>',
+        'Authenticator' => '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
         'Handynummer' => '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>',
         'Passwort' => '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>',
         'Kontodaten' => '<path d="M3 10l9-6 9 6M5 10v8M9 10v8M15 10v8M19 10v8M3 20h18"/>',
@@ -150,7 +150,7 @@ final class View {
         $brand = '<a class="brand" href="/" title="Start"><span class="mark" aria-hidden="true">K' . (!empty($nav['offenLogo']) ? '<span class="logo-dot" title="Die Einrichtung ist noch nicht abgeschlossen"></span>' : '') . '</span><span><strong>Kienzle-Suite</strong>'
             . '<span class="sub">' . self::h($practice !== '' ? $practice : 'Praxis') . '</span></span></a>';
         $head = '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=34"><script src="/assets/core.js?v=3" defer></script>' . ($extra['kopf'] ?? '') . '</head><body'
+            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=36"><script src="/assets/core.js?v=4" defer></script>' . ($extra['kopf'] ?? '') . '</head><body'
             . (self::$starter !== '' ? ' data-starter="' . self::h(self::$starter) . '"' : '') . ($extra['body'] ?? '') . '>';
         if (!$nav) {
             return $head . '<div class="solo">' . $brand . '<main><h1>' . self::h($title) . '</h1>' . self::cards($body) . '</main></div></body></html>';
@@ -245,6 +245,11 @@ final class View {
 
     public static function error(?string $message): string { return $message ? '<p class="error" role="alert">' . self::h($message) . '</p>' : ''; }
 
+    /** Ergebnis einer Aktion nur kurz nach der Aktion zeigen (sonst stünde „Gespeichert.“ noch Tage später da). */
+    public static function frisch(?array $last, int $seconds = 600): ?array {
+        $t = (int)($last['zeit'] ?? $last['time'] ?? 0);
+        return $last !== null && $t > 0 && $t >= time() - $seconds ? $last : null;
+    }
     public static function notice(?string $message): string { return $message ? '<p class="notice" role="status">' . self::h($message) . '</p>' : ''; }
 
     public static function input(string $name, string $label, string $type = 'text', string $value = '', string $extra = ''): string {

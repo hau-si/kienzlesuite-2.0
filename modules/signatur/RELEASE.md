@@ -1,5 +1,9 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.5
+
+- Seite mit Kategorie-Zeile „Signatur“ und Titel „Unterschriften“ wie die anderen Seiten; Formularfelder in voller Kartenbreite; Seitenbreite wie die Basis (940 px). Nicht im Browser geprüft.
+
 ## 0.1.0-beta.4
 - Pad-Software hochladen: Meldungen bei Fehlern genauer. Kommt keine JSON-Antwort, steht der HTTP-Status mit dem Anfang der Antwort da; interne Fehler des Servers werden mit Typ und Text gemeldet und ins Protokoll geschrieben. Nicht auf der VM geprüft.
 

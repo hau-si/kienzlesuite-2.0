@@ -1,5 +1,19 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.54
+
+- **Meldungen bleiben bei der Aktion:** Die Rückmeldung nach einem Klick („Gespeichert.“, Fehlertext) erscheint nicht mehr ganz oben auf der Seite, sondern direkt hinter dem Block mit dem angeklickten Knopf und wird ins Bild gerollt (`core.js?v=4`, `core.css?v=36`). Fehlt der Block oder wechselt die Seite, bleibt sie oben.
+- **Modulverwaltung:** Bei Installation und Aktualisierung eines Moduls zeigt ein Hinweisfeld mit **drehendem Kreis** „… läuft“, bleibt beim Scrollen sichtbar, und die Seite lädt sich selbst neu. Die Dienste des Moduls werden bei der Aktualisierung neu gestartet; die Meldung am Ende sagt jetzt „aktualisiert, Dienste neu gestartet“.
+- Nicht im Browser auf der VM geprüft.
+
+## 0.21.4-beta.53
+
+- **Alte Erfolgsmeldungen** („Gespeichert. Die Suite ist jetzt erreichbar unter …“, „Virtuelle Drucker abgeglichen“, „Letterxpress gespeichert“, „Empfänger gespeichert“, Modul-Meldungen) erscheinen nur noch **10 Minuten** nach der Aktion, nicht mehr bei jedem späteren Aufruf der Seite.
+- Startseite, **Server-Zustand**: Kacheln in **drei Spalten**, gegliedert in **Server** (Prozessor, Arbeitsspeicher, Festplatte, Temperatur), **Betrieb** (Läuft seit, Letzte Sicherung) und **Dienste** (Guthaben Letterxpress, seven.io).
+- Mein Konto: Der Pfeil bei „Passwort ändern“ sitzt wie bei den anderen Zeilen rechts; „Authenticator-App“ hat ein eigenes Symbol (Schild mit Haken).
+- Benutzer und Gruppen: Avatar und Anmeldename in einer Zeile, Name ohne Umbruch, „Zugang“ darf umbrechen.
+- Nicht im Browser auf der VM geprüft (`core.css?v=35`).
+
 ## 0.21.4-beta.52
 
 - Seitenleiste: Der Anmeldename steht jetzt unter **Mein Konto** (oben), unten entfällt „Abmelden (Name)“. **Abmelden** gibt es als Knopf auf der Seite „Mein Konto“ (neben dem Profil). Nicht im Browser geprüft.
