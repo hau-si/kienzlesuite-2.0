@@ -13,6 +13,8 @@ class InvoiceExport {
 
     public function enabled(): bool { return (bool)$this->config->get('invoice_export', 'enabled', false); }
     public function when(): string { return $this->config->get('invoice_export', 'when', 'paid'); }
+    /** Auch die per Post (Letterxpress) verschickten Rechnungen ablegen? */
+    public function letterInvoices(): bool { return $this->enabled() && (bool)$this->config->get('invoice_export', 'letter', false); }
     /** Auch die in der App erzeugten Rechnungen/Leistungsbelege ablegen? */
     public function appInvoices(): bool { return $this->enabled() && (bool)$this->config->get('invoice_export', 'app_invoices', false); }
 

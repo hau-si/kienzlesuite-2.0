@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.38
+
+- Verwaltung → Server: Der Verweis „Name, Anschrift, Konto und Steuer der Praxis“ (zeigte nur auf „Praxis“) entfällt.
+- Arbeitsplätze einrichten: Ist die Kasse installiert, steht als dritter Schritt der **Starter** für T2med mit einem Knopf zu Kasse → Einstellungen → „Arbeitsplätze einrichten“, wo das Paket geladen wird.
+
 ## 0.21.4-beta.37
 
 - „Mein Konto“ aufgeräumt: Oben steht das Profil, dort lässt sich jetzt der **Anzeigename ändern** (leer lassen zeigt den Benutzernamen; der Benutzername zum Anmelden bleibt). Darunter sind E-Mail-Adresse, Passwort, Handynummer (SMS-Ersatz, nur Admins), Authenticator-App, Passkeys und gemerkte Geräte Ausklappzeilen mit Statusmarke („bestätigt“, „nicht eingerichtet“ …) statt sieben Blöcken mit langem Text. Wartet eine E-Mail-Adresse auf Bestätigung, ist diese Zeile geöffnet.

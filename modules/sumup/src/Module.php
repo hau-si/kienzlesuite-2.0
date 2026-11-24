@@ -5,6 +5,7 @@ namespace KienzleSumup;
 /** Angaben des Moduls für Einstellungsseite, Einrichtungs-Überblick der Suite und Haken. */
 final class Module {
     public const INVOICE_QUEUE = 'SumUp-Rechnung';
+    public const LETTER_QUEUE = 'Letterxpress';
 
     public static function version(): string { return trim((string)@file_get_contents(dirname(__DIR__) . '/VERSION')); }
 
@@ -39,6 +40,14 @@ final class Module {
             $q = self::invoicePrinter($config)['queue'];
             $items[] = ['title' => 'Drucker „SumUp-Rechnung“ ' . ($q ? 'bereit' : 'fehlt'), 'state' => $q ? 'done' : 'error',
                 'hint' => $q ? 'In T2med die Rechnung auf diesen Drucker drucken' : 'Verwaltung → Drucker der Suite: virtuelle Drucker abgleichen', 'link' => $link('invoice-printer-help')];
+        }
+        if ($config->get('letterxpress', 'enabled', false)) {
+            $q = null;
+            try {
+                foreach (Suite::modul()->drucker() as $d) if ($d['name'] === self::LETTER_QUEUE) $q = $d;
+            } catch (\Throwable) {}
+            $items[] = ['title' => 'Drucker „Letterxpress“ ' . ($q ? 'bereit' : 'fehlt'), 'state' => $q ? 'done' : 'error',
+                'hint' => $q ? 'Rechnungen aus T2med, die darauf gedruckt werden, gehen sofort per Post an Letterxpress (Windows: IPP-Drucker wie „SumUp-Rechnung“ hinzufügen, Papier A4)' : 'Verwaltung → Drucker der Suite: virtuelle Drucker abgleichen', 'link' => $link('s-letterxpress')];
         }
         foreach (['printing' => 'Bondrucker', 'office_printing' => 'Praxisdrucker (A4)'] as $section => $label) {
             if (!$config->get($section, 'enabled', false)) continue;

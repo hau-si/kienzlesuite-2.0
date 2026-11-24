@@ -82,6 +82,7 @@ final class Settings {
             'directory' => ['type' => 'string', 'label' => 'Unterordner ({jahr} und {monat} möglich)', 'default' => 'Rechnungen/{jahr}/{monat}'],
             'app_invoices' => ['type' => 'bool', 'label' => 'Auch in der App erzeugte Rechnungen ablegen'],
             'when' => ['type' => 'choice', 'label' => 'T2med-Rechnungen ablegen', 'choices' => ['paid' => 'nur per Karte bezahlte', 'received' => 'jede gedruckte']],
+            'letter' => ['type' => 'bool', 'label' => 'Über den Drucker „Letterxpress“ verschickte Rechnungen ablegen'],
         ]],
     ];
 

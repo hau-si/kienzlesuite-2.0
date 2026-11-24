@@ -38,7 +38,7 @@ Oberfläche, Hilfetexte, Dokumentation und Commit-Nachrichten auf Deutsch.
 
 ## Hinweise für neue Sitzungen (Stand 24.11.2026)
 
-**Stand:** Basis 0.21.4-beta.37, Kasse (`sumup`) 2.3.4-beta.20, Terminzettel 1.3.0-beta.3; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
+**Stand:** Basis 0.21.4-beta.38, Kasse (`sumup`) 2.3.4-beta.21, Terminzettel 1.3.0-beta.3; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
 (Basis 0.19.1). Der Nutzer testet auf einer echten Ubuntu-26.04-VM (Aktualisierung dort: `cd ~/kienzlesuite-2.0 && git pull && sudo bash installer/install.sh`,
 oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nicht ins Repository.
 
@@ -88,6 +88,6 @@ oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nich
 ### Offene Ideen (nichts davon ist beauftragt)
 
 - SMS für Passwort-/Einrichtungslink; SMS-Verbindung der Basis an Module durchreichen; E-Mail per Gmail-OAuth.
-- Einstellungen der Kasse weiter vereinfachen (Überblicksliste einklappen; „Als bezahlt abhaken“ auch in der rechten Liste der Startseite); Karte „Arbeitsplätze“ in die Basis verschieben; Terminzettel im Rahmen der Suite anzeigen; „Reader suchen“ für SumUp.
+- Einstellungen der Kasse weiter vereinfachen (Überblicksliste einklappen; „Als bezahlt abhaken“ auch in der rechten Liste der Startseite); Karte „Arbeitsplätze“ in die Basis verschieben; „Reader suchen“ für SumUp.
 - Stammdaten (Konto/IBAN, Steuernummer, USt) in der Verwaltung unter „Praxis“ zusammenführen; weitere Verwaltungsseiten zusammenlegen.
 - Updater: SSH-Signaturen unterstützen; Repository später an Thomas übertragen (GitHub: Settings → Transfer ownership; danach Workflows und Release-Schlüssel prüfen); `beta` nach `main` mit Endversionen durch den Nutzer.

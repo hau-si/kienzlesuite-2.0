@@ -1,5 +1,16 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.21
+
+- **Neuer virtueller Drucker „Letterxpress“** (wird wie „SumUp-Rechnung“ von der Basis angelegt und freigegeben, Papier A4, PDF/PostScript, eigene Durchreich-PPD `Letterxpress-PDF.ppd` für den Mac). Jede aus T2med darauf gedruckte Rechnung wird wie im Rechnungseingang gelesen (gleiche Rechnungen, gleiche Erkennung, Rechnungseingang muss dafür nicht eingeschaltet sein) und **sofort per Post an Letterxpress** gesendet. Voraussetzung: Letterxpress ist eingeschaltet (Einstellungen → Letterxpress, Zugang unter Verwaltung → Verbindungen).
+- **Lesbarer Text:** Letterxpress nimmt nur PDFs mit Textebene an. Hat das PDF keine (z. B. reines Bild von einem Windows-Treiber), ergänzt die Texterkennung (tesseract, 300 dpi, bis 10 Seiten) den Text vor dem Versand; die vorhandenen Pakete reichen, es wird nichts nachinstalliert.
+- **Sammelversand:** Der Drucker ist dafür gedacht, viele T2med-Rechnungen auf einmal zu versenden: in T2med vorübergehend den Rechnungsdrucker auf „Letterxpress“ umstellen, drucken, danach zurückstellen.
+- **Ablage für die Steuerberatung:** Neue Einstellung „Über den Drucker „Letterxpress“ verschickte Rechnungen ablegen“ (Einstellungen → Ablage im Netzwerkordner, ab dort wie bei den Zahlungen: gleiches Ziel und gleicher Unterordner). Dann landet jede per Post verschickte Rechnung zusätzlich als PDF im Netzwerkordner, Dateiname endet auf `_Post`. Gilt auch für „Per Post senden“ an der Kasse. Ein Fehler der Ablage stoppt den Versand nicht, er steht im Protokoll. Standardmäßig aus.
+- Ein zweiter Druck derselben Rechnung verschickt keinen zweiten Brief, wenn der erste live gesendet wurde (Testbriefe sperren nicht). Schlägt der Versand fehl, liegt die Rechnung trotzdem im Eingang (mit Fehlertext), der Drucker meldet es im Protokoll.
+- **Vorgänge:** Per Post versandte Rechnungen stehen in der Liste mit Zahlungsart **Überweisung**, Status „per Letterxpress verschickt“ (im Testmodus mit „(Test)“, bei unklarem Ausgang „Postversand unklar“) und im Excel-Export; neuer Status-Filter „Per Post“. Das gilt auch für Rechnungen, die über „Per Post senden“ an der Kasse verschickt werden. Diese Rechnungen werden nicht mehr nach 14 Tagen aus dem Eingang gelöscht (das PDF schon).
+- Einrichtungs-Überblick: Punkt „Drucker Letterxpress bereit/fehlt“ bei eingeschaltetem Letterxpress.
+- Nicht auf der echten VM und nicht mit echtem Letterxpress geprüft (nur Nachbildung der API und Texterkennung mit erfundenen Beispielrechnungen).
+
 ## 2.3.4-beta.20
 
 - **Die neue Vorgänge-Liste ersetzt „Export für die Steuerberatung“ und „T2med-Rechnungen als bezahlt abhaken“** in den Einstellungen; beide Bereiche und die Download-Adresse `tax-export.php` entfallen. Die Excel-Liste enthält zusätzlich die Spalten „davon Netto“ und „davon MwSt.“ für IGeL-Rechnungen. Die nachträgliche Betragskorrektur an T2med-Zahlungen entfällt (dafür gibt es das Storno).

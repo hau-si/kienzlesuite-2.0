@@ -545,10 +545,10 @@ final class App {
     }
 
     /** Gelesene Rechnung speichern (getrennt vom PDF-Lesen, damit testbar). */
-    public function storeInvoice(array $invoice, ?string $pdf = null): array {
-        if (!$this->config->get('invoice_inbox', 'enabled', false)) throw new Problem('Rechnungseingang ist deaktiviert.', 404);
+    public function storeInvoice(array $invoice, ?string $pdf = null, bool $viaLetter = false): array {
+        if (!$viaLetter && !$this->config->get('invoice_inbox', 'enabled', false)) throw new Problem('Rechnungseingang ist deaktiviert.', 404);
         // Die Original-PDF nur aufbewahren, wenn sie in den Netzwerkordner, zum Praxisdrucker oder per Post (Letterxpress) gehen soll.
-        $keep = ($this->export->enabled() || $this->office->enabled() || $this->letter->enabled()) && $pdf !== null ? $pdf : null;
+        $keep = ($viaLetter || $this->export->enabled() || $this->office->enabled() || $this->letter->enabled()) && $pdf !== null ? $pdf : null;
         $result = $this->db->transaction(function () use ($invoice, $keep): array {
             $this->purgeInbox();
             $number = $invoice['number'];
@@ -570,12 +570,50 @@ final class App {
             $status = $this->exportRow($result['id']);
             $result['message'] .= $status['status'] === 'done' ? ' PDF im Netzwerkordner abgelegt.' : ' PDF NICHT im Netzwerkordner abgelegt: ' . $status['error'];
         }
-        unset($result['id']);
+        if (!$viaLetter) unset($result['id']);
         return $result;
     }
+
+    /**
+     * Virtueller Drucker „Letterxpress“: Die Rechnung wird wie im Rechnungseingang gelesen (gleiche Rechnungen aus T2med), erscheint unter Vorgänge
+     * und geht sofort per Post an Letterxpress. Letterxpress nimmt nur PDFs mit lesbarem Text an: fehlt er, ergänzt die Texterkennung ihn vorher.
+     */
+    public function letterPrint(string $pdf): array {
+        if (!$this->letter->enabled()) throw new Problem('Der Versand per Post ist ausgeschaltet (Kasse → Einstellungen → Letterxpress).', 409);
+        [$pdf, $ocr] = PdfText::ensure($pdf);
+        try {
+            $invoice = T2medInvoice::fromPdf($pdf, $this->config->get('app', 'max_amount_cents'), $this->inboxLabels());
+        } catch (Problem $e) {
+            (new InboxLog($this->config->get('app', 'state_dir')))->add($e->getMessage(), 'Drucker Letterxpress', T2medInvoice::overview(T2medInvoice::$lastText));
+            T2medInvoice::$lastText = '';
+            throw $e;
+        }
+        T2medInvoice::$lastText = '';
+        // Ein zweiter Druck derselben Rechnung darf keinen zweiten Brief auslösen (die ältere Fassung wird beim Speichern ersetzt, der Versandstatus gehört zur Nummer).
+        if ($this->db->one("SELECT 1 AS x FROM invoice_inbox WHERE invoice_number=? AND lxp_status<>'' AND lxp_mode='live' LIMIT 1", [$invoice['number']])) {
+            throw new Problem('Rechnung ' . $invoice['number'] . ' wurde bereits per Post gesendet und wird nicht noch einmal verschickt.', 409);
+        }
+        $stored = $this->storeInvoice($invoice, $pdf, true);
+        try {
+            $sent = $this->letter->send($stored['id']);
+        } catch (Problem $e) {
+            $this->db->query('UPDATE invoice_inbox SET lxp_error=? WHERE id=? AND lxp_status=\'\'', [mb_substr($e->getMessage(), 0, 300), $stored['id']]);
+            throw new Problem('Rechnung ' . $invoice['number'] . ' liegt im Rechnungseingang, der Postversand schlug aber fehl: ' . $e->getMessage(), $e->getCode() ?: 502);
+        }
+        $message = $sent['message'] . ($ocr ? ' (Text per Texterkennung ergänzt)' : '');
+        // Für die Steuerberatung: Kopie in der Ablage (Dateiname mit _Post); ein Fehler dort stoppt den Versand nicht, er steht im Protokoll.
+        $filed = null;
+        if ($this->export->letterInvoices()) {
+            $status = $this->exportRow($stored['id'], 'Post');
+            $filed = $status['status'] === 'done';
+            $message .= $filed ? ' PDF in der Ablage gespeichert.' : ' PDF NICHT in der Ablage gespeichert: ' . $status['error'];
+        }
+        return ['ok' => true, 'number' => $invoice['number'], 'ocr' => $ocr, 'filed' => $filed, 'message' => $message];
+    }
+
     /** Original-PDF einer Rechnung ablegen; idempotent, Fehler werden gespeichert statt geworfen. */
-    private function exportRow(string $inboxId): array {
-        return $this->db->locked('invoice-export-' . $inboxId, function () use ($inboxId): array {
+    private function exportRow(string $inboxId, string|bool|null $name = null): array {
+        return $this->db->locked('invoice-export-' . $inboxId, function () use ($inboxId, $name): array {
             $row = $this->db->one('SELECT * FROM invoice_inbox WHERE id=?', [$inboxId]);
             if (!$row) return ['status' => 'failed', 'error' => 'Rechnung nicht mehr vorhanden.', 'path' => ''];
             if ($row['export_status'] === 'done') return ['status' => 'done', 'error' => '', 'path' => $row['export_path']];
@@ -583,7 +621,7 @@ final class App {
             try {
                 // Bei „nach Zahlung“ trägt der Dateiname die Zahlungsart (Karte oder Bar).
                 $method = $this->db->one("SELECT payment_method FROM payments WHERE inbox_id=? AND payment_status='successful' ORDER BY paid_at DESC LIMIT 1", [$inboxId])['payment_method'] ?? 'card';
-                $path = $this->export->export($row, $row['pdf'], $this->export->when() === 'paid' ? ($method === 'cash' ? 'Bar' : true) : false);
+                $path = $this->export->export($row, $row['pdf'], $name ?? ($this->export->when() === 'paid' ? ($method === 'cash' ? 'Bar' : true) : false));
                 // Nach erfolgreicher Ablage keine Kopie der PDF auf dem Anwendungsserver behalten.
                 $this->db->query("UPDATE invoice_inbox SET export_status='done',export_error='',export_path=? WHERE id=?", [$path, $inboxId]);
                 $this->releaseInboxPdf($inboxId);
@@ -651,7 +689,9 @@ final class App {
     private function purgeInbox(): void {
         $limit = time() - $this->config->get('invoice_inbox', 'max_age_days', 14) * 86400;
         // Nur nie kassierte Einträge löschen; Zahlungen behalten ihre Zuordnung.
-        $this->db->query('DELETE FROM invoice_inbox WHERE (received_at < ? OR superseded_at < ?) AND id NOT IN (SELECT inbox_id FROM payments WHERE inbox_id IS NOT NULL)', [$limit, $limit]);
+        // Per Post (Letterxpress) versandte Rechnungen bleiben für die Vorgänge und die Buchhaltung stehen.
+        $this->db->query("DELETE FROM invoice_inbox WHERE (received_at < ? OR superseded_at < ?) AND lxp_status='' AND id NOT IN (SELECT inbox_id FROM payments WHERE inbox_id IS NOT NULL)", [$limit, $limit]);
+        $this->db->query("UPDATE invoice_inbox SET pdf=NULL WHERE pdf IS NOT NULL AND received_at < ? AND lxp_status<>''", [$limit]);
         // Bezahlte, aber nie abgeschlossene Vorgänge: Original-PDF nach Ablauf der Frist ebenfalls löschen.
         $this->db->query("UPDATE invoice_inbox SET pdf=NULL WHERE pdf IS NOT NULL AND received_at < ? AND id IN (SELECT inbox_id FROM payments WHERE inbox_id IS NOT NULL AND payment_status='successful')", [$limit]);
     }
@@ -732,7 +772,12 @@ final class App {
         $this->editable($fresh);
         $open = array_column($this->openInvoices($fresh), null, 'id');
         if (!isset($open[$invoiceId])) throw new Problem('Diese Rechnung ist nicht mehr offen oder gehört nicht zu diesem Patienten. Bitte Seite neu laden.', 409);
-        return $this->letter->send($invoiceId);
+        $sent = $this->letter->send($invoiceId);
+        if ($this->export->letterInvoices()) {
+            $status = $this->exportRow($invoiceId, 'Post');
+            $sent['message'] .= $status['status'] === 'done' ? ' PDF in der Ablage gespeichert.' : ' PDF NICHT in der Ablage gespeichert: ' . $status['error'];
+        }
+        return $sent;
     }
     /** „Später (Überweisung)“: Original-Rechnung einmal auf dem Praxisdrucker ausgeben (ohne Zahlung). */
     public function invoiceLater(array $visit, array $input): array {

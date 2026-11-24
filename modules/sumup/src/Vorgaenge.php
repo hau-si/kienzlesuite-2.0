@@ -59,9 +59,12 @@ final class Vorgaenge {
             AND NOT EXISTS (SELECT 1 FROM payments p WHERE p.t2med_invoice=i.invoice_number AND p.payment_status IN ('starting','pending','unknown','cancel_requested','successful') AND p.storno_at IS NULL)
             ORDER BY i.received_at DESC", [$p['from'], $p['to']])->fetchAll() as $i) {
             [$day, $time] = $when((int)$i['received_at']);
-            $status = (int)$i['received_at'] < $limit ? 'abgelaufen' : ($i['parked_at'] !== null ? 'zurückgestellt' : ($i['transfer_at'] !== null ? 'überwiesen (offen)' : 'offen'));
+            // Per Post über Letterxpress verschickt (Drucker „Letterxpress“ oder Knopf „Per Post“): Zahlung folgt per Überweisung.
+            $post = in_array($i['lxp_status'], ['sent', 'unknown'], true);
+            $status = $post ? ($i['lxp_status'] === 'unknown' ? 'Postversand unklar' : 'per Letterxpress verschickt' . ($i['lxp_mode'] === 'live' ? '' : ' (Test)'))
+                : ((int)$i['received_at'] < $limit ? 'abgelaufen' : ($i['parked_at'] !== null ? 'zurückgestellt' : ($i['transfer_at'] !== null ? 'überwiesen (offen)' : 'offen')));
             $out[] = ['id' => $i['id'], 'source' => 'inbox', 'date' => $day, 'time' => $time, 'art' => 'T2med', 'number' => (string)$i['invoice_number'], 'patient' => (string)$i['patient_name'], 'birthdate' => (string)$i['patient_birthdate'],
-                'method' => '', 'status' => $status, 'invoice_cents' => (int)$i['amount_cents'], 'vat_cents' => 0, 'net_cents' => 0, 'paid_cents' => 0, 'storno' => '', 'done_date' => '', 'can_done' => false, 'sort' => (int)$i['received_at']];
+                'method' => $post ? 'transfer' : '', 'status' => $status, 'post' => $post, 'invoice_cents' => (int)$i['amount_cents'], 'vat_cents' => 0, 'net_cents' => 0, 'paid_cents' => 0, 'storno' => '', 'done_date' => '', 'can_done' => false, 'sort' => (int)$i['received_at']];
         }
         usort($out, static fn($a, $b) => $b['sort'] <=> $a['sort']);
         return ['period' => ['art' => $art, 'label' => $p['label'], 'file' => $p['file'], 'from' => $p['from'], 'to' => $p['to']], 'items' => $out, 'now' => time()];

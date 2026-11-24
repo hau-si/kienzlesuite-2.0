@@ -55,7 +55,7 @@ final class SettingsHelp {
         'printing.cups_server' => ['tip' => 'Nur ausfüllen, wenn der Drucker auf einem anderen Rechner eingerichtet ist. Sonst leer.', 'example' => 'kienzlebox'],
         'printing.share' => ['tip' => 'Freigabe des Bondruckers auf dem Druckserver.', 'example' => '//kienzlebox/TMm10'],
         'printing.width_dots' => ['tip' => 'Normalerweise leer lassen; wird nach dem Modell gesetzt.', 'example' => '576'],
-        'letterxpress.enabled' => ['tip' => 'Zeigt bei offenen T2med-Rechnungen „Per Post senden“. Dabei geht die Rechnung mit Patientendaten an Letterxpress (A&O Fischer GmbH & Co. KG). Dafür in der Regel vorher eine Vereinbarung zur Auftragsverarbeitung abschließen und mit dem Datenschutzbeauftragten abstimmen. Die Empfängeradresse liest Letterxpress aus dem Adressfenster der Rechnung; die T2med-Vorlage muss die Anschrift dort drucken.'],
+        'letterxpress.enabled' => ['tip' => 'Zeigt bei offenen T2med-Rechnungen „Per Post senden“. Außerdem verschickt der virtuelle Drucker „Letterxpress“ jede darauf gedruckte T2med-Rechnung sofort per Post (Windows-Einrichtung wie beim Drucker „SumUp-Rechnung“, Papier A4); sie erscheint unter Vorgänge als „per Letterxpress verschickt“ mit Zahlungsart Überweisung. Dabei geht die Rechnung mit Patientendaten an Letterxpress (A&O Fischer GmbH & Co. KG). Dafür in der Regel vorher eine Vereinbarung zur Auftragsverarbeitung abschließen und mit dem Datenschutzbeauftragten abstimmen. Die Empfängeradresse liest Letterxpress aus dem Adressfenster der Rechnung; die T2med-Vorlage muss die Anschrift dort drucken.'],
         'letterxpress.color' => ['tip' => 'Gilt für alle Briefe. Schwarz-Weiß ist günstiger.'],
         'letterxpress.duplex' => ['tip' => 'Druckt auf Vorder- und Rückseite, spart Porto bei mehrseitigen Rechnungen.'],
         'letterxpress.shipping' => ['tip' => 'Automatisch erkennt Letterxpress Inland oder Ausland an der Anschrift.'],
@@ -83,6 +83,7 @@ final class SettingsHelp {
         'invoice_export.password' => ['tip' => 'Passwort dieses Benutzers. Wird nach dem Speichern nie wieder angezeigt.'],
         'invoice_export.domain' => ['tip' => 'Nur bei Windows-Domänen nötig, sonst leer.', 'example' => 'WORKGROUP'],
         'invoice_export.app_invoices' => ['tip' => 'Auch die direkt auf der Kartenzahlungsseite erstellten Rechnungen ablegen.'],
+        'invoice_export.letter' => ['tip' => 'Rechnungen, die über den virtuellen Drucker „Letterxpress“ (oder „Per Post senden“ an der Kasse) verschickt werden, landen zusätzlich in der Ablage, z. B. für die Steuerberatung. Der Dateiname endet auf _Post. Unabhängig von der Einstellung darunter.'],
         'invoice_export.when' => ['tip' => 'Welche T2med-Rechnungen abgelegt werden.',
             'options' => ['paid' => 'Erst nach erfolgreicher Kartenzahlung.', 'received' => 'Sofort beim Drucken auf „SumUp-Rechnung“, auch ohne Zahlung.']],
     ];

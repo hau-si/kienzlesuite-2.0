@@ -147,6 +147,13 @@ final class Web {
             . '<li>Am Ende diese Zeile einfügen und speichern:<br><code>' . V::h($ip . '   ' . $name) . '</code></li>'
             . '<li>Mac: im Terminal <code>sudo nano /etc/hosts</code>, dieselbe Zeile ergänzen, speichern.</li></ol></details>'
             . '<p>Danach die Suite unter <a href="https://' . V::h($name) . '/">https://' . V::h($name) . '/</a> öffnen.</p>';
+        // Ist die Kasse installiert, braucht jeder PC, an dem aus T2med kassiert wird, zusätzlich den Starter (Paket aus den Kasse-Einstellungen).
+        if (($starter = $this->modules->starterPath()) !== '') {
+            $body .= '<h2 id="starter">3. Kasse: Starter für T2med installieren</h2>'
+                . '<p>Damit der Knopf in T2med die Kasse öffnet, braucht jeder Kassen-PC einmal den <strong>Starter</strong>. Das Paket lädt ein Admin der Kasse und führt es auf dem PC einmal aus.</p>'
+                . '<p class="row-buttons"><a class="button" href="' . V::h($starter) . '/settings.php#s-clients">Starter der Kasse einrichten</a></p>'
+                . '<p class="muted">Zuerst Schritt 1 und 2 erledigen: Der Starter prüft das Zertifikat der Suite und braucht ihren Namen.</p>';
+        }
         return Response::html(V::page('Arbeitsplätze einrichten', $body, $this->nav(), $this->config->practice, 'Einrichten'));
     }
 
@@ -186,7 +193,6 @@ final class Web {
             . V::checkbox('neue_ca', '1', 'Falls nötig: neue Zertifizierungsstelle erstellen', false)
             . V::checkbox('ohne_ip', '1', 'Nicht mehr über die IP-Adresse erreichbar', false) . '</details>'
             . '<button' . ($st['pending'] ? ' disabled' : '') . '>Speichern</button></form>'
-            . '<h2>Name, Anschrift, Konto und Steuer der Praxis</h2><p class="muted">Stehen gemeinsam unter <a href="/verwaltung/praxis">Praxis</a>.</p>'
             . '<h2>Danach</h2><ol class="steps"><li>Den Namen im Router eintragen – oder auf jedem PC in der Datei hosts: '
             . '<a href="/hilfe/arbeitsplatz#name">Anleitung</a>.</li><li>Die Suite unter <strong>' . V::h($address) . '</strong> öffnen und dort neu anmelden.</li>'
             . '<li>Falls schon Passkeys eingerichtet sind: unter „Mein Konto“ neu anlegen (sie gelten für den alten Namen).</li></ol>'

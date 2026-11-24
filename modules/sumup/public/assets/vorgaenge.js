@@ -8,7 +8,7 @@ const euro = c => new Intl.NumberFormat('de-DE', {style: 'currency', currency: '
 const ARTEN = [['tag', 'Tag'], ['woche', 'Woche'], ['monat', 'Monat'], ['jahr', 'Jahr']];
 const KINDS = [['alle', 'Alle'], ['t2med', 'T2med'], ['igel', 'IGeL']];
 const PAYS = [['alle', 'Alle Zahlungen'], ['card', '💳 SumUp (Karte)'], ['cash', '💶 Bar'], ['transfer', '🏦 Überweisung']];
-const STATI = [['alle', 'Alle Status'], ['bezahlt', 'Bezahlt'], ['offen', 'Offen'], ['zurueck', 'Zurückgestellt'], ['storniert', 'Storniert']];
+const STATI = [['alle', 'Alle Status'], ['bezahlt', 'Bezahlt'], ['offen', 'Offen'], ['zurueck', 'Zurückgestellt'], ['post', 'Per Post'], ['storniert', 'Storniert']];
 const ZAHLUNG = {card: '💳 Karte', cash: '💶 Bar', transfer: '🏦 Überweisung'};
 let art = 'tag', kind = 'alle', pay = 'alle', status = 'alle', data = {items: [], rights: {periods: false}}, auswahl = new Set();
 const heute = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); };
@@ -18,7 +18,7 @@ async function api(action, body = {}) {
   if (!r.ok || j.error) throw new Error(j.error || 'Anfrage fehlgeschlagen.');
   return j;
 }
-const gruppeStatus = s => s === 'bezahlt' ? 'bezahlt' : s === 'storniert' ? 'storniert' : s === 'offen' ? 'offen' : 'zurueck';
+const gruppeStatus = s => s === 'bezahlt' ? 'bezahlt' : s === 'storniert' ? 'storniert' : s === 'offen' ? 'offen' : /Letterxpress|Postversand/.test(s) ? 'post' : 'zurueck';
 function chips(box, list, current, set) {
   box.replaceChildren(...list.map(([id, text]) => { const b = el('button', text, 'start-tab' + (id === current ? ' on' : '')); b.type = 'button'; b.onclick = () => set(id); return b; }));
 }
@@ -38,7 +38,7 @@ function zeigen() {
     summe += r.invoice_cents; paid += r.paid_cents;
     const tr = el('tr', '', r.status === 'storniert' ? 'vg-storno' : '');
     const c0 = el('td'); if (r.can_done && data.rights.paid) { const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = auswahl.has(r.id); cb.setAttribute('aria-label', 'Rechnung ' + r.number + ' auswählen'); cb.onchange = () => { cb.checked ? auswahl.add(r.id) : auswahl.delete(r.id); }; c0.append(cb); }
-    const status_td = el('td'); status_td.append(el('span', r.status, 'tag ' + (r.status === 'bezahlt' ? 'ok' : r.status === 'storniert' ? 'err' : 'warn')));
+    const status_td = el('td'); status_td.append(el('span', r.status, 'tag ' + (r.status === 'bezahlt' ? 'ok' : r.status === 'storniert' ? 'err' : r.post ? 'info' : 'warn')));
     if (r.storno) status_td.append(' ', el('span', r.storno, 'muted small'));
     const betrag = el('td', euro(r.invoice_cents), 'num');
     const ist = el('td'); if (r.art === 'T2med' && r.can_done) ist.append(el('span', r.done_date ? '✓ ' + r.done_date.split('-').reverse().join('.') : '–', r.done_date ? 'tag ok' : 'muted'));

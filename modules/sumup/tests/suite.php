@@ -153,6 +153,15 @@ try {
     exec($env . ' php ' . escapeshellarg(dirname(__DIR__) . '/printer/kienzle-sumup-rechnung') . ' ' . escapeshellarg($job) . ' 2>&1', $o, $rc);
     check($rc === 1 && str_contains(implode("\n", $o), 'Unbekanntes Druckformat') && !is_file($job), 'Drucker nimmt Unbekanntes an oder lässt den Auftrag liegen');
 
+    // Virtueller Drucker „Letterxpress“: gleiche Formatprüfung, Auftrag wird gelöscht; ohne eingeschaltetes Letterxpress kein Versand.
+    $job = Suite::$data . '/auftrag2.bin'; file_put_contents($job, "kein PDF");
+    $o = [];
+    exec($env . ' php ' . escapeshellarg(dirname(__DIR__) . '/printer/kienzle-letterxpress') . ' ' . escapeshellarg($job) . ' 2>&1', $o, $rc);
+    check($rc === 1 && str_contains(implode("\n", $o), 'Unbekanntes Druckformat') && !is_file($job), 'Drucker Letterxpress nimmt Unbekanntes an oder lässt den Auftrag liegen');
+    $toml = (string)file_get_contents(dirname(__DIR__) . '/module.toml');
+    check(substr_count($toml, '[[printers]]') === 2 && str_contains($toml, 'command = "printer/kienzle-letterxpress"') && is_executable(dirname(__DIR__) . '/printer/kienzle-letterxpress')
+        && is_file(dirname(__DIR__) . '/public/assets/Letterxpress-PDF.ppd'), 'Drucker Letterxpress nicht vollständig angelegt');
+
     // Haken: install legt Grundwerte und Datenbank an; busy meldet laufende Zahlungen (75); Überblick als JSON.
     $fresh = sys_get_temp_dir() . '/ks-haken-' . bin2hex(random_bytes(5)); mkdir($fresh, 0700); $dirs[] = $fresh;
     $env = 'KIENZLE_DATEN=' . escapeshellarg($fresh) . ' KIENZLE_SUITE_HILFE=' . escapeshellarg(dirname(__DIR__, 3) . '/core/php/modul/Kienzle.php');
