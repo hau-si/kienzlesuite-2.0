@@ -7,9 +7,10 @@ const el = (tag, text, cls) => { const e = document.createElement(tag); if (text
 const euro = c => new Intl.NumberFormat('de-DE', {style: 'currency', currency: 'EUR'}).format(c / 100);
 const ARTEN = [['tag', 'Tag'], ['woche', 'Woche'], ['monat', 'Monat'], ['jahr', 'Jahr']];
 const KINDS = [['alle', 'Alle'], ['t2med', 'T2med'], ['igel', 'IGeL']];
+const PAYS = [['alle', 'Alle Zahlungen'], ['card', '💳 SumUp (Karte)'], ['cash', '💶 Bar'], ['transfer', '🏦 Überweisung']];
 const STATI = [['alle', 'Alle Status'], ['bezahlt', 'Bezahlt'], ['offen', 'Offen'], ['zurueck', 'Zurückgestellt'], ['storniert', 'Storniert']];
 const ZAHLUNG = {card: '💳 Karte', cash: '💶 Bar', transfer: '🏦 Überweisung'};
-let art = 'tag', kind = 'alle', status = 'alle', data = {items: [], rights: {}}, auswahl = new Set();
+let art = 'tag', kind = 'alle', pay = 'alle', status = 'alle', data = {items: [], rights: {periods: false}}, auswahl = new Set();
 const heute = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); };
 async function api(action, body = {}) {
   const r = await fetch(BASE + 'api.php', {method: 'POST', credentials: 'same-origin', cache: 'no-store', headers: {'Content-Type': 'application/json', 'X-Kienzle-Csrf': SUITE_CSRF}, body: JSON.stringify({action, ...body})});
@@ -23,11 +24,12 @@ function chips(box, list, current, set) {
 }
 function sichtbar() {
   const q = $('vg-search').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  return data.items.filter(r => (kind === 'alle' || (kind === 't2med') === (r.art === 'T2med')) && (status === 'alle' || gruppeStatus(r.status) === status)
+  return data.items.filter(r => (kind === 'alle' || (kind === 't2med') === (r.art === 'T2med')) && (pay === 'alle' || r.method === pay) && (status === 'alle' || gruppeStatus(r.status) === status)
     && q.every(t => (r.patient + ' ' + r.number).toLowerCase().includes(t)));
 }
 function zeigen() {
-  chips($('vg-art'), ARTEN, art, id => { art = id; laden(); });
+  chips($('vg-art'), ARTEN.filter(([id]) => data.rights.periods || (id !== 'monat' && id !== 'jahr')), art, id => { art = id; laden(); });
+  chips($('vg-pay'), PAYS, pay, id => { pay = id; zeigen(); });
   chips($('vg-kind'), KINDS, kind, id => { kind = id; zeigen(); });
   chips($('vg-status'), STATI, status, id => { status = id; zeigen(); });
   const rows = sichtbar(), body = $('vg-body'); body.replaceChildren();
@@ -46,7 +48,7 @@ function zeigen() {
   $('vg-empty').hidden = rows.length > 0;
   $('vg-label').textContent = data.period ? data.period.label : '';
   $('vg-sum').textContent = rows.length + ' Vorgänge · Rechnungsbetrag ' + euro(summe) + ' · davon bezahlt (ohne Storno) ' + euro(paid);
-  const q = new URLSearchParams({art, date: $('vg-date').value, kind}); $('vg-export').href = BASE + 'vorgaenge-export.php?' + q;
+  const q = new URLSearchParams({art, date: $('vg-date').value, kind, pay}); $('vg-export').href = BASE + 'vorgaenge-export.php?' + q;
   $('vg-export').hidden = !data.rights.export; $('vg-done').hidden = $('vg-undone').hidden = !data.rights.paid;
   $('vg-all').hidden = !data.rights.paid;
 }

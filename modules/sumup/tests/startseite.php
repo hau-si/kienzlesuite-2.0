@@ -157,5 +157,7 @@ check($vg->markDone([$p60['id']], false) === 1, 'Haken entfernen ohne Wirkung');
 try { $vg->markDone(['nicht-hex'], true); throw new RuntimeException('Ungültige ID beim Abhaken akzeptiert'); } catch (Problem) {}
 $xlsx = $vg->workbook('tag', date('Y-m-d'), 'alle');
 check(str_starts_with($xlsx, 'PK') && strlen($xlsx) > 1000, 'Excel-Liste ungültig');
+check(str_starts_with($vg->workbook('tag', date('Y-m-d'), 'igel', 'cash'), 'PK') && str_starts_with($vg->workbook('tag', date('Y-m-d'), 't2med', 'card'), 'PK'), 'Excel mit Filter Zahlungsart fehlerhaft');
+check(isset($byNum['RE2026-0050']['net_cents'], $byNum['RE2026-0050']['vat_cents']), 'Netto/MwSt. fehlen in den Vorgängen');
 check($vg->filename('monat', '2026-03-05') === 'Vorgaenge-2026-03.xlsx', 'Dateiname falsch');
 echo "Startseite der Kasse: ok\n";

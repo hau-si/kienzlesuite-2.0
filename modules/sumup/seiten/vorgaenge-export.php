@@ -12,9 +12,11 @@ try {
     if ($site !== '' && $site !== 'same-origin' && $site !== 'none') throw new Problem('Unzulässiger Ursprung.', 403);
     if (!Suite::can('export')) throw new Problem('Für die Excel-Liste fehlt das Recht „Excel-Listen“. Bitte den Admin fragen.', 403);
     $app = ks_app();
+    if (in_array($_GET['art'] ?? '', ['monat', 'jahr'], true) && !Suite::can('periods')) throw new Problem('Für die Monats- und Jahresansicht fehlt das Recht.', 403);
     $v = new Vorgaenge($app->db, $app->config);
     $art = App::string($_GET, 'art', 8); $date = App::string($_GET, 'date', 10); $kind = in_array($_GET['kind'] ?? '', ['t2med', 'igel'], true) ? $_GET['kind'] : 'alle';
-    $data = $v->workbook($art, $date, $kind);
+    $pay = in_array($_GET['pay'] ?? '', ['card', 'cash', 'transfer'], true) ? $_GET['pay'] : 'alle';
+    $data = $v->workbook($art, $date, $kind, $pay);
     header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     header('Content-Disposition: attachment; filename="' . $v->filename($art, $date) . '"');
     header('Content-Length: ' . strlen($data));

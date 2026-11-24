@@ -104,19 +104,6 @@ try {
     check(trim((string)$out) === 'ok', 'Excel-Datei fehlerhaft: ' . $out);
     if (getenv('KS_KEEP_XLSX')) copy($state . '/jahr.xlsx', getenv('KS_KEEP_XLSX'));
 
-    // Download nur mit Anmeldung an der Suite und dem Recht „export“.
-    $dirs[] = suite(['KIENZLE_PFAD' => '/kasse'], [], [], $state);
-    $page = new SettingsPage($app->config);
-    problem(fn() => $page->taxExport(['year' => '2026'], fn() => null, fn() => null), 'Export ohne Anmeldung', 401);
-    $dirs[] = suite(staff_server(['paid']), [], [], $state);
-    problem(fn() => (new SettingsPage($app->config))->taxExport(['year' => '2026'], fn() => null, fn() => null), 'Export ohne Recht', 403);
-    $dirs[] = suite(staff_server(['export']), [], [], $state);
-    $page = new SettingsPage($app->config);
-    $headers = []; $data = '';
-    $page->taxExport(['year' => '2026', 'month' => '1'], function ($h) use (&$headers) { $headers[] = $h; }, function ($b) use (&$data) { $data .= $b; });
-    check(str_starts_with($data, "PK\x03\x04") && in_array('Content-Disposition: attachment; filename="Rechnungen-2026-01.xlsx"', $headers, true), 'Download falsch');
-    problem(fn() => $page->taxExport(['year' => 'x'], fn() => null, fn() => null), 'Ungültiges Jahr akzeptiert', 422);
-
     // Einstellungen: Prozentsatz mit Komma, Grenzen.
     $base = config($state);
     Settings::save($app->db, $base, 'tax', ['rate' => '7,5', 'small_business' => false]);

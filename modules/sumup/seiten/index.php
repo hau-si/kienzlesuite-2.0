@@ -5,7 +5,7 @@ use KienzleSumup\Suite;
 if (!Suite::can('kassieren')) {
     http_response_code(403);
     header('Content-Type: text/html; charset=utf-8');
-    $settings = array_diff(Suite::rights(), ['kassieren']) ? '<p><a href="' . ks_h(ks_url('settings.php')) . '">Zu den freigegebenen Bereichen der Kasse</a></p>' : '';
+    $settings = Suite::settingsRights() ? '<p><a href="' . ks_h(ks_url('settings.php')) . '">Zu den freigegebenen Bereichen der Kasse</a></p>' : '';
     exit('<!doctype html><html lang="de"><meta charset="utf-8"><title>Kasse</title><link rel="stylesheet" href="' . ks_h(ks_url('assets/style.css')) . '"><main><section class="card"><h1>Kasse</h1><p>Für die Kasse fehlt das Recht „Kassieren“. Bitte den Admin fragen (Verwaltung → Benutzer der Suite).</p>' . $settings . '<p><a href="/">Zur Kienzle-Suite</a></p></section></main></html>');
 }
 try { $demo = ks_app()->config->get('sumup', 'mode') === 'mock' && ks_app()->config->get('fhir', 'mode') === 'mock'; } catch (\Throwable) { $demo = false; }

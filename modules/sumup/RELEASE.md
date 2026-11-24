@@ -1,5 +1,12 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.20
+
+- **Die neue Vorgänge-Liste ersetzt „Export für die Steuerberatung“ und „T2med-Rechnungen als bezahlt abhaken“** in den Einstellungen; beide Bereiche und die Download-Adresse `tax-export.php` entfallen. Die Excel-Liste enthält zusätzlich die Spalten „davon Netto“ und „davon MwSt.“ für IGeL-Rechnungen. Die nachträgliche Betragskorrektur an T2med-Zahlungen entfällt (dafür gibt es das Storno).
+- **Neue Benutzerrechte** (Verwaltung → Benutzer): „Monats- und Jahresansicht der Vorgänge“ (`periods`); die Ansichten Tag und Woche gehören zum Recht „Kassieren“. „Excel-Export der Vorgänge“ (`export`) und „T2med-Rechnungen in den Vorgängen abhaken“ (`paid`) gelten jetzt für die neue Liste. Wer nur diese Rechte hat, bekommt keinen Zugang zu den Einstellungen mehr (nur Rechnungseingang, Post und Leistungen öffnen sie).
+- **Neues Benutzerrecht „Rechnungen stornieren“** (`storno`): Ohne dieses Recht fehlt die Stornieren-Funktion in der Detailansicht, und die Anfrage wird abgelehnt.
+- Neue Schaltflächen in der Liste: **Alle Zahlungen · 💳 SumUp (Karte) · 💶 Bar · 🏦 Überweisung**; sie wirken auch auf die Excel-Liste.
+
 ## 2.3.4-beta.19
 
 - **Neue Seite „Vorgänge“** (Startseite → „📋 Vorgänge & Export“): alle T2med-Rechnungen und IGeL-Zahlungen eines **Tages, einer Woche, eines Monats oder eines Jahres** (mit Blättern ◀ ▶ und Datumswahl) als übersichtliche Liste mit Art (T2med/IGeL), Nummer, Patient, Zahlungsart, Status (bezahlt, offen, zurückgestellt, storniert) und Betrag, dazu Filter nach Art und Status, Namenssuche und Summe. **Excel-Export** der angezeigten Liste (Recht „Excel-Listen“).

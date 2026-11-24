@@ -138,28 +138,6 @@ try {
     $year = (int)date('Y');
     check(count($export->t2medPaid('all', $year)) === 2 && $export->t2medPaid('all', $year - 1) === [], 'Jahresfilter falsch');
 
-    // Über die Einstellungsseite (Admin) und als Excel.
-    $dirs[] = suite(['KIENZLE_PFAD' => '/kasse'], [], [], $state);
-    $page = new SettingsPage($app->config);
-    problem(fn() => $page->handle('t2med_paid', [], null), 'Liste ohne Anmeldung', 401);
-    $dirs[] = suite(staff_server(['paid']), [], [], $state);
-    $page = new SettingsPage($app->config);
-    check(count($page->handle('t2med_paid', ['status' => 'open'], null)['rows']) === 2, 'Liste über die Seite falsch');
-    problem(fn() => $page->handle('t2med_done', ['ids' => [$a]], 'falsch'), 'Abhaken ohne CSRF', 403);
-    $result = $page->handle('t2med_done', ['ids' => [$a], 'done' => true, 'filter' => ['status' => 'open']], TEST_CSRF);
-    check(str_contains($result['message'], '1 Rechnung als in T2med abgehakt') && count($result['rows']) === 1 && $result['open_total'] === 1, 'Abhaken über die Seite falsch');
-    $data = ''; $headers = [];
-    $page->taxExport(['kind' => 't2med', 'status' => 'all', 'year' => (string)$year], function ($h) use (&$headers) { $headers[] = $h; }, function ($x) use (&$data) { $data .= $x; });
-    check(in_array('Content-Disposition: attachment; filename="T2med-Rechnungen-bezahlt-' . $year . '.xlsx"', $headers, true), 'Dateiname falsch: ' . json_encode($headers));
-    file_put_contents($state . '/t2med.xlsx', $data);
-    $out = shell_exec('python3 -I -c ' . escapeshellarg('import openpyxl,sys
-ws=openpyxl.load_workbook(sys.argv[1])["T2med bezahlt"]
-rows=list(ws.iter_rows(values_only=True))
-assert rows[0][:5]==("Rechnungsnummer","Rechnungsdatum","Patient","Geburtsdatum","Betrag"), rows[0]
-assert [r[0] for r in rows[1:-1]]==["RE2026-0002","RE2026-0010"], rows
-assert rows[2][4]==42.5 and rows[2][9] is not None and rows[1][9] is None and rows[-1][0]=="Summe", rows
-print("ok")') . ' ' . escapeshellarg($state . '/t2med.xlsx') . ' 2>&1');
-    check(trim((string)$out) === 'ok', 'Excel-Liste fehlerhaft: ' . $out);
     echo "GOÄ-Rechner und T2med-Abhakliste ok\n";
 } finally {
     foreach ($dirs as $dir) if (is_dir($dir)) exec('rm -rf ' . escapeshellarg($dir));

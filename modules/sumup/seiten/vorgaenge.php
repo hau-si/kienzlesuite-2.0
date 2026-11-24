@@ -3,10 +3,10 @@ declare(strict_types=1);
 // Vorgänge: alle T2med-Rechnungen und IGeL-Zahlungen eines Tages, einer Woche, eines Monats oder Jahres als Liste mit Excel-Export und Abhaken.
 use KienzleSumup\Suite;
 $k = Suite::modul();
-if (!Suite::can('export') && !Suite::can('paid')) {
+if (!Suite::can('kassieren') && !Suite::can('export') && !Suite::can('paid') && !Suite::can('periods')) {
     http_response_code(403);
     header('Content-Type: text/plain; charset=utf-8');
-    exit("Für die Vorgänge fehlt das Recht „Excel-Listen“ oder „Bezahlt-Liste abhaken“. Bitte den Admin fragen (Verwaltung → Benutzer der Suite).\n");
+    exit("Für die Vorgänge fehlt ein Recht der Kasse (z. B. „Kassieren“). Bitte den Admin fragen (Verwaltung → Benutzer der Suite).\n");
 }
 header('Cache-Control: no-store');
 header('Referrer-Policy: no-referrer');
@@ -24,7 +24,7 @@ ob_start();
 <span class="vg-nav"><button type="button" id="vg-prev" class="secondary" aria-label="Zurück">◀</button><input id="vg-date" type="date" aria-label="Tag im Zeitraum"><button type="button" id="vg-next" class="secondary" aria-label="Weiter">▶</button><button type="button" id="vg-today" class="secondary">Heute</button></span>
 </div>
 <h2 id="vg-label"></h2>
-<div class="vg-filter"><div class="start-tabs" id="vg-kind" role="tablist"></div><div class="start-tabs" id="vg-status" role="tablist"></div><input id="vg-search" type="search" placeholder="Name oder Nummer" autocomplete="off" aria-label="Suchen"></div>
+<div class="vg-filter"><div class="start-tabs" id="vg-kind" role="tablist"></div><div class="start-tabs" id="vg-pay" role="tablist" aria-label="Zahlungsart"></div><div class="start-tabs" id="vg-status" role="tablist"></div><input id="vg-search" type="search" placeholder="Name oder Nummer" autocomplete="off" aria-label="Suchen"></div>
 <p id="vg-sum" class="muted"></p>
 <div class="vg-actions"><a id="vg-export" class="button primary" href="#">⬇ Excel-Liste</a><button type="button" id="vg-done" class="secondary">T2med: Auswahl abhaken</button><button type="button" id="vg-undone" class="secondary">Haken entfernen</button></div>
 <div class="vg-scroll"><table class="fw-table" id="vg-table"><thead><tr><th><input type="checkbox" id="vg-all" aria-label="Alle T2med-Rechnungen auswählen"></th><th>Datum</th><th>Art</th><th>Nummer</th><th>Patient</th><th>Zahlung</th><th>Status</th><th class="num">Betrag</th><th>In T2med</th></tr></thead><tbody id="vg-body"></tbody></table></div>

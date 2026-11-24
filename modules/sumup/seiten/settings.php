@@ -2,7 +2,7 @@
 declare(strict_types=1);
 // Einstellungen und Abrechnung der Kasse. Anmeldung über die Suite; Admins des Moduls sehen alles, Mitarbeiter ihre Bereiche.
 use KienzleSumup\Suite;
-if (!array_diff(Suite::rights(), ['kassieren'])) {
+if (!Suite::settingsRights()) {
     http_response_code(403);
     header('Content-Type: text/plain; charset=utf-8');
     exit("Für die Einstellungen der Kasse fehlt das Recht. Bitte den Admin fragen (Verwaltung → Benutzer der Suite).\n");
@@ -24,13 +24,6 @@ ob_start();
 <div id="tab-panels"></div>
 <div id="sections" hidden></div>
 <section class="card settings-card" id="s-checklist"><h2>Einrichtung – Überblick</h2><p class="muted">Diese Schritte sind nur einmal nötig, geordnet nach dem Ort, an dem sie erledigt werden. Ein Klick auf einen Punkt öffnet die passende Einstellung.</p><div id="checklist"></div></section>
-<section class="card settings-card" id="s-t2med-paid"><h2>T2med-Rechnungen als bezahlt abhaken</h2>
-<p>Alle über den Drucker „SumUp-Rechnung“ übernommenen und per Karte bezahlten T2med-Rechnungen, nach Rechnungsnummer sortiert. In T2med unter Rechnungen die Nummern als bezahlt markieren und hier anschließend abhaken – dann erscheinen beim nächsten Mal nur die neuen. Mit „Korrigieren“ lässt sich eine Zahlung nachträglich stornieren oder der Betrag für Statistik und Excel ändern (keine Erstattung bei SumUp).</p>
-<div id="t2med-paid" class="settings-form"></div></section>
-<section class="card settings-card" id="s-export"><h2>Export für die Steuerberatung</h2>
-<p>Alle hier im Rechnungstool erstellten und bezahlten Rechnungen (bar und Karte, in der Spalte „Zahlungsart“ gekennzeichnet) als Excel-Tabelle – für ein ganzes Jahr oder einen Monat. T2med-Rechnungen sind nicht enthalten; sie stehen in T2med.</p>
-<form id="export-form" class="settings-form export-form"></form>
-<p class="muted small">Die Datei hat drei Blätter: <strong>Rechnungen</strong> (je Rechnung Brutto, Netto und MwSt. je Satz), <strong>Positionen</strong> (jede Leistung einzeln) und <strong>Monatssummen</strong>. Patientennamen nur, wenn angekreuzt.</p></section>
 <section class="card settings-card" id="s-clients"><h2>Arbeitsplätze einrichten</h2>
 <p>Auf dem Kassen-PC diese Seite öffnen, an der Suite anmelden und das passende Paket laden. Es enthält die Einrichtung des Starters, mit dem T2med die Kasse öffnet. Das Zertifikat der Suite vorher einmal einrichten: <a href="/hilfe/arbeitsplatz">Arbeitsplatz einrichten</a>.</p>
 <div id="client-downloads" class="row-buttons"></div>

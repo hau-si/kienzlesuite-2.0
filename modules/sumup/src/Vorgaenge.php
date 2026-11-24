@@ -46,9 +46,11 @@ final class Vorgaenge {
             $amount = (int)($r['corrected_cents'] ?? $r['amount_cents']);
             $status = $r['storno_at'] !== null ? 'storniert' : ($r['payment_status'] === 'transfer_open' ? 'Überweisung offen' : 'bezahlt');
             $method = (string)($r['payment_method'] ?: 'card');
+            $vat = 0;
+            if (!$t2med && $r['invoice_json']) { foreach (Tax::totals(json_decode($r['invoice_json'], true)['items'] ?? []) as $rate => $sum) if ($rate > 0) $vat += (int)$sum['vat']; }
             $number = (string)($r['t2med_invoice'] ?: ($r['doc_number'] ?: ($r['transaction_id'] ?: $r['reference'])));
             $out[] = ['id' => $r['id'], 'source' => 'payment', 'date' => $day, 'time' => $time, 'art' => $t2med ? 'T2med' : 'IGeL', 'number' => $number, 'patient' => (string)$r['pname'], 'birthdate' => (string)$r['pbirth'],
-                'method' => $method, 'status' => $status, 'invoice_cents' => $amount, 'paid_cents' => $status === 'bezahlt' ? $amount : 0, 'storno' => (string)($r['snumber'] ?? ''),
+                'method' => $method, 'status' => $status, 'invoice_cents' => $amount, 'vat_cents' => $vat, 'net_cents' => $t2med ? 0 : $amount - $vat, 'paid_cents' => $status === 'bezahlt' ? $amount : 0, 'storno' => (string)($r['snumber'] ?? ''),
                 'done_date' => $r['t2med_done_at'] !== null ? $when((int)$r['t2med_done_at'])[0] : '', 'can_done' => $t2med && $r['payment_status'] === 'successful' && $r['storno_at'] === null, 'sort' => (int)($r['paid_at'] ?? $r['created_at'])];
         }
         // Noch nicht bezahlte T2med-Rechnungen aus dem Eingang (offen, zurückgestellt, überwiesen, abgelaufen).
@@ -59,7 +61,7 @@ final class Vorgaenge {
             [$day, $time] = $when((int)$i['received_at']);
             $status = (int)$i['received_at'] < $limit ? 'abgelaufen' : ($i['parked_at'] !== null ? 'zurückgestellt' : ($i['transfer_at'] !== null ? 'überwiesen (offen)' : 'offen'));
             $out[] = ['id' => $i['id'], 'source' => 'inbox', 'date' => $day, 'time' => $time, 'art' => 'T2med', 'number' => (string)$i['invoice_number'], 'patient' => (string)$i['patient_name'], 'birthdate' => (string)$i['patient_birthdate'],
-                'method' => '', 'status' => $status, 'invoice_cents' => (int)$i['amount_cents'], 'paid_cents' => 0, 'storno' => '', 'done_date' => '', 'can_done' => false, 'sort' => (int)$i['received_at']];
+                'method' => '', 'status' => $status, 'invoice_cents' => (int)$i['amount_cents'], 'vat_cents' => 0, 'net_cents' => 0, 'paid_cents' => 0, 'storno' => '', 'done_date' => '', 'can_done' => false, 'sort' => (int)$i['received_at']];
         }
         usort($out, static fn($a, $b) => $b['sort'] <=> $a['sort']);
         return ['period' => ['art' => $art, 'label' => $p['label'], 'file' => $p['file'], 'from' => $p['from'], 'to' => $p['to']], 'items' => $out, 'now' => time()];
@@ -67,16 +69,17 @@ final class Vorgaenge {
 
     public function filename(string $art, string $date): string { return 'Vorgaenge-' . $this->period($art, $date)['file'] . '.xlsx'; }
 
-    public function workbook(string $art, string $date, string $kind = 'alle'): string {
+    public function workbook(string $art, string $date, string $kind = 'alle', string $pay = 'alle'): string {
         $data = $this->list($art, $date);
         $rows = [];
         foreach ($data['items'] as $r) {
             if ($kind === 't2med' && $r['art'] !== 'T2med' || $kind === 'igel' && $r['art'] !== 'IGeL') continue;
+            if ($pay !== 'alle' && $r['method'] !== $pay) continue;
             $rows[] = [$r['date'], $r['time'], $r['art'], $r['number'], $r['patient'], $r['birthdate'] ?: null, ['card' => 'Karte', 'cash' => 'Bar', 'transfer' => 'Überweisung', '' => ''][$r['method']] ?? '',
-                $r['status'], $r['invoice_cents'], $r['paid_cents'], $r['storno'], $r['art'] === 'T2med' ? ($r['done_date'] ?: null) : null];
+                $r['status'], $r['invoice_cents'], $r['net_cents'], $r['vat_cents'], $r['paid_cents'], $r['storno'], $r['art'] === 'T2med' ? ($r['done_date'] ?: null) : null];
         }
         $columns = [['title' => 'Datum', 'type' => 'date', 'width' => 12], ['title' => 'Uhrzeit', 'width' => 8], ['title' => 'Art', 'width' => 8], ['title' => 'Rechnungsnummer', 'width' => 24], ['title' => 'Patient', 'width' => 28],
-            ['title' => 'Geburtsdatum', 'type' => 'date', 'width' => 14], ['title' => 'Zahlungsart', 'width' => 14], ['title' => 'Status', 'width' => 18], ['title' => 'Rechnungsbetrag', 'type' => 'money', 'width' => 16],
+            ['title' => 'Geburtsdatum', 'type' => 'date', 'width' => 14], ['title' => 'Zahlungsart', 'width' => 14], ['title' => 'Status', 'width' => 18], ['title' => 'Rechnungsbetrag', 'type' => 'money', 'width' => 16], ['title' => 'davon Netto', 'type' => 'money', 'width' => 14], ['title' => 'davon MwSt.', 'type' => 'money', 'width' => 14],
             ['title' => 'Bezahlt (ohne Storno)', 'type' => 'money', 'width' => 20], ['title' => 'Stornonummer', 'width' => 22], ['title' => 'In T2med abgehakt am', 'type' => 'date', 'width' => 20]];
         $x = new Xlsx(); $x->sheet('Vorgänge', $columns, $rows, true);
         return $x->build();

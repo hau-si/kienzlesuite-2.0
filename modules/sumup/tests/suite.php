@@ -64,8 +64,10 @@ try {
     check(str_contains($html, 'Testpatient öffnen') && !preg_match('/id="demo"[^>]*hidden/', $html), 'Testpatient im Testmodus nicht angeboten');
     [$code] = page($root, staff_server(['paid']) + ['REQUEST_URI' => '/kasse/kassieren']);
     check($code === 403, 'Kasse ohne Recht „kassieren“');
-    [$code, $html] = page($root, staff_server(['paid']) + ['REQUEST_URI' => '/kasse/settings.php']);
+    [$code, $html] = page($root, staff_server(['inbox']) + ['REQUEST_URI' => '/kasse/settings.php']);
     check($code === 200 && str_contains($html, 'settings.js'), 'Einstellungen für Mitarbeiter mit Recht nicht erreichbar');
+    [$code] = page($root, staff_server(['paid', 'export', 'periods']) + ['REQUEST_URI' => '/kasse/settings.php']);
+    check($code === 403, 'Rechte der Vorgänge öffnen die Einstellungen');
     [$code] = page($root, staff_server([]) + ['REQUEST_URI' => '/kasse/settings.php']);
     check($code === 403, 'Einstellungen ohne Recht');
     [$code] = page($root, ['REQUEST_URI' => '/kasse/../etc/passwd'] + $server);
@@ -95,6 +97,31 @@ try {
     check($code === 200 && isset($count['count'], $count['red']) && $count['count'] >= $count['red'], 'Einrichtungszähler fehlt: ' . $out);
     [$code, $out] = page($root, $post + ['HTTP_X_KIENZLE_CSRF' => TEST_CSRF] + staff_server(['kassieren']), json_encode(['action' => 'setup_count']));
     check($code === 200 && (json_decode($out, true)['count'] ?? -1) === 0, 'Zähler ohne Einstellungsrecht nicht 0: ' . $out);
+    // Vorgänge: Tag und Woche für jeden mit Kassenrecht, Monat und Jahr nur mit dem Recht „periods“, Excel nur mit „export“, Abhaken nur mit „paid“.
+    $vg = fn(array $rights, array $in) => page($root, $post + ['HTTP_X_KIENZLE_CSRF' => TEST_CSRF] + staff_server($rights), json_encode($in));
+    [$code, $out] = $vg(['kassieren'], ['action' => 'vorgaenge', 'art' => 'tag', 'date' => date('Y-m-d')]);
+    check($code === 200 && (json_decode($out, true)['rights']['periods'] ?? null) === false, 'Tagesansicht ohne Zusatzrecht: ' . $out);
+    [$code] = $vg(['kassieren'], ['action' => 'vorgaenge', 'art' => 'woche', 'date' => date('Y-m-d')]);
+    check($code === 200, 'Wochenansicht ohne Zusatzrecht');
+    foreach (['monat', 'jahr'] as $art) { [$code] = $vg(['kassieren'], ['action' => 'vorgaenge', 'art' => $art, 'date' => date('Y-m-d')]); check($code === 403, $art . 'sansicht ohne Recht „periods“'); }
+    [$code] = $vg(['periods'], ['action' => 'vorgaenge', 'art' => 'monat', 'date' => date('Y-m-d')]);
+    check($code === 200, 'Monatsansicht mit Recht „periods“');
+    [$code] = $vg(['kassieren'], ['action' => 'storno', 'payment_id' => str_repeat('0', 32)]);
+    check($code === 403, 'Storno ohne Recht „storno“');
+    [$code] = $vg(['kassieren', 'storno'], ['action' => 'storno', 'payment_id' => str_repeat('0', 32)]);
+    check($code !== 403, 'Storno mit Recht „storno“ abgelehnt');
+    [$code] = $vg(['kassieren'], ['action' => 'vorgaenge_done', 'ids' => [], 'done' => true]);
+    check($code === 403, 'Abhaken ohne Recht „paid“');
+    [$code] = $vg(['paid'], ['action' => 'vorgaenge_done', 'ids' => [], 'done' => true]);
+    check($code === 200, 'Abhaken mit Recht „paid“');
+    [$code] = page($root, ['REQUEST_URI' => '/kasse/vorgaenge-export.php', 'REQUEST_METHOD' => 'GET'] + staff_server(['kassieren']), '', [], ['art' => 'tag', 'date' => date('Y-m-d')]);
+    check($code === 403, 'Excel ohne Recht „export“');
+    [$code] = page($root, ['REQUEST_URI' => '/kasse/vorgaenge-export.php', 'REQUEST_METHOD' => 'GET'] + staff_server(['export']), '', [], ['art' => 'monat', 'date' => date('Y-m-d')]);
+    check($code === 403, 'Monats-Excel ohne Recht „periods“');
+    [$code, $out] = page($root, ['REQUEST_URI' => '/kasse/vorgaenge-export.php', 'REQUEST_METHOD' => 'GET'] + staff_server(['export', 'periods']), '', [], ['art' => 'monat', 'date' => date('Y-m-d'), 'pay' => 'cash']);
+    check($code === 200 && str_starts_with($out, 'PK'), 'Monats-Excel mit Rechten: ' . $code);
+    [$code] = page($root, ['REQUEST_URI' => '/kasse/vorgaenge'] + staff_server(['letter']), '', [], []);
+    check($code === 403, 'Vorgänge-Seite ohne Kassenrecht erreichbar');
     [$code, $out] = page($root, $post + ['HTTP_X_KIENZLE_CSRF' => TEST_CSRF] + $server, json_encode(['action' => 'day_stats']));
     check($code === 200 && ($out !== '') && isset(json_decode($out, true)['total_cents']), 'Tageswerte fehlen: ' . $out);
 

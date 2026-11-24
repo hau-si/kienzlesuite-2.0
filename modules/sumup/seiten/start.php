@@ -15,10 +15,10 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-sr
 $version = ks_h(trim((string)file_get_contents(dirname(__DIR__) . '/VERSION')));
 $base = ks_h(Suite::base() . '/');
 $csrf = ks_h($k->csrf());
-$einstellungen = array_diff(Suite::rights(), ['kassieren']) !== [];
+$einstellungen = Suite::settingsRights() !== [];
 ob_start();
 ?>
-<header class="seitenkopf"><div><p class="eyebrow">Kasse</p><h1>Kassieren</h1></div><span class="start-tools"><span id="day-stats" class="muted small"></span><?php if (Suite::can('export') || Suite::can('paid')): ?><a class="button secondary" href="<?= $base ?>vorgaenge">📋 Vorgänge &amp; Export</a><?php endif; ?><?php if ($einstellungen): ?><a class="button secondary" href="<?= $base ?>einstellungen">⚙ Einstellungen<span id="setup-count" class="zaehler" hidden></span></a><?php endif; ?></span></header>
+<header class="seitenkopf"><div><p class="eyebrow">Kasse</p><h1>Kassieren</h1></div><span class="start-tools"><span id="day-stats" class="muted small"></span><a class="button secondary" href="<?= $base ?>vorgaenge">📋 Vorgänge</a><?php if ($einstellungen): ?><a class="button secondary" href="<?= $base ?>einstellungen">⚙ Einstellungen<span id="setup-count" class="zaehler" hidden></span></a><?php endif; ?></span></header>
 <div class="start-grid">
 <aside class="start-left" aria-label="Rechnungen"><div class="start-tabs" id="kinds" role="tablist" aria-label="Art"></div><div class="start-tabs" id="tabs" role="tablist"></div>
 <input id="inv-search" class="inv-search" type="search" placeholder="Name suchen" autocomplete="off" aria-label="Rechnungen nach Namen suchen">

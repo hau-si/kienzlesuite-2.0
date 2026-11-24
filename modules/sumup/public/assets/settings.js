@@ -98,8 +98,6 @@ function render(data) {
   $('warning').hidden = !data.warning; $('warning').textContent = data.warning || '';
   renderInvoicePrinter(data.invoice_printer || {});
   if (data.clients) renderClients(data.clients);
-  if (data.export_years) renderExport(data.export_years, data.mode);
-  if (data.export_years) t2medPaidSetup(data.export_years, data.mode);
   const root = $('sections');
   document.querySelectorAll('[data-generated]').forEach(node => node.remove());
   for (const section of data.sections) {
@@ -204,7 +202,7 @@ const GROUPS = [
   {id: 'sicherheit', label: 'Protokoll', cards: ['s-audit']},
 ];
 const TABS = [
-  {id: 'abrechnung', label: 'Abrechnung', hint: 'laufend', cards: ['s-inbox-list', 's-t2med-paid', 's-export']},
+  {id: 'abrechnung', label: 'Abrechnung', hint: 'laufend', cards: ['s-inbox-list']},
   {id: 'leistungen', label: 'Leistungen', hint: 'GOÄ', cards: ['s-catalog']},
   {id: 'einrichtung', label: 'Einrichtung', hint: 'einmalig', cards: ['s-checklist', ...GROUPS.flatMap(g => g.cards)], groups: GROUPS},
 ];
@@ -359,7 +357,6 @@ function staffMode(data) {
   const panel = $('tab-panels'); panel.replaceChildren(); panel.hidden = false;
   const rights = data.rights || [], can = r => rights.includes(r);
   const take = id => { const card = $(id); if (card) { card.hidden = false; panel.append(card); } };
-  if (can('paid')) { take('s-t2med-paid'); t2medPaidSetup(data.export_years || [], data.mode); }
   if (can('inbox') || can('letter')) { take('s-inbox-list'); loadInbox(); }
   if (can('catalog')) { take('s-catalog'); loadCatalog(); }
   if (!panel.children.length) panel.append(el('p', 'Für diesen Zugang sind keine Bereiche freigegeben. Bitte beim Administrator melden.', 'muted'));
@@ -380,115 +377,6 @@ function ippIpNote(url, ips) {
   return byIp.length ? 'Per IP-Adresse (z. B. aus dem VPN): ' + byIp.map(i => i.url + ' (' + i.name + ')').join(' oder ') + '. ' : '';
 }
 
-// ---- Export für die Steuerberatung ------------------------------------------------------
-const MONTH_NAMES = ['Ganzes Jahr', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
-function renderExport(years, mode) {
-  const form = $('export-form'); if (form.dataset.ready) return; form.dataset.ready = '1';
-  const row = el('div', null, 'export-row');
-  const year = el('select', null, null, {name: 'year', 'aria-label': 'Jahr'}); for (const y of years) year.append(el('option', String(y), null, {value: String(y)}));
-  const month = el('select', null, null, {name: 'month', 'aria-label': 'Zeitraum'}); MONTH_NAMES.forEach((n, i) => month.append(el('option', n, null, {value: String(i)})));
-  const yearField = el('div', null, 'field'); yearField.append(el('label', 'Jahr'), year);
-  const monthField = el('div', null, 'field'); const ml = el('div', null, 'label-row'); ml.append(el('label', 'Zeitraum'));
-  const t = tip({label: 'Zeitraum', tip: 'Ganzes Jahr für den Jahresabschluss, ein Monat z. B. für die monatliche Umsatzsteuer-Voranmeldung. Maßgeblich ist das Zahlungsdatum.'}); if (t) ml.append(t);
-  monthField.append(ml, month); row.append(yearField, monthField); form.append(row);
-  const names = el('label', null, 'check'); const nameBox = el('input', null, null, {type: 'checkbox', name: 'names'}); names.append(nameBox, document.createTextNode(' Patientennamen aufnehmen'));
-  const nl = el('div', null, 'label-row'); nl.append(names);
-  const nt = tip({label: 'Patientennamen', tip: 'Nur ankreuzen, wenn die Steuerberatung die Namen braucht. Ohne Namen reichen Rechnungsnummer, Datum und Betrag für die Buchhaltung.'}); if (nt) nl.append(nt);
-  form.append(nl);
-  let testBox = null;
-  if (mode !== 'live') { const test = el('label', null, 'check'); testBox = el('input', null, null, {type: 'checkbox', name: 'test'}); test.append(testBox, document.createTextNode(' Testzahlungen einbeziehen (nur zum Ausprobieren)')); form.append(test); }
-  const now = new Date(); month.value = '0'; year.value = String(now.getFullYear());
-  const buttons = el('div', null, 'row-buttons'); const link = el('a', 'Excel-Tabelle herunterladen', 'button primary', {download: ''}); buttons.append(link); form.append(buttons);
-  const update = () => { link.href = BASE + 'tax-export.php?' + new URLSearchParams({year: year.value, month: month.value, names: nameBox.checked ? '1' : '0', test: testBox && testBox.checked ? '1' : '0'}); };
-  form.onchange = update; update();
-  link.onclick = () => message('Excel-Tabelle für ' + (month.value === '0' ? 'das Jahr ' + year.value : MONTH_NAMES[month.value] + ' ' + year.value) + ' wird geladen.');
-}
-
-// ---- Bezahlte T2med-Rechnungen abhaken -------------------------------------------------
-let t2medFilter = {status: 'open', year: 0, month: 0, test: false};
-function t2medPaidSetup(years, mode) {
-  const box = $('t2med-paid'); if (box.dataset.ready) return; box.dataset.ready = '1';
-  const bar = el('div', null, 'export-row t2med-bar');
-  const status = el('select', null, null, {'aria-label': 'Anzeigen'}); status.append(el('option', 'Noch nicht abgehakt', null, {value: 'open'}), el('option', 'Alle', null, {value: 'all'}));
-  const year = el('select', null, null, {'aria-label': 'Jahr'}); year.append(el('option', 'Alle Jahre', null, {value: '0'})); for (const y of years) year.append(el('option', String(y), null, {value: String(y)}));
-  const month = el('select', null, null, {'aria-label': 'Monat'}); MONTH_NAMES.forEach((n, i) => month.append(el('option', i ? n : 'Alle Monate', null, {value: String(i)})));
-  for (const [label, input] of [['Anzeigen', status], ['Jahr', year], ['Monat', month]]) { const f = el('div', null, 'field'); f.append(el('label', label), input); bar.append(f); }
-  box.append(bar);
-  let test = null;
-  if (mode !== 'live') { const l = el('label', null, 'check'); test = el('input', null, null, {type: 'checkbox'}); l.append(test, document.createTextNode(' Testzahlungen anzeigen (nur zum Ausprobieren – nie in T2med abhaken)')); box.append(l); }
-  const summary = el('p', null, 'muted small', {id: 't2med-summary'}); const table = el('div', null, 't2med-table', {id: 't2med-table'});
-  const buttons = el('div', null, 'row-buttons');
-  const done = el('button', 'Markierte als in T2med abgehakt', 'primary', {type: 'button'});
-  const undo = el('button', 'Markierte wieder öffnen', 'secondary', {type: 'button'});
-  const link = el('a', 'Liste als Excel herunterladen', 'button secondary', {download: ''});
-  buttons.append(done, undo, link); box.append(summary, table, buttons);
-  const read = () => { t2medFilter = {status: status.value, year: Number(year.value), month: year.value === '0' ? 0 : Number(month.value), test: !!(test && test.checked)}; month.disabled = year.value === '0';
-    link.href = BASE + 'tax-export.php?' + new URLSearchParams({kind: 't2med', status: t2medFilter.status, year: t2medFilter.year, month: t2medFilter.month, test: t2medFilter.test ? '1' : '0'}); };
-  const load = async () => { read(); try { renderT2medPaid(await api('t2med_paid', t2medFilter)); } catch (error) { summary.textContent = error.message; } };
-  const mark = (flag, button) => busy(button, async () => {
-    const ids = [...table.querySelectorAll('input[type=checkbox]:checked')].map(c => c.value);
-    if (!ids.length) throw new Error('Bitte zuerst Rechnungen ankreuzen.');
-    const result = await api('t2med_done', {ids, done: flag, filter: t2medFilter}); renderT2medPaid(result); message(result.message);
-  });
-  done.onclick = () => mark(true, done); undo.onclick = () => mark(false, undo);
-  for (const input of [status, year, month, test].filter(Boolean)) input.onchange = load;
-  load();
-}
-function renderT2medPaid(data) {
-  const table = $('t2med-table'); table.replaceChildren();
-  const euro = c => (c / 100).toLocaleString('de-DE', {style: 'currency', currency: 'EUR'});
-  const date = d => d ? d.split('-').reverse().join('.') : '';
-  const sum = data.rows.reduce((t, r) => t + r.amount_cents, 0);
-  const voided = data.rows.filter(r => r.voided).length;
-  badge('abrechnung', data.open_total);
-  $('t2med-summary').textContent = data.rows.length ? (data.rows.length - voided) + ' Rechnungen, zusammen ' + euro(sum) + (voided ? ' (' + voided + ' storniert, nicht mitgezählt)' : '') + '. Noch nicht abgehakt insgesamt: ' + data.open_total + '.' : 'Keine Rechnungen für diese Auswahl.' + (data.open_total ? '' : ' Alles abgehakt.');
-  if (!data.rows.length) return;
-  const t = el('table'); const head = el('tr');
-  const all = el('input', null, null, {type: 'checkbox', 'aria-label': 'Alle auswählen'}); const th = el('th'); th.append(all); head.append(th);
-  for (const h of ['Re.-Nr.', 'Re.-Datum', 'Patient', 'Geb.', 'Betrag', 'Bezahlt', 'Abgehakt', '']) head.append(el('th', h));
-  t.append(head);
-  for (const r of data.rows) {
-    const tr = el('tr', null, (r.done_date ? 'done ' : '') + (r.voided ? 'voided' : '')); const td = el('td'); const c = el('input', null, null, {type: 'checkbox', value: r.id, 'aria-label': 'Rechnung ' + r.number}); td.append(c); tr.append(td);
-    const amount = r.voided ? 'storniert' : euro(r.amount_cents) + (r.corrected ? ' (bezahlt: ' + euro(r.original_cents) + ')' : '');
-    for (const v of [r.number + (r.test ? ' (Test)' : ''), date(r.invoice_date), r.patient, date(r.birthdate), amount, date(r.paid_date) + ' ' + r.paid_time, date(r.done_date) || '–']) tr.append(el('td', v));
-    const fix = el('button', 'Korrigieren', 'secondary small-button', {type: 'button'});
-    fix.onclick = e => { e.stopPropagation(); correctionPanel(r, table, euro); };
-    const last = el('td'); last.append(fix); tr.append(last);
-    tr.onclick = e => { if (e.target === c || e.target === fix) return; c.checked = !c.checked; };
-    t.append(tr);
-  }
-  all.onchange = () => t.querySelectorAll('td input').forEach(c => { c.checked = all.checked; });
-  table.append(t);
-}
-// Nachträgliche Korrektur einer bezahlten Rechnung (nur Statistik und Excel; keine Erstattung bei SumUp).
-function correctionPanel(r, table, euro) {
-  const old = table.querySelector('.t2med-correct'); if (old) old.remove();
-  const box = el('div', null, 't2med-correct');
-  box.append(el('h3', 'Korrektur: Rechnung ' + r.number + (r.patient ? ' – ' + r.patient : '')));
-  box.append(el('p', 'Per Karte bezahlt: ' + euro(r.original_cents) + '. Die Korrektur ändert nur die Statistik und die Excel-Liste. Eine Erstattung an den Patienten erfolgt nicht automatisch, sie muss im SumUp-Konto vorgenommen werden. Das Original bleibt gespeichert.', 'muted small'));
-  const f1 = el('div', null, 'field'); f1.append(el('label', 'Richtiger Betrag in Euro'));
-  const amount = el('input', null, null, {type: 'text', inputmode: 'decimal', value: ((r.voided ? r.original_cents : r.amount_cents) / 100).toFixed(2).replace('.', ',')}); f1.append(amount);
-  const f2 = el('div', null, 'field'); f2.append(el('label', 'Notiz (optional, z. B. Grund)'));
-  const note = el('input', null, null, {type: 'text', maxlength: '200', value: r.note || ''}); f2.append(note);
-  const buttons = el('div', null, 'row-buttons');
-  const send = (change, button, confirmText) => { if (confirmText && !confirm(confirmText)) return; busy(button, async () => {
-    const result = await api('t2med_correct', {id: r.id, change, amount: amount.value, note: note.value, filter: t2medFilter}); renderT2medPaid(result); message(result.message); }); };
-  const save = el('button', 'Betrag ändern', 'primary', {type: 'button'}); save.onclick = () => send('amount', save);
-  const cancel = el('button', 'Zahlung stornieren', 'secondary', {type: 'button'}); cancel.onclick = () => send('void', cancel, 'Zahlung für Rechnung ' + r.number + ' stornieren? Sie zählt dann nicht mehr in der Statistik. Das Geld wird dadurch NICHT erstattet.');
-  buttons.append(save, cancel);
-  if (r.voided || r.corrected) { const undo = el('button', 'Korrektur zurücknehmen', 'secondary', {type: 'button'}); undo.onclick = () => send('restore', undo); buttons.append(undo); }
-  const close = el('button', 'Schließen', 'secondary', {type: 'button'}); close.onclick = () => box.remove(); buttons.append(close);
-  box.append(f1, f2, buttons);
-  table.append(box); box.scrollIntoView({block: 'nearest'});
-}
-
-// ---- Arbeitsplätze ---------------------------------------------------------------------
-const CLIENT_STEPS = {
-  windows: ['ZIP-Datei mit Rechtsklick → „Alle extrahieren …“ entpacken.', '„install-windows.cmd“ doppelklicken. Bei „Windows hat den PC geschützt“: „Weitere Informationen“ → „Trotzdem ausführen“.',
-    'Die Zertifikatswarnung mit „Ja“ bestätigen – das Fenster liegt manchmal hinter anderen Fenstern (Taskleiste prüfen).', 'Fertig, wenn „Kienzle-SumUp eingerichtet“ erscheint.'],
-  macos: ['ZIP-Datei doppelklicken.', '„install-macos.command“ mit Rechtsklick → „Öffnen“ starten.', 'Mac-Passwort für das Zertifikat eingeben.'],
-  linux: ['ZIP-Datei entpacken.', 'Im entpackten Ordner im Terminal: bash install-linux.sh', 'server.crt im Browser als vertrauenswürdig importieren.'],
-};
 function guessSystem() { const p = navigator.userAgent; return /Windows/.test(p) ? 'windows' : /Mac OS X|Macintosh/.test(p) ? 'macos' : /Linux|X11/.test(p) ? 'linux' : 'windows'; }
 function renderClients(clients) {
   const box = $('client-downloads'); box.replaceChildren(); const steps = $('client-steps'); steps.replaceChildren();

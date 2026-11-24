@@ -56,7 +56,7 @@ function detail(item) {
   if (item.storno) {
     const s = el('div', '', 'storno-box'); s.append(el('p', 'Storniert am ' + new Date(item.storno.at * 1000).toLocaleString('de-DE', {dateStyle: 'short', timeStyle: 'short'}) + ' mit Stornorechnung ' + item.storno.number + '. Die ursprüngliche Rechnung bleibt für die Buchhaltung erhalten.', 'tag warn'));
     const l = el('a', 'Stornorechnung (PDF)', 'button secondary'); l.href = BASE + 'beleg.php?s=' + encodeURIComponent(item.storno.id); l.target = '_blank'; l.rel = 'noopener'; s.append(l); box.append(s);
-  } else {
+  } else if (rechte.storno) {
     const f = el('details', '', 'fold'); f.append(el('summary', item.open_transfer ? 'Offene Rechnung stornieren …' : 'Stornieren …'));
     const grund = document.createElement('input'); grund.maxLength = 200; grund.placeholder = 'Grund (optional)'; grund.setAttribute('aria-label', 'Grund der Stornierung');
     const knopf = el('button', 'Stornorechnung mit neuer Nummer erstellen', 'secondary'); knopf.type = 'button';
@@ -119,8 +119,8 @@ function inArbeit() { try { return $('work').contentDocument.body.dataset.dirty 
 async function liste() {
   try {
     const result = await api('open_inbox'); items = result.items || [];
-    try { erledigt = ((await api('processed')).items || []).map(x => ({...x, erledigt: true})); } catch { erledigt = []; } letter = !!(result.letter && result.letter.enabled);
-    jetzt = result.now || Math.floor(Date.now() / 1000); rechte = result.rights || {};
+    try { const proc = await api('processed'); rechte = {...rechte, ...(proc.rights || {})}; erledigt = (proc.items || []).map(x => ({...x, erledigt: true})); } catch { erledigt = []; } letter = !!(result.letter && result.letter.enabled);
+    jetzt = result.now || Math.floor(Date.now() / 1000); rechte = {...rechte, ...(result.rights || {})};
     items.sort((a, b) => b.received_at - a.received_at);
     // Die neueste Rechnung ist zuerst vorgewählt; später eingehende nur, wenn gerade nichts in Arbeit ist (nie mitten im Vorgang umschalten).
     const offen = items.filter(i => gruppe(i) === 'offen'), neueste = offen[0];

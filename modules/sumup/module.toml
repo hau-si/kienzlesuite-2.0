@@ -5,7 +5,7 @@
 [module]
 id = "sumup"
 name = "Kasse"
-version = "2.3.4-beta.19"
+version = "2.3.4-beta.20"
 core_api = "1"
 description = "Kartenzahlung am SumUp Solo aus T2med, T2med-Rechnungseingang über den Drucker „SumUp-Rechnung“, GOÄ-Leistungen, Barzahlung, Belege per E-Mail, Druck und Post."
 
@@ -29,7 +29,7 @@ label = "Kasse: Kartenzahlung und Barzahlung aus T2med"
 
 [[rights]]
 id = "paid"
-label = "Kasse: bezahlte T2med-Rechnungen abhaken"
+label = "Kasse: T2med-Rechnungen in den Vorgängen abhaken"
 
 [[rights]]
 id = "inbox"
@@ -45,7 +45,15 @@ label = "Kasse: Leistungen und GOÄ-Positionen bearbeiten"
 
 [[rights]]
 id = "export"
-label = "Kasse: Excel-Export für die Steuerberatung"
+label = "Kasse: Excel-Export der Vorgänge"
+
+[[rights]]
+id = "storno"
+label = "Kasse: Rechnungen stornieren"
+
+[[rights]]
+id = "periods"
+label = "Kasse: Monats- und Jahresansicht der Vorgänge"
 
 [backup]
 paths = ["/var/lib/kienzle/sumup"]
