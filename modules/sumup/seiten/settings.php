@@ -32,6 +32,9 @@ ob_start();
 <section class="card settings-card" id="invoice-printer-help" hidden><h2>Drucker „SumUp-Rechnung“</h2>
 <div id="invoice-printer-status"></div>
 </section>
+<section class="card settings-card" id="letter-printer-help" hidden><h2>Drucker „Letterxpress“</h2>
+<div id="letter-printer-status"></div>
+</section>
 <section class="card settings-card" id="s-inbox-list"><h2>Rechnungseingang</h2>
 <p class="muted">Die Rechnungsliste steht jetzt unter „Vorgänge“ (Startseite der Kasse). Hier erscheinen nur Rechnungen, die der Drucker „SumUp-Rechnung“ angenommen, aber nicht übernommen hat.</p>
 <div class="row-buttons"><button id="inbox-load" class="secondary" type="button">Aktualisieren</button></div>

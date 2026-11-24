@@ -65,7 +65,7 @@ try {
     [$code] = page($root, staff_server(['paid']) + ['REQUEST_URI' => '/kasse/kassieren']);
     check($code === 403, 'Kasse ohne Recht „kassieren“');
     [$code, $html] = page($root, staff_server(['inbox']) + ['REQUEST_URI' => '/kasse/settings.php']);
-    check($code === 200 && str_contains($html, 'settings.js'), 'Einstellungen für Mitarbeiter mit Recht nicht erreichbar');
+    check($code === 200 && str_contains($html, 'settings.js') && str_contains($html, 'id="letter-printer-help"'), 'Einstellungen für Mitarbeiter mit Recht nicht erreichbar');
     [$code] = page($root, staff_server(['paid', 'export', 'periods']) + ['REQUEST_URI' => '/kasse/settings.php']);
     check($code === 403, 'Rechte der Vorgänge öffnen die Einstellungen');
     [$code] = page($root, staff_server([]) + ['REQUEST_URI' => '/kasse/settings.php']);

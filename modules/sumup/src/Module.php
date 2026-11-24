@@ -19,6 +19,16 @@ final class Module {
             'url' => 'http://' . Suite::host() . ':631/printers/' . self::INVOICE_QUEUE, 'ips' => []];
     }
 
+    /** Zustand des virtuellen Druckers „Letterxpress“ (Sammelversand per Post; nur sinnvoll bei eingeschaltetem Letterxpress). */
+    public static function letterPrinter(Config $config): array {
+        $queue = null;
+        try {
+            foreach (Suite::modul()->drucker() as $q) if ($q['name'] === self::LETTER_QUEUE) $queue = ['state' => $q['state'] ?: 'bereit', 'ours' => true];
+        } catch (\Throwable) {}
+        return ['enabled' => (bool)$config->get('letterxpress', 'enabled', false), 'installed' => true, 'queue' => $queue,
+            'url' => 'http://' . Suite::host() . ':631/printers/' . self::LETTER_QUEUE, 'ips' => []];
+    }
+
     /**
      * Einrichtungs-Überblick im Format der Suite (docs/MODULE-TOML.md, [setup] overview): Punkte mit title, state
      * (done/open/error), hint und link (unter dem eigenen Webpfad).

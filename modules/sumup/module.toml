@@ -5,7 +5,7 @@
 [module]
 id = "sumup"
 name = "Kasse"
-version = "2.3.4-beta.21"
+version = "2.3.4-beta.22"
 core_api = "1"
 description = "Kartenzahlung am SumUp Solo aus T2med, T2med-Rechnungseingang über den Drucker „SumUp-Rechnung“, GOÄ-Leistungen, Barzahlung, Belege per E-Mail, Druck und Post."
 
@@ -66,7 +66,7 @@ label = "T2med-Rechnung an die Kasse (Rechnungseingang)"
 command = "printer/kienzle-sumup-rechnung"
 formats = ["application/pdf", "application/postscript"]
 paper = "A4"
-share = ["samba", "ipp"]
+share = ["ipp"]
 
 [[printers]]
 name = "Letterxpress"
@@ -74,7 +74,7 @@ label = "T2med-Rechnung direkt per Post (Letterxpress)"
 command = "printer/kienzle-letterxpress"
 formats = ["application/pdf", "application/postscript"]
 paper = "A4"
-share = ["samba", "ipp"]
+share = ["ipp"]
 
 [[connections]]
 id = "t2med"

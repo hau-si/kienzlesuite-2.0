@@ -125,3 +125,15 @@ document.addEventListener('DOMContentLoaded', function () {
   if (reset) reset.addEventListener('click', () => rows.forEach((row) => { row.querySelector('input[data-erg]').checked = base(row); mark(row); }));
   columns();
 });
+
+// Adresse in die Zwischenablage (Knopf mit data-copy) und Schalter, die sofort speichern (Formular mit data-auto).
+document.addEventListener('click', function (e) {
+  const b = e.target.closest('[data-copy]');
+  if (!b) return;
+  const text = b.dataset.copy, done = () => { const old = b.textContent; b.textContent = 'Kopiert'; setTimeout(() => { b.textContent = old; }, 1500); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, () => {});
+});
+document.addEventListener('change', function (e) {
+  const f = e.target.closest('form[data-auto]');
+  if (f) f.requestSubmit();
+});

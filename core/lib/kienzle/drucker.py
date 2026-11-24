@@ -401,6 +401,8 @@ def set_share(name: str, share: list[str]) -> str:
     q = {x['name']: x for x in queues()}.get(name)
     if not q or not q['managed']:
         raise Fehler('Nur Drucker der Suite lassen sich hier freigeben.')
+    if q.get('modul'):
+        share = sorted(set(share) | {'ipp'})   # virtuelle Drucker der Module: IPP ist immer an
     run('lpadmin', '-p', name, '-o', f'printer-is-shared={"true" if "ipp" in share else "false"}')
     _set_share(name, share)
     return f'Freigabe für „{name}“ gespeichert.'
@@ -534,6 +536,7 @@ def sync() -> list[str]:
         for p in m.get('printers') or []:
             wanted[p['name']] = {**p, 'command': p.get('command'), 'formats': p.get('formats') or ['application/pdf'], 'modul': mid, 'scheme': scheme(mid, p['name'])}
     installed = _read(STATE / 'installiert.json', {})
+    shares_now = _read(STATE / 'freigaben.json', {})
     notes = []
     current = {q['name']: q for q in queues()}
     used_ports = {i.get('port') for n, i in installed.items() if n in wanted}
@@ -590,12 +593,16 @@ def sync() -> list[str]:
         except (OSError, Fehler) as e:
             notes.append(f'{name}: {e}')
             continue
+        # Virtuelle Drucker sind immer per IPP freigegeben (Standardweg für alle Betriebssysteme). Samba ist optional: neue Drucker
+        # übernehmen die Vorgabe des Moduls, bei bekannten bleibt die Wahl des Admins auch nach einem Abgleich erhalten.
+        samba_an = 'samba' in (shares_now[name] if name in shares_now else p['share'])
+        share = ['ipp', 'samba'] if samba_an else ['ipp']
         if not q or changed or q['uri'] != uri:
             run('lpadmin', '-p', name, '-v', uri, *model, '-D', f'{MARK} Modul {p["modul"]}: {p["label"]}'[:127],
-                '-L', 'auf diesem Server', '-o', f'printer-is-shared={"true" if "ipp" in p["share"] else "false"}', '-E', timeout=90)
+                '-L', 'auf diesem Server', '-o', 'printer-is-shared=true', '-E', timeout=90)
             notes.append(f'{name}: angelegt bzw. aktualisiert.')
         installed[name] = entry
-        _set_share(name, p['share'])
+        _set_share(name, share)
     for name, q in current.items():
         if q['modul'] and name not in wanted:
             run('lpadmin', '-x', name, timeout=30)

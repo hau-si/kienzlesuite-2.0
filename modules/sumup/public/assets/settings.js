@@ -97,6 +97,7 @@ function render(data) {
   $('mode').classList.toggle('live', data.mode === 'live');
   $('warning').hidden = !data.warning; $('warning').textContent = data.warning || '';
   renderInvoicePrinter(data.invoice_printer || {});
+  renderLetterPrinter(data.letter_printer || {});
   if (data.clients) renderClients(data.clients);
   const root = $('sections');
   document.querySelectorAll('[data-generated]').forEach(node => node.remove());
@@ -171,24 +172,30 @@ function render(data) {
   layoutTabs(data);
 }
 
-// ---- Drucker „SumUp-Rechnung“ (wird beim Einschalten automatisch angelegt) ---------------
-function renderInvoicePrinter(info) {
-  $('invoice-printer-help').hidden = !info.enabled;
-  const box = $('invoice-printer-status'); box.replaceChildren();
+// ---- Virtuelle Drucker „SumUp-Rechnung“ und „Letterxpress“ (legt die Suite aus module.toml an) ---------------
+const PRINTERS = {
+  invoice: {box: 'invoice-printer', queue: 'SumUp-Rechnung', ppd: 'SumUp-Rechnung-PDF.ppd', use: 'In T2med die Rechnung auf diesen Drucker drucken – sie erscheint dann beim Patienten zum Kassieren.'},
+  letter: {box: 'letter-printer', queue: 'Letterxpress', ppd: 'Letterxpress-PDF.ppd', use: 'Für den Sammelversand in T2med vorübergehend den Rechnungsdrucker auf diesen Drucker umstellen: jede gedruckte Rechnung geht sofort per Post an Letterxpress (und erscheint unter Vorgänge). Danach wieder zurückstellen.'},
+};
+function renderInvoicePrinter(info) { renderPrinterHelp(PRINTERS.invoice, info); }
+function renderLetterPrinter(info) { renderPrinterHelp(PRINTERS.letter, info); }
+function renderPrinterHelp(cfg, info) {
+  $(cfg.box + '-help').hidden = !info.enabled;
+  const box = $(cfg.box + '-status'); box.replaceChildren();
   if (!info.enabled) return;
   if (!info.queue) {
-    const p = el('p', 'Der Drucker „SumUp-Rechnung“ fehlt in der Suite. Unter Verwaltung → Drucker „Virtuelle Drucker abgleichen“ wählen; legt die Suite ihn dann nicht an, das Modul unter Verwaltung → Module neu installieren.', 'inline-error');
-    box.append(p); return;
+    box.append(el('p', 'Der Drucker „' + cfg.queue + '“ fehlt in der Suite. Unter Verwaltung → Drucker „Virtuelle Drucker abgleichen“ wählen; legt die Suite ihn dann nicht an, das Modul unter Verwaltung → Module neu installieren.', 'inline-error'));
+    return;
   }
-  if (!info.queue.ours) { box.append(el('p', 'Ein anderer Drucker heißt bereits „SumUp-Rechnung“. Bitte diesen umbenennen oder entfernen.', 'inline-error')); return; }
-  box.append(el('p', 'Eingerichtet (' + info.queue.state + '). In T2med die Rechnung auf diesen Drucker drucken – sie erscheint dann beim Patienten zum Kassieren.', 'notice'));
+  if (!info.queue.ours) { box.append(el('p', 'Ein anderer Drucker heißt bereits „' + cfg.queue + '“. Bitte diesen umbenennen oder entfernen.', 'inline-error')); return; }
+  box.append(el('p', 'Eingerichtet (' + info.queue.state + '), per IPP freigegeben. ' + cfg.use, 'notice'));
   const ol = el('ol', null, 'steps');
   ol.append(el('li', 'Windows: Drucker hinzufügen → „Freigegebenen Drucker über den Namen auswählen“: ' + info.url + ' – Treiber „Microsoft IPP Class Driver“, Papier A4. ' + ippIpNote(info.url, info.ips)));
   const driver = el('li', 'Windows 11: Fehlt der Treiber „Microsoft IPP Class Driver“ oder akzeptiert Windows die Adresse nicht, PowerShell als Administrator öffnen und ausführen:');
-  driver.append(el('pre', ippPowerShell('SumUp-Rechnung', info.url, info.ips, 'A4'), 'audit-list'));
+  driver.append(el('pre', ippPowerShell(cfg.queue, info.url, info.ips, 'A4'), 'audit-list'));
   ol.append(driver);
   ol.append(el('li', 'Druckereigenschaften lassen sich nicht öffnen („Das Handle ist ungültig“) oder der Druck bleibt aus: Die Windows-Einrichtung ist veraltet, z. B. nach Neueinrichtung des Servers. Drucker entfernen und mit dem PowerShell-Skript oben neu einrichten (es startet den Druckspooler neu und entfernt den alten Drucker). Eine Meldung beim Löschen alter Anschlüsse („Anschluss unbekannt“) ist harmlos. Möglichst die IP-Adresse statt des Namens verwenden.'));
-  const mac = el('li'); mac.append(document.createTextNode('Mac: „SumUp-Rechnung“ hinzufügen, als Treiber die Datei '), el('a', 'SumUp-Rechnung-PDF.ppd', null, {href: BASE + 'assets/SumUp-Rechnung-PDF.ppd', download: 'SumUp-Rechnung-PDF.ppd'}), document.createTextNode(' wählen.'));
+  const mac = el('li'); mac.append(document.createTextNode('Mac: „' + cfg.queue + '“ hinzufügen, als Treiber die Datei '), el('a', cfg.ppd, null, {href: BASE + 'assets/' + cfg.ppd, download: cfg.ppd}), document.createTextNode(' wählen.'));
   ol.append(mac); box.append(ol);
 }
 
@@ -300,6 +307,7 @@ function t2medSetupHelp() {
 const PLACES = {web: 'In diesem Webfenster', pc: 'Auf den Kassen-PCs', t2med: 'In T2med'};
 function renderChecklist(data) {
   const invoiceQueue = !!(data.invoice_printer && data.invoice_printer.queue);
+  const letterQueue = !!(data.letter_printer && data.letter_printer.queue && data.letter_printer.enabled);
   const flag = key => !!(data.sections.find(s => s.id === key)?.fields.find(f => f.key === 'enabled') || {}).value;
   // Punkte der Kasse kommen vom Server (dieselben wie im Einrichtungs-Überblick der Suite), schon in der nötigen Reihenfolge.
   const own = (data.setup || []).map(i => ({ort: /Starter/.test(i.title) ? 'pc' : 'web', done: i.state === 'done', error: i.state === 'error', label: i.title, card: (i.link || '').split('#')[1] || 's-checklist', detail: i.hint}));
@@ -311,6 +319,7 @@ function renderChecklist(data) {
     {ort: 'pc', info: true, label: 'Zertifikat der Suite einrichten (einmal je PC, siehe Arbeitsplatz einrichten der Suite)', card: 's-clients'},
     ...pc,
     ...(invoiceQueue ? [{ort: 'pc', info: true, label: 'Drucker „SumUp-Rechnung“ am Arbeitsplatz installieren (Windows: IPP-Drucker hinzufügen, Papier A4)', card: 'invoice-printer-help', detail: (data.invoice_printer && data.invoice_printer.url) || ''}] : []),
+    ...(letterQueue ? [{ort: 'pc', info: true, label: 'Drucker „Letterxpress“ am Arbeitsplatz installieren (für den Sammelversand per Post; wie „SumUp-Rechnung“, Papier A4)', card: 'letter-printer-help', detail: (data.letter_printer && data.letter_printer.url) || ''}] : []),
     {ort: 't2med', info: true, label: 'Drittanbieter-Zugriff mit Funktionsleisten-Button „Kartenzahlung“ anlegen (Aufruf-Adresse steht bei der T2med-Anbindung)', card: 's-fhir', href: GUIDE_URL, hrefLabel: 'Anleitung mit Bildern'},
     ...(invoiceQueue ? [{ort: 't2med', info: true, label: 'Rechnungen in T2med auf den zuvor installierten Drucker „SumUp-Rechnung“ drucken', card: 'invoice-printer-help'}] : []),
   ];

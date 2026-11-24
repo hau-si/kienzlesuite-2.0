@@ -56,7 +56,11 @@ final class Printers {
 
     public function remove(string $name): void { $this->write(['action' => 'entfernen', 'name' => $this->known($name)]); }
     public function testPage(string $name): void { $this->write(['action' => 'testseite', 'name' => $this->known($name)]); }
-    public function share(string $name, array $share): void { $this->write(['action' => 'freigabe', 'name' => $this->known($name), 'freigabe' => self::shares($share)]); }
+    public function share(string $name, array $share): void {
+        $virtual = array_filter($this->status()['queues'], fn($q) => $q['name'] === $name && $q['modul'] !== '') !== [];
+        // Virtuelle Drucker der Module sind immer per IPP freigegeben; Samba (alte Windows-Freigabe) ist optional.
+        $this->write(['action' => 'freigabe', 'name' => $this->known($name), 'freigabe' => self::shares($virtual ? [...$share, 'ipp'] : $share)]);
+    }
     public function sync(): void { $this->write(['action' => 'abgleichen']); }
 
     public function cancelJob(string $id): void {

@@ -1,5 +1,12 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.39
+
+- **Virtuelle Drucker: IPP immer an, Samba optional.** Verwaltung → Drucker zeigt jeden virtuellen Drucker als Karte: IPP-Adresse mit Knopf „Kopieren“, „Freigabe per IPP: immer an“, ein Schalter „Windows-Freigabe (Samba, alt)“ (speichert sofort, Erläuterung im Hinweis „i“: standardmäßig aus, von neuem Windows nicht mehr unterstützt, IPP ist der Standardweg für alle Betriebssysteme) und „Testseite“. Das Häkchen für IPP und „Freigabe speichern“ entfallen.
+- Neue virtuelle Drucker starten nur mit IPP (`share = ["ipp"]` in allen Modulen). Der Druckerdienst gibt virtuelle Drucker immer per IPP frei, auch wenn ein Modul nichts nennt; die Samba-Wahl des Admins bleibt bei einem Abgleich erhalten (bisher setzte der Abgleich sie auf die Vorgabe des Moduls zurück). Bereits mit Samba freigegebene Drucker behalten es.
+- Anleitung für die Arbeitsplätze: Voraussetzung neu formuliert (nur Firewall IPP 631), PPD-Datei je Drucker (auch „Letterxpress“), Hinweis zum Sammelversand.
+- Nicht auf der echten VM geprüft (Seite, Kopieren, Sofort-Speichern mit Skript).
+
 ## 0.21.4-beta.38
 
 - Verwaltung → Server: Der Verweis „Name, Anschrift, Konto und Steuer der Praxis“ (zeigte nur auf „Praxis“) entfällt.

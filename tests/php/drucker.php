@@ -62,6 +62,17 @@ function test_seite(): void {
     $r = $b->post('/verwaltung/drucker', ['aktion' => 'freigabe', 'name' => 'Bon', 'samba' => '1', 'ipp' => '1']);
     check($r->status === 303 && req_p($env) === ['action' => 'freigabe', 'name' => 'Bon', 'freigabe' => ['samba', 'ipp']], 'Freigabe');
     check(str_contains(implode("\n", $env->audit->recent()), 'drucker-freigabe Bon'), 'nicht protokolliert');
+    // Virtuelle Drucker: Karte mit IPP-Adresse zum Kopieren, IPP immer an, Samba als Schalter mit Erläuterung; IPP wird auch ohne Feld erzwungen
+    $page = $b->get('/verwaltung/drucker')->body;
+    check(str_contains($page, 'class="vp-karte"') && str_contains($page, 'data-copy="http://') && str_contains($page, ':631/printers/Beispiel-Drucker') && str_contains($page, 'Freigabe per IPP: immer an')
+        && str_contains($page, 'Windows-Freigabe (Samba, alt)') && str_contains($page, 'class="inline vp-samba" data-auto') && str_contains($page, 'nicht mehr unterstützt') && str_contains($page, 'Standardweg für alle Betriebssysteme')
+        && !str_contains($page, 'Freigabe speichern') && !str_contains($page, 'für macOS und andere freigeben'), 'Karte der virtuellen Drucker: ');
+    check(substr_count($page, 'name="samba" value="1"') === 1 && substr_count($page, 'name="samba" value="1" checked') === 0, 'Samba beim virtuellen Drucker ohne Freigabe ist angehakt');
+    $r = $b->post('/verwaltung/drucker', ['aktion' => 'freigabe', 'name' => 'Beispiel-Drucker', 'samba' => '1']);
+    check($r->status === 303, 'Freigabe virtuell: ' . $r->status);
+    check(req_p($env) === ['action' => 'freigabe', 'name' => 'Beispiel-Drucker', 'freigabe' => ['samba', 'ipp']], 'IPP wird bei virtuellen Druckern nicht erzwungen');
+    $b->post('/verwaltung/drucker', ['aktion' => 'freigabe', 'name' => 'Beispiel-Drucker']);
+    check(req_p($env) === ['action' => 'freigabe', 'name' => 'Beispiel-Drucker', 'freigabe' => ['ipp']], 'Ohne Samba muss IPP bleiben');
     check($b->post('/verwaltung/drucker', ['aktion' => 'anlegen', 'art' => 'bon', 'adresse' => ''])->status === 422, 'leere Adresse');
     $env->user('bert');
     $m = new Browser($env); $m->web = fn() => $m->defaultWeb(null, null, null, null, $p);

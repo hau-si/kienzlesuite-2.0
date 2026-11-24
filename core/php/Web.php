@@ -1906,9 +1906,26 @@ final class Web {
         return $this->printers;
     }
 
-    private function shareBoxes(array $share): string {
-        return V::checkbox('samba', '1', 'für Windows freigeben (Samba)', in_array('samba', $share, true))
-            . V::checkbox('ipp', '1', 'für macOS und andere freigeben (IPP)', in_array('ipp', $share, true));
+    private const SAMBA_HINT = 'Alte Windows-Freigabe (Samba, Port 445). Standardmäßig aus und von neuem Windows (ab 11 24H2) nicht mehr unterstützt. IPP ist bereits für alle virtuellen Drucker freigegeben und der Standardweg für alle Betriebssysteme.';
+
+    /** Name oder Adresse, unter der die Arbeitsplätze den Server erreichen (für die IPP-Adresse der virtuellen Drucker). */
+    private function printerHost(): string {
+        $host = strtolower((string)preg_replace('/:\d+$/', '', (string)($_SERVER['HTTP_HOST'] ?? 'server')));
+        return $this->config->ownHost($host) ? $host : 'server';
+    }
+
+    /** Karte eines virtuellen Druckers: IPP-Adresse zum Kopieren, IPP immer an, Samba als Schalter (speichert sofort), Testseite. */
+    private function virtualPrinterCard(array $q, string $host, string $dis): string {
+        $url = 'http://' . $host . ':631/printers/' . rawurlencode((string)$q['name']);
+        $samba = in_array('samba', $q['share'], true);
+        return '<div class="vp-karte"><div class="vp-kopf"><strong>' . V::h($q['name']) . '</strong> <span class="tag ' . ($q['state'] === 'bereit' || $q['state'] === 'idle' ? 'ok' : 'warn') . '">' . V::h($q['state']) . '</span>'
+            . '<span class="muted small vp-modul">Modul ' . V::h($this->modules->name($q['modul'])) . '</span></div>'
+            . '<div class="vp-adresse"><code>' . V::h($url) . '</code><button type="button" class="link" data-copy="' . V::h($url) . '" title="Adresse kopieren">Kopieren</button></div>'
+            . '<div class="vp-fuss"><span class="muted small">Freigabe per IPP: immer an</span>'
+            . '<form method="post" action="/verwaltung/drucker" class="inline vp-samba" data-auto>' . $this->hidden('freigabe', ['name' => $q['name']]) . '<input type="hidden" name="ipp" value="1">'
+            . '<label><input type="checkbox" name="samba" value="1"' . ($samba ? ' checked' : '') . $dis . '> Windows-Freigabe (Samba, alt)</label>'
+            . '<span class="hilfe" tabindex="0" role="note" aria-label="' . V::h(self::SAMBA_HINT) . '" data-tip="' . V::h(self::SAMBA_HINT) . '">i</span><noscript><button' . $dis . '>Speichern</button></noscript></form>'
+            . '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('testseite', ['name' => $q['name']]) . '<button class="secondary"' . $dis . '>Testseite</button></form></div></div>';
     }
 
     public const PRINTER_ROLES = ['buero' => 'Praxisdrucker (A4, Rechnungen)', 'bon' => 'Bondrucker (Belege)'];
@@ -1932,26 +1949,22 @@ final class Web {
         $body = V::error($error) . ($st['last'] ? '<p class="' . (($st['last']['ok'] ?? false) ? 'notice' : 'error') . '">' . V::h((string)($st['last']['meldung'] ?? '')) . '</p>' : '')
             . ($busy ? '<p class="notice">Vorgang läuft …</p>' : '') . ($st['error'] !== '' ? '<p class="error">' . V::h($st['error']) . '</p>' : '')
             . (!$st['service'] ? '<p class="error">Der Druckerdienst ist nicht eingerichtet. Bitte den Installer ausführen.</p>' : '')
-            . '<p>Drucker werden einmal hier eingerichtet; alle Module können sie nutzen. Echte Drucker brauchen keine Freigabe. Die Freigabe der virtuellen Drucker wirkt erst, '
-            . 'wenn die <a href="/verwaltung/firewall">Firewall</a> Drucken (IPP 631 bzw. Windows-Freigabe 445) aus den Praxisnetzen zulässt.</p>';
+            . '<p>Drucker werden einmal hier eingerichtet; alle Module können sie nutzen. Echte Drucker brauchen keine Freigabe. Virtuelle Drucker sind immer per IPP freigegeben; das wirkt erst, '
+            . 'wenn die <a href="/verwaltung/firewall">Firewall</a> Drucken (IPP, Port 631) aus den Praxisnetzen zulässt.</p>';
         $rows = $virtualRows = '';
+        $host = $this->printerHost();
         foreach ($st['queues'] as $q) {
+            if ($q['modul'] !== '') { $virtualRows .= $this->virtualPrinterCard($q, $host, $dis); continue; }
             $actions = '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('testseite', ['name' => $q['name']]) . '<button' . $dis . '>Testseite</button></form> ';
-            if ($q['managed']) {
-                // Freigaben gibt es nur für die virtuellen Drucker der Module: Die Arbeitsplätze drucken dorthin, echte Drucker braucht kein Arbeitsplatz direkt.
-                if ($q['modul'] !== '') $actions .= '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('freigabe', ['name' => $q['name']]) . $this->shareBoxes($q['share'])
-                    . '<button' . $dis . '>Freigabe speichern</button></form> ';
-                if ($q['modul'] === '') $actions .= '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('entfernen', ['name' => $q['name']])
-                    . '<button class="danger"' . $dis . '>Entfernen</button></form>';
-            }
-            $row = '<tr><td><strong>' . V::h($q['name']) . '</strong><br><small>' . V::h($q['description']) . '</small></td><td>' . V::h($q['address']) . '</td><td>'
-                . V::h($q['state']) . '</td><td>' . ($q['modul'] !== '' ? 'Modul ' . V::h($this->modules->name($q['modul'])) : ($q['managed'] ? 'Suite' : 'fremd')) . '</td><td>' . $actions . '</td></tr>';
-            if ($q['modul'] !== '') $virtualRows .= $row; else $rows .= $row;
+            if ($q['managed']) $actions .= '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('entfernen', ['name' => $q['name']])
+                . '<button class="danger"' . $dis . '>Entfernen</button></form>';
+            $rows .= '<tr><td><strong>' . V::h($q['name']) . '</strong><br><small>' . V::h($q['description']) . '</small></td><td>' . V::h($q['address']) . '</td><td>'
+                . V::h($q['state']) . '</td><td>' . ($q['managed'] ? 'Suite' : 'fremd') . '</td><td>' . $actions . '</td></tr>';
         }
         $head = '<table><tr><th>Name</th><th>Adresse</th><th>Zustand</th><th>Von</th><th></th></tr>';
         $body .= '<h2>Drucker</h2><p class="muted">Echte Drucker und Bondrucker, die in der Praxis stehen.</p>' . ($rows !== '' ? $head . $rows . '</table>' : '<p>Noch keine.</p>')
             . '<h2>Virtuelle Drucker</h2><p class="muted">Legen Module an (z. B. „SumUp-Rechnung“, „Terminzettel“): In T2med oder anderen Programmen drucken, das Modul verarbeitet den Auftrag. Sie werden nicht von Hand angelegt.</p>'
-            . ($virtualRows !== '' ? $head . $virtualRows . '</table>' : '<p>Noch keine.</p>')
+            . ($virtualRows !== '' ? '<div class="vp-liste">' . $virtualRows . '</div>' : '<p>Noch keine.</p>')
             . $this->virtualPrinterHelp($st['queues'])
             . '<form method="post" action="/verwaltung/drucker">' . $this->hidden('abgleichen') . '<button' . $dis . '>Virtuelle Drucker der Module abgleichen</button></form>';
         $roles = $this->printerRoles();
@@ -2003,9 +2016,8 @@ final class Web {
 
     /** Aufklappbare Anleitung: virtuelle Drucker der Module an den Arbeitsplätzen einrichten (Windows, Mac, T2med), im Format der Kasse. */
     private function virtualPrinterHelp(array $queues): string {
-        $host = strtolower((string)preg_replace('/:\d+$/', '', (string)($_SERVER['HTTP_HOST'] ?? 'server')));
-        if (!$this->config->ownHost($host)) $host = 'server';
-        $ppd = ['terminzettel' => '/terminzettel/assets/Terminzettel-PDF.ppd', 'sumup' => '/kasse/assets/SumUp-Rechnung-PDF.ppd'];
+        $host = $this->printerHost();
+        $ppd = ['Terminzettel' => '/terminzettel/assets/Terminzettel-PDF.ppd', 'SumUp-Rechnung' => '/kasse/assets/SumUp-Rechnung-PDF.ppd', 'Letterxpress' => '/kasse/assets/Letterxpress-PDF.ppd'];
         $blocks = '';
         foreach ($queues as $q) {
             if ($q['modul'] === '') continue;
@@ -2023,7 +2035,7 @@ final class Web {
                 . "  Add-Printer -Name \"" . $name . "\" -DriverName \"Microsoft IPP Class Driver\" -PortName \$url -ErrorAction SilentlyContinue\n}\n"
                 . "Get-Printer -Name \"" . $name . "\" | Select-Object Name, DriverName, PortName"
                ;
-            $mac = isset($ppd[$q['modul']]) ? ' <a href="' . V::h($ppd[$q['modul']]) . '" download>PDF-Beschreibungsdatei (PPD) herunterladen</a>' : '';
+            $mac = isset($ppd[$name]) ? ' <a href="' . V::h($ppd[$name]) . '" download>PDF-Beschreibungsdatei (PPD) herunterladen</a>' : '';
             $blocks .= '<h3>Drucker „' . V::h($name) . '“</h3><ol>'
                 . '<li>Windows: Drucker hinzufügen → „Freigegebenen Drucker über den Namen auswählen“: <code>' . V::h($url) . '</code> – Treiber „Microsoft IPP Class Driver“, Papier ' . $paper . '. '
                 . 'Per IP-Adresse (z. B. aus dem VPN) statt des Namens: <code>http://&lt;IP-Adresse&gt;:631/printers/' . V::h(rawurlencode($name)) . '</code>.</li>'
@@ -2034,11 +2046,12 @@ final class Web {
         if ($blocks === '') return '';
         return '<details class="box"><summary><strong>Anleitung: virtuelle Drucker an den Arbeitsplätzen einrichten</strong></summary>'
             . '<p>Nur die virtuellen Drucker der Module werden an den Arbeitsplätzen (T2med-PC) eingerichtet. Echte Drucker und der Bondrucker brauchen keine Freigabe und keine Einrichtung am Arbeitsplatz: die Module drucken von hier aus.</p>'
-            . '<p><strong>Voraussetzung:</strong> Haken bei „für Windows freigeben (Samba)“ bzw. „für macOS und andere freigeben (IPP)“ beim virtuellen Drucker und in der <a href="/verwaltung/firewall">Firewall</a> Drucken (IPP, Port 631) aus dem Praxisnetz erlauben. '
-            . 'Windows 11 Pro ab 24H2 lässt Gastzugriff auf Windows-Freigaben (Samba) nicht mehr zu: dort immer über IPP einrichten.</p>'
+            . '<p><strong>Voraussetzung:</strong> In der <a href="/verwaltung/firewall">Firewall</a> Drucken (IPP, Port 631) aus dem Praxisnetz erlauben. IPP ist bei jedem virtuellen Drucker immer freigegeben und der Standardweg für Windows, Mac und alle anderen. '
+            . 'Die Windows-Freigabe (Samba) ist optional und standardmäßig aus; neues Windows (ab 11 24H2) unterstützt sie nicht mehr.</p>'
             . $blocks
             . '<h3>In T2med</h3><ul><li>„Terminzettel“: Einstellungen → Kalender → Terminliste (DIN A6), Drucker „Terminzettel“ wählen.</li>'
-            . '<li>„SumUp-Rechnung“: Rechnung aus T2med auf diesen Drucker drucken, sie erscheint danach beim Patienten in der Kasse.</li></ul></details>';
+            . '<li>„SumUp-Rechnung“: Rechnung aus T2med auf diesen Drucker drucken, sie erscheint danach beim Patienten in der Kasse.</li>'
+            . '<li>„Letterxpress“: Für den Sammelversand per Post in T2med vorübergehend den Rechnungsdrucker auf diesen Drucker umstellen; jede Rechnung geht sofort an Letterxpress.</li></ul></details>';
     }
 
     private function saveRoles(Request $r): void {

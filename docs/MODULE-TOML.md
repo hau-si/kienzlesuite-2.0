@@ -112,7 +112,7 @@ Virtuelle Drucker des Moduls. Die Druckerverwaltung der Basis legt sie an und en
 | `formats` | nein | nur mit `command`: angenommene Dateitypen, Vorgabe `["application/pdf"]`, höchstens 5 |
 | `ppd` | eins von beiden | Ältere Art: CUPS-Warteschlange mit PPD-Datei aus dem Modulordner (CUPS behandelt PPDs als veraltet) |
 | `backend` | nein | nur mit `ppd`: CUPS-Backend im Modulordner (ausführbar, läuft als Benutzer `lp`). Ohne Backend verwirft die Warteschlange die Ausgabe der Filter (Backend `kienzle-leer` der Basis) |
-| `share` | nein | Liste aus `"samba"` und `"ipp"`: wie die Arbeitsplätze den Drucker erreichen |
+| `share` | nein | Liste aus `"samba"` und `"ipp"`: wie die Arbeitsplätze den Drucker erreichen. IPP ist bei virtuellen Druckern immer an (Standardweg für alle Betriebssysteme), auch wenn es hier fehlt; Samba (alte Windows-Freigabe) ist nur eine Vorgabe für neue Drucker, der Admin schaltet es unter Verwaltung → Drucker ein oder aus |
 
 ### `[[connections]]` – optional
 

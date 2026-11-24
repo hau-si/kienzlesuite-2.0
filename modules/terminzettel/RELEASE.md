@@ -1,5 +1,9 @@
 # Terminzettel – Release-Notizen
 
+## 1.3.0-beta.4
+
+- Der virtuelle Drucker „Terminzettel“ wird nur noch per IPP freigegeben; Samba ist optional (Verwaltung → Drucker).
+
 ## 1.3.0-beta.3
 
 - Die Einstellungsseite steht jetzt im Rahmen der Suite: Die Seitenleiste mit dem Menü bleibt links sichtbar (wie bei der Kasse), die eigene Kopfzeile entfällt.

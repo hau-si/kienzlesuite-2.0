@@ -1,5 +1,10 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.22
+
+- Die virtuellen Drucker „SumUp-Rechnung“ und „Letterxpress“ werden nur noch per IPP freigegeben (`share = ["ipp"]`); Samba schaltet der Admin bei Bedarf unter Verwaltung → Drucker ein.
+- Einstellungen → Arbeitsplätze: Neben der Hilfe für „SumUp-Rechnung“ gibt es jetzt eine Karte „Drucker „Letterxpress““ (IPP-Adresse, Windows-Skript, Mac-Datei `Letterxpress-PDF.ppd`, Hinweis zum Sammelversand) und einen Punkt in der Einrichtungsliste. Der Starter selbst richtet keine Drucker ein; er öffnet nur die Kasse aus T2med.
+
 ## 2.3.4-beta.21
 
 - **Neuer virtueller Drucker „Letterxpress“** (wird wie „SumUp-Rechnung“ von der Basis angelegt und freigegeben, Papier A4, PDF/PostScript, eigene Durchreich-PPD `Letterxpress-PDF.ppd` für den Mac). Jede aus T2med darauf gedruckte Rechnung wird wie im Rechnungseingang gelesen (gleiche Rechnungen, gleiche Erkennung, Rechnungseingang muss dafür nicht eingeschaltet sein) und **sofort per Post an Letterxpress** gesendet. Voraussetzung: Letterxpress ist eingeschaltet (Einstellungen → Letterxpress, Zugang unter Verwaltung → Verbindungen).

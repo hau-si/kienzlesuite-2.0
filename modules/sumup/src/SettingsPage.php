@@ -95,7 +95,7 @@ final class SettingsPage {
             'mode' => $config->get('sumup', 'mode'), 'fhir_mode' => $config->get('fhir', 'mode'),
             'connections' => ['t2med' => Suite::connected('t2med'), 'mail' => Suite::connected('mail'), 'ablage' => Suite::connected('ablage')],
             'warning' => $broken ? 'Gespeicherte Einstellungen passen nicht zur aktuellen Version und werden ignoriert. Bitte die Bereiche prüfen und neu speichern.' : null,
-            'invoice_printer' => Module::invoicePrinter($config), 'clients' => $this->clients(), 'setup' => Module::overview($config)];
+            'invoice_printer' => Module::invoicePrinter($config), 'letter_printer' => Module::letterPrinter($config), 'clients' => $this->clients(), 'setup' => Module::overview($config)];
     }
 
     private function save(string $section, array $values): array {
