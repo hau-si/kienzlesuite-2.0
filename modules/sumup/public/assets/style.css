@@ -58,3 +58,18 @@ progress.progress{display:block;width:100%;height:8px;margin:6px 0 10px}
 
 .badge.test{background:#fff0ca;color:#886100}
 .free-patient{margin-top:10px;display:grid;gap:4px;max-width:420px}
+
+/* Nachbearbeitung nicht erkannter Rechnungen */
+.review { margin-top: .75rem; }
+.review-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 1rem; align-items: start; padding: .75rem 0; border-top: 1px solid #e6e4dc; }
+.review-label { margin: 0 0 .35rem; font-size: .85rem; color: #5f5e5a; }
+.review-chip { display: inline-block; margin-left: .35rem; padding: 1px 8px; border-radius: 999px; font-size: .75rem; }
+.review-ok { background: #eaf3de; color: #27500a; } .review-warn { background: #faeeda; color: #633806; } .review-miss { background: #fcebeb; color: #791f1f; }
+.review-snip { display: block; max-width: 100%; margin: 0 0 .4rem; border: 1px solid #c8c6bc; border-radius: 6px; background: #fff; }
+.review-row input { width: 100%; box-sizing: border-box; margin-bottom: .4rem; }
+.review-picks { display: flex; flex-wrap: wrap; gap: .35rem; margin: 0; }
+.review-pick { padding: 2px 10px; min-height: 32px; font-size: .85rem; }
+.review-pages { margin: .75rem 0; } .review-pages summary { cursor: pointer; min-height: 32px; }
+.review-page { display: block; max-width: 100%; margin: .5rem 0; border: 1px solid #c8c6bc; }
+.review-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: .75rem; }
+@media (max-width: 640px) { .review-row { grid-template-columns: 1fr; } }

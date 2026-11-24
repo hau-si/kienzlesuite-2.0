@@ -238,7 +238,8 @@ class Modulverwaltung(unittest.TestCase):
 
     def test_uploads_nur_wenn_das_modul_sie_anfordert(self):
         tz = manifest.check_folder(ROOT / 'modules' / 'terminzettel')
-        self.assertTrue(tz['web']['uploads'])
+        self.assertFalse(tz['web']['uploads'])
+        tz['web']['uploads'] = True
         self.assertIn('php_admin_flag[file_uploads] = on', self.mo.fpm_conf(tz))
         su = manifest.check_folder(ROOT / 'modules' / 'sumup')
         self.assertFalse(su['web']['uploads'])

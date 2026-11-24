@@ -152,7 +152,7 @@ function test_anzeigename_im_konto_aendern(): void {
     $env = new Env();
     [$b, $id] = admin_browser($env);
     $seite = $b->get('/konto')->body;
-    check(str_contains($seite, 'action="/konto/name"') && str_contains($seite, '<details class="fold">') && str_contains($seite, 'Namen speichern'), 'Konto: Namensfeld oder Ausklappzeilen fehlen');
+    check(str_contains($seite, 'action="/konto/name"') && str_contains($seite, '<details class="fold">') && str_contains($seite, 'class="name-edit"') && str_contains($seite, 'aria-label="Namen ändern"'), 'Konto: Namensfeld (Stift) oder Ausklappzeilen fehlen');
     $b->post('/konto/name', ['display' => "  Anna Beispiel\x01 "]);
     check($env->users->find($id)['display'] === 'Anna Beispiel' && str_contains($b->last->body, 'Name gespeichert.') && str_contains($b->last->body, 'value="Anna Beispiel"'), 'Anzeigename nicht gespeichert');
     $login = $env->users->find($id)['login'];
@@ -243,6 +243,7 @@ function test_verwaltung_braucht_bestaetigung_und_csrf(): void {
 function test_rollen_matrix_speichern(): void {
     $env = new Env();
     [$b] = admin_browser($env);
+    $b->get('/verwaltung/benutzer/neu');   // die Sitzungsmarke steht im Formular (die Seitenleiste hat kein Abmelden-Formular mehr)
     $b->post('/verwaltung/benutzer', ['login' => 'dora', 'display' => 'Dora']);
     $id = (int)$env->users->byLogin('dora')['id'];
     // Rolle MFA, aber „paid“ einzeln abgewählt und „catalog“ einzeln dazu

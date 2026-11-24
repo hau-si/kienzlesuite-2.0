@@ -41,10 +41,10 @@ final class Ansicht {
         $iDrucker = $sym('<path d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2"/><path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4"/><path d="M7 13m0 2a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2z"/>');
         $logo = Seite::logoDaten();
         $logoZeile = '<div class="logo"><div class="logo-bild">' . ($logo !== '' ? '<img src="' . $h($logo) . '" alt="Aktuelles Logo">' : '<span class="muted">Kein Logo</span>') . '</div><div>'
-            . '<input type="file" name="logo" accept="image/png,image/jpeg,image/gif" form="logoform" aria-label="Logo-Datei">'
-            . '<div class="aktionen"><button class="zweit klein" name="aktion" value="logo" form="logoform">Hochladen</button>'
+            . '<input type="file" id="logo-datei" accept="image/png,image/jpeg,image/gif" aria-label="Logo-Datei">'
+            . '<div class="aktionen"><button type="button" class="zweit klein" id="logo-los" data-ziel="' . $h($base) . '/logo">Hochladen</button>'
             . ($logo !== '' ? '<button class="zweit klein" name="aktion" value="logo-entfernen" form="logoform">Entfernen</button>' : '') . '</div>'
-            . '<p class="muted klein-text">PNG, JPEG oder GIF bis 2 MB. Wird in Schwarz-Weiß umgerechnet; einfache, kontrastreiche Logos drucken am besten. Beim Hochladen wird die Seite neu geladen: ungespeicherte Änderungen vorher speichern.</p></div></div>';
+            . '<p class="muted klein-text" id="logo-status" role="status"></p><p class="muted klein-text">PNG, JPEG oder GIF bis 2 MB. Wird in Schwarz-Weiß umgerechnet; einfache, kontrastreiche Logos drucken am besten. Beim Hochladen wird die Seite neu geladen: ungespeicherte Änderungen vorher speichern.</p></div></div>';
         $form = '<details class="fold" id="kopf"><summary><h2>' . $iKopf . ' Kopf</h2></summary><div class="tz-body">'
             . '<div class="teil">' . $logoZeile . '<div class="fmt">' . $check('logo_enabled', 'Logo drucken') . '<span class="sm">Breite</span>' . $seg('logo_size', Seite::LOGO_SIZES, 'Logo: Breite') . '<span class="sm">Lage</span>' . $seg('logo_align', Seite::LOGO_ALIGNS, 'Logo: Ausrichtung') . '</div></div>'
             . '<div class="teil">' . $text('name_text', 'Praxisname (erste Zeile)') . $format('name_size', 'name_bold', 'Praxisname') . '</div>'
@@ -74,7 +74,7 @@ final class Ansicht {
             . '<div class="tz-gitter"><div class="tz-links"><form method="post" action="' . $h($base) . '/" class="stack" id="layout"><input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"><input type="hidden" name="aktion" value="speichern">'
             . '<p class="muted">Papierbreite des Bondruckers: <strong>' . Seite::bonBreite() . ' mm</strong> – zentral einzustellen unter <a href="/verwaltung/drucker">Verwaltung → Drucker</a>.</p>'
             . $form . '<div class="tz-speichern"><button>Speichern</button><span class="muted">Gedruckt wird erst nach dem Speichern.</span></div></form>'
-            . '<form method="post" action="' . $h($base) . '/" enctype="multipart/form-data" id="logoform"><input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"></form></div>'
+            . '<form method="post" action="' . $h($base) . '/" id="logoform"><input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"></form></div>'
             . '<aside class="tz-rechts"><h2>Vorschau (Beispieldaten)</h2><div id="vorschau" class="vorschau"><img id="bild" alt="Vorschau des Bons" hidden><p id="hinweis" class="muted">Wird geladen …</p></div><p id="ungespeichert" class="fehler" hidden>Ungespeicherte Änderungen: Die Vorschau zeigt den Stand des Formulars. Gedruckt wird erst nach „Speichern“.</p>'
             . '<form method="post" action="' . $h($base) . '/"><input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"><input type="hidden" name="aktion" value="testdruck">'
             . '<button class="zweit"' . ($queue === '' ? ' disabled' : '') . '>Beispiel-Terminzettel drucken</button></form></aside></div>'

@@ -417,3 +417,19 @@ main.modul { max-width: 940px; }
 .vp-fuss { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 10px; }
 .vp-fuss .vp-samba { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; }
 .vp-fuss .vp-samba label { margin: 0; display: inline-flex; align-items: center; gap: 6px; font-weight: 400; font-size: 13px; }
+
+/* Anmeldename unter „Mein Konto“, Abmelden auf der Kontoseite */
+.menu-konto { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.menu-konto small { font-size: 12px; font-weight: 500; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
+.konto .profil-abmelden { margin: 0; flex: none; }
+@media (max-width: 640px) { .konto .profil { flex-wrap: wrap; } .konto .profil-abmelden { width: 100%; } }
+
+/* Anzeigename: nur ein kleiner Stift, das Feld klappt bei Klick auf */
+.name-edit { margin: 0 0 4px; }
+.name-edit > summary { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; min-height: 32px; }
+.name-edit > summary::-webkit-details-marker { display: none; }
+.name-edit > summary::after { content: none; }
+.name-anzeige { font-size: 1.15rem; }
+.name-edit .stift { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: var(--muted); }
+.name-edit > summary:hover .stift, .name-edit > summary:focus-visible .stift { background: var(--soft); color: var(--teal); }
+.name-edit[open] .name-form { margin-top: 6px; }

@@ -13,7 +13,7 @@ final class SettingsPage {
 
     /** Rechte der Mitarbeiter und die Aktionen, die sie erlauben. */
     public const RIGHTS = [
-        'inbox' => ['Rechnungseingang ansehen und Rechnungen löschen', ['inbox_overview', 'inbox_delete', 'inbox_delete_many', 'inbox_clear']],
+        'inbox' => ['Rechnungseingang ansehen, nicht erkannte Rechnungen nachbearbeiten, Rechnungen löschen', ['inbox_overview', 'inbox_delete', 'inbox_delete_many', 'inbox_clear', 'inbox_review', 'inbox_review_page', 'inbox_review_apply', 'inbox_review_drop']],
         'letter' => ['Rechnungen per Post (Letterxpress) senden', ['inbox_overview', 'inbox_letter', 'inbox_letter_many']],
         'catalog' => ['Leistungen und GOÄ-Positionen bearbeiten', ['catalog', 'catalog_service_save', 'catalog_service_delete', 'catalog_group_save', 'catalog_group_delete']],
     ];
@@ -53,6 +53,10 @@ final class SettingsPage {
             'audit' => ['lines' => $this->audit->recent(40)],
             'save' => $this->save(App::string($input, 'section', 40), is_array($input['values'] ?? null) ? $input['values'] : []),
             'test' => ['message' => $this->test(App::string($input, 'kind', 40))],
+            'inbox_review' => $this->reviewOpen(App::string($input, 'id', 32)),
+            'inbox_review_page' => ['image' => InvoiceReview::page($this->rejectedPdf(App::string($input, 'id', 32)), (int)($input['page'] ?? 1))],
+            'inbox_review_apply' => $this->reviewApply($input),
+            'inbox_review_drop' => $this->reviewDrop(App::string($input, 'id', 32)),
             'inbox_delete' => $this->inboxDelete($input),
             'inbox_letter' => $this->inboxLetter($input),
             'inbox_letter_many' => $this->inboxMany($input, 'letter'),
@@ -178,6 +182,35 @@ final class SettingsPage {
         $message = $done . ($done === 1 ? ' Rechnung ' : ' Rechnungen ') . $verb . '.';
         if ($errors) $message .= ' Nicht ausgeführt: ' . (count($ids) - $done) . ' (' . mb_substr(implode(' ', $errors), 0, 300) . ')';
         return InboxOverview::build($this->db, $config) + ['message' => $message];
+    }
+    private function log(): InboxLog { return new InboxLog($this->config()->get('app', 'state_dir')); }
+    private function rejectedPdf(string $id): string {
+        $file = $this->log()->pdfPath($id);
+        if ($file === null) throw new Problem('Diese Rechnung liegt nicht mehr zur Nachbearbeitung vor (nach ' . InboxLog::KEEP_DAYS . ' Tagen wird sie gelöscht). Bitte in T2med erneut drucken.', 404);
+        return $file;
+    }
+    /** Bildausschnitte und Vorschläge für eine abgelehnte Rechnung. */
+    private function reviewOpen(string $id): array {
+        $file = $this->rejectedPdf($id);
+        $labels = (new App($this->config(), $this->http))->inboxLabels();
+        return ['review' => InvoiceReview::analyze($file, $labels) + ['id' => $id]];
+    }
+    /** Von Hand eingetragene Werte prüfen, die Rechnung in den Eingang legen und den Eintrag samt PDF entfernen. */
+    private function reviewApply(array $input): array {
+        $id = App::string($input, 'id', 32);
+        $file = $this->rejectedPdf($id);
+        $config = $this->config();
+        $app = new App($config, $this->http);
+        $prefixes = (array)($app->inboxLabels()[T2medInvoice::LABEL_KEYS['prefix']] ?? []);
+        $invoice = InvoiceReview::validate($input, (int)$config->get('app', 'max_amount_cents'), $prefixes);
+        $result = $app->storeInvoice($invoice, (string)file_get_contents($file));
+        $this->log()->remove($id);
+        return InboxOverview::build($this->db, $config) + ['message' => 'Rechnung ' . $invoice['number'] . ' übernommen. ' . $result['message']];
+    }
+    private function reviewDrop(string $id): array {
+        if (!preg_match('/^[a-f0-9]{32}$/D', $id)) throw new Problem('Ungültige Auswahl.', 422);
+        $this->log()->remove($id);
+        return InboxOverview::build($this->db, $this->config()) + ['message' => 'Rechnung aus der Nachbearbeitung entfernt.'];
     }
     private function inboxDelete(array $input): array {
         InboxOverview::delete($this->db, App::string($input, 'id', 32));

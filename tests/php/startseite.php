@@ -82,6 +82,8 @@ function test_seitenleiste_und_konto_einklappbar(): void {
     check(substr_count($p, 'class="menu-app" draggable="true"') >= 2 && !str_contains($p, 'data-richtung') && !str_contains($p, 'data-sortieren'), 'Seitenleiste: Anwendungen per Ziehen sortierbar, keine Pfeile/Knöpfe');
     check(preg_match('#<a href="/[a-z]+/"[^>]*><span><svg class="ico"#', $p) === 1, 'Symbol vor dem Modul in der Seitenleiste');
     $k = $b->get('/konto')->body;
+    check(str_contains($p, 'class="menu-konto"') && str_contains($p, '<small>') && !str_contains($p, 'Abmelden (') && !str_contains($p, 'action="/abmelden"'), 'Seitenleiste: Anmeldename bei Mein Konto, kein Abmelden unten');
+    check(str_contains($k, 'class="profil-abmelden"') && str_contains($k, 'action="/abmelden"'), 'Mein Konto: Abmelden-Knopf');
     foreach (['Passwort ändern', 'Authenticator-App', 'Gemerkte Geräte'] as $titel) {
         check(preg_match('#<details class="fold"><summary><h2>[^<]*(?:<svg.*?</svg>)?' . preg_quote($titel, '#') . '#s', $k) === 1, 'Konto: „' . $titel . '“ nicht einklappbar');
     }

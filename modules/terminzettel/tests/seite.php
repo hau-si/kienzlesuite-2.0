@@ -93,7 +93,10 @@ check(str_starts_with(Seite::logoDaten(), 'data:image/png;base64,'), 'Logo-Anzei
 $mitLogo = json_decode((string)file_get_contents("$dir/layout.json"), true);
 check($mitLogo['logo'] === ['enabled' => true, 'width_dots' => 384, 'align' => 'right'], 'layout.json nach Logo-Upload nicht neu geschrieben');
 $hLogo = Ansicht::seite('/terminzettel', Seite::werte(), 'tok', 'Bon-1', null, null, 'server');
-check(str_contains($hLogo, 'alt="Aktuelles Logo"') && str_contains($hLogo, 'value="logo-entfernen"') && str_contains($hLogo, 'enctype="multipart/form-data"') && str_contains($hLogo, 'form="logoform"'), 'Logo-Bereich der Ansicht');
+check(str_contains($hLogo, 'alt="Aktuelles Logo"') && str_contains($hLogo, 'value="logo-entfernen"') && str_contains($hLogo, 'id="logo-los"') && str_contains($hLogo, 'data-ziel=') && !str_contains($hLogo, 'multipart'), 'Logo-Bereich der Ansicht');
+wirft(fn() => Seite::rohBytes(''), 'Leeres Logo akzeptiert');
+wirft(fn() => Seite::rohBytes(str_repeat('a', Seite::LOGO_MAX_BYTES + 1)), 'Zu großes Logo akzeptiert');
+check(Seite::rohBytes('abc') === 'abc', 'Logo roh');
 check(str_contains($hLogo, 'name="name_size" value="2x2" checked') && str_contains($hLogo, 'name="address_size" value="1x1" checked') && !str_contains($hLogo, '<select'), 'Auswahlleisten statt Aufklappliste');
 Seite::logoEntfernen();
 check(!Seite::logoVorhanden() && json_decode((string)file_get_contents("$dir/layout.json"), true)['logo']['enabled'] === false, 'Logo entfernen');

@@ -150,7 +150,7 @@ final class View {
         $brand = '<a class="brand" href="/" title="Start"><span class="mark" aria-hidden="true">K' . (!empty($nav['offenLogo']) ? '<span class="logo-dot" title="Die Einrichtung ist noch nicht abgeschlossen"></span>' : '') . '</span><span><strong>Kienzle-Suite</strong>'
             . '<span class="sub">' . self::h($practice !== '' ? $practice : 'Praxis') . '</span></span></a>';
         $head = '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=32"><script src="/assets/core.js?v=3" defer></script>' . ($extra['kopf'] ?? '') . '</head><body'
+            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=34"><script src="/assets/core.js?v=3" defer></script>' . ($extra['kopf'] ?? '') . '</head><body'
             . (self::$starter !== '' ? ' data-starter="' . self::h(self::$starter) . '"' : '') . ($extra['body'] ?? '') . '>';
         if (!$nav) {
             return $head . '<div class="solo">' . $brand . '<main><h1>' . self::h($title) . '</h1>' . self::cards($body) . '</main></div></body></html>';
@@ -158,15 +158,15 @@ final class View {
         $path = (string)($nav['pfad'] ?? '');
         $badges = ['/verwaltung/einrichtung' => [(int)($nav['einrichtung'] ?? 0), 'Offene Punkte'], '/verwaltung/sicherung' => [(int)($nav['sicherung'] ?? 0), 'Hinweise zur Sicherung'],
             '/verwaltung/updates' => [(int)($nav['updates'] ?? 0), 'Neue Version verfügbar'], '/verwaltung/module' => [(int)($nav['module'] ?? 0), 'Neue Modulversion verfügbar']];
-        $link = function (string $href, string $label, ?string $icon = null) use ($path, $badges, $nav): string {
+        $link = function (string $href, string $label, ?string $icon = null, string $sub = '') use ($path, $badges, $nav): string {
             $current = $path === $href || ($href !== '/' && str_starts_with($path, $href . '/'));
             [$n, $hint] = $badges[$href] ?? [0, ''];
             $todo = in_array(strtok($href, '?#') ?: $href, (array)($nav['offen'] ?? []), true);
-            return '<a href="' . $href . '"' . ($current ? ' class="current" aria-current="page"' : '') . '><span>' . ($icon ?? self::icon($href)) . self::h($label) . '</span>'
+            return '<a href="' . $href . '"' . ($current ? ' class="current" aria-current="page"' : '') . '><span>' . ($icon ?? self::icon($href)) . ($sub !== '' ? '<span class="menu-konto">' . self::h($label) . '<small>' . self::h($sub) . '</small></span>' : self::h($label)) . '</span>'
                 . ($n > 0 ? '<span class="badge" title="' . self::h($hint) . '">' . $n . '</span>' : '')
                 . ($todo ? '<span class="todo-dot" title="Hier muss noch etwas eingegeben oder bestätigt werden (siehe Einrichtung auf der Startseite)"></span>' : '') . '</a>';
         };
-        $menu = '<nav class="menu" aria-label="Menü"><div class="menu-group">' . $link('/konto', 'Mein Konto') . '</div>';
+        $menu = '<nav class="menu" aria-label="Menü"><div class="menu-group">' . $link('/konto', 'Mein Konto', null, (string)($nav['login'] ?? '')) . '</div>';
         // Anwendungen: nur noch ein Eintrag je Modul (mit Symbol des Moduls); der Punkt zeigt offene Einstellungen. Einklappbar, weil weitere Module dazukommen.
         if (!empty($nav['apps'])) {
             $links = '';
@@ -196,9 +196,8 @@ final class View {
             $restart = '<details class="menu-fold"' . (str_starts_with($path, '/verwaltung/neustart') ? ' open' : '') . '><summary class="menu-title">' . self::icon('/verwaltung/neustart') . 'Neu starten</summary>'
                 . $link('/verwaltung/neustart?art=dienste', 'Dienste neu starten') . $link('/verwaltung/neustart?art=server', 'Server neu starten') . '</details>';
         }
-        // Modulseiten kennen die Sitzungs-Marke nicht (nur eine eigene): dort führt „Mein Konto“ zum Abmelden.
-        $foot = '<div class="side-foot">' . $restart . (($nav['csrf'] ?? '') !== '' ? '<form method="post" action="/abmelden" class="inline">' . self::csrf($nav['csrf'])
-            . '<button class="link">Abmelden (' . self::h($nav['login']) . ')</button></form>' : '<a class="link" href="/konto">' . self::h($nav['login']) . ' · Abmelden</a>') . '</div>';
+        // Anmeldename steht bei „Mein Konto“, Abmelden auf der Seite „Mein Konto“.
+        $foot = '<div class="side-foot">' . $restart . '</div>';
         $eyebrow ??= $group;
         $inner = !empty($extra['roh']) ? $body : ($eyebrow ? '<p class="eyebrow">' . self::h($eyebrow) . '</p>' : '') . '<h1>' . self::h($title) . '</h1>' . self::cards($body);
         return $head . '<div class="layout"><aside class="side">' . $brand . $menu . $foot . '</aside><main' . (!empty($extra['roh']) ? ' class="modul"' : '') . '>' . $inner . '</main></div></body></html>';

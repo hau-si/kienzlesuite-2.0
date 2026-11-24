@@ -1,5 +1,12 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.29
+
+- **Nicht erkannte T2med-Rechnungen von Hand nachbearbeiten** (Kasse → Einstellungen → Rechnungseingang → „Abgelehnte Drucke“ → „Von Hand nachbearbeiten“): Die Rechnung wird in der Seite gesucht, und zu Rechnungsnummer, Datum, Gesamtbetrag (mit Zahlbetrag) sowie Patient und Geburtsdatum erscheint je ein **Bildausschnitt** der Rechnung neben einem Eingabefeld mit Vorschlag (gelesen, unsicher oder nicht gefunden; bei mehreren Werten zum Anklicken). Bei Bild-PDFs per Texterkennung, sonst aus der Textebene. Darunter lässt sich die ganze Rechnung ansehen. „Übernehmen und zuordnen“ prüft die Eingaben (Datum, Betrag im erlaubten Bereich, Nummer, Name), legt die Rechnung in den Rechnungseingang und löscht die PDF; „Verwerfen“ löscht sie ebenfalls.
+- Dafür bleibt die abgelehnte PDF (mit Patientendaten) **höchstens 7 Tage** in einem privaten Ordner des Moduls (`rejected/`, Rechte 0700/0600) und wird danach, beim Leeren der Liste und nach der Übernahme gelöscht. Die Liste selbst zeigt weiter nur maskierte Zeilen.
+- Recht „Rechnungseingang“ (Mitarbeiter) umfasst die Nachbearbeitung; Aktionen stehen im Änderungsprotokoll.
+- Gilt für den Rechnungseingang (Drucker vKasse). Rechnungen, die der Drucker vBriefversand ablehnt, werden nicht gemerkt (kein Postversand ohne geprüfte Rechnung). Nicht im Browser und nicht mit echten T2med-Rechnungen geprüft, nur mit erfundenen Beispiel-PDFs (Text und Bild).
+
 ## 2.3.4-beta.28
 
 - Drucker umbenannt: „SumUp-Rechnung“ → vKasse, „Letterxpress“ → vBriefversand; Texte, Anleitungen und PPD-Dateien angepasst. Drucker an den Arbeitsplätzen neu einrichten und in T2med neu wählen.

@@ -572,12 +572,76 @@ function renderInbox(data) {
       const details = el('details', null, 'inbox-reject');
       details.append(el('summary', when(r.at) + ' – ' + r.reason + (r.source ? ' [' + r.source + ']' : '')));
       details.append(el('pre', r.lines.length ? r.lines.join('\n') : 'Keine Beschriftungszeilen erkannt.', 'audit-list'));
+      if (r.pdf) {
+        const fix = el('button', 'Von Hand nachbearbeiten', 'secondary', {type: 'button'});
+        const panel = el('div', null, 'review');
+        panel.hidden = true;
+        fix.onclick = () => busy(fix, async () => { if (!panel.hidden) { panel.hidden = true; return; } await openReview(r.id, panel); panel.hidden = false; });
+        details.append(fix, panel);
+      } else {
+        details.append(el('p', 'Die Rechnung liegt nicht mehr zur Nachbearbeitung vor (sie wird nach 7 Tagen gelöscht). Bitte in T2med erneut drucken.', 'muted small'));
+      }
       box.append(details);
     }
     const clear = el('button', 'Liste leeren', 'secondary', {type: 'button'});
     clear.onclick = () => busy(clear, async () => { const r = await api('inbox_clear'); renderInbox(r); message(r.message); });
     box.append(clear);
   }
+}
+// Nicht erkannte Rechnung von Hand zuordnen: je Feld Bildausschnitte der Rechnung, Vorschläge und Eingabefelder.
+async function openReview(id, panel) {
+  const {review} = await api('inbox_review', {id});
+  panel.replaceChildren();
+  panel.append(el('p', 'Prüfe die Werte neben den Ausschnitten, korrigiere sie bei Bedarf und übernimm die Rechnung. Gelesen wurde per ' + review.source + '. Die PDF wird danach aus der Nachbearbeitung gelöscht.', 'muted small'));
+  const chip = {gelesen: ['gelesen', 'review-ok'], unsicher: ['unsicher', 'review-warn'], fehlt: ['nicht gefunden', 'review-miss']};
+  const inputs = {};
+  for (const key of ['number', 'date', 'total', 'patient']) {
+    const f = review.fields[key];
+    const row = el('div', null, 'review-row');
+    const left = el('div');
+    const head = el('p', f.title + ' ', 'review-label');
+    head.append(el('span', chip[f.status][0], 'review-chip ' + chip[f.status][1]));
+    left.append(head);
+    if (f.snippets.length) for (const src of f.snippets) left.append(el('img', null, 'review-snip', {src, alt: 'Ausschnitt der Rechnung: ' + f.title}));
+    else left.append(el('p', 'Die Beschriftung wurde nicht gefunden. Bitte unten in der Seitenansicht nachsehen.', 'muted small'));
+    const right = el('div');
+    if (key === 'patient') {
+      const [name = '', birth = ''] = (f.guess || '').split(' | ');
+      inputs.name = el('input', null, null, {type: 'text', placeholder: 'Vorname Nachname', autocomplete: 'off', value: name.trim(), 'aria-label': 'Patientenname'});
+      inputs.birth = el('input', null, null, {type: 'text', placeholder: 'TT.MM.JJJJ', autocomplete: 'off', value: birth.trim(), 'aria-label': 'Geburtsdatum'});
+      right.append(inputs.name, inputs.birth);
+    } else {
+      inputs[key] = el('input', null, null, {type: 'text', autocomplete: 'off', value: f.guess || '', placeholder: {number: 'z. B. IG2026-309', date: 'TT.MM.JJJJ', total: 'z. B. 84,00'}[key], 'aria-label': f.title});
+      right.append(inputs[key]);
+      if (f.values.length > 1) {
+        const picks = el('p', null, 'review-picks');
+        for (const v of f.values) { const b = el('button', v, 'secondary review-pick', {type: 'button'}); b.onclick = () => { inputs[key].value = v; }; picks.append(b); }
+        right.append(picks);
+      }
+    }
+    row.append(left, right);
+    panel.append(row);
+  }
+  const pages = el('details', null, 'review-pages');
+  pages.append(el('summary', 'Ganze Rechnung ansehen (' + review.pages + ' Seite' + (review.pages > 1 ? 'n' : '') + ')'));
+  let loaded = false;
+  pages.addEventListener('toggle', async () => {
+    if (!pages.open || loaded) return;
+    loaded = true;
+    for (let page = 1; page <= review.pages; page++) {
+      try { const r = await api('inbox_review_page', {id, page}); pages.append(el('img', null, 'review-page', {src: r.image, alt: 'Seite ' + page + ' der Rechnung'})); }
+      catch (error) { pages.append(el('p', error.message, 'muted small')); }
+    }
+  });
+  const apply = el('button', 'Übernehmen und zuordnen', null, {type: 'button'});
+  apply.onclick = () => busy(apply, async () => {
+    const r = await api('inbox_review_apply', {id, number: inputs.number.value, date: inputs.date.value, total: inputs.total.value, name: inputs.name.value, birth: inputs.birth.value});
+    renderInbox(r); message(r.message);
+  });
+  const drop = el('button', 'Verwerfen', 'secondary', {type: 'button'});
+  drop.onclick = () => busy(drop, async () => { if (!confirm('Diese Rechnung aus der Nachbearbeitung entfernen? Die PDF wird gelöscht.')) return; const r = await api('inbox_review_drop', {id}); renderInbox(r); message(r.message); });
+  panel.append(pages, el('div', null, 'review-actions'));
+  panel.lastChild.append(drop, apply);
 }
 async function loadInbox() {
   try { renderInbox(await api('inbox_overview')); }

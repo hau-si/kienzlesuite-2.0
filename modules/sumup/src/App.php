@@ -524,7 +524,7 @@ final class App {
             $invoice = T2medInvoice::fromPdf($pdf, $this->config->get('app', 'max_amount_cents'), $this->inboxLabels());
         } catch (Problem $e) {
             // Grund und maskierte Beschriftungszeilen merken (ohne Namen, Daten, PDF), damit neue Vorlagen einstellbar sind.
-            (new InboxLog($this->config->get('app', 'state_dir')))->add($e->getMessage(), T2medInvoice::$lastSource, T2medInvoice::overview(T2medInvoice::$lastText));
+            (new InboxLog($this->config->get('app', 'state_dir')))->add($e->getMessage(), T2medInvoice::$lastSource, T2medInvoice::overview(T2medInvoice::$lastText), $pdf);
             T2medInvoice::$lastText = '';
             throw $e;
         }
@@ -538,7 +538,7 @@ final class App {
     }
 
     /** Eigene Textschnipsel für die Rechnungserkennung. */
-    private function inboxLabels(): array {
+    public function inboxLabels(): array {
         $labels = [];
         foreach (T2medInvoice::LABEL_KEYS as $key) $labels[$key] = (array)$this->config->get('invoice_inbox', $key, []);
         return $labels;

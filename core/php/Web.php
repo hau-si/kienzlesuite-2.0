@@ -903,10 +903,12 @@ final class Web {
         $phone = $this->phoneOf($uid);
         // Profil mit änderbarem Anzeigenamen (der Benutzername zum Anmelden bleibt)
         $profil = '<section class="card konto"><div class="profil">' . V::avatar($name, $roles, (int)$user['admin'] === 1) . '<div class="profil-text">'
+            . '<details class="name-edit"><summary><strong class="name-anzeige">' . V::h($name) . '</strong><span class="stift" title="Namen ändern" role="img" aria-label="Namen ändern"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/></svg></span></summary>'
             . '<form method="post" action="/konto/name" class="name-form">' . $csrf . '<label class="sr-only" for="k-name">Anzeigename</label>'
-            . '<input id="k-name" name="display" value="' . V::h((string)$user['display']) . '" maxlength="80" placeholder="' . V::h((string)$user['login']) . '" autocomplete="name"><button class="secondary">Namen speichern</button></form>'
+            . '<input id="k-name" name="display" value="' . V::h((string)$user['display']) . '" maxlength="80" placeholder="' . V::h((string)$user['login']) . '" autocomplete="name"><button class="secondary">Speichern</button></form></details>'
             . '<div class="muted small">Benutzername ' . V::h($user['login']) . ($mail !== '' ? ' · ' . V::h($mail) : '') . '</div>'
-            . ($chips !== '' ? '<div class="rollen-zeile">' . $chips . '</div>' : '<div class="muted small">Keine Gruppe zugewiesen</div>') . '</div></div></section>';
+            . ($chips !== '' ? '<div class="rollen-zeile">' . $chips . '</div>' : '<div class="muted small">Keine Gruppe zugewiesen</div>') . '</div>'
+            . '<form method="post" action="/abmelden" class="profil-abmelden">' . $csrf . '<button class="secondary">Abmelden</button></form></div></section>';
         $fold = static fn(string $title, string $tag, string $inner, bool $open = false): string => '<details class="fold"' . ($open ? ' open' : '') . '><summary><h2>' . $title . '</h2>' . $tag . '</summary><div class="fold-body">' . $inner . '</div></details>';
         $ok = static fn(bool $good, string $yes, string $no): string => '<span class="tag ' . ($good ? 'ok' : 'warn') . ' fold-status">' . V::h($good ? $yes : $no) . '</span>';
         $folds = $fold('E-Mail-Adresse', $ok($mail !== '', 'bestätigt', $pending !== '' ? 'wartet auf Bestätigung' : 'nicht hinterlegt'),

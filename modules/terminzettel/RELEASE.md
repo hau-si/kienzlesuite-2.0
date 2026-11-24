@@ -1,8 +1,12 @@
 # Terminzettel – Release-Notizen
 
+## 1.3.0-beta.10
+
+- **Logo-Upload hing beim Hochladen** (Chrome drehte ewig, keine Meldung): Das Logo wird jetzt wie die Pad-Software der Signatur **roh per fetch** gesendet (kein Multipart-Formular mehr), Fehler und Erfolg stehen unter dem Knopf, danach lädt die Seite neu. `uploads = true` ist nicht mehr nötig und wurde wieder entfernt. Die genaue Ursache des Hängens ist nicht geklärt (nicht reproduzierbar ohne VM); der neue Weg ist der, der bei der Signatur auf der VM funktioniert.
+
 ## 1.3.0-beta.9
 
-- **Logo-Upload ging nicht** („Bitte zuerst ein Bild auswählen“): Der Modul-Dienst nahm keine Formular-Uploads an. Das Modul fordert sie jetzt an (`uploads = true` in `module.toml`, braucht Basis 0.21.4-beta.51). Nach dem Update **Verwaltung → Module** (oder `sudo bash installer/install.sh`), damit der Dienst neu startet.
+- **Logo-Upload ging nicht** („Bitte zuerst ein Bild auswählen“): Der Modul-Dienst nahm keine Formular-Uploads an. (Ersetzt durch beta.10.)
 - Logo: Lage **links, Mitte oder rechts** wählbar (Kopf → „Lage“).
 - Neu: **Absage per E-Mail**. Unten auf dem Bon steht ein QR-Code, der eine vorbereitete E-Mail öffnet (Empfänger, Betreff und Nachrichtentext frei wählbar; Größe Klein/Mittel/Groß; Text über dem Code). Standardmäßig aus. Der Nachrichtentext darf höchstens 400 Zeichen haben; ist der Code zu dicht, wird der Bon ohne ihn gedruckt. Nicht mit echtem Drucker und nicht mit einem Handy gescannt; die QR-Erzeugung ist hier nur ohne `python3-qrcode` getestet (Test übersprungen).
 

@@ -5,7 +5,7 @@
 [module]
 id = "sumup"
 name = "Kasse"
-version = "2.3.4-beta.28"
+version = "2.3.4-beta.29"
 core_api = "1"
 description = "Kartenzahlung am SumUp Solo aus T2med, T2med-Rechnungseingang über den Drucker „vKasse“, GOÄ-Leistungen, Barzahlung, Belege per E-Mail, Druck und Post."
 
@@ -33,7 +33,7 @@ label = "Kasse: T2med-Rechnungen in den Vorgängen abhaken"
 
 [[rights]]
 id = "inbox"
-label = "Kasse: Rechnungseingang ansehen und Rechnungen löschen"
+label = "Kasse: Rechnungseingang, Nachbearbeitung und Löschen von Rechnungen"
 
 [[rights]]
 id = "letter"

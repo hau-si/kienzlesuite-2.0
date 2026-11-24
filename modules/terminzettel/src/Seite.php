@@ -205,6 +205,13 @@ final class Seite {
         return $bytes;
     }
 
+    /** Logo als rohe Anfrage (fetch, kein Formular-Upload: Modul-Dienste nehmen keine Multipart-Uploads an): Größe prüfen. */
+    public static function rohBytes(string $bytes): string {
+        if ($bytes === '') throw new \InvalidArgumentException('Bitte zuerst ein Bild auswählen.');
+        if (strlen($bytes) > self::LOGO_MAX_BYTES) throw new \InvalidArgumentException('Das Logo darf höchstens 2 MB groß sein.');
+        return $bytes;
+    }
+
     /** Logo prüfen, verkleinern (lib/logo.py) und ablegen; das Layout für den Druckdienst wird neu geschrieben. @throws \InvalidArgumentException mit Meldung für den Benutzer */
     public static function logoSpeichern(string $bytes, ?callable $run = null): void {
         $script = dirname(__DIR__) . '/lib/logo.py';
