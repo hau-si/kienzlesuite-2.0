@@ -20,3 +20,16 @@ main.modul ul.checklist small, main.modul ol.checklist small, main.modul .checkl
 .start-pay button { padding: 8px 6px; font-size: 14px; }
 .zaehler { display: inline-block; margin-left: 6px; min-width: 18px; padding: 0 6px; border-radius: 9px; background: #c0392b; color: #fff; font-size: 12px; text-align: center; }
 @media (max-width: 980px) { .start-grid { grid-template-columns: 1fr; } .work-frame { height: 85vh; } }
+/* Einrichtung: Themenblöcke in der Optik der Basis (Ausklappzeile mit Statuspunkt und Etikett) */
+.setup-group.fold { border: 1px solid #d9e3df; border-radius: 12px; background: #fff; margin: 0 0 10px; padding: 0 14px; }
+.setup-group.fold > summary { padding: 13px 0; font-size: 15px; font-weight: 600; gap: 10px; }
+.setup-group.fold > summary::before { content: "▸"; }
+.setup-group.fold[open] > summary::before { content: "▾"; }
+.setup-group.fold[open] > summary { border-bottom: 1px solid #edf0ee; margin-bottom: 6px; }
+.setup-group.fold > summary .tag { margin-left: auto; }
+.setup-group .mark-icon { flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-size: 13px; font-weight: 700; }
+.setup-group .mark-icon.done { background: #e5f3ed; color: #16503f; }
+.setup-group .mark-icon.open { background: #fff3ed; color: #c2410c; border: 1px solid #f0b9a3; }
+.setup-group .mark-icon.error { background: #c2410c; color: #fff; }
+.setup-group.fold > .settings-card { margin: 0; padding: 14px 0; border: 0; border-bottom: 1px solid #edf0ee; border-radius: 0; box-shadow: none; background: transparent; }
+.setup-group.fold > .settings-card:last-child { border-bottom: 0; }

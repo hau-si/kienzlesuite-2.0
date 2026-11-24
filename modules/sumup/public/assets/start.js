@@ -57,6 +57,10 @@ async function tag() {
     $('day-stats').textContent = 'Heute: ' + euro(s.total_cents) + ' · ' + s.card + ' Karte · ' + s.cash + ' bar';
   } catch { /* Tageswerte sind nur Beiwerk */ }
 }
+async function einrichtung() {
+  const z = $('setup-count'); if (!z) return;
+  try { const r = await api('setup_count'); z.hidden = !r.count; z.textContent = String(r.count); z.title = r.red ? r.red + ' Punkt(e) erneut nötig oder fehlerhaft' : 'Offene Einrichtungspunkte'; } catch { /* nur Beiwerk */ }
+}
 $('work-new').onclick = neuerVorgang;
-liste(); tag();
+liste(); tag(); einrichtung();
 setInterval(() => { if (!document.hidden) { liste(); tag(); } }, 15000);

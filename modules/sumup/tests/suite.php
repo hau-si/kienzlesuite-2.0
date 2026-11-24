@@ -89,6 +89,15 @@ try {
     [$code, $out] = page($root, ['HTTP_ORIGIN' => 'https://fremd.example.org', 'HTTP_X_KIENZLE_CSRF' => TEST_CSRF] + $post + $server, json_encode(['action' => 'demo']));
     check($code === 403, 'Fremder Ursprung akzeptiert');
 
+    // Startseite: Zähler für offene Einrichtung nur mit Einstellungsrechten; freie Eingabe und Tageswerte.
+    [$code, $out] = page($root, $post + ['HTTP_X_KIENZLE_CSRF' => TEST_CSRF] + $server, json_encode(['action' => 'setup_count']));
+    $count = json_decode($out, true);
+    check($code === 200 && isset($count['count'], $count['red']) && $count['count'] >= $count['red'], 'Einrichtungszähler fehlt: ' . $out);
+    [$code, $out] = page($root, $post + ['HTTP_X_KIENZLE_CSRF' => TEST_CSRF] + staff_server(['kassieren']), json_encode(['action' => 'setup_count']));
+    check($code === 200 && (json_decode($out, true)['count'] ?? -1) === 0, 'Zähler ohne Einstellungsrecht nicht 0: ' . $out);
+    [$code, $out] = page($root, $post + ['HTTP_X_KIENZLE_CSRF' => TEST_CSRF] + $server, json_encode(['action' => 'day_stats']));
+    check($code === 200 && ($out !== '') && isset(json_decode($out, true)['total_cents']), 'Tageswerte fehlen: ' . $out);
+
     // Starter (POST /api.php ohne Anmeldung): nur mit Starter-Schlüssel, nur „launch“, Antwort mit Startlink auf „/“.
     $starter = ['REQUEST_METHOD' => 'POST', 'REQUEST_URI' => '/api.php', 'CONTENT_TYPE' => 'application/json', 'KIENZLE_OEFFENTLICH' => 'starter',
         'KIENZLE_PFAD' => '/kasse', 'HTTP_HOST' => 'kasse.example.org'];

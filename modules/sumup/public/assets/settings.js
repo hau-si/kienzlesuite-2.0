@@ -230,12 +230,13 @@ function layoutTabs(data) {
     const panel = $('panel-' + tab.id); const lead = $('s-checklist'); if (lead) panel.append(lead);
     for (const group of tab.groups) {
       let box = $('group-' + group.id);
-      if (!box) { box = el('details', null, 'setup-group', {id: 'group-' + group.id}); box.append(el('summary', group.label)); }
+      if (!box) { box = el('details', null, 'setup-group fold', {id: 'group-' + group.id}); const sum = el('summary'); sum.append(el('span', '○', 'mark-icon'), el('strong', group.label), el('span', '', 'tag', {id: 'tag-' + group.id})); box.append(sum); }
       panel.append(box);
       for (const id of group.cards) { const card = $(id); if (card) box.append(card); }
     }
   }
   const open = renderChecklist(data);
+  rankGroups();
   if (!activeTab) {
     for (const id of lastOpenCards) openGroupOf(id);
     openGroupOf(location.hash.slice(1));
@@ -244,8 +245,29 @@ function layoutTabs(data) {
     if (tabOf(hash)) setTimeout(() => $(hash)?.scrollIntoView({block: 'start'}), 50);
   } else activate(activeTab);
 }
+// Themenblöcke wie in der Basis: Rot (erneut nötig/Fehler) zuerst, dann Offenes, dann Fertiges; Rotes und Offenes ist aufgeklappt.
+let lastItems = [];
+function rankGroups() {
+  const panel = $('panel-einrichtung'); if (!panel) return;
+  const rows = [];
+  for (const group of GROUPS) {
+    const box = $('group-' + group.id); if (!box) continue;
+    const mine = lastItems.filter(i => !i.optional && !i.info && group.cards.includes(i.card));
+    const bad = mine.filter(i => i.error).length, need = mine.filter(i => !i.done).length;
+    const rank = bad ? 0 : need ? 1 : 2;
+    box.dataset.rank = String(rank);
+    const mark = box.querySelector('.mark-icon'), tag = $('tag-' + group.id);
+    mark.textContent = bad ? '!' : need ? '○' : '✓'; mark.className = 'mark-icon ' + (bad ? 'error' : need ? 'open' : 'done');
+    tag.textContent = bad ? bad + ' rot' : need ? need + ' offen' : 'fertig'; tag.className = 'tag ' + (bad ? 'err' : need ? 'warn' : 'ok');
+    if (rank < 2 && !box.dataset.touched) box.open = true;
+    rows.push([rank, GROUPS.indexOf(group), box]);
+  }
+  rows.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  for (const [, , box] of rows) panel.append(box);
+}
 function activate(id) {
   activeTab = id;
+  document.querySelectorAll('details.setup-group').forEach(d => { d.ontoggle = () => { d.dataset.touched = '1'; }; });
   for (const tab of TABS) {
     $('panel-' + tab.id).hidden = tab.id !== id;
     $('tab-' + tab.id).setAttribute('aria-selected', String(tab.id === id));
@@ -314,6 +336,7 @@ function renderChecklist(data) {
   }
   list.append(ol);
   lastOpenCards = required.filter(i => !i.done).map(i => i.card);
+  lastItems = items;
   badge('einrichtung', open);
   return open;
 }

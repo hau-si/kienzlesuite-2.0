@@ -1,5 +1,11 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.13
+
+- Einrichtung in den Einstellungen im Stil der Basis: Themenblöcke als Ausklappzeilen mit Statuspunkt und Etikett („n rot“, „n offen“, „fertig“). Rotes (erneut nötig, Fehler) steht oben, dann Offenes, dann Fertiges; Rotes und Offenes ist aufgeklappt.
+- Startseite: am Zahnrad „Einstellungen“ steht eine rote Zahl mit den noch nicht erledigten Einrichtungspunkten (nur für Benutzer mit Einstellungsrechten).
+- Intern: neue API-Aktion `setup_count`.
+
 ## 2.3.4-beta.12
 
 - Neue Startseite der Kasse (im Rahmen der Suite, zwei Spalten): Links steht gleich die Eingabemaske für Leistungen, IGeL und GOÄ bereit – auch ohne T2med-Rechnung, mit frei eingebbarem Betrag, Name und Geburtsdatum (beides optional) und der vorhandenen Kartenzahlung, Bar und Überweisung. Rechts die offenen T2med-Rechnungen mit Direktwahl **Karte, Bar, Überweisung oder Per Post (Letterxpress)** sowie die Tageswerte.

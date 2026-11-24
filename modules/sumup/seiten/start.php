@@ -18,7 +18,7 @@ $csrf = ks_h($k->csrf());
 $einstellungen = array_diff(Suite::rights(), ['kassieren']) !== [];
 ob_start();
 ?>
-<header class="seitenkopf"><div><p class="eyebrow">Kasse</p><h1>Kassieren</h1></div><span class="start-tools"><span id="day-stats" class="muted small"></span><?php if ($einstellungen): ?><a class="button secondary" href="<?= $base ?>einstellungen">⚙ Einstellungen</a><?php endif; ?></span></header>
+<header class="seitenkopf"><div><p class="eyebrow">Kasse</p><h1>Kassieren</h1></div><span class="start-tools"><span id="day-stats" class="muted small"></span><?php if ($einstellungen): ?><a class="button secondary" href="<?= $base ?>einstellungen">⚙ Einstellungen<span id="setup-count" class="zaehler" hidden></span></a><?php endif; ?></span></header>
 <div class="start-grid">
 <section class="start-left" aria-label="Kassieren"><div class="start-bar"><strong id="work-title">Freie Eingabe · IGeL · GOÄ</strong><button id="work-new" class="text-button" type="button">Neuer Vorgang</button></div>
 <iframe id="work" class="work-frame" title="Kassieren" src="<?= $base ?>kassieren?neu=1"></iframe></section>
