@@ -11,14 +11,65 @@ final class Overview {
     public static string $state = '/var/lib/kienzle/ueberblick';
     public const MANUAL = ['ca' => 'Zertifizierungsstelle auf allen Arbeitsplätzen eingerichtet', 'codes' => 'Wiederherstellungscodes der Admins ausgedruckt und verwahrt',
         'name' => 'Servername auf den Arbeitsplätzen bekannt (Router/DNS oder hosts-Datei)',
-        'anmeldung' => 'Suite unter dem neuen Namen geöffnet und neu angemeldet', 'passkeys' => 'Passkeys unter dem neuen Namen neu angelegt (oder keine vorhanden)'];
+        'anmeldung' => 'Suite unter dem neuen Namen geöffnet und neu angemeldet', 'passkeys' => 'Passkeys unter dem neuen Namen neu angelegt (oder keine vorhanden)',
+        'starter' => 'Arbeitsplatz-Starter der Module auf den Arbeitsplätzen neu installiert (Verknüpfungen enthalten den Servernamen)',
+        'dienste' => 'Dienste mit Anmeldung über die Suite (OIDC) auf den neuen Namen umgestellt'];
+    /** Gruppen der Basis-Liste in der Reihenfolge der Anzeige. */
+    public const GROUPS = ['zugang' => 'Zugang und Konten', 'name' => 'Servername und Arbeitsplätze', 'sicherung' => 'Datensicherung', 'betrieb' => 'Schutz und Updates'];
+    private const AGAIN = 'ueberblick_erneut';
     /** Wo ein Punkt erledigt wird (wie im Einrichtungs-Überblick von kienzle-sumup). */
     public const PLACES = ['web' => ['In diesem Webfenster', 'Einstellungen dieses Servers'], 'pc' => ['Auf den Arbeitsplätzen', 'jeder PC der Praxis'],
         'nas' => ['Am NAS und im Router', 'Geräte im Praxisnetz']];
     private const KEY = 'ueberblick_manuell';
+    /** @var array<string,int> Während core() gesetzt: erneut nötige Punkte. */
+    private static array $again = [];
+    private const IGNORE = 'ueberblick_ignoriert';
+
+    public static function key(string $title): string { return substr(sha1($title), 0, 12); }
+
+    /** Schlüssel der Punkte, die ein Admin ignoriert (zählen nicht als offen). */
+    private function ignored(): array {
+        $m = json_decode((string)$this->db->setting(self::IGNORE), true);
+        return is_array($m) ? array_values(array_filter($m, 'is_string')) : [];
+    }
+
+    public function ignore(string $key, bool $on): void {
+        if (!preg_match('/^[0-9a-f]{12}$/', $key)) throw new Problem('Unbekannter Punkt.', 422);
+        $l = array_diff($this->ignored(), [$key]);
+        if ($on) $l[] = $key;
+        $this->db->store(self::IGNORE, json_encode(array_values($l), JSON_THROW_ON_ERROR));
+    }
+
+    private function flag(array $items): array {
+        $ig = $this->ignored();
+        foreach ($items as $k => $i) { $items[$k]['key'] = self::key($i['title']); $items[$k]['ignoriert'] = in_array($items[$k]['key'], $ig, true); }
+        return $items;
+    }
+
+    /** Zählt als noch zu erledigen: nicht fertig, nicht optional, nicht ignoriert. */
+    public static function needed(array $i): bool { return $i['state'] !== 'done' && !$i['optional'] && empty($i['ignoriert']); }
 
     public function __construct(private Database $db, private Users $users, private Modules $modules, private ?Firewall $firewall = null,
         private ?Updates $updates = null, private ?Connections $connections = null, private ?Backup $backup = null, private ?Config $config = null) {}
+
+    /** Punkte, die nach einer Änderung des Servernamens erneut erledigt werden müssen: Schlüssel => Zeitpunkt der Änderung. */
+    private function again(): array {
+        $m = json_decode((string)$this->db->setting(self::AGAIN), true);
+        return is_array($m) ? array_intersect_key(array_map('intval', $m), self::MANUAL) : [];
+    }
+
+    /**
+     * Servername (oder Adresse) wurde geändert: Alles, was an den Namen gebunden ist, gilt wieder als offen und wird rot angezeigt,
+     * bis es erneut bestätigt ist. Bei einer neuen Zertifizierungsstelle muss sie auch auf den Arbeitsplätzen neu eingespielt werden.
+     */
+    public function nameChanged(bool $newCa): void {
+        $keys = ['name', 'anmeldung', 'passkeys', 'starter', 'dienste'] + ($newCa ? [5 => 'ca'] : []);
+        $m = $this->manual();
+        $a = $this->again();
+        foreach ($keys as $k) { unset($m[$k]); $a[$k] = time(); }
+        $this->db->store(self::KEY, json_encode($m, JSON_THROW_ON_ERROR));
+        $this->db->store(self::AGAIN, json_encode($a, JSON_THROW_ON_ERROR));
+    }
 
     private function manual(): array {
         $m = json_decode((string)$this->db->setting(self::KEY), true);
@@ -30,6 +81,7 @@ final class Overview {
         $m = $this->manual();
         if ($done) $m[$item] = time(); else unset($m[$item]);
         $this->db->store(self::KEY, json_encode($m, JSON_THROW_ON_ERROR));
+        if ($done) $this->db->store(self::AGAIN, json_encode(array_diff_key($this->again(), [$item => 1]), JSON_THROW_ON_ERROR));
     }
 
     public function refresh(): void {
@@ -39,11 +91,56 @@ final class Overview {
     }
 
     private static function item(string $title, string $state, string $hint, string $link, ?string $manual = null): array {
-        return ['title' => $title, 'state' => $state, 'hint' => $hint, 'link' => $link, 'manuell' => $manual, 'ort' => 'web'];
+        if ($manual !== null && $state !== 'done' && isset(self::$again[$manual])) {
+            $state = 'error';
+            $hint = 'Erneut nötig, weil der Servername am ' . date('d.m.Y H:i', self::$again[$manual]) . ' geändert wurde. ' . $hint;
+        }
+        return ['title' => $title, 'state' => $state, 'hint' => $hint, 'link' => $link, 'manuell' => $manual, 'ort' => 'web', 'optional' => false];
     }
 
-    /** Punkte der Basis. */
+    /** Notwendige Reihenfolge der Basis-Schritte: Anfang des Titels => [Ort, optional, Gruppe]. Nicht aufgeführte Punkte kommen ans Ende. */
+    private const ORDER = [
+        'Admin mit Authenticator-App' => ['web', false, 'zugang'],
+        'Mindestens zwei Admins' => ['web', true, 'zugang'],
+        'Wiederherstellungscodes für jeden Admin' => ['web', false, 'zugang'],
+        'Wiederherstellungscodes der Admins ausgedruckt' => ['web', false, 'zugang'],
+        'Servername festgelegt' => ['web', false, 'name'],
+        'Servername auf den Arbeitsplätzen' => ['pc', false, 'name'],
+        'Zertifizierungsstelle auf allen Arbeitsplätzen' => ['pc', false, 'name'],
+        'Suite unter dem neuen Namen' => ['pc', false, 'name'],
+        'Passkeys unter dem neuen Namen' => ['pc', true, 'name'],
+        'Arbeitsplatz-Starter' => ['pc', false, 'name'],
+        'Dienste mit Anmeldung' => ['web', false, 'name'],
+        'Netzwerkspeicher eingetragen' => ['web', true, 'sicherung'],
+        'Datensicherung eingerichtet' => ['web', false, 'sicherung'],
+        'Schlüsselblatt gedruckt' => ['web', false, 'sicherung'],
+        'Letzte Sicherung erfolgreich' => ['web', false, 'sicherung'],
+        'Probe-Wiederherstellung erfolgreich' => ['web', true, 'sicherung'],
+        'Schreibgeschützte Schnappschüsse am NAS' => ['nas', true, 'sicherung'],
+        'Firewall eingeschaltet' => ['web', false, 'betrieb'],
+        'Updates: kürzlich' => ['web', false, 'betrieb'],
+        'Updates: Signaturprüfung' => ['web', true, 'betrieb'],
+    ];
+
+    /** Punkte der Basis, in der Reihenfolge, in der sie erledigt werden sollten, mit Ort und Kennzeichnung „optional“. */
     public function core(): array {
+        self::$again = $this->again();
+        $items = $this->coreItems();
+        $rank = static function (array $i): int {
+            $n = 0;
+            foreach (self::ORDER as $start => $_) { if (str_starts_with($i['title'], $start)) return $n; $n++; }
+            return 100;
+        };
+        foreach ($items as $k => $i) {
+            $items[$k]['gruppe'] = 'betrieb';
+            foreach (self::ORDER as $start => [$ort, $optional, $gruppe]) if (str_starts_with($i['title'], $start)) { $items[$k]['ort'] = $ort; $items[$k]['optional'] = $optional; $items[$k]['gruppe'] = $gruppe; break; }
+            $items[$k]['rang'] = $rank($i) * 100 + $k;
+        }
+        usort($items, fn($a, $b) => $a['rang'] <=> $b['rang']);
+        return $this->flag($items);
+    }
+
+    private function coreItems(): array {
         $admins = array_filter($this->users->all(), fn($u) => $u['admin'] && $u['active']);
         $withOtp = array_filter($admins, fn($u) => $u['otp']);
         $codes = array_filter($admins, fn($u) => $this->users->recoveryLeft((int)$u['id']) > 0);
@@ -53,21 +150,27 @@ final class Overview {
         foreach ($this->config?->hostnames ?? [] as $h) if (!filter_var($h, FILTER_VALIDATE_IP) && str_contains($h, '.')) $named = true;
         // Der Name zählt erst als erledigt, wenn die Schritte danach (Router/hosts, neu anmelden, Passkeys) von Hand bestätigt sind.
         $after = isset($manual['name'], $manual['anmeldung'], $manual['passkeys']);
-        if ($this->config) $out[] = self::item('Servername festgelegt', $named && $after ? 'done' : 'open',
+        if ($this->config) $out[] = self::item('Servername festgelegt', $named && $after ? 'done' : ($named && self::$again ? 'error' : 'open'),
             !$named ? 'Für Passkeys auf allen Arbeitsplätzen nötig' : implode(', ', $this->config->hostnames) . ($after ? '' : ' – noch offen: Namen im Router/hosts eintragen, unter dem Namen neu anmelden, Passkeys neu anlegen (jeweils unten bestätigen)'), '/verwaltung/server');
         $out[] = self::item('Admin mit Authenticator-App', $admins && count($withOtp) === count($admins) ? 'done' : 'open',
             $admins ? count($withOtp) . ' von ' . count($admins) . ' Admins mit OTP' : 'Noch kein Admin', '/verwaltung/benutzer');
         $out[] = self::item('Mindestens zwei Admins (Vertretung)', count($admins) >= 2 ? 'done' : 'open', 'Fällt ein Admin aus, kommt sonst nur noch die Konsole weiter.', '/verwaltung/benutzer');
-        $out[] = self::item('Wiederherstellungscodes für jeden Admin', $admins && count($codes) === count($admins) ? 'done' : 'open', 'Unter „Mein Zugang“ neu erzeugen', '/verwaltung/zugang');
-        $out[] = self::item(self::MANUAL['codes'], isset($manual['codes']) ? 'done' : 'open', 'Bitte von Hand bestätigen', '/verwaltung/einrichtung', 'codes');
+        $out[] = self::item('Wiederherstellungscodes für jeden Admin', $admins && count($codes) === count($admins) ? 'done' : 'open', 'Unter „Mein Konto“ neu erzeugen', '/konto');
+        $out[] = self::item(self::MANUAL['codes'], isset($manual['codes']) ? 'done' : 'open', 'Auf Papier ausdrucken und sicher verwahren; danach hier bestätigen', '/verwaltung/einrichtung', 'codes');
         $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['ca'], isset($manual['ca']) ? 'done' : 'open', 'Datei ca.crt als vertrauenswürdige Stammzertifizierungsstelle eintragen – Anleitung für Windows, Mac, iPhone und Android', '/hilfe/arbeitsplatz#zertifikat', 'ca');
-        $out[] = self::item(self::MANUAL['anmeldung'], isset($manual['anmeldung']) ? 'done' : 'open', 'Suite unter dem Namen aus „Server und Name“ öffnen, dort neu anmelden', '/verwaltung/server', 'anmeldung');
+        $out[] = self::item(self::MANUAL['anmeldung'], isset($manual['anmeldung']) ? 'done' : 'open', 'Suite unter dem Namen aus „Server“ öffnen, dort neu anmelden', '/verwaltung/server', 'anmeldung');
         $out[] = self::item(self::MANUAL['passkeys'], isset($manual['passkeys']) ? 'done' : 'open', 'Unter „Mein Konto“ neu anlegen; sie gelten nur für den Namen, unter dem sie angelegt wurden', '/konto', 'passkeys');
         $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['name'], isset($manual['name']) ? 'done' : 'open', 'Einmal im Router bzw. DNS eintragen – oder auf jedem PC in der Datei hosts', '/hilfe/arbeitsplatz#name', 'name');
+        if (array_filter($this->modules->all(), fn($m) => !empty($m['web']['starter']))) {
+            $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['starter'], isset($manual['starter']) ? 'done' : 'open', 'In den Einstellungen des Moduls (z. B. Kasse → Arbeitsplätze) das Paket neu laden und auf jedem Arbeitsplatz ausführen', '/verwaltung/module', 'starter');
+        }
+        if ((int)($this->db->one('SELECT COUNT(*) AS n FROM oidc_clients')['n'] ?? 0) > 0) {
+            $out[] = self::item(self::MANUAL['dienste'], isset($manual['dienste']) ? 'done' : 'open', 'Die Anmelde-Adresse (Issuer) heißt jetzt https://' . ($this->config?->hostnames[0] ?? '') . '; in den angebundenen Diensten (Modulen) ändern', '/verwaltung/module', 'dienste');
+        }
         if ($this->firewall) {
             $fw = $this->firewall->status()['state'];
             $out[] = self::item('Firewall eingeschaltet und bestätigt', $fw === 'active' ? 'done' : ($fw === 'failed' ? 'error' : 'open'),
-                ['active' => 'aktiv', 'off' => 'aus', 'pending' => 'wartet auf Bestätigung', 'reverted' => 'zurückgenommen', 'failed' => 'Fehler', 'requested' => 'wird übernommen'][$fw] ?? $fw, '/verwaltung/firewall');
+                ['active' => 'aktiv', 'off' => 'aus', 'pending' => 'wartet auf Bestätigung', 'reverted' => 'zurückgenommen', 'failed' => 'Fehler', 'requested' => 'wird übernommen'][$fw] ?? $fw, '/verwaltung/sicherheit?bereich=firewall');
         }
         if ($this->updates) {
             $u = $this->updates->status();
@@ -108,17 +211,39 @@ final class Overview {
                 if (!is_array($i) || !in_array($i['state'] ?? '', ['done', 'open', 'error'], true)) continue;
                 $link = (string)($i['link'] ?? '');
                 if ($link !== '' && ($path === '' || !str_starts_with($link, rtrim($path, '/')) || str_contains($link, '..'))) $link = '';
-                $items[] = self::item(mb_substr((string)($i['title'] ?? ''), 0, 120), $i['state'], mb_substr((string)($i['hint'] ?? ''), 0, 300), $link);
+                $items[] = ['optional' => !empty($i['optional'])] + self::item(mb_substr((string)($i['title'] ?? ''), 0, 120), $i['state'], mb_substr((string)($i['hint'] ?? ''), 0, 300), $link);
             }
-            $out[] = ['id' => $id, 'name' => $this->modules->name($id), 'items' => array_slice($items, 0, 30),
+            $out[] = ['id' => $id, 'name' => $this->modules->name($id), 'items' => $this->flag(array_slice($items, 0, 30)),
                 'fehler' => is_array($d) ? mb_substr((string)($d['fehler'] ?? ''), 0, 200) : 'Noch nicht gesammelt', 'zeit' => is_array($d) ? (int)($d['zeit'] ?? 0) : 0];
         }
         return $out;
     }
 
     public function open(): int {
-        $n = count(array_filter($this->core(), fn($i) => $i['state'] !== 'done'));
-        foreach ($this->modules() as $m) $n += count(array_filter($m['items'], fn($i) => $i['state'] !== 'done'));
+        $n = count(array_filter($this->core(), fn($i) => self::needed($i)));
+        foreach ($this->modules() as $m) $n += count(array_filter($m['items'], fn($i) => self::needed($i)));
         return $n;
+
+    }
+
+    /** Seiten (Pfad ohne Anhang), auf denen noch ein nötiger Schritt offen ist – für die blaue Markierung im Menü. */
+    public function openPaths(): array {
+        $items = $this->core();
+        foreach ($this->modules() as $m) foreach ($m['items'] as $i) $items[] = $i;
+        $out = [];
+        foreach ($items as $i) {
+            if (!self::needed($i) || $i['link'] === '') continue;
+            $out[] = strtok($i['link'], '?#') ?: $i['link'];
+        }
+        return array_values(array_unique($out));
+    }
+
+    /** Kurzstand für die Startseite: erledigte und alle nötigen Schritte (ohne optionale) und der nächste offene. */
+    public function summary(): array {
+        $all = $this->core();
+        foreach ($this->modules() as $m) foreach ($m['items'] as $i) $all[] = $i;
+        $required = array_values(array_filter($all, fn($i) => !$i['optional'] && empty($i['ignoriert'])));
+        $open = array_values(array_filter($required, fn($i) => $i['state'] !== 'done'));
+        return ['done' => count($required) - count($open), 'total' => count($required), 'next' => $open[0]['title'] ?? '', 'link' => $open[0]['link'] ?? '', 'errors' => count(array_filter($open, fn($i) => $i['state'] === 'error'))];
     }
 }

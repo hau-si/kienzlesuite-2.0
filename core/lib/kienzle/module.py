@@ -207,6 +207,13 @@ def check() -> dict:
         rows.append({**_summary(m), 'update': {'version': newer['version'], 'source': newer['source'], 'signed': newer['signed']} if newer else None,
                      'releases': local_releases(mid)})
     available = [o for mid, o in sorted(offer.items()) if mid not in have]
+    try:
+        ensure_running()
+        states = service_states()
+        for r in rows:
+            r['dienste'] = states.get(r['id'], [])
+    except (OSError, subprocess.SubprocessError):
+        pass
     return set_status(installed=rows, available=available, checked_at=int(time.time()), error=error)
 
 
@@ -487,6 +494,78 @@ def start(names: list[str]) -> None:
             _systemctl('restart', n)
 
 
+def ensure_running() -> list[str]:
+    """Dienste installierter Module, die eingeschaltet, aber gestoppt sind, wieder starten (z. B. nach einem unterbrochenen Update).
+    Läuft gerade eine Installation oder Aktualisierung, geschieht nichts. Einmalige Dienste (Type=oneshot) werden nicht angefasst."""
+    if read_status().get('running'):
+        return []
+    started: list[str] = []
+    for mid in sorted(installed()):
+        for n in unit_names(mid):
+            if n.endswith('.service'):
+                try:
+                    if 'Type=oneshot' in (UNITS / n).read_text(encoding='utf-8'):
+                        continue
+                except OSError:
+                    continue
+            elif not n.endswith(('.timer', '.path', '.socket')):
+                continue
+            enabled, active = _systemctl('is-enabled', n), _systemctl('is-active', n)
+            if enabled is None or active is None or enabled.returncode != 0 or active.returncode == 0:
+                continue
+            _systemctl('start', n)
+            log(f'{mid}: {n} war gestoppt und wurde wieder gestartet.')
+            started.append(n)
+    return started
+
+
+def _long_running(n: str) -> bool:
+    """Dauerdienst des Moduls (nicht Type=oneshot)."""
+    if not n.endswith('.service'):
+        return False
+    try:
+        return 'Type=oneshot' not in (UNITS / n).read_text(encoding='utf-8')
+    except OSError:
+        return False
+
+
+def service_states() -> dict[str, list[dict]]:
+    """Je installiertem Modul die Dauerdienste mit Zustand (aktiv: True/False, ohne systemd: None)."""
+    out: dict[str, list[dict]] = {}
+    for mid in sorted(installed()):
+        rows = []
+        for n in unit_names(mid):
+            if _long_running(n):
+                r = _systemctl('is-active', n)
+                rows.append({'name': n, 'aktiv': None if r is None else r.returncode == 0})
+        out[mid] = rows
+    return out
+
+
+def refresh_states() -> None:
+    """Nur die Dienstzustände in der Statusdatei erneuern (ohne Netzzugriff)."""
+    states = service_states()
+    rows = read_status().get('installed', [])
+    for r in rows:
+        if isinstance(r, dict):
+            r['dienste'] = states.get(r.get('id'), [])
+    set_status(installed=rows)
+
+
+def service_action(mid: str, restart: bool) -> str:
+    """Dienste eines Moduls starten oder neu starten."""
+    if mid not in installed():
+        raise Fehler('Modul ist nicht installiert.')
+    names = [n for n in unit_names(mid) if _long_running(n) or n.endswith(('.timer', '.path', '.socket'))]
+    if not names:
+        raise Fehler('Dieses Modul hat keinen eigenen Dienst.')
+    for n in names:
+        _systemctl('restart' if restart else 'start', n)
+    log(f'{mid}: Dienste ' + ('neu gestartet.' if restart else 'gestartet.'))
+    refresh_states()
+    return f'{mid}: Dienste ' + ('neu gestartet.' if restart else 'gestartet.')
+
+
 def stop(mid: str) -> None:
     for n in unit_names(mid):
         _systemctl('stop', n)
@@ -635,6 +714,9 @@ def dispatch(req: dict) -> str:
     if action == 'pruefen':
         check()
         return 'Angebot aktualisiert.'
+    if action == 'status':
+        refresh_states()
+        return 'Status der Module aktualisiert.'
     if action == 'automatisch':
         on = req.get('an') is True
         set_status(auto=on)
@@ -651,6 +733,8 @@ def dispatch(req: dict) -> str:
         return install(mid, version)
     if action == 'entfernen':
         return remove(mid, req.get('daten_loeschen') is True)
+    if action in ('dienst-start', 'dienst-neustart'):
+        return service_action(mid, action == 'dienst-neustart')
     raise Fehler('Anfrage ungültig.')
 
 

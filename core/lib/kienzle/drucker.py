@@ -95,8 +95,9 @@ def ppd_text(p: dict) -> str:
              f'*ShortNickName: "{label}"', f'*NickName: "{label} (PDF/PostScript)"', '*PSVersion: "(3010.000) 0"', '*LanguageLevel: "3"',
              '*ColorDevice: False', '*DefaultColorSpace: Gray', '*FileSystem: False', '*Throughput: "1"', '*LandscapeOrientation: Plus90',
              '*TTRasterizer: Type42', '*cupsVersion: 1.1', '*cupsManualCopies: True', '*cupsMaxCopies: 99',
-             '*cupsFilter: "application/vnd.cups-pdf 0 -"', '*cupsFilter2: "application/pdf application/pdf 0 -"',
-             '*cupsFilter2: "application/vnd.cups-pdf application/pdf 0 -"', '*cupsFilter2: "application/postscript application/postscript 0 -"',
+             # Nur diese drei Filterzeilen (wie im früheren Rechnungseingang): Jede weitere Umwandlung (z. B. über „application/vnd.cups-pdf“)
+             # lässt CUPS zusätzlich JPEG, PNG, TIFF und Raster anbieten; Windows schickt dann Bilder statt PDF mit Textebene.
+             '*cupsFilter2: "application/pdf application/pdf 0 -"', '*cupsFilter2: "application/postscript application/postscript 0 -"',
              '*cupsFilter2: "application/vnd.cups-postscript application/postscript 0 -"']
     for key, label2 in (('PageSize', 'Original page size'), ('PageRegion', 'Original page region')):
         lines += [f'*OpenUI *{key}/{label2}: PickOne', f'*OrderDependency: 10 AnySetup *{key}', f'*Default{key}: {paper}']

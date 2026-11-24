@@ -47,7 +47,7 @@ RESERVED_RIGHTS = frozenset({'admin'})
 APPARMOR = frozenset({'gs', 'qpdf'})
 HOOKS = ('install', 'update', 'remove', 'busy', 'health')
 # Zentrale Verbindungen der Basis, die ein Modul anmelden kann (Zugangsdaten bekommen nur anmeldende Module).
-CONNECTIONS = ('t2med', 'mail', 'ablage')
+CONNECTIONS = ('t2med', 'mail', 'ablage', 'letterxpress')
 SHARES = ('samba', 'ipp')
 FORMAT = re.compile(r'^[a-z]+/[a-z0-9.+-]{1,60}$')
 

@@ -13,12 +13,9 @@ header('X-Content-Type-Options: nosniff');
 header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
 $version = ks_h(trim((string)file_get_contents(dirname(__DIR__) . '/VERSION')));
 $base = ks_h(Suite::base() . '/');
+ob_start();
 ?>
-<!doctype html>
-<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kasse · Einstellungen · Kienzle-Suite</title><link rel="stylesheet" href="<?= $base ?>assets/style.css?v=<?= $version ?>"><script src="<?= $base ?>assets/goae-calc.js?v=<?= $version ?>" defer></script><script src="<?= $base ?>assets/settings.js?v=<?= $version ?>" defer></script></head>
-<body data-base="<?= $base ?>"><main class="settings-main">
-<header class="top"><a class="brand" href="/"><span class="mark" aria-hidden="true">K</span><div><strong>Kasse</strong><span>Einstellungen · Kienzle-Suite</span></div></a><span id="mode" class="badge" hidden></span></header>
+<header class="seitenkopf"><div><p class="eyebrow">Kasse</p><h1>Einstellungen</h1></div><span id="mode" class="badge" hidden></span></header>
 <p id="message" class="notice" role="status" hidden></p>
 
 <div id="settings" hidden>
@@ -56,4 +53,13 @@ $base = ks_h(Suite::base() . '/');
 <p class="settings-foot"><a href="<?= $base ?>">Zur Kasse</a> · <a href="/">Zur Kienzle-Suite</a></p>
 </div>
 <footer>Kasse v<?= $version ?> · auf Grundlage von kienzle-sumup von Dr. Thomas Kienzle</footer>
-</main></body></html>
+<?php
+$inhalt = (string)ob_get_clean();
+$kopf = '<link rel="stylesheet" href="' . $base . 'assets/style.css?v=' . $version . '"><link rel="stylesheet" href="' . $base . 'assets/rahmen.css?v=' . $version . '">'
+    . '<script src="' . $base . 'assets/goae-calc.js?v=' . $version . '" defer></script><script src="' . $base . 'assets/settings.js?v=' . $version . '" defer></script>';
+$k = Suite::modul();
+if (!method_exists($k, 'rahmen')) {   // ältere Basis ohne Rahmen: eigenständige Seite wie früher
+    echo '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Kasse · Einstellungen · Kienzle-Suite</title>' . $kopf . '</head><body data-base="' . $base . '"><main class="settings-main">' . $inhalt . '</main></body></html>';
+    return;
+}
+echo $k->rahmen('Kasse – Einstellungen', $inhalt, ['roh' => true, 'kopf' => $kopf, 'body' => ' data-base="' . $base . '"']);

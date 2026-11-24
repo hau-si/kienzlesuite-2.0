@@ -1,0 +1,10 @@
+# Kienzle-Suite: Neustart von Diensten oder Server aus dem Menü (Anfragedatei von ks-core).
+[Unit]
+Description=Kienzle-Suite Neustart (Anfragen)
+
+[Path]
+PathExists=/var/lib/kienzle/core/anfragen/neustart.json
+Unit=kienzle-neustart-anwenden.service
+
+[Install]
+WantedBy=multi-user.target

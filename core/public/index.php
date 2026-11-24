@@ -19,8 +19,9 @@ try {
         null, new Firewall($db, new Network(), $modules), new Updates($db, $config), new Connections($db), new Backup($db, $modules), null, new Printers($db), new Oidc($db, $users, $secrets, $config), store: new ModuleAdmin($db));
     $web->handle($request)->send();
 } catch (Throwable $e) {
-    // Keine Einzelheiten an den Browser; ins Protokoll nur Art und Ort, keine Eingaben.
-    error_log('kienzle-core: ' . get_class($e) . ' in ' . basename($e->getFile()) . ':' . $e->getLine());
+    // Keine Einzelheiten an den Browser; ins Protokoll Art, Ort und die (gekürzte) Meldung der Ausnahme, keine Eingaben der Anfrage.
+    $msg = substr((string)preg_replace('/[\x00-\x1f\x7f]+/', ' ', $e->getMessage()), 0, 300);
+    error_log('kienzle-core: ' . get_class($e) . ' in ' . basename($e->getFile()) . ':' . $e->getLine() . ($msg !== '' ? ' – ' . $msg : '') . ' [' . ($_SERVER['REQUEST_METHOD'] ?? '-') . ' ' . strtok((string)($_SERVER['REQUEST_URI'] ?? ''), '?') . ']');
     http_response_code(500);
     header('Content-Type: text/plain; charset=utf-8');
     header('Cache-Control: no-store');

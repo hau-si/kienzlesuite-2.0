@@ -1,5 +1,180 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.34
+
+- Dokumentation: README und Bildschirmfotos auf den aktuellen Stand gebracht (neu: Übersicht, Mein Konto, Gruppen, Einrichtung, Verbindungen, Kasse-Startseite und -Einstellungen); die Bilder entstehen jetzt reproduzierbar mit `scripts/bildschirmfotos.sh` (erfundene Daten, Vorschau der Kasse in `scripts/kasse-vorschau/`). AGENTS.md enthält den vollständigen Stand für neue Sitzungen. Keine Funktionsänderung.
+
+## 0.21.4-beta.33
+
+- Mein Konto: Die E-Mail-Adresse wird jetzt mit einem Zahlencode bestätigt (16 Ziffern in Vierergruppen, z. B. 1234-5678-9012-3456) statt mit einem Link, denn ein Link ist im lokalen Netz oft nicht erreichbar. Der Code wird in Mein Konto eingegeben, gilt eine Stunde und ist nach fünf falschen Eingaben verbraucht. Der Link zum Zurücksetzen des Passworts („Passwort vergessen?“) bleibt unverändert.
+
+## 0.21.4-beta.32
+
+- Module können ihre Seiten im Rahmen der Suite zeigen (Seitenleiste, Kopf, Praxisname): neue Kopfzeile `X-Kienzle-Menue` der Anmelde-Prüfung (schlank, ohne zusätzliche Anfrage und ohne Sitzungs-Marke) und die Helfer `menue()` und `rahmen()` im PHP-Modul-Helfer; Beschreibung in docs/MODUL-SCHNITTSTELLE.md.
+
+## 0.21.4-beta.31
+
+- Mein Konto: Profilkopf mit Avatar (Initialen, unten rechts das Symbol der wichtigsten Rolle: Admin, Arzt, MFA) und den Gruppen des Kontos als Rollen-Zeile; derselbe Avatar steht in der Benutzerliste.
+- Neu: E-Mail-Adresse im Konto. Sie gilt erst, nachdem der Link in der Bestätigungs-Mail geöffnet wurde (24 Stunden gültig, nur angemeldet, eine Adresse nur für ein Konto). Der Versand läuft über die E-Mail-Verbindung der Suite (neue Aktion „mail-senden“ im root-Dienst); ohne sie weist die Seite darauf hin.
+- Neu: „Passwort vergessen?“ auf der Anmeldeseite (nur sichtbar, wenn der E-Mail-Versand eingerichtet ist). Mit bestätigter Adresse kommt ein Link (3 Tage, einmal), unabhängig davon, ob die Adresse existiert, dieselbe Antwort; höchstens fünf Anfragen, dann Pause. Beim Verwenden werden – wie beim Admin-Link – Passwort, App, Passkeys und alle Anmeldungen zurückgesetzt. Admin-Konten mit Authenticator-App sind ausgenommen (nur Konsole).
+- Datenbank: Änderungen innerhalb einer Transaktion dürfen jetzt verschachtelt sein.
+
+## 0.21.4-beta.30
+
+- Einrichtung: Die Liste ist in Gruppen gegliedert (Zugang und Konten, Servername und Arbeitsplätze, Datensicherung, Schutz und Updates), mit Zähler je Gruppe, Legende und klareren Zeilen.
+- Ändert man den Servernamen oder eine Adresse (Verwaltung → Server), werden alle davon abhängigen Punkte zurückgesetzt und rot angezeigt („Erneut nötig“): Servername auf den Arbeitsplätzen (Router/hosts), Neuanmeldung unter dem neuen Namen, Passkeys, Arbeitsplatz-Starter der Module (Zertifikat) und – falls vorhanden – Dienste mit Anmeldung über die Suite; bei „neue Zertifizierungsstelle“ zusätzlich die Zertifizierungsstelle auf den Arbeitsplätzen. Oben erscheint ein Hinweis; jeder Punkt wird einzeln wieder bestätigt. Das Ändern des Praxisnamens setzt nichts zurück.
+- Neue Einrichtungspunkte: „Arbeitsplatz-Starter … neu installiert“ und „Dienste mit Anmeldung … umgestellt“ (nur wenn Module mit Starter bzw. OIDC-Anbindung vorhanden sind).
+
+## 0.21.4-beta.29
+
+- Benutzer und Gruppen: Gruppen sind jetzt feste Rollen. Wer einer Gruppe angehört, behält sie dauerhaft; ändert man die Gruppe (Rechte, Modul-Admin), gilt das sofort für alle Mitglieder. Mehrere Rollen pro Benutzer sind möglich.
+- Beim Benutzer gibt es eine Rechte-Matrix je Modul: Spalten = Rollen (✓ = die Rolle gewährt das Recht), letzte Spalte = Ergebnis für diesen Benutzer. Blau = von der Rolle, gelb mit Stift = einzeln geändert. Ein Klick ändert ein Recht einzeln, „zurück auf Rolle“ nimmt alle Einzeländerungen zurück.
+- Standardsymbole: Admin = Schild mit Haken, Arzt = Stethoskop, MFA = Person mit Herz (auch in der Benutzerliste und bei den Gruppen, dort mit der Mitgliederliste).
+- Update: bisherige Rechte werden als Einzelrechte ohne Rolle übernommen; für niemanden ändert sich der Zugang. Datenbank-Version 3 (neue Tabellen `user_groups`, `user_overrides`).
+
+## 0.21.4-beta.28
+
+- Der Name der Praxis steht jetzt unter Verwaltung → Praxis (ganz oben, mit Status „✓ eingetragen“); die Seite „Server“ enthält nur noch den Namen des Servers. Die Seitentitel und das Menü heißen kurz „Server“ und „Praxis“ (vorher „Server und Name“ und „Praxis und Daten“). Beim Speichern des Praxisnamens bleiben die Servernamen unverändert; der Root-Dienst übernimmt die Änderung wie bisher.
+- Kasse 2.3.4-beta.9: Hinweistexte in den Kasse-Einstellungen nennen „Verwaltung → Praxis“.
+
+## 0.21.4-beta.27
+
+- Module: Die Seite zeigt Kacheln statt langer Kästen. Installierte Module mit Symbol, Status („✓ läuft“, „gestoppt“), Version und „Öffnen“; bei einem Update steht „Update x.y.z“ mit Knopf „Aktualisieren“ in der Kachel. Noch nicht installierte Module stehen gestrichelt im selben Raster mit „verfügbar“ und „Installieren“. Starten, Neu starten, Nach Update suchen und das rote „Modul entfernen“ (mit Wahl, ob die Daten gelöscht werden) sind im Drei-Punkte-Menü der Kachel. Die Funktionen sind unverändert.
+
+## 0.21.4-beta.26
+
+- Seitenleiste vereinfacht: Die Gruppe „Einstellungen“ entfällt (sie führte zu denselben Modulen wie „Anwendungen“). „Anwendungen“ ist einklappbar und zeigt je Modul das Symbol der Startseite; der rote Punkt neben einem Modul zeigt, dass dort noch etwas eingerichtet werden muss. Die Einstellungen eines Moduls öffnen sich im Modul selbst.
+- Mein Konto: Alle Abschnitte (Passwort ändern, Handynummer, Authenticator-App, Passkeys, Gemerkte Geräte) sind einklappbar und beim Öffnen der Seite eingeklappt; der Status (z. B. „✓ eingerichtet“) steht in der Kopfzeile und bleibt eingeklappt sichtbar. Abschnitte mit Fehlermeldung bleiben offen.
+
+## 0.21.4-beta.25
+
+- Startseite (Admins): neue Karte „Server-Zustand“ mit Kacheln für freien Speicherplatz, Arbeitsspeicher, Prozessorlast (Minutenmittel je Kern), Temperatur (nur wenn der Server einen Sensor meldet, in einer VM meist nicht), Laufzeit seit dem Neustart, Datum der letzten Sicherung (gelb bei „nicht eingerichtet“ oder älter als drei Tage, rot bei Fehler; Klick öffnet die Sicherung) sowie Guthaben bei Letterxpress und seven.io (nur wenn eingerichtet; gelb unter 5 €). Warnfarben: Speicher und Arbeitsspeicher ab 85 % (rot ab 95 %) belegt, Prozessor ab 80 % (rot ab 95 %), Temperatur ab 75 °C (rot ab 85 °C). Mitarbeiter ohne Admin-Recht sehen die Karte nicht.
+- Guthaben: Aktualisieren-Pfeil an der Kachel fragt den Betrag beim Anbieter ab und lädt die Startseite danach selbst neu. Neu: seven.io-Guthaben wird abgefragt (Schlüssel prüfen merkt den Betrag ebenfalls). Es wird nichts verschickt. Nur mit nachgebautem Aufruf getestet, nicht gegen echtes seven.io/Letterxpress; der root-Dienst muss neu starten (normales Update genügt).
+- Symbole: Einrichtung, Server-Zustand, Ihre Module sowie je Modul (Kasse, Terminzettel; andere das Standardsymbol) erhalten ein Symbol.
+- Technik: Neue Klasse `SystemStatus` liest nur /proc und /sys (keine Befehle, keine Rechte). Die Prüfen-Aktion der Verbindungen kennt `zurueck=start`.
+
+## 0.21.4-beta.24
+
+- Verbindungen → E-Mail: Ist Gmail (oder SMTP) verbunden, zeigt ein grüner Balken „Mit Google verbunden: …“ und die Überschrift „✓ eingerichtet“; die Anmeldung (Anleitung, Schritt 1) ist dann unter „Erneut einrichten oder anderes Konto verbinden“ eingeklappt. Knopfreihe (Anmeldung prüfen, Testnachricht mit Empfängerfeld, Entfernen) steht in einer Zeile; das Feld bleibt mit seinem Knopf zusammen (auch bei SMS und Letterxpress).
+
+## 0.21.4-beta.23
+
+- Gmail-Anleitung: Schritt „Branding“ ergänzt (App-Name, Support-E-Mail, Adressen für Startseite und Datenschutzerklärung, autorisierte Domain), den Google vor „In Produktion“ verlangt. Nur Text.
+
+## 0.21.4-beta.22
+
+- Testbetrieb überall gelb gekennzeichnet (wie die offenen Punkte): neues Schild `tag test`/„Testbetrieb“ bei Letterxpress in den Verbindungen; „Live“ grün.
+- Verbindungen → Letterxpress: eigener Knopf „Guthaben abfragen“ mit Symbol; darüber steht der zuletzt abgefragte Wert mit Uhrzeit (auch nach „Zugang prüfen“). Nur mit nachgebautem Aufruf getestet, nicht gegen das echte Letterxpress. Der root-Dienst muss neu starten (normales Update genügt).
+
+## 0.21.4-beta.21
+
+- Einheitliches Aussehen der Kartenüberschriften im ganzen Projekt: ein passendes Symbol davor und, wo es sinnvoll ist, ein Status-Schild dahinter („✓ eingerichtet“ / „nicht eingerichtet“, „✓ ausgefüllt“, „✓ aktiv“, „✓ gedruckt“ …): Verbindungen, Praxis und Daten, Mein Konto (Authenticator-App, Passkeys, Handynummer), Sicherheit (Firewall), Sicherung (Schutz vor Erpressungstrojanern, Schlüsselblatt, Benachrichtigung). Neue Seiten setzen dafür nur `View::$status`.
+- Gmail-Anleitung an die „Google Auth Platform“ von Google angepasst (Erste Schritte, Datenzugriff, Zielgruppe, Clients). Nur nach Googles Dokumentation geschrieben, nicht mit einem Konto durchgespielt.
+
+## 0.21.4-beta.20
+
+- Verbindungen → E-Mail-Versand: neben dem SMTP-Server jetzt auch ein Gmail-Konto per OAuth (Gmail-Schnittstelle, nur Berechtigung „E-Mails senden“). Jede Praxis legt dazu einmal einen eigenen Google-Zugang an (Anleitung auf der Seite); die Anmeldung geschieht über Weiterleitung auf localhost und Einfügen der Adresse. Module bekommen `art = gmail` mit Client und Refresh-Token. Nur mit nachgebautem Google getestet, nicht mit einem echten Konto.
+
+## 0.21.4-beta.19
+
+- Verbindungen: Hilfe-Tooltips (i) bei den Feldern von SMS (seven.io: welche Einstellungen und Berechtigungen der API-Key braucht – nur „sms“ und „balance“, Umgebung Live, unbegrenzt gültig) und Letterxpress. Nur Text, nicht im Browser geprüft.
+
+## 0.21.4-beta.18
+
+- Verbindungen: neuer Abschnitt „Letterxpress (Briefversand)“ mit Benutzername, API-Key und Betrieb Test/Live, Prüfung (Guthaben) und Entfernen. Module melden die Verbindung `letterxpress` in ihrer module.toml an und bekommen die Zugangsdaten wie bei E-Mail. Erfordert einmal den Installer bzw. ein normales Update. Nur mit nachgebautem Aufruf getestet, nicht gegen das echte Letterxpress.
+
+## 0.21.4-beta.17
+
+- Verbindungen: Alle Abschnitte (T2med, E-Mail, SMS, Netzwerkspeicher, Wer nutzt was) lassen sich einklappen. Eingerichtete sind zugeklappt und tragen ein grünes „✓ eingerichtet“; noch nicht eingerichtete oder fehlerhafte bleiben aufgeklappt. Nur mit Testdaten geprüft, nicht im Browser.
+
+## 0.21.4-beta.16
+
+- Einrichtung: Module erscheinen als eine einzige Karte mit Zähler („3 offen“, rot markiert, solange nötige Schritte offen sind); ein Klick führt in die Einstellungen des Moduls, wo die Schritte stehen. Nur mit Testdaten geprüft, nicht im Browser.
+
+## 0.21.4-beta.15
+
+- Updates: Zustand, installierte und neue Version stehen in einer einzigen Karte mit Statussymbol (✓ aktuell, ↑ neue Version, ! Fehler); die Karte „Verfügbar“ entfällt.
+- Roter Punkt am K-Logo, solange die Einrichtung nicht abgeschlossen ist.
+- Einrichtung: Jeder nötige Punkt lässt sich „Ignorieren“ (und wieder beachten); ignorierte Punkte zählen nicht als offen. Nur mit Testdaten geprüft, nicht im Browser.
+
+## 0.21.4-beta.14
+
+- Verwaltung → Module zeigt pro Modul den Zustand der Dienste („läuft“ / „gestoppt“) mit den Knöpfen „Starten“ bzw. „Neu starten“ und „Status der Dienste aktualisieren“. Der Status wird bei der täglichen Modulprüfung und auf Knopfdruck erneuert. Nur mit nachgebautem systemctl getestet, nicht auf dem echten Server (Ubuntu 26.04).
+
+## 0.21.4-beta.13
+
+- Modul-Dienste, die nach einem unterbrochenen Update gestoppt blieben (z. B. Terminzettel: Seite zeigte „Einen Moment bitte“), werden bei der täglichen Modulprüfung und bei „Neu prüfen“ wieder gestartet, wenn sie eingeschaltet sind und gerade kein Update läuft. Einmalige Dienste (Type=oneshot) bleiben unberührt. Nur mit nachgebautem systemctl getestet.
+
+## 0.21.4-beta.12
+
+- Fehler behoben: Auf der Updates-Seite (bei verfügbarer Version) rutschte der Inhalt unter die Seitenleiste. Ursache: Die Aufteilung in Karten schnitt an jeder Überschrift, auch an der im Update-Kasten, und ließ ein div offen. Karten beginnen jetzt nur noch an Überschriften auf oberster Ebene. Das betrifft ebenso andere Seiten mit Überschriften in Kästen (z. B. Gruppen). Im Test mit Beispiel-HTML geprüft, nicht im Browser.
+
+## 0.21.4-beta.11
+
+- Menü: Ein dezenter blauer Punkt hinter einem Menüeintrag zeigt, dass auf dieser Seite noch ein nötiger Schritt aus der Einrichtung offen ist (optionale Punkte zählen nicht); auch bei Modul-Einstellungen, wenn das Modul offene Schritte meldet.
+- Lange Seiten: Selten gebrauchte Abschnitte sind eingeklappt (Überschrift mit Pfeil bleibt sichtbar): Drucker suchen, Drucker von Hand eintragen, Wer nutzt was, Danach (Server), Zeitplan/Benachrichtigung/Aufbewahrung (Sicherung), Kanal und frühere Version (Updates), Protokolle, Dienst hinzufügen, Neue Gruppe. Abschnitte mit Fehlermeldung bleiben offen. Nicht im Browser angesehen.
+
+## 0.21.4-beta.10
+
+- Fehler behoben: Ein Rückschritt des Updaters (automatisch nach fehlgeschlagenem Update oder von Hand) stellte die Datenbank als root wieder her; danach konnte der Dienst sie nicht mehr öffnen („Interner Fehler“, „Die Basis antwortet nicht“). Der Updater merkt sich jetzt beim Schnappschuss Besitzer und Gruppe aller Dateien und stellt sie beim Rückschritt wieder her (Schnappschüsse aus älteren Versionen: Besitzer des Zielordners).
+- Gehört die Datenbank nicht dem Dienst, nennt das Systemprotokoll jetzt die Ursache samt Reparaturbefehl statt einer allgemeinen PDO-Meldung.
+- Gleichzeitig Web-Update und `install.sh` zu starten bleibt zu vermeiden. Nur im Test mit Probeverzeichnissen geprüft, nicht mit einem echten Rückschritt auf dem Server.
+
+## 0.21.4-beta.9
+
+- Interne Fehler: Das Systemprotokoll (`journalctl -t kienzle-core-php`) enthält jetzt zusätzlich die gekürzte Meldung der Ausnahme sowie Methode und Pfad der Anfrage (ohne Eingaben, Query-Teil abgeschnitten).
+- Der Neustart-Dienst (kienzle-neustart.path) steht in der open_basedir-Liste von PHP; sonst hätte die Seite ihn trotz Installation als „nicht eingerichtet“ gemeldet. Nach dem Update einmal `sudo bash installer/install.sh` (schreibt die PHP-Einstellung neu). Nicht auf dem Server getestet.
+
+## 0.21.4-beta.8
+
+- Einrichtung: „Mindestens zwei Admins“, „Netzwerkspeicher eingetragen“ und „Probe-Wiederherstellung erfolgreich“ sind jetzt als optional gekennzeichnet und zählen nicht für den Fortschritt.
+
+## 0.21.4-beta.7
+
+- Zugang (Abmeldezeiten): Zahlenfeld und Einheit stehen jetzt nebeneinander in sinnvoller Breite (vorher war das Zahlenfeld zusammengedrückt); der doppelte Rahmen im aufklappbaren Abschnitt ist weg. Nicht im Browser angesehen.
+
+## 0.21.4-beta.6
+
+- Updates: Während ein Update läuft, steht oben ein gelb hinterlegter, beim Scrollen mitlaufender Hinweis mit drehendem Symbol und dem aktuellen Schritt; die Knöpfe sind gesperrt, bis „fertig“ dasteht. Neu: Hinweis, dass Module beim Update automatisch mit aktualisiert werden, wenn unter Module die automatische Aktualisierung an ist. Nicht im Browser angesehen.
+
+## 0.21.4-beta.5
+
+- Menü links: Symbole vor allen Einträgen; „Start“ ist jetzt das Logo oben; „Neu starten“ (Dienste/Server) steht aufklappbar unten über „Abmelden“. Die Seitenleiste bleibt beim Scrollen stehen und läuft über die volle Höhe (vorher brach die Anzeige auf langen Seiten wie Updates um).
+- Einrichtung: nicht mehr im Menü, sondern als Karte mit Fortschritt auf der Startseite (nur Admins). Die Schritte stehen in der nötigen Reihenfolge, jeder mit Ort (Webfenster, Arbeitsplätze, NAS/Router) und Kennzeichnung „optional“; optionale Punkte zählen nicht für den Fortschritt. Als optional gelten: Passkeys, Schnappschüsse am NAS, Signaturprüfung der Updates. Nicht im Browser/auf dem Server angesehen.
+
+## 0.21.4-beta.4
+
+- Neu im Menü links (nur Admins): aufklappbarer Punkt „Neu starten“ mit „Dienste neu starten“ (Webinterface, Module, nginx) und „Server neu starten“. Beides fragt erst auf einer eigenen Seite nach, wird protokolliert und läuft über einen neuen root-Dienst (kienzle-neustart.path); er wird vom Installer eingerichtet, also nach dem Update einmal `sudo bash installer/install.sh` ausführen. Nicht auf dem Server getestet, der Neustart selbst nur im Probelauf.
+
+## 0.21.4-beta.3
+
+- Neue zentrale Verbindung „SMS (seven.io)“ unter Verwaltung → Verbindungen: API-Schlüssel und optionaler Absendername, Schlüssel prüfen, Test-SMS. Der Versand läuft über den root-Dienst für Verbindungen; der Schlüssel wird nie wieder angezeigt. Gedacht auch für die spätere kienzlefon-App.
+- Ersatz bei der Admin-Anmeldung: Admins hinterlegen unter „Mein Konto“ ihre Handynummer (nur nach Bestätigung mit Passwort und Code). Auf der Code-Seite gibt es dann „Code per SMS senden“: 6 Ziffern, 10 Minuten gültig, einmal verwendbar, höchstens 3 je Anmeldung, frühestens nach einer Minute erneut; protokolliert. Hinweis: Das schwächt die Zwei-Faktor-Anmeldung auf „Besitz der SIM-Karte“; wer das nicht will, richtet SMS nicht ein.
+- Nicht auf dem Server und nicht gegen seven.io getestet (nur mit nachgebauter Schnittstelle).
+
+## 0.21.4-beta.2
+
+- Neue Seite „Praxis und Daten“ (Verwaltung → Praxis): Anschrift, Kontodaten für Überweisungen (Kontoinhaber, IBAN mit Prüfziffer, BIC, Bank) und Steuerangaben (Steuernummer/USt-IdNr., Kleinunternehmerregelung) an einer Stelle; die Module übernehmen sie. Die Anschrift ist von „Server und Name“ hierher gezogen. Nicht auf dem Server getestet.
+
+## 0.21.4-beta.1
+
+- Verwaltung entschlackt: „Sicherheit“ fasst Firewall, Zugang (Abmeldezeiten) und Protokoll in einer Karte mit aufklappbaren Abschnitten zusammen; „Benutzer und Gruppen“ stehen auf einer Seite. Die alten Adressen (/verwaltung/firewall, /zugang, /protokoll, /gruppen) funktionieren weiter.
+- Zugang: Zeiten mit Einheit (Minuten, Stunden, Tage), bis höchstens 1 Jahr (vorher 183 Tage).
+- Hinweis (Tooltip und Text) zum T2med-Demo-Schlüssel: Dabei darf kein eigener API-Schlüssel eingetragen sein.
+- Noch offen: Stammdaten (Kontodaten, Steuernummer, USt) unter „Praxis und Daten“ zusammenführen. Nicht auf dem Server getestet.
+
+## 0.21.3-beta.6
+
+- Durchreich-PPD der virtuellen Drucker enthält nur noch die drei Filterzeilen des früheren Rechnungseingangs (PDF, PostScript, CUPS-PostScript). Die zusätzlichen Zeilen über „application/vnd.cups-pdf“ ließen CUPS weiter JPEG, PNG, TIFF, PWG-Raster und URF anbieten; Windows schickte JPEG-Seiten (Bild-PDF ohne Textebene, Texterkennung nötig). Die Warteschlangen werden beim nächsten Abgleich neu angelegt. Folge: `lp` einer reinen Textdatei an einen virtuellen Drucker funktioniert nicht mehr (Windows druckt PDF). Nicht mit Windows getestet.
+
+## 0.21.3-beta.5
+
+- Windows-Skript: Anschluss und Drucker werden bis zu viermal angelegt (Pause nach dem Spooler-Neustart, sonst Fehler 0x800703eb), am Ende zeigt es den angelegten Drucker. Nicht getestet (auf dem Windows-PC des Anwenders klappte der Befehl `Add-Printer` beim zweiten Versuch).
+
+## 0.21.3-beta.4
+
+- AGENTS.md: Hinweise für neue Sitzungen (Stand, Arbeitsweise, offene Punkte). Nur Dokumentation.
+
 ## 0.21.3-beta.3
 
 - README: aktueller Stand und Abschnitt „So sieht es aus“ mit Bildschirmfotos (Anmeldung, Benutzer, Gruppen, Sicherung auf das NAS per SFTP, Updater; nur erfundene Beispieldaten). Nur Dokumentation, kein Programmcode geändert.

@@ -4,8 +4,9 @@ namespace Kienzle\Core;
 
 /**
  * Gruppen für Benutzer (Vorlagen für Modulrechte): „Admin“, „Arzt“ und „MFA“ sind voreingestellt und änderbar.
- * Eine Gruppe nennt, in welchen Modulen ihre Mitglieder Admin sind und welche Rechte sie haben. Sie wird beim Speichern
- * eines Benutzers angewendet (dort einmal gewählt); spätere Änderungen an der Gruppe ändern bestehende Benutzer nicht.
+ * Eine Gruppe nennt, in welchen Modulen ihre Mitglieder Admin sind und welche Rechte sie haben. Sie ist eine dauerhafte Rolle:
+ * Wer Mitglied ist, bekommt die Rechte der Gruppe, und Änderungen an der Gruppe gelten sofort für alle Mitglieder
+ * (Einzeländerungen am Benutzer bleiben erhalten, siehe Users).
  * Gespeichert wird nur, was ein Admin geändert hat; ohne Änderung gilt die Vorgabe, die neue Module von selbst einschließt.
  */
 final class Groups {
@@ -60,6 +61,7 @@ final class Groups {
     public function reset(string $name): void {
         $stored = $this->stored();
         unset($stored[$name]);
+        if (!isset($this->defaults()[$name])) $this->db->query('DELETE FROM user_groups WHERE grp=?', [$name]);   // eigene Gruppe gelöscht: keine Mitglieder mehr
         $this->db->store(self::KEY, json_encode($stored, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
     }
 

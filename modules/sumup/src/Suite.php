@@ -85,7 +85,7 @@ final class Suite {
     }
 
     /**
-     * Praxisname, Anschrift und die Zuordnung der Drucker gehören der Basis (Verwaltung → Server und Name bzw. Drucker).
+     * Praxisname, Anschrift und die Zuordnung der Drucker gehören der Basis (Verwaltung → Praxis bzw. Drucker).
      * Bei jeder angemeldeten Anfrage wird die mitgelieferte Fassung als basis.json übernommen, damit auch der Starter
      * (ohne Anmeldung) sie nutzen kann.
      */
@@ -141,6 +141,12 @@ final class Suite {
         $v['printing']['width_dots'] = Config::PRINTER_MODELS[$v['printing']['model']]['width_dots'];
         // Drucker richtet die Basis ein (Verwaltung → Drucker); das Modul druckt nur auf deren Warteschlangen.
         foreach (self::praxis() as $k => $val) $v['practice'][$k] = $val;
+        // Kontodaten und Steuerangaben gehören ebenfalls der Basis (Verwaltung → Praxis).
+        try {
+            $st = self::modul()->stammdaten();
+            foreach (['holder', 'iban', 'bic', 'bank_name'] as $f) $v['bank'][$f] = $st[$f];
+            $v['tax']['tax_id'] = $st['tax_id']; $v['tax']['small_business'] = $st['small_business'];
+        } catch (\Throwable) { /* ohne Basis-Angaben bleiben die Vorgaben */ }
         $rollen = self::druckerRollen();
         if ($rollen['bon'] !== '') $v['printing']['queue'] = $rollen['bon'];
         if ($rollen['buero'] !== '') $v['office_printing']['queue'] = $rollen['buero'];
@@ -157,9 +163,14 @@ final class Suite {
         $v['fhir']['ca_file'] = $t ? self::caFile((string)($t['ca_pem'] ?? '')) : '';
         $v['fhir']['pin_certificate'] = $t && !empty($t['pin']) && $v['fhir']['ca_file'] !== '';
         $m = $k->verbindung('mail');
-        $v['mail'] = $m ? ['enabled' => false, 'host' => (string)($m['host'] ?? ''), 'port' => (int)($m['port'] ?? 587),
+        $v['mail'] = $m && ($m['art'] ?? '') === 'gmail' ? ['enabled' => false, 'art' => 'gmail', 'client_id' => (string)($m['client_id'] ?? ''), 'client_secret' => (string)($m['client_secret'] ?? ''),
+            'refresh_token' => (string)($m['refresh_token'] ?? ''), 'from_address' => (string)($m['absender'] ?? ''), 'from_name' => ''] : ($m ? ['enabled' => false, 'host' => (string)($m['host'] ?? ''), 'port' => (int)($m['port'] ?? 587),
             'encryption' => ($m['sicherheit'] ?? '') === 'smtps' ? 'smtps' : 'starttls', 'username' => (string)($m['benutzer'] ?? ''),
-            'password' => (string)($m['passwort'] ?? ''), 'from_address' => (string)($m['absender'] ?? ''), 'from_name' => ''] : ['enabled' => false];
+            'password' => (string)($m['passwort'] ?? ''), 'from_address' => (string)($m['absender'] ?? ''), 'from_name' => ''] : ['enabled' => false]);
+        $l = $k->verbindung('letterxpress');
+        $v['letterxpress']['username'] = $l ? (string)($l['username'] ?? '') : '';
+        $v['letterxpress']['api_key'] = $l ? (string)($l['api_key'] ?? '') : '';
+        $v['letterxpress']['mode'] = $l && ($l['modus'] ?? '') === 'live' ? 'live' : 'test';
         $a = $k->verbindung('ablage');
         $v['invoice_export']['ziel'] = $a ? (string)(($a['ziele'][0]['id'] ?? '')) : '';
         return new Config($v);

@@ -27,11 +27,47 @@ final class KienzleModul {
     /** @return list<string> */
     public function rechte(): array { return array_values(array_filter(explode(',', (string)($this->server['KIENZLE_RECHTE'] ?? '')))); }
     public function recht(string $recht): bool { return $this->istAdmin() || in_array($recht, $this->rechte(), true); }
-    /** Praxisdaten der Basis (Verwaltung → Server und Name): name, street, city, contact; leer, wenn keine mitgeliefert wurden. */
+    /** Menü der Suite für die Seitenleiste: apps (Pfad => Name), ids (Pfad => Modul-ID), admin (Basis-Admin), login. Leer, wenn die Basis nichts mitgeliefert hat. */
+    public function menue(): array {
+        $d = json_decode(rawurldecode((string)($this->server['KIENZLE_MENUE'] ?? '')), true);
+        $apps = [];
+        foreach (is_array($d['apps'] ?? null) ? $d['apps'] : [] as $href => $name) {
+            if (is_string($href) && is_string($name) && preg_match('#^/[a-z0-9-]{1,31}/$#D', $href)) $apps[$href] = mb_substr($name, 0, 60);
+        }
+        $ids = [];
+        foreach (is_array($d['ids'] ?? null) ? $d['ids'] : [] as $href => $id) if (isset($apps[$href]) && is_string($id)) $ids[$href] = $id;
+        return ['apps' => $apps, 'ids' => $ids, 'admin' => is_array($d) && ($d['admin'] ?? false) === true, 'login' => is_array($d) && is_string($d['login'] ?? null) ? $d['login'] : $this->benutzer()];
+    }
+
+    /**
+     * Seite im Rahmen der Suite (Seitenleiste, Kopf, Praxisname) mit dem Inhalt des Moduls. $extra: 'kopf' (Stylesheets/Skripte des Moduls),
+     * 'roh' (Inhalt unverändert statt Überschrift und Karten). Ohne die Basis-Klasse gibt es nur den Inhalt zurück.
+     */
+    public function rahmen(string $titel, string $inhalt, array $extra = []): string {
+        $file = dirname(__DIR__) . '/View.php';
+        if (!is_file($file)) return $inhalt;
+        require_once $file;
+        $m = $this->menue();
+        $nav = ['apps' => $m['apps'], 'appmeta' => array_map(fn($id) => ['id' => $id, 'todo' => false], $m['ids']), 'settings' => [], 'login' => $m['login'], 'admin' => $m['admin'],
+            'csrf' => '', 'updates' => 0, 'module' => 0, 'sicherung' => 0, 'einrichtung' => 0, 'offenLogo' => false, 'offen' => [],
+            'pfad' => (string)parse_url((string)($this->server['REQUEST_URI'] ?? '/'), PHP_URL_PATH)];
+        return \Kienzle\Core\View::page($titel, $inhalt, $nav, $this->praxis()['name'], null, $extra);
+    }
+
+    /** Praxisdaten der Basis (Verwaltung → Praxis): name, street, city, contact; leer, wenn keine mitgeliefert wurden. */
     public function praxis(): array {
         $d = json_decode(rawurldecode((string)($this->server['KIENZLE_PRAXIS'] ?? '')), true);
         $out = [];
         foreach (['name', 'street', 'city', 'contact'] as $k) $out[$k] = is_array($d) && is_string($d[$k] ?? null) ? $d[$k] : '';
+        return $out;
+    }
+
+    /** Kontodaten und Steuerangaben der Basis (Verwaltung → Praxis): holder, iban, bic, bank_name, tax_id, small_business. */
+    public function stammdaten(): array {
+        $d = json_decode(rawurldecode((string)($this->server['KIENZLE_PRAXIS'] ?? '')), true);
+        $out = [];
+        foreach (['holder', 'iban', 'bic', 'bank_name', 'tax_id'] as $k) $out[$k] = is_array($d) && is_string($d[$k] ?? null) ? $d[$k] : '';
+        $out['small_business'] = is_array($d) && ($d['small_business'] ?? false) === true;
         return $out;
     }
 

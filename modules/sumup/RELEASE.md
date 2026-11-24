@@ -1,5 +1,75 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.15
+
+- In der Startseite eingebettete Kassenansicht: Marke „Kasse“ und Willkommenskarte werden dort nicht mehr doppelt gezeigt.
+
+## 2.3.4-beta.14
+
+- Anonymisierte Beispielrechnung im Aufbau der T2med-Liquidation (`tests/fixtures/t2med-beispielrechnung.pdf`, vollständig erfunden, mit Erzeugungsskript und Beschreibung) und ein Test, der sie mit dem Rechnungsleser prüft. Nur Tests und Dokumentation.
+
+## 2.3.4-beta.13
+
+- Einrichtung in den Einstellungen im Stil der Basis: Themenblöcke als Ausklappzeilen mit Statuspunkt und Etikett („n rot“, „n offen“, „fertig“). Rotes (erneut nötig, Fehler) steht oben, dann Offenes, dann Fertiges; Rotes und Offenes ist aufgeklappt.
+- Startseite: am Zahnrad „Einstellungen“ steht eine rote Zahl mit den noch nicht erledigten Einrichtungspunkten (nur für Benutzer mit Einstellungsrechten).
+- Intern: neue API-Aktion `setup_count`.
+
+## 2.3.4-beta.12
+
+- Neue Startseite der Kasse (im Rahmen der Suite, zwei Spalten): Links steht gleich die Eingabemaske für Leistungen, IGeL und GOÄ bereit – auch ohne T2med-Rechnung, mit frei eingebbarem Betrag, Name und Geburtsdatum (beides optional) und der vorhandenen Kartenzahlung, Bar und Überweisung. Rechts die offenen T2med-Rechnungen mit Direktwahl **Karte, Bar, Überweisung oder Per Post (Letterxpress)** sowie die Tageswerte.
+- Die schlanke Ansicht für den Start aus T2med liegt jetzt unter „…/kassieren“ (weiterhin ohne Menü); der Starter ändert sich nicht.
+- Intern: neue Aktionen `manual_open`, `inbox_visit`, `open_inbox`, `day_stats`; Anzeige der Kasse darf im Rahmen der Suite (gleiche Herkunft) eingebettet werden.
+
+## 2.3.4-beta.11
+
+- Die Einstellungen der Kasse stehen jetzt im Rahmen der Suite: Seitenleiste mit der Kasse als aktivem Eintrag, Kopf „Kasse – Einstellungen“, gleiche Schrift und Abstände wie die übrigen Seiten. Die Kassieren-Ansicht (aus T2med) bleibt schlank und ohne Menü.
+- Erster Schritt der Umgestaltung (Startseite mit Offenem und Zahlen, Einstellungen als einklappbare Zeilen folgen).
+
+## 2.3.4-beta.10
+
+- Einrichtungs-Überblick: „Starter auf den Kassen-PCs installieren“ steht rot („Erneut nötig“), wenn sich das Serverzertifikat geändert hat (z. B. nach einer Änderung des Servernamens), statt nur als offen.
+
+## 2.3.4-beta.9
+
+- Hinweise in den Einstellungen verweisen auf „Verwaltung → Praxis“ (Praxisname, Anschrift, Konto, Steuer stehen dort gemeinsam; die Seite „Praxis und Daten“ heißt jetzt „Praxis“). Nur Text.
+
+## 2.3.4-beta.8
+
+- Testbetrieb gelb: Die Anzeige „TESTMODUS“/„T2MED TESTMODUS“ oben in der Kasse und den Einstellungen ist gelb; im Rechnungseingang steht bei Letterxpress im Testbetrieb ein gelbes Schild „TESTBETRIEB Post“. Nicht im Browser geprüft.
+
+## 2.3.4-beta.7
+
+- E-Mail-Beleg: Wird in der Basis ein Gmail-Konto verbunden, versendet die Kasse Belege über die Gmail-Schnittstelle statt per SMTP. Voraussetzung: Basis 0.21.4-beta.20. Nicht mit einem echten Gmail-Konto getestet.
+
+## 2.3.4-beta.6
+
+- Letterxpress-Zugang (Benutzername, API-Key, Test/Live) kommt jetzt zentral aus der Basis (Verwaltung → Verbindungen) und steht nicht mehr in den Einstellungen der Kasse. Bisher hier eingetragene Werte werden nicht mehr verwendet: bitte einmal in der Basis eintragen. Druck, Beidseitig, Versandart und Einschreiben bleiben in der Kasse. Voraussetzung: Basis 0.21.4-beta.18. Nicht gegen das echte Letterxpress getestet.
+
+## 2.3.4-beta.5
+
+- Rechnungseingang: In der Liste stand in der Spalte „Eingang“ „[object Observable]“ statt Datum und Uhrzeit, weil die Datumsfunktion in der Einstellungsseite fehlte; behoben. Auch das Datum im Protokoll der abgelehnten Drucke ist davon betroffen gewesen. Nicht im Browser getestet.
+
+## 2.3.4-beta.4
+
+- Einrichtung der Kasse im Aufbau der Basis: eine nummerierte Liste in der nötigen Reihenfolge (Suite, dann Kassen-PCs, dann T2med) mit Fortschrittsbalken und Schildern „In diesem Webfenster“, „Auf den Kassen-PCs“, „In T2med“ sowie „optional“.
+- Rechnungsnummern: Das eingetragene Kürzel wird auch bei Text-PDFs zugeordnet (z. B. wird „1IG2026-309“ zu „IG2026-309“), nicht nur nach Texterkennung. Voraussetzung: das Kürzel ist unter Rechnungseingang eingetragen. Nicht mit echten T2med-Rechnungen getestet.
+
+## 2.3.4-beta.3
+
+- Kontodaten (Kontoinhaber, IBAN, BIC, Bank), Steuernummer und Kleinunternehmerregelung kommen jetzt zentral aus der Basis (Verwaltung → Praxis und Daten) und stehen nicht mehr in den Einstellungen der Kasse. Bisher hier eingetragene Werte werden nicht mehr verwendet: bitte einmal in der Basis eintragen. Voraussetzung: Basis 0.21.4-beta.2. Nicht auf dem Server getestet.
+
+## 2.3.4-beta.2
+
+- Hinweis zum T2med-Demo-Schlüssel (kein eigener API-Schlüssel eintragen, sonst 403) in Einstellungshilfe.
+
+## 2.3.4-beta.1
+
+- Neue Einstellung „Kürzel der Rechnungsnummern“ (T2med-Rechnungen übernehmen, ein Kürzel pro Zeile, mehrere Rechnungsgruppen möglich): Die Texterkennung liest das Kürzel oft verschieden („1IG“, „16G“, „162“); die Kasse ordnet es dem eingetragenen Kürzel zu (Verwechslungen I/1, G/6, O/0 …), sodass dieselbe Rechnung immer dieselbe Nummer erhält und beim erneuten Druck „Ersetzt“ wird. Nur mit erfundenen Nummern getestet, nicht mit echten T2med-Rechnungen.
+
+## 2.3.3-beta.4
+
+- Windows-Skript: Anschluss und Drucker werden bis zu viermal angelegt (Pause nach dem Spooler-Neustart, sonst Fehler 0x800703eb), am Ende zeigt es den angelegten Drucker. Nicht getestet (auf dem Windows-PC des Anwenders klappte der Befehl `Add-Printer` beim zweiten Versuch).
+
 ## 2.3.3-beta.3
 
 - Nach einer nicht erfolgten oder abgebrochenen Zahlung heißt die Überweisung überall „Patient zahlt später (Überweisung)“. Bei internen Rechnungen (Leistungsauswahl) wechselt sie in die offene Überweisung mit Kontodaten und QR-Code (Bon druckbar); bei T2med-Rechnungen, deren Überweisungs-QR-Code schon auf der Rechnung steht, kehrt sie zur Rechnungsliste zurück (Rechnung wird gedruckt, wenn der Rechnungsdruck eingeschaltet ist). Dieselbe Beschriftung gilt in der Rechnungsliste.

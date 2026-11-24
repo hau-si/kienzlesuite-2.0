@@ -11,7 +11,11 @@ final class Seite {
     public static string $data = '/var/lib/kienzle/terminzettel';
     public static string $helper = '/opt/kienzle/core/current/php/modul/Kienzle.php';
     public const QR_SIZES = ['small' => 224, 'medium' => 292, 'large' => 384];
-    private const SIZES = ['1x1' => 'Normal (1×1)', '1x2' => 'Hoch (1×2)', '2x1' => 'Breit (2×1)', '2x2' => 'Groß (2×2)', '2x3' => 'Groß und hoch (2×3)', '3x3' => 'Sehr groß (3×3)', '4x4' => 'Riesig (4×4)'];
+    /** Logobreite in Druckpunkten (Papier 58 mm: 420 Punkte, 80 mm: 576). */
+    public const LOGO_DOTS = ['small' => 160, 'medium' => 256, 'large' => 384];
+    public const LOGO_SIZES = ['small' => 'Klein', 'medium' => 'Mittel', 'large' => 'Groß'];
+    public const LOGO_MAX_BYTES = 2097152;
+    public const SIZES = ['1x1' => 'Normal (1×1)', '1x2' => 'Hoch (1×2)', '2x1' => 'Breit (2×1)', '2x2' => 'Groß (2×2)', '2x3' => 'Groß und hoch (2×3)', '3x3' => 'Sehr groß (3×3)', '4x4' => 'Riesig (4×4)'];
     /** Erklärungen als Tooltip neben der Beschriftung. */
     public const HILFE = [
         'qr_summary' => 'Dieser Text steht im Kalendereintrag, der beim Scannen des QR-Codes entsteht, vor dem Termintyp (z. B. „Termin Arztpraxis: Lufu“). Keine Patientennamen eintragen.',
@@ -20,11 +24,14 @@ final class Seite {
     public static function schema(): array {
         return [
             'enabled' => ['bool', 'Terminzettel aus T2med auf dem Bondrucker drucken', true],
-            'header_text' => ['text', 'Kopf: erste Zeile Praxisname, darunter Adressbereich (leer = keiner)', ''],
-            'header_first_size' => ['choice', 'Erste Zeile (Praxisname): Schriftgröße', '2x2', ['same' => 'Wie der Adressbereich'] + self::SIZES],
-            'header_first_bold' => ['choice', 'Erste Zeile (Praxisname): fett', 'same', ['same' => 'Wie der Adressbereich', 'yes' => 'Fett', 'no' => 'Nicht fett']],
-            'header_size' => ['choice', 'Adressbereich (übrige Zeilen): Schriftgröße', '1x1', self::SIZES],
-            'header_bold' => ['bool', 'Adressbereich (übrige Zeilen): fett', true],
+            'logo_enabled' => ['bool', 'Logo drucken (wenn eines hochgeladen ist)', true],
+            'logo_size' => ['choice', 'Logo: Breite', 'medium', self::LOGO_SIZES],
+            'name_text' => ['string', 'Praxisname (erste Zeile)', ''],
+            'name_size' => ['choice', 'Praxisname: Schriftgröße', '2x2', self::SIZES],
+            'name_bold' => ['bool', 'Praxisname: fett', true],
+            'address_text' => ['text', 'Adressblock (Straße, Ort, Kontakt; leer = keiner)', ''],
+            'address_size' => ['choice', 'Adressblock: Schriftgröße', '1x1', self::SIZES],
+            'address_bold' => ['bool', 'Adressblock: fett', true],
             'heading' => ['string', 'Überschrift', 'IHRE TERMINE'],
             'heading_size' => ['choice', 'Schriftgröße Überschrift', '2x2', self::SIZES],
             'show_patient' => ['bool', 'Patientennamen drucken', true],
@@ -39,23 +46,40 @@ final class Seite {
         ];
     }
 
-    /** Kopf aus den Praxisdaten der Basis: Name, dann Straße, Ort, Kontakt (nur ausgefüllte Zeilen). */
-    public static function kopfAusPraxis(array $praxis): string {
-        $zeilen = [];
-        foreach (['name', 'street', 'city', 'contact'] as $k) {
-            $z = trim(preg_replace('/[\x00-\x1f\x7f-\x9f]+/u', ' ', (string)($praxis[$k] ?? '')) ?? '');
-            if ($z !== '') $zeilen[] = $z;
-        }
-        return mb_substr(implode("\n", $zeilen), 0, 1000);
+    /** Praxisname und Adressblock aus den Praxisdaten der Basis: Name, dann Straße, Ort, Kontakt (nur ausgefüllte Zeilen). @return array{name:string,address:string} */
+    public static function kopfAusPraxis(array $praxis): array {
+        $z = static fn(string $k): string => trim(preg_replace('/[\x00-\x1f\x7f-\x9f]+/u', ' ', (string)($praxis[$k] ?? '')) ?? '');
+        $adresse = array_values(array_filter([$z('street'), $z('city'), $z('contact')], static fn($t) => $t !== ''));
+        return ['name' => mb_substr($z('name'), 0, 80), 'address' => mb_substr(implode("\n", $adresse), 0, 1000)];
     }
 
-    /** Gespeicherte Werte, ergänzt um die Vorgaben; der Kopf ist mit den Praxisdaten der Basis vorbelegt, solange er nicht gespeichert wurde. */
+    /** Gespeicherte Werte, ergänzt um die Vorgaben. Name und Adresse sind mit den Praxisdaten der Basis vorbelegt, solange nichts gespeichert wurde; der alte gemeinsame Kopf (header_text) wird aufgeteilt. */
     public static function werte(array $praxis = []): array {
         $d = json_decode((string)@file_get_contents(self::$data . '/werte.json'), true);
+        if (is_array($d) && !array_key_exists('name_text', $d) && !array_key_exists('address_text', $d) && is_string($d['header_text'] ?? null)) $d = self::ausAltemKopf($d);
         $out = [];
         foreach (self::schema() as $k => $f) $out[$k] = is_array($d) && array_key_exists($k, $d) && self::passt($f, $d[$k]) ? $d[$k] : $f[2];
-        if (!is_array($d) || !array_key_exists('header_text', $d)) $out['header_text'] = self::kopfAusPraxis($praxis);
+        if (!is_array($d) || (!array_key_exists('name_text', $d) && !array_key_exists('address_text', $d))) {
+            $kopf = self::kopfAusPraxis($praxis);
+            $out['name_text'] = $kopf['name'];
+            $out['address_text'] = $kopf['address'];
+        }
         return $out;
+    }
+
+    /** Älteres Format (ein Textfeld „Kopf“ mit Praxisname in der ersten Zeile) in Name und Adressblock zerlegen. */
+    private static function ausAltemKopf(array $d): array {
+        $zeilen = explode("\n", trim(str_replace("\r", '', $d['header_text']), "\n"));
+        $name = trim((string)array_shift($zeilen));
+        $d['name_text'] = mb_substr($name, 0, 80);
+        $d['address_text'] = trim(implode("\n", $zeilen), "\n ");
+        $adresseGross = is_string($d['header_size'] ?? null) && isset(self::SIZES[$d['header_size']]) ? $d['header_size'] : '1x1';
+        $d['address_size'] = $adresseGross;
+        $d['address_bold'] = is_bool($d['header_bold'] ?? null) ? $d['header_bold'] : true;
+        $d['name_size'] = is_string($d['header_first_size'] ?? null) && isset(self::SIZES[$d['header_first_size']]) ? $d['header_first_size'] : $adresseGross;
+        $fett = $d['header_first_bold'] ?? 'same';
+        $d['name_bold'] = $fett === 'yes' ? true : ($fett === 'no' ? false : $d['address_bold']);
+        return $d;
     }
 
     private static function passt(array $f, mixed $v): bool {
@@ -105,19 +129,64 @@ final class Seite {
     public static function overlay(array $values): array {
         $o = ['enabled' => $values['enabled'], 'model' => self::modell(), 'cut' => $values['cut']];
         $map = [
-            'header_text' => ['header', 'text'], 'header_size' => ['header', 'size'], 'header_bold' => ['header', 'bold'],
             'heading' => ['heading', 'text'], 'heading_size' => ['heading', 'size'],
             'show_patient' => ['appointments', 'show_patient'], 'appointment_size' => ['appointments', 'size'],
             'footer_text' => ['footer', 'text'], 'footer_size' => ['footer', 'size'],
             'qr_enabled' => ['qr', 'enabled'], 'qr_position' => ['qr', 'position'], 'qr_summary' => ['qr', 'summary'],
         ];
         foreach ($map as $key => [$block, $field]) $o[$block][$field] = $values[$key];
-        if ($values['header_first_size'] !== 'same') $o['header']['first_size'] = $values['header_first_size'];
-        if (in_array($values['header_first_bold'], ['yes', 'no'], true)) $o['header']['first_bold'] = $values['header_first_bold'] === 'yes';
-        $o['header']['enabled'] = trim($values['header_text']) !== '';
+        // Kopf für den Druckdienst: erste Zeile = Praxisname (eigene Größe, eigenes Fett), darunter der Adressblock.
+        $name = trim($values['name_text']);
+        $adresse = trim($values['address_text'], "\n ");
+        $o['header'] = ['text' => $name !== '' && $adresse !== '' ? $name . "\n" . $adresse : $name . $adresse, 'size' => $values['address_size'], 'bold' => $values['address_bold']];
+        if ($name !== '') { $o['header']['first_size'] = $values['name_size']; $o['header']['first_bold'] = $values['name_bold']; }
+        $o['header']['enabled'] = $name !== '' || $adresse !== '';
+        $o['logo'] = ['enabled' => $values['logo_enabled'] && self::logoVorhanden(), 'width_dots' => self::LOGO_DOTS[$values['logo_size']]];
         $o['footer']['enabled'] = trim($values['footer_text']) !== '';
         $o['qr']['width_dots'] = self::QR_SIZES[$values['qr_size']];
         return $o;
+    }
+
+    public static function logoPfad(): string { return self::$data . '/logo.png'; }
+    public static function logoVorhanden(): bool { return is_file(self::logoPfad()); }
+
+    /** Das gespeicherte Logo als data:-URL für die Anzeige auf der Einstellungsseite (leer ohne Logo). */
+    public static function logoDaten(): string {
+        $b = self::logoVorhanden() ? @file_get_contents(self::logoPfad(), false, null, 0, 600000) : false;
+        return is_string($b) && $b !== '' ? 'data:image/png;base64,' . base64_encode($b) : '';
+    }
+
+    /** Hochgeladene Datei ($_FILES-Eintrag) lesen und grob prüfen. @throws \InvalidArgumentException */
+    public static function uploadBytes(mixed $f, bool $echterUpload = true): string {
+        if (!is_array($f) || ($f['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) throw new \InvalidArgumentException('Bitte zuerst ein Bild auswählen.');
+        if (in_array($f['error'], [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) throw new \InvalidArgumentException('Das Logo darf höchstens 2 MB groß sein.');
+        $tmp = (string)($f['tmp_name'] ?? '');
+        if ($f['error'] !== UPLOAD_ERR_OK || $tmp === '' || ($echterUpload && !is_uploaded_file($tmp))) throw new \InvalidArgumentException('Das Hochladen hat nicht geklappt. Bitte noch einmal versuchen.');
+        $bytes = (string)@file_get_contents($tmp, false, null, 0, self::LOGO_MAX_BYTES + 1);
+        if ($bytes === '' || strlen($bytes) > self::LOGO_MAX_BYTES) throw new \InvalidArgumentException('Das Logo darf höchstens 2 MB groß sein.');
+        return $bytes;
+    }
+
+    /** Logo prüfen, verkleinern (lib/logo.py) und ablegen; das Layout für den Druckdienst wird neu geschrieben. @throws \InvalidArgumentException mit Meldung für den Benutzer */
+    public static function logoSpeichern(string $bytes, ?callable $run = null): void {
+        $script = dirname(__DIR__) . '/lib/logo.py';
+        $r = $run ? $run($script, $bytes) : self::starten(['/usr/bin/python3', '-B', $script], $bytes);
+        if ($r['code'] !== 0 || strncmp($r['out'], "\x89PNG", 4) !== 0) {
+            $err = trim($r['stderr']);
+            throw new \InvalidArgumentException($err !== '' ? substr($err, 0, 200) : 'Das Logo konnte nicht verarbeitet werden.');
+        }
+        self::schreiben('logo.png', $r['out'], true);
+        self::layoutNeu();
+    }
+
+    public static function logoEntfernen(): void {
+        @unlink(self::logoPfad());
+        self::layoutNeu();
+    }
+
+    /** layout.json aus den gespeicherten Werten neu bilden (z. B. nach Logo-Änderung); ohne gespeicherte Werte nichts tun. */
+    private static function layoutNeu(): void {
+        if (is_file(self::$data . '/werte.json')) self::schreiben('layout.json', self::overlay(self::werte()));
     }
 
     public static function speichern(array $values): void {
@@ -138,11 +207,11 @@ final class Seite {
         if (!is_file(self::$data . '/werte.json')) self::speichern(self::werte($neu['praxis']));
     }
 
-    private static function schreiben(string $name, array $data): void {
+    private static function schreiben(string $name, array|string $data, bool $roh = false): void {
         if (!is_dir(self::$data)) @mkdir(self::$data, 0700, true);
         $path = self::$data . '/' . $name;
         $tmp = $path . '.' . bin2hex(random_bytes(4));
-        $json = json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n";
+        $json = $roh ? (string)$data : json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n";
         if (file_put_contents($tmp, $json) === false || !chmod($tmp, 0600) || !rename($tmp, $path)) {
             @unlink($tmp);
             throw new \RuntimeException('Einstellungen konnten nicht gespeichert werden.');

@@ -218,6 +218,8 @@ class IppEverywhere(Umgebung):
         text = ppd.read_text(encoding='utf-8')
         self.assertIn('*cupsFilter2: "application/pdf application/pdf 0 -"', text)
         self.assertNotIn('raster', text)
+        self.assertNotIn('vnd.cups-pdf', text)      # sonst bietet CUPS zusätzlich JPEG/PNG/TIFF/Raster an
+        self.assertEqual(text.count('*cupsFilter2:'), 3)
         self.assertEqual(stat.S_IMODE(ppd.stat().st_mode), 0o644)
         self.assertIn(['restart', 'kienzle-drucker-beispiel-beispiel-pdf.service'], self.cups()['systemctl'])
         with mock.patch.object(self.d, '_port_open', return_value=True):

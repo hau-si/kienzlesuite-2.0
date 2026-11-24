@@ -71,6 +71,7 @@ function renderInvoices() {
   $('invoices').replaceChildren(); $('invoices-section').hidden = !list.length;
   for (const invoice of list) {
     const box = element('div','','invoice'), line = element('div','','invoice-line');
+    box.dataset.id = invoice.id;
     if (fresh.has(invoice.id)) box.classList.add('invoice-new');
     line.append(element('span','Rechnung '+invoice.number+' vom '+invoice.invoice_date.split('-').reverse().join('.')+(fresh.has(invoice.id)?' – neu':'')), element('strong',euro(invoice.amount_cents)));
     const pay = method => () => run(async() => {
@@ -381,10 +382,10 @@ async function load() {
   state=await api('state'); csrf=state.csrf;
   $('welcome').hidden=true; $('workspace').hidden=false;
   $('mode').hidden=!state.mock && !state.fhir_mock;
-  $('mode').textContent=state.mock?'TESTMODUS':state.fhir_mock?'T2MED TESTMODUS':'';
+  $('mode').textContent=state.mock?'TESTMODUS':state.fhir_mock?'T2MED TESTMODUS':'';$('mode').classList.toggle('test',/TESTMODUS/.test($('mode').textContent));
   $('patient-name').textContent=state.patient.name; document.querySelector('.patient .eyebrow').textContent=state.manual ? 'OHNE PATIENTENAKTE' : 'AKTUELLER PATIENT';
   $('patient-birth').textContent=state.patient.birthdate ? 'Geboren am '+state.patient.birthdate.split('-').reverse().join('.') : '';
-  $('practice-hint').hidden=state.local_receipts;
+  $('free-patient').hidden=!state.manual; $('practice-hint').hidden=state.local_receipts;
   if(!$('service-date').value) $('service-date').value=state.today;
   $('service-date').max=state.today;
   renderVatOption(); renderServices(); renderInvoices(); renderPrintBox(); renderPayment();
@@ -413,7 +414,7 @@ $('pay').onclick=()=>run(async()=>{
   if(!$('service-date').reportValidity()) return;
   for(const input of $('basket').querySelectorAll('textarea')) if(!input.reportValidity()) return;
   const ids=selectedIds();
-  const data={services:[...selected].sort(),groups:[...selectedGroups].sort(),reasons:Object.fromEntries(Object.entries(reasons).filter(([id,value])=>ids.has(id) && value.trim())),service_date:$('service-date').value,manual_amount:$('manual').value.trim(),method:payMethod(),...printChoice()};
+  const data={services:[...selected].sort(),groups:[...selectedGroups].sort(),reasons:Object.fromEntries(Object.entries(reasons).filter(([id,value])=>ids.has(id) && value.trim())),service_date:$('service-date').value,manual_amount:$('manual').value.trim(),method:payMethod(),...(state.manual?{patient_name:$('free-name').value.trim(),patient_birthdate:$('free-birth').value}:{}),...printChoice()};
   // Schlüssel und Anfrage vor dem Netzaufruf speichern; bei verlorener Antwort wiederverwenden.
   if(!startRequest) startRequest={...data,request_id:crypto.randomUUID()};
   sessionStorage.setItem('ks-start-'+visitId,JSON.stringify(startRequest));
@@ -551,7 +552,16 @@ $('manual-form').onsubmit=event=>{ event.preventDefault(); run(async()=>{
   sessionStorage.removeItem(key); location.href=result.url; location.reload();
 }); };
 $('demo').onclick=()=>run(async()=>{ const result=await api('demo'); location.href=result.url; location.reload(); });
+// Aus der Startseite: gewünschte Zahlungsart einer Rechnung gleich auslösen (die Abfragen bleiben wie bei Klick auf den Knopf).
+function autoAction(invoiceId, action) {
+  const box = document.querySelector('.invoice[data-id="'+invoiceId+'"]'); if (!box) { message('Diese Rechnung ist nicht mehr offen.'); return; }
+  const sel = {card:'.invoice-pay', cash:'.invoice-cash', later:'.invoice-later', post:'.invoice-letter'}[action];
+  const button = sel && box.querySelector(sel);
+  if (button) button.click(); else if (action === 'post') message('Per Post senden ist für diese Rechnung nicht möglich (Letterxpress aus oder Anschrift fehlt).');
+}
 async function init() {
+  const query = new URL(location.href).searchParams, auto = {invoice: query.get('rechnung'), action: query.get('aktion')};
+  if (query.get('neu') || query.get('rechnung')) { $('welcome').hidden = true; document.querySelector('.top .brand').hidden = true; }   // eingebettet in der Startseite: gleich die Arbeitsfläche zeigen, nicht die Willkommenskarte
   // Start aus T2med: #launch=<code>. Musste sich der Benutzer erst an der Suite anmelden, hat die Basis den Code im Tab gemerkt.
   let hash=location.hash.slice(1);
   try { if(!hash.startsWith('launch=')) hash=(sessionStorage.getItem('kienzle-launch')||'').slice(1); sessionStorage.removeItem('kienzle-launch'); } catch { /* ohne sessionStorage */ }
@@ -561,10 +571,16 @@ async function init() {
     const result=await api('exchange',{ticket}); visitId=result.visit_id; csrf=result.csrf;
     history.replaceState(null,'',BASE+'?v='+encodeURIComponent(visitId));
   }
+  if(!ticket && !visitId && query.get('neu')) {   // Startseite: freie Eingabe ohne Patientenakte
+    const opened=await api('manual_open'); const t=new URLSearchParams(opened.url.split('#')[1]||'').get('launch');
+    const result=await api('exchange',{ticket:t}); visitId=result.visit_id; csrf=result.csrf;
+    history.replaceState(null,'',BASE+'kassieren?v='+encodeURIComponent(visitId));
+  }
   if(visitId) {
     const saved=sessionStorage.getItem('ks-start-'+visitId);
     if(saved) { try { startRequest=JSON.parse(saved); selected=new Set(startRequest.services); selectedGroups=new Set(startRequest.groups || []); reasons=startRequest.reasons || {}; $('service-date').value=startRequest.service_date || ''; $('manual').value=startRequest.manual_amount; if(startRequest.method==='cash') document.querySelector('input[name="pay-method"][value="cash"]').checked=true; } catch { sessionStorage.removeItem('ks-start-'+visitId); } }
     await load();
+    if(auto.invoice && auto.action) autoAction(auto.invoice, auto.action);
   }
 }
 init().catch(e=>message(e.message));

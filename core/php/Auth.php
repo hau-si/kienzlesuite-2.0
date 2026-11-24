@@ -16,8 +16,8 @@ final class Auth {
     public const COOKIE = 'kienzle_sitzung';
     public const IDLE_DEFAULT = 30;              // Minuten ohne Aktion
     public const MAX_DEFAULT = 12;               // Stunden Höchstdauer
-    public const MAX_IDLE_MINUTES = 263520;      // 183 Tage
-    public const MAX_HOURS = 4392;               // 183 Tage
+    public const MAX_IDLE_MINUTES = 525600;      // 1 Jahr
+    public const MAX_HOURS = 8760;               // 1 Jahr
     public const STEP_SECONDS = 600;             // 10 Minuten für OTP-Eingabe bzw. OTP-Einrichtung
     public const REMEMBER_IDLE = 2592000;        // gemerkte Geräte: 30 Tage ohne Nutzung …
     public const REMEMBER_MAX = 15811200;        // … höchstens 6 Monate
@@ -64,7 +64,7 @@ final class Auth {
         $this->checkLock();
         $user = $this->users->find((int)$session['user_id']);
         $recovery = preg_match('/^[A-Za-z0-9]{4}-?[A-Za-z0-9]{4}-?[A-Za-z0-9]{4}$/D', trim($code)) === 1;
-        $ok = $user && ($recovery ? $this->users->useRecoveryCode((int)$user['id'], $code) : $this->users->verifyOtp($user, $code, self::time()));
+        $ok = $user && ($recovery ? $this->users->useRecoveryCode((int)$user['id'], $code) : ($this->users->verifyOtp($user, $code, self::time()) || $this->smsCodeValid($session, $code)));
         if (!$ok) {
             $failures = (int)$session['otp_failures'] + 1;
             $this->failed('code-fehlgeschlagen', $user['login'] ?? '');
@@ -80,6 +80,27 @@ final class Auth {
         $this->throttle->clear('login');
         $this->audit->write($user['login'], $recovery ? 'wiederherstellungscode-verwendet' : 'code-ok', 'angemeldet; uebrig ' . $this->users->recoveryLeft((int)$user['id']));
         return $this->promote($session, 'full');
+    }
+
+    /** Neuer Einmalcode für die SMS-Ersatzanmeldung: 6 Ziffern, 10 Minuten gültig, höchstens 3 je Anmeldung, frühestens nach einer Minute erneut. */
+    public function smsCodeIssue(array $session): string {
+        $key = 'smsotp:' . $session['token_hash'];
+        $d = json_decode((string)$this->db->setting($key), true);
+        $n = is_array($d) ? (int)($d['n'] ?? 0) : 0;
+        if ($n >= 3) throw new Problem('Es wurden schon drei SMS-Codes verschickt. Bitte neu anmelden.', 429);
+        if (is_array($d) && time() - (int)($d['t'] ?? 0) < 60) throw new Problem('Bitte eine Minute warten, bevor ein neuer SMS-Code verschickt wird.', 429);
+        $code = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $this->db->store($key, json_encode(['h' => hash('sha256', $code), 'exp' => time() + 600, 't' => time(), 'n' => $n + 1], JSON_THROW_ON_ERROR));
+        return $code;
+    }
+
+    private function smsCodeValid(array $session, string $code): bool {
+        $key = 'smsotp:' . $session['token_hash'];
+        $d = json_decode((string)$this->db->setting($key), true);
+        $code = trim($code);
+        if (!is_array($d) || !preg_match('/^[0-9]{6}$/D', $code) || time() > (int)($d['exp'] ?? 0) || !hash_equals((string)($d['h'] ?? ''), hash('sha256', $code))) return false;
+        $this->db->query('DELETE FROM settings WHERE key=?', [$key]);   // nur einmal verwendbar
+        return true;
     }
 
     /**
@@ -215,8 +236,8 @@ final class Auth {
     public function maxSeconds(): int { return max(1, min(self::MAX_HOURS, (int)($this->db->setting('session_max_hours') ?? self::MAX_DEFAULT))) * 3600; }
 
     public function saveTimes(int $idleMinutes, int $maxHours): void {
-        if ($idleMinutes < 5 || $idleMinutes > self::MAX_IDLE_MINUTES) throw new Problem('Die Abmeldung bei Inaktivität muss zwischen 5 Minuten und 6 Monaten (183 Tagen) liegen.', 422);
-        if ($maxHours < 1 || $maxHours > self::MAX_HOURS) throw new Problem('Die Höchstdauer einer Sitzung muss zwischen 1 Stunde und 6 Monaten (183 Tagen) liegen.', 422);
+        if ($idleMinutes < 5 || $idleMinutes > self::MAX_IDLE_MINUTES) throw new Problem('Die Abmeldung bei Inaktivität muss zwischen 5 Minuten und 1 Jahr liegen.', 422);
+        if ($maxHours < 1 || $maxHours > self::MAX_HOURS) throw new Problem('Die Höchstdauer einer Sitzung muss zwischen 1 Stunde und 1 Jahr liegen.', 422);
         if ($idleMinutes * 60 > $maxHours * 3600) throw new Problem('Die Abmeldung bei Inaktivität darf nicht länger sein als die Höchstdauer der Sitzung.', 422);
         $this->db->store('session_idle_minutes', (string)$idleMinutes);
         $this->db->store('session_max_hours', (string)$maxHours);

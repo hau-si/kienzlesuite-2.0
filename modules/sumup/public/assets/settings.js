@@ -10,10 +10,15 @@ const SHOW = {
   'sumup.api_key': v => v.mode === 'live', 'sumup.affiliate_key': v => v.mode === 'live', 'sumup.app_id': v => v.mode === 'live',
   'sumup.merchant_code': v => v.mode === 'live', 'sumup.reader_id': v => v.mode === 'live',
   'fhir.entry_code': v => v.mode === 'live', 'mail.from_name': v => v.enabled,
-  'letterxpress.username': v => v.enabled, 'letterxpress.api_key': v => v.enabled, 'letterxpress.mode': v => v.enabled, 'letterxpress.color': v => v.enabled,
+  'letterxpress.color': v => v.enabled,
   'letterxpress.duplex': v => v.enabled, 'letterxpress.shipping': v => v.enabled, 'letterxpress.registered': v => v.enabled,
   'tax.rate': v => !v.small_business, 'tax.manual_vat': v => !v.small_business, 'tax.exempt_note': v => !v.small_business, 'tax.small_business_note': v => v.small_business,
 };
+
+/** Zeitstempel (Sekunden) als „TT.MM.JJ, HH:MM“. */
+function when(seconds) {
+  return seconds ? new Date(seconds * 1000).toLocaleString('de-DE', {dateStyle: 'short', timeStyle: 'short'}) : '';
+}
 
 function el(tag, text, cls, attrs) {
   const node = document.createElement(tag);
@@ -88,7 +93,7 @@ function applyVisibility(form, section) {
 function render(data) {
   csrf = data.csrf || csrf;
   $('mode').hidden = false;
-  $('mode').textContent = data.mode === 'live' ? (data.fhir_mode === 'live' ? 'LIVE' : 'LIVE · T2MED TESTMODUS') : 'TESTMODUS';
+  $('mode').textContent = data.mode === 'live' ? (data.fhir_mode === 'live' ? 'LIVE' : 'LIVE · T2MED TESTMODUS') : 'TESTMODUS'; $('mode').classList.toggle('test', /TESTMODUS/.test($('mode').textContent));
   $('mode').classList.toggle('live', data.mode === 'live');
   $('warning').hidden = !data.warning; $('warning').textContent = data.warning || '';
   renderInvoicePrinter(data.invoice_printer || {});
@@ -225,12 +230,13 @@ function layoutTabs(data) {
     const panel = $('panel-' + tab.id); const lead = $('s-checklist'); if (lead) panel.append(lead);
     for (const group of tab.groups) {
       let box = $('group-' + group.id);
-      if (!box) { box = el('details', null, 'setup-group', {id: 'group-' + group.id}); box.append(el('summary', group.label)); }
+      if (!box) { box = el('details', null, 'setup-group fold', {id: 'group-' + group.id}); const sum = el('summary'); sum.append(el('span', '○', 'mark-icon'), el('strong', group.label), el('span', '', 'tag', {id: 'tag-' + group.id})); box.append(sum); }
       panel.append(box);
       for (const id of group.cards) { const card = $(id); if (card) box.append(card); }
     }
   }
   const open = renderChecklist(data);
+  rankGroups();
   if (!activeTab) {
     for (const id of lastOpenCards) openGroupOf(id);
     openGroupOf(location.hash.slice(1));
@@ -239,8 +245,29 @@ function layoutTabs(data) {
     if (tabOf(hash)) setTimeout(() => $(hash)?.scrollIntoView({block: 'start'}), 50);
   } else activate(activeTab);
 }
+// Themenblöcke wie in der Basis: Rot (erneut nötig/Fehler) zuerst, dann Offenes, dann Fertiges; Rotes und Offenes ist aufgeklappt.
+let lastItems = [];
+function rankGroups() {
+  const panel = $('panel-einrichtung'); if (!panel) return;
+  const rows = [];
+  for (const group of GROUPS) {
+    const box = $('group-' + group.id); if (!box) continue;
+    const mine = lastItems.filter(i => !i.optional && !i.info && group.cards.includes(i.card));
+    const bad = mine.filter(i => i.error).length, need = mine.filter(i => !i.done).length;
+    const rank = bad ? 0 : need ? 1 : 2;
+    box.dataset.rank = String(rank);
+    const mark = box.querySelector('.mark-icon'), tag = $('tag-' + group.id);
+    mark.textContent = bad ? '!' : need ? '○' : '✓'; mark.className = 'mark-icon ' + (bad ? 'error' : need ? 'open' : 'done');
+    tag.textContent = bad ? bad + ' rot' : need ? need + ' offen' : 'fertig'; tag.className = 'tag ' + (bad ? 'err' : need ? 'warn' : 'ok');
+    if (rank < 2 && !box.dataset.touched) box.open = true;
+    rows.push([rank, GROUPS.indexOf(group), box]);
+  }
+  rows.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  for (const [, , box] of rows) panel.append(box);
+}
 function activate(id) {
   activeTab = id;
+  document.querySelectorAll('details.setup-group').forEach(d => { d.ontoggle = () => { d.dataset.touched = '1'; }; });
   for (const tab of TABS) {
     $('panel-' + tab.id).hidden = tab.id !== id;
     $('tab-' + tab.id).setAttribute('aria-selected', String(tab.id === id));
@@ -271,45 +298,45 @@ function t2medSetupHelp() {
   d.append(ol); return d;
 }
 
-/** Überblick der einmaligen Schritte; liefert die Zahl offener Pflichtpunkte. */
+/** Überblick der einmaligen Schritte in der Reihenfolge, in der sie nötig sind (wie die Einrichtung der Basis); liefert die Zahl offener Pflichtpunkte. */
+const PLACES = {web: 'In diesem Webfenster', pc: 'Auf den Kassen-PCs', t2med: 'In T2med'};
 function renderChecklist(data) {
   const invoiceQueue = !!(data.invoice_printer && data.invoice_printer.queue);
-  // Punkte der Kasse kommen vom Server (dieselben wie im Einrichtungs-Überblick der Suite).
-  const own = (data.setup || []).map(i => ({done: i.state === 'done', error: i.state === 'error', label: i.title, card: (i.link || '').split('#')[1] || 's-checklist', detail: i.hint}));
-  const groups = [
-    {title: 'In der Suite und hier', hint: 'Einstellungen dieses Servers', items: [
-      ...own,
-      {done: !!(data.sections.find(s => s.id === 'letterxpress')?.fields.find(f => f.key === 'enabled') || {}).value, optional: true, label: 'Rechnung per Post über Letterxpress versenden (optional)', card: 's-letterxpress'},
-      {done: !!(data.sections.find(s => s.id === 'invoice_export')?.fields.find(f => f.key === 'enabled') || {}).value, optional: true, label: 'Rechnungen im Netzwerkspeicher ablegen (optional, z. B. für die Steuerberatung)', card: 's-invoice_export'},
-    ]},
-    {title: 'Auf den Kassen-PCs', hint: 'Kassen- und Arbeitsplatzrechner', items: [
-      {info: true, label: 'Zertifikat der Suite einrichten (einmal je PC, siehe Arbeitsplatz einrichten der Suite)', card: 's-clients'},
-      ...(invoiceQueue ? [{info: true, label: 'Drucker „SumUp-Rechnung“ am Arbeitsplatz installieren (Windows: IPP-Drucker hinzufügen, Papier A4)', card: 'invoice-printer-help', detail: (data.invoice_printer && data.invoice_printer.url) || ''}] : []),
-    ]},
-    {title: 'In T2med', hint: 'Einstellungen in der Praxissoftware', items: [
-      {info: true, label: 'Drittanbieter-Zugriff mit Funktionsleisten-Button „Kartenzahlung“ anlegen (Aufruf-Adresse steht bei der T2med-Anbindung)', card: 's-fhir', href: GUIDE_URL, hrefLabel: 'Anleitung mit Bildern'},
-      ...(invoiceQueue ? [{info: true, label: 'Rechnungen in T2med auf den zuvor installierten Drucker „SumUp-Rechnung“ drucken', card: 'invoice-printer-help'}] : []),
-    ]},
+  const flag = key => !!(data.sections.find(s => s.id === key)?.fields.find(f => f.key === 'enabled') || {}).value;
+  // Punkte der Kasse kommen vom Server (dieselben wie im Einrichtungs-Überblick der Suite), schon in der nötigen Reihenfolge.
+  const own = (data.setup || []).map(i => ({ort: /Starter/.test(i.title) ? 'pc' : 'web', done: i.state === 'done', error: i.state === 'error', label: i.title, card: (i.link || '').split('#')[1] || 's-checklist', detail: i.hint}));
+  const web = own.filter(i => i.ort === 'web'), pc = own.filter(i => i.ort === 'pc');
+  const items = [
+    ...web,
+    {ort: 'web', done: flag('letterxpress'), optional: true, label: 'Rechnung per Post über Letterxpress versenden', card: 's-letterxpress'},
+    {ort: 'web', done: flag('invoice_export'), optional: true, label: 'Rechnungen im Netzwerkspeicher ablegen (z. B. für die Steuerberatung)', card: 's-invoice_export'},
+    {ort: 'pc', info: true, label: 'Zertifikat der Suite einrichten (einmal je PC, siehe Arbeitsplatz einrichten der Suite)', card: 's-clients'},
+    ...pc,
+    ...(invoiceQueue ? [{ort: 'pc', info: true, label: 'Drucker „SumUp-Rechnung“ am Arbeitsplatz installieren (Windows: IPP-Drucker hinzufügen, Papier A4)', card: 'invoice-printer-help', detail: (data.invoice_printer && data.invoice_printer.url) || ''}] : []),
+    {ort: 't2med', info: true, label: 'Drittanbieter-Zugriff mit Funktionsleisten-Button „Kartenzahlung“ anlegen (Aufruf-Adresse steht bei der T2med-Anbindung)', card: 's-fhir', href: GUIDE_URL, hrefLabel: 'Anleitung mit Bildern'},
+    ...(invoiceQueue ? [{ort: 't2med', info: true, label: 'Rechnungen in T2med auf den zuvor installierten Drucker „SumUp-Rechnung“ drucken', card: 'invoice-printer-help'}] : []),
   ];
-  const items = groups.flatMap(g => g.items);
   const list = $('checklist'); list.replaceChildren();
-  for (const group of groups) {
-    const heading = el('h3', group.title, 'check-group'); heading.append(el('small', ' · ' + group.hint)); list.append(heading);
-    const ul = el('ul', null, 'checklist');
-    for (const item of group.items) {
-      const li = el('li', null, item.info ? 'info' : item.done ? 'done' : item.error ? 'open error' : item.optional ? 'optional' : 'open');
-      li.append(el('span', item.info ? 'i' : item.done ? '✓' : item.error ? '!' : '○', 'mark-icon'));
-      const text = el('span'); text.append(el('a', item.label, null, {href: '#' + item.card}));
-      if (item.href) text.append(' · ', el('a', item.hrefLabel || 'Anleitung', null, {href: item.href, target: '_blank', rel: 'noopener'}));
-      if (item.detail) { text.append(el('br'), el('small', item.detail, 'mono')); }
-      li.append(text);
-      if (item.optional && !item.done) li.append(el('small', ' optional'));
-      ul.append(li);
-    }
-    list.append(ul);
+  const required = items.filter(i => !i.optional && !i.info);
+  const open = required.filter(i => !i.done).length;
+  const bar = el('progress', null, 'progress', {max: String(required.length || 1), value: String(required.length - open)});
+  list.append(el('p', (required.length - open) + ' von ' + required.length + ' nötigen Schritten erledigt (Hinweise für PC und T2med und optionale Punkte zählen nicht mit)', 'muted'), bar);
+  list.append(el('p', 'In dieser Reihenfolge abarbeiten. Das Schild zeigt, wo der Schritt erledigt wird: ' + Object.values(PLACES).join(', ') + '.', 'muted'));
+  const ol = el('ol', null, 'checklist numbered');
+  for (const item of items) {
+    const li = el('li', null, item.info ? 'info' : item.done ? 'done' : item.error ? 'open error' : item.optional ? 'optional' : 'open');
+    li.append(el('span', item.info ? 'i' : item.done ? '✓' : item.error ? '!' : '○', 'mark-icon'));
+    const text = el('span'); text.append(el('a', item.label, null, {href: '#' + item.card}));
+    if (item.href) text.append(' · ', el('a', item.hrefLabel || 'Anleitung', null, {href: item.href, target: '_blank', rel: 'noopener'}));
+    text.append(' ', el('span', PLACES[item.ort], 'tag'));
+    if (item.optional) text.append(' ', el('span', 'optional', 'tag opt'));
+    if (item.detail) { text.append(el('br'), el('small', item.detail, 'mono')); }
+    li.append(text);
+    ol.append(li);
   }
-  const open = items.filter(i => !i.done && !i.info && !i.optional).length;
-  lastOpenCards = items.filter(i => !i.done && !i.info && !i.optional).map(i => i.card);
+  list.append(ol);
+  lastOpenCards = required.filter(i => !i.done).map(i => i.card);
+  lastItems = items;
   badge('einrichtung', open);
   return open;
 }
@@ -327,7 +354,7 @@ async function loadSettings() {
 // Mitarbeiter-Zugang: nur die freigegebenen Bereiche, keine Einstellungen oder Schlüssel.
 function staffMode(data) {
   csrf = csrf || ''; document.body.classList.add('staff');
-  $('mode').hidden = false; $('mode').textContent = data.mode === 'live' ? (data.fhir_mode === 'live' ? 'LIVE' : 'LIVE · T2MED TESTMODUS') : 'TESTMODUS'; $('mode').classList.toggle('live', data.mode === 'live');
+  $('mode').hidden = false; $('mode').textContent = data.mode === 'live' ? (data.fhir_mode === 'live' ? 'LIVE' : 'LIVE · T2MED TESTMODUS') : 'TESTMODUS'; $('mode').classList.toggle('test', /TESTMODUS/.test($('mode').textContent)); $('mode').classList.toggle('live', data.mode === 'live');
   $('tabs').hidden = true; $('sections').replaceChildren(); $('warning').hidden = true;
   const panel = $('tab-panels'); panel.replaceChildren(); panel.hidden = false;
   const rights = data.rights || [], can = r => rights.includes(r);
@@ -346,7 +373,7 @@ function ippByIp(url, ips) {
 }
 function ippPowerShell(queue, url, ips, paper) {
   const byIp = ippByIp(url, ips), use = byIp.length ? byIp[0].url : url;
-  return 'Enable-WindowsOptionalFeature -Online -FeatureName Printing-Foundation-InternetPrinting-Client -NoRestart | Out-Null\n# Druckspooler neu starten und auf den laufenden Dienst warten; alten Drucker entfernen (behebt „Das Handle ist ungültig“)\nRestart-Service Spooler -Force\n(Get-Service Spooler).WaitForStatus(\'Running\', \'00:00:30\')\nStart-Sleep 3\nGet-Printer -Name "' + queue + '" -ErrorAction SilentlyContinue | Remove-Printer\nAdd-PrinterDriver -Name "Microsoft IPP Class Driver"\n$url = "' + use + '"\nAdd-PrinterPort -Name $url -ErrorAction SilentlyContinue\nAdd-Printer -Name "' + queue + '" -DriverName "Microsoft IPP Class Driver" -PortName $url';
+  return 'Enable-WindowsOptionalFeature -Online -FeatureName Printing-Foundation-InternetPrinting-Client -NoRestart | Out-Null\n# Druckspooler neu starten und auf den laufenden Dienst warten; alten Drucker entfernen (behebt „Das Handle ist ungültig“)\nRestart-Service Spooler -Force\n(Get-Service Spooler).WaitForStatus(\'Running\', \'00:00:30\')\nStart-Sleep 3\nGet-Printer -Name "' + queue + '" -ErrorAction SilentlyContinue | Remove-Printer\nAdd-PrinterDriver -Name "Microsoft IPP Class Driver"\n$url = "' + use + '"\n# Anschluss und Drucker anlegen, bis zu viermal (direkt nach dem Neustart des Spoolers ist der Anschluss manchmal noch nicht nutzbar)\nfor ($i = 1; $i -le 4 -and -not (Get-Printer -Name "' + queue + '" -ErrorAction SilentlyContinue); $i++) {\n  Add-PrinterPort -Name $url -ErrorAction SilentlyContinue\n  Start-Sleep 3\n  Add-Printer -Name "' + queue + '" -DriverName "Microsoft IPP Class Driver" -PortName $url -ErrorAction SilentlyContinue\n}\nGet-Printer -Name "' + queue + '" | Select-Object Name, DriverName, PortName';
 }
 function ippIpNote(url, ips) {
   const byIp = ippByIp(url, ips);
@@ -665,6 +692,7 @@ function renderInbox(data) {
       rows => rows.length + ' Rechnung(en) (' + euro(rows.reduce((a, r) => a + r.amount_cents, 0)) + ') ' + (data.letter_mode === 'live' ? 'jetzt per Post verschicken' : 'im TESTMODUS an Letterxpress übergeben (es wird nichts verschickt)') + '?\n\nDabei gehen die Rechnungen mit Patientendaten an Letterxpress. Bereits live gesendete Rechnungen werden nicht erneut gesendet.',
       r => r.postable && !(r.letter || {}).locked));
     bar.append(bulk('Auswahl löschen', 'inbox_delete_many', rows => rows.length + ' Rechnung(en) aus dem Eingang löschen?', r => r.deletable), countText);
+    if (data.letter_enabled && data.letter_mode !== 'live') bar.append(el('span', 'TESTBETRIEB Post', 'badge test', {title: 'Letterxpress im Testbetrieb: es wird nichts gedruckt oder verschickt'}));
     box.append(bar);
     const first = el('th'); first.append(toggleAll); head.append(first);
     for (const h of ['Eingang', 'Nummer', 'Betrag', 'Patient', 'Geb.', 'Status', ...(data.letter_enabled ? ['Post'] : []), '']) head.append(el('th', h));

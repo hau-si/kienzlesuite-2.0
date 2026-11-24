@@ -30,6 +30,8 @@ DEFAULT_CONFIG = str(Path(__file__).resolve().parent / "config.toml")
 # Von der Einstellungsseite des Moduls geschrieben (Layout) bzw. von der Basis übernommen (Drucker); überlagert config.toml.
 WEB_OVERLAY = str(DATA / "layout.json")
 BASIS = str(DATA / "basis.json")
+# Praxislogo (Graustufen-PNG), von der Einstellungsseite abgelegt.
+LOGO = str(DATA / "logo.png")
 # Bondrucker-Modelle: Druckbreite in Punkten und Zeichen je Zeile (Font A, 12 Punkte breit).
 MODELS = {"tm-m10": (420, 35), "tm-m30iii": (576, 48)}
 SIZES = ("1x1", "1x2", "2x1", "2x2", "2x3", "3x3", "4x4")
@@ -222,6 +224,14 @@ def apply_overlay(cfg: dict[str, Any], web: Any, *, printing: bool = False) -> d
                 if type(block["first_bold"]) is not bool:
                     raise TicketError("Ungültige Auswahl in den Terminzettel-Einstellungen.")
                 layout["header_first_bold"] = block["first_bold"]
+    logo = web.get("logo")
+    if isinstance(logo, dict):
+        if type(logo.get("enabled")) is not bool:
+            raise TicketError("Ungültige Auswahl in den Terminzettel-Einstellungen.")
+        width = logo.get("width_dots", 288)
+        if type(width) is not int or not 32 <= width <= 384:
+            raise TicketError("Logo-Breite muss zwischen 32 und 384 Punkten liegen.")
+        cfg["logo"] = {"enabled": logo["enabled"], "width_dots": width}
     heading = web.get("heading")
     if isinstance(heading, dict):
         if "text" in heading:
@@ -681,11 +691,29 @@ def append_appointment_row(r: EscPosRenderer, appointment: Appointment, cfg: dic
         return False
 
 
+def append_logo(r: EscPosRenderer, cfg: dict[str, Any]) -> None:
+    """Praxislogo oben, mittig, als Raster (GS v 0). Ohne lesbare Logodatei bleibt der Bon wie bisher."""
+    section = cfg.get("logo", {})
+    if not cfg_bool(section, "enabled", False):
+        return
+    try:
+        from escpos import raster_image
+        from logo import bitmap
+        image = bitmap(LOGO, int(section.get("width_dots", 288)), r.page_width)
+        if image is None:
+            return
+        r.set_align("center")
+        r.raw(raster_image(image))
+    except Exception:  # Logo ist Zierde: ein Fehler darf den Ausdruck nie verhindern
+        eprint("Logo konnte nicht gedruckt werden.")
+
+
 def render_escpos(ticket: ParsedTicket, cfg: dict[str, Any]) -> bytes:
     r = EscPosRenderer(cfg)
     layout = cfg.get("layout", {})
     r.init()
 
+    append_logo(r, cfg)
     first_bold = layout.get("header_first_bold")
     r.block("header", r.sizes["header"],
             first_size=parse_size(layout.get("header_first_size"), r.sizes["header"]) if layout.get("header_first_size") else None,

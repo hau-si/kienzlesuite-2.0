@@ -10,7 +10,7 @@ spl_autoload_register(static function (string $class): void {
 
 // Zusätzliche Schutz-Header für jede Web-Antwort (zusätzlich zu denen von nginx).
 if (PHP_SAPI !== 'cli' && PHP_SAPI !== 'cli-server' && !headers_sent()) {
-    header('X-Frame-Options: DENY');
+    header('X-Frame-Options: SAMEORIGIN');
     header('Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()');
     header('Cross-Origin-Opener-Policy: same-origin');
     header('Cross-Origin-Resource-Policy: same-origin');

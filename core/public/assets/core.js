@@ -105,3 +105,23 @@ document.addEventListener('DOMContentLoaded', function () {
   art.addEventListener('change', update);
   update();
 });
+
+// Rechte-Matrix: Rollen wählen, Häkchen folgen der Rolle; einzeln geänderte Rechte bleiben gelb markiert.
+document.addEventListener('DOMContentLoaded', function () {
+  const rows = document.querySelectorAll('tr.recht[data-grants]');
+  if (!rows.length) return;
+  const roles = () => Array.from(document.querySelectorAll('input[data-rolle]:checked')).map((i) => i.value);
+  const base = (row) => { const g = row.dataset.grants ? row.dataset.grants.split('|') : []; return roles().some((r) => g.includes(r)); };
+  const mark = (row) => row.classList.toggle('abw', row.querySelector('input[data-erg]').checked !== base(row));
+  const columns = () => document.querySelectorAll('.gcol').forEach((c) => c.classList.toggle('aktiv', roles().includes(c.dataset.gcol)));
+  document.querySelectorAll('input[data-rolle]').forEach((i) => i.addEventListener('change', () => {
+    const before = new Map();
+    rows.forEach((row) => before.set(row, row.classList.contains('abw')));
+    columns();
+    rows.forEach((row) => { if (!before.get(row)) row.querySelector('input[data-erg]').checked = base(row); mark(row); });
+  }));
+  rows.forEach((row) => row.querySelector('input[data-erg]').addEventListener('change', () => mark(row)));
+  const reset = document.querySelector('[data-reset]');
+  if (reset) reset.addEventListener('click', () => rows.forEach((row) => { row.querySelector('input[data-erg]').checked = base(row); mark(row); }));
+  columns();
+});

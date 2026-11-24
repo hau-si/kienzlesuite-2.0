@@ -28,7 +28,7 @@ final class Users {
         foreach ($this->db->query('SELECT id,login,display,admin,active,totp_secret,password_hash FROM users ORDER BY login')->fetchAll() as $u) {
             $out[] = ['id' => (int)$u['id'], 'login' => $u['login'], 'display' => $u['display'], 'admin' => (int)$u['admin'] === 1,
                 'active' => (int)$u['active'] === 1, 'otp' => $u['totp_secret'] !== '', 'password' => $u['password_hash'] !== '',
-                'access' => $this->access((int)$u['id'])];
+                'access' => $this->access((int)$u['id']), 'roles' => $this->roles((int)$u['id'])];
         }
         return $out;
     }
@@ -57,6 +57,61 @@ final class Users {
         $user = $this->require($id);
         if ((int)$user['admin'] === 1 && (int)$user['active'] === 1 && $this->activeAdmins() <= 1) throw new Problem('Der letzte Basis-Admin kann nicht gelöscht werden.', 409);
         $this->db->query('DELETE FROM users WHERE id=?', [$id]);
+        $this->db->query('DELETE FROM settings WHERE key IN (?,?)', ['mail.adresse.' . $id, 'mail.offen.' . $id]);
+    }
+
+    // ---- E-Mail-Adresse (für den Link „Passwort vergessen“) -------------------------------------------------------
+    public const MAIL_SECONDS = 3600;
+    public const MAIL_VERSUCHE = 5;
+
+    /** Bestätigte E-Mail-Adresse oder ''. */
+    public function email(int $id): string { return (string)$this->db->setting('mail.adresse.' . $id); }
+
+    /** Konto zu einer bestätigten Adresse (Groß-/Kleinschreibung egal), sonst null. */
+    public function byEmail(string $address): ?array {
+        $row = $this->db->one("SELECT key FROM settings WHERE key LIKE 'mail.adresse.%' AND lower(value)=lower(?)", [trim($address)]);
+        return $row ? $this->find((int)substr($row['key'], strlen('mail.adresse.'))) : null;
+    }
+
+    /** Neue Adresse vormerken; liefert den Bestätigungscode (16 Ziffern, in Vierergruppen) für die E-Mail. Ein Link wäre lokal nicht erreichbar. */
+    public function emailStart(int $id, string $address): string {
+        $this->require($id);
+        $address = trim($address);
+        if (!filter_var($address, FILTER_VALIDATE_EMAIL) || strlen($address) > 254) throw new Problem('Bitte eine gültige E-Mail-Adresse eingeben.', 422);
+        $other = $this->byEmail($address);
+        if ($other && (int)$other['id'] !== $id) throw new Problem('Diese Adresse wird schon von einem anderen Konto verwendet.', 409);
+        $digits = '';
+        for ($i = 0; $i < 16; $i++) $digits .= (string)random_int(0, 9);
+        $this->db->store('mail.offen.' . $id, json_encode(['a' => $address, 'h' => hash('sha256', $digits), 'e' => time() + self::MAIL_SECONDS, 'v' => 0], JSON_THROW_ON_ERROR));
+        return implode('-', str_split($digits, 4));
+    }
+
+    /** Code bestätigt → Adresse gilt; liefert sie, sonst null. Nach fünf falschen Eingaben ist der Code verbraucht. */
+    public function emailConfirm(int $id, string $code): ?string {
+        $p = json_decode((string)$this->db->setting('mail.offen.' . $id), true);
+        if (!is_array($p) || (int)($p['e'] ?? 0) < time()) return null;
+        $digits = preg_replace('/\D+/', '', $code);
+        if (!hash_equals((string)($p['h'] ?? ''), hash('sha256', (string)$digits))) {
+            $p['v'] = (int)($p['v'] ?? 0) + 1;
+            if ($p['v'] >= self::MAIL_VERSUCHE) $this->db->query('DELETE FROM settings WHERE key=?', ['mail.offen.' . $id]);
+            else $this->db->store('mail.offen.' . $id, json_encode($p, JSON_THROW_ON_ERROR));
+            return null;
+        }
+        $other = $this->byEmail((string)$p['a']);
+        if ($other && (int)$other['id'] !== $id) return null;
+        $this->db->store('mail.adresse.' . $id, (string)$p['a']);
+        $this->db->query('DELETE FROM settings WHERE key=?', ['mail.offen.' . $id]);
+        return (string)$p['a'];
+    }
+
+    public function emailRemove(int $id): void {
+        $this->db->query('DELETE FROM settings WHERE key IN (?,?)', ['mail.adresse.' . $id, 'mail.offen.' . $id]);
+    }
+
+    /** Ausstehende (noch nicht bestätigte) Adresse oder ''. */
+    public function emailPending(int $id): string {
+        $p = json_decode((string)$this->db->setting('mail.offen.' . $id), true);
+        return is_array($p) && (int)($p['e'] ?? 0) >= time() ? (string)($p['a'] ?? '') : '';
     }
 
     public function activeAdmins(): int { return (int)$this->db->query('SELECT COUNT(*) FROM users WHERE admin=1 AND active=1')->fetchColumn(); }
@@ -76,7 +131,62 @@ final class Users {
     }
 
     // ---- Rollen und Rechte ----------------------------------------------------------------------------------------
-    /** @return array<string, array{admin:bool, rights:list<string>}> nur Module, die noch installiert sind */
+    // Zugang = Rollen (Gruppen, dauerhaft) und Einzeländerungen (erlaubt oder entzogen). Die Rollen kommen aus Groups und gelten
+    // sofort für alle Mitglieder; die Einzeländerungen bleiben bei jeder Änderung der Rollen oder Gruppen erhalten.
+    private ?Groups $groups = null;
+
+    private function groups(): Groups { return $this->groups ??= new Groups($this->db, $this->modules); }
+
+    /** Rollen des Benutzers (nur Gruppen, die es noch gibt). @return list<string> */
+    public function roles(int $id): array {
+        $known = array_keys($this->groups()->all());
+        $out = [];
+        foreach ($this->db->query('SELECT grp FROM user_groups WHERE user_id=? ORDER BY grp', [$id])->fetchAll() as $r) if (in_array($r['grp'], $known, true)) $out[] = $r['grp'];
+        return $out;
+    }
+
+    /** Rollen ersetzen. @param list<string> $names @throws Problem bei unbekannter Gruppe */
+    public function setRoles(int $id, array $names): void {
+        $this->require($id);
+        $known = array_keys($this->groups()->all());
+        $names = array_values(array_unique(array_map('strval', $names)));
+        foreach ($names as $n) if (!in_array($n, $known, true)) throw new Problem('Unbekannte Gruppe.', 422);
+        $this->db->query('DELETE FROM user_groups WHERE user_id=?', [$id]);
+        foreach ($names as $n) $this->db->query('INSERT INTO user_groups(user_id,grp) VALUES(?,?)', [$id, $n]);
+    }
+
+    /** Mitglieder einer Gruppe (Anmeldenamen). @return list<string> */
+    public function members(string $group): array {
+        return array_column($this->db->query('SELECT u.login FROM user_groups g JOIN users u ON u.id=g.user_id WHERE g.grp=? ORDER BY u.login', [$group])->fetchAll(), 'login');
+    }
+
+    /** Einzeländerungen: „modul:recht“ oder „modul:@admin“ => true (einzeln erlaubt) / false (einzeln entzogen). @return array<string,bool> */
+    public function overrides(int $id): array {
+        $out = [];
+        foreach ($this->db->query('SELECT perm,allow FROM user_overrides WHERE user_id=? ORDER BY perm', [$id])->fetchAll() as $r) $out[$r['perm']] = (int)$r['allow'] === 1;
+        return $out;
+    }
+
+    public function resetOverrides(int $id): void { $this->db->query('DELETE FROM user_overrides WHERE user_id=?', [$id]); }
+
+    /** Was die Rollen allein ergeben (ohne Einzeländerungen). @param list<string>|null $roles null = gespeicherte Rollen @return array<string, array{admin:bool, rights:list<string>}> alle installierten Module */
+    public function baseAccess(int $id, ?array $roles = null): array {
+        $groups = $this->groups()->all();
+        $out = [];
+        foreach (array_keys($this->modules->all()) as $m) {
+            $admin = false;
+            $has = [];
+            foreach ($roles ?? $this->roles($id) as $name) {
+                if (!isset($groups[$name])) continue;
+                if (in_array($m, $groups[$name]['admin'], true)) $admin = true;
+                foreach ($groups[$name]['rechte'] as $e) if (str_starts_with($e, $m . ':')) $has[substr($e, strlen($m) + 1)] = true;
+            }
+            $out[$m] = ['admin' => $admin, 'rights' => array_values(array_filter($this->modules->rightIds($m), fn($r) => isset($has[$r])))];
+        }
+        return $out;
+    }
+
+    /** @return array<string, array{admin:bool, rights:list<string>}> nur Module, die noch installiert sind und in denen etwas erlaubt ist */
     public function access(int $id): array {
         $out = [];
         // Basis-Admins dürfen in jedem installierten Modul alles (Modul-Admin mit allen Rechten).
@@ -85,25 +195,28 @@ final class Users {
             foreach (array_keys($this->modules->all()) as $m) $out[$m] = ['admin' => true, 'rights' => array_values($this->modules->rightIds($m))];
             return $out;
         }
-        foreach ($this->db->query('SELECT module,admin,rights FROM user_modules WHERE user_id=? ORDER BY module', [$id])->fetchAll() as $r) {
-            if (!$this->modules->has($r['module'])) continue;
-            $rights = json_decode($r['rights'], true);
-            $out[$r['module']] = ['admin' => (int)$r['admin'] === 1,
-                'rights' => array_values(array_intersect($this->modules->rightIds($r['module']), is_array($rights) ? $rights : []))];
+        $over = $this->overrides($id);
+        foreach ($this->baseAccess($id) as $m => $b) {
+            $admin = $over[$m . ':@admin'] ?? $b['admin'];
+            $rights = array_values(array_filter($this->modules->rightIds($m), fn($r) => $over[$m . ':' . $r] ?? in_array($r, $b['rights'], true)));
+            if ($admin || $rights) $out[$m] = ['admin' => $admin, 'rights' => $rights];
         }
+        ksort($out);
         return $out;
     }
 
-    /** Zugang zu einem Modul setzen; ohne Admin und ohne Rechte wird er entfernt. Unbekannte Rechte sind ein Fehler. */
+    /** Gewünschten Zugang zu einem Modul setzen; abgelegt werden nur die Abweichungen von den Rollen. Unbekannte Rechte sind ein Fehler. */
     public function setAccess(int $id, string $module, bool $admin, array $rights): void {
         $this->require($id);
         if (!$this->modules->has($module)) throw new Problem('Unbekanntes Modul.', 422);
         $known = $this->modules->rightIds($module);
         $rights = array_values(array_unique(array_map('strval', $rights)));
         foreach ($rights as $r) if (!in_array($r, $known, true)) throw new Problem('Unbekanntes Recht.', 422);
-        if (!$admin && !$rights) { $this->db->query('DELETE FROM user_modules WHERE user_id=? AND module=?', [$id, $module]); return; }
-        $this->db->query('INSERT INTO user_modules(user_id,module,admin,rights) VALUES(?,?,?,?) ON CONFLICT(user_id,module) DO UPDATE SET admin=excluded.admin, rights=excluded.rights',
-            [$id, $module, $admin ? 1 : 0, json_encode(array_values(array_intersect($known, $rights)))]);
+        $base = $this->baseAccess($id)[$module];
+        $this->db->query('DELETE FROM user_overrides WHERE user_id=? AND substr(perm,1,?)=?', [$id, strlen($module) + 1, $module . ':']);
+        $ins = fn(string $perm, bool $allow) => $this->db->query('INSERT INTO user_overrides(user_id,perm,allow) VALUES(?,?,?)', [$id, $perm, $allow ? 1 : 0]);
+        if ($admin !== $base['admin']) $ins($module . ':@admin', $admin);
+        foreach ($known as $r) if (in_array($r, $rights, true) !== in_array($r, $base['rights'], true)) $ins($module . ':' . $r, in_array($r, $rights, true));
     }
 
     /** Braucht dieses Konto OTP? Ja, sobald es irgendeine Admin-Rolle hat. */

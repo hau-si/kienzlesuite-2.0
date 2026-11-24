@@ -304,11 +304,31 @@ def busy_modules() -> list[str]:
     return out
 
 
+def _ownership(root: Path) -> dict[str, list[int]]:
+    """Besitzer (uid, gid) aller Dateien unter `root`, damit ein Rückschritt sie wieder so herstellt (copy2 behält den Besitzer nicht)."""
+    out: dict[str, list[int]] = {}
+    for p in [root, *root.rglob('*')]:
+        st = p.lstat()
+        out[str(p.relative_to(root))] = [st.st_uid, st.st_gid]
+    return out
+
+
+def _apply_ownership(root: Path, owners: dict, fallback: os.stat_result) -> None:
+    """Besitzer wiederherstellen; Dateien ohne Eintrag bekommen den Besitzer des Zielordners."""
+    for p in [root, *root.rglob('*')]:
+        uid, gid = owners.get(str(p.relative_to(root)), [fallback.st_uid, fallback.st_gid])
+        try:
+            os.lchown(p, uid, gid)
+        except PermissionError:
+            pass   # nicht als root gestartet (Tests)
+
+
 def snapshot(version: str) -> Path:
     target = STATE / 'schnappschuesse' / 'core' / f'{version}-{time.time_ns()}'
     target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     shutil.copytree(DATA, target / 'daten', symlinks=True, ignore=shutil.ignore_patterns('anfragen'))
     shutil.copytree(SETTINGS, target / 'einstellungen', symlinks=True)
+    (target / 'besitz.json').write_text(json.dumps({'daten': _ownership(DATA), 'einstellungen': _ownership(SETTINGS)}), encoding='utf-8')
     os.chmod(target, 0o700)
     snaps = sorted((STATE / 'schnappschuesse' / 'core').iterdir(), key=lambda p: int(p.name.rsplit('-', 1)[1]))
     for old in snaps[:-KEEP_SNAPSHOTS]:
@@ -324,16 +344,22 @@ def latest_snapshot(version: str) -> Path | None:
 
 
 def restore(snap: Path) -> None:
+    try:
+        owners = json.loads((snap / 'besitz.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        owners = {}   # Schnappschuss aus älterer Version: Besitzer des Zielordners verwenden
     for name, dest in (('daten', DATA), ('einstellungen', SETTINGS)):
         src = snap / name
         if not src.is_dir():
             continue
+        fallback = dest.stat()
         for item in dest.iterdir():
             if item.name == 'anfragen':
                 continue
             shutil.rmtree(item) if item.is_dir() and not item.is_symlink() else item.unlink()
         for item in src.iterdir():
             (shutil.copytree if item.is_dir() and not item.is_symlink() else shutil.copy2)(item, dest / item.name, **({'symlinks': True} if item.is_dir() else {}))
+        _apply_ownership(dest, (owners.get(name) if isinstance(owners, dict) else None) or {}, fallback)
 
 
 def healthy(version: str) -> bool:

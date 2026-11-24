@@ -55,11 +55,29 @@ function test_anfragen(): void {
     problem(fn() => $m->check(), 503, 'ohne Dienst');
 }
 
+function test_dienststatus_und_start(): void {
+    [$env, $m] = mod_env(['installed' => [['id' => 'kasse', 'name' => 'Kasse', 'version' => '2.0.0', 'description' => '', 'path' => '/kasse', 'update' => null,
+        'dienste' => [['name' => 'kienzle-kasse-php.service', 'aktiv' => false], ['name' => '../boese', 'aktiv' => true]]]]]);
+    $s = $m->status();
+    check($s['installed'][0]['dienste'] === [['name' => 'kienzle-kasse-php.service', 'aktiv' => false]], 'Dienste nicht bereinigt: ' . json_encode($s['installed'][0]['dienste']));
+    $b = module_browser($env, $m);
+    $page = $b->get('/verwaltung/module')->body;
+    check(str_contains($page, 'gestoppt') && str_contains($page, 'value="dienst-start"') && str_contains($page, 'value="dienst-neustart"'), 'Dienststatus oder Knöpfe fehlen');
+    $b->post('/verwaltung/module', ['aktion' => 'dienst-start', 'id' => 'kasse']);
+    check(mreq($env) === ['action' => 'dienst-start', 'id' => 'kasse'], 'Startanfrage falsch');
+    check(str_contains(implode("\n", $env->audit->recent()), 'modul-dienst-start kasse'), 'Start nicht protokolliert');
+    unlink($env->dir . '/anfragen/module.json');
+    $b->post('/verwaltung/module', ['aktion' => 'status']);
+    check(mreq($env) === ['action' => 'status'], 'Statusanfrage falsch');
+}
+
 function test_seite_menue_und_rechte(): void {
     [$env, $m] = mod_env();
     $b = module_browser($env, $m);
     $page = $b->get('/verwaltung/module');
     check($page->status === 200 && str_contains($page->body, 'Neue Version <strong>2.1.0</strong> (GitHub, nicht signiert)') && str_contains($page->body, 'Telefon &lt;b&gt;'), 'Seite unvollständig oder nicht maskiert');
+    check(str_contains($page->body, 'class="mod-grid"') && str_contains($page->body, 'mod-tile available') && str_contains($page->body, '<span class="tag">verfügbar</span>') && str_contains($page->body, 'class="mod-remove"')
+        && str_contains($page->body, '<button class="danger">') && str_contains($page->body, 'Update 2.1.0') && str_contains($page->body, ' Installieren</button>'), 'Modulkacheln: installiert, verfügbar, Update, rotes Entfernen');
     check(str_contains($b->get('/')->body, 'title="Neue Modulversion verfügbar">1</span>'), 'Hinweis im Menü fehlt');
     $r = $b->post('/verwaltung/module', ['aktion' => 'installieren', 'id' => 'telefon']);
     check($r->status === 303 && mreq($env)['id'] === 'telefon', 'Installieren über die Seite');

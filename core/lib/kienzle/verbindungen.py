@@ -74,7 +74,7 @@ def load() -> dict:
         data = json.loads((ETC / 'konfiguration.json').read_text(encoding='utf-8'))
     except FileNotFoundError:
         data = {}
-    return {'t2med': data.get('t2med'), 'mail': data.get('mail'), 'ablage': data.get('ablage', [])}
+    return {'t2med': data.get('t2med'), 'mail': data.get('mail'), 'sms': data.get('sms'), 'letterxpress': data.get('letterxpress'), 'ablage': data.get('ablage', [])}
 
 
 def save(config: dict) -> None:
@@ -156,6 +156,147 @@ def set_mail(config: dict, d: dict) -> None:
                       'passwort': pw if pw else old.get('passwort', ''), 'absender': sender}
 
 
+SMS_NUMBER = re.compile(r'^\+[1-9][0-9]{7,14}$')
+SMS_SENDER = re.compile(r'^(?:[A-Za-z0-9]{1,11}|\+?[0-9]{1,15})$')
+SMS_URL = 'https://gateway.seven.io/api/'
+
+
+def set_sms(config: dict, d: dict) -> None:
+    """SMS-Verbindung (seven.io): API-Schlüssel und optionaler Absendername; ein leerer Schlüssel behält den gespeicherten."""
+    old = config.get('sms') or {}
+    key = d.get('api_key', '')
+    if not isinstance(key, str) or len(key) > 200 or CONTROL.search(key) or ' ' in key:
+        raise Fehler('API-Schlüssel ungültig.')
+    key = key or old.get('api_key', '')
+    if not key:
+        raise Fehler('Bitte den API-Schlüssel von seven.io eingeben.')
+    sender = _text(d.get('absender', ''), 'Absender', 16, required=False)
+    if sender and not SMS_SENDER.match(sender):
+        raise Fehler('Absender: höchstens 11 Buchstaben/Ziffern (ohne Leerzeichen) oder eine Nummer.')
+    config['sms'] = {'anbieter': 'seven', 'api_key': key, 'absender': sender}
+
+
+LXP_URL = 'https://api.letterxpress.de/v3'
+
+
+def set_letterxpress(config: dict, d: dict) -> None:
+    """Letterxpress (Briefversand): Benutzername, API-Key und Betrieb Test/Live; ein leerer Schlüssel behält den gespeicherten."""
+    old = config.get('letterxpress') or {}
+    key = d.get('api_key', '')
+    if not isinstance(key, str) or len(key) > 200 or CONTROL.search(key):
+        raise Fehler('API-Key ungültig.')
+    key = key.strip() or old.get('api_key', '')
+    if not key:
+        raise Fehler('Bitte den Letterxpress API-Key eingeben.')
+    mode = d.get('modus', 'test')
+    if mode not in ('test', 'live'):
+        raise Fehler('Betrieb: bitte Test oder Live wählen.')
+    config['letterxpress'] = {'username': _text(d.get('username', ''), 'Benutzername', 200), 'api_key': key, 'modus': mode}
+
+
+def letterxpress_balance(c: dict | None) -> float | None:
+    """Guthaben bei Letterxpress abfragen (nichts wird gedruckt oder verschickt); None, wenn die Antwort keinen Betrag enthält."""
+    if not c:
+        raise Fehler('Letterxpress ist nicht eingerichtet.')
+    import urllib.request
+    body = json.dumps({'auth': {'username': c['username'], 'apikey': c['api_key'], 'mode': c.get('modus', 'test')}}).encode()
+    req = urllib.request.Request(LXP_URL + '/balance', data=body, method='GET', headers={'Accept': 'application/json', 'Content-Type': 'application/json'})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:  # noqa: S310 (feste https-Adresse)
+            out = json.loads(r.read(20000).decode('utf-8', 'replace'))
+    except OSError as e:
+        raise Fehler(f'Letterxpress nicht erreichbar oder Zugangsdaten abgelehnt: {str(e)[:100]}') from None
+    except ValueError:
+        raise Fehler('Letterxpress hat unlesbar geantwortet.') from None
+    data = out.get('data') if isinstance(out, dict) and isinstance(out.get('data'), dict) else {}
+    bal = data.get('balance')
+    return float(bal) if isinstance(bal, (int, float)) and not isinstance(bal, bool) else None
+
+
+def _balance_record(key: str, value: float | None) -> None:
+    """Letzten abgerufenen Wert samt Zeit merken (Anzeige auf der Verbindungsseite)."""
+    try:
+        old = json.loads((STATE / 'status.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        old = {}
+    g = old.get('guthaben', {})
+    g[key] = {'wert': value, 'zeit': int(time.time())}
+    old['guthaben'] = g
+    _write(STATE / 'status.json', old, 0o644)
+
+
+def test_letterxpress(c: dict | None) -> str:
+    """Zugangsdaten prüfen (Guthaben abfragen); es wird nichts gedruckt oder verschickt."""
+    bal = letterxpress_balance(c)
+    _balance_record('letterxpress', bal)
+    betrieb = 'Live (echter Postversand)' if c.get('modus') == 'live' else 'Test (nichts wird verschickt)'
+    return 'Verbunden' + (f'. Guthaben: {bal:.2f} €' if bal is not None else '') + f'. Betrieb: {betrieb}.'
+
+
+def balance_letterxpress(c: dict | None) -> str:
+    bal = letterxpress_balance(c)
+    _balance_record('letterxpress', bal)
+    return f'Guthaben bei Letterxpress: {bal:.2f} €.' if bal is not None else 'Letterxpress hat kein Guthaben gemeldet.'
+
+
+def _sms_call(c: dict, path: str, payload: dict | None) -> dict:
+    import urllib.request
+    data = json.dumps(payload).encode() if payload is not None else None
+    req = urllib.request.Request(SMS_URL + path, data=data, method='POST' if payload is not None else 'GET',
+                                 headers={'X-Api-Key': c['api_key'], 'Accept': 'application/json', 'Content-Type': 'application/json', 'SentWith': 'Kienzle-Suite'})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:  # noqa: S310 (feste https-Adresse)
+            body = r.read(20000).decode('utf-8', 'replace')
+    except OSError as e:
+        raise Fehler(f'seven.io nicht erreichbar oder Schlüssel abgelehnt: {str(e)[:100]}') from None
+    try:
+        out = json.loads(body)
+    except ValueError:
+        out = body.strip()
+    return out if isinstance(out, dict) else {'wert': out}
+
+
+def sms_balance(c: dict | None) -> float | None:
+    """Guthaben bei seven.io abfragen (es wird nichts verschickt) und samt Zeit merken; None, wenn kein Betrag gemeldet wird."""
+    if not c:
+        raise Fehler('SMS ist nicht eingerichtet.')
+    wert = _sms_call(c, 'balance', None).get('wert')
+    bal = float(wert) if isinstance(wert, (int, float)) and not isinstance(wert, bool) else None
+    _balance_record('sms', bal)
+    return bal
+
+
+def test_sms(c: dict | None) -> str:
+    bal = sms_balance(c)
+    return 'Schlüssel von seven.io akzeptiert (keine SMS gesendet).' + (f' Guthaben: {bal:.2f} €.' if bal is not None else '')
+
+
+def balance_sms(c: dict | None) -> str:
+    bal = sms_balance(c)
+    return f'Guthaben bei seven.io: {bal:.2f} €.' if bal is not None else 'seven.io hat kein Guthaben gemeldet.'
+
+
+def send_sms(c: dict | None, to: str, text: str) -> None:
+    """Eine SMS über die zentrale Verbindung (nur kurzer Text, keine Patientendaten)."""
+    if not c:
+        raise Fehler('SMS ist nicht eingerichtet.')
+    if not isinstance(to, str) or not SMS_NUMBER.match(to):
+        raise Fehler('Handynummer bitte im Format +491701234567 angeben.')
+    if not isinstance(text, str) or not text.strip() or len(text) > 320 or CONTROL.search(text.replace('\n', ' ')):
+        raise Fehler('SMS-Text ungültig.')
+    payload = {'to': to, 'text': text}
+    if c.get('absender'):
+        payload['from'] = c['absender']
+    r = _sms_call(c, 'sms', payload)
+    if str(r.get('success', '')) != '100':
+        raise Fehler(f'seven.io hat die SMS nicht angenommen (Antwort {str(r.get("success", r))[:40]}).')
+
+
+def test_sms_send(c: dict | None, to: str) -> str:
+    send_sms(c, to, 'Kienzle-Suite: Testnachricht. Es ist nichts weiter zu tun.')
+    return f'Test-SMS an {to} verschickt.'
+
+
 def set_target(config: dict, d: dict) -> None:
     if not isinstance(d, dict):
         raise Fehler('Ziel ungültig.')
@@ -216,6 +357,8 @@ def distribute(config: dict) -> list[str]:
             out['t2med'] = config['t2med']
         if 'mail' in ids and config['mail']:
             out['mail'] = config['mail']
+        if 'letterxpress' in ids and config.get('letterxpress'):
+            out['letterxpress'] = config['letterxpress']
         if 'ablage' in ids:
             spool = SPOOL / mid
             spool.mkdir(mode=0o2770, parents=True, exist_ok=True)
@@ -310,9 +453,80 @@ def _smtp(c: dict, action) -> None:
         action(smtp)
 
 
+GOOGLE_TOKEN = 'https://oauth2.googleapis.com/token'
+GMAIL_SEND = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send'
+GOOGLE_REDIRECT = 'http://localhost'
+CLIENT_ID = re.compile(r'^[A-Za-z0-9._-]{10,200}$')
+
+
+def _google_post(url: str, data: bytes, headers: dict) -> dict:
+    """POST an Google; Fehler ohne Schlüssel und mit kurzer Begründung."""
+    import urllib.error
+    import urllib.request
+    req = urllib.request.Request(url, data=data, method='POST', headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:  # noqa: S310 (feste https-Adressen)
+            out = json.loads(r.read(200000).decode('utf-8', 'replace') or '{}')
+    except urllib.error.HTTPError as e:
+        try:
+            err = json.loads(e.read(20000).decode('utf-8', 'replace'))
+        except ValueError:
+            err = {}
+        fehler = err.get('error')
+        why = err.get('error_description') or (fehler if isinstance(fehler, str) else '') or (fehler.get('message') if isinstance(fehler, dict) else '') or ''
+        raise Fehler(f'Google lehnt ab (HTTP {e.code})' + (f': {CONTROL.sub(" ", str(why))[:160]}' if why else '') + '.') from None
+    except (OSError, ValueError) as e:
+        raise Fehler(f'Google nicht erreichbar: {str(e)[:100]}') from None
+    return out if isinstance(out, dict) else {}
+
+
+def set_gmail(config: dict, d: dict) -> None:
+    """Gmail per OAuth: eigener Google-Client der Praxis; der Code aus der Anmeldung wird gegen ein Refresh-Token getauscht.
+    Ohne neuen Code bleibt die bestehende Anmeldung (nur Absender, Client ändern ist dann nicht möglich)."""
+    old = config.get('mail') if (config.get('mail') or {}).get('art') == 'gmail' else {}
+    cid = _text(d.get('client_id', old.get('client_id', '')), 'Client-ID', 200)
+    if not CLIENT_ID.match(cid):
+        raise Fehler('Client-ID ungültig (sie endet meist auf .apps.googleusercontent.com).')
+    secret = d.get('client_secret', '')
+    if not isinstance(secret, str) or len(secret) > 200 or CONTROL.search(secret) or ' ' in secret:
+        raise Fehler('Client-Secret ungültig.')
+    secret = secret or old.get('client_secret', '')
+    if not secret:
+        raise Fehler('Bitte das Client-Secret eintragen.')
+    sender = _text(d.get('absender'), 'Absender', 254)
+    if not EMAIL.match(sender):
+        raise Fehler('Absender ist keine E-Mail-Adresse (die Gmail-Adresse, mit der du dich anmeldest).')
+    code = d.get('code', '')
+    if not isinstance(code, str) or len(code) > 500 or CONTROL.search(code) or ' ' in code:
+        raise Fehler('Code ungültig.')
+    refresh = old.get('refresh_token', '')
+    if code:
+        data = urllib.parse.urlencode({'code': code, 'client_id': cid, 'client_secret': secret, 'redirect_uri': GOOGLE_REDIRECT, 'grant_type': 'authorization_code'}).encode()
+        out = _google_post(GOOGLE_TOKEN, data, {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'})
+        refresh = out.get('refresh_token', '')
+        if not refresh:
+            raise Fehler('Google hat kein Dauer-Token geliefert. Bitte die Anmeldung wiederholen und unter „Zugriff“ alles bestätigen '
+                         '(ggf. bei myaccount.google.com → Sicherheit den alten Zugriff entfernen).')
+    if not refresh:
+        raise Fehler('Noch nicht mit Google angemeldet: bitte auf „Mit Google verbinden“ klicken und den Code übernehmen.')
+    config['mail'] = {'art': 'gmail', 'client_id': cid, 'client_secret': secret, 'refresh_token': refresh, 'absender': sender}
+
+
+def _gmail_access(c: dict) -> str:
+    data = urllib.parse.urlencode({'client_id': c['client_id'], 'client_secret': c['client_secret'], 'refresh_token': c['refresh_token'], 'grant_type': 'refresh_token'}).encode()
+    out = _google_post(GOOGLE_TOKEN, data, {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'})
+    token = out.get('access_token')
+    if not isinstance(token, str) or not token:
+        raise Fehler('Google hat kein Zugriffs-Token geliefert.')
+    return token
+
+
 def test_mail(c: dict) -> str:
     if not c:
         raise Fehler('E-Mail ist nicht eingerichtet.')
+    if c.get('art') == 'gmail':
+        _gmail_access(c)
+        return 'Anmeldung bei Google erfolgreich (keine Nachricht gesendet).'
     try:
         _smtp(c, lambda smtp: None)
     except (OSError, smtplib.SMTPException, ssl.SSLError) as e:
@@ -320,7 +534,7 @@ def test_mail(c: dict) -> str:
     return 'Anmeldung am SMTP-Server erfolgreich (keine Nachricht gesendet).'
 
 
-def send_mail(c: dict | None, to: list[str], subject: str, body: str) -> None:
+def send_mail(c: dict | None, to: list[str], subject: str, body: str) -> None:  # noqa: C901
     """Nachricht der Suite über die zentrale E-Mail-Verbindung (nur Text, keine Patientendaten)."""
     from email.message import EmailMessage
     if not c:
@@ -332,6 +546,12 @@ def send_mail(c: dict | None, to: list[str], subject: str, body: str) -> None:
     msg['From'], msg['To'], msg['Subject'] = c['absender'], ', '.join(to), CONTROL.sub('', subject)[:150]
     msg['Auto-Submitted'] = 'auto-generated'
     msg.set_content(body[:20000])
+    if c.get('art') == 'gmail':
+        import base64
+        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+        kopf = {'Authorization': 'Bearer ' + _gmail_access(c), 'Content-Type': 'application/json', 'Accept': 'application/json'}
+        _google_post(GMAIL_SEND, json.dumps({'raw': raw}).encode(), kopf)
+        return
     try:
         _smtp(c, lambda smtp: smtp.send_message(msg))
     except (OSError, smtplib.SMTPException, ssl.SSLError) as e:
@@ -347,6 +567,14 @@ def test_mail_send(c: dict | None, to: str) -> str:
 
 
 # ---- Status ohne Geheimnisse -------------------------------------------------------------------------------------
+def _mail_status(mail: dict) -> dict:
+    """Mail-Verbindung für die Statusanzeige (ohne Passwort, Secret und Token)."""
+    if mail.get('art') == 'gmail':
+        return {'art': 'gmail', 'client_id': mail['client_id'], 'absender': mail['absender'],
+                'secret_gesetzt': bool(mail.get('client_secret')), 'verbunden': bool(mail.get('refresh_token'))}
+    return {'art': 'smtp', **{k: mail[k] for k in ('host', 'port', 'sicherheit', 'benutzer', 'absender')}, 'passwort_gesetzt': bool(mail.get('passwort'))}
+
+
 def view(config: dict, extra: dict | None = None) -> dict:
     try:
         old = json.loads((STATE / 'status.json').read_text(encoding='utf-8'))
@@ -354,6 +582,8 @@ def view(config: dict, extra: dict | None = None) -> dict:
         old = {}
     t2 = config['t2med']
     mail = config['mail']
+    sms = config.get('sms')
+    lxp = config.get('letterxpress')
     ca_fp = ''
     if t2 and t2.get('ca_pem'):
         ca_fp = hashlib.sha256(ssl.PEM_cert_to_DER_cert(t2['ca_pem'])).hexdigest()
@@ -365,9 +595,11 @@ def view(config: dict, extra: dict | None = None) -> dict:
     except (Fehler, OSError, ValueError):
         pass
     out = {'zeit': int(time.time()), 'tests': old.get('tests', {}), 'hostkeys': old.get('hostkeys', {}), 'zertifikate': old.get('zertifikate', {}),
-           'hinweise': old.get('hinweise', []),
+           'hinweise': old.get('hinweise', []), 'guthaben': old.get('guthaben', {}),
            't2med': {**{k: t2[k] for k in ('base_url', 'launch_urls', 'pin')}, 'api_key_gesetzt': bool(t2.get('api_key')), 'zertifikat': ca_fp} if t2 else None,
-           'mail': {**{k: mail[k] for k in ('host', 'port', 'sicherheit', 'benutzer', 'absender')}, 'passwort_gesetzt': bool(mail.get('passwort'))} if mail else None,
+           'mail': _mail_status(mail) if mail else None,
+           'sms': {'anbieter': sms['anbieter'], 'absender': sms.get('absender', ''), 'schluessel_gesetzt': bool(sms.get('api_key'))} if sms else None,
+           'letterxpress': {'username': lxp['username'], 'modus': lxp.get('modus', 'test'), 'schluessel_gesetzt': bool(lxp.get('api_key'))} if lxp else None,
            'ablage': [{**{k: v for k, v in t.items() if k != 'passwort'}, 'passwort_gesetzt': bool(t.get('passwort')),
                        'fingerprint': ablage.fingerprint(t['hostkey']) if t.get('hostkey') else ''} for t in config['ablage']],
            'nutzung': usage, 'sftp_schluessel': ABLAGE_PUB.read_text(encoding='utf-8').strip() if ABLAGE_PUB.is_file() else ''}
@@ -435,6 +667,33 @@ def dispatch(config: dict, req: dict) -> str:
         save(config)
         view(config, {'hinweise': distribute(config)})
         return 'E-Mail-Verbindung gespeichert und an die Module verteilt.' if config['mail'] else 'E-Mail-Verbindung entfernt.'
+    if action == 'gmail':
+        set_gmail(config, d)
+        save(config)
+        view(config, {'hinweise': distribute(config)})
+        return 'Gmail verbunden und an die Module verteilt.'
+    if action == 'sms':
+        if req.get('loeschen') is True:
+            config['sms'] = None
+        else:
+            set_sms(config, d)
+        save(config)
+        view(config, {'hinweise': distribute(config)})
+        return 'SMS-Verbindung gespeichert.' if config.get('sms') else 'SMS-Verbindung entfernt.'
+    if action == 'letterxpress':
+        if req.get('loeschen') is True:
+            config['letterxpress'] = None
+        else:
+            set_letterxpress(config, d)
+        save(config)
+        view(config, {'hinweise': distribute(config)})
+        return 'Letterxpress gespeichert und an die Module verteilt.' if config.get('letterxpress') else 'Letterxpress entfernt.'
+    if action == 'sms-senden':
+        send_sms(config.get('sms'), req.get('an'), req.get('text'))
+        return 'SMS verschickt.'
+    if action == 'mail-senden':
+        send_mail(config.get('mail'), [req.get('an')], str(req.get('betreff') or ''), str(req.get('text') or ''))
+        return 'E-Mail verschickt.'
     if action == 'ziel':
         set_target(config, d)
         save(config)
@@ -460,6 +719,19 @@ def dispatch(config: dict, req: dict) -> str:
                 msg = test_t2med(config['t2med'])
             elif art == 'mail':
                 msg = test_mail(config['mail'])
+            elif art == 'sms':
+                msg = test_sms(config.get('sms'))
+            elif art == 'letterxpress':
+                msg = test_letterxpress(config.get('letterxpress'))
+            elif art == 'guthaben' and tid == 'sms':
+                key = 'guthaben'
+                msg = balance_sms(config.get('sms'))
+            elif art == 'guthaben':
+                key = 'guthaben'
+                msg = balance_letterxpress(config.get('letterxpress'))
+            elif art == 'testsms':
+                key = 'sms'
+                msg = test_sms_send(config.get('sms'), req.get('an'))
             elif art == 'testmail':
                 key = 'mail'
                 msg = test_mail_send(config['mail'], req.get('an'))

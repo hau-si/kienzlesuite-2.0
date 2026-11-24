@@ -18,6 +18,7 @@ function page(string $root, array $server, string $body = '', array $cookies = [
 $dirs = [];
 try {
     $t2med = ['t2med' => ['base_url' => 'https://t2med.example.org/aps/fhir/api/r4', 'launch_urls' => [], 'api_key' => 'k-beispiel', 'ca_pem' => '', 'pin' => ''],
+        'letterxpress' => ['username' => 'praxis-test', 'api_key' => 'lxp-geheim', 'modus' => 'live'],
         'ablage' => ['ausgang' => '', 'ziele' => [['id' => 'steuerbuero', 'name' => 'Steuerbüro']]]];
     $dirs[] = $root = suite(admin_server(), $t2med, [['name' => 'SumUp-Rechnung', 'description' => 'Kienzle-Suite', 'state' => 'bereit'], ['name' => 'Praxisdrucker', 'description' => '', 'state' => 'bereit']]);
 
@@ -31,6 +32,7 @@ try {
     $base = Suite::baseConfig();
     check($base->get('app', 'base_url') === 'https://kasse.example.org' && $base->get('app', 'state_dir') === Suite::$data, 'Adresse oder Datenordner falsch');
     check($base->get('fhir', 'launch_urls') === ['https://t2med.example.org/aps/fhir/api/r4'] && $base->get('invoice_export', 'ziel') === 'steuerbuero', 'Verbindungen nicht übernommen');
+    check($base->get('letterxpress', 'username') === 'praxis-test' && $base->get('letterxpress', 'api_key') === 'lxp-geheim' && $base->get('letterxpress', 'mode') === 'live', 'Letterxpress nicht aus der Verbindung übernommen');
     check($base->get('printing', 'transport') === 'cups', 'Bondrucker nicht über die Suite');
     $_SERVER['HTTP_HOST'] = 'evil"name'; check(Suite::host() === 'localhost', 'Unsicherer Servername übernommen'); $_SERVER['HTTP_HOST'] = 'kasse.example.org';
 
@@ -54,11 +56,13 @@ try {
     check(in_array('T2med-Verbindung der Suite vorhanden', array_column($items, 'title'), true), 'T2med-Verbindung nicht erkannt');
 
     // Seiten: Kasse nur mit Recht „kassieren“, Einstellungen nur mit Rechten, unbekannte Adressen 404, Dateien aus assets.
-    $server = admin_server(['REQUEST_URI' => '/kasse/']);
+    [$code, $html] = page($root, admin_server(['REQUEST_URI' => '/kasse/']));
+    check($code === 200 && str_contains($html, '/kasse/assets/start.js') && str_contains($html, 'kassieren?neu=1') && str_contains($html, 'name="kienzle-csrf" content="' . TEST_CSRF . '"'), 'Startseite der Kasse fehlt');
+    $server = admin_server(['REQUEST_URI' => '/kasse/kassieren']);
     [$code, $html] = page($root, $server);
     check($code === 200 && str_contains($html, 'data-base="/kasse/"') && str_contains($html, 'name="kienzle-csrf" content="' . TEST_CSRF . '"') && str_contains($html, '/kasse/assets/app.js'), 'Kasse nicht unter /kasse/');
     check(str_contains($html, 'Testpatient öffnen') && !preg_match('/id="demo"[^>]*hidden/', $html), 'Testpatient im Testmodus nicht angeboten');
-    [$code] = page($root, staff_server(['paid']) + ['REQUEST_URI' => '/kasse/']);
+    [$code] = page($root, staff_server(['paid']) + ['REQUEST_URI' => '/kasse/kassieren']);
     check($code === 403, 'Kasse ohne Recht „kassieren“');
     [$code, $html] = page($root, staff_server(['paid']) + ['REQUEST_URI' => '/kasse/settings.php']);
     check($code === 200 && str_contains($html, 'settings.js'), 'Einstellungen für Mitarbeiter mit Recht nicht erreichbar');
@@ -84,6 +88,15 @@ try {
     check($code === 403, 'Kasse-API ohne Recht');
     [$code, $out] = page($root, ['HTTP_ORIGIN' => 'https://fremd.example.org', 'HTTP_X_KIENZLE_CSRF' => TEST_CSRF] + $post + $server, json_encode(['action' => 'demo']));
     check($code === 403, 'Fremder Ursprung akzeptiert');
+
+    // Startseite: Zähler für offene Einrichtung nur mit Einstellungsrechten; freie Eingabe und Tageswerte.
+    [$code, $out] = page($root, $post + ['HTTP_X_KIENZLE_CSRF' => TEST_CSRF] + $server, json_encode(['action' => 'setup_count']));
+    $count = json_decode($out, true);
+    check($code === 200 && isset($count['count'], $count['red']) && $count['count'] >= $count['red'], 'Einrichtungszähler fehlt: ' . $out);
+    [$code, $out] = page($root, $post + ['HTTP_X_KIENZLE_CSRF' => TEST_CSRF] + staff_server(['kassieren']), json_encode(['action' => 'setup_count']));
+    check($code === 200 && (json_decode($out, true)['count'] ?? -1) === 0, 'Zähler ohne Einstellungsrecht nicht 0: ' . $out);
+    [$code, $out] = page($root, $post + ['HTTP_X_KIENZLE_CSRF' => TEST_CSRF] + $server, json_encode(['action' => 'day_stats']));
+    check($code === 200 && ($out !== '') && isset(json_decode($out, true)['total_cents']), 'Tageswerte fehlen: ' . $out);
 
     // Starter (POST /api.php ohne Anmeldung): nur mit Starter-Schlüssel, nur „launch“, Antwort mit Startlink auf „/“.
     $starter = ['REQUEST_METHOD' => 'POST', 'REQUEST_URI' => '/api.php', 'CONTENT_TYPE' => 'application/json', 'KIENZLE_OEFFENTLICH' => 'starter',

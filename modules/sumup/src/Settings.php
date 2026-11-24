@@ -28,21 +28,15 @@ final class Settings {
                 'help' => 'Adresse, Schlüssel und Zertifikat von T2med stehen zentral unter Verwaltung → Verbindungen der Suite.'],
             'entry_code' => ['type' => 'string', 'label' => 'Aktenkürzel', 'default' => 'ZAHLUNG'],
         ]],
-        'practice' => ['label' => 'Belege (Praxisname und Anschrift: Verwaltung → Server und Name)', 'fields' => [
+        'practice' => ['label' => 'Belege (Praxisname und Anschrift: Verwaltung → Praxis)', 'fields' => [
             'append_sumup_receipt' => ['type' => 'bool', 'label' => 'Originalen SumUp-Beleg statt lokaler Zahlungsbestätigung anhängen'],
         ]],
-        'bank' => ['label' => 'Überweisung (Kontodaten der Praxis)', 'fields' => [
-            'holder' => ['type' => 'string', 'label' => 'Kontoinhaber', 'default' => '', 'optional' => true],
-            'iban' => ['type' => 'string', 'label' => 'IBAN', 'default' => '', 'optional' => true],
-            'bic' => ['type' => 'string', 'label' => 'BIC (optional)', 'default' => '', 'optional' => true],
-            'bank_name' => ['type' => 'string', 'label' => 'Bank (optional)', 'default' => '', 'optional' => true],
+        'bank' => ['label' => 'Überweisung (Kontodaten: Verwaltung → Praxis)', 'fields' => [
             'purpose' => ['type' => 'string', 'label' => 'Verwendungszweck', 'default' => 'Rechnung {nummer}', 'optional' => true],
         ]],
-        'tax' => ['label' => 'Umsatzsteuer', 'fields' => [
-            'small_business' => ['type' => 'bool', 'label' => 'Kleinunternehmerregelung (§ 19 UStG): alle Rechnungen ohne MwSt.', 'default' => false],
+        'tax' => ['label' => 'Umsatzsteuer (Steuernummer und Kleinunternehmerregelung: Verwaltung → Praxis)', 'fields' => [
             'rate' => ['type' => 'percent', 'label' => 'MwSt.-Satz in Prozent', 'default' => 1900],
             'manual_vat' => ['type' => 'bool', 'label' => '„Sonstiger Betrag“ mit MwSt. berechnen', 'default' => false],
-            'tax_id' => ['type' => 'string', 'label' => 'Steuernummer oder USt-IdNr. (steht auf der Rechnung)', 'default' => '', 'optional' => true],
             'exempt_note' => ['type' => 'text', 'label' => 'Hinweis bei Positionen ohne MwSt. (optional)', 'default' => ''],
             'small_business_note' => ['type' => 'text', 'label' => 'Hinweis bei Kleinunternehmerregelung', 'default' => 'Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.'],
         ]],
@@ -68,13 +62,11 @@ final class Settings {
             'label_date' => ['type' => 'list', 'label' => 'Eigene Textschnipsel vor dem Rechnungsdatum', 'optional' => true],
             'label_total' => ['type' => 'list', 'label' => 'Eigene Textschnipsel vor der Gesamtsumme', 'optional' => true],
             'label_transfer' => ['type' => 'list', 'label' => 'Eigene Textschnipsel vor dem Überweisungsbetrag (Gegenprobe)', 'optional' => true],
+            'number_prefix' => ['type' => 'list', 'label' => 'Kürzel der Rechnungsnummern (einer pro Zeile, z. B. IG)', 'optional' => true],
             'label_patient' => ['type' => 'list', 'label' => 'Eigene Textschnipsel vor Patient und Geburtsdatum', 'optional' => true],
         ]],
         'letterxpress' => ['label' => 'Letterxpress (Rechnung per Post)', 'fields' => [
-            'enabled' => ['type' => 'bool', 'label' => 'Rechnungen per Post über Letterxpress versenden'],
-            'username' => ['type' => 'string', 'label' => 'Letterxpress Benutzername'],
-            'api_key' => ['type' => 'secret', 'label' => 'Letterxpress API-Key'],
-            'mode' => ['type' => 'choice', 'label' => 'Betrieb', 'default' => 'test', 'choices' => ['test' => 'Test (nur Postausgang bei Letterxpress, es wird nichts gedruckt oder verschickt)', 'live' => 'Live (echter Postversand, kostenpflichtig)']],
+            'enabled' => ['type' => 'bool', 'label' => 'Rechnungen per Post über Letterxpress versenden', 'help' => 'Benutzername, API-Key und Test/Live stehen zentral unter Verwaltung → Verbindungen der Suite (Letterxpress).'],
             'color' => ['type' => 'choice', 'label' => 'Druck', 'default' => '1', 'choices' => ['1' => 'Schwarz-Weiß', '4' => 'Farbe']],
             'duplex' => ['type' => 'bool', 'label' => 'Beidseitig drucken', 'default' => false],
             'shipping' => ['type' => 'choice', 'label' => 'Versandart', 'default' => 'auto', 'choices' => ['auto' => 'Automatisch (Inland oder Ausland)', 'national' => 'Nur Inland', 'international' => 'Ausland']],

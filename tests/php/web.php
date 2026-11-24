@@ -3,8 +3,9 @@ declare(strict_types=1);
 // Webinterface der Basis über simulierte Anfragen: Einrichtung, Anmeldung mit OTP und Passkey, Rechte, /_auth, Schutz.
 require __DIR__ . '/lib.php';
 require __DIR__ . '/browser.php';
+require_once dirname(__DIR__, 2) . '/core/php/modul/Kienzle.php';
 
-use Kienzle\Core\{Auth, Totp};
+use Kienzle\Core\{Auth, Connections, Totp};
 
 function test_ersteinrichtung_mit_link_und_otp(): void {
     $env = new Env();
@@ -109,7 +110,15 @@ function test_mitarbeiter_ohne_otp_und_rechte_je_modul(): void {
         && $auth->header('X-Kienzle-Rechte') === 'paid', 'Weitergabe an Modul falsch');
     check(strlen((string)$auth->header('X-Kienzle-Csrf')) === 64, 'Modul-CSRF fehlt');
     check(is_array(json_decode(rawurldecode((string)$auth->header('X-Kienzle-Praxis')), true)), 'Praxisdaten fehlen in der Weitergabe');
-    check(str_contains($b->get('/')->body, '<span class="menu-title">Anwendungen</span>'), 'Modul fehlt in der Seitenleiste');
+    // Menü für die Seitenleiste in Modulseiten: schlank, ohne Sitzungs-CSRF, nur Module mit Zugang
+    $menu = json_decode(rawurldecode((string)$auth->header('X-Kienzle-Menue')), true);
+    check(is_array($menu) && array_keys($menu['apps']) === ['/kasse/'] && $menu['login'] === 'bert' && $menu['admin'] === false, 'Menü für Modulseiten falsch');
+    $k = new KienzleModul('kasse', ['KIENZLE_MENUE' => $auth->header('X-Kienzle-Menue'), 'KIENZLE_PRAXIS' => $auth->header('X-Kienzle-Praxis'), 'KIENZLE_BENUTZER' => 'bert', 'REQUEST_URI' => '/kasse/settings.php']);
+    $seite = $k->rahmen('Kasse', '<p id="inhalt">Hallo</p>', ['roh' => true, 'kopf' => '<link rel="stylesheet" href="/kasse/assets/x.css">']);
+    check(str_contains($seite, '<aside class="side">') && str_contains($seite, 'href="/kasse/" class="current"') && str_contains($seite, '<p id="inhalt">Hallo</p>') && str_contains($seite, '/kasse/assets/x.css')
+        && !str_contains($seite, '/verwaltung/server') && !str_contains($seite, 'action="/abmelden"') && str_contains($seite, 'class="modul"'), 'Rahmen für Modulseiten falsch');
+    $start = $b->get('/')->body;
+    check(str_contains($start, '<summary class="menu-title">Anwendungen</summary>') && !str_contains($start, '<span class="menu-title">Einstellungen</span>'), 'Anwendungen fehlen oder Einstellungen stehen doppelt in der Seitenleiste');
     check($b->get('/_auth/beispiel')->status === 403, 'Zugang zu nicht freigegebenem Modul');
     $env->users->setAccess($id, 'kasse', false, []);
     $env->db->store('erstadmin:kasse', (string)$id);
@@ -144,6 +153,55 @@ function test_verwaltung_braucht_bestaetigung_und_csrf(): void {
     $env = new Env();
     [$b, , $secret] = admin_browser($env);
     check($b->get('/verwaltung/benutzer')->status === 200, 'Verwaltung direkt nach Anmeldung nicht erreichbar');
+    $page = $b->get('/verwaltung/benutzer')->body;
+    check(str_contains($page, 'Gruppen</h2>') && str_contains($page, 'Benutzer</h2>'), 'Benutzer und Gruppen nicht auf einer Seite');
+    check(str_contains($b->get('/verwaltung/praxis')->body, 'Kontodaten für Überweisungen'), 'Seite Praxis fehlt');
+    check($b->post('/verwaltung/praxis', ['aktion' => 'konto', 'holder' => 'Praxis Beispiel', 'iban' => 'DE02 1203 0000 0000 2020 52'])->status === 422, 'falsche IBAN angenommen');
+    check($b->post('/verwaltung/praxis', ['aktion' => 'konto', 'holder' => 'Praxis Beispiel', 'iban' => 'DE02 1203 0000 0000 2020 51'])->status === 200 && str_contains($b->get('/verwaltung/praxis')->body, 'DE02 1203 0000 0000 2020 51'), 'Kontodaten nicht gespeichert');
+    check($b->post('/verwaltung/praxis', ['aktion' => 'steuer', 'tax_id' => '12/345/67890', 'small_business' => '1'])->status === 200 && str_contains($b->get('/verwaltung/praxis')->body, '12/345/67890'), 'Steuerangaben nicht gespeichert');
+    check(Connections::phone('0151 123 456 78') === '+4915112345678' && Connections::phone('0049 151 12345678') === '+4915112345678' && Connections::phone('+43 660 1234567') === '+436601234567', 'Handynummer nicht normalisiert');
+    try { Connections::phone('12345'); check(false, 'zu kurze Nummer angenommen'); } catch (\Kienzle\Core\Problem $e) { }
+    $fake = ['token_hash' => 'sms-test'];
+    $code = $env->auth->smsCodeIssue($fake);
+    check(preg_match('/^\d{6}$/D', $code) === 1, 'SMS-Code ohne 6 Ziffern');
+    try { $env->auth->smsCodeIssue($fake); check(false, 'zweiter Code binnen einer Minute'); } catch (\Kienzle\Core\Problem $e) { }
+    check(str_contains($b->get('/verwaltung/benutzer')->body, 'Server neu starten'), 'Neustart nicht im Menü');
+    check(str_contains($b->get('/verwaltung/neustart?art=server')->body, 'Server jetzt neu starten'), 'Neustart-Seite fehlt');
+    check(str_contains($b->post('/verwaltung/neustart', ['art' => 'dienste'])->body, 'nicht eingerichtet'), 'Neustart ohne Dienst nicht abgelehnt');
+    \Kienzle\Core\Web::$restartUnit = __FILE__;
+    check($b->post('/verwaltung/neustart', ['art' => 'wasanderes'])->status === 422, 'unbekannte Art angenommen');
+    check($b->post('/verwaltung/neustart', ['art' => 'dienste'])->status === 200 && is_file($env->dir . '/anfragen/neustart.json'), 'Neustart-Anfrage nicht geschrieben');
+    check(str_contains(implode("\n", $env->audit->recent()), 'neustart dienste'), 'Neustart nicht protokolliert');
+    unlink($env->dir . '/anfragen/neustart.json');
+    // Update-Seite: jede Karte muss geschlossen sein (ein h2 im Update-Kasten zerriss früher den Aufbau und schob die Seitenleiste weg).
+    $upd = $b->get('/verwaltung/updates')->body;
+    check(substr_count($upd, '<div') === substr_count($upd, '</div') && substr_count($upd, '<section') === substr_count($upd, '</section'), 'Updates-Seite: ungleich viele öffnende und schließende Tags');
+    $home = $b->get('/')->body;
+    check(str_contains($home, 'todo-dot'), 'Keine blaue Markierung für offene Schritte im Menü');
+    check(str_contains($b->get('/verwaltung/drucker')->body, '<summary><h2>Drucker suchen</h2></summary>') || !str_contains($b->get('/verwaltung/drucker')->body, 'Drucker suchen'), 'Drucker suchen nicht eingeklappt');
+    check(str_contains($home, 'setup-card') && str_contains($home, 'nötigen Schritten erledigt') && !str_contains($home, 'href="/verwaltung/einrichtung"><span>'), 'Einrichtungskarte auf der Startseite fehlt oder Menüpunkt noch da');
+    check(str_contains($home, '<svg class="ico"'), 'Menüsymbole fehlen');
+    $setup = $b->get('/verwaltung/einrichtung')->body;
+    check(strpos($setup, 'Admin mit Authenticator-App') < strpos($setup, 'Mindestens zwei Admins') && strpos($setup, 'Mindestens zwei Admins') < strpos($setup, 'Servername festgelegt') && str_contains($setup, 'tag opt">optional'), 'Einrichtung nicht geordnet oder ohne optional-Kennzeichnung');
+    // Update-Seite: Status als Symbol in einer einzigen Karte; roter Punkt am Logo; Einrichtungspunkte ignorieren.
+    check(str_contains($home, 'logo-dot'), 'Roter Punkt am Logo fehlt bei offener Einrichtung');
+    check(preg_match('/name="aktion" value="ignorieren"><input type="hidden" name="punkt" value="([0-9a-f]{12})"/', $setup, $mi) === 1, 'Ignorieren-Knopf fehlt');
+    $openBefore = $b->get('/')->body; preg_match('/(\\d+) von (\\d+) nötigen/', $openBefore, $c0);
+    $b->post('/verwaltung/einrichtung', ['aktion' => 'ignorieren', 'punkt' => $mi[1], 'an' => '1']);
+    preg_match('/(\\d+) von (\\d+) nötigen/', $b->get('/')->body, $c1);
+    check($c1[2] === (string)((int)$c0[2] - 1), 'Ignorierter Punkt zählt weiter als nötig');
+    check(str_contains($b->get('/verwaltung/einrichtung')->body, 'Wieder beachten'), '„Wieder beachten“ fehlt');
+    $b->post('/verwaltung/einrichtung', ['aktion' => 'ignorieren', 'punkt' => $mi[1], 'an' => '0']);
+    preg_match('/(\\d+) von (\\d+) nötigen/', $b->get('/')->body, $c2);
+    check($c2[2] === $c0[2], 'Wieder beachten wirkt nicht');
+    $prax = $b->get('/verwaltung/praxis')->body;
+    check(str_contains($prax, 'class="h-ico"') && str_contains($prax, 'Anschrift <span class="tag opt">nicht ausgefüllt</span>') && str_contains($prax, 'Kontodaten für Überweisungen <span class="tag ok">✓ ausgefüllt</span>'), 'Praxis und Daten: Symbole oder Statusschilder fehlen');
+    check(str_contains($b->get('/konto')->body, 'Authenticator-App <span class="tag ok">✓ eingerichtet</span>'), 'Konto: Statusschild der Authenticator-App fehlt');
+    $page = $b->get('/verwaltung/sicherheit')->body;
+    check(str_contains($page, 'Firewall <span class="tag') && str_contains($page, 'Zugang (Abmeldezeiten)') && str_contains($page, 'Protokoll</h2>') && str_contains($page, 'name="idle_einheit"'), 'Sicherheit unvollständig');
+    check($b->post('/verwaltung/zugang', ['idle' => '2', 'idle_einheit' => 'd', 'max' => '3', 'max_einheit' => 'd'])->status === 200 && $env->auth->idleSeconds() === 172800, 'Zugang in Tagen nicht gespeichert');
+    check($b->post('/verwaltung/zugang', ['idle' => '400', 'idle_einheit' => 'd', 'max' => '400', 'max_einheit' => 'd'])->status === 422, 'mehr als ein Jahr angenommen');
+    check($b->post('/verwaltung/zugang', ['idle' => '365', 'idle_einheit' => 'd', 'max' => '365', 'max_einheit' => 'd'])->status === 200, 'ein Jahr abgelehnt');
     $env->db->query('UPDATE sessions SET confirmed_at=?', [time() - Auth::CONFIRM_SECONDS - 1]);
     check(str_starts_with((string)$b->get('/verwaltung/benutzer')->header('Location'), '/bestaetigen'), 'Verwaltung ohne erneute Bestätigung');
     $b->get('/bestaetigen?weiter=/verwaltung/benutzer');
@@ -154,6 +212,23 @@ function test_verwaltung_braucht_bestaetigung_und_csrf(): void {
     $b->get('/verwaltung/benutzer/neu');
     $r = $b->req('POST', '/verwaltung/benutzer', ['login' => 'carla', 'csrf' => 'falsch']);
     check($r->status === 403 && !$env->users->byLogin('carla'), 'Anlegen ohne gültige CSRF-Marke');
+}
+
+function test_rollen_matrix_speichern(): void {
+    $env = new Env();
+    [$b] = admin_browser($env);
+    $b->post('/verwaltung/benutzer', ['login' => 'dora', 'display' => 'Dora']);
+    $id = (int)$env->users->byLogin('dora')['id'];
+    // Rolle MFA, aber „paid“ einzeln abgewählt und „catalog“ einzeln dazu
+    $b->post('/verwaltung/benutzer/' . $id, ['display' => 'Dora', 'active' => '1', 'rollen_gesendet' => '1', 'rolle' => ['MFA'], 'recht' => ['kasse:catalog']]);
+    check($env->users->roles($id) === ['MFA'], 'Rolle nicht gespeichert');
+    check($env->users->overrides($id) === ['kasse:catalog' => true, 'kasse:paid' => false], 'Einzeländerungen falsch: ' . json_encode($env->users->overrides($id)));
+    $b->get('/verwaltung/benutzer/' . $id);
+    check(str_contains($b->last->body, 'class="matrix"') && str_contains($b->last->body, 'recht abw') && str_contains($b->last->body, 'data-rolle checked'), 'Matrix zeigt Rolle/Abweichung nicht');
+    $b->get('/verwaltung/benutzer');
+    check(str_contains($b->last->body, 'title="MFA"'), 'Rollen-Symbol fehlt in der Benutzerliste');
+    $b->post('/verwaltung/benutzer/' . $id, ['display' => 'Dora', 'active' => '1', 'rollen_gesendet' => '1', 'rolle' => ['Gibtesnicht']]);
+    check($b->last->status === 422, 'unbekannte Rolle angenommen');
 }
 
 function test_benutzer_anlegen_rechte_und_link(): void {
@@ -172,7 +247,7 @@ function test_benutzer_anlegen_rechte_und_link(): void {
     check($b->last->status === 422, 'unbekanntes Modul angenommen');
     // Gruppen: Vorgaben Admin/Arzt/MFA, Anwenden beim Speichern, eigene Änderung
     $b->get('/verwaltung/gruppen');
-    check($b->last->status === 200 && str_contains($b->last->body, '>MFA<') && str_contains($b->last->body, '>Arzt<') && str_contains($b->last->body, '>Admin<'), 'Vorgabe-Gruppen fehlen');
+    check($b->last->status === 200 && str_contains($b->last->body, ' MFA</h2>') && str_contains($b->last->body, ' Arzt</h2>') && str_contains($b->last->body, ' Admin</h2>'), 'Vorgabe-Gruppen fehlen');
     $b->post('/verwaltung/benutzer/' . $carla['id'], ['display' => 'Carla', 'active' => '1', 'gruppe' => 'Arzt']);
     $acc = $env->users->access((int)$carla['id']);
     check($acc['kasse']['admin'] === false && $acc['kasse']['rights'] === ['paid', 'catalog'] && $acc['beispiel']['rights'] === ['ansehen', 'bearbeiten'], 'Gruppe Arzt nicht angewendet: ' . json_encode($acc));

@@ -60,6 +60,7 @@ final class Web {
             case '/anmelden': return $get ? $this->loginPage() : $this->login($r);
             case '/anmelden/passkey/optionen': return $this->passkeyLoginOptions();
             case '/anmelden/passkey': return $this->passkeyLogin($r);
+            case '/passwort-vergessen': return $get ? $this->forgotPage() : $this->forgot($r);
             case '/einrichten': return $get ? $this->setupPage($r->get('t', 60)) : $this->setup($r);
             case '/abmelden': if (!$get) return $this->logout($r); break;
             case '/hilfe/arbeitsplatz': if ($get) return $this->workstationHelp(); break;
@@ -67,7 +68,7 @@ final class Web {
             case '/oidc/authorize': if ($get && $this->oidc && $stage !== 'full') return Response::redirect('/anmelden?weiter=/oidc/fortsetzen/' . $this->oidc->park($r->query)); break;
             case '/oidc/abmelden': if ($this->oidc && $stage !== 'full') return Response::redirect($this->oidc->logoutTarget($r->get('client_id', 100) ?: $this->oidc->clientFromIdToken($r->get('id_token_hint', 4000)), $r->get('post_logout_redirect_uri', 300)) ?? '/anmelden'); break;
         }
-        if ($stage === 'otp') return $r->path === '/anmelden/code' ? ($get ? $this->codePage() : $this->code($r)) : Response::redirect('/anmelden/code');
+        if ($stage === 'otp') return $r->path === '/anmelden/code' ? ($get ? $this->codePage() : $this->code($r)) : ($r->path === '/anmelden/code/sms' && !$get ? $this->smsCodeSend() : Response::redirect('/anmelden/code'));
         if ($stage === 'enroll') return $r->path === '/konto/otp' ? ($get ? $this->enrollPage() : $this->enroll($r)) : Response::redirect('/konto/otp');
         if ($stage !== 'full') return Response::redirect('/anmelden' . ($get && $r->path !== '/' ? '?weiter=' . rawurlencode($r->path) : ''));
         if (!$get) $this->checkCsrf($r);
@@ -79,6 +80,9 @@ final class Web {
             'GET /konto/otp' => fn() => $this->enrollPage(),
             'POST /konto/otp' => fn() => $this->enroll($r),
             'POST /konto/codes' => fn() => $this->newCodes(),
+            'POST /konto/telefon' => fn() => $this->savePhone($r),
+            'POST /konto/email' => fn() => $this->saveEmail($r),
+            'POST /konto/email-code' => fn() => $this->confirmEmail($r),
             'POST /konto/geraete' => fn() => $this->revoke($r),
             'POST /konto/passkey/optionen' => fn() => $this->passkeyRegisterOptions(),
             'POST /konto/passkey' => fn() => $this->passkeyRegister($r),
@@ -134,7 +138,7 @@ final class Web {
             . '<h2 id="name">2. Den Namen der Suite bekannt machen</h2>'
             . '<p>Die Suite heißt <strong>' . V::h($name) . '</strong> und hat die Adresse <strong>' . V::h($ip) . '</strong>. Damit der Name funktioniert, gibt es zwei Wege:</p>'
             . '<details class="how" open><summary>Einmal im Router (empfohlen, gilt für alle PCs)</summary><p>Viele Router kennen Geräte im Netz automatisch unter ihrem Rechnernamen, '
-            . 'eine FRITZ!Box z. B. als <code>rechnername.fritz.box</code>. Dann unter „Server und Name“ genau diesen Namen mit der Endung „.fritz.box“ wählen. '
+            . 'eine FRITZ!Box z. B. als <code>rechnername.fritz.box</code>. Dann unter „Server“ genau diesen Namen mit der Endung „.fritz.box“ wählen. '
             . 'Andere Router oder ein eigener DNS-Server: den Namen <code>' . V::h($name) . '</code> mit der Adresse <code>' . V::h($ip) . '</code> eintragen (meist die IT).</p></details>'
             . '<details class="how"><summary>Oder auf jedem PC in der Datei hosts</summary><ol class="steps">'
             . '<li>Windows: Startmenü → „Editor“ mit der rechten Maustaste → <strong>Als Administrator ausführen</strong>.</li>'
@@ -150,7 +154,6 @@ final class Web {
 
     private function serverPage(?string $error = null): Response {
         $st = $this->srv()->status();
-        $addr = $this->address();
         $ips = array_values(array_filter($st['names'], fn($n) => filter_var($n, FILTER_VALIDATE_IP)));
         $dns = array_values(array_filter($st['names'], fn($n) => !filter_var($n, FILTER_VALIDATE_IP)));
         // Erster Name mit bekannter Endung → Feld „Name“ und Auswahl der Endung; alles andere steht unter „Weitere Namen“.
@@ -167,9 +170,8 @@ final class Web {
         $address = 'https://' . $short . $suffix . '/';
         $body = V::error($error) . ($st['last'] ? '<p class="' . (($st['last']['ok'] ?? false) ? 'notice' : 'error') . '">' . V::h((string)($st['last']['meldung'] ?? '')) . '</p>' : '')
             . ($st['pending'] ? '<p class="notice">Wird übernommen …</p>' : '')
-            . '<h2>Name der Praxis und des Servers</h2>'
+            . '<h2>Servername</h2>'
             . '<form method="post" action="/verwaltung/server">' . $this->hidden('speichern')
-            . V::input('praxis', 'Name der Praxis', 'text', $st['practice'], 'maxlength="60" placeholder="Praxis Dr. Beispiel"')
             . '<label>Name des Servers<span class="name-row">'
             . '<input type="text" name="kurzname" value="' . V::h($short) . '" required maxlength="40" pattern="[A-Za-z0-9][A-Za-z0-9-]*" aria-label="Name">'
             . '<select name="endung" aria-label="Endung">' . $options . '</select></span></label>'
@@ -183,17 +185,12 @@ final class Web {
             . V::checkbox('neue_ca', '1', 'Falls nötig: neue Zertifizierungsstelle erstellen', false)
             . V::checkbox('ohne_ip', '1', 'Nicht mehr über die IP-Adresse erreichbar', false) . '</details>'
             . '<button' . ($st['pending'] ? ' disabled' : '') . '>Speichern</button></form>'
-            . '<h2>Anschrift der Praxis</h2><p class="muted">Steht auf Rechnungen und Belegen. Die Module (z. B. die Kasse) übernehmen sie von hier.</p>'
-            . '<form method="post" action="/verwaltung/server">' . $this->hidden('anschrift')
-            . V::input('street', 'Straße und Hausnummer', 'text', $addr['street'], 'maxlength="80" autocomplete="street-address"')
-            . V::input('city', 'PLZ und Ort', 'text', $addr['city'], 'maxlength="80"')
-            . V::input('contact', 'Kontakt auf dem Beleg (optional, z. B. Telefon)', 'text', $addr['contact'], 'maxlength="120"')
-            . '<button>Anschrift speichern</button></form>'
+            . '<h2>Name, Anschrift, Konto und Steuer der Praxis</h2><p class="muted">Stehen gemeinsam unter <a href="/verwaltung/praxis">Praxis</a>.</p>'
             . '<h2>Danach</h2><ol class="steps"><li>Den Namen im Router eintragen – oder auf jedem PC in der Datei hosts: '
             . '<a href="/hilfe/arbeitsplatz#name">Anleitung</a>.</li><li>Die Suite unter <strong>' . V::h($address) . '</strong> öffnen und dort neu anmelden.</li>'
             . '<li>Falls schon Passkeys eingerichtet sind: unter „Mein Konto“ neu anlegen (sie gelten für den alten Namen).</li></ol>'
             . '<p class="muted">Diese drei Schritte bestätigst du von Hand unter <a href="/verwaltung/einrichtung">Einrichtung</a>; erst dann gilt „Servername festgelegt“ als erledigt.</p>';
-        $response = Response::html(V::page('Server und Name', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+        $response = Response::html(V::page('Server', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
         return $st['pending'] ? $response->with('Refresh', '3') : $response;
     }
 
@@ -205,24 +202,90 @@ final class Web {
         return $out;
     }
 
-    private function saveAddress(Request $r, string $admin): Response {
-        $in = [];
+    private const MASTER = ['holder' => 70, 'iban' => 42, 'bic' => 11, 'bank_name' => 100, 'tax_id' => 40];
+
+    /** Kontodaten und Steuerangaben der Praxis (Kontoinhaber, IBAN, BIC, Bank, Steuernummer/USt-IdNr., Kleinunternehmer). */
+    private function master(): array {
+        $d = json_decode((string)$this->db->setting('praxis.stammdaten'), true);
+        $out = [];
+        foreach (self::MASTER as $k => $_) $out[$k] = is_array($d) && is_string($d[$k] ?? null) ? $d[$k] : '';
+        $out['small_business'] = is_array($d) && ($d['small_business'] ?? false) === true;
+        return $out;
+    }
+
+    private function practicePage(?string $error = null, ?string $notice = null): Response {
+        $a = $this->address(); $m = $this->master();
+        $form = fn(string $kind, string $fields, string $button) => '<form method="post" action="/verwaltung/praxis">' . V::csrf($this->session['csrf'])
+            . '<input type="hidden" name="aktion" value="' . $kind . '">' . $fields . '<button>' . $button . '</button></form>';
+        $body = V::error($error) . V::notice($notice) . '<section class="card"><p class="muted">Diese Angaben gelten für alle Module (Rechnungen, Belege, Überweisungs-QR, Bons). </p>'
+            . '<details class="fold" open><summary><h2>Name der Praxis</h2></summary>' . $form('name',
+                V::input('praxis', 'Name der Praxis (erscheint auf Belegen, Bons und im Kopf der Suite)', 'text', $this->config->practice, 'maxlength="60" placeholder="Praxis Dr. Beispiel"'), 'Name speichern') . '</details>'
+            . '<details class="fold"><summary><h2>Anschrift</h2></summary>' . $form('anschrift',
+                V::input('street', 'Straße und Hausnummer', 'text', $a['street'], 'maxlength="80" autocomplete="street-address"')
+                . V::input('city', 'PLZ und Ort', 'text', $a['city'], 'maxlength="80"')
+                . V::input('contact', 'Kontakt auf dem Beleg (optional, z. B. Telefon)', 'text', $a['contact'], 'maxlength="120"'), 'Anschrift speichern') . '</details>'
+            . '<details class="fold"><summary><h2>Kontodaten für Überweisungen</h2></summary>' . $form('konto',
+                V::input('holder', 'Kontoinhaber', 'text', $m['holder'], 'maxlength="70"')
+                . V::input('iban', 'IBAN', 'text', $m['iban'], 'maxlength="42" autocapitalize="characters"')
+                . V::input('bic', 'BIC (optional)', 'text', $m['bic'], 'maxlength="11"')
+                . V::input('bank_name', 'Bank (optional)', 'text', $m['bank_name'], 'maxlength="100"'), 'Kontodaten speichern') . '</details>'
+            . '<details class="fold"><summary><h2>Steuer</h2></summary>' . $form('steuer',
+                V::input('tax_id', 'Steuernummer oder USt-IdNr. (steht auf der Rechnung)', 'text', $m['tax_id'], 'maxlength="40"')
+                . V::checkbox('small_business', '1', 'Kleinunternehmerregelung (§ 19 UStG): keine Umsatzsteuer ausweisen', $m['small_business']), 'Steuerangaben speichern') . '</details></section>';
+        $filled = fn(bool $ok) => [$ok, 'ausgefüllt', 'nicht ausgefüllt'];
+        V::$status = ['Name der Praxis' => [$this->config->practice !== '', 'eingetragen', 'nicht eingetragen'], 'Anschrift' => $filled($a['street'] !== '' && $a['city'] !== ''), 'Kontodaten für Überweisungen' => $filled($m['iban'] !== ''), 'Steuer' => $filled($m['tax_id'] !== '' || $m['small_business'])];
+        return Response::html(V::page('Praxis', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+    }
+
+    private function practiceSave(Request $r, string $admin): Response {
+        $kind = $r->field('aktion', 20);
         try {
-            foreach (['street' => 80, 'city' => 80, 'contact' => 120] as $k => $max) {
-                $v = trim($r->field($k, $max + 1));
-                if (mb_strlen($v) > $max || preg_match('/[\x00-\x1f\x7f<>]/', $v)) throw new Problem('Anschrift: Angaben zu lang oder mit unerlaubten Zeichen.', 422);
-                $in[$k] = $v;
+            if ($kind === 'anschrift') {
+                $in = [];
+                foreach (['street' => 80, 'city' => 80, 'contact' => 120] as $k => $max) {
+                    $v = trim($r->field($k, $max + 1));
+                    if (mb_strlen($v) > $max || preg_match('/[\x00-\x1f\x7f<>]/', $v)) throw new Problem('Anschrift: Angaben zu lang oder mit unerlaubten Zeichen.', 422);
+                    $in[$k] = $v;
+                }
+                $this->db->store('praxis.anschrift', json_encode($in, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+                $this->audit->write($admin, 'praxisanschrift', '');
+                return $this->practicePage(null, 'Anschrift gespeichert.');
             }
+            if ($kind === 'name') {
+                // Der Name steckt in der Serverkonfiguration (Root-Dienst): Servernamen bleiben unverändert, nur der Praxisname wechselt.
+                $name = trim($r->field('praxis', 200));
+                $this->srv()->save(implode("\n", $this->config->hostnames), $name, false);
+                $this->audit->write($admin, 'praxisname', $name);
+                return $this->practicePage(null, 'Name der Praxis wird übernommen und erscheint gleich überall.');
+            }
+            if (!in_array($kind, ['konto', 'steuer'], true)) throw new Problem('Unbekannte Aktion.', 400);
+            $m = $this->master();
+            foreach ($kind === 'konto' ? ['holder', 'iban', 'bic', 'bank_name'] : ['tax_id'] as $k) {
+                $v = trim($r->field($k, self::MASTER[$k] + 1));
+                if (mb_strlen($v) > self::MASTER[$k] || preg_match('/[\x00-\x1f\x7f<>]/', $v)) throw new Problem('Angaben zu lang oder mit unerlaubten Zeichen: ' . $k . '.', 422);
+                $m[$k] = $v;
+            }
+            if ($kind === 'steuer') $m['small_business'] = $r->field('small_business') === '1';
+            if ($m['iban'] !== '' && !self::validIban($m['iban'])) throw new Problem('Die IBAN ist ungültig (Prüfziffer stimmt nicht).', 422);
+            $this->db->store('praxis.stammdaten', json_encode($m, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+            $this->audit->write($admin, 'praxisdaten-gespeichert', $kind);
         } catch (Problem $e) {
-            return $this->serverPage($e->getMessage());
+            return $this->practicePage($e->getMessage());
         }
-        $this->db->store('praxis.anschrift', json_encode($in, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
-        $this->audit->write($admin, 'praxisanschrift', '');
-        return Response::redirect('/verwaltung/server');
+        return $this->practicePage(null, $kind === 'konto' ? 'Kontodaten gespeichert.' : 'Steuerangaben gespeichert.');
+    }
+
+    private static function validIban(string $iban): bool {
+        $iban = strtoupper((string)preg_replace('/\s+/', '', $iban));
+        if (!preg_match('/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/D', $iban)) return false;
+        $n = '';
+        foreach (str_split(substr($iban, 4) . substr($iban, 0, 4)) as $c) $n .= ctype_alpha($c) ? (string)(ord($c) - 55) : $c;
+        $rest = 0;
+        foreach (str_split($n, 7) as $part) $rest = (int)($rest . $part) % 97;
+        return $rest === 1;
     }
 
     private function serverSave(Request $r, string $admin): Response {
-        if ($r->field('aktion', 20) === 'anschrift') return $this->saveAddress($r, $admin);
         $short = strtolower(trim($r->field('kurzname', 60)));
         $suffix = $r->field('endung', 30);
         $names = '';
@@ -231,12 +294,20 @@ final class Web {
             if (!isset(self::SUFFIXES[$suffix])) throw new Problem('Bitte eine Endung wählen.', 422);
             $ips = $r->field('ohne_ip') === '1' ? [] : array_filter($this->config->hostnames, fn($n) => filter_var($n, FILTER_VALIDATE_IP));
             $names = implode("\n", array_merge([$short . $suffix], preg_split('/\R/', trim($r->field('weitere', 3000))) ?: [], $ips));
-            $this->srv()->save($names, $r->field('praxis', 200), $r->field('neue_ca') === '1');
+            $this->srv()->save($names, $this->config->practice, $r->field('neue_ca') === '1');   // Praxisname unverändert; er steht unter Praxis
         } catch (Problem $e) {
             if (in_array($e->http, [409, 422, 503], true)) return $this->serverPage($e->getMessage());
             throw $e;
         }
         $this->audit->write($admin, 'servername', strtolower(implode(' ', array_slice(preg_split('/[\s,;]+/', trim($names)) ?: [], 0, 10))));
+        $new = array_values(array_unique(array_filter(array_map(fn($n) => strtolower(trim($n)), preg_split('/[\s,;]+/', $names) ?: []))));
+        $old = array_map('strtolower', $this->config->hostnames);
+        sort($new);
+        sort($old);
+        if ($new !== $old || $r->field('neue_ca') === '1') {   // Name oder Adresse geändert: alles, was daran hängt, muss erneut erledigt werden (rot)
+            $this->ov()->nameChanged($r->field('neue_ca') === '1');
+            try { $this->ov()->refresh(); } catch (Problem) { /* Module werden beim nächsten Öffnen neu geprüft */ }
+        }
         return Response::redirect('/verwaltung/server');
     }
 
@@ -362,7 +433,19 @@ final class Web {
             ->with('X-Kienzle-Csrf', self::moduleCsrf($session['csrf'], $module))
             ->with('X-Kienzle-Bestaetigt', (string)(int)$session['confirmed_at'])
             ->with('X-Kienzle-Drucker', rawurlencode(json_encode($this->printerRoles() + ['bonbreite' => $this->bonWidth()], JSON_UNESCAPED_UNICODE)))
-            ->with('X-Kienzle-Praxis', rawurlencode(json_encode(['name' => $this->config->practice] + $this->address(), JSON_UNESCAPED_UNICODE)));
+            ->with('X-Kienzle-Menue', $this->moduleMenu((int)$session['user_id'], (int)$session['user_admin'] === 1, (string)$session['login']))
+            ->with('X-Kienzle-Praxis', rawurlencode(json_encode(['name' => $this->config->practice] + $this->address() + $this->master(), JSON_UNESCAPED_UNICODE)));
+    }
+
+    /** Schlankes Menü für die Seitenleiste in Modulseiten: nur Anwendungen des Benutzers (ohne Zähler, damit die Prüfung jeder Modul-Anfrage schnell bleibt). */
+    private function moduleMenu(int $uid, bool $admin, string $login): string {
+        $apps = $meta = [];
+        foreach ($this->users->access($uid) as $id => $_) {
+            if (($p = $this->modules->webPath($id)) === null) continue;
+            $apps[$p . '/'] = $this->modules->name($id);
+            $meta[$p . '/'] = $id;
+        }
+        return rawurlencode(json_encode(['apps' => $apps, 'ids' => $meta, 'admin' => $admin, 'login' => $login], JSON_UNESCAPED_UNICODE));
     }
 
     /** CSRF-Marke, die ein Modul in seine Formulare schreibt und mit X-Kienzle-Csrf vergleicht. */
@@ -385,6 +468,7 @@ final class Web {
             . '<button>Anmelden</button></form>'
             . ($this->passkeys ? '<div class="box" data-passkey-login data-next="' . V::h($weiter) . '"><p>Oder ohne Passwort:</p>'
                 . '<button type="button">Mit Passkey anmelden</button><p class="error" hidden></p></div>' : '')
+            . ($this->mailReady() ? '<p class="muted"><a href="/passwort-vergessen">Passwort vergessen?</a> Ein Link zum Neusetzen kommt per E-Mail, wenn im Konto eine Adresse bestätigt ist.</p>' : '')
             . '<p class="muted">Warnt der Browser („Nicht sicher“) oder lässt sich die Adresse nicht öffnen? Dieser PC muss einmal eingerichtet werden (Zertifikat und Name): '
             . '<a href="/hilfe/arbeitsplatz">Arbeitsplatz einrichten</a>.</p>';
         return Response::html(V::page('Anmelden', $body, null, $this->config->practice), $error ? 401 : 200);
@@ -430,10 +514,32 @@ final class Web {
         return Response::html(V::page('Uhrzeit', $body, null, $this->config->practice))->with('Refresh', '4; url=' . $back);
     }
 
-    private function codePage(?string $error = null, ?\Throwable $e = null): Response {
-        $body = V::error($error) . $this->clockOffer($e) . '<form method="post" action="/anmelden/code" class="box">'
-            . V::input('code', 'Code aus der Authenticator-App (oder Wiederherstellungscode)', 'text', '', 'autocomplete="one-time-code" inputmode="text" required autofocus')
+    /** Handynummer für den SMS-Ersatzcode (nur Admins; leer = keine). */
+    private function phoneOf(int $uid): string { return (string)$this->db->setting('telefon.' . $uid); }
+
+    private function smsReady(int $uid): bool {
+        try { return $this->phoneOf($uid) !== '' && $this->con()->status()['sms'] !== null; } catch (Problem) { return false; }
+    }
+
+    private function smsCodeSend(): Response {
+        $uid = (int)$this->session['user_id'];
+        try {
+            if (!$this->smsReady($uid)) throw new Problem('SMS-Codes sind nicht eingerichtet.', 409);
+            $code = $this->auth->smsCodeIssue($this->session);
+            $this->con()->sendSms($this->phoneOf($uid), 'Kienzle-Suite: Ihr Code lautet ' . $code . ' (10 Minuten gültig). Niemandem weitergeben.');
+        } catch (Problem $e) {
+            return $this->codePage($e->getMessage());
+        }
+        $this->audit->write((string)$this->session['login'], 'sms-code-gesendet');
+        return $this->codePage(null, null, 'Der Code wurde per SMS geschickt. Es kann einen Moment dauern.');
+    }
+
+    private function codePage(?string $error = null, ?\Throwable $e = null, ?string $notice = null): Response {
+        $uid = (int)($this->session['user_id'] ?? 0);
+        $body = V::error($error) . V::notice($notice) . $this->clockOffer($e) . '<form method="post" action="/anmelden/code" class="box">'
+            . V::input('code', 'Code aus der Authenticator-App (oder Wiederherstellungscode oder SMS-Code)', 'text', '', 'autocomplete="one-time-code" inputmode="text" required autofocus')
             . '<button>Weiter</button></form>'
+            . ($this->smsReady($uid) ? '<form method="post" action="/anmelden/code/sms"><button class="link">Code per SMS senden</button></form>' : '')
             . '<form method="post" action="/abmelden"><button class="link">Abbrechen</button></form>';
         return Response::html(V::page('Code eingeben', $body, null, $this->config->practice), $error ? 401 : 200);
     }
@@ -481,6 +587,8 @@ final class Web {
             if ($r->field('password') !== $r->field('password2')) throw new Problem('Die Passwörter stimmen nicht überein.', 422);
             $id = $this->db->transaction(function () use ($info, $r, $token): int {
                 $id = $info['user_id'] ?? $this->users->create($r->field('login', 64), $r->field('display', 80), true);
+                // Link aus „Passwort vergessen“ (Konto hat noch Passwort, App, Passkeys): wie beim Admin-Link alles zurücksetzen und alle Geräte abmelden
+                if ($info['user_id'] && $this->users->find($id)['password_hash'] !== '') $this->users->resetCredentials($id);
                 $this->users->setPassword($id, $r->field('password'));
                 $this->users->redeemSetup($token);
                 return $id;
@@ -534,17 +642,162 @@ final class Web {
     }
 
     // ---- Start und Konto ----------------------------------------------------------------------------------------
+    /** Dienste, die die Startseite für Serverwerte benutzt (für Tests austauschbar). */
+    public ?SystemStatus $system = null;
+
     private function start(): Response {
         $uid = (int)$this->session['user_id'];
         $items = '';
         foreach ($this->users->access($uid) as $module => $a) {
             $path = $this->modules->webPath($module);
-            if ($path !== null) $items .= '<li><a href="' . V::h($path) . '/">' . V::h($this->modules->name($module)) . '</a>' . ($a['admin'] ? ' <span class="tag">Admin</span>' : '') . '</li>';
+            if ($path !== null) $items .= '<li><a href="' . V::h($path) . '/">' . V::icon('modul:' . $module) . '<span>' . V::h($this->modules->name($module)) . '</span></a>' . ($a['admin'] ? ' <span class="tag">Admin</span>' : '') . '</li>';
         }
-        $body = '<p>Angemeldet als <strong>' . V::h($this->session['display'] ?: $this->session['login']) . '</strong>.</p>'
+        $body = '<h2>Ihre Module</h2><p>Angemeldet als <strong>' . V::h($this->session['display'] ?: $this->session['login']) . '</strong>.</p>'
             . ($items !== '' ? '<ul class="modules">' . $items . '</ul>' : '<p>Für dieses Konto sind noch keine Module freigegeben.'
                 . ((int)$this->session['user_admin'] === 1 ? ' Zugang zu Modulen vergeben Sie unter <a href="/verwaltung/benutzer">Benutzer</a>, auch für sich selbst.' : ' Bitte den Admin fragen.') . '</p>');
-        return Response::html(V::page('Start', $body, $this->nav(), $this->config->practice));
+        $pending = false;
+        $body = '<section class="card">' . $body . '</section>';
+        if ((int)$this->session['user_admin'] === 1) {
+            $server = '';
+            try {
+                [$tiles, $pending] = $this->statusTiles();
+                if ($tiles !== '') $server = '<section class="card"><h2>Server-Zustand</h2><div class="tiles">' . $tiles . '</div></section>';
+            } catch (\Throwable) { /* ohne Werte keine Karte */ }
+            $setup = '';
+            try {
+                $sum = $this->ov()->summary();
+                $pct = $sum['total'] ? (int)round(100 * $sum['done'] / $sum['total']) : 100;
+                $setup = '<a class="card setup-card" href="/verwaltung/einrichtung"><h2>' . V::heading('Einrichtung') . ' ' . ($sum['done'] >= $sum['total'] ? '<span class="tag ok">✓ fertig</span>' : '<span class="tag warn">' . ($sum['total'] - $sum['done']) . ' offen</span>') . '</h2>'
+                    . '<progress class="progress" value="' . $pct . '" max="100" aria-label="Fortschritt der Einrichtung">' . $pct . ' %</progress>'
+                    . '<p class="muted">' . $sum['done'] . ' von ' . $sum['total'] . ' nötigen Schritten erledigt.'
+                    . ($sum['next'] !== '' ? ' Als Nächstes: <strong>' . V::h($sum['next']) . '</strong>.' : '') . '</p></a>';
+            } catch (\Throwable) { /* ohne Überblick keine Karte */ }
+            $body = $setup . $server . $body;
+        }
+        $response = Response::html(V::page('Start', $body, $this->nav(), $this->config->practice));
+        // Wird gerade ein Guthaben abgefragt, nach kurzer Zeit neu laden, damit der neue Wert erscheint.
+        return $pending ? $response->with('Refresh', '3; url=/') : $response;
+    }
+
+    private function tile(string $icon, string $label, string $value, string $sub = '', string $level = 'ok', ?int $percent = null, string $extra = '', string $href = ''): string {
+        $val = '<strong class="t-val">' . V::h($value) . '</strong>';
+        return '<div class="tile ' . $level . '"><span class="t-ico">' . V::icon($icon) . '</span><div class="t-body"><span class="t-label">' . V::h($label) . '</span>'
+            . ($href !== '' ? '<a href="' . V::h($href) . '">' . $val . '</a>' : $val)
+            . ($sub !== '' ? '<small class="muted">' . V::h($sub) . '</small>' : '')
+            . ($percent !== null ? '<progress class="progress" value="' . $percent . '" max="100" aria-label="' . V::h($label) . '">' . $percent . ' %</progress>' : '') . '</div>' . $extra . '</div>';
+    }
+
+    /** Kacheln für den Server-Zustand und ob gerade eine Abfrage läuft. @return array{0:string,1:bool} */
+    private function statusTiles(): array {
+        $sys = ($this->system ?? new SystemStatus())->read();
+        $t = '';
+        if ($sys['disk']) {
+            $used = (int)round(100 * (1 - $sys['disk']['frei'] / $sys['disk']['gesamt']));
+            $t .= $this->tile('st:disk', 'Speicherplatz', SystemStatus::bytes($sys['disk']['frei']) . ' frei', 'von ' . SystemStatus::bytes($sys['disk']['gesamt']) . ' (' . $used . ' % belegt)', $used >= 95 ? 'bad' : ($used >= 85 ? 'warn' : 'ok'), $used);
+        }
+        if ($sys['ram']) {
+            $used = (int)round(100 * (1 - $sys['ram']['frei'] / $sys['ram']['gesamt']));
+            $t .= $this->tile('st:ram', 'Arbeitsspeicher', SystemStatus::bytes($sys['ram']['frei']) . ' frei', 'von ' . SystemStatus::bytes($sys['ram']['gesamt']) . ' (' . $used . ' % belegt)', $used >= 95 ? 'bad' : ($used >= 85 ? 'warn' : 'ok'), $used);
+        }
+        if ($sys['cpu']) {
+            $p = $sys['cpu']['prozent'];
+            $t .= $this->tile('st:cpu', 'Prozessor', $p . ' % ausgelastet', 'Last ' . number_format($sys['cpu']['last'], 2, ',', '') . ' bei ' . $sys['cpu']['kerne'] . ($sys['cpu']['kerne'] === 1 ? ' Kern' : ' Kernen') . ' (Minutenmittel)', $p >= 95 ? 'bad' : ($p >= 80 ? 'warn' : 'ok'), $p);
+        }
+        if ($sys['temp'] !== null) $t .= $this->tile('st:temp', 'Temperatur', number_format($sys['temp'], 0, ',', '') . ' °C', 'höchster Messwert', $sys['temp'] >= 85 ? 'bad' : ($sys['temp'] >= 75 ? 'warn' : 'ok'));
+        if ($sys['laufzeit'] !== null) $t .= $this->tile('st:zeit', 'Läuft seit', SystemStatus::dauer($sys['laufzeit']), 'seit dem letzten Neustart');
+        if ($this->backup) {
+            $b = $this->backup->status();
+            $l = $b['letzte_sicherung'];
+            if (!$b['eingerichtet']) $t .= $this->tile('st:backup', 'Letzte Sicherung', 'nicht eingerichtet', 'Ohne Sicherung gehen Daten bei einem Ausfall verloren.', 'warn', null, '', '/verwaltung/sicherung');
+            elseif (!$l) $t .= $this->tile('st:backup', 'Letzte Sicherung', 'noch keine', 'Die erste Sicherung steht noch aus.', 'warn', null, '', '/verwaltung/sicherung');
+            else {
+                $alt = time() - (int)($l['zeit'] ?? 0);
+                $ok = ($l['ok'] ?? false) === true;
+                $t .= $this->tile('st:backup', 'Letzte Sicherung', V::date((int)($l['zeit'] ?? 0)), $ok ? ($alt > 3 * 86400 ? 'Älter als drei Tage' : 'in Ordnung') : 'Fehlgeschlagen', !$ok ? 'bad' : ($alt > 3 * 86400 ? 'warn' : 'ok'), null, '', '/verwaltung/sicherung');
+            }
+        }
+        $pending = false;
+        if ($this->connections) {
+            $st = $this->connections->status();
+            $pending = (bool)$st['pending'];
+            foreach (['letterxpress' => ['st:post', 'Guthaben Letterxpress', 'Brief-Versand'], 'sms' => ['st:sms', 'Guthaben seven.io', 'SMS-Versand']] as $key => [$icon, $label, $sub]) {
+                if (empty($st[$key])) continue;
+                $g = $st['guthaben'][$key] ?? null;
+                $wert = is_array($g) && isset($g['wert']) && is_numeric($g['wert']) ? (float)$g['wert'] : null;
+                $knopf = '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'guthaben', 'id' => $key === 'sms' ? 'sms' : '', 'zurueck' => 'start'])
+                    . '<button class="icon-btn" title="Guthaben jetzt abfragen" aria-label="' . V::h($label) . ' aktualisieren"' . ($pending ? ' disabled' : '') . '>' . V::icon('st:aktualisieren') . '</button></form>';
+                $t .= $this->tile($icon, $label, $wert !== null ? number_format($wert, 2, ',', '.') . ' €' : ($g ? 'unbekannt' : 'noch nicht abgefragt'),
+                    $pending ? 'wird abgefragt …' : ($g ? $sub . ', abgefragt ' . V::date((int)($g['zeit'] ?? 0)) : $sub . ': mit dem Pfeil abfragen'),
+                    $wert !== null && $wert < 5 ? 'warn' : 'ok', null, $knopf);
+            }
+        }
+        return [$t, $pending];
+    }
+
+    /** Ist der E-Mail-Versand der Suite eingerichtet? Ohne ihn gibt es weder Bestätigung noch „Passwort vergessen“. */
+    private function mailReady(): bool {
+        try { return $this->connections !== null && $this->connections->status()['mail'] !== null; } catch (Problem) { return false; }
+    }
+
+    private function forgotPage(?string $notice = null, ?string $error = null): Response {
+        $body = V::error($error) . V::notice($notice)
+            . ($notice ? '' : '<form method="post" action="/passwort-vergessen" class="box">'
+                . '<p>Gib die E-Mail-Adresse ein, die du unter „Mein Konto“ bestätigt hast. Dorthin schicken wir einen Link, mit dem du ein neues Passwort festlegst. Der Link gilt 3 Tage und nur einmal.</p>'
+                . V::input('email', 'E-Mail-Adresse', 'email', '', 'autocomplete="email" maxlength="254" required autofocus') . '<button>Link schicken</button></form>')
+            . '<p><a href="/anmelden">Zurück zur Anmeldung</a></p>';
+        return Response::html(V::page('Passwort vergessen', $body, null, $this->config->practice), $error ? 429 : 200);
+    }
+
+    private function forgot(Request $r): Response {
+        try {
+            if (!$this->mailReady()) throw new Problem('Der E-Mail-Versand ist auf diesem Server nicht eingerichtet. Bitte einen Admin um einen Einrichtungslink bitten.', 503);
+            $this->auth->throttle->check('reset');
+            $this->auth->throttle->fail('reset', 5);   // jede Anfrage zählt: so lässt sich niemand mit Mails überfluten
+            $user = $this->users->byEmail($r->field('email', 254));
+            // Immer dieselbe Antwort, damit sich nicht erraten lässt, welche Adressen es gibt. Admin-Konten (App-Pflicht) nur über die Konsole.
+            if ($user && (int)$user['active'] === 1 && !$this->users->needsOtp($user)) {
+                $url = 'https://' . $this->config->hostnames[0] . '/einrichten?t=' . $this->users->setupToken((int)$user['id']);
+                $this->con()->sendMail($this->users->email((int)$user['id']), 'Kienzle-Suite: Passwort neu festlegen',
+                    "Hallo " . ($user['display'] ?: $user['login']) . ",\n\nüber diesen Link legst du ein neues Passwort fest (3 Tage gültig, nur einmal verwendbar):\n\n" . $url
+                    . "\n\nWar das nicht deine Anfrage, kannst du diese Nachricht ignorieren. Dein Passwort bleibt, solange du den Link nicht verwendest.\n");
+                $this->audit->write($user['login'], 'passwort-link-per-mail');
+            }
+        } catch (Problem $e) {
+            if ($e->http === 429 || $e->http === 503) return $this->forgotPage(null, $e->getMessage());
+            throw $e;
+        }
+        return $this->forgotPage('Wenn zu dieser Adresse ein Konto gehört, ist ein Link unterwegs. Bitte auch im Spam-Ordner nachsehen.');
+    }
+
+    private function saveEmail(Request $r): Response {
+        $uid = (int)$this->session['user_id'];
+        $user = $this->users->find($uid);
+        try {
+            if (!$this->auth->confirmedRecently($this->session)) return $this->needConfirm('/konto');
+            $address = trim($r->field('email', 254));
+            if ($address === '') {
+                $this->users->emailRemove($uid);
+                $notice = 'E-Mail-Adresse entfernt.';
+            } else {
+                if (!$this->mailReady()) throw new Problem('Der E-Mail-Versand ist nicht eingerichtet (Verwaltung → Verbindungen). Ohne ihn lässt sich die Adresse nicht bestätigen.', 409);
+                $code = $this->users->emailStart($uid, $address);
+                $this->con()->sendMail($address, 'Kienzle-Suite: E-Mail-Adresse bestätigen', "Hallo " . ($user['display'] ?: $user['login']) . ",\n\ndein Bestätigungscode für diese Adresse (1 Stunde gültig):\n\n" . $code
+                    . "\n\nGib ihn in der Kienzle-Suite unter „Mein Konto → E-Mail-Adresse“ ein. Du musst dazu angemeldet sein.\n\nWar das nicht deine Anfrage, kannst du diese Nachricht ignorieren.\n");
+                $notice = 'Bestätigungscode an ' . $address . ' geschickt. Gib ihn unten ein, dann gilt die Adresse.';
+            }
+        } catch (Problem $e) {
+            return $this->account($e->getMessage());
+        }
+        $this->audit->write($user['login'], 'email-geaendert');
+        return $this->account(null, $notice);
+    }
+
+    private function confirmEmail(Request $r): Response {
+        $uid = (int)$this->session['user_id'];
+        $address = $this->users->emailConfirm($uid, $r->field('code', 40));
+        if ($address === null) return $this->account('Der Code stimmt nicht oder ist abgelaufen (fünf Versuche, eine Stunde). Bitte die Adresse oben noch einmal eintragen, dann kommt ein neuer Code.');
+        $this->audit->write((string)$this->session['login'], 'email-bestaetigt');
+        return $this->account(null, 'E-Mail-Adresse ' . $address . ' bestätigt.');
     }
 
     private function account(?string $error = null, ?string $notice = null): Response {
@@ -562,23 +815,60 @@ final class Web {
                 . '<form method="post" action="/konto/passkey/entfernen">' . $csrf . '<input type="hidden" name="id" value="' . V::h($k['id']) . '"><button class="link">Entfernen</button></form></td></tr>';
         }
         $otp = $this->users->hasOtp($user);
-        $body = V::error($error) . V::notice($notice)
-            . '<section><h2>Passwort ändern</h2><form method="post" action="/konto/passwort" class="box">' . $csrf
+        $mail = $this->users->email($uid);
+        $pending = $this->users->emailPending($uid);
+        $roles = $this->users->roles($uid);
+        $chips = ((int)$user['admin'] === 1 ? '<span class="tag rollentag">' . V::role('Admin') . 'Basis-Admin</span>' : '')
+            . implode('', array_map(fn($n) => '<span class="tag rollentag">' . V::role($n) . V::h($n) . '</span>', $roles));
+        $profil = '<div class="profil">' . V::avatar($user['display'] ?: $user['login'], $roles, (int)$user['admin'] === 1)
+            . '<div><strong>' . V::h($user['display'] ?: $user['login']) . '</strong><div class="muted small">' . V::h($user['login']) . ($mail !== '' ? ' · ' . V::h($mail) : '') . '</div>'
+            . ($chips !== '' ? '<div class="rollen-zeile">' . $chips . '</div>' : '<div class="muted small">Keine Gruppe zugewiesen</div>') . '</div></div>';
+        $body = V::error($error) . V::notice($notice) . $profil
+            . '<h2>E-Mail-Adresse</h2><p>Mit einer bestätigten Adresse kannst du dir auf der Anmeldeseite selbst einen Link zum Neusetzen des Passworts schicken lassen'
+            . ($this->users->needsOtp($user) ? ' (für Admin-Konten mit Authenticator-App gilt das nicht: sie werden an der Server-Konsole zurückgesetzt)' : '') . '.'
+            . ($this->mailReady() ? '' : ' <strong>Der E-Mail-Versand ist noch nicht eingerichtet</strong> (Verwaltung → Verbindungen).') . '</p>'
+            . ($pending !== '' ? '<p class="notice">Wartet auf Bestätigung: ' . V::h($pending) . '. Den Code aus der E-Mail hier eingeben.</p><form method="post" action="/konto/email-code" class="box">' . $csrf
+                . V::input('code', 'Bestätigungscode (z. B. 1234-5678-9012-3456)', 'text', '', 'inputmode="numeric" autocomplete="one-time-code" maxlength="24" required placeholder="0000-0000-0000-0000"') . '<button>Code bestätigen</button></form>' : '')
+            . '<form method="post" action="/konto/email" class="box">' . $csrf . V::input('email', 'E-Mail-Adresse (leer lassen zum Entfernen)', 'email', $mail !== '' ? $mail : $pending, 'maxlength="254" autocomplete="email" placeholder="name@praxis.de"')
+            . '<button>Bestätigungscode schicken</button></form>'
+            . '<h2>Passwort ändern</h2><form method="post" action="/konto/passwort" class="box">' . $csrf
             . V::input('current', 'Bisheriges Passwort', 'password', '', 'autocomplete="current-password" required')
             . V::input('password', 'Neues Passwort', 'password', '', 'autocomplete="new-password" required')
             . V::input('password2', 'Neues Passwort wiederholen', 'password', '', 'autocomplete="new-password" required')
-            . '<button>Ändern</button></form></section>'
-            . '<section><h2>Authenticator-App</h2><p>' . ($otp ? 'Eingerichtet. Übrige Wiederherstellungscodes: ' . $this->users->recoveryLeft($uid) . '.' : 'Nicht eingerichtet' . ($this->users->needsOtp($user) ? ' (für Admins Pflicht).' : '.')) . '</p>'
+            . '<button>Ändern</button></form>'
+            . ($this->users->needsOtp($user) ? '<h2>Handynummer für SMS-Code (Ersatz)</h2><p>Hast du die Authenticator-App nicht dabei, kann ein Code per SMS geschickt werden. Das geht nur, wenn unter Verwaltung → Verbindungen SMS eingerichtet ist.</p>'
+                . '<form method="post" action="/konto/telefon" class="box">' . $csrf . V::input('telefon', 'Handynummer (leer lassen zum Entfernen)', 'tel', $this->phoneOf($uid), 'maxlength="30" placeholder="01701234567" autocomplete="tel"')
+                . '<button>Speichern</button></form>' : '')
+            . '<h2>Authenticator-App</h2><p>' . ($otp ? 'Eingerichtet. Übrige Wiederherstellungscodes: ' . $this->users->recoveryLeft($uid) . '.' : 'Nicht eingerichtet' . ($this->users->needsOtp($user) ? ' (für Admins Pflicht).' : '.')) . '</p>'
             . '<p><a class="button" href="/konto/otp">' . ($otp ? 'Neu einrichten' : 'Einrichten') . '</a></p>'
-            . ($otp ? '<form method="post" action="/konto/codes">' . $csrf . '<button>Neue Wiederherstellungscodes erzeugen</button></form>' : '') . '</section>'
-            . ($this->passkeys ? '<section><h2>Passkeys</h2><p>Anmelden ohne Passwort mit Fingerabdruck, Gesicht oder PIN des Geräts. Funktioniert nur unter der Adresse <code>'
+            . ($otp ? '<form method="post" action="/konto/codes">' . $csrf . '<button>Neue Wiederherstellungscodes erzeugen</button></form>' : '') . ''
+            . ($this->passkeys ? '<h2>Passkeys</h2><p>Anmelden ohne Passwort mit Fingerabdruck, Gesicht oder PIN des Geräts. Funktioniert nur unter der Adresse <code>'
                 . V::h($this->passkeys->origin()) . '</code>.' . ($this->users->needsOtp($user) ? ' Die Authenticator-App bleibt als Rückfall nötig.' : '') . '</p>'
                 . ($keys !== '' ? '<table><tr><th>Passkey</th><th>Zuletzt</th><th></th></tr>' . $keys . '</table>' : '<p>Noch kein Passkey.</p>')
                 . '<div class="box" data-passkey-register data-csrf="' . V::h($this->session['csrf']) . '">' . V::input('label', 'Bezeichnung', 'text', '', 'maxlength="60" placeholder="z. B. Laptop Empfang"')
-                . '<button type="button">Passkey hinzufügen</button><p class="error" hidden></p></div></section>' : '')
-            . '<section><h2>Gemerkte Geräte</h2>' . ($devices !== '' ? '<table><tr><th>Gerät</th><th>Zuletzt</th><th></th></tr>' . $devices . '</table>'
-                . '<form method="post" action="/konto/geraete">' . $csrf . '<input type="hidden" name="id" value="all"><button class="link">Alle abmelden</button></form>' : '<p>Keine.</p>') . '</section>';
+                . '<button type="button">Passkey hinzufügen</button><p class="error" hidden></p></div>' : '')
+            . '<h2>Gemerkte Geräte</h2>' . ($devices !== '' ? '<table><tr><th>Gerät</th><th>Zuletzt</th><th></th></tr>' . $devices . '</table>'
+                . '<form method="post" action="/konto/geraete">' . $csrf . '<input type="hidden" name="id" value="all"><button class="link">Alle abmelden</button></form>' : '<p>Keine.</p>') . '';
+        V::$status = ['E-Mail-Adresse' => [$mail !== '', 'bestätigt', $pending !== '' ? 'wartet auf Bestätigung' : 'nicht hinterlegt'], 'Authenticator-App' => [$otp, 'eingerichtet', 'nicht eingerichtet'], 'Passkeys' => [$keys !== '', 'eingerichtet', 'nicht eingerichtet'],
+            'Handynummer für SMS-Code (Ersatz)' => [$this->phoneOf($uid) !== '', 'hinterlegt', 'nicht hinterlegt'],
+            'Gemerkte Geräte' => [$devices !== '', 'vorhanden', 'keine']];
         return Response::html(V::page('Mein Konto', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+    }
+
+    private function savePhone(Request $r): Response {
+        $uid = (int)$this->session['user_id'];
+        $user = $this->users->find($uid);
+        try {
+            if (!$this->auth->confirmedRecently($this->session)) return $this->needConfirm('/konto');
+            if (!$this->users->needsOtp($user)) throw new Problem('Die SMS-Ersatzanmeldung gibt es nur für Admin-Konten.', 403);
+            $raw = trim($r->field('telefon', 40));
+            if ($raw === '') { $this->db->query('DELETE FROM settings WHERE key=?', ['telefon.' . $uid]); $notice = 'Handynummer entfernt.'; }
+            else { $this->db->store('telefon.' . $uid, Connections::phone($raw)); $notice = 'Handynummer gespeichert.'; }
+        } catch (Problem $e) {
+            return $this->account($e->getMessage());
+        }
+        $this->audit->write($user['login'], 'handynummer-geaendert');
+        return $this->account(null, $notice);
     }
 
     private function changePassword(Request $r): Response {
@@ -713,6 +1003,7 @@ final class Web {
             if (!$get && $action === '/link') return $this->userLink($id, $admin);
             if (!$get && $action === '/loeschen') return $this->userDelete($id, $admin);
         }
+        if ($r->path === '/verwaltung/sicherheit') return $this->securityPage();
         if ($r->path === '/verwaltung/zugang') return $get ? $this->accessPage() : $this->accessSave($r, $admin);
         if ($r->path === '/verwaltung/protokoll' && $get) return $this->protocol();
         if ($r->path === '/verwaltung/firewall') return $get ? $this->firewallPage() : $this->firewallApply($r, $admin);
@@ -721,6 +1012,8 @@ final class Web {
         if ($r->path === '/verwaltung/updates') return $get ? $this->updatesPage() : $this->updatesAction($r, $admin);
         if ($r->path === '/verwaltung/module') return $get ? $this->modulesPage() : $this->modulesAction($r, $admin);
         if ($r->path === '/verwaltung/verbindungen') return $get ? $this->connectionsPage() : $this->connectionsAction($r, $admin);
+        if ($r->path === '/verwaltung/neustart') return $get ? $this->restartPage() : $this->restartDo($r, $admin);
+        if ($r->path === '/verwaltung/praxis') return $get ? $this->practicePage() : $this->practiceSave($r, $admin);
         if ($r->path === '/verwaltung/server') return $get ? $this->serverPage() : $this->serverSave($r, $admin);
         if ($r->path === '/verwaltung/sso') return $get ? $this->ssoPage() : $this->ssoAction($r, $admin);
         if ($r->path === '/verwaltung/drucker') return $get ? $this->printersPage() : $this->printersAction($r, $admin);
@@ -747,11 +1040,16 @@ final class Web {
         foreach ($this->users->all() as $u) {
             $roles = $u['admin'] ? ['Basis-Admin'] : [];
             foreach ($u['access'] as $m => $a) $roles[] = $this->modules->name($m) . ($a['admin'] ? ' (Admin)' : '');
-            $rows .= '<tr><td><a href="/verwaltung/benutzer/' . $u['id'] . '">' . V::h($u['login']) . '</a></td><td>' . V::h($u['display']) . '</td><td>' . V::h(implode(', ', $roles) ?: '–')
+            $icons = ($u['admin'] ? V::role('Admin') : '') . implode('', array_map([V::class, 'role'], $u['roles']));
+            $rows .= '<tr><td>' . V::avatar($u['display'] ?: $u['login'], $u['roles'], (bool)$u['admin'], true) . ' <a href="/verwaltung/benutzer/' . $u['id'] . '">' . V::h($u['login']) . '</a></td><td>' . V::h($u['display']) . '</td><td>' . $icons . ' ' . V::h(implode(', ', $roles) ?: '–')
                 . '</td><td>' . ($u['active'] ? ($u['password'] ? ($u['otp'] ? 'Passwort + App' : 'Passwort') : 'Einrichtung offen') : 'gesperrt') . '</td></tr>';
         }
-        return Response::html(V::page('Benutzer', V::notice($notice) . '<p><a class="button" href="/verwaltung/benutzer/neu">Benutzer anlegen</a></p>'
-            . '<table><tr><th>Anmeldename</th><th>Name</th><th>Zugang</th><th>Anmeldung</th></tr>' . $rows . '</table>', $this->nav(), $this->config->practice));
+        $groups = self::stripCards(self::inner($this->groupsPage()));
+        return Response::html(V::page('Benutzer und Gruppen', V::notice($notice) . '<section class="card"><details class="fold" open><summary><h2>Benutzer</h2></summary>'
+            . '<p><a class="button" href="/verwaltung/benutzer/neu">Benutzer anlegen</a></p>'
+            . '<table><tr><th>Anmeldename</th><th>Name</th><th>Zugang</th><th>Anmeldung</th></tr>' . $rows . '</table></details>'
+            . '<details class="fold" id="gruppen"' . (str_contains((string)($this->req?->query['bereich'] ?? ''), 'gruppen') ? ' open' : '') . '><summary><h2>Gruppen</h2></summary>' . $groups . '</details></section>',
+            $this->nav(), $this->config->practice));
     }
 
     private function userNew(?string $error = null): Response {
@@ -780,12 +1078,33 @@ final class Web {
         if (!$user) throw new Problem('Benutzer nicht gefunden.', 404);
         $access = $this->users->access($id);
         $self = $id === (int)$this->session['user_id'];
+        $groups = (new Groups($this->db, $this->modules))->all();
+        $roles = $this->users->roles($id);
+        $chips = '';
+        foreach (array_keys($groups) as $name) $chips .= '<label class="rolle-chip">' . '<input type="checkbox" name="rolle[]" value="' . V::h($name) . '" data-rolle' . (in_array($name, $roles, true) ? ' checked' : '') . '> ' . V::role($name) . ' ' . V::h($name) . '</label>';
         $modules = '';
         foreach ($this->modules->all() as $mid => $m) {
             $a = $access[$mid] ?? ['admin' => false, 'rights' => []];
-            $rights = '';
-            foreach ($this->modules->rights($mid) as $right) $rights .= V::checkbox('recht[]', $mid . ':' . $right['id'], $right['label'], in_array($right['id'], $a['rights'], true));
-            $modules .= '<fieldset><legend>' . V::h($this->modules->name($mid)) . '</legend>' . V::checkbox('modul_admin[]', $mid, 'Admin dieses Moduls (braucht Authenticator-App)', $a['admin']) . $rights . '</fieldset>';
+            $head = '<th>Recht</th>';
+            foreach ($groups as $name => $_) $head .= '<th class="gcol" data-gcol="' . V::h($name) . '">' . V::role($name) . '<span class="gname">' . V::h($name) . '</span></th>';
+            $head .= '<th>Für ' . V::h($this->users->find($id)['login']) . '</th>';
+            $rows = [['@admin', 'Admin dieses Moduls (braucht Authenticator-App)', 'modul_admin[]', $mid, $a['admin']]];
+            foreach ($this->modules->rights($mid) as $right) $rows[] = [$right['id'], $right['label'], 'recht[]', $mid . ':' . $right['id'], in_array($right['id'], $a['rights'], true)];
+            $body = '';
+            foreach ($rows as [$rid, $label, $field, $value, $on]) {
+                $grants = [];
+                $cells = '';
+                foreach ($groups as $name => $g) {
+                    $has = $rid === '@admin' ? in_array($mid, $g['admin'], true) : in_array($mid . ':' . $rid, $g['rechte'], true);
+                    if ($has) $grants[] = $name;
+                    $cells .= '<td class="gcol' . ($has ? ' ja' : '') . '" data-gcol="' . V::h($name) . '">' . ($has ? '✓' : '') . '</td>';
+                }
+                $base = array_intersect($grants, $roles) !== [];
+                $abw = $on !== $base;
+                $body .= '<tr class="recht' . ($abw ? ' abw' : '') . '" data-grants="' . V::h(implode('|', $grants)) . '"><td>' . V::h($label) . '</td>' . $cells
+                    . '<td class="erg"><label class="check"><input type="checkbox" name="' . $field . '" value="' . V::h($value) . '"' . ($on ? ' checked' : '') . ' data-erg> <span class="stift" title="Einzeln geändert, weicht von der Rolle ab">' . V::icon('stift') . '</span></label></td></tr>';
+            }
+            $modules .= '<fieldset><legend>' . V::h($this->modules->name($mid)) . '</legend><table class="matrix"><tr>' . $head . '</tr>' . $body . '</table></fieldset>';
         }
         $url = 'https://' . $this->config->hostnames[0] . '/einrichten?t=';
         $body = V::error($error)
@@ -794,22 +1113,17 @@ final class Web {
             . '<form method="post" action="/verwaltung/benutzer/' . $id . '" class="box">' . V::csrf($this->session['csrf'])
             . '<p>Anmeldename: <strong>' . V::h($user['login']) . '</strong></p>'
             . V::input('display', 'Name', 'text', $user['display'])
-            . $this->groupSelect()
+            . '<h2>Rollen</h2><input type="hidden" name="rollen_gesendet" value="1"><div class="rollen">' . $chips . '</div>'
+            . '<p class="muted small">Die Rolle gilt dauerhaft: Ändert sich die <a href="/verwaltung/benutzer?bereich=gruppen">Gruppe</a>, ändern sich die Rechte aller Mitglieder mit. '
+            . '<span class="legende"><span class="punkt blau"></span> von der Rolle &nbsp; <span class="punkt gelb"></span> einzeln geändert</span></p>'
             . V::checkbox('admin', '1', 'Basis-Admin', (int)$user['admin'] === 1) . V::checkbox('active', '1', 'Konto aktiv', (int)$user['active'] === 1)
-            . ($modules !== '' ? '<h2>Zugang zu Modulen</h2>' . $modules : '<p>Es sind noch keine Module installiert.</p>')
+            . ($modules !== '' ? '<h2>Zugang zu Modulen</h2><p><button type="button" class="secondary" data-reset>Alle Einzeländerungen zurücknehmen (zurück auf Rolle)</button></p>' . $modules : '<p>Es sind noch keine Module installiert.</p>')
             . '<button>Speichern</button></form>'
             . (!$self && !$this->users->needsOtp($user) ? '<form method="post" action="/verwaltung/benutzer/' . $id . '/link" class="box">' . V::csrf($this->session['csrf'])
                 . '<p>Passwort vergessen? Ein neuer Einrichtungslink löscht das bisherige Passwort und meldet alle Geräte ab.</p><button>Neuen Einrichtungslink erzeugen</button></form>'
                 : (!$self ? '<p>Admin-Konten (Passwort oder Authenticator-App verloren) setzt man nur an der Server-Konsole zurück: <code>sudo kienzle-admin zuruecksetzen ' . V::h($user['login']) . '</code></p>' : ''))
             . (!$self ? '<form method="post" action="/verwaltung/benutzer/' . $id . '/loeschen" class="box">' . V::csrf($this->session['csrf']) . '<button class="danger">Benutzer löschen</button></form>' : '');
         return Response::html(V::page('Benutzer ' . $user['login'], $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
-    }
-
-    private function groupSelect(): string {
-        $opts = '<option value="">– nicht ändern, Haken unten gelten –</option>';
-        foreach (array_keys((new Groups($this->db, $this->modules))->all()) as $name) $opts .= '<option value="' . V::h($name) . '">' . V::h($name) . '</option>';
-        return '<label>Gruppe anwenden<select name="gruppe">' . $opts . '</select></label>'
-            . '<p class="muted small">Setzt beim Speichern die Modulrechte dieser Gruppe (<a href="/verwaltung/gruppen">Gruppen bearbeiten</a>). Danach lassen sich die Haken einzeln ändern.</p>';
     }
 
     private function groupBoxes(string $prefix, array $g): string {
@@ -825,11 +1139,11 @@ final class Web {
     private function groupsPage(?string $error = null, ?string $notice = null): Response {
         $groups = new Groups($this->db, $this->modules);
         $body = V::error($error) . V::notice($notice)
-            . '<p>Gruppen sind Vorlagen für Modulrechte. Beim Bearbeiten eines Benutzers wählt man eine Gruppe, die Rechte werden dann übernommen. '
-            . 'Spätere Änderungen an einer Gruppe ändern bestehende Benutzer nicht. Basis-Admins dürfen in allen Modulen ohnehin alles.</p>';
+            . '<p>Gruppen sind dauerhafte Rollen: Wer einer Gruppe angehört, hat ihre Rechte, und jede Änderung hier gilt sofort für alle Mitglieder. '
+            . 'Beim Benutzer lassen sich einzelne Rechte abweichend erlauben oder entziehen. Basis-Admins dürfen in allen Modulen ohnehin alles.</p>';
         foreach ($groups->all() as $name => $g) {
             $body .= '<form method="post" action="/verwaltung/gruppen" class="box">' . V::csrf($this->session['csrf']) . '<input type="hidden" name="aktion" value="speichern"><input type="hidden" name="name" value="' . V::h($name) . '">'
-                . '<h2>' . V::h($name) . '</h2>' . $this->groupBoxes($name, $g) . '<button>Speichern</button></form>'
+                . '<h2>' . V::role($name) . ' ' . V::h($name) . '</h2><p class="muted small">Mitglieder: ' . V::h(implode(', ', $this->users->members($name)) ?: 'keine') . '</p>' . $this->groupBoxes($name, $g) . '<button>Speichern</button></form>'
                 . '<form method="post" action="/verwaltung/gruppen" class="inline">' . V::csrf($this->session['csrf']) . '<input type="hidden" name="aktion" value="zuruecksetzen"><input type="hidden" name="name" value="' . V::h($name) . '">'
                 . '<button class="danger">' . (isset($groups->defaults()[$name]) ? 'Auf Vorgabe zurücksetzen' : 'Gruppe löschen') . '</button></form>';
         }
@@ -854,7 +1168,7 @@ final class Web {
         } catch (Problem $e) {
             return $this->groupsPage($e->getMessage());
         }
-        return $this->groupsPage(null, 'Gespeichert.');
+        return Response::redirect('/verwaltung/benutzer?bereich=gruppen');
     }
 
     private function userSave(Request $r, int $id, string $admin): Response {
@@ -863,9 +1177,11 @@ final class Web {
         $moduleAdmin = $r->list('modul_admin');
         $entries = $r->list('recht');
         $groupName = $r->field('gruppe', 30);
-        if ($groupName !== '') {
+        $roles = $r->field('rollen_gesendet') === '1' ? array_map('strval', $r->list('rolle')) : null;
+        if ($groupName !== '') {   // älterer Weg: eine Gruppe als alleinige Rolle, ohne Einzeländerungen
             $g = (new Groups($this->db, $this->modules))->get($groupName);
             if (!$g) return $this->userEdit($id, 'Unbekannte Gruppe.');
+            $roles = [$groupName];
             $moduleAdmin = $g['admin'];
             $entries = $g['rechte'];
         }
@@ -875,9 +1191,10 @@ final class Web {
             $rights[$m][] = $right;
         }
         try {
-            $this->db->transaction(function () use ($id, $r, $moduleAdmin, $rights): void {
+            $this->db->transaction(function () use ($id, $r, $moduleAdmin, $rights, $roles): void {
                 $self = $id === (int)$this->session['user_id'];
                 $this->users->update($id, $r->field('display', 80), $self || $r->field('admin') === '1', $self || $r->field('active') === '1');
+                if ($roles !== null) $this->users->setRoles($id, $roles);
                 foreach (array_keys($this->modules->all()) as $m) $this->users->setAccess($id, $m, in_array($m, $moduleAdmin, true), $rights[$m] ?? []);
                 foreach (array_diff(array_keys($rights), array_keys($this->modules->all())) as $unknown) throw new Problem('Unbekanntes Modul.', 422);
             });
@@ -913,23 +1230,71 @@ final class Web {
         return $this->userList('Gelöscht: ' . $user['login'] . '.');
     }
 
+    /** Zeitfeld mit Einheit: Wert + Minuten/Stunden/Tage (nur Einheiten ab $smallest). */
+    private function durationField(string $name, string $label, int $seconds, array $units): string {
+        $factor = ['min' => 60, 'h' => 3600, 'd' => 86400]; $names = ['min' => 'Minuten', 'h' => 'Stunden', 'd' => 'Tage'];
+        $unit = $units[0];
+        foreach (array_reverse($units) as $u) if ($seconds % $factor[$u] === 0) { $unit = $u; break; }
+        $options = '';
+        foreach ($units as $u) $options .= '<option value="' . $u . '"' . ($u === $unit ? ' selected' : '') . '>' . $names[$u] . '</option>';
+        return '<label>' . V::h($label) . '<span class="row"><input type="number" name="' . $name . '" min="1" value="' . intdiv($seconds, $factor[$unit]) . '" required>'
+            . '<select name="' . $name . '_einheit" aria-label="Einheit">' . $options . '</select></span></label>';
+    }
+
     private function accessPage(?string $error = null, ?string $notice = null): Response {
-        $body = V::error($error) . V::notice($notice) . '<form method="post" action="/verwaltung/zugang" class="box">' . V::csrf($this->session['csrf'])
-            . V::input('idle', 'Abmelden nach Minuten ohne Aktion (5 bis 263520)', 'number', (string)intdiv($this->auth->idleSeconds(), 60), 'min="5" max="263520" required')
-            . V::input('max', 'Höchstdauer einer Sitzung in Stunden (1 bis 4392)', 'number', (string)intdiv($this->auth->maxSeconds(), 3600), 'min="1" max="4392" required')
+        return Response::html(V::page('Zugang', $this->accessBody($error, $notice), $this->nav(), $this->config->practice), $error ? 422 : 200);
+    }
+
+    private function accessBody(?string $error = null, ?string $notice = null): string {
+        return V::error($error) . V::notice($notice) . '<form method="post" action="/verwaltung/zugang">' . V::csrf($this->session['csrf'])
+            . $this->durationField('idle', 'Abmelden nach … ohne Aktion (5 Minuten bis 1 Jahr)', $this->auth->idleSeconds(), ['min', 'h', 'd'])
+            . $this->durationField('max', 'Höchstdauer einer Sitzung (1 Stunde bis 1 Jahr)', $this->auth->maxSeconds(), ['h', 'd'])
             . '<p>Gemerkte Geräte bleiben bis zu 30 Tage ohne Nutzung und höchstens 6 Monate angemeldet, nur aus dem Netz der Anmeldung.</p><button>Speichern</button></form>';
-        return Response::html(V::page('Zugang', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+    }
+
+    private static function seconds(Request $r, string $name, int $default): int {
+        $factor = ['min' => 60, 'h' => 3600, 'd' => 86400];
+        $unit = $r->field($name . '_einheit', 5);
+        return max(0, (int)$r->field($name, 10)) * ($factor[$unit] ?? $default);
     }
 
     private function accessSave(Request $r, string $admin): Response {
         try {
-            $this->auth->saveTimes((int)$r->field('idle', 10), (int)$r->field('max', 10));
+            $idle = self::seconds($r, 'idle', 60); $max = self::seconds($r, 'max', 3600);
+            if ($idle % 60 !== 0 || $max % 3600 !== 0) throw new Problem('Die Höchstdauer einer Sitzung gibt es nur in ganzen Stunden oder Tagen.', 422);
+            $this->auth->saveTimes(intdiv($idle, 60), intdiv($max, 3600));
         } catch (Problem $e) {
-            return $this->accessPage($e->getMessage());
+            return $this->securityPage($e->getMessage());
         }
         $this->audit->write($admin, 'zugang-gespeichert', 'abmeldezeiten');
-        return $this->accessPage(null, 'Gespeichert.');
+        return $this->securityPage(null, 'Gespeichert.');
     }
+
+    /** Inhalt einer fertigen Seite ohne Rahmen und Überschrift (für zusammengelegte Seiten). */
+    private static function inner(Response $page): string {
+        return preg_match('#</h1>(.*)</main>#s', $page->body, $m) ? $m[1] : '';
+    }
+
+    /** Sicherheit: Firewall, Zugang (Abmeldezeiten) und Protokoll als aufklappbare Abschnitte in einer Karte. */
+    private function securityPage(?string $error = null, ?string $notice = null): Response {
+        $log = $this->protocol();
+        try {
+            $fw = $this->firewallPage(); $fwState = (string)$this->fw()->overview($this->req->remote)['status']['state'];
+        } catch (Problem $e) {
+            $fw = Response::html('<main><h1>x</h1><p class="muted">' . V::h($e->getMessage()) . '</p></main>'); $fwState = 'off';
+        }
+        $open = fn(string $id) => str_contains((string)($this->req?->query['bereich'] ?? ''), $id) || $error !== null && $id === 'zugang' ? ' open' : '';
+        $body = V::error($error) . V::notice($notice) . '<section class="card">'
+            . '<details class="fold" id="firewall"' . ($open('firewall') ?: ($fwState === 'pending' ? ' open' : '')) . '><summary><h2>Firewall</h2></summary>' . self::stripCards(self::inner($fw)) . '</details>'
+            . '<details class="fold" id="zugang"' . $open('zugang') . '><summary><h2>Zugang (Abmeldezeiten)</h2></summary>' . $this->accessBody() . '</details>'
+            . '<details class="fold" id="protokoll"' . $open('protokoll') . '><summary><h2>Protokoll</h2></summary>' . self::stripCards(self::inner($log)) . '</details></section>';
+        V::$status = ['Firewall' => [$fwState === 'active', 'aktiv', $fwState === 'pending' ? 'wartet auf Bestätigung' : 'aus']];
+        $response = Response::html(V::page('Sicherheit', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+        if (($refresh = $fw->header('Refresh')) !== null) $response->with('Refresh', $refresh);
+        return $response;
+    }
+
+    private static function stripCards(string $html): string { return preg_replace('#</?section[^>]*>#', '', $html) ?? $html; }
 
     private function protocol(): Response {
         $lines = array_map(fn($l) => '<li><code>' . V::h($l) . '</code></li>', $this->audit->recent(200));
@@ -996,19 +1361,19 @@ final class Web {
             return $this->firewallPage($e->getMessage(), $again);
         }
         $this->audit->write($admin, 'firewall-geladen', implode(',', $config['cidrs']) . ($config['strict'] ? ' alles-zu' : ' nur-ports') . ($config['modules'] ? ' ' . implode(',', $config['modules']) : ''));
-        return Response::redirect('/verwaltung/firewall');
+        return Response::redirect('/verwaltung/sicherheit?bereich=firewall');
     }
 
     private function firewallConfirm(string $admin): Response {
         $this->fw()->confirm();
         $this->audit->write($admin, 'firewall-bestaetigt');
-        return Response::redirect('/verwaltung/firewall');
+        return Response::redirect('/verwaltung/sicherheit?bereich=firewall');
     }
 
     private function firewallOff(string $admin): Response {
         $this->fw()->disable();
         $this->audit->write($admin, 'firewall-ausgeschaltet');
-        return Response::redirect('/verwaltung/firewall');
+        return Response::redirect('/verwaltung/sicherheit?bereich=firewall');
     }
 
     // ---- Module -------------------------------------------------------------------------------------------------
@@ -1033,35 +1398,48 @@ final class Web {
         if (!$st['service']) $body .= '<p class="error">Die Modulverwaltung ist nicht eingerichtet. Bitte den Installer ausführen.</p>';
         $body .= '<p>Module erweitern die Suite um Programme wie die Kasse. Jedes Modul läuft unter einem eigenen Systembenutzer und sieht nur seine eigenen Daten. '
             . 'Nach dem Installieren unter <a href="/verwaltung/benutzer">Benutzer</a> festlegen, wer das Modul nutzen darf.</p>';
-        $body .= '<h2>Installiert</h2>';
-        if (!$st['installed']) $body .= '<p>Noch keine Module installiert.</p>';
+        $post = fn(string $aktion, string $label, string $hidden = '', string $class = '', string $extra = '') => '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . $hidden
+            . '<input type="hidden" name="aktion" value="' . $aktion . '">' . $extra . '<button' . ($class !== '' ? ' class="' . $class . '"' : '') . $off . '>' . $label . '</button></form>';
+        $tiles = '';
         foreach ($st['installed'] as $m) {
             $hidden = '<input type="hidden" name="id" value="' . V::h($m['id']) . '">';
-            $body .= '<div class="box wide"><h3>' . V::h($m['name']) . ' <span class="tag">' . V::h($m['version']) . '</span></h3>'
-                . ($m['description'] !== '' ? '<p>' . V::h($m['description']) . '</p>' : '')
-                . ($m['path'] ? '<p><a href="' . V::h($m['path']) . '/">Öffnen</a></p>' : '');
-            if ($m['update']) {
-                $body .= '<form method="post" action="/verwaltung/module">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="aktualisieren">'
-                    . '<p>Neue Version <strong>' . V::h($m['update']['version']) . '</strong>' . ($m['update']['source'] === 'github' ? ' (GitHub' . ($m['update']['signed'] === false ? ', nicht signiert' : '') . ')' : ' (mit der Basis geliefert)')
-                    . '. Vorher wird ein Schnappschuss der Moduldaten angelegt; schlägt etwas fehl, springt das Modul zurück.</p><button' . $off . '>Aktualisieren</button></form>';
+            $state = '';
+            $stopped = false;
+            if ($m['dienste']) {
+                $active = count(array_filter($m['dienste'], fn($d) => $d['aktiv'] === true));
+                $unknown = count(array_filter($m['dienste'], fn($d) => $d['aktiv'] === null)) > 0;
+                $all = $active === count($m['dienste']);
+                $stopped = !$all && !$unknown;
+                $state = $unknown ? '<span class="tag">Status unbekannt</span>' : ($all ? '<span class="tag ok">✓ läuft</span>' : '<span class="tag warn">' . ($active === 0 ? 'gestoppt' : 'teilweise gestoppt') . '</span>');
             }
-            else $body .= '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="pruefen"><p class="muted">Dieses Modul ist auf dem neuesten bekannten Stand. '
-                . '<button class="secondary"' . $off . '>Jetzt nach einem Update suchen</button></p></form>';
-            $body .= '<details class="how"><summary>Entfernen</summary><form method="post" action="/verwaltung/module">' . $csrf . $hidden
-                . '<input type="hidden" name="aktion" value="entfernen"><label class="check"><input type="checkbox" name="daten" value="1"> Auch alle Daten des Moduls löschen (nicht rückgängig zu machen)</label>'
-                . '<p>Ohne Häkchen bleiben die Daten erhalten; eine spätere Installation übernimmt sie.</p><button class="danger"' . $off . '>Modul entfernen</button></form></details></div>';
+            $more = '<details class="mod-more"><summary class="icon-btn" title="Mehr" aria-label="Mehr zu ' . V::h($m['name']) . '">' . V::icon('st:mehr') . '</summary><div class="mod-menu">'
+                . ($m['dienste'] ? '<small class="muted">Dienste: ' . V::h(implode(', ', array_map(fn($d) => preg_replace('/^kienzle-|\.service$/', '', $d['name']) . ($d['aktiv'] === true ? ' ✓' : ($d['aktiv'] === false ? ' ✗' : ' ?')), $m['dienste']))) . '</small>' : '')
+                . ($stopped ? $post('dienst-start', 'Starten', $hidden) : '')
+                . ($m['dienste'] ? $post('dienst-neustart', 'Neu starten', $hidden, 'secondary') : '')
+                . (!$m['update'] ? $post('pruefen', 'Nach Update suchen', '', 'secondary') : '')
+                . '<form method="post" action="/verwaltung/module" class="mod-remove">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="entfernen">'
+                . '<label class="check"><input type="checkbox" name="daten" value="1"> Auch alle Daten löschen (nicht rückgängig zu machen)</label>'
+                . '<small class="muted">Ohne Häkchen bleiben die Daten erhalten; eine spätere Installation übernimmt sie.</small><button class="danger"' . $off . '>' . V::icon('st:papierkorb') . ' Modul entfernen</button></form></div></details>';
+            $upd = $m['update'] ? '<span class="tag warn">Update ' . V::h($m['update']['version']) . '</span>' : '<span class="tag">aktuell</span>';
+            $tiles .= '<div class="mod-tile"><div class="mod-head"><span class="t-ico">' . V::icon('modul:' . $m['id']) . '</span>' . $state . '</div>'
+                . '<p class="mod-name">' . V::h($m['name']) . '</p><p class="muted mod-sub">Version ' . V::h($m['version']) . '</p>' . ($m['description'] !== '' ? '<p class="muted mod-desc">' . V::h($m['description']) . '</p>' : '')
+                . $upd
+                . ($m['update'] ? '<p class="muted mod-desc">Neue Version <strong>' . V::h($m['update']['version']) . '</strong>' . ($m['update']['source'] === 'github' ? ' (GitHub' . ($m['update']['signed'] === false ? ', nicht signiert' : '') . ')' : ' (mit der Basis geliefert)')
+                    . '. Vorher wird ein Schnappschuss der Moduldaten angelegt; schlägt etwas fehl, springt das Modul zurück.</p>'
+                    . '<form method="post" action="/verwaltung/module">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="aktualisieren"><button' . $off . '>Aktualisieren</button></form>' : '')
+                . '<div class="mod-foot">' . ($m['path'] ? '<a class="button secondary" href="' . V::h($m['path']) . '/">Öffnen</a>' : '') . $more . '</div></div>';
         }
-        $body .= '<h2>Verfügbar</h2>';
-        if (!$st['available']) $body .= '<p>Keine weiteren Module verfügbar.</p>';
         foreach ($st['available'] as $m) {
-            $body .= '<div class="box wide"><h3>' . V::h($m['name']) . ' <span class="tag">' . V::h($m['version']) . '</span>'
-                . ($m['signed'] === false ? ' <span class="tag warn">nicht signiert</span>' : '') . '</h3>'
-                . ($m['description'] !== '' ? '<p>' . V::h($m['description']) . '</p>' : '')
-                . '<p class="muted">' . ($m['source'] === 'github' ? 'Von GitHub' : 'Mit der Basis geliefert') . ($m['path'] ? ' · Adresse ' . V::h($m['path']) : '') . '</p>'
-                . '<form method="post" action="/verwaltung/module">' . $csrf . '<input type="hidden" name="aktion" value="installieren"><input type="hidden" name="id" value="' . V::h($m['id']) . '">'
-                . '<button' . $off . '>Installieren</button></form></div>';
+            $tiles .= '<div class="mod-tile available"><div class="mod-head"><span class="t-ico">' . V::icon('modul:' . $m['id']) . '</span><span class="tag">verfügbar</span></div>'
+                . '<p class="mod-name">' . V::h($m['name']) . '</p><p class="muted mod-sub">Version ' . V::h($m['version']) . ($m['signed'] === false ? ' <span class="tag warn">nicht signiert</span>' : '') . '</p>'
+                . ($m['description'] !== '' ? '<p class="muted mod-desc">' . V::h($m['description']) . '</p>' : '')
+                . '<p class="muted mod-desc">' . ($m['source'] === 'github' ? 'Von GitHub' : 'Mit der Basis geliefert') . ($m['path'] ? ' · Adresse ' . V::h($m['path']) : '') . '</p>'
+                . '<div class="mod-foot"><form method="post" action="/verwaltung/module">' . $csrf . '<input type="hidden" name="aktion" value="installieren"><input type="hidden" name="id" value="' . V::h($m['id']) . '">'
+                . '<button' . $off . '>' . V::icon('st:herunter') . ' Installieren</button></form></div></div>';
         }
-        $body .= '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="pruefen"><button class="secondary"' . $off . '>Nach Modulen sehen</button></form> '
+        $body .= '<h2>Module</h2>' . ($tiles !== '' ? '<div class="mod-grid">' . $tiles . '</div>' : '<p>Noch keine Module installiert, und es sind keine weiteren verfügbar.</p>');
+        $body .= '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="status"><button class="secondary"' . $off . '>Status der Dienste aktualisieren</button></form> '
+            . '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="pruefen"><button class="secondary"' . $off . '>Nach Modulen sehen</button></form> '
             . '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="automatisch"><input type="hidden" name="an" value="' . ($st['auto'] ? '0' : '1') . '">'
             . '<button class="secondary"' . $off . '>' . ($st['auto'] ? 'Automatische Updates ausschalten' : 'Automatische Updates einschalten') . '</button></form>'
             . '<p class="muted">' . ($st['auto'] ? 'Neue Modulversionen werden täglich nachts installiert, nicht während einer Zahlung.' : 'Modul-Updates nur von Hand.') . '</p>'
@@ -1077,6 +1455,8 @@ final class Web {
         try {
             switch ($r->field('aktion', 20)) {
                 case 'pruefen': $store->check(); break;
+                case 'status': $store->refreshStates(); break;
+                case 'dienst-start': case 'dienst-neustart': $restart = $r->field('aktion', 20) === 'dienst-neustart'; $store->startService($id, $restart); $this->audit->write($admin, $restart ? 'modul-dienst-neustart' : 'modul-dienst-start', $id); break;
                 case 'automatisch': $on = $r->field('an', 1) === '1'; $store->auto($on); $this->audit->write($admin, 'modul-automatisch', $on ? 'an' : 'aus'); break;
                 case 'installieren': $store->install($id); $this->db->store('erstadmin:' . $id, (string)(int)$this->session['user_id']); $this->audit->write($admin, 'modul-installieren', $id); break;
                 case 'aktualisieren': $store->update($id); $this->audit->write($admin, 'modul-aktualisieren', $id); break;
@@ -1104,22 +1484,30 @@ final class Web {
         $csrf = V::csrf($this->session['csrf']);
         $busy = in_array($st['state'], ['running', 'requested'], true);
         $labels = ['idle' => 'bereit', 'requested' => 'Auftrag wird übernommen …', 'running' => 'Aktualisierung läuft (' . $st['step'] . ') …', 'done' => 'fertig', 'failed' => 'nicht erfolgreich'];
-        $body = V::error($error) . V::notice($notice)
-            . '<p>Installiert: <strong>Basis ' . V::h($st['installed']) . '</strong>. Zustand: ' . V::h($labels[$st['state']] ?? $st['state'])
-            . ($st['message'] !== '' ? ' – ' . V::h($st['message']) : '') . '</p>'
-            . (!$st['service'] ? '<p class="error">Der Update-Dienst ist nicht eingerichtet. Bitte den Installer ausführen.</p>' : '')
-            . '<p>Zuletzt geprüft: ' . V::date($st['checked_at']) . ($st['error'] ? ' – <span class="error">' . V::h($st['error']) . '</span>' : '') . '</p>'
-            . '<form method="post" action="/verwaltung/updates" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="pruefen"><button' . ($busy ? ' disabled' : '') . '>Jetzt nach Updates sehen</button></form>';
+        $working = $busy ? '<div class="working" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><div><strong>Update läuft – bitte nicht erneut starten und nichts anderes anklicken.</strong>'
+            . '<p>' . V::h($st['state'] === 'requested' ? 'Der Auftrag wird übernommen …' : 'Aktueller Schritt: ' . $st['step']) . '. Die Seite lädt sich alle 5 Sekunden selbst neu und kann zwischendurch kurz nicht erreichbar sein. '
+            . 'Erst wenn hier „fertig“ steht, ist das Update ganz durchgelaufen.</p></div></div>' : '';
         $rows = '';
         foreach ($st['available'] as $a) {
-            $rows .= '<div class="box wide"><h2>Basis ' . V::h($a['version']) . ($a['prerelease'] ? ' <span class="tag">beta</span>' : '')
-                . (!$a['signed'] ? ' <span class="tag warn">nicht signiert</span>' : '') . '</h2>'
+            $rows .= '<div class="box wide"><h3>Basis ' . V::h($a['version']) . ($a['prerelease'] ? ' <span class="tag">beta</span>' : '')
+                . (!$a['signed'] ? ' <span class="tag warn">nicht signiert</span>' : '') . '</h3>'
                 . ($a['published'] !== '' ? '<p>Veröffentlicht: ' . V::h($a['published']) . '</p>' : '') . '<pre class="notes">' . V::h($a['notes']) . '</pre>'
                 . '<form method="post" action="/verwaltung/updates">' . $csrf . '<input type="hidden" name="aktion" value="installieren"><input type="hidden" name="version" value="' . V::h($a['version']) . '">'
                 . '<p>Vorher wird ein Schnappschuss der Daten angelegt. Schlägt etwas fehl, springt die Suite automatisch zurück. Die Seite ist einige Minuten nicht erreichbar.</p>'
                 . '<button' . ($busy ? ' disabled' : '') . '>Jetzt installieren</button></form></div>';
         }
-        $body .= '<h2>Verfügbar</h2>' . ($rows !== '' ? $rows : '<p>Keine neuere Version.</p>');
+        $failed = $st['state'] === 'failed' || $st['error'];
+        $kind = $failed ? 'err' : ($st['available'] ? 'new' : 'ok');
+        $head = $failed ? 'Nicht erfolgreich' : ($st['available'] ? 'Neue Version verfügbar: Basis ' . $st['available'][0]['version'] : 'Aktuell – keine neuere Version');
+        $body = $working . V::error($error) . V::notice($notice)
+            . '<div class="update-state ' . $kind . '"><span class="big" aria-hidden="true">' . ($failed ? '!' : ($st['available'] ? '↑' : '✓')) . '</span><div><strong>' . V::h($head) . '</strong>'
+            . '<span class="muted">Installiert: Basis ' . V::h($st['installed']) . ' · Zustand: ' . V::h($labels[$st['state']] ?? $st['state'])
+            . ($st['message'] !== '' ? ' (' . V::h($st['message']) . ')' : '') . ' · Zuletzt geprüft: ' . V::date($st['checked_at']) . '</span></div></div>'
+            . ($st['error'] ? '<p class="error">' . V::h($st['error']) . '</p>' : '')
+            . (!$st['service'] ? '<p class="error">Der Update-Dienst ist nicht eingerichtet. Bitte den Installer ausführen.</p>' : '')
+            . '<form method="post" action="/verwaltung/updates" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="pruefen"><button class="secondary"' . ($busy ? ' disabled' : '') . '>Jetzt nach Updates sehen</button></form>'
+            . $rows
+            . '<p class="muted">Module werden beim Update der Basis automatisch mit aktualisiert, sofern unter <a href="/verwaltung/module">Module</a> die automatische Aktualisierung eingeschaltet ist; das geschieht täglich nach der Prüfung. Ein gerade beschäftigtes Modul (z. B. bei laufender Zahlung) wird dabei übersprungen und am nächsten Tag erneut versucht.</p>';
         $body .= '<h2>Kanal</h2><form method="post" action="/verwaltung/updates" class="box">' . $csrf . '<input type="hidden" name="aktion" value="kanal">'
             . '<label class="check"><input type="radio" name="kanal" value="stabil"' . ($st['channel'] === 'stabil' ? ' checked' : '') . '> Stabil (empfohlen)</label>'
             . '<label class="check"><input type="radio" name="kanal" value="beta"' . ($st['channel'] === 'beta' ? ' checked' : '') . '> Beta (Vorabversionen zum Testen)</label>'
@@ -1169,6 +1557,13 @@ final class Web {
         return $this->connections;
     }
 
+    /** Letzter abgerufener Kontostand mit Zeit. */
+    private function balanceLine(?array $g): string {
+        if (!$g) return '<p class="muted">Guthaben noch nicht abgefragt.</p>';
+        $wert = isset($g['wert']) && is_numeric($g['wert']) ? number_format((float)$g['wert'], 2, ',', '.') . ' €' : 'unbekannt';
+        return '<p>' . V::symbol('coins') . ' Guthaben: <strong>' . V::h($wert) . '</strong> <span class="muted">(abgefragt ' . V::date((int)($g['zeit'] ?? 0)) . ')</span></p>';
+    }
+
     private function testLine(array $tests, string $key): string {
         $t = $tests[$key] ?? null;
         if (!is_array($t)) return '<p>Noch nicht geprüft.</p>';
@@ -1179,6 +1574,16 @@ final class Web {
         $out = V::csrf($this->session['csrf']) . '<input type="hidden" name="aktion" value="' . V::h($action) . '">';
         foreach ($extra as $k => $v) $out .= '<input type="hidden" name="' . V::h($k) . '" value="' . V::h($v) . '">';
         return $out;
+    }
+
+    /** Kleines „i“ mit Hilfetext (Tooltip bei Maus und Tastatur). */
+    private function tip(string $text): string {
+        return ' <span class="hilfe" tabindex="0" role="note" aria-label="' . V::h($text) . '" data-tip="' . V::h($text) . '">i</span>';
+    }
+
+    /** Eingabefeld mit Tooltip hinter der Beschriftung. */
+    private function tipInput(string $name, string $label, string $tip, string $type = 'text', string $value = '', string $extra = ''): string {
+        return '<label>' . V::h($label) . $this->tip($tip) . '<input type="' . $type . '" name="' . $name . '" value="' . V::h($value) . '" ' . $extra . '></label>';
     }
 
     private function connectionsPage(?string $error = null): Response {
@@ -1196,8 +1601,8 @@ final class Web {
         $body .= '<section><h2>T2med (FHIR)</h2><form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('t2med')
             . V::input('base_url', 'Adresse des FHIR-Servers', 'url', (string)($t2['base_url'] ?? ''), 'placeholder="https://t2med-server:16567/aps/fhir/api/r4"')
             . '<label>Erlaubte fhirBasisUrl aus T2med – weitere Adressen (eine je Zeile)<textarea name="launch_urls" rows="2">' . V::h(implode("\n", array_diff((array)($t2['launch_urls'] ?? []), [(string)($t2['base_url'] ?? '')]))) . '</textarea></label>'
-            . V::input('api_key', 'API-Schlüssel der FHIR-Schnittstelle', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($t2['api_key_gesetzt'] ?? false))) . '"')
-            . '<p class="muted small">Schlüssel der FHIR-Schnittstelle (wird als X-API-Key gesendet). Antwortet T2med mit „FHIR-API-Key fehlt oder ist ungültig“, passt der Wert nicht, z. B. wenn hier das Client Secret des Drittanbieters steht. Mit „Schlüssel entfernen“ nutzt die Kasse wie das alte Tool den hinterlegten T2med-Demo-Schlüssel.</p>'
+            . V::input('api_key', 'API-Schlüssel der FHIR-Schnittstelle', 'password', '', 'title="Beim T2med-Demo-Schlüssel hier nichts eintragen: Feld leer lassen und den gespeicherten Schlüssel entfernen. Ein eigener Schlüssel führt dort zu Fehler 403." autocomplete="new-password" placeholder="' . V::h($set((bool)($t2['api_key_gesetzt'] ?? false))) . '"')
+            . '<p class="muted small">Schlüssel der FHIR-Schnittstelle (wird als X-API-Key gesendet). Antwortet T2med mit „FHIR-API-Key fehlt oder ist ungültig“, passt der Wert nicht, z. B. wenn hier das Client Secret des Drittanbieters steht. Mit „Schlüssel entfernen“ nutzt die Kasse wie das alte Tool den hinterlegten T2med-Demo-Schlüssel. <strong>Beim Demo-Schlüssel darf hier kein eigener API-Schlüssel stehen</strong> (sonst Fehler 403): Feld leer lassen und den gespeicherten Schlüssel entfernen.</p>'
             . V::checkbox('api_key_entfernen', '1', 'Gespeicherten Schlüssel entfernen (Kasse nimmt den T2med-Demo-Schlüssel)', false)
             . '<label>Zertifikat des T2med-Servers (PEM, optional)' . (($t2['zertifikat'] ?? '') !== '' ? ' – gespeichert, SHA-256 <code>' . V::h(substr((string)$t2['zertifikat'], 0, 16)) . '…</code>' : '')
             . '<textarea name="ca_pem" rows="3" placeholder="-----BEGIN CERTIFICATE-----"></textarea></label>'
@@ -1218,7 +1623,15 @@ final class Web {
             . '</section>';
         // E-Mail
         $sec = (string)($mail['sicherheit'] ?? 'starttls');
-        $body .= '<section><h2>E-Mail-Versand (SMTP)</h2><form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('mail')
+        $gmail = ($mail['art'] ?? '') === 'gmail';
+        $pending = $this->con()->gmailPending();
+        $connected = $gmail && !empty($mail['verbunden']);
+        $reconnect = $connected && !$pending;
+        $lead = !$mail ? '' : ($gmail && !$connected ? '<p class="error">Gmail: ' . V::h((string)($mail['absender'] ?? '')) . ' – noch nicht angemeldet</p>'
+            : '<div class="status-ok">' . ($gmail ? 'Mit Google verbunden: ' . V::h((string)($mail['absender'] ?? '')) : 'SMTP-Server: ' . V::h((string)($mail['host'] ?? '')) . ' (' . V::h((string)($mail['absender'] ?? '')) . ')') . '</div>');
+        $body .= '<section><h2>E-Mail-Versand</h2>' . $lead
+            . '<details class="fold"' . (!$gmail ? ' open' : '') . '><summary><h3>SMTP-Server (eigener Mailserver, z. B. Praxis-Domain)' . ($mail && !$gmail ? ' <span class="tag ok">✓ eingerichtet</span>' : ' <span class="tag opt">nicht eingerichtet</span>') . '</h3></summary>'
+            . 'form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('mail')
             . V::input('host', 'SMTP-Server', 'text', (string)($mail['host'] ?? ''), 'placeholder="smtp.example.org"')
             . V::input('port', 'Port', 'number', (string)($mail['port'] ?? '587'), 'min="1" max="65535"')
             . '<label>Verschlüsselung<select name="sicherheit"><option value="starttls"' . ($sec === 'starttls' ? ' selected' : '') . '>STARTTLS (meist 587)</option>'
@@ -1226,10 +1639,60 @@ final class Web {
             . V::input('benutzer', 'Benutzername', 'text', (string)($mail['benutzer'] ?? ''), 'autocomplete="off"')
             . V::input('passwort', 'Passwort', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($mail['passwort_gesetzt'] ?? false))) . '"')
             . V::input('absender', 'Absender', 'email', (string)($mail['absender'] ?? ''), 'placeholder="praxis@example.org"')
+            . '<button>Speichern</button></form>' . '</details>'
+            . '<details class="fold"' . (($gmail && !$connected) || $pending ? ' open' : '') . '><summary><h3>Gmail-Konto (OAuth, ohne Passwort im Klartext)' . ($connected ? ' <span class="tag ok">✓ eingerichtet</span>' : ' <span class="tag opt">nicht eingerichtet</span>') . '</h3></summary>'
+            . ($reconnect ? '<details class="fold"><summary><h3>Erneut einrichten oder anderes Konto verbinden</h3></summary>' : '')
+            . '<p class="muted">Gilt für ein normales Gmail-Konto. Jede Praxis legt dafür einmalig einen eigenen Zugang bei Google an (kostenlos, ca. 10 Minuten). Gesendet wird nur über die Gmail-Schnittstelle mit der Berechtigung „E-Mails senden“; die Suite kann keine Postfächer lesen.</p>'
+            . '<ol class="muted"><li>Auf <strong>console.cloud.google.com</strong> mit dem Gmail-Konto anmelden und oben ein <strong>neues Projekt</strong> anlegen (Name z. B. „Kienzle-Suite“).</li>'
+            . '<li>Im Suchfeld oben „<strong>Gmail API</strong>“ suchen und <strong>Aktivieren</strong> klicken.</li>'
+            . '<li>Im Suchfeld „<strong>Google Auth Platform</strong>“ öffnen und <strong>Erste Schritte</strong> wählen: App-Name (z. B. „Kienzle-Suite“) und deine E-Mail-Adresse als Support-E-Mail eintragen, Zielgruppe <strong>Extern</strong>, Kontakt-E-Mail eintragen, Bedingungen bestätigen.</li>'
+            . '<li>Links <strong>Datenzugriff</strong> → „Bereiche hinzufügen oder entfernen“ → in „Bereiche manuell hinzufügen“ <code>https://www.googleapis.com/auth/gmail.send</code> eintragen, hinzufügen, <strong>Speichern</strong>.</li>'
+            . '<li>Für „In Produktion“ verlangt Google vorher unter <strong>Branding</strong>: gültigen App-Namen, Support-E-Mail sowie Adressen für <strong>Startseite der App</strong> und <strong>Datenschutzerklärung</strong> (zwei Webadressen, z. B. die Startseite und die Datenschutzseite der eigenen Praxis-Website). Die Domain dieser Adressen unter „Autorisierte Domains“ eintragen, dann <strong>Speichern</strong>. Die Adressen werden nur auf Googles Zustimmungsseite angezeigt, es muss keine Seite der Suite sein.</li>'
+            . '<li>Links <strong>Zielgruppe</strong> → <strong>App veröffentlichen</strong> („In Produktion“ statt „Test“). Im Teststatus läuft die Anmeldung nach 7 Tagen ab. Google verlangt für diesen Bereich eine Überprüfung der App, lässt eine nicht überprüfte App für wenige Nutzer aber zu: Bei der Anmeldung erscheint „Google hat diese App nicht überprüft“ – dort <strong>Erweitert</strong> → „Weiter zu … (unsicher)“ wählen.</li>'
+            . '<li>Links <strong>Clients</strong> → <strong>Client erstellen</strong> → Anwendungstyp <strong>Desktop-App</strong>, Namen vergeben, <strong>Erstellen</strong>. Client-ID und Client-Secret kopieren (das Secret wird nur direkt nach dem Erstellen angezeigt) und unten eintragen.</li></ol>'
+            . '<p class="muted">Die Bezeichnungen bei Google ändern sich gelegentlich; sinngemäß gesucht werden: Branding/App-Informationen, Zielgruppe, Datenzugriff, Clients. Stimmt etwas nicht mit deiner Ansicht überein, bitte melden.</p>'
+            . '<form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('gmail-start') . '<h4>Schritt 1: bei Google anmelden</h4>'
+            . $this->tipInput('client_id', 'Client-ID', 'Endet meist auf .apps.googleusercontent.com.', 'text', (string)($pending['client_id'] ?? $mail['client_id'] ?? ''), 'autocomplete="off" maxlength="200"')
+            . $this->tipInput('absender', 'Gmail-Adresse (Absender)', 'Das Konto, mit dem du dich bei Google anmeldest; von dort werden die E-Mails verschickt.', 'email', (string)($pending['absender'] ?? $mail['absender'] ?? ''), 'placeholder="praxis@gmail.com"')
+            . '<button>Weiter</button></form>'
+            . ($pending ? '<div class="box wide"><h4>Schritt 2: Code übernehmen</h4><p><a href="' . V::h($this->con()->gmailUrl($pending)) . '" target="_blank" rel="noopener">Hier bei Google anmelden und den Zugriff erlauben</a> (öffnet in neuem Tab). '
+                . 'Danach zeigt der Browser eine Fehlerseite („Seite nicht erreichbar“ unter <code>localhost</code>) – das ist richtig. Die <strong>ganze Adresse aus der Adresszeile</strong> (beginnt mit <code>http://localhost/?state=</code>) kopieren und hier einfügen:</p>'
+                . '<form method="post" action="/verwaltung/verbindungen">' . $this->hidden('gmail')
+                . '<label>Adresse aus der Adresszeile<input type="text" name="adresse" required maxlength="2000" autocomplete="off" placeholder="http://localhost/?state=…&amp;code=…"></label>'
+                . V::input('client_secret', 'Client-Secret', 'password', '', 'autocomplete="new-password" required maxlength="200"')
+                . '<button>Verbinden</button></form><p class="muted">Die Anmeldung ist 30 Minuten gültig.</p></div>' : '')
+            . ($reconnect ? '</details>' : '')
+            . '</details>'
+
+            . ($mail ? $this->testLine($st['tests'], 'mail') . '<div class="actions"><form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'mail']) . '<button>Anmeldung prüfen</button></form> '
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline grp">' . $this->hidden('testmail') . '<input type="email" name="an" placeholder="empfaenger@example.org" required maxlength="254" aria-label="Empfänger der Testnachricht"> <button>Testnachricht senden</button></form> '
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'mail']) . '<button class="danger">Entfernen</button></form></div>' : '')
+            . '</section>';
+        // SMS
+        $sms = $st['sms'] ?? [];
+        $body .= '<section><h2>SMS (seven.io)</h2><p class="muted">Für Einmalcodes als Ersatz bei der Admin-Anmeldung und später für Nachrichten der kienzlefon-App. Schlüssel unter seven.io → Entwickler → API-Schlüssel anlegen.</p>'
+            . '<form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('sms')
+            . $this->tipInput('api_key', 'API-Schlüssel von seven.io', 'Bei seven.io unter Entwickler → API-Schlüssel → „API-Key anlegen“: Label z. B. „Kienzle-Suite“, Umgebung Live (Sandbox verschickt nichts), Gültig bis Unbegrenzt, Zugriff auf Subaccounts aus. Berechtigungen nur „sms“ (Versand) und „balance“ (Schlüssel prüfen); alle anderen aus.', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($sms['schluessel_gesetzt'] ?? false))) . '"')
+            . $this->tipInput('absender', 'Absendername (optional, höchstens 11 Zeichen)', 'Erscheint beim Empfänger als Absender, z. B. „Praxis“. Nur Buchstaben und Ziffern, keine Leerzeichen; leer = Standard von seven.io.', 'text', (string)($sms['absender'] ?? ''), 'maxlength="16" placeholder="Praxis"')
             . '<button>Speichern</button></form>'
-            . ($mail ? $this->testLine($st['tests'], 'mail') . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'mail']) . '<button>Anmeldung prüfen</button></form> '
-                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('testmail') . '<input type="email" name="an" placeholder="empfaenger@example.org" required maxlength="254" aria-label="Empfänger der Testnachricht"> <button>Testnachricht senden</button></form> '
-                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'mail']) . '<button class="danger">Entfernen</button></form>' : '')
+            . ($sms ? $this->testLine($st['tests'], 'sms') . '<div class="actions"><form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'sms']) . '<button>Schlüssel prüfen</button></form> '
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline grp">' . $this->hidden('testsms') . '<input type="tel" name="an" placeholder="01701234567" required maxlength="30" aria-label="Handynummer der Test-SMS"> <button>Test-SMS senden</button></form> '
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'sms']) . '<button class="danger">Entfernen</button></form></div>' : '')
+            . '</section>';
+        // Letterxpress
+        $lxp = $st['letterxpress'] ?? [];
+        $body .= '<section><h2>Letterxpress (Briefversand)</h2><p class="muted">Rechnungen und Briefe per Post. Zugang unter letterxpress.de im Kundenkonto → API anlegen. Module, die Post versenden, nutzen diese Verbindung. Im Testbetrieb wird nichts gedruckt oder verschickt.</p>'
+            . '<form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('letterxpress')
+            . $this->tipInput('username', 'Letterxpress Benutzername', 'Benutzername des Letterxpress-Kundenkontos.', 'text', (string)($lxp['username'] ?? ''), 'autocomplete="off" maxlength="200"')
+            . $this->tipInput('api_key', 'Letterxpress API-Key', 'Im Letterxpress-Kundenbereich unter Mein Konto → Zugangsdaten → LXP API erzeugen. Er wird nach dem Speichern nie wieder angezeigt.', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($lxp['schluessel_gesetzt'] ?? false))) . '"')
+            . '<p>' . (($lxp['modus'] ?? 'test') === 'live' ? '<span class="tag ok">Live</span> Echter Postversand, kostenpflichtig.' : '<span class="tag warn">Testbetrieb</span> Nichts wird gedruckt oder verschickt.') . '</p>'
+            . '<label>Betrieb' . $this->tip('Im Testbetrieb landen Aufträge nur im Postausgang bei Letterxpress (nach 7 Tagen gelöscht) und können dort geprüft werden. Erst nach einem gelungenen Test auf Live stellen.') . '<select name="modus"><option value="test"' . (($lxp['modus'] ?? 'test') !== 'live' ? ' selected' : '') . '>Test (nur Postausgang bei Letterxpress, nichts wird gedruckt oder verschickt)</option>'
+            . '<option value="live"' . (($lxp['modus'] ?? '') === 'live' ? ' selected' : '') . '>Live (echter Postversand, kostenpflichtig)</option></select></label>'
+            . '<button>Speichern</button></form>'
+            . ($lxp ? $this->testLine($st['tests'], 'letterxpress') . $this->balanceLine($st['guthaben']['letterxpress'] ?? null)
+                . '<div class="actions"><form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'letterxpress']) . '<button>Zugang prüfen</button></form> '
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'guthaben']) . '<button class="secondary">' . V::symbol('coins') . ' Guthaben abfragen</button></form> '
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'letterxpress']) . '<button class="danger">Entfernen</button></form></div>' : '')
             . '</section>';
         // Netzwerkspeicher
         $body .= '<section><h2>Netzwerkspeicher</h2>';
@@ -1279,6 +1742,16 @@ final class Web {
         $rows = '';
         foreach ($st['nutzung'] as $u) $rows .= '<tr><td>' . V::h((string)$u['name']) . '</td><td>' . V::h((string)$u['verbindung']) . '</td><td>' . V::h((string)$u['zweck']) . '</td><td>' . (($u['pflicht'] ?? false) ? 'ja' : 'nein') . '</td></tr>';
         $body .= '<section><h2>Wer nutzt was</h2>' . ($rows !== '' ? '<table><tr><th>Modul</th><th>Verbindung</th><th>Wofür</th><th>Nötig</th></tr>' . $rows . '</table>' : '<p>Kein installiertes Modul nutzt eine zentrale Verbindung.</p>') . '</section>';
+        $body = preg_replace('#(<p>Zugänge, die mehrere Module brauchen.*?</p>)#s', '<section class="card">$1</section>', $body, 1);
+        // Jeder Abschnitt klappt zu; eingerichtete tragen ein grünes „✓ eingerichtet“, offene und fehlerhafte bleiben aufgeklappt.
+        $done = ['T2med (FHIR)' => trim((string)($t2['base_url'] ?? '')) !== '', 'E-Mail-Versand' => $mail !== null && $mail !== [],
+            'SMS (seven.io)' => !empty($st['sms']), 'Letterxpress (Briefversand)' => !empty($st['letterxpress']), 'Netzwerkspeicher' => !empty($st['ablage'])];
+        foreach ($done as $title => $ok) V::$status[$title] = [$ok, 'eingerichtet', 'nicht eingerichtet'];
+        $body = preg_replace_callback('#<section><h2>([^<]*)</h2>(.*?)</section>#s', function (array $m) use ($done): string {
+            $title = html_entity_decode($m[1], ENT_QUOTES, 'UTF-8');
+            $open = array_key_exists($title, $done) && !$done[$title] || str_contains($m[2], 'class="error"');
+            return '<section class="card"><details class="fold"' . ($open ? ' open' : '') . '><summary><h2>' . $m[1] . '</h2></summary>' . $m[2] . '</details></section>';
+        }, $body);
         $response = Response::html(V::page('Verbindungen', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
         return $st['pending'] ? $response->with('Refresh', '2') : $response;
     }
@@ -1295,13 +1768,18 @@ final class Web {
                 case 'mail':
                     $c->saveMail(['host' => $f('host'), 'port' => $f('port', 10), 'sicherheit' => $f('sicherheit', 20), 'benutzer' => $f('benutzer'), 'passwort' => $f('passwort'), 'absender' => $f('absender')]);
                     $what = 'mail'; break;
+                case 'sms': $c->saveSms(['api_key' => $f('api_key'), 'absender' => $f('absender', 20)]); $what = 'sms'; break;
+                case 'letterxpress': $c->saveLetterxpress(['username' => $f('username', 200), 'api_key' => $f('api_key', 200), 'modus' => $f('modus', 10)]); $what = 'letterxpress'; break;
+                case 'gmail-start': $c->gmailStart($f('client_id', 200), $f('absender', 254)); $what = 'gmail-start'; break;
+                case 'gmail': $c->saveGmail($f('client_secret', 200), $f('adresse', 2000)); $what = 'gmail'; break;
+                case 'testsms': $c->testSms($f('an', 40)); $what = 'testsms'; break;
                 case 'ziel':
                     $c->saveTarget(['id' => $f('id', 40), 'name' => $f('name', 80), 'art' => $f('art', 10), 'host' => $f('host'), 'freigabe' => $f('freigabe', 100), 'port' => $f('port', 10),
                         'ordner' => $f('ordner'), 'benutzer' => $f('benutzer', 100), 'passwort' => $f('passwort'), 'domaene' => $f('domaene', 100), 'gast' => $f('gast') === '1']);
                     $what = 'ziel ' . $f('id', 40); break;
                 case 'ziel-loeschen': $c->removeTarget($f('id', 40)); $what = 'ziel-entfernt ' . $f('id', 40); break;
-                case 'entfernen': $c->remove($f('was', 10)); $what = 'entfernt ' . $f('was', 10); break;
-                case 'pruefen': $c->test($f('art', 10), $f('id', 40)); $what = 'pruefen ' . $f('art', 10) . ' ' . $f('id', 40); break;
+                case 'entfernen': $c->remove($f('was', 20)); $what = 'entfernt ' . $f('was', 10); break;
+                case 'pruefen': $c->test($f('art', 20), $f('id', 40)); $what = 'pruefen ' . $f('art', 10) . ' ' . $f('id', 40); break;
                 case 'testmail': $c->testMail($f('an', 300)); $what = 'testmail'; break;
                 case 'zertifikat-holen': $c->fetchCertificate(); $what = 'zertifikat-holen'; break;
                 case 'zertifikat-uebernehmen': $c->acceptCertificate($f('fingerprint', 100)); $what = 'zertifikat-uebernommen'; break;
@@ -1313,7 +1791,41 @@ final class Web {
             return $this->connectionsPage($e->getMessage());
         }
         $this->audit->write($admin, 'verbindung', $what);
-        return Response::redirect('/verwaltung/verbindungen');
+        return Response::redirect($f('zurueck', 10) === 'start' ? '/' : '/verwaltung/verbindungen');
+    }
+
+    // ---- Neustart -----------------------------------------------------------------------------------------------
+    public static string $restartUnit = '/etc/systemd/system/kienzle-neustart.path';
+
+    private function restartPage(?string $error = null, ?string $notice = null): Response {
+        $art = $this->req->get('art', 10) === 'server' ? 'server' : 'dienste';
+        $text = $art === 'server'
+            ? 'Der ganze Server startet neu. Alle Arbeitsplätze verlieren kurz die Verbindung (Drucken, Kasse, Terminzettel); nach etwa ein bis zwei Minuten ist die Suite wieder da und du musst dich neu anmelden.'
+            : 'Webinterface und alle Module werden neu gestartet. Das dauert wenige Sekunden; laufende Anmeldungen bleiben bestehen, eine Seite lädt eventuell einmal neu.';
+        $body = V::error($error) . V::notice($notice) . '<section class="card"><h2>' . ($art === 'server' ? 'Server neu starten' : 'Dienste neu starten') . '</h2><p>' . V::h($text)
+            . '</p><p class="muted">Läuft gerade ein Update, eine Sicherung oder eine Zahlung an der Kasse, bitte erst warten.</p>'
+            . '<form method="post" action="/verwaltung/neustart">' . V::csrf($this->session['csrf']) . '<input type="hidden" name="art" value="' . $art . '">'
+            . '<button class="danger">' . ($art === 'server' ? 'Server jetzt neu starten' : 'Dienste jetzt neu starten') . '</button></form></section>';
+        return Response::html(V::page('Neu starten', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+    }
+
+    private function restartDo(Request $r, string $admin): Response {
+        $art = $r->field('art', 10);
+        try {
+            if (!in_array($art, ['dienste', 'server'], true)) throw new Problem('Unbekannte Art des Neustarts.', 422);
+            if (!is_file(self::$restartUnit)) throw new Problem('Der Neustart-Dienst ist nicht eingerichtet. Bitte den Installer ausführen.', 503);
+            $file = $this->db->directory . '/anfragen/neustart.json';
+            if (is_file($file)) throw new Problem('Ein Neustart wurde schon angefordert.', 409);
+            $dir = dirname($file);
+            if (!is_dir($dir) && !mkdir($dir, 0700) && !is_dir($dir)) throw new Problem('Anfrage konnte nicht gespeichert werden.', 500);
+            $tmp = $dir . '/.neustart.' . bin2hex(random_bytes(4));
+            if (file_put_contents($tmp, json_encode(['art' => $art], JSON_THROW_ON_ERROR)) === false || !rename($tmp, $file)) { @unlink($tmp); throw new Problem('Anfrage konnte nicht gespeichert werden.', 500); }
+        } catch (Problem $e) {
+            return $this->restartPage($e->getMessage());
+        }
+        $this->audit->write($admin, 'neustart', $art);
+        return Response::html(V::page('Neu starten', V::notice($art === 'server' ? 'Der Server startet neu. In ein bis zwei Minuten diese Seite neu laden.' : 'Die Dienste starten neu. Gleich diese Seite neu laden.')
+            . '<p><a class="button" href="/">Zur Startseite</a></p>', $this->nav(), $this->config->practice))->with('Refresh', $art === 'server' ? '90; url=/' : '8; url=/');
     }
 
     // ---- Drucker ------------------------------------------------------------------------------------------------
@@ -1432,8 +1944,12 @@ final class Web {
                 . "# Druckspooler neu starten und auf den laufenden Dienst warten; alten Drucker entfernen (behebt „Das Handle ist ungültig“)\n"
                 . "Restart-Service Spooler -Force\n(Get-Service Spooler).WaitForStatus('Running', '00:00:30')\nStart-Sleep 3\n"
                 . "Get-Printer -Name \"" . $name . "\" -ErrorAction SilentlyContinue | Remove-Printer\n"
-                . "Add-PrinterDriver -Name \"Microsoft IPP Class Driver\"\n\$url = \"" . $url . "\"\nAdd-PrinterPort -Name \$url -ErrorAction SilentlyContinue\n"
-                . "Add-Printer -Name \"" . $name . "\" -DriverName \"Microsoft IPP Class Driver\" -PortName \$url"
+                . "Add-PrinterDriver -Name \"Microsoft IPP Class Driver\"\n\$url = \"" . $url . "\"\n"
+                . "# Anschluss und Drucker anlegen, bis zu viermal (direkt nach dem Neustart des Spoolers ist der Anschluss manchmal noch nicht nutzbar)\n"
+                . "for (\$i = 1; \$i -le 4 -and -not (Get-Printer -Name \"" . $name . "\" -ErrorAction SilentlyContinue); \$i++) {\n"
+                . "  Add-PrinterPort -Name \$url -ErrorAction SilentlyContinue\n  Start-Sleep 3\n"
+                . "  Add-Printer -Name \"" . $name . "\" -DriverName \"Microsoft IPP Class Driver\" -PortName \$url -ErrorAction SilentlyContinue\n}\n"
+                . "Get-Printer -Name \"" . $name . "\" | Select-Object Name, DriverName, PortName"
                ;
             $mac = isset($ppd[$q['modul']]) ? ' <a href="' . V::h($ppd[$q['modul']]) . '" download>PDF-Beschreibungsdatei (PPD) herunterladen</a>' : '';
             $blocks .= '<h3>Drucker „' . V::h($name) . '“</h3><ol>'
@@ -1498,43 +2014,57 @@ final class Web {
         return $this->overview ?? new Overview($this->db, $this->users, $this->modules, $this->firewall, $this->updates, $this->connections, $this->backup, $this->config);
     }
 
-    private function overviewList(array $items): string {
+    private function overviewList(array $items, bool $places = false): string {
         $rows = '';
         foreach ($items as $i) {
-            $class = ['done' => 'done', 'open' => 'open', 'error' => 'error', 'info' => 'info'][$i['state']] ?? 'open';
+            $class = ($i['state'] !== 'done' && !empty($i['ignoriert']) ? 'ignored ' : '') . ['done' => 'done', 'open' => 'open', 'error' => 'error', 'info' => 'info'][$i['state']] ?? 'open';
             $icon = ['done' => '✓', 'error' => '!', 'info' => 'i'][$i['state']] ?? '○';
             $title = $i['link'] !== '' ? '<a href="' . V::h($i['link']) . '">' . V::h($i['title']) . '</a>' : V::h($i['title']);
             $manual = !empty($i['manuell']) ? '<form method="post" action="/verwaltung/einrichtung" class="inline">'
                 . $this->hidden('bestaetigen', ['punkt' => $i['manuell'], 'erledigt' => $i['state'] === 'done' ? '0' : '1'])
                 . '<button class="secondary">' . ($i['state'] === 'done' ? 'Zurücknehmen' : 'Erledigt') . '</button></form>' : '';
-            $rows .= '<li class="' . $class . '"><span class="mark-icon" aria-hidden="true">' . $icon . '</span><span class="text">' . $title
-                . ($i['hint'] !== '' ? '<small>' . V::h($i['hint']) . '</small>' : '') . '</span>' . $manual . '</li>';
+            $chips = ($places ? '<span class="tag">' . V::h(Overview::PLACES[$i['ort'] ?? 'web'][0] ?? '') . '</span>' : '') . (!empty($i['optional']) ? '<span class="tag opt">optional</span>' : '');
+            $skip = $i['state'] !== 'done' && empty($i['optional']) && isset($i['key']) ? '<form method="post" action="/verwaltung/einrichtung" class="inline">'
+                . $this->hidden('ignorieren', ['punkt' => $i['key'], 'an' => !empty($i['ignoriert']) ? '0' : '1'])
+                . '<button class="secondary small">' . (!empty($i['ignoriert']) ? 'Wieder beachten' : 'Ignorieren') . '</button></form>' : '';
+            $rows .= '<li class="' . $class . '"><span class="nr" aria-hidden="true"></span><span class="mark-icon" aria-hidden="true">' . $icon . '</span><span class="text">' . $title
+                . ($chips !== '' ? '<span class="chips">' . $chips . '</span>' : '') . ($i['hint'] !== '' ? '<small>' . V::h($i['hint']) . '</small>' : '') . '</span>' . $manual . $skip . '</li>';
         }
-        return '<ul class="checklist">' . $rows . '</ul>';
+        return '<ol class="checklist">' . $rows . '</ol>';
     }
 
     private function overviewPage(): Response {
         $o = $this->ov();
         $core = $o->core();
         $modules = $o->modules();
-        $all = array_merge($core, ...array_map(fn($m) => $m['items'], $modules));
-        $done = count(array_filter($all, fn($i) => $i['state'] === 'done'));
-        $pct = $all ? (int)round(100 * $done / count($all)) : 100;
-        $body = '<p class="lead">' . $done . ' von ' . count($all) . ' Schritten erledigt</p>'
+        $sum = $o->summary();
+        $pct = $sum['total'] ? (int)round(100 * $sum['done'] / $sum['total']) : 100;
+        $again = count(array_filter($core, fn($i) => $i['state'] === 'error' && str_starts_with($i['hint'], 'Erneut nötig')));
+        $body = '<p class="lead">' . $sum['done'] . ' von ' . $sum['total'] . ' nötigen Schritten erledigt <span class="muted">(optionale Punkte zählen nicht mit)</span></p>'
             . '<progress class="progress" value="' . $pct . '" max="100" aria-label="Fortschritt der Einrichtung">' . $pct . ' %</progress>'
-            . '<section class="card"><h2>Basis</h2><p class="muted">Diese Schritte sind nur einmal nötig, geordnet nach dem Ort, an dem sie erledigt werden. '
-            . 'Ein Klick auf einen Punkt öffnet die passende Seite.</p>';
-        foreach (Overview::PLACES as $place => [$label, $hint]) {
-            $items = array_values(array_filter($core, fn($i) => ($i['ort'] ?? 'web') === $place));
-            if ($items) $body .= '<h3 class="check-group">' . V::h($label) . ' <small>· ' . V::h($hint) . '</small></h3>' . $this->overviewList($items);
+            . ($again ? '<div class="notice warn"><p><strong>Der Servername wurde geändert.</strong> ' . $again . ' Punkt' . ($again === 1 ? '' : 'e') . ' unten stehen deshalb wieder rot und müssen erneut erledigt werden.</p></div>' : '')
+            . '<p class="legend"><span class="lg done">✓ erledigt</span><span class="lg open">○ offen</span><span class="lg error">! Fehler oder erneut nötig</span><span class="lg info">i optional</span>'
+            . ' · Orte: ' . implode(', ', array_map(fn($p) => '<strong>' . V::h($p[0]) . '</strong> (' . V::h($p[1]) . ')', Overview::PLACES)) . '</p>';
+        foreach (Overview::GROUPS as $gid => $glabel) {
+            $part = array_values(array_filter($core, fn($i) => ($i['gruppe'] ?? 'betrieb') === $gid));
+            if (!$part) continue;
+            $need = array_filter($part, fn($i) => Overview::needed($i));
+            $bad = array_filter($need, fn($i) => $i['state'] === 'error');
+            $tag = $bad ? '<span class="tag err">' . count($bad) . ' rot</span>' : ($need ? '<span class="tag warn">' . count($need) . ' offen</span>' : '<span class="tag ok">fertig</span>');
+            $body .= '<section class="card group"><h2>' . V::h($glabel) . ' ' . $tag . '</h2>' . $this->overviewList($part, true) . '</section>';
         }
-        $body .= '</section>';
         foreach ($modules as $m) {
-            $body .= '<section class="card"><h2>' . V::h($m['name']) . '</h2>' . ($m['fehler'] !== '' ? '<p class="error">Überblick nicht lesbar: ' . V::h($m['fehler']) . '</p>' : '')
-                . ($m['items'] ? $this->overviewList($m['items']) : '') . ($m['zeit'] ? '<p class="muted">Stand ' . V::date($m['zeit']) . '</p>' : '') . '</section>';
+            $need = array_filter($m['items'], fn($i) => Overview::needed($i));
+            $err = array_filter($need, fn($i) => $i['state'] === 'error');
+            $url = $this->modules->settingsUrl($m['id']);
+            $tag = $m['fehler'] !== '' ? '<span class="tag warn">nicht lesbar</span>' : ($need ? '<span class="tag warn">' . count($need) . ' offen' . ($err ? ', davon ' . count($err) . ' mit Fehler' : '') . '</span>' : '<span class="tag">fertig</span>');
+            $inner = '<h2>' . V::h($m['name']) . ' ' . $tag . '</h2><p class="muted">' . ($m['fehler'] !== '' ? 'Überblick nicht lesbar: ' . V::h($m['fehler']) . '. ' : '')
+                . ($need ? 'Die Einrichtung geschieht in den Einstellungen des Moduls: ' . V::h(implode(', ', array_map(fn($i) => $i['title'], array_slice(array_values($need), 0, 3)))) . (count($need) > 3 ? ' …' : '') . '.' : 'Alle nötigen Schritte sind erledigt.')
+                . ($m['zeit'] ? ' Stand ' . V::date($m['zeit']) . '.' : '') . '</p>';
+            $body .= $url !== null ? '<a class="card setup-card' . ($need ? ' needs' : '') . '" href="' . V::h($url) . '">' . $inner . '</a>' : '<section class="card">' . $inner . '</section>';
         }
         if ($modules) $body .= '<form method="post" action="/verwaltung/einrichtung">' . $this->hidden('neu') . '<button class="secondary">Module neu prüfen</button></form>';
-        return Response::html(V::page('Überblick', $body, $this->nav(), $this->config->practice));
+        return Response::html(V::page('Einrichtung', $body, $this->nav(), $this->config->practice));
     }
 
     private function overviewAction(Request $r, string $admin): Response {
@@ -1542,6 +2072,9 @@ final class Web {
         if ($a === 'bestaetigen') {
             $this->ov()->confirm($r->field('punkt', 20), $r->field('erledigt') === '1');
             $this->audit->write($admin, 'einrichtung-' . ($r->field('erledigt') === '1' ? 'erledigt' : 'zurueck'), $r->field('punkt', 20));
+        } elseif ($a === 'ignorieren') {
+            $this->ov()->ignore($r->field('punkt', 20), $r->field('an') === '1');
+            $this->audit->write($admin, 'einrichtung-' . ($r->field('an') === '1' ? 'ignoriert' : 'beachtet'), $r->field('punkt', 20));
         } elseif ($a === 'neu') {
             $this->ov()->refresh();
         } else {
@@ -1590,7 +2123,9 @@ final class Web {
                 . V::input('pfad', 'Ordner', 'text', '', 'placeholder="/media/sicherung"')
                 . '<button' . $dis . '>Sicherung einrichten</button></form>';
             $body .= $this->exportSection($st, $dis);
-            $response = Response::html(V::page('Sicherung', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+            V::$status = ['Schutz vor Erpressungstrojanern' => [!in_array('Schreibgeschützte Schnappschüsse am NAS sind nicht als eingerichtet bestätigt (Schutz vor Erpressungstrojanern).', $st['warnungen'], true), 'bestätigt', 'nicht bestätigt'],
+            'Schlüsselblatt' => [!$st['blatt'], 'gedruckt', 'noch nicht gedruckt'], 'Benachrichtigung bei Fehlern' => [!empty($st['mail_an']), 'eingerichtet', 'nicht eingerichtet']];
+        $response = Response::html(V::page('Sicherung', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
             return $busy ? $response->with('Refresh', '3') : $response;
         }
         if ($st['blatt']) {
@@ -1705,9 +2240,22 @@ final class Web {
     }
 
     // ---- Hilfen -------------------------------------------------------------------------------------------------
+    /** Seiten mit noch offenen Schritten; für Modul-Einstellungen zählt der Pfadanfang (z. B. /kasse). */
+    private function openPaths(): array {
+        try {
+            $paths = $this->ov()->openPaths();
+            foreach ($paths as $p) if (preg_match('#^(/[a-z0-9-]+)/#', $p, $m) && !str_starts_with($p, '/verwaltung') && !str_starts_with($p, '/hilfe')) {
+                foreach ($this->modules->all() as $id => $_) if (($u = $this->modules->settingsUrl($id)) !== null && str_starts_with($u, $m[1])) $paths[] = $u;
+            }
+            return array_values(array_unique($paths));
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
     private function openSteps(): int {
         try {
-            return count(array_filter($this->ov()->core(), fn($i) => in_array($i['state'], ['open', 'error'], true)));
+            return $this->ov()->open();
         } catch (\Throwable) {
             return 0;
         }
@@ -1727,15 +2275,19 @@ final class Web {
         if (($this->session['stage'] ?? '') !== 'full') return null;
         $this->claimFirstAdmin((int)$this->session['user_id']);
         $admin = (int)$this->session['user_admin'] === 1;
-        $apps = $settings = [];
+        $apps = $settings = $meta = [];
         foreach ($this->users->access((int)$this->session['user_id']) as $id => $a) {
             if (($p = $this->modules->webPath($id)) === null) continue;
             $apps[$p . '/'] = $this->modules->name($id);
-            if ($a['admin'] && ($s = $this->modules->settingsUrl($id)) !== null) $settings[$s] = $this->modules->name($id);
+            $s = $a['admin'] ? $this->modules->settingsUrl($id) : null;
+            if ($s !== null) $settings[$s] = $this->modules->name($id);
+            $meta[$p . '/'] = ['id' => $id, 'settings' => $s];
         }
-        return ['apps' => $apps, 'settings' => $settings, 'login' => $this->session['login'], 'admin' => $admin, 'csrf' => $this->session['csrf'],
+        $offen = $admin ? $this->openPaths() : [];
+        foreach ($meta as $k => $m) $meta[$k]['todo'] = $m['settings'] !== null && in_array($m['settings'], $offen, true);
+        return ['apps' => $apps, 'appmeta' => $meta, 'settings' => $settings, 'login' => $this->session['login'], 'admin' => $admin, 'csrf' => $this->session['csrf'],
             'updates' => $admin && $this->updates ? $this->updates->count() : 0, 'module' => $admin && $this->store ? $this->store->count() : 0, 'sicherung' => $admin && $this->backup ? $this->backup->count() : 0,
-            'pfad' => $this->req?->path ?? '', 'einrichtung' => $admin ? $this->openSteps() : 0];
+            'pfad' => $this->req?->path ?? '', 'einrichtung' => $admin ? $this->openSteps() : 0, 'offenLogo' => $admin && $this->openSteps() > 0, 'offen' => $admin ? $this->openPaths() : []];
     }
 
     private function issuer(): string { return $this->config->practice !== '' ? 'Kienzle-Suite ' . $this->config->practice : 'Kienzle-Suite'; }

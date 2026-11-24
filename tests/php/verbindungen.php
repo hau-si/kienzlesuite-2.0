@@ -4,29 +4,9 @@ declare(strict_types=1);
 require __DIR__ . '/lib.php';
 require __DIR__ . '/browser.php';
 require dirname(__DIR__, 2) . '/core/php/modul/Kienzle.php';
+require __DIR__ . '/verbindungen_hilfe.php';
 
 use Kienzle\Core\Connections;
-
-function con_env(array $status = []): array {
-    $env = new Env();
-    Connections::$state = $env->dir . '/verb'; mkdir(Connections::$state);
-    Connections::$unit = $env->dir . '/kienzle-verbindungen.path'; touch(Connections::$unit);
-    file_put_contents(Connections::$state . '/status.json', json_encode($status + [
-        't2med' => ['base_url' => 'https://t2med.example.org:16567/fhir', 'launch_urls' => ['https://t2med.example.org:16567/fhir'], 'pin' => false, 'api_key_gesetzt' => true, 'zertifikat' => ''],
-        'mail' => null, 'ablage' => [['id' => 'steuerbuero', 'name' => 'Steuer<b>büro', 'art' => 'smb', 'host' => 'nas.example.org', 'freigabe' => 'praxis', 'ordner' => 'Kienzle', 'passwort_gesetzt' => true]],
-        'tests' => ['t2med' => ['ok' => true, 'meldung' => 'FHIR-Server antwortet', 'zeit' => time()]],
-        'nutzung' => [['modul' => 'beispiel', 'name' => 'Beispielmodul', 'verbindung' => 't2med', 'zweck' => 'Patient lesen', 'pflicht' => true]],
-        'letzte' => ['ok' => false, 'meldung' => 'Fehler <script>', 'zeit' => time()], 'sftp_schluessel' => 'ssh-ed25519 AAAATEST ks-ablage']));
-    return [$env, new Connections($env->db)];
-}
-
-function req_v(Env $env): array {
-    $f = $env->dir . '/anfragen/verbindungen.json';
-    $r = json_decode((string)file_get_contents($f), true);
-    check(substr(sprintf('%o', fileperms($f)), -3) === '600', 'Anfrage mit Passwörtern nicht 0600');
-    unlink($f);
-    return $r;
-}
 
 function test_anfragen(): void {
     [$env, $c] = con_env();
@@ -62,6 +42,7 @@ function test_seite(): void {
     check($p->status === 200 && str_contains($p->body, 'value="https://t2med.example.org:16567/fhir"') && str_contains($p->body, 'gespeichert – leer lassen'), 'Seite unvollständig');
     check(!str_contains($p->body, '<script>') && !str_contains($p->body, 'Steuer<b>') && str_contains($p->body, 'Steuer&lt;b&gt;büro'), 'Inhalte nicht maskiert');
     check(str_contains($p->body, 'FHIR-Server antwortet') && str_contains($p->body, 'Patient lesen') && str_contains($p->body, 'ssh-ed25519 AAAATEST'), 'Prüfung, Nutzung oder SFTP-Schlüssel fehlen');
+    check(preg_match('#<details class="fold"><summary><h2><svg class="h-ico"[^>]*>.*?</svg>T2med \(FHIR\) <span class="tag ok">✓ eingerichtet</span></h2></summary>#s', $p->body) === 1 && str_contains($p->body, '<details class="fold"><summary><h2><svg class="h-ico"'), 'Verbindungen: Abschnitte nicht einklappbar, ohne Symbol oder ohne Status');
     $r = $b->post('/verwaltung/verbindungen', ['aktion' => 'ziel', 'id' => 'steuerbuero', 'name' => 'Steuerbüro', 'art' => 'smb', 'host' => 'nas.example.org', 'freigabe' => 'praxis',
         'ordner' => 'Kienzle', 'benutzer' => 'k', 'passwort' => '']);
     check($r->status === 303 && req_v($env)['daten']['passwort'] === '', 'Ziel speichern über die Seite');
@@ -109,6 +90,53 @@ function test_ablegen(): void {
     check(!glob("$dir/spool/.*.json"), 'halbfertiger Auftrag liegt herum');
     try { $k->ablegen('unbekannt', 'x', 'a.pdf'); throw new LogicException('unbekanntes Ziel angenommen'); } catch (RuntimeException) {}
     try { (new KienzleModul('zeit', ['X' => '1'], $dir, $dir))->ablegen('steuerbuero', 'x', 'a.pdf'); throw new LogicException('ohne Verbindung abgelegt'); } catch (RuntimeException) {}
+}
+
+function test_letterxpress(): void {
+    [$env, $c] = con_env(['letterxpress' => ['username' => 'praxis-test', 'modus' => 'live', 'schluessel_gesetzt' => true]]);
+    [$b] = admin_browser($env);
+    $b->web = fn() => $b->defaultWeb(null, null, $c);
+    $page = $b->get('/verwaltung/verbindungen')->body;
+    check(str_contains($page, 'Letterxpress (Briefversand)') && str_contains($page, 'value="praxis-test"') && str_contains($page, 'gespeichert – leer lassen') && str_contains($page, 'Zugang prüfen')
+        && str_contains($page, '<option value="live" selected>'), 'Letterxpress-Abschnitt unvollständig');
+    $r = $b->post('/verwaltung/verbindungen', ['aktion' => 'letterxpress', 'username' => ' praxis-test ', 'api_key' => ' lxp-1 ', 'modus' => 'live']);
+    check($r->status === 303 && req_v($env) === ['action' => 'letterxpress', 'daten' => ['username' => 'praxis-test', 'api_key' => 'lxp-1', 'modus' => 'live']], 'Speicher-Anfrage falsch');
+    check(str_contains($page, 'Guthaben noch nicht abgefragt') && str_contains($page, 'Guthaben abfragen') && str_contains($page, '<span class="tag ok">Live</span>'), 'Guthaben-Knopf oder Live-Schild fehlt');
+    $b->post('/verwaltung/verbindungen', ['aktion' => 'pruefen', 'art' => 'guthaben']);
+    check(req_v($env) === ['action' => 'pruefen', 'art' => 'guthaben', 'id' => ''], 'Guthaben-Anfrage falsch');
+    $b->post('/verwaltung/verbindungen', ['aktion' => 'pruefen', 'art' => 'letterxpress']);
+    check(req_v($env) === ['action' => 'pruefen', 'art' => 'letterxpress', 'id' => ''], 'Prüf-Anfrage falsch');
+    $b->post('/verwaltung/verbindungen', ['aktion' => 'entfernen', 'was' => 'letterxpress']);
+    check(req_v($env) === ['action' => 'letterxpress', 'loeschen' => true], 'Entfernen-Anfrage falsch');
+    [$env2, $c2] = con_env(['letterxpress' => ['username' => 'praxis-test', 'modus' => 'test', 'schluessel_gesetzt' => true], 'guthaben' => ['letterxpress' => ['wert' => 12.5, 'zeit' => time()]]]);
+    [$b2] = admin_browser($env2);
+    $b2->web = fn() => $b2->defaultWeb(null, null, $c2);
+    $page2 = $b2->get('/verwaltung/verbindungen')->body;
+    check(str_contains($page2, '<strong>12,50 €</strong>') && str_contains($page2, '(abgefragt ') && str_contains($page2, '<span class="tag warn">Testbetrieb</span>'), 'Guthaben mit Zeit oder gelbes Testbetrieb-Schild fehlt');
+}
+
+function test_gmail(): void {
+    [$env, $c] = con_env([]);
+    [$b] = admin_browser($env);
+    $b->web = fn() => $b->defaultWeb(null, null, $c);
+    $r = $b->post('/verwaltung/verbindungen', ['aktion' => 'gmail-start', 'client_id' => 'kurz', 'absender' => 'praxis@gmail.example']);
+    check($r->status === 422, 'Ungültige Client-ID angenommen');
+    $b->post('/verwaltung/verbindungen', ['aktion' => 'gmail-start', 'client_id' => '1234567890-abc.apps.googleusercontent.com', 'absender' => 'praxis@gmail.example']);
+    $page = $b->get('/verwaltung/verbindungen')->body;
+    check(preg_match('#href="(https://accounts\.google\.com/o/oauth2/v2/auth\?[^"]+)"#', $page, $m) === 1, 'Anmelde-Link fehlt');
+    $url = html_entity_decode($m[1]);
+    parse_str((string)parse_url($url, PHP_URL_QUERY), $q);
+    check($q['scope'] === 'https://www.googleapis.com/auth/gmail.send' && $q['redirect_uri'] === 'http://localhost' && $q['access_type'] === 'offline' && strlen($q['state']) === 32, 'Anmelde-Adresse falsch');
+    $r = $b->post('/verwaltung/verbindungen', ['aktion' => 'gmail', 'client_secret' => 'GOCSPX-geheim', 'adresse' => 'http://localhost/?state=falsch&code=4/abc']);
+    check($r->status === 422 && !file_exists($env->dir . '/anfragen/verbindungen.json'), 'Falscher Zustandswert angenommen');
+    $r = $b->post('/verwaltung/verbindungen', ['aktion' => 'gmail', 'client_secret' => 'GOCSPX-geheim', 'adresse' => 'http://localhost/?state=' . $q['state'] . '&code=4%2Fabc&scope=x']);
+    check($r->status === 303 && req_v($env) === ['action' => 'gmail', 'daten' => ['client_id' => '1234567890-abc.apps.googleusercontent.com', 'client_secret' => 'GOCSPX-geheim', 'absender' => 'praxis@gmail.example', 'code' => '4/abc']], 'Gmail-Anfrage falsch');
+    check(!str_contains($b->get('/verwaltung/verbindungen')->body, 'accounts.google.com'), 'Anmeldung nach Abschluss noch offen');
+    [$env2, $c2] = con_env(['mail' => ['art' => 'gmail', 'client_id' => '1234567890-abc.apps.googleusercontent.com', 'absender' => 'praxis@gmail.example', 'secret_gesetzt' => true, 'verbunden' => true]]);
+    [$b2] = admin_browser($env2);
+    $b2->web = fn() => $b2->defaultWeb(null, null, $c2);
+    $page2 = $b2->get('/verwaltung/verbindungen')->body;
+    check(str_contains($page2, 'status-ok">Mit Google verbunden: praxis@gmail.example') && str_contains($page2, 'Gmail-Konto (OAuth, ohne Passwort im Klartext) <span class="tag ok">✓ eingerichtet</span>') && str_contains($page2, 'Erneut einrichten oder anderes Konto verbinden') && !str_contains($page2, 'GOCSPX'), 'Gmail-Status falsch');
 }
 
 function test_testnachricht(): void {

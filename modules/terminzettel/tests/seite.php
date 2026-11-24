@@ -16,13 +16,17 @@ register_shutdown_function(fn() => array_map('unlink', glob("$dir/*") ?: []) && 
 // Vorgaben und Eingabeprüfung
 $defaults = Seite::werte();
 check($defaults['qr_size'] === 'medium' && $defaults['enabled'] === true && $defaults['heading'] === 'IHRE TERMINE', 'Vorgaben');
-$in = ['enabled' => '1', 'header_text' => "Praxis Beispiel\r\nMusterweg 1", 'header_first_size' => '2x2', 'header_first_bold' => 'yes', 'header_size' => '1x1',
+$in = ['enabled' => '1', 'logo_enabled' => '1', 'logo_size' => 'large', 'name_text' => 'Praxis Beispiel', 'name_size' => '2x2', 'name_bold' => '1',
+    'address_text' => "Musterweg 1\r\n12345 Beispielstadt", 'address_size' => '1x1',
     'heading' => 'TERMINE', 'heading_size' => '2x2', 'show_patient' => '1', 'appointment_size' => '1x2', 'footer_text' => '', 'footer_size' => '1x1',
     'qr_enabled' => '1', 'qr_position' => 'below', 'qr_size' => 'large', 'qr_summary' => 'Termin Praxis', 'cut' => ''];
 $v = Seite::pruefen($in);
-check($v['header_text'] === "Praxis Beispiel\nMusterweg 1" && $v['header_bold'] === false && $v['cut'] === false && $v['show_patient'] === true, 'Eingabe falsch übernommen');
+check($v['name_text'] === 'Praxis Beispiel' && $v['address_text'] === "Musterweg 1\n12345 Beispielstadt" && $v['address_bold'] === false && $v['name_bold'] === true && $v['cut'] === false && $v['show_patient'] === true, 'Eingabe falsch übernommen');
 wirft(fn() => Seite::pruefen(['heading' => "A\x1bB"] + $in), 'Steuerzeichen in der Überschrift');
-wirft(fn() => Seite::pruefen(['header_text' => str_repeat('a', 1001)] + $in), 'zu langer Text');
+wirft(fn() => Seite::pruefen(['address_text' => str_repeat('a', 1001)] + $in), 'zu langer Text');
+wirft(fn() => Seite::pruefen(['name_text' => str_repeat('a', 81)] + $in), 'zu langer Praxisname');
+wirft(fn() => Seite::pruefen(['name_size' => 'same'] + $in), 'alte Auswahl „same“ beim Praxisnamen');
+wirft(fn() => Seite::pruefen(['logo_size' => 'riesig'] + $in), 'ungültige Logobreite');
 wirft(fn() => Seite::pruefen(['qr_size' => 'riesig'] + $in), 'ungültige QR-Größe');
 
 // Layout für den Druckdienst: ohne Drucker, mit abgeschaltetem Endtext; Papierbreite kommt zentral aus der Basis
@@ -30,22 +34,63 @@ file_put_contents("$dir/basis.json", '{"bonbreite":80}');
 check(Seite::bonBreite() === 80 && Seite::modell() === 'tm-m30iii', 'Papierbreite aus basis.json');
 $o = Seite::overlay($v);
 check(!array_key_exists('queue', $o) && $o['model'] === 'tm-m30iii' && $o['cut'] === false, 'Overlay: Kopf');
-check($o['header']['enabled'] === true && $o['header']['first_size'] === '2x2' && $o['header']['first_bold'] === true && $o['footer']['enabled'] === false, 'Overlay: Kopf und Fuß');
+check($o['header']['enabled'] === true && $o['header']['text'] === "Praxis Beispiel\nMusterweg 1\n12345 Beispielstadt" && $o['header']['first_size'] === '2x2' && $o['header']['first_bold'] === true
+    && $o['header']['size'] === '1x1' && $o['header']['bold'] === false && $o['footer']['enabled'] === false, 'Overlay: Kopf und Fuß');
+check($o['logo'] === ['enabled' => false, 'width_dots' => 384], 'Overlay: Logo ohne Datei ist aus, Breite folgt der Auswahl');
+$nurAdresse = Seite::overlay(['name_text' => ''] + $v);
+check($nurAdresse['header']['text'] === "Musterweg 1\n12345 Beispielstadt" && !isset($nurAdresse['header']['first_size']), 'Overlay: ohne Praxisname keine Sonderzeile');
+$leer = Seite::overlay(['name_text' => '', 'address_text' => ''] + $v);
+check($leer['header']['enabled'] === false, 'Overlay: leerer Kopf ist aus');
 check($o['qr']['width_dots'] === 384 && $o['qr']['position'] === 'below' && $o['appointments']['size'] === '1x2', 'Overlay: QR');
 
-check($defaults['qr_position'] === 'below' && $defaults['header_first_size'] === '2x2' && $defaults['header_size'] === '1x1' && $defaults['appointment_size'] === '2x2', 'neue Vorgaben');
+check($defaults['qr_position'] === 'below' && $defaults['name_size'] === '2x2' && $defaults['name_bold'] === true && $defaults['address_size'] === '1x1' && $defaults['logo_enabled'] === true && $defaults['appointment_size'] === '2x2', 'neue Vorgaben');
 $html0 = Ansicht::seite('/terminzettel', $defaults, 'tok', 'Bon-1', null, null, 'server');
 check(str_contains($html0, 'data-tip="Dieser Text steht im Kalendereintrag'), 'Tooltip Kalender-Titel fehlt');
 
 // Kopf aus den Praxisdaten der Basis vorbelegt (erfundene Daten), gespeicherter Kopf hat Vorrang
 $praxis = ['name' => 'Praxis Beispiel', 'street' => 'Musterweg 1', 'city' => '12345 Beispielstadt', 'contact' => ''];
-check(Seite::werte($praxis)['header_text'] === "Praxis Beispiel\nMusterweg 1\n12345 Beispielstadt", 'Kopf nicht aus Praxisdaten vorbelegt');
-check(Seite::werte()['header_text'] === '', 'ohne Praxisdaten bleibt der Kopf leer');
+$vor = Seite::werte($praxis);
+check($vor['name_text'] === 'Praxis Beispiel' && $vor['address_text'] === "Musterweg 1\n12345 Beispielstadt", 'Name und Adresse nicht aus Praxisdaten vorbelegt');
+check(Seite::werte()['name_text'] === '' && Seite::werte()['address_text'] === '', 'ohne Praxisdaten bleibt der Kopf leer');
 
 // Speichern und Zurücklesen
 Seite::speichern($v);
 check(Seite::werte() === $v, 'Werte nicht zurückgelesen');
 check((fileperms("$dir/layout.json") & 0777) === 0600 && json_decode((string)file_get_contents("$dir/layout.json"), true) === $o, 'layout.json');
+// Älteres Format (ein Kopf-Textfeld) wird in Name und Adressblock zerlegt
+file_put_contents("$dir/werte.json", json_encode(['header_text' => "Praxis Alt\nAltweg 2\n01234 Altstadt", 'header_size' => '1x2', 'header_bold' => false, 'header_first_size' => 'same', 'header_first_bold' => 'yes', 'heading' => 'ALT']));
+$alt = Seite::werte($praxis);
+check($alt['name_text'] === 'Praxis Alt' && $alt['address_text'] === "Altweg 2\n01234 Altstadt" && $alt['address_size'] === '1x2' && $alt['name_size'] === '1x2'
+    && $alt['address_bold'] === false && $alt['name_bold'] === true && $alt['heading'] === 'ALT', 'Alter Kopf nicht aufgeteilt');
+file_put_contents("$dir/werte.json", json_encode(['header_text' => 'Nur Name', 'header_first_bold' => 'same', 'header_bold' => true]));
+$alt2 = Seite::werte();
+check($alt2['name_text'] === 'Nur Name' && $alt2['address_text'] === '' && $alt2['name_bold'] === true, 'Alter Kopf nur mit Name');
+Seite::speichern($v);
+
+// Logo: Upload prüfen, Umrechnung durch lib/logo.py (hier Ersatz), Ablage, Layout, Entfernen
+wirft(fn() => Seite::uploadBytes(null), 'Upload ohne Datei');
+wirft(fn() => Seite::uploadBytes(['error' => UPLOAD_ERR_INI_SIZE]), 'Upload zu groß (php.ini)');
+file_put_contents("$dir/up.bin", str_repeat('x', Seite::LOGO_MAX_BYTES + 1));
+wirft(fn() => Seite::uploadBytes(['error' => UPLOAD_ERR_OK, 'tmp_name' => "$dir/up.bin"], false), 'Upload über 2 MB');
+wirft(fn() => Seite::uploadBytes(['error' => UPLOAD_ERR_OK, 'tmp_name' => "$dir/up.bin"]), 'Datei, die kein echter Upload ist');
+file_put_contents("$dir/up.bin", 'BILD');
+check(Seite::uploadBytes(['error' => UPLOAD_ERR_OK, 'tmp_name' => "$dir/up.bin"], false) === 'BILD', 'Upload lesen');
+check(!Seite::logoVorhanden() && Seite::logoDaten() === '', 'Anfangs kein Logo');
+wirft(fn() => Seite::logoSpeichern('BILD', fn() => ['code' => 2, 'out' => '', 'stderr' => 'Das Logo muss ein PNG-, JPEG- oder GIF-Bild sein.']), 'Ungültiges Bild akzeptiert');
+check(!Seite::logoVorhanden(), 'Ungültiges Bild abgelegt');
+$png = "\x89PNG\r\n\x1a\nDATEN";
+$bekam = '';
+Seite::logoSpeichern('BILD', function (string $script, string $input) use ($png, &$bekam) { $bekam = $input; return ['code' => 0, 'out' => $png, 'stderr' => '']; });
+check($bekam === 'BILD' && Seite::logoVorhanden() && (fileperms("$dir/logo.png") & 0777) === 0600 && file_get_contents("$dir/logo.png") === $png, 'Logo nicht abgelegt');
+check(str_starts_with(Seite::logoDaten(), 'data:image/png;base64,'), 'Logo-Anzeige');
+$mitLogo = json_decode((string)file_get_contents("$dir/layout.json"), true);
+check($mitLogo['logo'] === ['enabled' => true, 'width_dots' => 384], 'layout.json nach Logo-Upload nicht neu geschrieben');
+$hLogo = Ansicht::seite('/terminzettel', Seite::werte(), 'tok', 'Bon-1', null, null, 'server');
+check(str_contains($hLogo, 'alt="Aktuelles Logo"') && str_contains($hLogo, 'value="logo-entfernen"') && str_contains($hLogo, 'enctype="multipart/form-data"') && str_contains($hLogo, 'form="logoform"'), 'Logo-Bereich der Ansicht');
+check(str_contains($hLogo, 'name="name_size" value="2x2" checked') && str_contains($hLogo, 'name="address_size" value="1x1" checked') && !str_contains($hLogo, '<select'), 'Auswahlleisten statt Aufklappliste');
+Seite::logoEntfernen();
+check(!Seite::logoVorhanden() && json_decode((string)file_get_contents("$dir/layout.json"), true)['logo']['enabled'] === false, 'Logo entfernen');
+
 file_put_contents("$dir/werte.json", '{"model":"boese","heading":5}');
 $k = Seite::werte();
 check(!array_key_exists('model', $k) && $k['heading'] === 'IHRE TERMINE', 'Ungültige gespeicherte Werte fallen auf Vorgaben');
@@ -76,5 +121,6 @@ wirft(fn() => Seite::testdruck(new KienzleModul('terminzettel', ['KIENZLE_DRUCKE
 
 // Ansicht: Eingaben werden maskiert, kein Inline-Skript
 $html = Ansicht::seite('/terminzettel', ['heading' => '<script>x</script>'] + Seite::werte(), 'tok', 'Bon-1', null, '<b>Fehler</b>', 'server');
-check(!str_contains($html, '<script>x') && !str_contains($html, '<b>Fehler') && str_contains($html, 'Bon-1') && substr_count($html, '<script') === 1 && str_contains($html, 'src="/terminzettel/assets/app.js"'), 'Ansicht maskiert nicht');
+check(!str_contains($html, '<script>x') && !str_contains($html, '<b>Fehler') && str_contains($html, 'Bon-1') && substr_count($html, '<script') === 1 && str_contains($html, 'src="/terminzettel/assets/app.js?v='), 'Ansicht maskiert nicht');
+check(preg_match('#assets/style\.css\?v=[0-9a-f]{8}"#', $html) === 1 && preg_match('#assets/app\.js\?v=[0-9a-f]{8}"#', $html) === 1, 'Skript und Stil ohne Versionsanhang: Zwischenspeicher zeigt nach einem Update alte Dateien');
 echo "OK: Terminzettel-Einstellungen, Layout, Ablage und Vorschau.\n";

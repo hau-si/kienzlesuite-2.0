@@ -33,6 +33,22 @@ try {
     } elseif ($action === 'manual') {
         $result = $app->manualStart($input);
         $result['url'] = str_replace('/#launch=', ks_url('#launch='), $result['url']);
+    } elseif ($action === 'manual_open') {
+        $result = $app->manualOpen();
+        $result['url'] = str_replace('/#launch=', ks_url('#launch='), $result['url']);
+    } elseif ($action === 'inbox_visit') {
+        if (!Suite::can('inbox') && !Suite::can('letter')) throw new Problem('Dafür fehlt das Recht „Rechnungseingang“.', 403);
+        $result = $app->inboxVisit(App::string($input, 'invoice_id', 32));
+        $result['url'] = str_replace('/#launch=', ks_url('kassieren#launch='), $result['url']);
+    } elseif ($action === 'day_stats') {
+        $result = $app->dayStats();
+    } elseif ($action === 'setup_count') {
+        // Rote Zahl am Zahnrad: noch nicht erledigte Punkte des Einrichtungs-Überblicks (nur für Benutzer mit Einstellungsrechten).
+        $items = array_diff(Suite::rights(), ['kassieren']) ? \KienzleSumup\Module::overview($app->config) : [];
+        $result = ['count' => count(array_filter($items, static fn($i) => ($i['state'] ?? '') === 'error' || (($i['state'] ?? '') === 'open' && empty($i['optional'])))),
+            'red' => count(array_filter($items, static fn($i) => ($i['state'] ?? '') === 'error'))];
+    } elseif ($action === 'open_inbox') {
+        $result = ['items' => (Suite::can('inbox') || Suite::can('letter')) ? $app->openInbox() : [], 'letter' => ['enabled' => $app->letterEnabled()]];
     } elseif ($action === 'exchange') {
         $result = $app->exchange(App::string($input, 'ticket', 64), $_COOKIE['ks_browser'] ?? null);
         setcookie('ks_browser', $result['cookie'], ['expires' => time() + $app->config->get('app', 'session_hours') * 3600,

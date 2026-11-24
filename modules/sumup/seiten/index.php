@@ -12,7 +12,7 @@ try { $demo = ks_app()->config->get('sumup', 'mode') === 'mock' && ks_app()->con
 header('Cache-Control: no-store');
 header('Referrer-Policy: no-referrer');
 header('X-Content-Type-Options: nosniff');
-header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
+header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'self'");
 $version = ks_h(trim((string)file_get_contents(dirname(__DIR__) . '/VERSION')));
 $csrf = ks_h(Suite::modul()->csrf());
 $base = ks_h(Suite::base() . '/');
@@ -24,7 +24,7 @@ $base = ks_h(Suite::base() . '/');
 <header class="top"><a class="brand" href="/"><span class="mark" aria-hidden="true">K</span><div><strong>Kasse</strong><span>Kienzle-Suite · T2med</span></div></a><span id="mode" class="badge" hidden>TESTMODUS</span></header>
 <section id="welcome" class="card"><h1>Kartenzahlung</h1><p>Bitte diese Seite aus der Patientenakte in T2med öffnen.</p><form id="manual-form" class="manual-form" autocomplete="off"><h2>Manuelle Kartenzahlung</h2><p class="muted small">Ohne Patientenakte: Betreff und Betrag werden an SumUp übergeben und die Zahlung startet am Kartenterminal. Keine Patientendaten eintragen.</p><label for="manual-label">Betreff</label><input id="manual-label" maxlength="80" required placeholder="z. B. Selbstzahler-Leistung"><label for="manual-amount">Betrag in Euro</label><input id="manual-amount" inputmode="decimal" maxlength="12" required placeholder="z. B. 25,00"><button class="primary wide" type="submit">Kartenzahlung starten</button></form><a class="button secondary wide settings-link" href="<?= $base ?>settings.php">⚙ Einstellungen der Kasse</a><button id="demo" class="secondary"<?= $demo ? '' : ' hidden' ?>>Testpatient öffnen (Testmodus)</button></section>
 <div id="workspace" hidden>
-<section class="patient"><span class="eyebrow">AKTUELLER PATIENT</span><h1 id="patient-name"></h1><p id="patient-birth"></p></section>
+<section class="patient"><span class="eyebrow">AKTUELLER PATIENT</span><h1 id="patient-name"></h1><p id="patient-birth"></p><div id="free-patient" class="free-patient" hidden><label for="free-name">Name für Beleg / Rechnung <span class="muted">optional</span></label><input id="free-name" maxlength="80" autocomplete="off" placeholder="z. B. Erika Mustermann"><label for="free-birth">Geburtsdatum <span class="muted">optional</span></label><input id="free-birth" type="date"></div></section>
 <section class="card" id="selection"><div id="print-box" class="print-box" hidden>
 <div class="print-row"><label class="check"><input type="checkbox" id="auto-print"> Rechnung nach der Zahlung drucken</label><button type="button" id="print-settings-toggle" class="text-button" aria-expanded="false">Druckeinstellungen</button></div>
 <p id="print-targets" class="muted small"></p>

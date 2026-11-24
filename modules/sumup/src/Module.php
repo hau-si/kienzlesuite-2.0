@@ -28,12 +28,12 @@ final class Module {
         $practice = trim((string)$config->get('practice', 'name', '')) !== '' && trim((string)$config->get('practice', 'street', '')) !== '';
         $items = [
             ['title' => 'Praxisname und Anschrift für Rechnungen', 'state' => $practice ? 'done' : 'open', 'hint' => 'Einstellungen → Praxis & Rechnungen', 'link' => $link('s-practice')],
-            ['title' => $config->get('sumup', 'mode') === 'live' ? 'SumUp live verbunden' : 'SumUp: noch Testmodus', 'state' => $config->get('sumup', 'mode') === 'live' ? 'done' : 'open',
-                'hint' => 'API-Key, Händlercode und Reader-ID eintragen, dann auf Live stellen', 'link' => $link('s-sumup')],
             ['title' => Suite::connected('t2med') ? 'T2med-Verbindung der Suite vorhanden' : 'T2med-Verbindung fehlt', 'state' => Suite::connected('t2med') ? 'done' : 'open',
                 'hint' => 'Verwaltung → Verbindungen der Suite (Adresse, API-Key, Zertifikat); der Link im Bereich „T2med-Anbindung“ führt direkt dorthin', 'link' => $link('s-fhir')],
             ['title' => $config->get('fhir', 'mode') === 'live' ? 'T2med-Anbindung live' : 'T2med-Anbindung noch im Testmodus', 'state' => $config->get('fhir', 'mode') === 'live' ? 'done' : 'open',
                 'hint' => 'Einstellungen → Zahlung & T2med', 'link' => $link('s-fhir')],
+            ['title' => $config->get('sumup', 'mode') === 'live' ? 'SumUp live verbunden' : 'SumUp: noch Testmodus', 'state' => $config->get('sumup', 'mode') === 'live' ? 'done' : 'open',
+                'hint' => 'API-Key, Händlercode und Reader-ID eintragen, dann auf Live stellen', 'link' => $link('s-sumup')],
         ];
         if ($config->get('invoice_inbox', 'enabled', false)) {
             $q = self::invoicePrinter($config)['queue'];
@@ -49,11 +49,15 @@ final class Module {
         if ($config->get('mail', 'enabled', false) && !Suite::connected('mail')) {
             $items[] = ['title' => 'E-Mail-Versand: Verbindung fehlt', 'state' => 'error', 'hint' => 'Verwaltung → Verbindungen der Suite', 'link' => $link('s-mail')];
         }
+        if ($config->get('letterxpress', 'enabled', false) && !Suite::connected('letterxpress')) {
+            $items[] = ['title' => 'Letterxpress: Verbindung fehlt', 'state' => 'error', 'hint' => 'Verwaltung → Verbindungen der Suite (Benutzername, API-Key)', 'link' => $link('s-letterxpress')];
+        }
         if ($config->get('invoice_export', 'enabled', false) && !isset(Suite::targets()[(string)$config->get('invoice_export', 'ziel', '')])) {
             $items[] = ['title' => 'Ablage: Ziel im Netzwerkspeicher fehlt', 'state' => 'error', 'hint' => 'Verwaltung → Verbindungen der Suite, dann hier wählen', 'link' => $link('s-invoice_export')];
         }
-        $items[] = ['title' => 'Starter auf den Kassen-PCs installieren', 'state' => self::clientsCurrent($config) ? 'done' : 'open',
-            'hint' => 'Einstellungen → Arbeitsplätze: Paket laden und auf jedem Kassen-PC einmal ausführen (nach einem neuen Serverzertifikat erneut)', 'link' => $link('s-clients')];
+        $stale = !self::clientsCurrent($config) && trim((string)@file_get_contents(rtrim((string)$config->get('app', 'state_dir'), '/') . '/starter-zertifikat')) !== '';
+        $items[] = ['title' => 'Starter auf den Kassen-PCs installieren', 'state' => self::clientsCurrent($config) ? 'done' : ($stale ? 'error' : 'open'),
+            'hint' => ($stale ? 'Erneut nötig: Serverzertifikat oder Servername hat sich geändert. ' : '') . 'Einstellungen → Arbeitsplätze: Paket laden und auf jedem Kassen-PC einmal ausführen (nach einem neuen Serverzertifikat erneut)', 'link' => $link('s-clients')];
         return $items;
     }
 

@@ -26,6 +26,7 @@ und für dieses Modul Admin ist oder mindestens ein Recht hat. Ein Basis-Admin h
 | `X-Kienzle-Rechte` | `KIENZLE_RECHTE` | Rechte aus `[[rights]]`, mit Komma getrennt; leer möglich |
 | `X-Kienzle-Csrf` | `KIENZLE_CSRF` | CSRF-Marke dieser Sitzung für dieses Modul (64 Hexzeichen) |
 | `X-Kienzle-Bestaetigt` | `KIENZLE_BESTAETIGT` | Unix-Zeit der letzten Bestätigung mit Passwort+OTP oder Passkey |
+| `X-Kienzle-Menue` | `KIENZLE_MENUE` | Menü der Seitenleiste (URL-kodiertes JSON: apps, ids, admin, login), nur Anwendungen mit Zugang, ohne Zähler und ohne Sitzungs-Marke; im PHP-Helfer `menue()` bzw. `rahmen()` |
 | `X-Kienzle-Drucker` | `KIENZLE_DRUCKER` | Zuordnung der Drucker aus Verwaltung → Drucker (URL-kodiertes JSON: buero, bon); im PHP-Helfer `druckerRollen()` |
 | `X-Kienzle-Praxis` | `KIENZLE_PRAXIS` | Praxisname und Anschrift (URL-kodiertes JSON: name, street, city, contact); im PHP-Helfer `praxis()` |
 | `X-Kienzle-Pfad` | `KIENZLE_PFAD` | Webpfad des Moduls, z. B. `/kasse` |
@@ -134,3 +135,13 @@ und entfernt sie mit dem Modul:
   bekommt ihren Pfad als erstes Argument und läuft als Modul-Benutzer. Arbeitsplätze sehen eine normale Warteschlange.
 - Ältere Art, `ppd` (+ `backend`): Backend 0755 und PPD 0644 aus dem Programmordner, Adresse `kienzle-<id>-<name>:/<name>`;
   ohne `backend` verwirft das Backend `kienzle-leer` der Basis die Ausgabe der Filter.
+
+
+## Seiten im Rahmen der Suite
+
+Ein PHP-Modul kann eine Seite in den Rahmen der Suite setzen (Seitenleiste, Kopf, Praxisname): Inhalt mit `ob_start()` sammeln und
+`echo $k->rahmen('Titel', $inhalt, ['roh' => true, 'kopf' => '<link …><script …>', 'body' => ' data-x="…"']);` ausgeben.
+`roh` lässt den Inhalt unverändert (sonst setzt die Basis Überschrift und Karten), `kopf` hängt Stylesheets und Skripte des Moduls an
+(Inhalt der Seite bekommt `<main class="modul">`). Das Menü kommt mit der ohnehin laufenden Anmelde-Prüfung (Kopfzeile `X-Kienzle-Menue`),
+es entsteht also keine zusätzliche Anfrage. Die Sitzungs-Marke der Basis erhält das Modul nicht: Abmelden führt deshalb über „Mein Konto“.
+Schlanke Seiten (z. B. die Kassieren-Ansicht in T2med) bleiben ohne Rahmen.

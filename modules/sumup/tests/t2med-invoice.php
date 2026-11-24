@@ -85,6 +85,10 @@ try {
     rejects(fn() => T2medInvoice::parse('', 100000), 'Leere Rechnung akzeptiert', 422);
     rejects(fn() => T2medInvoice::fromPdf('kein pdf', 100000), 'Nicht-PDF akzeptiert', 415);
 
+    // Anonymisierte Beispielrechnung (fixtures/t2med-beispielrechnung.pdf, Aufbau der T2med-Liquidation, zwei Seiten, nur erfundene Angaben).
+    $sample = T2medInvoice::fromPdf((string)file_get_contents(__DIR__ . '/fixtures/t2med-beispielrechnung.pdf'), 1000000);
+    check($sample === ['number' => 'IG2026-0001', 'invoice_date' => '2026-05-28', 'amount_cents' => 7588, 'patient_name' => 'Max Mustermann', 'patient_birthdate' => '1990-01-01'], 'Beispielrechnung falsch gelesen');
+
     // Bild-PDF ohne Textebene: Texterkennung (nur, wenn pdftoppm und tesseract mit „deu“ vorhanden sind).
     $ocrReady = is_executable('/usr/bin/pdftoppm') || is_executable('/usr/local/bin/pdftoppm');
     $ocrReady = $ocrReady && (is_executable('/usr/bin/tesseract') || is_executable('/usr/local/bin/tesseract'));
@@ -331,6 +335,13 @@ try {
     $payment = $app->start($v, ['request_id' => App::id(), 'services' => [], 'groups' => [], 'reasons' => [], 'manual_amount' => '12,00', 'service_date' => date('Y-m-d')]);
     $app->mock($v, ['payment_id' => $payment['id'], 'status' => 'successful']);
     check($app->document($v, $payment['id'])['invoice_export'] === null && $export->commands === [], 'Zahlung ohne App-Rechnung abgelegt');
+
+    // Kürzel-Zuordnung bei Texterkennung (mehrere Rechnungsgruppen).
+    $pre = ['IG', 'KV'];
+    foreach (['1IG2026-309', '16G2026-309', '162026-309', 'IG2026-309'] as $read) check(T2medInvoice::canonicalNumber($read, $pre) === 'IG2026-309', 'Kürzel nicht zugeordnet: ' . $read);
+    check(T2medInvoice::canonicalNumber('KV2026-12', $pre) === 'KV2026-12', 'zweites Kürzel verändert');
+    check(T2medInvoice::canonicalNumber('XY2026-5', $pre) === 'XY2026-5', 'unbekanntes Kürzel verändert');
+    check(T2medInvoice::canonicalNumber('1IG2026-309', []) === '1IG2026-309', 'ohne Kürzel verändert');
 
     echo "OK: T2med-Rechnung lesen, Patientenabgleich, Ersetzen, Doppelzahlungsschutz, Akteneintrag, neutrale SumUp-Daten und Ablage von T2med- und App-Rechnungen im Netzwerkordner.\n";
 } finally {
