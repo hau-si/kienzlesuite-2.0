@@ -150,7 +150,7 @@ final class View {
         $brand = '<a class="brand" href="/" title="Start"><span class="mark" aria-hidden="true">K' . (!empty($nav['offenLogo']) ? '<span class="logo-dot" title="Die Einrichtung ist noch nicht abgeschlossen"></span>' : '') . '</span><span><strong>Kienzle-Suite</strong>'
             . '<span class="sub">' . self::h($practice !== '' ? $practice : 'Praxis') . '</span></span></a>';
         $head = '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=31"><script src="/assets/core.js?v=2" defer></script>' . ($extra['kopf'] ?? '') . '</head><body'
+            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=32"><script src="/assets/core.js?v=3" defer></script>' . ($extra['kopf'] ?? '') . '</head><body'
             . (self::$starter !== '' ? ' data-starter="' . self::h(self::$starter) . '"' : '') . ($extra['body'] ?? '') . '>';
         if (!$nav) {
             return $head . '<div class="solo">' . $brand . '<main><h1>' . self::h($title) . '</h1>' . self::cards($body) . '</main></div></body></html>';
@@ -175,13 +175,11 @@ final class View {
                 $meta = (array)($nav['appmeta'][$href] ?? []);
                 $current = $path === rtrim($href, '/') || str_starts_with($path, $href);
                 $open = $open || $current;
-                $links .= '<div class="menu-app" data-app="' . self::h($href) . '"><a href="' . self::h($href) . '"' . ($current ? ' class="current" aria-current="page"' : '') . '><span>' . self::icon('modul:' . (string)($meta['id'] ?? ''), 'app') . self::h($label) . '</span>'
-                    . (!empty($meta['todo']) ? '<span class="todo-dot" title="Hier muss noch etwas eingegeben oder bestätigt werden (siehe Einrichtung auf der Startseite)"></span>' : '') . '</a>'
-                    . '<span class="menu-move"><button type="button" data-richtung="-1" aria-label="' . self::h($label) . ' nach oben" title="Nach oben">▲</button><button type="button" data-richtung="1" aria-label="' . self::h($label) . ' nach unten" title="Nach unten">▼</button></span></div>';
+                $links .= '<div class="menu-app" draggable="true" data-app="' . self::h($href) . '"><a href="' . self::h($href) . '"' . ($current ? ' class="current" aria-current="page"' : '') . ' draggable="false" title="Zum Sortieren ziehen oder Alt + Pfeil nach oben/unten"><span>' . self::icon('modul:' . (string)($meta['id'] ?? ''), 'app') . self::h($label) . '</span>'
+                    . (!empty($meta['todo']) ? '<span class="todo-dot" title="Hier muss noch etwas eingegeben oder bestätigt werden (siehe Einrichtung auf der Startseite)"></span>' : '') . '</a></div>';
             }
-            // Reihenfolge wählt jeder selbst (im Browser gemerkt, siehe core.js); der Knopf erscheint erst ab zwei Anwendungen.
-            $sortKnopf = count($nav['apps']) > 1 ? '<button type="button" class="link menu-sort" data-sortieren>Reihenfolge ändern</button>' : '';
-            $menu .= '<details class="menu-group menu-fold" data-menu="anwendungen" open><summary class="menu-title">Anwendungen</summary>' . $links . $sortKnopf . '</details>';
+            // Reihenfolge wählt jeder selbst: per Ziehen (oder Alt + Pfeiltaste), im Browser gemerkt, siehe core.js.
+            $menu .= '<details class="menu-group menu-fold" data-menu="anwendungen" open><summary class="menu-title">Anwendungen</summary>' . $links . '</details>';
         }
         $group = null;
         if ($nav['admin']) {

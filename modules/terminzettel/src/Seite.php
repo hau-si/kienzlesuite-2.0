@@ -14,6 +14,7 @@ final class Seite {
     /** Logobreite in Druckpunkten (Papier 58 mm: 420 Punkte, 80 mm: 576). */
     public const LOGO_DOTS = ['small' => 160, 'medium' => 256, 'large' => 384];
     public const LOGO_SIZES = ['small' => 'Klein', 'medium' => 'Mittel', 'large' => 'Groß'];
+    public const LOGO_ALIGNS = ['left' => 'Links', 'center' => 'Mitte', 'right' => 'Rechts'];
     public const LOGO_MAX_BYTES = 2097152;
     public const SIZES = ['1x1' => 'Normal (1×1)', '1x2' => 'Hoch (1×2)', '2x1' => 'Breit (2×1)', '2x2' => 'Groß (2×2)', '2x3' => 'Groß und hoch (2×3)', '3x3' => 'Sehr groß (3×3)', '4x4' => 'Riesig (4×4)'];
     /** Erklärungen als Tooltip neben der Beschriftung. */
@@ -26,6 +27,7 @@ final class Seite {
             'enabled' => ['bool', 'Terminzettel aus T2med auf dem Bondrucker drucken', true],
             'logo_enabled' => ['bool', 'Logo drucken (wenn eines hochgeladen ist)', true],
             'logo_size' => ['choice', 'Logo: Breite', 'medium', self::LOGO_SIZES],
+            'logo_align' => ['choice', 'Logo: Ausrichtung', 'center', self::LOGO_ALIGNS],
             'name_text' => ['string', 'Praxisname (erste Zeile)', ''],
             'name_size' => ['choice', 'Praxisname: Schriftgröße', '2x2', self::SIZES],
             'name_bold' => ['bool', 'Praxisname: fett', true],
@@ -42,6 +44,12 @@ final class Seite {
             'qr_position' => ['choice', 'Position des QR-Codes', 'below', ['right' => 'Rechts neben dem Termin', 'left' => 'Links neben dem Termin', 'below' => 'Unter dem Termin (mittig)']],
             'qr_size' => ['choice', 'Größe des QR-Codes', 'medium', ['small' => 'Klein', 'medium' => 'Mittel', 'large' => 'Groß']],
             'qr_summary' => ['string', 'Kalender-Titel (Präfix)', 'Termin Arztpraxis'],
+            'cancel_enabled' => ['bool', 'Absage-QR unten auf dem Bon drucken', false],
+            'cancel_to' => ['string', 'Empfänger (E-Mail-Adresse der Praxis)', ''],
+            'cancel_subject' => ['string', 'Betreff', 'Terminabsage'],
+            'cancel_body' => ['text', 'Nachrichtentext', "Guten Tag,\n\nich kann meinen Termin leider nicht wahrnehmen und sage ihn hiermit ab.\n\nMit freundlichen Grüßen"],
+            'cancel_caption' => ['string', 'Text über dem QR-Code', 'Termin absagen: Code mit dem Handy scannen'],
+            'cancel_size' => ['choice', 'Größe des Absage-QR-Codes', 'medium', ['small' => 'Klein', 'medium' => 'Mittel', 'large' => 'Groß']],
             'cut' => ['bool', 'Bon abschneiden', true],
         ];
     }
@@ -110,6 +118,10 @@ final class Seite {
             }
             $out[$k] = $v;
         }
+        if ($out['cancel_enabled'] && !preg_match('/^[^\s@<>,;]{1,64}@[^\s@<>,;]{1,60}\.[^\s@<>,;]{2,20}$/D', $out['cancel_to'])) {
+            throw new \InvalidArgumentException('Absage-QR: Bitte eine gültige E-Mail-Adresse als Empfänger eintragen.');
+        }
+        if (mb_strlen($out['cancel_body']) > 400) throw new \InvalidArgumentException('Absage-QR: Der Nachrichtentext darf höchstens 400 Zeichen haben (sonst wird der QR-Code zu dicht).');
         return $out;
     }
 
@@ -165,7 +177,9 @@ final class Seite {
         $o['header'] = ['text' => $name !== '' && $adresse !== '' ? $name . "\n" . $adresse : $name . $adresse, 'size' => $values['address_size'], 'bold' => $values['address_bold']];
         if ($name !== '') { $o['header']['first_size'] = $values['name_size']; $o['header']['first_bold'] = $values['name_bold']; }
         $o['header']['enabled'] = $name !== '' || $adresse !== '';
-        $o['logo'] = ['enabled' => $values['logo_enabled'] && self::logoVorhanden(), 'width_dots' => self::LOGO_DOTS[$values['logo_size']]];
+        $o['logo'] = ['enabled' => $values['logo_enabled'] && self::logoVorhanden(), 'width_dots' => self::LOGO_DOTS[$values['logo_size']], 'align' => $values['logo_align']];
+        $o['cancel'] = ['enabled' => $values['cancel_enabled'], 'to' => trim($values['cancel_to']), 'subject' => $values['cancel_subject'], 'body' => $values['cancel_body'],
+            'caption' => $values['cancel_caption'], 'width_dots' => self::QR_SIZES[$values['cancel_size']]];
         $o['footer']['enabled'] = trim($values['footer_text']) !== '';
         $o['qr']['width_dots'] = self::QR_SIZES[$values['qr_size']];
         return $o;

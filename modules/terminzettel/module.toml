@@ -4,7 +4,7 @@
 [module]
 id = "terminzettel"
 name = "Terminzettel"
-version = "1.3.0-beta.8"
+version = "1.3.0-beta.9"
 core_api = "1"
 description = "Terminblatt aus T2med als Bon auf dem Bondrucker: virtueller Drucker „vTermine“, Layout mit Vorschau, Kalender-QR je Termin."
 
@@ -19,6 +19,7 @@ upstream = "unix:/run/kienzle/terminzettel/web.sock"
 protocol = "fastcgi"
 entry = "public/index.php"
 einstellungen = "/"
+uploads = true
 
 [[rights]]
 id = "layout"

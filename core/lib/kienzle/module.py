@@ -54,7 +54,8 @@ HEALTH_SECONDS = int(E('KIENZLE_MODULE_HEALTH_SECONDS', '60'))
 SYSTEMD_RUN = Path(E('KIENZLE_SYSTEMD_RUN', '/run/systemd/system'))
 KEEP_RELEASES = 3
 KEEP_SNAPSHOTS = 3
-EXCLUDED = frozenset({'beispiel'})            # Beispielmodul nur für Tests, nie installierbar
+# beispiel: nur für Tests, nie installierbar; unterschrift: umbenannt in signatur, das alte GitHub-Release wird nicht mehr angeboten
+EXCLUDED = frozenset({'beispiel', 'unterschrift'})
 ID = re.compile(r'^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$')
 UNIT_NAME = re.compile(r'^kienzle-[a-z0-9-]+\.(service|timer|path|socket)$')
 
@@ -404,8 +405,11 @@ def fpm_conf(m: dict) -> str:
         'php_admin_value[open_basedir] = ' + ':'.join(readable), 'php_admin_value[date.timezone] = Europe/Berlin',
         'php_admin_value[disable_functions] = exec,passthru,shell_exec,system,popen,pcntl_exec,dl',
         'php_admin_flag[display_errors] = off', 'php_admin_flag[display_startup_errors] = off', 'php_admin_flag[log_errors] = on',
-        'php_admin_flag[expose_php] = off', 'php_admin_flag[file_uploads] = off', 'php_admin_value[post_max_size] = 8M',
-        'php_admin_value[max_execution_time] = 120', 'php_admin_value[memory_limit] = 256M', 'php_admin_value[session.auto_start] = 0', ''])
+        'php_admin_flag[expose_php] = off', 'php_admin_flag[file_uploads] = ' + ('on' if (m.get('web') or {}).get('uploads') else 'off'),
+        'php_admin_value[upload_max_filesize] = 3M', 'php_admin_value[upload_tmp_dir] = /tmp', 'php_admin_value[post_max_size] = 8M',
+        'php_admin_value[max_execution_time] = 120',
+        'php_admin_value[opcache.revalidate_path] = 1', 'php_admin_value[realpath_cache_ttl] = 0',
+        'php_admin_value[memory_limit] = 256M', 'php_admin_value[session.auto_start] = 0', ''])
 
 
 def fpm_unit(m: dict, binary: str) -> str:

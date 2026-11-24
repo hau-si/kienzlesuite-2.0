@@ -46,7 +46,7 @@ final class Ansicht {
             . ($logo !== '' ? '<button class="zweit klein" name="aktion" value="logo-entfernen" form="logoform">Entfernen</button>' : '') . '</div>'
             . '<p class="muted klein-text">PNG, JPEG oder GIF bis 2 MB. Wird in Schwarz-Weiß umgerechnet; einfache, kontrastreiche Logos drucken am besten. Beim Hochladen wird die Seite neu geladen: ungespeicherte Änderungen vorher speichern.</p></div></div>';
         $form = '<details class="fold" id="kopf"><summary><h2>' . $iKopf . ' Kopf</h2></summary><div class="tz-body">'
-            . '<div class="teil">' . $logoZeile . '<div class="fmt">' . $check('logo_enabled', 'Logo drucken') . '<span class="sm">Breite</span>' . $seg('logo_size', Seite::LOGO_SIZES, 'Logo: Breite') . '</div></div>'
+            . '<div class="teil">' . $logoZeile . '<div class="fmt">' . $check('logo_enabled', 'Logo drucken') . '<span class="sm">Breite</span>' . $seg('logo_size', Seite::LOGO_SIZES, 'Logo: Breite') . '<span class="sm">Lage</span>' . $seg('logo_align', Seite::LOGO_ALIGNS, 'Logo: Ausrichtung') . '</div></div>'
             . '<div class="teil">' . $text('name_text', 'Praxisname (erste Zeile)') . $format('name_size', 'name_bold', 'Praxisname') . '</div>'
             . '<div class="teil">' . $area('address_text', 'Adressblock (Straße, Ort, Kontakt, eine Angabe je Zeile)', 3) . $format('address_size', 'address_bold', 'Adressblock') . '</div></div></details>'
             . '<details class="fold"><summary><h2>' . $iTermine . ' Termine</h2></summary><div class="tz-body">'
@@ -58,6 +58,12 @@ final class Ansicht {
             . '<div class="fmt"><span class="sm">Position</span>' . $seg('qr_position', ['below' => ['Unter', 'Unter dem Termin (mittig)'], 'right' => ['Rechts', 'Rechts neben dem Termin'], 'left' => ['Links', 'Links neben dem Termin']], 'Position des QR-Codes')
             . '<span class="sm">Größe</span>' . $seg('qr_size', ['small' => 'Klein', 'medium' => 'Mittel', 'large' => 'Groß'], 'Größe des QR-Codes') . '</div>'
             . $text('qr_summary', 'Kalender-Titel (Präfix)') . '</div></details>'
+            . '<details class="fold"><summary><h2>' . $iQr . ' Absage per E-Mail</h2></summary><div class="tz-body">'
+            . '<p class="muted klein-text">Unten auf dem Bon steht ein QR-Code. Wer ihn mit dem Handy scannt, bekommt eine vorbereitete E-Mail an die Praxis (Empfänger, Betreff und Text wie unten) und kann den Termin damit absagen. Keine Patientendaten eintragen.</p>'
+            . $check('cancel_enabled', 'Absage-QR unten auf dem Bon drucken')
+            . $text('cancel_to', 'Empfänger (E-Mail-Adresse der Praxis)') . $text('cancel_subject', 'Betreff', 100)
+            . $area('cancel_body', 'Nachrichtentext (höchstens 400 Zeichen)', 5) . $text('cancel_caption', 'Text über dem QR-Code')
+            . '<div class="fmt"><span class="sm">Größe</span>' . $seg('cancel_size', ['small' => 'Klein', 'medium' => 'Mittel', 'large' => 'Groß'], 'Größe des Absage-QR-Codes') . '</div></div></details>'
             . '<div class="tz-zeile">' . $check('cut', 'Bon abschneiden') . '</div>';
         $printer = 'http://' . $host . ':631/printers/vTermine';
         return '<header class="seitenkopf"><div><p class="eyebrow">Terminzettel</p><h1>Einstellungen</h1></div></header><div class="tz">'

@@ -231,7 +231,7 @@ def apply_overlay(cfg: dict[str, Any], web: Any, *, printing: bool = False) -> d
         width = logo.get("width_dots", 288)
         if type(width) is not int or not 32 <= width <= 384:
             raise TicketError("Logo-Breite muss zwischen 32 und 384 Punkten liegen.")
-        cfg["logo"] = {"enabled": logo["enabled"], "width_dots": width}
+        cfg["logo"] = {"enabled": logo["enabled"], "width_dots": width, "align": _choice(logo.get("align", "center"), ("left", "center", "right"))}
     heading = web.get("heading")
     if isinstance(heading, dict):
         if "text" in heading:
@@ -246,6 +246,18 @@ def apply_overlay(cfg: dict[str, Any], web: Any, *, printing: bool = False) -> d
             if type(appointments["show_patient"]) is not bool:
                 raise TicketError("Ungültige Auswahl in den Terminzettel-Einstellungen.")
             layout["show_patient"] = appointments["show_patient"]
+    cancel = web.get("cancel")
+    if isinstance(cancel, dict):
+        if type(cancel.get("enabled")) is not bool:
+            raise TicketError("Ungültige Auswahl in den Terminzettel-Einstellungen.")
+        width = cancel.get("width_dots", 292)
+        if type(width) is not int or not 64 <= width <= 384:
+            raise TicketError("QR-Größe muss zwischen 64 und 384 Punkten liegen.")
+        to = _text(cancel.get("to", ""), 100).strip()
+        if cancel["enabled"] and not re.fullmatch(r"[^\s@<>,;]{1,64}@[^\s@<>,;]{1,60}\.[^\s@<>,;]{2,20}", to):
+            raise TicketError("Absage-QR: Bitte eine gültige E-Mail-Adresse als Empfänger eintragen.")
+        cfg["cancel_qr"] = {"enabled": cancel["enabled"], "to": to, "subject": _text(cancel.get("subject", ""), 100),
+                            "body": _text(cancel.get("body", ""), 400), "caption": _text(cancel.get("caption", ""), 80), "width_dots": width}
     qr = web.get("qr")
     if isinstance(qr, dict):
         calendar = cfg.setdefault("calendar_qr", {})
@@ -702,10 +714,38 @@ def append_logo(r: EscPosRenderer, cfg: dict[str, Any]) -> None:
         image = bitmap(LOGO, int(section.get("width_dots", 288)), r.page_width)
         if image is None:
             return
-        r.set_align("center")
+        align = section.get("align", "center")
+        r.set_align(align if align in ("left", "center", "right") else "center")
         r.raw(raster_image(image))
     except Exception:  # Logo ist Zierde: ein Fehler darf den Ausdruck nie verhindern
         eprint("Logo konnte nicht gedruckt werden.")
+
+
+def cancel_mailto(cancel: dict[str, Any]) -> bytes:
+    """mailto:-Adresse für den Absage-QR: Empfänger, Betreff und Nachrichtentext (UTF-8, prozentkodiert)."""
+    from urllib.parse import quote
+    body = str(cancel.get("body", "")).replace("\n", "\r\n")
+    return ("mailto:" + quote(str(cancel.get("to", "")), safe="@.+-_") + "?subject=" + quote(str(cancel.get("subject", "")), safe="")
+            + "&body=" + quote(body, safe="")).encode("ascii")
+
+
+def append_cancel_qr(r: EscPosRenderer, cfg: dict[str, Any]) -> None:
+    """QR-Code unten auf dem Bon: öffnet eine vorbereitete E-Mail zum Absagen. Ein Fehler darf den Ausdruck nie verhindern."""
+    cancel = cfg.get("cancel_qr", {})
+    if not isinstance(cancel, dict) or not cfg_bool(cancel, "enabled", False):
+        return
+    try:
+        from calendar_qr import build_qr_image
+        from escpos import raster_image
+        image = build_qr_image(cancel_mailto(cancel), {"max_width_dots": min(int(cancel.get("width_dots", 292)), r.page_width)})
+        r.line("")
+        caption = str(cancel.get("caption", "")).strip()
+        if caption:
+            r.wrapped(caption, align="center", bold=True, size=r.sizes["footer"])
+        r.set_align("center")
+        r.raw(raster_image(image))
+    except Exception:
+        eprint("Absage-QR konnte nicht gedruckt werden (Text zu lang?).")
 
 
 def render_escpos(ticket: ParsedTicket, cfg: dict[str, Any]) -> bytes:
@@ -764,6 +804,7 @@ def render_escpos(ticket: ParsedTicket, cfg: dict[str, Any]) -> bytes:
             r.line(separator * r.cols(r.sizes["footer"]), align="left", bold=False, size=r.sizes["footer"])
         r.block("footer", r.sizes["footer"])
 
+    append_cancel_qr(r, cfg)
     return r.finish()
 
 

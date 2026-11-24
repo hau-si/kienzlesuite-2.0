@@ -88,6 +88,38 @@ class LogoTests(unittest.TestCase):
         self.assertLess(with_logo.index(b"\x1dv0\x00"), with_logo.index(b"Praxis"))
         self.assertIn(b"\x1ba\x01", with_logo[:with_logo.index(b"\x1dv0\x00")])  # mittig
 
+    def test_logo_alignment(self):
+        self.stored()
+        for name, code in (("center", b"\x1ba\x01"), ("right", b"\x1ba\x02")):
+            out = render({"logo": {"enabled": True, "width_dots": 256, "align": name}, "header": {"enabled": False}})
+            self.assertIn(code, out[:out.index(b"\x1dv0\x00")])
+        out = render({"logo": {"enabled": True, "width_dots": 256, "align": "left"}, "header": {"enabled": False}})
+        before = out[:out.index(b"\x1dv0\x00")]
+        self.assertNotIn(b"\x1ba\x01", before)
+        self.assertNotIn(b"\x1ba\x02", before)
+        with self.assertRaises(app.TicketError):
+            app.apply_overlay({}, {"logo": {"enabled": True, "width_dots": 256, "align": "oben"}})
+
+    def test_cancel_qr(self):
+        cancel = {"enabled": True, "to": "praxis@example.org", "subject": "Terminabsage", "body": "Guten Tag\nich sage ab", "caption": "Absagen", "width_dots": 292}
+        cfg = app.apply_overlay({}, {"cancel": cancel})
+        self.assertEqual(cfg["cancel_qr"]["to"], "praxis@example.org")
+        self.assertEqual(app.cancel_mailto(cfg["cancel_qr"]), b"mailto:praxis@example.org?subject=Terminabsage&body=Guten%20Tag%0D%0Aich%20sage%20ab")
+        for bad in ({"enabled": True, "to": "keine adresse"}, {"enabled": "ja", "to": "a@example.org"}, {"enabled": True, "to": "a@example.org", "width_dots": 10}):
+            with self.assertRaises(app.TicketError):
+                app.apply_overlay({}, {"cancel": bad})
+        try:
+            import qrcode  # noqa: F401
+        except ImportError:
+            self.skipTest("qrcode fehlt (auf dem Server: python3-qrcode)")
+        with_qr = render({"cancel": cancel})
+        without = render({"cancel": {**cancel, "enabled": False}})
+        self.assertIn(b"\x1dv0\x00", with_qr)
+        self.assertNotIn(b"\x1dv0\x00", without)
+        self.assertGreater(with_qr.rindex(b"\x1dv0\x00"), with_qr.index(b"Absagen"))
+        # zu langer Text: Ausdruck bleibt möglich, nur ohne QR
+        self.assertNotIn(b"\x1dv0\x00", render({"cancel": {**cancel, "body": "x" * 400, "subject": "y" * 100, "width_dots": 64}}))
+
     def test_missing_logo_file_does_not_break_printing(self):
         out = render({"logo": {"enabled": True, "width_dots": 256}, "header": {"enabled": True, "text": "Praxis"}})
         self.assertNotIn(b"\x1dv0\x00", out)

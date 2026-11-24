@@ -1,5 +1,16 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.51
+
+- Seitenleiste: Die Reihenfolge der Anwendungen ändert man jetzt **per Ziehen** (Ziehen und Ablegen) statt mit Pfeilen und „Reihenfolge ändern“. Per Tastatur: Alt + Pfeil nach oben/unten auf dem Eintrag. Die Reihenfolge merkt sich weiter der Browser. Auf Touch-Geräten (Handy, Tablet) funktioniert Ziehen nicht.
+- Seitenleiste in Kasse und Terminzettel zeigte nach einem Basis-Update noch die alte Leiste (ohne Einklappfeile bei Praxis und Betrieb): Die Modul-Dienste (php-fpm) hielten die alte Datei im Zwischenspeicher, weil `current` ein Symlink ist. Jetzt lösen die Modul-Dienste den Symlink bei jedem Aufruf neu auf (`opcache.revalidate_path`), und der Installer startet sie neu. **Einmal `sudo bash installer/install.sh`** (startet die Modul-Dienste neu), danach erscheinen die Pfeile in allen Modulen. Nicht im Browser und nicht auf der VM geprüft.
+
+- `module.toml`: neuer Schlüssel `[web] uploads = true` erlaubt Formular-Uploads (`$_FILES`, bis 3 MB je Datei) im Modul-Dienst; ohne ihn bleibt `file_uploads` aus. Beschreibung in `docs/MODULE-TOML.md`. Genutzt vom Terminzettel (Logo-Upload).
+
+## 0.21.4-beta.50
+
+- Verwaltung → Module: Das alte, in „Signatur“ umbenannte Modul „unterschrift“ wird nicht mehr als verfügbar angeboten (stand wegen eines alten GitHub-Releases weiter in der Liste). Nicht auf der VM geprüft.
+
 ## 0.21.4-beta.49
 
 - Seitenleiste: Die Gruppen **Praxis** und **Betrieb** lassen sich wie **Anwendungen** einklappen (Pfeil an der Überschrift). Die Gruppe mit der aktuellen Seite bleibt immer offen.

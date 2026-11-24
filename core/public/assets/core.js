@@ -165,7 +165,7 @@ document.addEventListener('change', function (e) {
   document.addEventListener('click', on);
 })();
 
-// Seitenleiste: Gruppen (Anwendungen, Praxis, Betrieb) einklappen und die Reihenfolge der Anwendungen ändern.
+// Seitenleiste: Gruppen (Anwendungen, Praxis, Betrieb) einklappen und die Anwendungen per Ziehen sortieren (oder Alt + Pfeil nach oben/unten).
 // Beides wird im Browser gemerkt (localStorage, je Browser); die Gruppe mit der aktuellen Seite bleibt offen.
 (function () {
   'use strict';
@@ -176,47 +176,56 @@ document.addEventListener('change', function (e) {
   var apps = document.querySelector('nav.menu details[data-menu="anwendungen"]');
   var schmal = window.matchMedia && window.matchMedia('(max-width: 760px)').matches;   // dort sind die Überschriften ausgeblendet: nichts einklappen
   var bereit = false;
-
-  // Reihenfolge der Anwendungen: gemerkte zuerst, neue Anwendungen hinten in der Reihenfolge des Servers.
-  function sortiere() {
-    if (!apps) return;
-    var reihe = lies(REIHE);
-    var items = [].slice.call(apps.querySelectorAll('.menu-app'));
-    var rang = function (e) { var i = reihe.indexOf(e.getAttribute('data-app')); return i < 0 ? 1e6 : i; };
-    var ziel = apps.querySelector('.menu-sort');
-    items.map(function (e, i) { return { e: e, r: rang(e), i: i }; }).sort(function (a, b) { return a.r - b.r || a.i - b.i; })
-      .forEach(function (x) { apps.insertBefore(x.e, ziel); });
-    pfeile();
-  }
-  function pfeile() {
-    if (!apps) return;
-    var items = [].slice.call(apps.querySelectorAll('.menu-app'));
-    items.forEach(function (e, i) {
-      var knoepfe = e.querySelectorAll('.menu-move button');
-      if (knoepfe.length === 2) { knoepfe[0].disabled = i === 0; knoepfe[1].disabled = i === items.length - 1; }
-    });
-  }
-  function speichereReihe() { merke(REIHE, [].slice.call(apps.querySelectorAll('.menu-app')).map(function (e) { return e.getAttribute('data-app'); })); }
+  function zeilen() { return [].slice.call(apps.querySelectorAll('.menu-app')); }
+  function speichereReihe() { merke(REIHE, zeilen().map(function (e) { return e.getAttribute('data-app'); })); }
 
   if (apps) {
-    sortiere();
-    apps.addEventListener('click', function (e) {
-      var b = e.target.closest ? e.target.closest('button') : null;
-      if (!b) return;
-      if (b.hasAttribute('data-sortieren')) {
-        var an = apps.classList.toggle('sortieren');
-        b.textContent = an ? 'Fertig' : 'Reihenfolge ändern';
-        return;
+    // gemerkte Reihenfolge zuerst, neue Anwendungen hinten in der Reihenfolge des Servers
+    var reihe = lies(REIHE), alle = zeilen();
+    var rang = function (e) { var i = reihe.indexOf(e.getAttribute('data-app')); return i < 0 ? 1e6 : i; };
+    alle.map(function (e, i) { return { e: e, r: rang(e), i: i }; }).sort(function (a, b) { return a.r - b.r || a.i - b.i; })
+      .forEach(function (x) { apps.appendChild(x.e); });
+
+    var gezogen = null;
+    function marke() { zeilen().forEach(function (z) { z.classList.remove('davor', 'danach'); }); }
+    apps.addEventListener('dragstart', function (e) {
+      var z = e.target.closest ? e.target.closest('.menu-app') : null;
+      if (!z) return;
+      gezogen = z;
+      z.classList.add('zieht');
+      if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', z.getAttribute('data-app')); } catch (x) { /* ältere Browser */ } }
+    });
+    apps.addEventListener('dragover', function (e) {
+      var z = e.target.closest ? e.target.closest('.menu-app') : null;
+      if (!gezogen || !z) return;
+      e.preventDefault();
+      marke();
+      if (z === gezogen) return;
+      var r = z.getBoundingClientRect();
+      z.classList.add(e.clientY < r.top + r.height / 2 ? 'davor' : 'danach');
+    });
+    apps.addEventListener('drop', function (e) {
+      var z = e.target.closest ? e.target.closest('.menu-app') : null;
+      if (!gezogen || !z) return;
+      e.preventDefault();
+      if (z !== gezogen) {
+        var r = z.getBoundingClientRect();
+        if (e.clientY < r.top + r.height / 2) apps.insertBefore(gezogen, z); else apps.insertBefore(gezogen, z.nextSibling);
+        speichereReihe();
       }
-      var r = b.getAttribute('data-richtung');
-      if (r !== '-1' && r !== '1') return;
-      var zeile = b.closest('.menu-app');
-      var nachbar = r === '-1' ? zeile.previousElementSibling : zeile.nextElementSibling;
+    });
+    apps.addEventListener('dragend', function () { if (gezogen) gezogen.classList.remove('zieht'); gezogen = null; marke(); });
+    // Tastatur: Alt + Pfeil nach oben/unten verschiebt die fokussierte Anwendung
+    apps.addEventListener('keydown', function (e) {
+      if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+      var z = e.target.closest ? e.target.closest('.menu-app') : null;
+      if (!z) return;
+      var nachbar = e.key === 'ArrowUp' ? z.previousElementSibling : z.nextElementSibling;
       if (!nachbar || !nachbar.classList.contains('menu-app')) return;
-      if (r === '-1') apps.insertBefore(zeile, nachbar); else apps.insertBefore(nachbar, zeile);
+      e.preventDefault();
+      if (e.key === 'ArrowUp') apps.insertBefore(z, nachbar); else apps.insertBefore(nachbar, z);
       speichereReihe();
-      pfeile();
-      b.focus();
+      var a = z.querySelector('a'); if (a) a.focus();
     });
   }
 
