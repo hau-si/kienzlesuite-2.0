@@ -1412,22 +1412,32 @@ final class Web {
                 $stopped = !$all && !$unknown;
                 $state = $unknown ? '<span class="tag">Status unbekannt</span>' : ($all ? '<span class="tag ok">✓ läuft</span>' : '<span class="tag warn">' . ($active === 0 ? 'gestoppt' : 'teilweise gestoppt') . '</span>');
             }
+            $menuItem = fn(string $aktion, string $label, string $icon) => '<form method="post" action="/verwaltung/module">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="' . $aktion . '">'
+                . '<button class="mod-item"' . $off . '>' . V::icon($icon) . ' ' . $label . '</button></form>';
             $more = '<details class="mod-more"><summary class="icon-btn" title="Mehr" aria-label="Mehr zu ' . V::h($m['name']) . '">' . V::icon('st:mehr') . '</summary><div class="mod-menu">'
                 . ($m['dienste'] ? '<small class="muted">Dienste: ' . V::h(implode(', ', array_map(fn($d) => preg_replace('/^kienzle-|\.service$/', '', $d['name']) . ($d['aktiv'] === true ? ' ✓' : ($d['aktiv'] === false ? ' ✗' : ' ?')), $m['dienste']))) . '</small>' : '')
-                . ($stopped ? $post('dienst-start', 'Starten', $hidden) : '')
-                . ($m['dienste'] ? $post('dienst-neustart', 'Neu starten', $hidden, 'secondary') : '')
-                . (!$m['update'] ? $post('pruefen', 'Nach Update suchen', '', 'secondary') : '')
+                . ($stopped ? $menuItem('dienst-start', 'Starten', 'st:start') : '')
+                . ($m['dienste'] ? $menuItem('dienst-neustart', 'Neu starten', 'st:neustart') : '')
+                . '<details class="mod-del"><summary class="mod-item danger-text">' . V::icon('st:papierkorb') . ' Entfernen …</summary>'
                 . '<form method="post" action="/verwaltung/module" class="mod-remove">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="entfernen">'
+                . '<small><strong>' . V::h($m['name']) . ' entfernen.</strong> Ohne Häkchen bleiben die Daten erhalten; eine spätere Installation übernimmt sie.</small>'
                 . '<label class="check"><input type="checkbox" name="daten" value="1"> Auch alle Daten löschen (nicht rückgängig zu machen)</label>'
-                . '<small class="muted">Ohne Häkchen bleiben die Daten erhalten; eine spätere Installation übernimmt sie.</small><button class="danger"' . $off . '>' . V::icon('st:papierkorb') . ' Modul entfernen</button></form></div></details>';
-            $upd = $m['update'] ? '<span class="tag warn">Update ' . V::h($m['update']['version']) . '</span>' : '<span class="tag">aktuell</span>';
-            $tiles .= '<div class="mod-tile"><div class="mod-head"><span class="t-ico">' . V::icon('modul:' . $m['id']) . '</span>' . $state . '</div>'
+                . '<label class="muted">Zur Bestätigung den Namen „' . V::h($m['name']) . '“ eintippen<input name="bestaetigung" autocomplete="off" required maxlength="80" placeholder="' . V::h($m['name']) . '"></label>'
+                . '<button class="danger"' . $off . '>' . V::icon('st:papierkorb') . ' Modul entfernen</button></form></details></div></details>';
+            $formUpd = fn(string $aktion, string $label, string $class, string $icon, string $title = '') => '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="' . $aktion . '">'
+                . '<button class="' . $class . '" title="' . V::h($title ?: strip_tags($label)) . '"' . $off . '>' . V::icon($icon) . ($label !== '' ? ' ' . $label : '') . '</button></form>';
+            // Ein rundes Pfeil-Symbol für beides: Update einspielen (wenn eins da ist) oder nach einem Update suchen.
+            $upd = $m['update']
+                ? '<div class="mod-upd">' . $formUpd('aktualisieren', 'Auf ' . V::h($m['update']['version']) . ' aktualisieren', 'upd-pill', 'st:aktualisieren', 'Update auf ' . $m['update']['version'] . ' installieren') . '</div>'
+                : '<div class="mod-upd"><span class="tag">aktuell</span>' . $formUpd('pruefen', '', 'icon-btn round', 'st:aktualisieren', 'Nach Update suchen') . '</div>';
+            $logo = $m['path'] ? '<a class="t-ico mod-open" href="' . V::h($m['path']) . '/" title="' . V::h($m['name']) . ' öffnen" aria-label="' . V::h($m['name']) . ' öffnen">' . V::icon('modul:' . $m['id']) . '<span class="go">' . V::icon('st:oeffnen') . '</span></a>'
+                : '<span class="t-ico">' . V::icon('modul:' . $m['id']) . '</span>';
+            $tiles .= '<div class="mod-tile"><div class="mod-head">' . $logo . $state . '</div>'
                 . '<p class="mod-name">' . V::h($m['name']) . '</p><p class="muted mod-sub">Version ' . V::h($m['version']) . '</p>' . ($m['description'] !== '' ? '<p class="muted mod-desc">' . V::h($m['description']) . '</p>' : '')
                 . $upd
                 . ($m['update'] ? '<p class="muted mod-desc">Neue Version <strong>' . V::h($m['update']['version']) . '</strong>' . ($m['update']['source'] === 'github' ? ' (GitHub' . ($m['update']['signed'] === false ? ', nicht signiert' : '') . ')' : ' (mit der Basis geliefert)')
-                    . '. Vorher wird ein Schnappschuss der Moduldaten angelegt; schlägt etwas fehl, springt das Modul zurück.</p>'
-                    . '<form method="post" action="/verwaltung/module">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="aktualisieren"><button' . $off . '>Aktualisieren</button></form>' : '')
-                . '<div class="mod-foot">' . ($m['path'] ? '<a class="button secondary" href="' . V::h($m['path']) . '/">Öffnen</a>' : '') . $more . '</div></div>';
+                    . '. Vorher wird ein Schnappschuss der Moduldaten angelegt; schlägt etwas fehl, springt das Modul zurück.</p>' : '')
+                . '<div class="mod-foot">' . $more . '</div></div>';
         }
         foreach ($st['available'] as $m) {
             $tiles .= '<div class="mod-tile available"><div class="mod-head"><span class="t-ico">' . V::icon('modul:' . $m['id']) . '</span><span class="tag">verfügbar</span></div>'
@@ -1461,6 +1471,9 @@ final class Web {
                 case 'installieren': $store->install($id); $this->db->store('erstadmin:' . $id, (string)(int)$this->session['user_id']); $this->audit->write($admin, 'modul-installieren', $id); break;
                 case 'aktualisieren': $store->update($id); $this->audit->write($admin, 'modul-aktualisieren', $id); break;
                 case 'entfernen':
+                    $name = '';
+                    foreach ($store->status()['installed'] as $m) if ($m['id'] === $id) $name = (string)$m['name'];
+                    if ($name === '' || mb_strtolower(trim($r->field('bestaetigung', 80))) !== mb_strtolower($name)) throw new Problem('Zum Entfernen bitte den Namen des Moduls („' . ($name !== '' ? $name : $id) . '“) zur Bestätigung eintippen.', 422);
                     $data = $r->field('daten', 1) === '1';
                     $store->remove($id, $data);
                     $this->audit->write($admin, 'modul-entfernen', $id . ($data ? ' samt-daten' : ''));

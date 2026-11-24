@@ -298,7 +298,24 @@ ul.modules li { display: flex; align-items: center; justify-content: space-betwe
 .mod-menu { position: absolute; right: 0; bottom: 38px; z-index: 5; display: grid; gap: 8px; width: 17rem; padding: 12px; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 6px 20px rgba(32, 60, 67, .14); }
 .mod-menu form { margin: 0; }
 .mod-menu button { width: 100%; }
-.mod-remove { display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+.mod-open { position: relative; text-decoration: none; cursor: pointer; }
+.mod-open:hover, .mod-open:focus-visible { background: #d3ece6; outline: 2px solid var(--teal); outline-offset: 1px; }
+.mod-open .go { position: absolute; right: -6px; top: -6px; width: 16px; height: 16px; display: grid; place-items: center; border-radius: 50%; background: #fff; border: 1px solid var(--line); color: var(--muted); }
+.mod-open .go .ico { width: 10px; height: 10px; }
+.mod-upd { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.mod-upd .tag { margin-top: 0; }
+.mod-upd form { margin: 0; }
+.upd-pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; font-size: 13px; background: #e5f0fb; color: #1b4f86; border: 1px solid #b7d3ef; }
+.upd-pill .ico { width: 15px; height: 15px; }
+.icon-btn.round { border-radius: 50%; width: 30px; height: 30px; padding: 0; display: inline-grid; place-items: center; }
+.mod-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px; border: 0; border-radius: 8px; background: transparent; color: inherit; font: inherit; font-size: 14px; text-align: left; cursor: pointer; list-style: none; }
+.mod-item:hover { background: var(--soft); }
+.mod-item .ico { width: 16px; height: 16px; color: var(--muted); }
+.mod-item.danger-text, .mod-item.danger-text .ico { color: #a24435; }
+.mod-del > summary { list-style: none; } .mod-del > summary::-webkit-details-marker { display: none; }
+.mod-del[open] > summary { background: #fbe9e5; }
+.mod-remove { display: grid; gap: 8px; padding: 8px; margin-top: 4px; border: 1px solid #e2b9b1; border-radius: 8px; background: #fdf4f2; }
+.mod-remove input[name=bestaetigung] { width: 100%; box-sizing: border-box; }
 .mod-remove button.danger { background: #a24435; color: #fff; border-color: #a24435; }
 
 /* Rollen und Rechte-Matrix (Benutzer bearbeiten) */

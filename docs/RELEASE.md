@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.35
+
+- Modulübersicht neu gestaltet: Das **Logo** der Kachel öffnet das Modul (kleines ↗ am Logo), der Knopf „Öffnen“ entfällt. Ein **rundes Pfeil-Symbol** unter dem Namen dient für beides: mit neuer Version steht dort „Auf 2.x aktualisieren“, sonst „aktuell“ mit einem Rundpfeil zum Suchen nach Updates („Nach Update suchen“ im Menü entfällt).
+- Starten, Neu starten und Entfernen stehen weiter hinter „⋯“, jetzt mit einheitlichen Symbolen. **Entfernen ist doppelt abgesichert**: Nach „Entfernen …“ muss der Name des Moduls eingetippt werden (der Server prüft das ebenfalls), dazu optional „Auch alle Daten löschen“.
+
 ## 0.21.4-beta.34
 
 - Dokumentation: README und Bildschirmfotos auf den aktuellen Stand gebracht (neu: Übersicht, Mein Konto, Gruppen, Einrichtung, Verbindungen, Kasse-Startseite und -Einstellungen); die Bilder entstehen jetzt reproduzierbar mit `scripts/bildschirmfotos.sh` (erfundene Daten, Vorschau der Kasse in `scripts/kasse-vorschau/`). AGENTS.md enthält den vollständigen Stand für neue Sitzungen. Keine Funktionsänderung.
