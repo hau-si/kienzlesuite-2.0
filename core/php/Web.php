@@ -433,7 +433,19 @@ final class Web {
             ->with('X-Kienzle-Csrf', self::moduleCsrf($session['csrf'], $module))
             ->with('X-Kienzle-Bestaetigt', (string)(int)$session['confirmed_at'])
             ->with('X-Kienzle-Drucker', rawurlencode(json_encode($this->printerRoles() + ['bonbreite' => $this->bonWidth()], JSON_UNESCAPED_UNICODE)))
+            ->with('X-Kienzle-Menue', $this->moduleMenu((int)$session['user_id'], (int)$session['user_admin'] === 1, (string)$session['login']))
             ->with('X-Kienzle-Praxis', rawurlencode(json_encode(['name' => $this->config->practice] + $this->address() + $this->master(), JSON_UNESCAPED_UNICODE)));
+    }
+
+    /** Schlankes Menü für die Seitenleiste in Modulseiten: nur Anwendungen des Benutzers (ohne Zähler, damit die Prüfung jeder Modul-Anfrage schnell bleibt). */
+    private function moduleMenu(int $uid, bool $admin, string $login): string {
+        $apps = $meta = [];
+        foreach ($this->users->access($uid) as $id => $_) {
+            if (($p = $this->modules->webPath($id)) === null) continue;
+            $apps[$p . '/'] = $this->modules->name($id);
+            $meta[$p . '/'] = $id;
+        }
+        return rawurlencode(json_encode(['apps' => $apps, 'ids' => $meta, 'admin' => $admin, 'login' => $login], JSON_UNESCAPED_UNICODE));
     }
 
     /** CSRF-Marke, die ein Modul in seine Formulare schreibt und mit X-Kienzle-Csrf vergleicht. */

@@ -3,6 +3,7 @@ declare(strict_types=1);
 // Webinterface der Basis über simulierte Anfragen: Einrichtung, Anmeldung mit OTP und Passkey, Rechte, /_auth, Schutz.
 require __DIR__ . '/lib.php';
 require __DIR__ . '/browser.php';
+require_once dirname(__DIR__, 2) . '/core/php/modul/Kienzle.php';
 
 use Kienzle\Core\{Auth, Connections, Totp};
 
@@ -109,6 +110,13 @@ function test_mitarbeiter_ohne_otp_und_rechte_je_modul(): void {
         && $auth->header('X-Kienzle-Rechte') === 'paid', 'Weitergabe an Modul falsch');
     check(strlen((string)$auth->header('X-Kienzle-Csrf')) === 64, 'Modul-CSRF fehlt');
     check(is_array(json_decode(rawurldecode((string)$auth->header('X-Kienzle-Praxis')), true)), 'Praxisdaten fehlen in der Weitergabe');
+    // Menü für die Seitenleiste in Modulseiten: schlank, ohne Sitzungs-CSRF, nur Module mit Zugang
+    $menu = json_decode(rawurldecode((string)$auth->header('X-Kienzle-Menue')), true);
+    check(is_array($menu) && array_keys($menu['apps']) === ['/kasse/'] && $menu['login'] === 'bert' && $menu['admin'] === false, 'Menü für Modulseiten falsch');
+    $k = new KienzleModul('kasse', ['KIENZLE_MENUE' => $auth->header('X-Kienzle-Menue'), 'KIENZLE_PRAXIS' => $auth->header('X-Kienzle-Praxis'), 'KIENZLE_BENUTZER' => 'bert', 'REQUEST_URI' => '/kasse/settings.php']);
+    $seite = $k->rahmen('Kasse', '<p id="inhalt">Hallo</p>', ['roh' => true, 'kopf' => '<link rel="stylesheet" href="/kasse/assets/x.css">']);
+    check(str_contains($seite, '<aside class="side">') && str_contains($seite, 'href="/kasse/" class="current"') && str_contains($seite, '<p id="inhalt">Hallo</p>') && str_contains($seite, '/kasse/assets/x.css')
+        && !str_contains($seite, '/verwaltung/server') && !str_contains($seite, 'action="/abmelden"') && str_contains($seite, 'class="modul"'), 'Rahmen für Modulseiten falsch');
     $start = $b->get('/')->body;
     check(str_contains($start, '<summary class="menu-title">Anwendungen</summary>') && !str_contains($start, '<span class="menu-title">Einstellungen</span>'), 'Anwendungen fehlen oder Einstellungen stehen doppelt in der Seitenleiste');
     check($b->get('/_auth/beispiel')->status === 403, 'Zugang zu nicht freigegebenem Modul');

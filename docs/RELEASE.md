@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.32
+
+- Module können ihre Seiten im Rahmen der Suite zeigen (Seitenleiste, Kopf, Praxisname): neue Kopfzeile `X-Kienzle-Menue` der Anmelde-Prüfung (schlank, ohne zusätzliche Anfrage und ohne Sitzungs-Marke) und die Helfer `menue()` und `rahmen()` im PHP-Modul-Helfer; Beschreibung in docs/MODUL-SCHNITTSTELLE.md.
+
 ## 0.21.4-beta.31
 
 - Mein Konto: Profilkopf mit Avatar (Initialen, unten rechts das Symbol der wichtigsten Rolle: Admin, Arzt, MFA) und den Gruppen des Kontos als Rollen-Zeile; derselbe Avatar steht in der Benutzerliste.

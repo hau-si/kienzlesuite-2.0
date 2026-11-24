@@ -1,5 +1,10 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.11
+
+- Die Einstellungen der Kasse stehen jetzt im Rahmen der Suite: Seitenleiste mit der Kasse als aktivem Eintrag, Kopf „Kasse – Einstellungen“, gleiche Schrift und Abstände wie die übrigen Seiten. Die Kassieren-Ansicht (aus T2med) bleibt schlank und ohne Menü.
+- Erster Schritt der Umgestaltung (Startseite mit Offenem und Zahlen, Einstellungen als einklappbare Zeilen folgen).
+
 ## 2.3.4-beta.10
 
 - Einrichtungs-Überblick: „Starter auf den Kassen-PCs installieren“ steht rot („Erneut nötig“), wenn sich das Serverzertifikat geändert hat (z. B. nach einer Änderung des Servernamens), statt nur als offen.

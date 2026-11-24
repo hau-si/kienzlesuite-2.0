@@ -138,12 +138,16 @@ final class View {
     public static string $starter = '';
 
     /** Ganze Seite. $nav: null = ohne Menü (Anmeldung), sonst ['login', 'admin' => bool, 'csrf', 'pfad', Zähler]. $eyebrow: Gruppe über dem Titel. */
-    public static function page(string $title, string $body, ?array $nav = null, string $practice = '', ?string $eyebrow = null): string {
+    /**
+     * $extra für Modulseiten im Rahmen der Suite: 'kopf' = zusätzliche Tags im Kopf (Stylesheets, Skripte des Moduls), 'roh' = Inhalt unverändert
+     * (ohne Überschrift und Karten), 'body' = zusätzliche Attribute am body.
+     */
+    public static function page(string $title, string $body, ?array $nav = null, string $practice = '', ?string $eyebrow = null, array $extra = []): string {
         $brand = '<a class="brand" href="/" title="Start"><span class="mark" aria-hidden="true">K' . (!empty($nav['offenLogo']) ? '<span class="logo-dot" title="Die Einrichtung ist noch nicht abgeschlossen"></span>' : '') . '</span><span><strong>Kienzle-Suite</strong>'
             . '<span class="sub">' . self::h($practice !== '' ? $practice : 'Praxis') . '</span></span></a>';
         $head = '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=24"><script src="/assets/core.js" defer></script></head><body'
-            . (self::$starter !== '' ? ' data-starter="' . self::h(self::$starter) . '"' : '') . '>';
+            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=25"><script src="/assets/core.js" defer></script>' . ($extra['kopf'] ?? '') . '</head><body'
+            . (self::$starter !== '' ? ' data-starter="' . self::h(self::$starter) . '"' : '') . ($extra['body'] ?? '') . '>';
         if (!$nav) {
             return $head . '<div class="solo">' . $brand . '<main><h1>' . self::h($title) . '</h1>' . self::cards($body) . '</main></div></body></html>';
         }
@@ -187,11 +191,12 @@ final class View {
             $restart = '<details class="menu-fold"' . (str_starts_with($path, '/verwaltung/neustart') ? ' open' : '') . '><summary class="menu-title">' . self::icon('/verwaltung/neustart') . 'Neu starten</summary>'
                 . $link('/verwaltung/neustart?art=dienste', 'Dienste neu starten') . $link('/verwaltung/neustart?art=server', 'Server neu starten') . '</details>';
         }
-        $foot = '<div class="side-foot">' . $restart . '<form method="post" action="/abmelden" class="inline">' . self::csrf($nav['csrf'])
-            . '<button class="link">Abmelden (' . self::h($nav['login']) . ')</button></form></div>';
+        // Modulseiten kennen die Sitzungs-Marke nicht (nur eine eigene): dort führt „Mein Konto“ zum Abmelden.
+        $foot = '<div class="side-foot">' . $restart . (($nav['csrf'] ?? '') !== '' ? '<form method="post" action="/abmelden" class="inline">' . self::csrf($nav['csrf'])
+            . '<button class="link">Abmelden (' . self::h($nav['login']) . ')</button></form>' : '<a class="link" href="/konto">' . self::h($nav['login']) . ' · Abmelden</a>') . '</div>';
         $eyebrow ??= $group;
-        return $head . '<div class="layout"><aside class="side">' . $brand . $menu . $foot . '</aside><main>'
-            . ($eyebrow ? '<p class="eyebrow">' . self::h($eyebrow) . '</p>' : '') . '<h1>' . self::h($title) . '</h1>' . self::cards($body) . '</main></div></body></html>';
+        $inner = !empty($extra['roh']) ? $body : ($eyebrow ? '<p class="eyebrow">' . self::h($eyebrow) . '</p>' : '') . '<h1>' . self::h($title) . '</h1>' . self::cards($body);
+        return $head . '<div class="layout"><aside class="side">' . $brand . $menu . $foot . '</aside><main' . (!empty($extra['roh']) ? ' class="modul"' : '') . '>' . $inner . '</main></div></body></html>';
     }
 
     /** Inhalt in Karten aufteilen: Jede Überschrift h2 beginnt eine neue Karte; Meldungen am Anfang bleiben darüber. */

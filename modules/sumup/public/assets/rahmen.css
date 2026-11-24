@@ -1,0 +1,7 @@
+/* Kasse-Einstellungen im Rahmen der Suite: Seitenleiste, Hintergrund und Kopf kommen von core.css; hier nur Angleichungen an die Seitenstile der Kasse. */
+main.modul { max-width: 940px; margin: 0; padding: 32px 40px 48px; }
+main.modul .settings-main, main.modul .settings-card { max-width: none; }
+.seitenkopf { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.seitenkopf h1 { margin: 6px 0 0; }
+main.modul footer { text-align: left; padding: 8px 0 0; color: #7e918a; font-size: 12px; }
+main.modul ul.checklist small, main.modul ol.checklist small, main.modul .checklist small { font-family: inherit; font-size: 12.5px; }
