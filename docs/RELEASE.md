@@ -1,5 +1,15 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.44
+
+- Neues Modul **Unterschrift** (0.1.0-beta.1) liegt bei: Vorlagen und Vorgänge für Dokumente am Unterschriftenpad. Symbol in der Seitenleiste ergänzt. Pad-Anbindung und Rückschreiben nach T2med folgen; nicht auf der echten VM geprüft.
+
+## 0.21.4-beta.43
+
+- Virtuelle Drucker umbenannt: „SumUp-Rechnung“ → **vKasse**, „Letterxpress“ → **vBriefversand**, „Terminzettel“ → **vTermine**. Alle Beschreibungstexte, Anleitungen, PPD-Dateien (`vKasse-PDF.ppd`, `vBriefversand-PDF.ppd`, `vTermine-PDF.ppd`) und Tests sind angepasst. **Achtung:** Die alten Warteschlangen werden beim Abgleich entfernt, die neuen angelegt. An jedem Arbeitsplatz muss der Drucker neu eingerichtet und in T2med neu gewählt werden (Arbeitsplatz einrichten → Virtuelle Drucker). Die Zuordnung „Rechnungsdrucker“ in der Kasse bleibt auf dem Praxisdrucker.
+- Verwaltung → Drucker: Jede Karte eines virtuellen Druckers nennt in einem Satz, was er macht.
+- Nicht auf der echten VM geprüft (Abgleich der Warteschlangen nach der Umbenennung).
+
 ## 0.21.4-beta.42
 
 - Tooltips (Info-Zeichen „i“): Sie ragen nicht mehr über den Fensterrand. Reicht der Platz nicht, wird der ganze Tooltip verschoben (im Zweifel in die Mitte), nicht schmaler gemacht. Gilt für die Basis und die Module; nicht auf der echten VM geprüft.

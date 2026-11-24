@@ -5,9 +5,9 @@
 [module]
 id = "sumup"
 name = "Kasse"
-version = "2.3.4-beta.27"
+version = "2.3.4-beta.28"
 core_api = "1"
-description = "Kartenzahlung am SumUp Solo aus T2med, T2med-Rechnungseingang über den Drucker „SumUp-Rechnung“, GOÄ-Leistungen, Barzahlung, Belege per E-Mail, Druck und Post."
+description = "Kartenzahlung am SumUp Solo aus T2med, T2med-Rechnungseingang über den Drucker „vKasse“, GOÄ-Leistungen, Barzahlung, Belege per E-Mail, Druck und Post."
 
 [system]
 packages = ["php-fpm", "php-cli", "php-curl", "php-sqlite3", "php-mbstring", "php-gd", "librsvg2-bin", "qpdf", "fonts-dejavu-core", "poppler-utils", "tesseract-ocr", "tesseract-ocr-deu", "ghostscript", "cups-client"]
@@ -61,16 +61,16 @@ snapshot = "bin/backup-snapshot"
 settings = ["/var/lib/kienzle/sumup/grundwerte.json", "/var/lib/kienzle/sumup/sicherung"]
 
 [[printers]]
-name = "SumUp-Rechnung"
-label = "T2med-Rechnung an die Kasse (Rechnungseingang)"
+name = "vKasse"
+label = "Nimmt Rechnungen aus T2med an und legt sie in der Kasse ab."
 command = "printer/kienzle-sumup-rechnung"
 formats = ["application/pdf", "application/postscript"]
 paper = "A4"
 share = ["ipp"]
 
 [[printers]]
-name = "Letterxpress"
-label = "T2med-Rechnung direkt per Post (Letterxpress)"
+name = "vBriefversand"
+label = "Schickt Rechnungen aus T2med sofort per Post an Letterxpress."
 command = "printer/kienzle-letterxpress"
 formats = ["application/pdf", "application/postscript"]
 paper = "A4"

@@ -98,7 +98,7 @@ paths = ["/var/lib/kienzle/sumup"]
 snapshot = "bin/backup-snapshot"  # erzeugt eine konsistente Kopie der Datenbank
 
 [[printers]]
-name = "SumUp-Rechnung"
+name = "vKasse"
 label = "T2med-Rechnung an SumUp-Terminal"
 ppd = "printer/sumup-rechnung.ppd"
 backend = "printer/kienzle-sumup-backend"

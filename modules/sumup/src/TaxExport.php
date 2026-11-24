@@ -54,7 +54,7 @@ final class TaxExport {
     }
 
     /**
-     * Per Karte bezahlte T2med-Rechnungen (virtueller Drucker „SumUp-Rechnung“) zum Abhaken in T2med.
+     * Per Karte bezahlte T2med-Rechnungen (virtueller Drucker „vKasse“) zum Abhaken in T2med.
      * $status: 'open' = noch nicht als erledigt markiert, 'all' = alle im Zeitraum (Jahr 0 = alle Jahre).
      */
     public function t2medPaid(string $status = 'open', int $year = 0, int $month = 0, bool $includeTest = false): array {

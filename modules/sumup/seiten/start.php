@@ -24,10 +24,9 @@ ob_start();
 <input id="inv-search" class="inv-search" type="search" placeholder="Name suchen" autocomplete="off" aria-label="Rechnungen nach Namen suchen">
 <button id="free-entry" class="free-entry" type="button">Freie Eingabe (IGeL, GOÄ)</button>
 <div id="inbox" class="inbox-list"></div><p id="inbox-empty" class="muted small" hidden>Keine Rechnungen in dieser Ansicht.</p>
-<p class="muted small start-hint">Rechnungen aus T2med erscheinen hier, sobald sie auf „SumUp-Rechnung“ gedruckt wurden. „Bezahlt“ und „Zurückgestellt“ zeigen die Vorgänge der letzten 7 Tage; dort lässt sich auch stornieren. „Zurückstellen“ blendet eine Rechnung aus „Offen“ aus, ohne sie zu drucken.</p></aside>
+<p class="muted small start-hint">Rechnungen aus T2med erscheinen hier, sobald sie auf „vKasse“ gedruckt wurden. „Bezahlt“ und „Zurückgestellt“ zeigen die Vorgänge der letzten 7 Tage; dort lässt sich auch stornieren. „Zurückstellen“ blendet eine Rechnung aus „Offen“ aus, ohne sie zu drucken.</p></aside>
 <section class="start-right" aria-label="Kassieren"><iframe id="work" class="work-frame" title="Kassieren" src="about:blank"></iframe><div id="detail" class="start-detail card" hidden></div></section>
 </div>
-<footer>Kasse v<?= $version ?> · auf Grundlage von kienzle-sumup von Dr. Thomas Kienzle</footer>
 <?php
 $inhalt = (string)ob_get_clean();
 $kopf = '<meta name="kienzle-csrf" content="' . $csrf . '"><link rel="stylesheet" href="' . $base . 'assets/style.css?v=' . $version . '"><link rel="stylesheet" href="' . $base . 'assets/rahmen.css?v=' . $version . '">'

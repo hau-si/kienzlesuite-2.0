@@ -1,7 +1,7 @@
 #!/usr/bin/php
 <?php
 declare(strict_types=1);
-// Virtueller Drucker „Letterxpress“: T2med druckt die Rechnung hierher; sie wird wie im Rechnungseingang gelesen, erscheint unter „Vorgänge“
+// Virtueller Drucker „vBriefversand“: T2med druckt die Rechnung hierher; sie wird wie im Rechnungseingang gelesen, erscheint unter „Vorgänge“
 // (Überweisung, „per Letterxpress verschickt“) und geht sofort per Post an Letterxpress. Ohne lesbaren Text im PDF ergänzt die Texterkennung ihn.
 // Gestartet von ippeveprinter der Basis als ks-sumup, mit dem Pfad des Auftrags als erstem Argument.
 // Ausgaben gehen ins Protokoll des Druckers: nur feste Texte, keine Patientendaten.

@@ -4,7 +4,7 @@ Praxis-Appliance für Hausarztpraxen mit T2med: **eine Basis**, einmal auf einer
 einzeln dazukommen – Kartenzahlung (SumUp), Terminzettel, Fax, Telefon, Kienzlezeit. Verwaltung komplett im
 Webinterface; Firewall, Benutzer, Admin-Zugang mit OTP, Updates und verschlüsselte Sicherung gibt es nur einmal, in der Basis.
 
-Stand: **Basis 0.21.4-beta.42** mit den Modulen **Kasse** 2.3.4-beta.27 (SumUp, Rechnungseingang, Überweisung mit QR-Code, Startseite mit freier Eingabe) und **Terminzettel** 1.3.0-beta.7 (T2med-Terminzettel auf dem Bondrucker). Installierbar nur auf einer Test-VM ([docs/VM-TEST.md](docs/VM-TEST.md)); Fax, Telefon und Kienzlezeit sind geplant ([docs/PLAN.md](docs/PLAN.md)).
+Stand: **Basis 0.21.4-beta.44** mit den Modulen **Kasse** 2.3.4-beta.28 (SumUp, Rechnungseingang, Überweisung mit QR-Code, Startseite mit freier Eingabe) und **Terminzettel** 1.3.0-beta.8 sowie dem neuen Modul **Unterschrift** 0.1.0-beta.1 (Vorlagen und Vorgänge) (T2med-Terminzettel auf dem Bondrucker). Installierbar nur auf einer Test-VM ([docs/VM-TEST.md](docs/VM-TEST.md)); Fax, Telefon und Kienzlezeit sind geplant ([docs/PLAN.md](docs/PLAN.md)).
 
 ![Basis und Module](docs/architektur-whiteboard.png)
 

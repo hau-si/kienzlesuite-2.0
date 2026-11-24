@@ -38,7 +38,7 @@ Oberfläche, Hilfetexte, Dokumentation und Commit-Nachrichten auf Deutsch.
 
 ## Hinweise für neue Sitzungen (Stand 24.11.2026)
 
-**Stand:** Basis 0.21.4-beta.42, Kasse (`sumup`) 2.3.4-beta.27, Terminzettel 1.3.0-beta.7; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
+**Stand:** Basis 0.21.4-beta.44, Kasse (`sumup`) 2.3.4-beta.28, Terminzettel 1.3.0-beta.8, Unterschrift 0.1.0-beta.1; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
 (Basis 0.19.1). Der Nutzer testet auf einer echten Ubuntu-26.04-VM (Aktualisierung dort: `cd ~/kienzlesuite-2.0 && git pull && sudo bash installer/install.sh`,
 oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nicht ins Repository.
 
@@ -65,7 +65,7 @@ oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nich
   - `/kasse/kassieren` = schlanke Ansicht ohne Menü (`seiten/index.php`, `assets/app.js`), so startet T2med über den Starter (`#launch=<ticket>`; die Startseite leitet solche Links dorthin weiter). X-Frame-Options ist `SAMEORIGIN`, damit die Startseite sie einbetten darf.
   - API: `seiten/api.php` (Aktionen u. a. `manual_open`, `inbox_visit`, `open_inbox`, `day_stats`, `setup_count`; verlangt Suite-CSRF `X-Kienzle-Csrf`, Vorgangsaktionen zusätzlich `X-CSRF-Token` des Browser-Cookies `ks_browser`), `seiten/settings-api.php` für die Einstellungen.
   - Einstellungen (`seiten/settings.php`, `assets/settings.js`): im Rahmen; Einrichtung als Ausklappzeilen im Stil der Basis, Rotes zuerst.
-  - Rechnungen aus T2med kommen als PDF über den virtuellen Drucker „SumUp-Rechnung“; `T2medInvoice::fromPdf` liest Nummer, Datum, Betrag, Patient (Textebene oder Texterkennung). **Beispiel:** `modules/sumup/tests/fixtures/t2med-beispielrechnung.pdf` (vollständig erfunden, Aufbau der T2med-Liquidation, erzeugt von `make-t2med-beispielrechnung.py`); Hinweise in `modules/sumup/tests/fixtures/README.md`.
+  - Rechnungen aus T2med kommen als PDF über den virtuellen Drucker „vKasse“; `T2medInvoice::fromPdf` liest Nummer, Datum, Betrag, Patient (Textebene oder Texterkennung). **Beispiel:** `modules/sumup/tests/fixtures/t2med-beispielrechnung.pdf` (vollständig erfunden, Aufbau der T2med-Liquidation, erzeugt von `make-t2med-beispielrechnung.py`); Hinweise in `modules/sumup/tests/fixtures/README.md`.
 - **Tests:** `tests/run-all.sh`; PHP-Tests der Basis in `tests/php` (`lib.php` mit `Env`, `browser.php` mit `Browser` und `admin_browser`, `verbindungen_hilfe.php`); Kasse in `modules/sumup/tests` (je Datei `php modules/sumup/tests/<name>.php`).
 - **Bildschirmfotos und Vorschau:** `scripts/bildschirmfotos.php` erzeugt aus der Testumgebung (erfundene Daten) die Seiten der Basis als HTML; `scripts/kasse-vorschau/` startet die Kasse lokal mit erfundenen `KIENZLE_*`-Werten (`php -S 127.0.0.1:8099 -t … router.php`), Aufnahme mit `google-chrome --headless=new --no-sandbox --screenshot`. Anleitung in `docs/screenshots/README.md`.
 
@@ -75,13 +75,13 @@ oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nich
 - Kasse: Storno (neue Stornonummer je Storno, Original bleibt; keine automatische Rückzahlung über SumUp), Nummernformat der IGeL-Rechnungen (`DocNumbers`), Reiter Bezahlt/Zurückgestellt - alles noch nicht auf der echten VM geprüft.
 - Kasse-Startseite (eingebettete Kassenansicht, Direktknöpfe an Rechnungen, Per Post, Tageswerte), Einrichtung als Ausklappzeilen, roter Zähler am Zahnrad.
 - Rahmen der Suite für Modulseiten, Menü-Kopfzeile, Mein Konto mit Avatar, Zahlencode per E-Mail (echter Mailversand, z. B. Gmail), Rechte-Matrix.
-- Wirkt die Durchreich-PPD des virtuellen Druckers (Basis 0.21.3)? Prüfen: `ipptool -tv ipp://localhost:631/printers/SumUp-Rechnung get-printer-attributes.test | grep document-format-supported` (kein `pwg-raster`/`urf`/`jpeg`).
+- Wirkt die Durchreich-PPD des virtuellen Druckers (Basis 0.21.3)? Prüfen: `ipptool -tv ipp://localhost:631/printers/vKasse get-printer-attributes.test | grep document-format-supported` (kein `pwg-raster`/`urf`/`jpeg`).
 - Kasse: Überweisung mit EPC-QR, manuelle Kartenzahlung, „Patient zahlt später“, Letterxpress (echt), seven.io-SMS, Logo auf dem Bondrucker.
 - T2med: Aufruf-URL `kienzle-sumup://…`; HTTP 403 nach Wechsel des Demo-Schlüssels; Namensauflösung `kienzle.praxis.internal` am Windows-PC.
 
 ### Gelöst (zur Erinnerung)
 
-- Terminzettel druckt über den virtuellen Drucker „Terminzettel“; Ausfälle kamen von beschädigter Windows-Druckereinrichtung („Das Handle ist ungültig“): Spooler neu starten, Drucker entfernen, per `http://<Server-IP>:631/printers/<Name>` mit „Microsoft IPP Class Driver“ neu einrichten.
+- Terminzettel druckt über den virtuellen Drucker „vTermine“; Ausfälle kamen von beschädigter Windows-Druckereinrichtung („Das Handle ist ungültig“): Spooler neu starten, Drucker entfernen, per `http://<Server-IP>:631/printers/<Name>` mit „Microsoft IPP Class Driver“ neu einrichten.
 - Virtuelle Drucker nutzen eine Durchreich-PPD (`ppd_text` in `core/lib/kienzle/drucker.py`), damit Windows Text-PDFs statt Bild-PDFs schickt; die Kasse toleriert bei Texterkennung ein um höchstens ein Zeichen abweichend gelesenes Zeichen der Rechnungsnummer.
 - Servername geändert → abhängige Einrichtungspunkte stehen wieder rot („Erneut nötig“).
 

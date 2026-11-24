@@ -137,7 +137,7 @@ final class Seite {
             ['title' => 'Terminzettel: Praxisname im Kopf', 'state' => $name ? 'done' : 'open', 'optional' => true,
                 'hint' => 'Einstellungen → Kopf: Praxisname, Adresse und Logo für den Bon', 'link' => '/terminzettel/#kopf'],
             ['title' => 'Terminzettel aus T2med am Bondrucker angekommen', 'state' => $angekommen ? 'done' : 'open',
-                'hint' => 'Am Arbeitsplatz den Drucker „Terminzettel“ einrichten (Anleitung: Arbeitsplatz einrichten → Virtuelle Drucker) und in T2med unter Einstellungen → Kalender → Terminliste (DIN A6) wählen; dann einen Terminzettel drucken',
+                'hint' => 'Am Arbeitsplatz den Drucker „vTermine“ einrichten (Anleitung: Arbeitsplatz einrichten → Virtuelle Drucker) und in T2med unter Einstellungen → Kalender → Terminliste (DIN A6) wählen; dann einen Terminzettel drucken',
                 'link' => '/terminzettel/#drucker'],
         ];
     }

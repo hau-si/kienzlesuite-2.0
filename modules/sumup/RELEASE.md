@@ -1,5 +1,13 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.28
+
+- Drucker umbenannt: „SumUp-Rechnung“ → vKasse, „Letterxpress“ → vBriefversand; Texte, Anleitungen und PPD-Dateien angepasst. Drucker an den Arbeitsplätzen neu einrichten und in T2med neu wählen.
+- Fußzeile „Kasse v… auf Grundlage von …“ entfernt.
+- Die Schalter „T2med-Rechnung“ (mit Herz) und „IGeL-Leistungen“ (mit Igel) tragen Symbole.
+- Leistungen lassen sich einer Gruppe zuordnen (z. B. Blutwerte, Sonographie, Bescheinigungen, Beratung, Untersuchungen); die Auswahlliste zeigt sie mit Überschriften, die Suche blendet leere Gruppen aus. Neues Feld „Gruppe“ beim Anlegen und Bearbeiten (Datenbankversion 21, bestehende Leistungen bleiben ohne Gruppe).
+- Nicht auf der echten VM geprüft.
+
 ## 2.3.4-beta.27
 
 - Behoben: Die Einstellungen der Kasse zeigten nur „CLIENT_STEPS is not defined“. Die Anleitung für die Arbeitsplatz-Pakete (Windows, Mac, Linux) fehlte im Skript und ist wieder da; ein Test prüft das jetzt.

@@ -347,7 +347,7 @@ class _Checker:
         out, seen = [], set()
         for n, t in enumerate(items, 1):
             where = f'printers[{n}]'
-            name = self.pattern(t, 'name', where, PRINTER, 'SumUp-Rechnung')
+            name = self.pattern(t, 'name', where, PRINTER, 'vKasse')
             if name is not None and name.lower() in seen:
                 self.error(f'{where}.name', f'„{name}“ ist doppelt.')
             seen.add((name or '').lower())

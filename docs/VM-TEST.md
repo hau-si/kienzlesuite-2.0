@@ -145,8 +145,8 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
        der Suite und kehrt danach zurück. Einrichtungs-Überblick der Suite zeigt die Punkte der Kasse.
 6. [ ] Verwaltung → Verbindungen: T2med eintragen (Adresse, API-Key, erlaubte fhirBasisUrl aus T2med). In der Kasse „T2med-Anbindung“
        auf Live: kein Fehler; „T2med-Verbindung der Suite vorhanden“ im Überblick.
-7. [ ] Verwaltung → Drucker: „SumUp-Rechnung“ erscheint als Drucker des Moduls. Am Windows-PC als IPP-Drucker hinzufügen
-       (`http://<server>:631/printers/SumUp-Rechnung`, Papier A4), aus T2med eine Testrechnung (Testpatient) drucken:
+7. [ ] Verwaltung → Drucker: „vKasse“ erscheint als Drucker des Moduls. Am Windows-PC als IPP-Drucker hinzufügen
+       (`http://<server>:631/printers/vKasse`, Papier A4), aus T2med eine Testrechnung (Testpatient) drucken:
        erscheint im Rechnungseingang der Kasse.
 8. [ ] Kassen-PC: Zertifikat der Suite einrichten (Arbeitsplatz einrichten), in der Kasse unter Einstellungen → Arbeitsplätze das
        Paket für Windows laden (Bestätigung), installieren. In T2med den Button „Kartenzahlung“ anlegen (Anleitung in der Kasse).
@@ -157,8 +157,8 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
 ## Modul Terminzettel 1.0.0 (Basis ab 0.19.0)
 
 1. [ ] Verwaltung → Module → Terminzettel installieren (apt: Python-Pakete, Tesseract, Ghostscript). Danach erscheint „Terminzettel“ in der Seitenleiste unter „Anwendungen“ und „Einstellungen“.
-2. [ ] Verwaltung → Drucker: Bondrucker (Epson) einrichten, bei „Wofür welcher Drucker?“ als Bondrucker zuordnen. „Terminzettel“ erscheint als Drucker des Moduls.
+2. [ ] Verwaltung → Drucker: Bondrucker (Epson) einrichten, bei „Wofür welcher Drucker?“ als Bondrucker zuordnen. „vTermine“ erscheint als Drucker des Moduls.
 3. [ ] Einstellungen → Terminzettel: Vorschau erscheint und folgt den Änderungen; „Beispiel-Terminzettel drucken“ druckt einen Bon.
-4. [ ] Arbeitsplatz: Drucker „Terminzettel“ hinzufügen (Windows IPP `http://<server>:631/printers/Terminzettel`, Mac mit dem PDF-Treiber der Seite). In T2med ein Terminblatt drucken: Bon mit Terminen und Kalender-QR. Mit Handy-QR prüfen.
+4. [ ] Arbeitsplatz: Drucker „vTermine“ hinzufügen (Windows IPP `http://<server>:631/printers/vTermine`, Mac mit dem PDF-Treiber der Seite). In T2med ein Terminblatt drucken: Bon mit Terminen und Kalender-QR. Mit Handy-QR prüfen.
 5. [ ] Bild-PDF (Terminblatt als Scan) druckt über die Texterkennung; Firewall lässt Port 631 aus dem Praxisnetz zu.
-6. [ ] Modul entfernen: Drucker „Terminzettel“ verschwindet; Daten bleiben. Erneut installieren: Layout ist wieder da.
+6. [ ] Modul entfernen: Drucker „vTermine“ verschwindet; Daten bleiben. Erneut installieren: Layout ist wieder da.

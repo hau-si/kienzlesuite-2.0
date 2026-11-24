@@ -59,7 +59,7 @@ final class Vorgaenge {
             AND NOT EXISTS (SELECT 1 FROM payments p WHERE p.t2med_invoice=i.invoice_number AND p.payment_status IN ('starting','pending','unknown','cancel_requested','successful') AND p.storno_at IS NULL)
             ORDER BY i.received_at DESC", [$p['from'], $p['to']])->fetchAll() as $i) {
             [$day, $time] = $when((int)$i['received_at']);
-            // Per Post über Letterxpress verschickt (Drucker „Letterxpress“ oder Knopf „Per Post“): Zahlung folgt per Überweisung.
+            // Per Post über Letterxpress verschickt (Drucker „vBriefversand“ oder Knopf „Per Post“): Zahlung folgt per Überweisung.
             $post = in_array($i['lxp_status'], ['sent', 'unknown'], true);
             $status = $post ? ($i['lxp_status'] === 'unknown' ? 'Postversand unklar' : 'per Letterxpress verschickt' . ($i['lxp_mode'] === 'live' ? '' : ' (Test)'))
                 : ((int)$i['received_at'] < $limit ? 'abgelaufen' : ($i['parked_at'] !== null ? 'zurückgestellt' : ($i['transfer_at'] !== null ? 'überwiesen (offen)' : 'offen')));

@@ -122,7 +122,7 @@ final class App {
             'patient' => ['name' => $visit['patient_name'], 'birthdate' => $visit['patient_birthdate']],
             'completed' => $visit['completed_at'] !== null,
             't2med' => !self::isManual($visit) && $visit['patient_id'] !== 'inbox' && $visit['oauth_cipher'] !== '',
-            'services' => array_map(static fn($s) => ['vat' => (bool)$s['vat']] + $s, $this->db->query('SELECT id,label,price_cents,goae_code,factor,fee_type,on_request,vat,base_cents,default_reason FROM services WHERE active=1 ORDER BY label COLLATE NOCASE')->fetchAll()),
+            'services' => array_map(static fn($s) => ['vat' => (bool)$s['vat']] + $s, $this->db->query('SELECT id,label,category,price_cents,goae_code,factor,fee_type,on_request,vat,base_cents,default_reason FROM services WHERE active=1 ORDER BY LENGTH(category)=0, category COLLATE NOCASE, label COLLATE NOCASE')->fetchAll()),
             'tax' => array_intersect_key(Tax::settings($this->config), ['small_business' => 1, 'rate' => 1, 'manual_vat' => 1]),
             'groups' => array_map(static fn($g) => ['id' => $g['id'], 'label' => $g['label'], 'services' => json_decode($g['service_ids_json'], true, 32, JSON_THROW_ON_ERROR)], $this->db->query('SELECT * FROM service_groups WHERE active=1 ORDER BY label COLLATE NOCASE')->fetchAll()),
             'local_receipts' => $this->config->practiceReady(), 'bank_ready' => $this->bank->ready(),
@@ -575,7 +575,7 @@ final class App {
     }
 
     /**
-     * Virtueller Drucker „Letterxpress“: Die Rechnung wird wie im Rechnungseingang gelesen (gleiche Rechnungen aus T2med), erscheint unter Vorgänge
+     * Virtueller Drucker „vBriefversand“: Die Rechnung wird wie im Rechnungseingang gelesen (gleiche Rechnungen aus T2med), erscheint unter Vorgänge
      * und geht sofort per Post an Letterxpress. Letterxpress nimmt nur PDFs mit lesbarem Text an: fehlt er, ergänzt die Texterkennung ihn vorher.
      */
     public function letterPrint(string $pdf): array {
@@ -584,7 +584,7 @@ final class App {
         try {
             $invoice = T2medInvoice::fromPdf($pdf, $this->config->get('app', 'max_amount_cents'), $this->inboxLabels());
         } catch (Problem $e) {
-            (new InboxLog($this->config->get('app', 'state_dir')))->add($e->getMessage(), 'Drucker Letterxpress', T2medInvoice::overview(T2medInvoice::$lastText));
+            (new InboxLog($this->config->get('app', 'state_dir')))->add($e->getMessage(), 'Drucker vBriefversand', T2medInvoice::overview(T2medInvoice::$lastText));
             T2medInvoice::$lastText = '';
             throw $e;
         }
@@ -794,7 +794,7 @@ final class App {
             $row = $this->db->one('SELECT invoice_number,pdf,printed_at FROM invoice_inbox WHERE id=?', [$invoiceId]);
             if (!$row) throw new Problem('Diese Rechnung gibt es nicht (mehr).', 404);
             if ($row['printed_at'] !== null) return ['printed' => true, 'printed_at' => (int)$row['printed_at'], 'message' => 'Diese Rechnung wurde schon gedruckt.'];
-            if ($row['pdf'] === null) throw new Problem('Original-PDF liegt nicht mehr vor. Bitte die Rechnung in T2med erneut auf „SumUp-Rechnung“ drucken.', 409);
+            if ($row['pdf'] === null) throw new Problem('Original-PDF liegt nicht mehr vor. Bitte die Rechnung in T2med erneut auf „vKasse“ drucken.', 409);
             if ($this->config->get('sumup', 'mode') !== 'live') $info = 'Test: ' . $settings['office_label'] . ' (nichts gesendet)';
             else $info = $settings['office_label'] . ', Auftrag ' . $this->office->send($row['pdf'], 'Rechnung ' . $row['invoice_number']);
             $now = time();

@@ -1,5 +1,9 @@
 # Terminzettel – Release-Notizen
 
+## 1.3.0-beta.8
+
+- Drucker umbenannt: „Terminzettel“ → vTermine (PPD `vTermine-PDF.ppd`, Texte angepasst). Am Arbeitsplatz neu einrichten und in T2med neu wählen.
+
 ## 1.3.0-beta.7
 
 - Tooltips bleiben im sichtbaren Bereich (verschoben statt schmaler).

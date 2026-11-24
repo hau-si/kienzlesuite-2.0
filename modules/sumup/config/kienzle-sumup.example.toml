@@ -58,7 +58,7 @@ cut = true
 # Bei „Bar bezahlt“ (T2med-Rechnung) sofort eine Quittung drucken
 cash_receipt_auto = false
 
-# Optional: T2med-Rechnungen über den virtuellen Drucker „SumUp-Rechnung“ übernehmen.
+# Optional: T2med-Rechnungen über den virtuellen Drucker „vKasse“ übernehmen.
 # Der Druckserver sendet die PDF mit diesem Schlüssel an /invoice-inbox.php.
 [invoice_inbox]
 enabled = false
@@ -77,7 +77,7 @@ directory = "Rechnungen/{jahr}/{monat}"
 username = ""
 password = ""
 domain = ""
-# T2med-Rechnungen: paid = nur per Karte bezahlte, received = jede auf SumUp-Rechnung gedruckte.
+# T2med-Rechnungen: paid = nur per Karte bezahlte, received = jede auf vKasse gedruckte.
 when = "paid"
 # Auch die in dieser App erzeugten Rechnungen/Leistungsbelege nach erfolgreicher Zahlung ablegen.
 app_invoices = false

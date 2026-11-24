@@ -20,7 +20,7 @@ try {
     $t2med = ['t2med' => ['base_url' => 'https://t2med.example.org/aps/fhir/api/r4', 'launch_urls' => [], 'api_key' => 'k-beispiel', 'ca_pem' => '', 'pin' => ''],
         'letterxpress' => ['username' => 'praxis-test', 'api_key' => 'lxp-geheim', 'modus' => 'live'],
         'ablage' => ['ausgang' => '', 'ziele' => [['id' => 'steuerbuero', 'name' => 'Steuerbüro']]]];
-    $dirs[] = $root = suite(admin_server(), $t2med, [['name' => 'SumUp-Rechnung', 'description' => 'Kienzle-Suite', 'state' => 'bereit'], ['name' => 'Praxisdrucker', 'description' => '', 'state' => 'bereit']]);
+    $dirs[] = $root = suite(admin_server(), $t2med, [['name' => 'vKasse', 'description' => 'Kienzle-Suite', 'state' => 'bereit'], ['name' => 'Praxisdrucker', 'description' => '', 'state' => 'bereit']]);
 
     (new Database(Suite::$data))->migrate();   // wie der Haken install
 
@@ -149,20 +149,20 @@ try {
     [$code] = page($root, $post + ['HTTP_X_KIENZLE_CSRF' => TEST_CSRF] + $server, json_encode(['action' => 'exchange', 'ticket' => $ticket]));
     check($code === 401, 'Startcode zweimal eingelöst');
 
-    // Virtueller Drucker „SumUp-Rechnung“: nur PDF/PostScript, Auftrag wird danach gelöscht, ausgeschaltet abgelehnt.
+    // Virtueller Drucker „vKasse“: nur PDF/PostScript, Auftrag wird danach gelöscht, ausgeschaltet abgelehnt.
     $env = 'KIENZLE_DATEN=' . escapeshellarg(Suite::$data) . ' KIENZLE_SUITE_HILFE=' . escapeshellarg(dirname(__DIR__, 3) . '/core/php/modul/Kienzle.php');
     $job = Suite::$data . '/auftrag.bin'; file_put_contents($job, "kein PDF");
     exec($env . ' php ' . escapeshellarg(dirname(__DIR__) . '/printer/kienzle-sumup-rechnung') . ' ' . escapeshellarg($job) . ' 2>&1', $o, $rc);
     check($rc === 1 && str_contains(implode("\n", $o), 'Unbekanntes Druckformat') && !is_file($job), 'Drucker nimmt Unbekanntes an oder lässt den Auftrag liegen');
 
-    // Virtueller Drucker „Letterxpress“: gleiche Formatprüfung, Auftrag wird gelöscht; ohne eingeschaltetes Letterxpress kein Versand.
+    // Virtueller Drucker „vBriefversand“: gleiche Formatprüfung, Auftrag wird gelöscht; ohne eingeschaltetes Letterxpress kein Versand.
     $job = Suite::$data . '/auftrag2.bin'; file_put_contents($job, "kein PDF");
     $o = [];
     exec($env . ' php ' . escapeshellarg(dirname(__DIR__) . '/printer/kienzle-letterxpress') . ' ' . escapeshellarg($job) . ' 2>&1', $o, $rc);
-    check($rc === 1 && str_contains(implode("\n", $o), 'Unbekanntes Druckformat') && !is_file($job), 'Drucker Letterxpress nimmt Unbekanntes an oder lässt den Auftrag liegen');
+    check($rc === 1 && str_contains(implode("\n", $o), 'Unbekanntes Druckformat') && !is_file($job), 'Drucker vBriefversand nimmt Unbekanntes an oder lässt den Auftrag liegen');
     $toml = (string)file_get_contents(dirname(__DIR__) . '/module.toml');
     check(substr_count($toml, '[[printers]]') === 2 && str_contains($toml, 'command = "printer/kienzle-letterxpress"') && is_executable(dirname(__DIR__) . '/printer/kienzle-letterxpress')
-        && is_file(dirname(__DIR__) . '/public/assets/Letterxpress-PDF.ppd'), 'Drucker Letterxpress nicht vollständig angelegt');
+        && is_file(dirname(__DIR__) . '/public/assets/vBriefversand-PDF.ppd'), 'Drucker vBriefversand nicht vollständig angelegt');
 
     // Haken: install legt Grundwerte und Datenbank an; busy meldet laufende Zahlungen (75); Überblick als JSON.
     $fresh = sys_get_temp_dir() . '/ks-haken-' . bin2hex(random_bytes(5)); mkdir($fresh, 0700); $dirs[] = $fresh;

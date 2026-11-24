@@ -65,3 +65,9 @@ body.embed { background: transparent; margin: 0; }
 /* Eingebettet gibt es nie einen waagerechten Scrollbalken: der Rahmen der Startseite ist so breit wie der Platz, Überstand würde nur einen Balken unter der Ansicht zeigen. */
 html:has(body.embed), body.embed { overflow-x: hidden; }
 .embed main, .embed #workspace, .embed #selection { min-width: 0; max-width: 100%; }
+
+.work-tab { display: inline-flex; align-items: center; gap: 7px; }
+.work-tab .tab-ico { flex: none; }
+.work-tab .tab-ico.heart { color: #c0392b; }
+.cat-head { margin: 10px 0 2px; padding: 0 4px; font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #738b85; }
+.cat-head:first-child { margin-top: 0; }

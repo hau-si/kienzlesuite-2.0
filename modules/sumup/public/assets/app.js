@@ -186,6 +186,12 @@ function filterServices() {
     const text = row.dataset.search || '', checked = row.querySelector('input')?.checked;
     row.hidden = terms.length > 0 && !checked && !terms.every(t => text.includes(t));
   }
+  // Gruppenüberschrift nur zeigen, wenn darunter noch etwas sichtbar ist.
+  document.querySelectorAll('#services > .cat-head').forEach(head => {
+    let next = head.nextElementSibling, any = false;
+    while (next && !next.classList.contains('cat-head')) { if (!next.hidden) any = true; next = next.nextElementSibling; }
+    head.hidden = !any;
+  });
 }
 function renderServices() {
   $('services').replaceChildren(); $('manage-list').replaceChildren(); $('groups').replaceChildren(); $('group-list').replaceChildren(); $('group-members').replaceChildren();
@@ -193,15 +199,19 @@ function renderServices() {
   const activeGroups = new Set(state.groups.map(g=>g.id)); selectedGroups=new Set([...selectedGroups].filter(id=>activeGroups.has(id)));
   $('groups-section').hidden=!state.groups.length;
   $('empty').hidden = state.services.length > 0;
+  const hasCats = state.services.some(s => s.category);
+  let lastCat = null;
+  $('category-list').replaceChildren(...[...new Set(['Blutwerte', 'Sonographie', 'Bescheinigungen', 'Beratung', 'Untersuchungen', ...state.services.map(s => s.category).filter(Boolean)])].map(c => { const o = document.createElement('option'); o.value = c; return o; }));
   for (const service of state.services) {
+    if (hasCats && (service.category || '') !== lastCat) { lastCat = service.category || ''; $('services').append(element('div', lastCat || 'Weitere Leistungen', 'cat-head')); }
     const label = element('label','','service'); const checkbox = document.createElement('input'); checkbox.type='checkbox'; checkbox.checked=selected.has(service.id);
     checkbox.addEventListener('change', () => { checkbox.checked ? selected.add(service.id) : selected.delete(service.id); startRequest=null; renderBasket(); });
     const name=element('span',service.label,'label'); if(serviceDescription(service)) name.append(element('small',serviceDescription(service),'muted'));
     label.dataset.search = [service.label, service.goae_code, serviceDescription(service)].join(' ').toLowerCase();
     label.append(checkbox, name, element('span',euro(service.price_cents),'price')); $('services').append(label);
-    const row = element('div','','manage-row'); row.append(element('span', service.label+' · '+euro(service.price_cents)+(serviceDescription(service)?' · '+serviceDescription(service):'')));
+    const row = element('div','','manage-row'); row.append(element('span', (service.category ? service.category+' · ' : '')+service.label+' · '+euro(service.price_cents)+(serviceDescription(service)?' · '+serviceDescription(service):'')));
     const edit = element('button','Bearbeiten','text-button'); edit.onclick=() => {
-      $('service-id').value=service.id; $('service-label').value=service.label; $('service-price').value=(service.price_cents/100).toFixed(2).replace('.',',');
+      $('service-id').value=service.id; $('service-label').value=service.label; $('service-category').value=service.category || ''; $('service-price').value=(service.price_cents/100).toFixed(2).replace('.',',');
       $('service-goae').value=service.goae_code; $('service-factor').value=(service.factor || '2.3').replace('.',','); $('service-fee-type').value=service.fee_type;
       $('service-on-request').checked=!!service.on_request; $('service-reason').value=service.default_reason || ''; $('goae-fields').open=!!service.goae_code; $('service-vat').checked=!!service.vat;
       $('service-base').value=service.base_cents?(service.base_cents/100).toFixed(2).replace('.',','):''; $('service-target').value=service.base_cents?$('service-price').value:''; goaeResult('');
@@ -442,7 +452,7 @@ $('service-fee-type').onchange=()=>{
   const fee=state.fee_types[$('service-fee-type').value];
   if(Number($('service-factor').value.replace(',','.'))*100>fee.max) $('service-factor').value=String(fee.threshold/100).replace('.',',');
 };
-$('service-form').onsubmit=e=>{ e.preventDefault(); run(async()=>{ await api('service_save',{id:$('service-id').value,label:$('service-label').value,price:$('service-price').value,goae_code:$('service-goae').value,factor:$('service-factor').value,fee_type:$('service-fee-type').value,on_request:$('service-on-request').checked,default_reason:$('service-reason').value,vat:$('service-vat').checked,base:$('service-goae').value?$('service-base').value:''}); resetForm(); await load(); }); };
+$('service-form').onsubmit=e=>{ e.preventDefault(); run(async()=>{ await api('service_save',{id:$('service-id').value,label:$('service-label').value,category:$('service-category').value,price:$('service-price').value,goae_code:$('service-goae').value,factor:$('service-factor').value,fee_type:$('service-fee-type').value,on_request:$('service-on-request').checked,default_reason:$('service-reason').value,vat:$('service-vat').checked,base:$('service-goae').value?$('service-base').value:''}); resetForm(); await load(); }); };
 $('group-reset').onclick=resetGroup;
 $('group-form').onsubmit=e=>{e.preventDefault();run(async()=>{
   await api('group_save',{id:$('group-id').value,label:$('group-label').value,services:[...$('group-members').querySelectorAll('input:checked')].map(el=>el.value)});

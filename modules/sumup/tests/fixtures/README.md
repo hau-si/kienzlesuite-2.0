@@ -1,7 +1,7 @@
 # Beispielrechnung aus T2med (erfunden)
 
 `t2med-beispielrechnung.pdf` zeigt den Aufbau einer T2med-Privatrechnung („Liquidation“, JasperReports-Vorlage, A4, zwei Seiten, mit Textebene), wie sie
-der virtuelle Drucker „SumUp-Rechnung“ an die Kasse liefert. **Alle Angaben sind erfunden** (Praxis „Dr. med. Erika Beispiel“, Patient „Max Mustermann“,
+der virtuelle Drucker „vKasse“ an die Kasse liefert. **Alle Angaben sind erfunden** (Praxis „Dr. med. Erika Beispiel“, Patient „Max Mustermann“,
 Test-IBAN DE89 3704 0044 0532 0130 00); es gibt keinen Briefkopf und kein Logo. Neu erzeugen: `python3 make-t2med-beispielrechnung.py`.
 
 Was die Kasse (`T2medInvoice::parse`) daraus liest:

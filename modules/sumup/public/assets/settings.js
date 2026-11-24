@@ -172,10 +172,10 @@ function render(data) {
   layoutTabs(data);
 }
 
-// ---- Virtuelle Drucker „SumUp-Rechnung“ und „Letterxpress“ (legt die Suite aus module.toml an) ---------------
+// ---- Virtuelle Drucker „vKasse“ und „vBriefversand“ (legt die Suite aus module.toml an) ---------------
 const PRINTERS = {
-  invoice: {box: 'invoice-printer', queue: 'SumUp-Rechnung', ppd: 'SumUp-Rechnung-PDF.ppd', use: 'In T2med die Rechnung auf diesen Drucker drucken – sie erscheint dann beim Patienten zum Kassieren.'},
-  letter: {box: 'letter-printer', queue: 'Letterxpress', ppd: 'Letterxpress-PDF.ppd', use: 'Für den Sammelversand in T2med vorübergehend den Rechnungsdrucker auf diesen Drucker umstellen: jede gedruckte Rechnung geht sofort per Post an Letterxpress (und erscheint unter Vorgänge). Danach wieder zurückstellen.'},
+  invoice: {box: 'invoice-printer', queue: 'vKasse', ppd: 'vKasse-PDF.ppd', use: 'In T2med die Rechnung auf diesen Drucker drucken – sie erscheint dann beim Patienten zum Kassieren.'},
+  letter: {box: 'letter-printer', queue: 'vBriefversand', ppd: 'vBriefversand-PDF.ppd', use: 'Für den Sammelversand in T2med vorübergehend den Rechnungsdrucker auf diesen Drucker umstellen: jede gedruckte Rechnung geht sofort per Post an Letterxpress (und erscheint unter Vorgänge). Danach wieder zurückstellen.'},
 };
 function renderInvoicePrinter(info) { renderPrinterHelp(PRINTERS.invoice, info); }
 function renderLetterPrinter(info) { renderPrinterHelp(PRINTERS.letter, info); }
@@ -315,10 +315,10 @@ function renderChecklist(data) {
     ...web,
     {ort: 'pc', info: true, label: 'Zertifikat der Suite einrichten (einmal je PC, siehe Arbeitsplatz einrichten der Suite)', card: 's-clients'},
     ...pc,
-    ...(invoiceQueue ? [{ort: 'pc', info: true, label: 'Drucker „SumUp-Rechnung“ am Arbeitsplatz installieren (Windows: IPP-Drucker hinzufügen, Papier A4)', card: 'invoice-printer-help', detail: (data.invoice_printer && data.invoice_printer.url) || ''}] : []),
-    ...(letterQueue ? [{ort: 'pc', info: true, label: 'Drucker „Letterxpress“ am Arbeitsplatz installieren (für den Sammelversand per Post; wie „SumUp-Rechnung“, Papier A4)', card: 'letter-printer-help', detail: (data.letter_printer && data.letter_printer.url) || ''}] : []),
+    ...(invoiceQueue ? [{ort: 'pc', info: true, label: 'Drucker „vKasse“ am Arbeitsplatz installieren (Windows: IPP-Drucker hinzufügen, Papier A4)', card: 'invoice-printer-help', detail: (data.invoice_printer && data.invoice_printer.url) || ''}] : []),
+    ...(letterQueue ? [{ort: 'pc', info: true, label: 'Drucker „vBriefversand“ am Arbeitsplatz installieren (für den Sammelversand per Post; wie „vKasse“, Papier A4)', card: 'letter-printer-help', detail: (data.letter_printer && data.letter_printer.url) || ''}] : []),
     {ort: 't2med', info: true, label: 'Drittanbieter-Zugriff mit Funktionsleisten-Button „Kartenzahlung“ anlegen (Aufruf-Adresse steht bei der T2med-Anbindung)', card: 's-fhir', href: GUIDE_URL, hrefLabel: 'Anleitung mit Bildern'},
-    ...(invoiceQueue ? [{ort: 't2med', info: true, label: 'Rechnungen in T2med auf den zuvor installierten Drucker „SumUp-Rechnung“ drucken', card: 'invoice-printer-help'}] : []),
+    ...(invoiceQueue ? [{ort: 't2med', info: true, label: 'Rechnungen in T2med auf den zuvor installierten Drucker „vKasse“ drucken', card: 'invoice-printer-help'}] : []),
   ];
   const list = $('checklist'); list.replaceChildren();
   const required = items.filter(i => !i.optional && !i.info);

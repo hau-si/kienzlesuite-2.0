@@ -255,7 +255,7 @@ def main() -> int:
     try:
         request = json.loads(sys.stdin.buffer.read(65536).decode("utf-8") or "{}")
         if request.get("format") == "escpos":
-            # Testdruck: exakt die Bytes, die auch der Drucker „Terminzettel“ senden würde.
+            # Testdruck: exakt die Bytes, die auch der Drucker „vTermine“ senden würde.
             cfg = build_config(request.get("overlay", {}))
             payload = app.render_escpos(app.parse_t2med(sample_text()), cfg)
             sys.stdout.buffer.write(b"{}\n" + payload)

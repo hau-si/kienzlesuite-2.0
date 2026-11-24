@@ -1969,11 +1969,18 @@ final class Web {
     }
 
     /** Karte eines virtuellen Druckers: IPP-Adresse zum Kopieren, IPP immer an, Samba als Schalter (speichert sofort), Testseite. */
+    /** Ein Satz, was der virtuelle Drucker macht (Beschriftung aus module.toml). */
+    private function printerPurpose(array $q): string {
+        foreach ((array)($this->modules->all()[$q['modul']]['printers'] ?? []) as $p) if (($p['name'] ?? '') === $q['name']) return (string)($p['label'] ?? '');
+        return '';
+    }
+
     private function virtualPrinterCard(array $q, string $host, string $dis): string {
         $url = 'http://' . $host . ':631/printers/' . rawurlencode((string)$q['name']);
         $samba = in_array('samba', $q['share'], true);
         return '<div class="vp-karte"><div class="vp-kopf"><strong>' . V::h($q['name']) . '</strong> <span class="tag ' . ($q['state'] === 'bereit' || $q['state'] === 'idle' ? 'ok' : 'warn') . '">' . V::h($q['state']) . '</span>'
             . '<span class="muted small vp-modul">Modul ' . V::h($this->modules->name($q['modul'])) . '</span></div>'
+            . ($this->printerPurpose($q) !== '' ? '<p class="vp-zweck">' . V::h($this->printerPurpose($q)) . '</p>' : '')
             . '<div class="vp-adresse"><code>' . V::h($url) . '</code><button type="button" class="link" data-copy="' . V::h($url) . '" title="Adresse kopieren">Kopieren</button></div>'
             . '<div class="vp-fuss"><span class="muted small">Freigabe per IPP: immer an</span>'
             . '<form method="post" action="/verwaltung/drucker" class="inline vp-samba" data-auto>' . $this->hidden('freigabe', ['name' => $q['name']]) . '<input type="hidden" name="ipp" value="1">'
@@ -2017,7 +2024,7 @@ final class Web {
         }
         $head = '<table><tr><th>Name</th><th>Adresse</th><th>Zustand</th><th>Von</th><th></th></tr>';
         $body .= '<h2>Drucker</h2><p class="muted">Echte Drucker und Bondrucker, die in der Praxis stehen.</p>' . ($rows !== '' ? $head . $rows . '</table>' : '<p>Noch keine.</p>')
-            . '<h2>Virtuelle Drucker</h2><p class="muted">Legen Module an (z. B. „SumUp-Rechnung“, „Terminzettel“): In T2med oder anderen Programmen drucken, das Modul verarbeitet den Auftrag. Sie werden nicht von Hand angelegt.</p>'
+            . '<h2>Virtuelle Drucker</h2><p class="muted">Legen Module an (z. B. „vKasse“, „vTermine“): In T2med oder anderen Programmen drucken, das Modul verarbeitet den Auftrag. Sie werden nicht von Hand angelegt.</p>'
             . ($virtualRows !== '' ? '<div class="vp-liste">' . $virtualRows . '</div>' : '<p>Noch keine.</p>')
             . $this->virtualPrinterHelp($st['queues'])
             . '<form method="post" action="/verwaltung/drucker">' . $this->hidden('abgleichen') . '<button' . $dis . '>Virtuelle Drucker der Module abgleichen</button></form>';
@@ -2071,7 +2078,7 @@ final class Web {
     /** Aufklappbare Anleitung: virtuelle Drucker der Module an den Arbeitsplätzen einrichten (Windows, Mac, T2med), im Format der Kasse. */
     private function virtualPrinterHelp(array $queues, bool $inline = false): string {
         $host = $this->printerHost();
-        $ppd = ['Terminzettel' => '/terminzettel/assets/Terminzettel-PDF.ppd', 'SumUp-Rechnung' => '/kasse/assets/SumUp-Rechnung-PDF.ppd', 'Letterxpress' => '/kasse/assets/Letterxpress-PDF.ppd'];
+        $ppd = ['vTermine' => '/terminzettel/assets/vTermine-PDF.ppd', 'vKasse' => '/kasse/assets/vKasse-PDF.ppd', 'vBriefversand' => '/kasse/assets/vBriefversand-PDF.ppd'];
         $blocks = '';
         foreach ($queues as $q) {
             if ($q['modul'] === '') continue;
@@ -2103,9 +2110,9 @@ final class Web {
             . '<p><strong>Voraussetzung:</strong> In der <a href="/verwaltung/firewall">Firewall</a> Drucken (IPP, Port 631) aus dem Praxisnetz erlauben. IPP ist bei jedem virtuellen Drucker immer freigegeben und der Standardweg für Windows, Mac und alle anderen. '
             . 'Die Windows-Freigabe (Samba) ist optional und standardmäßig aus; neues Windows (ab 11 24H2) unterstützt sie nicht mehr.</p>'
             . $blocks
-            . '<h3>In T2med</h3><ul><li>„Terminzettel“: Einstellungen → Kalender → Terminliste (DIN A6), Drucker „Terminzettel“ wählen.</li>'
-            . '<li>„SumUp-Rechnung“: Rechnung aus T2med auf diesen Drucker drucken, sie erscheint danach beim Patienten in der Kasse.</li>'
-            . '<li>„Letterxpress“: Für den Sammelversand per Post in T2med vorübergehend den Rechnungsdrucker auf diesen Drucker umstellen; jede Rechnung geht sofort an Letterxpress.</li></ul>' . ($inline ? '</div>' : '</details>');
+            . '<h3>In T2med</h3><ul><li>„vTermine“: Einstellungen → Kalender → Terminliste (DIN A6), Drucker „vTermine“ wählen.</li>'
+            . '<li>„vKasse“: Rechnung aus T2med auf diesen Drucker drucken, sie erscheint danach beim Patienten in der Kasse.</li>'
+            . '<li>„vBriefversand“: Für den Sammelversand per Post in T2med vorübergehend den Rechnungsdrucker auf diesen Drucker umstellen; jede Rechnung geht sofort an Letterxpress.</li></ul>' . ($inline ? '</div>' : '</details>');
     }
 
     private function saveRoles(Request $r): void {

@@ -42,10 +42,10 @@ Die Aufruf-Adresse steht in der Kasse unter *Einstellungen → Zahlung & T2med* 
 Jetzt erscheint die Schaltfläche beim Patienten. Ein Klick schickt die Patientendaten per FHIR an die Suite.
 Der Starter-Aufruf funktioniert erst, wenn auf dem Arbeitsplatz das Starter-Paket installiert ist (Kasse → Einstellungen, Karte „Arbeitsplätze einrichten“). Die FHIR-Adresse, die T2med mitgibt, muss in der Suite unter *Verwaltung → Verbindungen → T2med* bei „Erlaubte fhirBasisUrl aus T2med“ stehen; bei einer Fehlermeldung zeigt die Seite die tatsächlichen Werte.
 
-## 3. Drucker „SumUp-Rechnung“
+## 3. Drucker „vKasse“
 
-7. In den T2med-Einstellungen unter **Privatabrechnung → Drucker und Schacht** den Drucker **„SumUp-Rechnung“** eintragen
-   (Papier A4; der Drucker muss am Arbeitsplatz installiert sein, siehe Kasse → Einstellungen, Karte „Drucker SumUp-Rechnung“).
+7. In den T2med-Einstellungen unter **Privatabrechnung → Drucker und Schacht** den Drucker **„vKasse“** eintragen
+   (Papier A4; der Drucker muss am Arbeitsplatz installiert sein, siehe Kasse → Einstellungen, Karte „Drucker vKasse“).
 
    ![Privatrechnung-Drucker](screenshots/t2med-7-privatrechnung-drucker.png)
 

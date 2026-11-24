@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Virtueller Drucker „Letterxpress“: Rechnung lesen, Textebene sicherstellen (Texterkennung), sofort per Post senden, unter Vorgänge zeigen. API nachgebildet.
+// Virtueller Drucker „vBriefversand“: Rechnung lesen, Textebene sicherstellen (Texterkennung), sofort per Post senden, unter Vorgänge zeigen. API nachgebildet.
 require dirname(__DIR__) . '/src/bootstrap.php';
 use KienzleSumup\{App, Config, HttpClient, InvoiceExport, PdfText, Problem, Vorgaenge};
 
@@ -104,7 +104,7 @@ try {
         $r4 = $app4->letterPrint($text);
         check(count($http4->calls) === 1 && $r4['filed'] === false && str_contains($r4['message'], 'NICHT in der Ablage'), 'Fehler der Ablage stoppt den Versand oder bleibt unbemerkt');
     }
-    echo "OK: Drucker Letterxpress: Lesen, Texterkennung, Versand, Schutz vor Doppelversand, Vorgänge.\n";
+    echo "OK: Drucker vBriefversand: Lesen, Texterkennung, Versand, Schutz vor Doppelversand, Vorgänge.\n";
 } finally {
     foreach ($dirs as $dir) { if (is_dir($dir)) { foreach (glob($dir . '/*') as $f) @unlink($f); @rmdir($dir); } }
 }

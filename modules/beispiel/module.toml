@@ -43,14 +43,14 @@ settings = ["/var/lib/kienzle/beispiel/einstellungen.json"]
 
 [[printers]]
 name = "Beispiel-Drucker"
-label = "Virtueller Drucker des Beispielmoduls"
+label = "Beispiel: Nimmt Druckaufträge für das Beispielmodul an."
 ppd = "printer/beispiel.ppd"
 backend = "printer/kienzle-beispiel-backend"
 share = ["samba", "ipp"]
 
 [[printers]]
 name = "Beispiel-PDF"
-label = "Virtueller PDF-Drucker des Beispielmoduls (IPP Everywhere)"
+label = "Beispiel: Nimmt PDF-Aufträge für das Beispielmodul an."
 command = "printer/kienzle-beispiel-druck"
 formats = ["application/pdf"]
 share = ["ipp"]

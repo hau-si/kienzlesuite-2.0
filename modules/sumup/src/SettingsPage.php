@@ -102,7 +102,7 @@ final class SettingsPage {
         $config = Settings::save($this->db, $this->base, $section, $values);
         Module::refreshOverview($config);
         $message = 'Gespeichert. Gilt ab sofort für alle Arbeitsplätze.';
-        if ($section === 'invoice_inbox' && $config->get('invoice_inbox', 'enabled', false)) $message .= ' Der Drucker „SumUp-Rechnung“ steht in der Suite bereit (Verwaltung → Drucker).';
+        if ($section === 'invoice_inbox' && $config->get('invoice_inbox', 'enabled', false)) $message .= ' Der Drucker „vKasse“ steht in der Suite bereit (Verwaltung → Drucker).';
         return $this->view() + ['message' => $message];
     }
 

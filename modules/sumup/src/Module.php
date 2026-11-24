@@ -4,12 +4,12 @@ namespace KienzleSumup;
 
 /** Angaben des Moduls für Einstellungsseite, Einrichtungs-Überblick der Suite und Haken. */
 final class Module {
-    public const INVOICE_QUEUE = 'SumUp-Rechnung';
-    public const LETTER_QUEUE = 'Letterxpress';
+    public const INVOICE_QUEUE = 'vKasse';
+    public const LETTER_QUEUE = 'vBriefversand';
 
     public static function version(): string { return trim((string)@file_get_contents(dirname(__DIR__) . '/VERSION')); }
 
-    /** Zustand des virtuellen Druckers „SumUp-Rechnung“ (legt die Basis aus module.toml an). */
+    /** Zustand des virtuellen Druckers „vKasse“ (legt die Basis aus module.toml an). */
     public static function invoicePrinter(Config $config): array {
         $queue = null;
         try {
@@ -19,7 +19,7 @@ final class Module {
             'url' => 'http://' . Suite::host() . ':631/printers/' . self::INVOICE_QUEUE, 'ips' => []];
     }
 
-    /** Zustand des virtuellen Druckers „Letterxpress“ (Sammelversand per Post; nur sinnvoll bei eingeschaltetem Letterxpress). */
+    /** Zustand des virtuellen Druckers „vBriefversand“ (Sammelversand per Post; nur sinnvoll bei eingeschaltetem Letterxpress). */
     public static function letterPrinter(Config $config): array {
         $queue = null;
         try {
@@ -48,7 +48,7 @@ final class Module {
         ];
         if ($config->get('invoice_inbox', 'enabled', false)) {
             $q = self::invoicePrinter($config)['queue'];
-            $items[] = ['title' => 'Drucker „SumUp-Rechnung“ ' . ($q ? 'bereit' : 'fehlt'), 'state' => $q ? 'done' : 'error',
+            $items[] = ['title' => 'Drucker „vKasse“ ' . ($q ? 'bereit' : 'fehlt'), 'state' => $q ? 'done' : 'error',
                 'hint' => $q ? 'In T2med die Rechnung auf diesen Drucker drucken' : 'Verwaltung → Drucker der Suite: virtuelle Drucker abgleichen', 'link' => $link('invoice-printer-help')];
         }
         if ($config->get('letterxpress', 'enabled', false)) {
@@ -56,8 +56,8 @@ final class Module {
             try {
                 foreach (Suite::modul()->drucker() as $d) if ($d['name'] === self::LETTER_QUEUE) $q = $d;
             } catch (\Throwable) {}
-            $items[] = ['title' => 'Drucker „Letterxpress“ ' . ($q ? 'bereit' : 'fehlt'), 'state' => $q ? 'done' : 'error',
-                'hint' => $q ? 'Rechnungen aus T2med, die darauf gedruckt werden, gehen sofort per Post an Letterxpress (Windows: IPP-Drucker wie „SumUp-Rechnung“ hinzufügen, Papier A4)' : 'Verwaltung → Drucker der Suite: virtuelle Drucker abgleichen', 'link' => $link('s-letterxpress')];
+            $items[] = ['title' => 'Drucker „vBriefversand“ ' . ($q ? 'bereit' : 'fehlt'), 'state' => $q ? 'done' : 'error',
+                'hint' => $q ? 'Rechnungen aus T2med, die darauf gedruckt werden, gehen sofort per Post an Letterxpress (Windows: IPP-Drucker wie „vKasse“ hinzufügen, Papier A4)' : 'Verwaltung → Drucker der Suite: virtuelle Drucker abgleichen', 'link' => $link('s-letterxpress')];
         }
         foreach (['printing' => 'Bondrucker', 'office_printing' => 'Praxisdrucker (A4)'] as $section => $label) {
             if (!$config->get($section, 'enabled', false)) continue;
@@ -75,7 +75,7 @@ final class Module {
             $items[] = ['title' => 'Ablage: Ziel im Netzwerkspeicher fehlt', 'state' => 'error', 'hint' => 'Verwaltung → Verbindungen der Suite, dann hier wählen', 'link' => $link('s-invoice_export')];
         }
         $items[] = ['title' => 'Rechnung per Post über Letterxpress versenden', 'state' => $config->get('letterxpress', 'enabled', false) ? 'done' : 'open', 'optional' => true,
-            'hint' => 'Einstellungen → Praxis & Rechnungen (Sammelversand aus T2med über den Drucker „Letterxpress“)', 'link' => $link('s-letterxpress')];
+            'hint' => 'Einstellungen → Praxis & Rechnungen (Sammelversand aus T2med über den Drucker „vBriefversand“)', 'link' => $link('s-letterxpress')];
         $items[] = ['title' => 'Rechnungen im Netzwerkspeicher ablegen (z. B. für die Steuerberatung)', 'state' => $config->get('invoice_export', 'enabled', false) ? 'done' : 'open', 'optional' => true,
             'hint' => 'Einstellungen → Praxis & Rechnungen', 'link' => $link('s-invoice_export')];
         $stale = !self::clientsCurrent($config) && trim((string)@file_get_contents(rtrim((string)$config->get('app', 'state_dir'), '/') . '/starter-zertifikat')) !== '';

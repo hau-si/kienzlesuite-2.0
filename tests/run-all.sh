@@ -68,6 +68,11 @@ php modules/terminzettel/tests/seite.php
 grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/terminzettel/module.toml | head -1)" modules/terminzettel/VERSION || { echo 'modules/terminzettel/VERSION passt nicht zu module.toml'; exit 1; }
 sh -n modules/terminzettel/printer/kienzle-terminzettel && for h in modules/terminzettel/bin/*; do sh -n "$h"; done
 
+step 'Modul Unterschrift (modules/unterschrift/tests)'
+php modules/unterschrift/tests/unterschrift.php
+grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/unterschrift/module.toml | head -1)" modules/unterschrift/VERSION || { echo 'modules/unterschrift/VERSION passt nicht zu module.toml'; exit 1; }
+for h in modules/unterschrift/bin/*; do sh -n "$h"; done
+
 step 'module.toml: alle Module im Repository'
 core/bin/kienzle-modul-pruefen --alle modules
 
