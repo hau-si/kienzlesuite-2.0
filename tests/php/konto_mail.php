@@ -23,16 +23,22 @@ function test_konto_profilkopf_und_email_bestaetigen(): void {
     check(str_contains($p, '<span class="tag rollentag"><span class="rolle" title="Arzt">') && str_contains($p, 'class="rb"'), 'Gruppe Arzt nicht als Rolle/Avatar-Symbol sichtbar');
     check(str_contains($b->get('/verwaltung/benutzer')->body, 'avatar klein'), 'Avatar in der Benutzerliste fehlt');
     $r = $b->post('/konto/email', ['email' => 'anna@example.org']);
-    check($r->status === 200 && str_contains($r->body, 'Bestätigungslink an anna@example.org'), 'Bestätigung nicht angestoßen: ' . $r->status);
+    check($r->status === 200 && str_contains($r->body, 'Bestätigungscode an anna@example.org'), 'Bestätigung nicht angestoßen: ' . $r->status);
     $q = req_v($env);
-    check($q['action'] === 'mail-senden' && $q['an'] === 'anna@example.org' && preg_match('#/konto/email-bestaetigen\?t=([A-Za-z0-9_-]{43})#', $q['text'], $m) === 1, 'Anfrage mit Bestätigungslink fehlt');
+    check($q['action'] === 'mail-senden' && $q['an'] === 'anna@example.org' && preg_match('#\n(\d{4}-\d{4}-\d{4}-\d{4})\n#', $q['text'], $m) === 1 && !str_contains($q['text'], 'http'), 'Anfrage mit Bestätigungscode (ohne Link) fehlt');
     $id = (int)$env->users->byLogin('anna')['id'];
     check($env->users->email($id) === '', 'Adresse gilt schon vor der Bestätigung');
-    $bad = $b->get('/konto/email-bestaetigen?t=' . str_repeat('a', 43));
-    check($bad->status === 422 && $env->users->email($id) === '', 'falscher Token angenommen');
-    $ok = $b->get('/konto/email-bestaetigen?t=' . $m[1]);
+    $bad = $b->post('/konto/email-code', ['code' => '0000-0000-0000-0000']);
+    check(str_contains($bad->body, 'Der Code stimmt nicht') && $env->users->email($id) === '', 'falscher Code angenommen');
+    $ok = $b->post('/konto/email-code', ['code' => str_replace('-', ' ', $m[1])]);
     check($ok->status === 200 && $env->users->email($id) === 'anna@example.org' && str_contains($ok->body, 'bestätigt'), 'Bestätigung gilt nicht');
-    check($b->get('/konto/email-bestaetigen?t=' . $m[1])->status === 422, 'Token zweimal verwendbar');
+    check(str_contains($b->post('/konto/email-code', ['code' => $m[1]])->body, 'Der Code stimmt nicht'), 'Code zweimal verwendbar');
+    // Fünf falsche Eingaben verbrauchen den Code, auch der richtige gilt danach nicht mehr.
+    $b->post('/konto/email', ['email' => 'anna2@example.org']);
+    $code2 = req_v($env); preg_match('#\n(\d{4}-\d{4}-\d{4}-\d{4})\n#', $code2['text'], $m2);
+    for ($i = 0; $i < 5; $i++) $b->post('/konto/email-code', ['code' => '1111-1111-1111-1111']);
+    $b->post('/konto/email-code', ['code' => $m2[1]]);
+    check($env->users->email($id) === 'anna@example.org', 'Code nach fünf Fehlversuchen noch gültig');
     // gleiche Adresse bei zweitem Konto abgelehnt
     $env->user('bert');
     check(str_contains((string)(function () use ($env) { try { $env->users->emailStart((int)$env->users->byLogin('bert')['id'], 'ANNA@example.org'); return ''; } catch (Kienzle\Core\Problem $e) { return $e->getMessage(); } })(), 'schon von einem anderen'), 'doppelte Adresse angenommen');
@@ -44,7 +50,7 @@ function test_konto_profilkopf_und_email_bestaetigen(): void {
 function test_passwort_vergessen_per_mail(): void {
     [$env, $c] = con_env(['mail' => ['art' => 'smtp', 'absender' => 'suite@example.org']]);
     [$bid] = $env->user('bert');
-    $env->users->emailConfirm($bid, (function () use ($env, $bid) { return $env->users->emailStart($bid, 'bert@example.org'); })());
+    $env->users->emailConfirm($bid, $env->users->emailStart($bid, 'bert@example.org'));
     [$aid] = $env->user('chef', true, 'Wiesen-Blume-Fahrrad-7', true);
     $env->users->emailConfirm($aid, $env->users->emailStart($aid, 'chef@example.org'));
     $b = mail_browser($env, $c);

@@ -61,7 +61,8 @@ final class Users {
     }
 
     // ---- E-Mail-Adresse (für den Link „Passwort vergessen“) -------------------------------------------------------
-    public const MAIL_SECONDS = 86400;
+    public const MAIL_SECONDS = 3600;
+    public const MAIL_VERSUCHE = 5;
 
     /** Bestätigte E-Mail-Adresse oder ''. */
     public function email(int $id): string { return (string)$this->db->setting('mail.adresse.' . $id); }
@@ -72,22 +73,30 @@ final class Users {
         return $row ? $this->find((int)substr($row['key'], strlen('mail.adresse.'))) : null;
     }
 
-    /** Neue Adresse vormerken; liefert den Bestätigungs-Token für den Link in der E-Mail. */
+    /** Neue Adresse vormerken; liefert den Bestätigungscode (16 Ziffern, in Vierergruppen) für die E-Mail. Ein Link wäre lokal nicht erreichbar. */
     public function emailStart(int $id, string $address): string {
         $this->require($id);
         $address = trim($address);
         if (!filter_var($address, FILTER_VALIDATE_EMAIL) || strlen($address) > 254) throw new Problem('Bitte eine gültige E-Mail-Adresse eingeben.', 422);
         $other = $this->byEmail($address);
         if ($other && (int)$other['id'] !== $id) throw new Problem('Diese Adresse wird schon von einem anderen Konto verwendet.', 409);
-        $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
-        $this->db->store('mail.offen.' . $id, json_encode(['a' => $address, 'h' => hash('sha256', $token), 'e' => time() + self::MAIL_SECONDS], JSON_THROW_ON_ERROR));
-        return $token;
+        $digits = '';
+        for ($i = 0; $i < 16; $i++) $digits .= (string)random_int(0, 9);
+        $this->db->store('mail.offen.' . $id, json_encode(['a' => $address, 'h' => hash('sha256', $digits), 'e' => time() + self::MAIL_SECONDS, 'v' => 0], JSON_THROW_ON_ERROR));
+        return implode('-', str_split($digits, 4));
     }
 
-    /** Link bestätigt → Adresse gilt; liefert sie, sonst null. */
-    public function emailConfirm(int $id, string $token): ?string {
+    /** Code bestätigt → Adresse gilt; liefert sie, sonst null. Nach fünf falschen Eingaben ist der Code verbraucht. */
+    public function emailConfirm(int $id, string $code): ?string {
         $p = json_decode((string)$this->db->setting('mail.offen.' . $id), true);
-        if (!is_array($p) || (int)($p['e'] ?? 0) < time() || !hash_equals((string)($p['h'] ?? ''), hash('sha256', $token))) return null;
+        if (!is_array($p) || (int)($p['e'] ?? 0) < time()) return null;
+        $digits = preg_replace('/\D+/', '', $code);
+        if (!hash_equals((string)($p['h'] ?? ''), hash('sha256', (string)$digits))) {
+            $p['v'] = (int)($p['v'] ?? 0) + 1;
+            if ($p['v'] >= self::MAIL_VERSUCHE) $this->db->query('DELETE FROM settings WHERE key=?', ['mail.offen.' . $id]);
+            else $this->db->store('mail.offen.' . $id, json_encode($p, JSON_THROW_ON_ERROR));
+            return null;
+        }
         $other = $this->byEmail((string)$p['a']);
         if ($other && (int)$other['id'] !== $id) return null;
         $this->db->store('mail.adresse.' . $id, (string)$p['a']);

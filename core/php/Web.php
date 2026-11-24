@@ -82,7 +82,7 @@ final class Web {
             'POST /konto/codes' => fn() => $this->newCodes(),
             'POST /konto/telefon' => fn() => $this->savePhone($r),
             'POST /konto/email' => fn() => $this->saveEmail($r),
-            'GET /konto/email-bestaetigen' => fn() => $this->confirmEmail($r),
+            'POST /konto/email-code' => fn() => $this->confirmEmail($r),
             'POST /konto/geraete' => fn() => $this->revoke($r),
             'POST /konto/passkey/optionen' => fn() => $this->passkeyRegisterOptions(),
             'POST /konto/passkey' => fn() => $this->passkeyRegister($r),
@@ -780,10 +780,10 @@ final class Web {
                 $notice = 'E-Mail-Adresse entfernt.';
             } else {
                 if (!$this->mailReady()) throw new Problem('Der E-Mail-Versand ist nicht eingerichtet (Verwaltung → Verbindungen). Ohne ihn lässt sich die Adresse nicht bestätigen.', 409);
-                $token = $this->users->emailStart($uid, $address);
-                $this->con()->sendMail($address, 'Kienzle-Suite: E-Mail-Adresse bestätigen', "Hallo " . ($user['display'] ?: $user['login']) . ",\n\nmit diesem Link bestätigst du diese Adresse für dein Konto (24 Stunden gültig). Du musst dazu angemeldet sein:\n\n"
-                    . 'https://' . $this->config->hostnames[0] . '/konto/email-bestaetigen?t=' . $token . "\n\nWar das nicht deine Anfrage, kannst du diese Nachricht ignorieren.\n");
-                $notice = 'Bestätigungslink an ' . $address . ' geschickt. Die Adresse gilt, sobald du den Link geöffnet hast.';
+                $code = $this->users->emailStart($uid, $address);
+                $this->con()->sendMail($address, 'Kienzle-Suite: E-Mail-Adresse bestätigen', "Hallo " . ($user['display'] ?: $user['login']) . ",\n\ndein Bestätigungscode für diese Adresse (1 Stunde gültig):\n\n" . $code
+                    . "\n\nGib ihn in der Kienzle-Suite unter „Mein Konto → E-Mail-Adresse“ ein. Du musst dazu angemeldet sein.\n\nWar das nicht deine Anfrage, kannst du diese Nachricht ignorieren.\n");
+                $notice = 'Bestätigungscode an ' . $address . ' geschickt. Gib ihn unten ein, dann gilt die Adresse.';
             }
         } catch (Problem $e) {
             return $this->account($e->getMessage());
@@ -794,8 +794,8 @@ final class Web {
 
     private function confirmEmail(Request $r): Response {
         $uid = (int)$this->session['user_id'];
-        $address = $this->users->emailConfirm($uid, $r->get('t', 60));
-        if ($address === null) return $this->account('Der Bestätigungslink ist abgelaufen, ungültig oder gehört zu einem anderen Konto. Bitte die Adresse unter „E-Mail-Adresse“ noch einmal eintragen.');
+        $address = $this->users->emailConfirm($uid, $r->field('code', 40));
+        if ($address === null) return $this->account('Der Code stimmt nicht oder ist abgelaufen (fünf Versuche, eine Stunde). Bitte die Adresse oben noch einmal eintragen, dann kommt ein neuer Code.');
         $this->audit->write((string)$this->session['login'], 'email-bestaetigt');
         return $this->account(null, 'E-Mail-Adresse ' . $address . ' bestätigt.');
     }
@@ -827,9 +827,10 @@ final class Web {
             . '<h2>E-Mail-Adresse</h2><p>Mit einer bestätigten Adresse kannst du dir auf der Anmeldeseite selbst einen Link zum Neusetzen des Passworts schicken lassen'
             . ($this->users->needsOtp($user) ? ' (für Admin-Konten mit Authenticator-App gilt das nicht: sie werden an der Server-Konsole zurückgesetzt)' : '') . '.'
             . ($this->mailReady() ? '' : ' <strong>Der E-Mail-Versand ist noch nicht eingerichtet</strong> (Verwaltung → Verbindungen).') . '</p>'
-            . ($pending !== '' ? '<p class="notice">Wartet auf Bestätigung: ' . V::h($pending) . '. Den Link in der E-Mail öffnen.</p>' : '')
+            . ($pending !== '' ? '<p class="notice">Wartet auf Bestätigung: ' . V::h($pending) . '. Den Code aus der E-Mail hier eingeben.</p><form method="post" action="/konto/email-code" class="box">' . $csrf
+                . V::input('code', 'Bestätigungscode (z. B. 1234-5678-9012-3456)', 'text', '', 'inputmode="numeric" autocomplete="one-time-code" maxlength="24" required placeholder="0000-0000-0000-0000"') . '<button>Code bestätigen</button></form>' : '')
             . '<form method="post" action="/konto/email" class="box">' . $csrf . V::input('email', 'E-Mail-Adresse (leer lassen zum Entfernen)', 'email', $mail !== '' ? $mail : $pending, 'maxlength="254" autocomplete="email" placeholder="name@praxis.de"')
-            . '<button>Bestätigungslink schicken</button></form>'
+            . '<button>Bestätigungscode schicken</button></form>'
             . '<h2>Passwort ändern</h2><form method="post" action="/konto/passwort" class="box">' . $csrf
             . V::input('current', 'Bisheriges Passwort', 'password', '', 'autocomplete="current-password" required')
             . V::input('password', 'Neues Passwort', 'password', '', 'autocomplete="new-password" required')

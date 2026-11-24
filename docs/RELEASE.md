@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.33
+
+- Mein Konto: Die E-Mail-Adresse wird jetzt mit einem Zahlencode bestätigt (16 Ziffern in Vierergruppen, z. B. 1234-5678-9012-3456) statt mit einem Link, denn ein Link ist im lokalen Netz oft nicht erreichbar. Der Code wird in Mein Konto eingegeben, gilt eine Stunde und ist nach fünf falschen Eingaben verbraucht. Der Link zum Zurücksetzen des Passworts („Passwort vergessen?“) bleibt unverändert.
+
 ## 0.21.4-beta.32
 
 - Module können ihre Seiten im Rahmen der Suite zeigen (Seitenleiste, Kopf, Praxisname): neue Kopfzeile `X-Kienzle-Menue` der Anmelde-Prüfung (schlank, ohne zusätzliche Anfrage und ohne Sitzungs-Marke) und die Helfer `menue()` und `rahmen()` im PHP-Modul-Helfer; Beschreibung in docs/MODUL-SCHNITTSTELLE.md.
