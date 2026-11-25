@@ -1,5 +1,11 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.6
+
+- **Verbindungstest zum Pad:** Neues Programm `lib/padtest.py`. Es sucht das signotec Delta per IP (Ethernet), liest Typ, Seriennummer und Firmware, öffnet das Pad und zeigt 5 Sekunden einen Testtext. Aufruf auf dem Server: `sudo -u ks-signatur python3 /opt/kienzle/signatur/current/signatur/lib/padtest.py <IP> 1002`. Noch ohne Knopf auf der Seite.
+- Die Pad-Bibliothek verlangt `libtiff.so.5`, das es auf Ubuntu 24.04 nicht mehr gibt (dort `libtiff.so.6`). Das Testprogramm legt dafür im Bibliotheksordner einen Verweis an. Lädt die Bibliothek ohne Fehler, ist das für den späteren Dienst die Lösung.
+- Nicht an echter Hardware geprüft; lokal nur mit einer nicht vorhandenen IP (meldet „Kein Pad gefunden“).
+
 ## 0.1.0-beta.5
 
 - Seite mit Kategorie-Zeile „Signatur“ und Titel „Unterschriften“ wie die anderen Seiten; Formularfelder in voller Kartenbreite; Seitenbreite wie die Basis (940 px). Nicht im Browser geprüft.

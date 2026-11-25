@@ -70,6 +70,7 @@ sh -n modules/terminzettel/printer/kienzle-terminzettel && for h in modules/term
 
 step 'Modul Signatur (modules/signatur/tests)'
 php modules/signatur/tests/signatur.php
+(cd modules/signatur/tests && python3 -B -m unittest discover -s . -p 'test_*.py')
 grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/signatur/module.toml | head -1)" modules/signatur/VERSION || { echo 'modules/signatur/VERSION passt nicht zu module.toml'; exit 1; }
 for h in modules/signatur/bin/*; do sh -n "$h"; done
 
