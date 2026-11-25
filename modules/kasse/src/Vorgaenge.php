@@ -51,7 +51,7 @@ final class Vorgaenge {
             $number = (string)($r['t2med_invoice'] ?: ($r['doc_number'] ?: ($r['transaction_id'] ?: $r['reference'])));
             $out[] = ['id' => $r['id'], 'source' => 'payment', 'date' => $day, 'time' => $time, 'art' => $t2med ? 'T2med' : 'IGeL', 'number' => $number, 'patient' => (string)$r['pname'], 'birthdate' => (string)$r['pbirth'],
                 'method' => $method, 'status' => $status, 'invoice_cents' => $amount, 'vat_cents' => $vat, 'net_cents' => $t2med ? 0 : $amount - $vat, 'paid_cents' => $status === 'bezahlt' ? $amount : 0, 'storno' => (string)($r['snumber'] ?? ''),
-                'done_date' => $r['t2med_done_at'] !== null ? $when((int)$r['t2med_done_at'])[0] : '', 'can_done' => $t2med && $r['payment_status'] === 'successful' && $r['storno_at'] === null, 'sort' => (int)($r['paid_at'] ?? $r['created_at'])];
+                'done_date' => $r['t2med_done_at'] !== null ? $when((int)$r['t2med_done_at'])[0] : '', 'can_done' => $t2med && $r['payment_status'] === 'successful' && $r['storno_at'] === null, 'can_storno' => $r['storno_at'] === null && in_array($r['payment_status'], ['successful', 'transfer_open'], true), 'sort' => (int)($r['paid_at'] ?? $r['created_at'])];
         }
         // Noch nicht bezahlte T2med-Rechnungen aus dem Eingang (offen, zurückgestellt, überwiesen, abgelaufen).
         $limit = time() - $this->config->get('invoice_inbox', 'max_age_days', 14) * 86400;

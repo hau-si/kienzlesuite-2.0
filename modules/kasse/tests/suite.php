@@ -110,6 +110,16 @@ try {
     $vg = fn(array $rights, array $in) => page($root, $post + ['HTTP_X_KIENZLE_CSRF' => TEST_CSRF] + staff_server($rights), json_encode($in));
     [$code, $out] = $vg(['kassieren'], ['action' => 'vorgaenge', 'art' => 'tag', 'date' => date('Y-m-d')]);
     check($code === 200 && (json_decode($out, true)['rights']['periods'] ?? null) === false, 'Tagesansicht ohne Zusatzrecht: ' . $out);
+    check((json_decode($out, true)['rights']['storno'] ?? null) === false, 'Storno-Recht ohne Recht angezeigt: ' . $out);
+    // Stornieren aus der Vorgänge-Liste: nur mit dem Recht „storno“ (ohne „kassieren“ erlaubt, mit ungültiger Zahlung 422), sonst 403.
+    [$code, $out] = $vg(['storno'], ['action' => 'vorgaenge', 'art' => 'tag', 'date' => date('Y-m-d')]);
+    check($code === 200 && (json_decode($out, true)['rights']['storno'] ?? null) === true, 'Vorgänge mit Recht „storno“: ' . $code);
+    [$code] = $vg(['storno'], ['action' => 'storno', 'payment_id' => 'x', 'note' => '']);
+    check($code === 422, 'Storno mit Recht „storno“ und ungültiger Zahlung: ' . $code);
+    [$code] = $vg(['export'], ['action' => 'storno', 'payment_id' => str_repeat('a', 32), 'note' => '']);
+    check($code === 403, 'Storno ohne Recht „storno“: ' . $code);
+    $js = (string)file_get_contents(dirname(__DIR__) . '/public/assets/vorgaenge.js');
+    check(str_contains($js, 'sortieren(') && str_contains($js, "api('storno'") && str_contains((string)file_get_contents(dirname(__DIR__) . '/seiten/vorgaenge.php'), 'data-key="number"'), 'Sortierung und Storno in der Vorgänge-Liste');
     [$code] = $vg(['kassieren'], ['action' => 'vorgaenge', 'art' => 'woche', 'date' => date('Y-m-d')]);
     check($code === 200, 'Wochenansicht ohne Zusatzrecht');
     foreach (['monat', 'jahr'] as $art) { [$code] = $vg(['kassieren'], ['action' => 'vorgaenge', 'art' => $art, 'date' => date('Y-m-d')]); check($code === 403, $art . 'sansicht ohne Recht „periods“'); }

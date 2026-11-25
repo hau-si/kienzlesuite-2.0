@@ -15,8 +15,6 @@ Installierbar nur auf einer Test-VM ([docs/VM-TEST.md](docs/VM-TEST.md)); Fax, T
 
 ## So sieht es aus
 
-**Erklärvideo (2:38 Minuten, ohne Ton):** [docs/video/Kienzle-Suite-Ueberblick.mp4](docs/video/Kienzle-Suite-Ueberblick.mp4) – alle Module im Überblick, mit erfundenen Beispieldaten.
-
 Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu erzeugen mit `bash scripts/bildschirmfotos.sh` ([Hinweise](docs/screenshots/README.md)).
 
 **Eine Anmeldung für alle Module** – Passwort oder Passkey. Basis-Admins brauchen zusätzlich einen Code aus der Authenticator-App (OTP).

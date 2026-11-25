@@ -1,5 +1,10 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.40
+
+- **Vorgänge: Stornieren direkt in der Liste.** Bei bezahlten und offenen Rechnungen steht rechts der Knopf „Stornieren“ (mit Rückfrage und optionalem Grund; es entsteht wie bisher eine Stornorechnung mit neuer Nummer). Sichtbar und erlaubt nur mit dem Recht „Rechnungen stornieren“, das jetzt auch allein zum Öffnen der Vorgänge genügt.
+- **Vorgänge: Sortieren per Klick auf die Spaltenüberschrift** (Datum, Art, Nummer, Patient, Zahlung, Status, Betrag, In T2med); noch einmal klicken kehrt die Reihenfolge um. Nicht auf der VM geprüft.
+
 ## 2.3.4-beta.39
 
 - Verweise auf die neue Seite „Arbeitsplätze“ (Paket für den Arbeitsplatz) statt auf „Starter“. Die Migration von „sumup“ ist entfernt. Nicht auf der VM geprüft.
