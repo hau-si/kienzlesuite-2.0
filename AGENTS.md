@@ -38,7 +38,7 @@ Oberfläche, Hilfetexte, Dokumentation und Commit-Nachrichten auf Deutsch.
 
 ## Hinweise für neue Sitzungen (Stand 25.11.2026)
 
-**Stand:** Basis 0.21.4-beta.60, Kasse (`sumup`) 2.3.4-beta.37, Terminzettel 1.3.0-beta.14, Signatur 0.1.0-beta.16; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
+**Stand:** Basis 0.21.4-beta.61, Kasse (`sumup`) 2.3.4-beta.37, Terminzettel 1.3.0-beta.14, Signatur 0.1.0-beta.16; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
 (Basis 0.19.1). Der Nutzer testet auf einer echten Ubuntu-26.04-VM (Aktualisierung dort: `cd ~/kienzlesuite-2.0 && git pull && sudo bash installer/install.sh`,
 oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nicht ins Repository.
 
@@ -53,6 +53,11 @@ oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nich
 - Nie echte Daten (Namen, Adressen, IBAN, Praxisbilder) in Repository, Tests oder Bildern; nur erfundene Beispiele (`example.org`, 192.0.2.0/24, „Max Mustermann“, „Dr. med. Erika Beispiel“).
 - Keine `rm -rf *`-artigen Befehle (die Sicherheitsprüfung blockiert sie); gezielt löschen.
 - „MFA“ in Gruppen heißt Medizinische Fachangestellte (nicht Multi-Faktor).
+
+### Werkzeuge für Bilder und Video
+
+- `bash scripts/bildschirmfotos.sh` erzeugt alle Bilder in `docs/screenshots` (Details: `docs/screenshots/README.md`); `python3 scripts/video-bauen.py` baut daraus das Erklärvideo (nicht einchecken). Bei neuen Funktionen: Bild ergänzen, README „So sieht es aus“ und die Szenenliste in `scripts/video-bauen.py` anpassen. Nur erfundene Daten.
+- Neu seit beta.59/60: Klicksperre von 30 s für Update-Abfragen (`Web::pruefSperre`, GitHub-Limit 60/h/IP); der virtuelle Drucker „vKasse“ (ippeveprinter-Unit je Modul, `ProtectSystem=strict`) darf den Ablage-Spool beschreiben (`ABLAGE_SPOOL` in `drucker.py`), sonst wird nichts in den Netzwerkordner abgelegt. Ein Knopf „Ablegen“ in den Vorgängen wurde bewusst verworfen.
 
 ### Aufbau, den man kennen muss
 

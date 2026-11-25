@@ -23,4 +23,15 @@ if (!$app->db->one('SELECT 1 AS x FROM invoice_inbox LIMIT 1')) {
         $app->db->query('INSERT INTO invoice_inbox (id, invoice_number, invoice_date, amount_cents, patient_name, patient_birthdate, received_at, parked_at, transfer_at) VALUES (?,?,?,?,?,?,?,?,?)', [bin2hex(random_bytes(16)), $n, date('Y-m-d', $at), $cents, $name, $birth, $at, $parked, $transfer]);
     }
 }
+// Bezahlte Vorgänge für die Liste „Vorgänge“ (Karte, bar, Überweisung offen; alles erfunden).
+if (!$app->db->one("SELECT 1 AS x FROM payments LIMIT 1")) {
+    $now = time();
+    foreach ([['Probe, Klaus', '1985-02-14', 8400, 'successful', 'card', 'RE2026-0104', $now - 900], ['Test, Anja', '1979-09-03', 4250, 'successful', 'cash', 'RE2026-0103', $now - 5400],
+              ['Versuch, Tom', '1968-12-20', 3120, 'transfer_open', 'transfer', 'RE2026-0102', $now - 20000], ['Probe, Lisa', '2001-11-05', 1500, 'successful', 'card', null, $now - 30000]] as $i => [$name, $birth, $cents, $st, $method, $nr, $at]) {
+        $v = bin2hex(random_bytes(16));
+        $app->db->query('INSERT INTO visits(id,context_id,patient_id,patient_name,patient_birthdate,oauth_cipher,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?)', [$v, 'vorschau-' . $i, 'p' . $i, $name, $birth, 'x', $at, $at + 3600]);
+        $app->db->query('INSERT INTO payments(id,visit_id,request_id,request_hash,reference,reader_id,amount_cents,services_json,payment_status,created_at,paid_at,transaction_id,t2med_invoice,payment_method,t2med_done_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            [bin2hex(random_bytes(16)), $v, bin2hex(random_bytes(8)), 'h' . $i, 'POS-' . $i, 'reader', $cents, '[]', $st, $at, $st === 'successful' ? $at + 60 : null, $st === 'successful' ? 'TX' . (1000 + $i) : null, $nr, $method, $i === 1 ? $at + 120 : null]);
+    }
+}
 echo "Daten in $daten\n";

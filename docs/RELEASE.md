@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.61
+
+- **Neue Bildschirmfotos und Erklärvideo-Werkzeug:** Alle Bilder in `docs/screenshots` neu mit erfundenen Daten, dazu Starter, Kasse (Vorgänge, Ablage, IGeL, GOÄ-Rechner), Terminzettel, Signatur und ein Schaubild „Weg der Rechnung“. Neue Skripte: `scripts/bildschirmfotos-seiten.py`, `scripts/modul-vorschau/`, `scripts/video-bauen.py`. README und `AGENTS.md` angepasst. Keine Änderung am Programm.
+
 ## 0.21.4-beta.60
 
 - **Virtuelle Drucker dürfen Aufträge an die Ablage abgeben:** Die Einheit eines Druckers (z. B. „vKasse“) lief mit `ProtectSystem=strict` und durfte nur in den Datenordner des Moduls schreiben. Der Auftragsordner der Ablage (`/var/spool/kienzle/ablage/<modul>`) war schreibgeschützt. Die Rechnung kam an, die PDF wurde aber nie zum Netzwerkspeicher übergeben. Jetzt steht der Ordner in `ReadWritePaths` (mit `-`, falls er fehlt). Die Drucker-Einheit wird beim nächsten Abgleich (Verwaltung → Drucker oder automatisch) neu geschrieben und der Drucker neu gestartet. Nicht auf der VM geprüft.
