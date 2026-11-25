@@ -116,7 +116,8 @@ class LogoTests(unittest.TestCase):
         without = render({"cancel": {**cancel, "enabled": False}})
         self.assertIn(b"\x1dv0\x00", with_qr)
         self.assertNotIn(b"\x1dv0\x00", without)
-        self.assertGreater(with_qr.rindex(b"\x1dv0\x00"), with_qr.index(b"Absagen"))
+        # Beschriftung steckt seit beta.11 im Bild (Balken über dem QR), nicht mehr als Text im Bon
+        self.assertNotIn(b"Absagen", with_qr)
         # zu langer Text: Ausdruck bleibt möglich, nur ohne QR
         self.assertNotIn(b"\x1dv0\x00", render({"cancel": {**cancel, "body": "x" * 400, "subject": "y" * 100, "width_dots": 64}}))
 
