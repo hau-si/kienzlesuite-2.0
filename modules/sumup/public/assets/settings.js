@@ -183,6 +183,7 @@ function renderPrinterHelp(cfg, info) {
   $(cfg.box + '-help').hidden = !info.enabled;
   const box = $(cfg.box + '-status'); box.replaceChildren();
   if (!info.enabled) return;
+  printerFold(cfg.box, !!(info.queue && info.queue.ours));
   if (!info.queue) {
     box.append(el('p', 'Der Drucker „' + cfg.queue + '“ fehlt in der Suite. Unter Verwaltung → Drucker „Virtuelle Drucker abgleichen“ wählen; legt die Suite ihn dann nicht an, das Modul unter Verwaltung → Module neu installieren.', 'inline-error'));
     return;
@@ -199,10 +200,21 @@ function renderPrinterHelp(cfg, info) {
   ol.append(mac); box.append(ol);
 }
 
+// Karte als Ausklappzeile (nur wo das HTML sie so anlegt, z. B. „vBriefversand“): fertig = zugeklappt mit „erledigt“, sonst offen mit „fehlt“.
+function printerFold(id, done) {
+  const fold = $(id + '-fold'); if (!fold) return;
+  const mark = $(id + '-mark'), tag = $(id + '-tag');
+  mark.textContent = done ? '✓' : '!'; mark.className = 'mark-icon ' + (done ? 'done' : 'error');
+  tag.textContent = done ? 'erledigt' : 'fehlt'; tag.className = 'tag ' + (done ? 'ok' : 'err');
+  // Von Hand auf- oder zugeklappt bleibt so; das toggle-Ereignis kommt auch nach dem Setzen hier, daher mit dem gesetzten Wert vergleichen.
+  if (!fold.dataset.touched) { fold.open = !done; fold.dataset.auto = String(!done); }
+  fold.ontoggle = () => { if (String(fold.open) !== fold.dataset.auto) fold.dataset.touched = '1'; };
+}
+
 // ---- Reiter: laufende Arbeit, Praxisangaben, Drucker, einmalige Einrichtung ---------------
 // Einmalige Einrichtung in einklappbaren Themenblöcken (alles Weitere steht in den Reitern daneben).
 const GROUPS = [
-  {id: 'praxis', label: 'Praxis & Rechnungen', cards: ['s-practice', 's-tax', 's-app', 's-mail', 's-letterxpress', 's-invoice_export']},
+  {id: 'praxis', label: 'Praxis & Rechnungen', cards: ['s-practice', 's-tax', 's-app', 's-mail', 's-letterxpress', 'letter-printer-help', 's-invoice_export']},
   {id: 'zahlung', label: 'Zahlung & T2med', cards: ['s-sumup', 's-fhir', 's-invoice_inbox', 'invoice-printer-help']},
   {id: 'drucker', label: 'Drucker', cards: ['s-printing', 's-office_printing']},
   {id: 'netz', label: 'Arbeitsplätze', cards: ['s-clients']},
@@ -214,7 +226,7 @@ const TABS = [
   {id: 'einrichtung', label: 'Einrichtung', hint: 'einmalig', cards: ['s-checklist', ...GROUPS.flatMap(g => g.cards)], groups: GROUPS},
 ];
 let lastOpenCards = [];
-function openGroupOf(cardId) { $(cardId)?.closest('details.setup-group')?.setAttribute('open', ''); }
+function openGroupOf(cardId) { const card = $(cardId); card?.closest('details.setup-group')?.setAttribute('open', ''); card?.querySelector(':scope > details.fold')?.setAttribute('open', ''); }
 let activeTab = null;
 function tabOf(cardId) { return (TABS.find(t => t.cards.includes(cardId)) || {}).id; }
 function layoutTabs(data) {

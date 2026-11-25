@@ -33,9 +33,9 @@ ob_start();
 <section class="card settings-card" id="invoice-printer-help" hidden><h2>Drucker „vKasse“</h2>
 <div id="invoice-printer-status"></div>
 </section>
-<section class="card settings-card" id="letter-printer-help" hidden><h2>Drucker „vBriefversand“</h2>
+<section class="card settings-card printer-card" id="letter-printer-help" hidden><details class="fold" id="letter-printer-fold"><summary><span class="mark-icon open" id="letter-printer-mark" aria-hidden="true">○</span><h2>Drucker „vBriefversand“</h2><span class="tag" id="letter-printer-tag"></span></summary>
 <div id="letter-printer-status"></div>
-</section>
+</details></section>
 <section class="card settings-card" id="s-inbox-list"><h2>Rechnungseingang</h2>
 <p class="muted">Die Rechnungsliste steht jetzt unter „Vorgänge“ (Startseite der Kasse). Hier erscheinen nur Rechnungen, die der Drucker „vKasse“ angenommen, aber nicht übernommen hat.</p>
 <div class="row-buttons"><button id="inbox-load" class="secondary" type="button">Aktualisieren</button></div>

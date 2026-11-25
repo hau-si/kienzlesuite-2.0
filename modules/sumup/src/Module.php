@@ -57,7 +57,7 @@ final class Module {
                 foreach (Suite::modul()->drucker() as $d) if ($d['name'] === self::LETTER_QUEUE) $q = $d;
             } catch (\Throwable) {}
             $items[] = ['title' => 'Drucker „vBriefversand“ ' . ($q ? 'bereit' : 'fehlt'), 'state' => $q ? 'done' : 'error',
-                'hint' => $q ? 'Rechnungen aus T2med, die darauf gedruckt werden, gehen sofort per Post an Letterxpress (Windows: IPP-Drucker wie „vKasse“ hinzufügen, Papier A4)' : 'Verwaltung → Drucker der Suite: virtuelle Drucker abgleichen', 'link' => $link('s-letterxpress')];
+                'hint' => $q ? 'Rechnungen aus T2med, die darauf gedruckt werden, gehen sofort per Post an Letterxpress (Windows: IPP-Drucker wie „vKasse“ hinzufügen, Papier A4)' : 'Verwaltung → Drucker der Suite: virtuelle Drucker abgleichen', 'link' => $link('letter-printer-help')];
         }
         foreach (['printing' => 'Bondrucker', 'office_printing' => 'Praxisdrucker (A4)'] as $section => $label) {
             if (!$config->get($section, 'enabled', false)) continue;

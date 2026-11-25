@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.36
+
+- **Drucker „vBriefversand“ einklappbar:** Die Karte hing bisher unter jedem Reiter der Einstellungen (z. B. unten bei „Leistungen“). Sie steht jetzt unter Einrichtung → „Praxis & Rechnungen“ nach Letterxpress, als Ausklappzeile mit Schild: **erledigt** (zugeklappt), sobald der Drucker in der Suite bereit ist, sonst **fehlt** (aufgeklappt). Ob der Drucker am Windows-PC eingerichtet ist, kann der Server nicht erkennen. Der Punkt im Einrichtungs-Überblick führt direkt dorthin. Im Browser (Vorschau mit erfundenen Daten) geprüft, nicht auf der VM.
+
 ## 2.3.4-beta.35
 
 - **GOÄ-Verzeichnis eingebaut:** Das Feld „GOÄ-Ziffer“ beim Anlegen einer Leistung (Einstellungen → Leistungen und Kassenansicht → Leistungen verwalten) kennt jetzt alle 2.775 Ziffern des amtlichen Gebührenverzeichnisses der GOÄ. Eine Ziffer (z. B. `250`, `250a`, `K1`) zeigt Leistungstext, Punktzahl, Einfachsatz und Gebührenrahmen. Ein Stichwort (z. B. „Blutentnahme“, „Ultraschall Organ“) zeigt bis zu acht Treffer zum Anklicken. „Übernehmen“ trägt Einfachsatz, Gebührenrahmen (ärztlich, technisch für Abschnitt A/E/O, Labor für M und Nr. 437) und den Schwellenfaktor (2,3 / 1,8 / 1,15; Zuschläge 1,0) ein, eine leere Bezeichnung wird mit dem Leistungstext gefüllt, und der Preis wird berechnet. Ein Stichwort ohne Ziffer wird nicht als GOÄ-Ziffer gespeichert.
