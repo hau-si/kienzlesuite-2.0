@@ -8,6 +8,8 @@ namespace KienzleSignatur;
  */
 class Fhir {
     public const KONTEXT = 'https://fhir.t2med.de/identifier/kontext';
+    /** Öffentlicher Demo-Schlüssel von T2med (github.com/T2med/fhir-demoapplication); gilt wie in der Kasse, wenn in der Basis kein Schlüssel hinterlegt ist. */
+    public const DEMO_SCHLUESSEL = '7QwA7931lJSQfMKuTH4MQXLn4YEiNhE5tggnYKlY4HE';
 
     /** @param array<string,mixed> $v Verbindung „t2med“ der Basis */
     public function __construct(private array $v, private string $caDatei = '') {}
@@ -25,7 +27,11 @@ class Fhir {
         $basis = rtrim((string)($this->v['base_url'] ?? ''), '/');
         if ($basis === '') throw new \RuntimeException('T2med ist in der Basis nicht eingerichtet (Verwaltung → Verbindungen).');
         $antwort = $this->anfrage($basis . '/Patient?' . http_build_query(['identifier' => self::KONTEXT . '|' . $kontext]), $token);
-        if ($antwort['status'] !== 200) throw new \RuntimeException('Patient konnte nicht aus T2med geladen werden (HTTP ' . $antwort['status'] . '). Bitte frisch aus der Patientenakte öffnen.');
+        if ($antwort['status'] !== 200) throw new \RuntimeException('Patient konnte nicht aus T2med geladen werden (HTTP ' . $antwort['status'] . '). ' . match (true) {
+            $antwort['status'] === 401, $antwort['status'] === 403 => 'T2med lehnt den Zugriff ab: den API-Schlüssel (Verwaltung → Verbindungen → T2med) und den Drittanbieter-Zugriff in T2med prüfen; außerdem muss der Aufruf frisch aus der Patientenakte kommen.',
+            $antwort['status'] === 404 => 'Die Adresse oder der Kontext ist T2med unbekannt. Bitte frisch aus der Patientenakte öffnen und die FHIR-Adresse prüfen.',
+            default => 'Bitte frisch aus der Patientenakte öffnen.',
+        });
         $body = $antwort['body']; $liste = [];
         if (($body['resourceType'] ?? '') === 'Patient') $liste[] = $body;
         elseif (($body['resourceType'] ?? '') === 'Bundle') foreach ($body['entry'] ?? [] as $e) if (($e['resource']['resourceType'] ?? '') === 'Patient') $liste[] = $e['resource'];
@@ -88,7 +94,7 @@ class Fhir {
         if (!$geaendert['telefon'] && !$geaendert['email']) return $geaendert;
         $p['telecom'] = $telecom;
         $p['meta']['profile'] = ['https://fhir.t2med.de/StructureDefinition/FhirApiPatient|1.0.0'];
-        $kopf = ['Content-Type: application/fhir+json', 'Prefer: return=OperationOutcome'];
+        $kopf = ['Content-Type: application/fhir+json'];
         if ($teil !== '' && preg_match('/^\d{1,12}$/D', $teil)) $kopf[] = 'If-Match: W/"' . $teil . '"';
         $neu = $this->anfrage($url, $token, 'PUT', $p, $kopf);
         if ($neu['status'] === 409) throw new \RuntimeException('Der Patient wurde in T2med inzwischen geändert. Bitte frisch aus der Patientenakte öffnen und erneut übernehmen.');
@@ -99,8 +105,9 @@ class Fhir {
     /** @return array{status:int,body:mixed} */
     protected function anfrage(string $url, string $token, string $methode = 'GET', ?array $body = null, array $mehr = []): array {
         $key = (string)($this->v['api_key'] ?? '');
+        if ($key === '') $key = self::DEMO_SCHLUESSEL;
         $kopf = array_merge(['Accept: application/fhir+json', 'Authorization: Bearer ' . $token, 'X-API-Key: ' . $key, 'X-FHIR-Profile: https://fhir.t2med.de/StructureDefinition/FhirApiPatient|1.0.0',
-            'User-Agent: kienzle-signatur'], $mehr);
+            'X-TreatWarningAsError: true', 'Prefer: return=OperationOutcome', 'User-Agent: kienzle-signatur'], $mehr);
         $roh = ''; $zuGross = false;
         $curl = curl_init($url);
         $opt = [CURLOPT_HTTPHEADER => $kopf, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 20, CURLOPT_FOLLOWLOCATION => false, CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,

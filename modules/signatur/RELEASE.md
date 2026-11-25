@@ -1,5 +1,9 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.24
+
+- **Start aus T2med: HTTP 403 behoben (wahrscheinliche Ursache):** Die Kasse nimmt den öffentlichen T2med-Demo-Schlüssel, wenn unter Verwaltung → Verbindungen → T2med kein API-Schlüssel steht; Signatur schickte dann einen leeren Schlüssel und T2med lehnte den Abruf des Patienten ab. Signatur macht es jetzt wie die Kasse. Bei 401/403 nennt die Meldung (und `starter.log` am PC) den API-Schlüssel und den Drittanbieter-Zugriff als Ursache. Nicht gegen echtes T2med geprüft.
+
 ## 0.1.0-beta.23
 
 - **Neues Layout der Startseite wie in der Kasse:** Links die offenen Vorgänge (am Pad zuerst, mit den Knöpfen zum Vorgang), rechts groß der Patient und darunter die Dokumentauswahl als Liste mit Auswahlpunkten (statt Auswahlfeld) und dem Knopf „Vorgang anlegen“. Auf schmalen Bildschirmen stehen die Spalten untereinander.
