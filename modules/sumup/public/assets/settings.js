@@ -475,7 +475,7 @@ function renderCatalog(data) {
   const onWrap = el('div', null, 'tip-row'); onWrap.append(onRow); if (onTip) onWrap.append(onTip);
   // GOÄ
   const goae = el('details', null, 'catalog-details', {id: 'cat-goae'}); goae.append(el('summary', 'GOÄ-Angaben und Rechner (optional)'));
-  const code = el('input', null, null, {type: 'text', id: 'cat-code', maxlength: '20', placeholder: 'z. B. 250'});
+  const code = el('input', null, null, {type: 'text', id: 'cat-code', maxlength: '60', placeholder: 'Ziffer oder Stichwort, z. B. 250 oder Blutentnahme'});
   const base = el('input', null, null, {type: 'text', id: 'cat-base', inputmode: 'decimal', maxlength: '12', placeholder: 'z. B. 10,72'});
   const target = el('input', null, null, {type: 'text', id: 'cat-target', inputmode: 'decimal', maxlength: '12', placeholder: 'z. B. 25,00'});
   const factor = el('input', null, null, {type: 'text', id: 'cat-factor', inputmode: 'decimal', maxlength: '8', value: '2,3'});
@@ -486,26 +486,35 @@ function renderCatalog(data) {
   goae.append(catField('GOÄ-Ziffer', code), catField('Einfachsatz (1,0-fach) in Euro', base), catField('Gewünschter Endbetrag in Euro', target), result,
     catField('Steigerungsfaktor', factor), catField('Gebührenrahmen', type),
     catField('Feste Begründung bei Faktor über dem Schwellenwert (optional)', reason), el('p', 'Wird an der Kasse vorausgefüllt und kann dort pro Abrechnung geändert werden. Steht auf der Rechnung und im Beleg.', 'muted small'),
-    el('p', 'Rechner: Einfachsatz und gewünschten Endbetrag eintragen, Faktor und Preis werden berechnet (Gebühr = Einfachsatz × Faktor, auf Cent gerundet; bis zu 4 Nachkommastellen). Ohne Einfachsatz ergänzen GOÄ und Faktor nur den Beleg, der Preis bleibt wie eingetragen. Oberhalb der Schwelle wird bei der Abrechnung eine Begründung erfasst.', 'muted small'));
+    el('p', 'Rechner: Einfachsatz und gewünschten Endbetrag eintragen, Faktor und Preis werden berechnet (Gebühr = Einfachsatz × Faktor, auf Cent gerundet; bis zu 4 Nachkommastellen). Ohne Einfachsatz ergänzen GOÄ und Faktor nur den Beleg, der Preis bleibt wie eingetragen. Oberhalb der Schwelle wird bei der Abrechnung eine Begründung erfasst. Ins Feld GOÄ-Ziffer lässt sich auch ein Stichwort eingeben; mit einer Ziffer aus dem amtlichen Gebührenverzeichnis werden Einfachsatz und Rahmen vorgeschlagen und die Gebühr genau nach § 5 GOÄ gerechnet (Punktzahl × Punktwert × Faktor).', 'muted small'));
+  // GOÄ-Verzeichnis: Ziffer oder Stichwort → Vorschlag; „Übernehmen“ füllt Einfachsatz, Rahmen, Faktor (und leere Bezeichnung).
+  const vorschlag = goaeHelfer(code, e => {
+    base.value = (e.cent / 100).toFixed(2).replace('.', ','); type.value = e.rahmen; factor.value = goaeStartfaktor(e, data.fee_types);
+    if (!label.value.trim()) label.value = goaeKurz(e.text, 160);
+    goae.open = true; calc('factor');
+  });
+  code.addEventListener('input', () => { if (parseCents(base.value)) calc('factor'); });
+  goaeVerzeichnis().catch(() => {});
   const show = (text, level) => { result.hidden = !text; result.textContent = text || ''; result.className = 'goae-result' + (level ? ' ' + level : ''); };
   const calc = source => {
     const b = parseCents(base.value), limits = data.fee_types[type.value];
     if (!b) { show(''); return; }
+    const punkte = goaePunkte(code.value, b);
     let h, p;
     if (source === 'factor') {
       const f = String(factor.value).replace(',', '.');
       if (!/^\d(\.\d{1,4})?$/.test(f)) { show('Bitte einen Faktor wie 2,3 oder 2,332 eingeben (höchstens 4 Nachkommastellen).', 'warn'); return; }
-      h = factorUnits(f); p = fee(b, h); target.value = (p / 100).toFixed(2).replace('.', ',');
+      h = factorUnits(f); p = fee(b, h, punkte); target.value = (p / 100).toFixed(2).replace('.', ',');
     } else {
       const t = parseCents(target.value);
       if (!t) { show('Gewünschten Endbetrag eintragen, dann wird der Faktor berechnet.'); return; }
-      [h, p] = bestFactor(b, t);
-      if (h > limits.max * 100) { show('Über dem Höchstsatz (' + commaFactor(limits.max * 100) + '-fach): höchstens ' + eur(fee(b, limits.max * 100)) + ' möglich. Bitte anderen Endbetrag oder Gebührenrahmen wählen.', 'error'); return; }
+      [h, p] = bestFactor(b, t, punkte);
+      if (h > limits.max * 100) { show('Über dem Höchstsatz (' + commaFactor(limits.max * 100) + '-fach): höchstens ' + eur(fee(b, limits.max * 100, punkte)) + ' möglich. Bitte anderen Endbetrag oder Gebührenrahmen wählen.', 'error'); return; }
       factor.value = commaFactor(h);
     }
     if (h > limits.max * 100) { show('Faktor über dem Höchstsatz (' + commaFactor(limits.max * 100) + ').', 'error'); return; }
     price.value = (p / 100).toFixed(2).replace('.', ',');
-    const t2 = parseCents(target.value), parts = ['Faktor ' + commaFactor(h) + ' × ' + eur(b) + ' = ' + eur(p) + ' → als Preis übernommen.'];
+    const t2 = parseCents(target.value), parts = [(punkte ? 'Faktor ' + commaFactor(h) + ' × ' + punkte + ' Punkte × 5,82873 Cent' : 'Faktor ' + commaFactor(h) + ' × ' + eur(b)) + ' = ' + eur(p) + ' → als Preis übernommen.'];
     if (source !== 'factor' && t2 && p !== t2) parts.push('Genau ' + eur(t2) + ' ist auch mit vier Nachkommastellen beim Faktor nicht möglich.');
     else if (source !== 'factor' && h % 100 !== 0) parts.push('Der Faktor hat ' + (h % 10 === 0 ? '3' : '4') + ' Nachkommastellen, damit der Betrag genau ' + eur(p) + ' ergibt.');
     if (h > limits.threshold * 100) parts.push('Über dem Schwellenwert ' + commaFactor(limits.threshold * 100) + ': Bei der Abrechnung ist eine Begründung nötig.');
@@ -515,12 +524,12 @@ function renderCatalog(data) {
   type.addEventListener('change', () => calc('target'));
   const save = el('button', 'Leistung hinzufügen', 'primary', {type: 'submit', id: 'cat-save'});
   const reset = el('button', 'Abbrechen', 'secondary', {type: 'button', hidden: ''});
-  const clear = () => { form.reset(); id.value = ''; factor.value = '2,3'; goae.open = false; show(''); save.textContent = 'Leistung hinzufügen'; reset.hidden = true; $('cat-form-title').textContent = 'Leistung anlegen oder ändern'; };
+  const clear = () => { form.reset(); id.value = ''; factor.value = '2,3'; goae.open = false; show(''); vorschlag.hide(); save.textContent = 'Leistung hinzufügen'; reset.hidden = true; $('cat-form-title').textContent = 'Leistung anlegen oder ändern'; };
   reset.onclick = clear;
   const buttons = el('div', null, 'row-buttons'); buttons.append(save, reset);
   form.append(id, catField('Bezeichnung', label), catField('Preis in Euro', price), vatRow, goae, onWrap, buttons);
-  form.onsubmit = e => { e.preventDefault(); busy(save, async () => apply(await api('catalog_service_save', {id: id.value, label: label.value, price: price.value,
-    goae_code: code.value, fee_type: type.value, factor: factor.value, base: base.value, on_request: onRequest.checked, default_reason: reason.value, vat: vat.checked && !vat.disabled}))); };
+  form.onsubmit = e => { e.preventDefault(); busy(save, async () => { goaePruefen(code.value); apply(await api('catalog_service_save', {id: id.value, label: label.value, price: price.value,
+    goae_code: code.value, fee_type: type.value, factor: factor.value, base: base.value, on_request: onRequest.checked, default_reason: reason.value, vat: vat.checked && !vat.disabled})); }); };
   window.fillCatalogForm = sv => {
     id.value = sv.id; label.value = sv.label; price.value = (sv.price_cents / 100).toFixed(2).replace('.', ','); code.value = sv.goae_code || '';
     factor.value = (sv.factor || '2.3').replace('.', ','); type.value = sv.fee_type; onRequest.checked = !!sv.on_request; reason.value = sv.default_reason || ''; vat.checked = !!sv.vat;

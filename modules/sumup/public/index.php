@@ -21,7 +21,7 @@ $rel = str_starts_with($path, $base . '/') ? substr($path, strlen($base)) : '/';
 
 /** Statische Dateien aus public/assets (nur bekannte Dateien, keine Unterordner). */
 if (preg_match('#^/assets/([A-Za-z0-9][A-Za-z0-9_.-]{0,80})$#D', $rel, $m)) {
-    $types = ['css' => 'text/css; charset=utf-8', 'js' => 'text/javascript; charset=utf-8', 'ppd' => 'application/vnd.cups-ppd', 'png' => 'image/png', 'svg' => 'image/svg+xml'];
+    $types = ['css' => 'text/css; charset=utf-8', 'js' => 'text/javascript; charset=utf-8', 'ppd' => 'application/vnd.cups-ppd', 'png' => 'image/png', 'svg' => 'image/svg+xml', 'json' => 'application/json; charset=utf-8'];
     $file = $root . '/public/assets/' . $m[1];
     $ext = strtolower(pathinfo($m[1], PATHINFO_EXTENSION));
     if (!isset($types[$ext]) || !is_file($file) || str_contains($m[1], '..')) { http_response_code(404); exit; }

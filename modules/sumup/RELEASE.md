@@ -1,5 +1,12 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.34
+
+- **GOÄ-Verzeichnis eingebaut:** Das Feld „GOÄ-Ziffer“ beim Anlegen einer Leistung (Einstellungen → Leistungen und Kassenansicht → Leistungen verwalten) kennt jetzt alle 2.775 Ziffern des amtlichen Gebührenverzeichnisses der GOÄ. Eine Ziffer (z. B. `250`, `250a`, `K1`) zeigt Leistungstext, Punktzahl, Einfachsatz und Gebührenrahmen. Ein Stichwort (z. B. „Blutentnahme“, „Ultraschall Organ“) zeigt bis zu acht Treffer zum Anklicken. „Übernehmen“ trägt Einfachsatz, Gebührenrahmen (ärztlich, technisch für Abschnitt A/E/O, Labor für M und Nr. 437) und den Schwellenfaktor (2,3 / 1,8 / 1,15; Zuschläge 1,0) ein, eine leere Bezeichnung wird mit dem Leistungstext gefüllt, und der Preis wird berechnet. Ein Stichwort ohne Ziffer wird nicht als GOÄ-Ziffer gespeichert.
+- **Gebühr genau nach § 5 GOÄ:** Passt der Einfachsatz zur Ziffer im Verzeichnis, rechnen Rechner und Prüfung beim Speichern mit Punktzahl × 5,82873 Cent × Faktor und runden erst am Ende (Nr. 3 × 2,3 = 20,11 € statt 20,10 € über den gerundeten Einfachsatz). Bei eigenen Einfachsätzen (Analogziffern) bleibt es bei Einfachsatz × Faktor. Gespeicherte Leistungen ändern sich nicht.
+- Daten: `public/assets/goae-verzeichnis.json`, erzeugt von `scripts/goae-verzeichnis.py` aus dem amtlichen Text (Spiegel von gesetze-im-internet.de im Repository `bundestag/gesetze`, Stand der GOÄ: zuletzt geändert 21.10.2019). Gegenprobe mit der DM-Spalte der Quelle. Korrigiert: Lithium (Quelle 4114, richtig 4214). Nicht enthalten sind Nr. 441 und 5298, weil sie als Prozentsatz berechnet werden, sowie Analogziffern und Abrechnungsempfehlungen. Neuer Test `tests/goae-verzeichnis.php`.
+- Im lokalen Browser mit erfundenen Daten geprüft (Suche, Übernehmen, Speichern), nicht auf der VM.
+
 ## 2.3.4-beta.33
 
 - **Zentraler Starter:** Die Kasse meldet ihren Startkontext `kienzle-sumup` bei der Basis an (Verwaltung → Starter). Dort gibt es ein Paket für alle Module; der bisherige Weg über `/api.php` und das Kassen-Paket bleibt unverändert. Der zentrale Aufruf (`/starter/sumup`) wird von der Basis geprüft, die Kasse nimmt ihn nur mit dieser Prüfung an. Neuer Test in `tests/suite.php`. Nicht mit T2med und nicht im Browser geprüft.
