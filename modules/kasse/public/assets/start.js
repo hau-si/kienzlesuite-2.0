@@ -11,12 +11,22 @@ const ART = {card: '💳 Karte', cash: '💶 Bar', transfer: '🏦 Überweisung'
 const ARTEN = [['alle', 'Alle'], ['t2med', 'T2med'], ['igel', 'IGeL']];
 let rechte = {}, art = 'alle', items = [], erledigt = [], jetzt = Math.floor(Date.now() / 1000), letter = false, aktiv = null, filter = 'offen', bekannt = null, ersterLauf = true;
 
-// Startlinks aus T2med (und der Testpatient) zeigen auf die Startadresse: gleich in die schlanke Kassenansicht weiterleiten.
+// Startlinks aus T2med (und der Testpatient) zeigen auf die Startadresse: die Kassenansicht mit dem Patienten öffnet rechts in dieser Seite
+// (mit Seitenleiste und Rechnungsliste); die Rechnungsliste wählt dann nicht von selbst eine andere Rechnung vor.
+let startHash = '';
 (() => {
   let hash = location.hash;
   try { if (!hash.startsWith('#launch=')) hash = sessionStorage.getItem('kienzle-launch') || ''; } catch { hash = ''; }
-  if (hash.startsWith('#launch=')) { try { sessionStorage.removeItem('kienzle-launch'); } catch { /* ohne sessionStorage */ } location.replace(BASE + 'kassieren' + hash); }
+  if (hash.startsWith('#launch=')) {
+    try { sessionStorage.removeItem('kienzle-launch'); } catch { /* ohne sessionStorage */ }
+    startHash = hash; history.replaceState(null, '', location.pathname + location.search);
+  }
 })();
+function startOeffnen() {
+  if (!startHash) return;
+  aktiv = 'start'; $('detail').hidden = true; $('work').hidden = false;
+  $('work').src = BASE + 'kassieren?eingebettet=1' + startHash; startHash = '';
+}
 
 async function api(action, data = {}) {
   const response = await fetch(BASE + 'api.php', {method: 'POST', credentials: 'same-origin', cache: 'no-store',
@@ -117,6 +127,8 @@ function anzeigen() {
 }
 function inArbeit() { try { return $('work').contentDocument.body.dataset.dirty === '1'; } catch { return false; } }
 async function liste() {
+  const startSeite = ersterLauf && !!startHash;
+  if (startSeite) startOeffnen();
   try {
     const result = await api('open_inbox'); items = result.items || [];
     try { const proc = await api('processed'); rechte = {...rechte, ...(proc.rights || {})}; erledigt = (proc.items || []).map(x => ({...x, erledigt: true})); } catch { erledigt = []; } letter = !!(result.letter && result.letter.enabled);
@@ -126,11 +138,11 @@ async function liste() {
     const offen = items.filter(i => gruppe(i) === 'offen'), neueste = offen[0];
     const neu = neueste && bekannt && !bekannt.has(neueste.id);
     bekannt = new Set(items.map(i => i.id));
-    if (neueste && (ersterLauf || (neu && frisch(neueste) && aktiv === null && !inArbeit()))) oeffnen(neueste);
-    if (ersterLauf && !neueste) frei();
+    if (!startSeite && neueste && (ersterLauf || (neu && frisch(neueste) && aktiv === null && !inArbeit()))) oeffnen(neueste);
+    if (ersterLauf && !neueste && !startSeite) frei();
     ersterLauf = false;
     anzeigen();
-  } catch (error) { if (ersterLauf) { ersterLauf = false; frei(); } $('inbox-empty').hidden = false; $('inbox-empty').textContent = error.message; }
+  } catch (error) { if (ersterLauf) { ersterLauf = false; if (!startSeite) frei(); } $('inbox-empty').hidden = false; $('inbox-empty').textContent = error.message; }
 }
 async function tag() {
   try {

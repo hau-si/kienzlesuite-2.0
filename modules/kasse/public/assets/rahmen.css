@@ -72,3 +72,6 @@ aside.side .brand .mark span { margin-top: 0; }
 
 /* Tooltips in Themenblöcken nicht am Blockrand abschneiden. */
 .setup-group { overflow: visible; }
+
+/* Kassenansicht (Aufruf aus T2med) im Rahmen der Suite: schmale Spalte wie bisher */
+main.modul:has(#welcome) { max-width: 780px; }

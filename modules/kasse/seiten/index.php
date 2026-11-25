@@ -20,13 +20,26 @@ $base = ks_h(Suite::base() . '/');
 // Modul „Signatur“ (Unterschrift am Pad): Pfad, wenn es installiert ist und der Benutzer es sehen darf; dann gibt es den Knopf „Zur Unterschrift“.
 $signatur = '';
 foreach (Suite::modul()->menue()['ids'] as $href => $modulId) if ($modulId === 'signatur') $signatur = $href;
-$modus = isset($_GET['rechnung']) ? 'embed rechnung' : (isset($_GET['neu']) ? 'embed frei' : '');
+$modus = isset($_GET['rechnung']) ? 'embed rechnung' : (isset($_GET['neu']) ? 'embed frei' : (isset($_GET['eingebettet']) ? 'embed' : ''));
+$k = Suite::modul();
+// Aufruf aus T2med und die Kassenansicht selbst: im Rahmen der Suite mit Seitenleiste. Eingebettet in der Startseite (iframe, embed) bleibt sie schlank.
+$rahmen = $modus === '' && method_exists($k, 'rahmen');
+$ssl = $base . 'assets/';
+$skripte = '<script src="' . $ssl . 'tipfit.js?v=' . $version . '" defer></script><script src="' . $ssl . 'goae-calc.js?v=' . $version . '" defer></script><script src="' . $ssl . 'app.js?v=' . $version . '" defer></script>';
+if ($rahmen) {
+    ob_start();
+} else {
 ?>
 <!doctype html>
 <html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="kienzle-csrf" content="<?= $csrf ?>"><title>Kasse · Kienzle-Suite</title><link rel="stylesheet" href="<?= $base ?>assets/style.css?v=<?= $version ?>"><link rel="stylesheet" href="<?= $base ?>assets/embed.css?v=<?= $version ?>"><script src="<?= $base ?>assets/tipfit.js?v=<?= $version ?>" defer></script><script src="<?= $base ?>assets/goae-calc.js?v=<?= $version ?>" defer></script><script src="<?= $base ?>assets/app.js?v=<?= $version ?>" defer></script></head>
+<meta name="kienzle-csrf" content="<?= $csrf ?>"><title>Kasse · Kienzle-Suite</title><link rel="stylesheet" href="<?= $base ?>assets/style.css?v=<?= $version ?>"><link rel="stylesheet" href="<?= $base ?>assets/embed.css?v=<?= $version ?>"><?= $skripte ?></head>
 <body class="<?= $modus ?>" data-base="<?= $base ?>" data-signatur="<?= ks_h($signatur) ?>"><main>
+<?php } ?>
+<?php if ($rahmen) { ?>
+<header class="seitenkopf"><div><p class="eyebrow">Kasse</p></div><span class="start-tools"><span id="mode" class="badge" hidden>TESTMODUS</span><a class="button secondary" href="<?= $base ?>">← Zur Kasse</a></span></header>
+<?php } else { ?>
 <header class="top"><a class="brand" href="/"><span class="mark" aria-hidden="true">K</span><div><strong>Kasse</strong><span>Kienzle-Suite · T2med</span></div></a><span id="mode" class="badge" hidden>TESTMODUS</span></header>
+<?php } ?>
 <section id="welcome" class="card"><h1>Kartenzahlung</h1><p>Bitte diese Seite aus der Patientenakte in T2med öffnen.</p><form id="manual-form" class="manual-form" autocomplete="off"><h2>Manuelle Kartenzahlung</h2><p class="muted small">Ohne Patientenakte: Betreff und Betrag werden an SumUp übergeben und die Zahlung startet am Kartenterminal. Keine Patientendaten eintragen.</p><label for="manual-label">Betreff</label><input id="manual-label" maxlength="80" required placeholder="z. B. Selbstzahler-Leistung"><label for="manual-amount">Betrag in Euro</label><input id="manual-amount" inputmode="decimal" maxlength="12" required placeholder="z. B. 25,00"><button class="primary wide" type="submit">Kartenzahlung starten</button></form><a class="button secondary wide settings-link" href="<?= $base ?>settings.php">⚙ Einstellungen der Kasse</a><button id="demo" class="secondary"<?= $demo ? '' : ' hidden' ?>>Testpatient öffnen (Testmodus)</button></section>
 <div id="workspace" hidden>
 <section class="patient"><span class="eyebrow">AKTUELLER PATIENT</span><div class="patient-head"><h1 id="patient-name"></h1><span id="patient-link" class="t2med-link" title="Mit der T2med-Akte verbunden: Zahlungen werden dort dokumentiert" hidden><span aria-hidden="true">❤</span> T2med</span></div><p id="patient-birth"></p><div class="work-tabs" role="group" aria-label="Ansicht"><button type="button" class="work-tab" data-tab="rechnung" aria-pressed="true"><svg class="tab-ico heart" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572"/></svg><span>T2med-Rechnung</span></button><button type="button" class="work-tab" data-tab="igel" aria-pressed="false"><svg class="tab-ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 16l1-4l2 1l1-4l2.5 1.5L12 7l2 3l2.5-1.5L17 12l2.5 .5L19 16"/><path d="M4 16c0 1.5 1 2 2 2h12c1.5 0 2.500-.8 3-2l2 1l-2 1"/><path d="M8 18v2M15 18v2"/><path d="M18.500 14.500h.01"/></svg><span>IGeL-Leistungen</span></button></div><div id="free-patient" class="free-patient" hidden><label for="free-name">Name für Beleg / Rechnung <span class="muted">optional</span></label><input id="free-name" maxlength="80" autocomplete="off" placeholder="z. B. Erika Mustermann"><label for="free-birth">Geburtsdatum <span class="muted">optional</span></label><input id="free-birth" type="date"></div></section>
@@ -101,4 +114,10 @@ $modus = isset($_GET['rechnung']) ? 'embed rechnung' : (isset($_GET['neu']) ? 'e
 </section></div>
 <p id="message" class="message" role="alert" hidden></p>
 <footer><a href="<?= $base ?>settings.php">Einstellungen</a> · <a href="/">Kienzle-Suite</a></footer>
-</main></body></html>
+<?php
+if ($rahmen) {
+    $inhalt = (string)ob_get_clean();
+    $kopf = '<meta name="kienzle-csrf" content="' . $csrf . '"><link rel="stylesheet" href="' . $ssl . 'style.css?v=' . $version . '"><link rel="stylesheet" href="' . $ssl . 'rahmen.css?v=' . $version . '">' . $skripte;
+    echo $k->rahmen('Kasse', $inhalt, ['roh' => true, 'kopf' => $kopf, 'body' => ' data-base="' . $base . '" data-signatur="' . ks_h($signatur) . '"']);
+} else { ?></main></body></html>
+<?php }

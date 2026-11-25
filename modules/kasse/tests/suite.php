@@ -62,6 +62,13 @@ try {
     [$code, $html] = page($root, $server);
     check($code === 200 && str_contains($html, 'data-base="/kasse/"') && str_contains($html, 'name="kienzle-csrf" content="' . TEST_CSRF . '"') && str_contains($html, '/kasse/assets/app.js'), 'Kasse nicht unter /kasse/');
     check(str_contains($html, 'Testpatient öffnen') && !preg_match('/id="demo"[^>]*hidden/', $html), 'Testpatient im Testmodus nicht angeboten');
+    check(str_contains($html, 'class="seitenkopf"') && str_contains($html, 'data-signatur=') && !str_contains($html, 'class="top"'), 'Kassenansicht (Aufruf aus T2med) nicht im Rahmen der Suite');
+    [$code, $emb] = page($root, admin_server(['REQUEST_URI' => '/kasse/kassieren?neu=1']), '', [], ['neu' => '1']);
+    [$code, $emb2] = page($root, admin_server(['REQUEST_URI' => '/kasse/kassieren?eingebettet=1']), '', [], ['eingebettet' => '1']);
+    check($code === 200 && str_contains($emb2, 'class="embed"') && !str_contains($emb2, 'class="seitenkopf"'), 'Aufruf aus T2med: Kassenansicht eingebettet in der Startseite');
+    $sj = (string)file_get_contents(dirname(__DIR__) . '/public/assets/start.js');
+    check(str_contains($sj, 'kassieren?eingebettet=1') && !str_contains($sj, "location.replace(BASE + 'kassieren'"), 'start.js: Aufruf aus T2med bleibt in der Startseite');
+    check($code === 200 && str_contains($emb, 'class="top"') && !str_contains($emb, 'class="seitenkopf"'), 'Eingebettete Ansicht bleibt schlank');
     [$code] = page($root, staff_server(['paid']) + ['REQUEST_URI' => '/kasse/kassieren']);
     check($code === 403, 'Kasse ohne Recht „kassieren“');
     $js = (string)file_get_contents(dirname(__DIR__) . '/public/assets/settings.js');

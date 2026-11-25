@@ -666,7 +666,7 @@ document.querySelectorAll('.work-tab').forEach(b => b.onclick = () => {
 });
 async function init() {
   const query = new URL(location.href).searchParams, auto = {invoice: query.get('rechnung'), action: query.get('aktion')};
-  if (query.get('neu') || query.get('rechnung')) { $('welcome').hidden = true; document.querySelector('.top .brand').hidden = true; }   // eingebettet in der Startseite: gleich die Arbeitsfläche zeigen, nicht die Willkommenskarte
+  if (query.get('neu') || query.get('rechnung') || query.get('eingebettet')) { $('welcome').hidden = true; document.querySelector('.top .brand').hidden = true; }   // eingebettet in der Startseite: gleich die Arbeitsfläche zeigen, nicht die Willkommenskarte
   // Start aus T2med: #launch=<code>. Musste sich der Benutzer erst an der Suite anmelden, hat die Basis den Code im Tab gemerkt.
   let hash=location.hash.slice(1);
   try { if(!hash.startsWith('launch=')) hash=(sessionStorage.getItem('kienzle-launch')||'').slice(1); sessionStorage.removeItem('kienzle-launch'); } catch { /* ohne sessionStorage */ }
@@ -674,7 +674,7 @@ async function init() {
   if(ticket) {
     history.replaceState(null,'',location.pathname);
     const result=await api('exchange',{ticket}); visitId=result.visit_id; csrf=result.csrf;
-    history.replaceState(null,'',BASE+'?v='+encodeURIComponent(visitId));
+    history.replaceState(null,'',BASE+'kassieren?'+(query.get('eingebettet')?'eingebettet=1&':'')+'v='+encodeURIComponent(visitId));
   }
   if(!ticket && !visitId && query.get('neu')) {   // Startseite: freie Eingabe ohne Patientenakte
     const opened=await api('manual_open'); const t=new URLSearchParams(opened.url.split('#')[1]||'').get('launch');
