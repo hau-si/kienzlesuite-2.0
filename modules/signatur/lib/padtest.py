@@ -76,6 +76,12 @@ def main(argv: list[str]) -> int:
             schritt(f'Hinweis: libtiff.so.5 nicht anlegbar ({exc})')
         os.environ['LD_LIBRARY_PATH'] = ordner + ':' + os.environ.get('LD_LIBRARY_PATH', '')
         os.execv(sys.executable, [sys.executable, os.path.abspath(__file__), *argv[:2], ordner])
+    # Die Bibliothek sucht STPad.ini und schreibt ihr Protokoll im Arbeitsordner: dafür der Ordner des Dienstbenutzers.
+    try:
+        os.chdir(ordner)
+    except OSError as exc:
+        schritt(f'FEHLER Ordner {ordner} nicht erreichbar: {exc}')
+        return 1
     try:
         lib = lade(ordner)
     except OSError as exc:

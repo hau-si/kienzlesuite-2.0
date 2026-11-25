@@ -1,5 +1,10 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.7
+
+- Verbindungstest: Das Programm wechselt in den Ordner der Pad-Bibliothek, weil sie dort `STPad.ini` sucht. Vorher brach es ab, wenn der Arbeitsordner für `ks-signatur` nicht lesbar war (Fehler „Permission denied: ./STPad.ini“). Nicht an echter Hardware geprüft.
+- **Aufnahmetest:** Neues Programm `lib/padsign.py`. Es zeigt auf dem Pad eine Testseite mit Unterschriftsfeld und den Schaltflächen Abbrechen, Löschen und OK, nimmt die Unterschrift auf und speichert sie als `unterschrift-test.png` und `unterschrift-test.sdb` (Rohdaten mit Druckstärke) im Ordner der Pad-Bibliothek. Aufruf: `sudo -u ks-signatur python3 /opt/kienzle/signatur/current/lib/padsign.py <IP> 1002`. Noch ohne Knopf auf der Seite und ohne PDF. Nicht an echter Hardware geprüft; die Schaltflächen sind nur Text mit Berührungsfläche, das Aussehen ist ein erster Entwurf.
+
 ## 0.1.0-beta.6
 
 - **Verbindungstest zum Pad:** Neues Programm `lib/padtest.py`. Es sucht das signotec Delta per IP (Ethernet), liest Typ, Seriennummer und Firmware, öffnet das Pad und zeigt 5 Sekunden einen Testtext. Aufruf auf dem Server: `sudo -u ks-signatur python3 /opt/kienzle/signatur/current/signatur/lib/padtest.py <IP> 1002`. Noch ohne Knopf auf der Seite.

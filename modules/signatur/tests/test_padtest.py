@@ -26,5 +26,13 @@ class PadTest(unittest.TestCase):
             self.assertEqual(padtest.main(['192.0.2.5', '1002', d]), 1)
 
 
+class SignTest(unittest.TestCase):
+    def test_ohne_ip_gibt_hilfe(self):
+        spec2 = importlib.util.spec_from_file_location('padsign', os.path.join(os.path.dirname(__file__), '..', 'lib', 'padsign.py'))
+        m = importlib.util.module_from_spec(spec2)
+        spec2.loader.exec_module(m)
+        self.assertEqual(m.main([]), 2)
+
+
 if __name__ == '__main__':
     unittest.main()
