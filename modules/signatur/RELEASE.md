@@ -1,5 +1,9 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.17
+
+- **Abgebrochene Vorgänge wieder aufnehmen:** In der Vorgangsliste hat ein abgebrochener Vorgang jetzt den Knopf „Wieder aufnehmen“. Er kehrt zu „Wartet auf Unterschrift“ zurück, war er schon unterschrieben, zu „Unterschrieben“; am Vorgang steht „Wieder aufgenommen.“ Eine abgelaufene T2med-Verbindung wird wie bisher angezeigt. Nicht im Browser geprüft.
+
 ## 0.1.0-beta.16
 
 - **Unterschrift am Pad: Fehlersuche und Umbau beim „OK“.** Das Protokoll aus beta.15 zeigte „0 Punkte erfasst“ bei sichtbarer Unterschrift und keine Stift-Ereignisse der Pad-Bibliothek. Ob die Zahl von `STSignatureStop` überhaupt die Punktzahl ist, ist unklar; deshalb entscheidet jetzt die Größe der Unterschriftsdaten (`STSignatureGetSignData` nach dem Anhalten). Sind Daten da, werden sie gespeichert (ohne `Confirm`, das nur das Display leert).

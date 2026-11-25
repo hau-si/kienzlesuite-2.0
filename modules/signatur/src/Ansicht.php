@@ -39,6 +39,7 @@ final class Ansicht {
         if (in_array($v['status'], ['wartet', 'fehler'], true) && (int)($v['pad_id'] ?? 0) > 0) $o .= self::knopf($csrfFeld, 'am-pad', (int)$v['id'], 'Am Pad zeigen', 'primary small');
         if ($v['status'] === 'am_pad') $o .= self::knopf($csrfFeld, 'vom-pad', (int)$v['id'], 'Vom Pad nehmen', 'small');
         if (!in_array($v['status'], ['uebertragen', 'abgebrochen'], true)) $o .= self::knopf($csrfFeld, 'abbrechen', (int)$v['id'], 'Abbrechen', 'danger small');
+        if ($v['status'] === 'abgebrochen') $o .= self::knopf($csrfFeld, 'wiederaufnehmen', (int)$v['id'], 'Wieder aufnehmen', 'primary small');
         if ($v['status'] === 'abgebrochen') $o .= self::knopf($csrfFeld, 'vorgang-loeschen', (int)$v['id'], 'Löschen', 'danger small', 'Diesen abgebrochenen Vorgang endgültig löschen?');
         return $o;
     }

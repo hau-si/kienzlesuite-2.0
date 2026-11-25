@@ -112,6 +112,9 @@ try {
             } elseif ($aktion === 'vorgang-loeschen' && $darfVorgang) {
                 Seite::vorgangLoeschen((int)($_POST['id'] ?? 0));
                 $meldung = 'Vorgang gelöscht.';
+            } elseif ($aktion === 'wiederaufnehmen' && $darfVorgang) {
+                Seite::wiederaufnehmen((int)($_POST['id'] ?? 0));
+                $meldung = 'Vorgang wieder aufgenommen.';
             } elseif ($aktion === 'abbrechen' && $darfVorgang) {
                 Seite::abbrechen((int)($_POST['id'] ?? 0));
                 $meldung = 'Vorgang abgebrochen.';
