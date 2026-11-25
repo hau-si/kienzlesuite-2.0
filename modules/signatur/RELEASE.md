@@ -1,5 +1,12 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.9
+
+- **Unterschreiben am Pad:** In der Vorgangsliste gibt es den Knopf **„Am Pad zeigen“** (Vorgang braucht ein zugeordnetes, aktives Pad; je Pad immer nur ein Vorgang). Das Pad zeigt dann den Vertragstext seitenweise (Abbrechen, Zurück, Weiter), danach die Unterschriftsseite mit Feld und den Schaltflächen Abbrechen, Zurück, Löschen und OK. Nach OK steht der Vorgang auf „Unterschrieben“; Bild (PNG) und Rohdaten mit Druckstärke liegen im Datenordner unter `unterschriften/<Nummer>.png` und `.sdb`. „Vom Pad nehmen“ räumt das Display wieder.
+- Wird am Pad abgebrochen oder 10 Minuten nichts bedient, geht der Vorgang zurück auf „Wartet auf Unterschrift“ mit Hinweis; bei Verbindungsfehlern steht „Fehler“ mit Text, und der Vorgang lässt sich erneut zeigen. Die Liste lädt sich alle 5 Sekunden neu, solange ein Vorgang am Pad ist.
+- Neuer Dauerdienst `kienzle-signatur-pad.service` (Benutzer ks-signatur, gehärtet): startet je Pad einen eigenen Arbeitsprozess, weil die Pad-Bibliothek je Prozess nur ein Gerät öffnet. Nach einem Neustart gehen Vorgänge „am Pad“ zurück auf „wartet“. Neue Pakete: python3, python3-pil, fonts-dejavu-core (Modul aktualisieren).
+- Noch nicht eingebaut: PDF mit Unterschrift, Ablegen in T2med, Knopf in der Kasse. Nur mit Testgerät geprüft, nicht an echter Hardware und nicht auf der VM; das Aussehen der Pad-Seiten ist ein erster Entwurf.
+
 ## 0.1.0-beta.8
 
 - **Mehrere Pads:** Neuer Bereich „Unterschriftenpads“ (nur Admins): je Arbeitsplatz ein Pad mit Name, Arbeitsplatz, Adresse (IP oder Rechnername), Port (Vorgabe 1002) und Haken „aktiv“. Beim Anlegen eines Vorgangs wird bei genau einem aktiven Pad dieses automatisch genommen, bei mehreren muss das Pad gewählt werden. Die Vorgangsliste zeigt eine Spalte „Pad“. Löschen eines Pads entzieht wartenden Vorgängen die Zuordnung.

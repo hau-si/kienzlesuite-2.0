@@ -62,6 +62,12 @@ try {
             if ($aktion === 'neu' && $darfVorgang) {
                 Seite::vorgangAnlegen($_POST, $k->benutzer(), $k->praxis());
                 $meldung = 'Vorgang angelegt. Er wartet auf die Unterschrift.';
+            } elseif ($aktion === 'am-pad' && $darfVorgang) {
+                Seite::amPadZeigen((int)($_POST['id'] ?? 0));
+                $meldung = 'Der Vorgang erscheint jetzt am Pad.';
+            } elseif ($aktion === 'vom-pad' && $darfVorgang) {
+                Seite::vomPadNehmen((int)($_POST['id'] ?? 0));
+                $meldung = 'Vorgang vom Pad genommen.';
             } elseif ($aktion === 'abbrechen' && $darfVorgang) {
                 Seite::abbrechen((int)($_POST['id'] ?? 0));
                 $meldung = 'Vorgang abgebrochen.';

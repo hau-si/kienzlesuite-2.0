@@ -62,7 +62,9 @@ final class Ansicht {
                 if ($v['meldung'] !== '') $stat .= '<div class="muted klein-text">' . $h($v['meldung']) . '</div>';
                 if ($v['status'] === 'wartet' && $v['kontext'] !== '' && !Seite::kontextGueltig($v)) $stat .= '<div class="muted klein-text">T2med-Verbindung abgelaufen: Das Ablegen braucht einen neuen Aufruf aus T2med.</div>';
                 $o .= '<tr><td>' . $h(self::datum((int)$v['erstellt'])) . '</td><td>' . $h($v['patient']) . '</td><td>' . $h($v['titel']) . '</td><td>' . $h($padNamen[(int)($v['pad_id'] ?? 0)] ?? '–') . '</td><td>' . $stat . '</td><td>'
-                    . ($darfVorgang && $abbrechbar ? '<form method="post" class="inline">' . $csrfFeld . '<input type="hidden" name="aktion" value="abbrechen"><input type="hidden" name="id" value="' . (int)$v['id'] . '"><button class="danger small" type="submit">Abbrechen</button></form>' : '')
+                    . ($darfVorgang && in_array($v['status'], ['wartet', 'fehler'], true) && (int)($v['pad_id'] ?? 0) > 0 ? self::knopf($csrfFeld, 'am-pad', (int)$v['id'], 'Am Pad zeigen', 'primary small') : '')
+                    . ($darfVorgang && $v['status'] === 'am_pad' ? self::knopf($csrfFeld, 'vom-pad', (int)$v['id'], 'Vom Pad nehmen', 'small') : '')
+                    . ($darfVorgang && $abbrechbar ? self::knopf($csrfFeld, 'abbrechen', (int)$v['id'], 'Abbrechen', 'danger small') : '')
                     . '</td></tr>';
             }
             $o .= '</tbody></table>';
@@ -72,6 +74,10 @@ final class Ansicht {
         if ($darfVorlage) $o .= self::vorlagen($csrfFeld, $vorlagen, $bearbeite);
         if ($pad !== null) $o .= self::pads($csrfFeld, $pads) . self::pad($csrfFeld, $pad);
         return $o . '</div>';
+    }
+
+    private static function knopf(string $csrfFeld, string $aktion, int $id, string $text, string $klasse): string {
+        return '<form method="post" class="inline">' . $csrfFeld . '<input type="hidden" name="aktion" value="' . $aktion . '"><input type="hidden" name="id" value="' . $id . '"><button class="' . $klasse . '" type="submit">' . $text . '</button></form> ';
     }
 
     /** Bereich „Unterschriftenpads“ nur für Admins: ein Pad je Arbeitsplatz mit Name, Adresse und Port. */
@@ -88,7 +94,7 @@ final class Ansicht {
                 . '<label>Port<input name="port" inputmode="numeric" maxlength="5" value="' . $h((string)($p['port'] ?? 1002)) . '"></label>'
                 . '<label class="check"><input type="checkbox" name="aktiv" value="1"' . (!isset($p['aktiv']) || (int)$p['aktiv'] ? ' checked' : '') . '> aktiv</label>'
                 . '<button class="primary small" type="submit">' . $knopf . '</button>'
-                . ($i > 0 ? '<button class="danger small" type="submit" name="aktion" value="pad-loeschen" formnovalidate>Löschen</button>' : '') . '</form>';
+                . ($i > 0 ? '<button class="danger small" type="submit" name="aktion" value="pad-loeschen" formnovalidate data-bestaetigen="Dieses Pad wirklich löschen?">Löschen</button>' : '') . '</form>';
         };
         foreach ($pads as $p) $o .= $feld($p, $csrfFeld, 'Speichern');
         $o .= '<h3>Neues Pad</h3>' . $feld([], $csrfFeld, 'Pad hinzufügen');

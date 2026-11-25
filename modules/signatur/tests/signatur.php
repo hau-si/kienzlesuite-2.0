@@ -164,4 +164,26 @@ check(str_contains($html, 'name="pad_id"') && str_contains($html, 'Pad Empfang (
 Seite::padLoeschen($p1);
 check((int)Seite::vorgang($v1)['pad_id'] === 0 && (int)Seite::vorgang($v2)['pad_id'] === $p2, 'Löschen entzieht nur wartenden Vorgängen die Zuordnung dieses Pads');
 
+// Am Pad zeigen
+$pa = Seite::padSpeichern(['name' => 'Pad A', 'adresse' => '192.0.2.20', 'aktiv' => '1']);
+$vp = Seite::vorgangAnlegen($neu + ['pad_id' => $pa], 'x');
+$ohnePad = Seite::vorgangAnlegen($neu + ['pad_id' => $pa], 'x');
+Speicher::pdo()->prepare('UPDATE vorgaenge SET pad_id=0 WHERE id=?')->execute([$ohnePad]);
+wirft(fn() => Seite::amPadZeigen($ohnePad), 'ohne Pad nicht am Pad zeigen');
+wirft(fn() => Seite::amPadZeigen(99999), 'unbekannter Vorgang');
+Seite::amPadZeigen($vp);
+check(Seite::vorgang($vp)['status'] === 'am_pad', 'Status am_pad');
+$zweiter = Seite::vorgangAnlegen($neu + ['pad_id' => $pa], 'x');
+wirft(fn() => Seite::amPadZeigen($zweiter), 'ein Pad zeigt nur einen Vorgang');
+wirft(fn() => Seite::amPadZeigen($vp), 'schon am Pad');
+$html = Ansicht::seite('tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null, null, null, Seite::pads());
+check(str_contains($html, 'Vom Pad nehmen') && str_contains($html, 'Am Pad zeigen') && str_contains($html, 's-am_pad'), 'Knöpfe und Status in der Liste');
+Seite::vomPadNehmen($vp);
+check(Seite::vorgang($vp)['status'] === 'wartet', 'vom Pad genommen');
+wirft(fn() => Seite::vomPadNehmen($vp), 'nicht am Pad');
+Seite::amPadZeigen($vp);
+Seite::abbrechen($vp);
+check(Seite::vorgang($vp)['status'] === 'abgebrochen', 'am Pad abbrechbar');
+check(in_array((int)$vp, array_map(fn($v) => (int)$v['id'], Seite::vorgaenge(true)), true) === false, 'abgebrochen nicht in offenen');
+
 echo "Signatur-Tests grün.\n";

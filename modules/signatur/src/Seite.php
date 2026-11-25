@@ -8,7 +8,7 @@ namespace KienzleSignatur;
  */
 final class Seite {
     public const ARTEN = ['igel' => 'IGeL-Vertrag', 'aufklaerung' => 'Patientenaufklärung', 'datenschutz' => 'Datenschutzerklärung', 'sonstige' => 'Sonstiges Dokument'];
-    public const STATI = ['wartet' => 'Wartet auf Unterschrift', 'unterschrieben' => 'Unterschrieben', 'uebertragen' => 'In T2med abgelegt', 'fehler' => 'Fehler', 'abgebrochen' => 'Abgebrochen'];
+    public const STATI = ['wartet' => 'Wartet auf Unterschrift', 'am_pad' => 'Wird am Pad unterschrieben', 'unterschrieben' => 'Unterschrieben', 'uebertragen' => 'In T2med abgelegt', 'fehler' => 'Fehler', 'abgebrochen' => 'Abgebrochen'];
     /** Platzhalter in Vertragstexten: {{name}} wird beim Anlegen des Vorgangs eingesetzt. */
     public const PLATZHALTER = ['patient' => 'Name des Patienten', 'datum' => 'Heutiges Datum', 'praxis' => 'Name der Praxis', 'leistung' => 'Leistung oder Thema', 'betrag' => 'Betrag in Euro'];
     public const MAX_TEXT = 20000;
@@ -183,8 +183,28 @@ final class Seite {
 
     /** Vorgänge, neueste zuerst. $offen: nur die, die noch bearbeitet werden müssen (wartet, unterschrieben, Fehler). */
     public static function vorgaenge(bool $offen = false, int $max = 200): array {
-        $sql = 'SELECT * FROM vorgaenge' . ($offen ? ' WHERE status IN ("wartet","unterschrieben","fehler")' : '') . ' ORDER BY erstellt DESC, id DESC LIMIT ' . max(1, min(1000, $max));
+        $sql = 'SELECT * FROM vorgaenge' . ($offen ? ' WHERE status IN ("wartet","am_pad","unterschrieben","fehler")' : '') . ' ORDER BY erstellt DESC, id DESC LIMIT ' . max(1, min(1000, $max));
         return self::pdo()->query($sql)->fetchAll();
+    }
+
+    /** Zeigt den Vorgang am zugeordneten Pad: Status „am_pad“, der Pad-Dienst holt ihn ab. Nur aus „wartet“ oder „fehler“. */
+    public static function amPadZeigen(int $id): void {
+        $v = self::vorgang($id);
+        if (!$v) throw new \InvalidArgumentException('Vorgang nicht gefunden.');
+        if (!in_array($v['status'], ['wartet', 'fehler'], true)) throw new \InvalidArgumentException('Dieser Vorgang kann gerade nicht am Pad gezeigt werden.');
+        $pad = (int)$v['pad_id'] > 0 ? self::pad((int)$v['pad_id']) : null;
+        if (!$pad || !(int)$pad['aktiv']) throw new \InvalidArgumentException('Dem Vorgang ist kein aktives Pad zugeordnet.');
+        $busy = self::pdo()->prepare('SELECT COUNT(*) FROM vorgaenge WHERE status="am_pad" AND pad_id=? AND id<>?');
+        $busy->execute([(int)$pad['id'], $id]);
+        if ((int)$busy->fetchColumn() > 0) throw new \InvalidArgumentException('An diesem Pad wird gerade ein anderer Vorgang unterschrieben.');
+        self::pdo()->prepare('UPDATE vorgaenge SET status="am_pad", meldung="" WHERE id=? AND status IN ("wartet","fehler")')->execute([$id]);
+    }
+
+    /** Nimmt einen Vorgang vom Pad zurück (der Pad-Dienst räumt das Display). */
+    public static function vomPadNehmen(int $id): void {
+        $v = self::vorgang($id);
+        if (!$v || $v['status'] !== 'am_pad') throw new \InvalidArgumentException('Dieser Vorgang ist nicht am Pad.');
+        self::pdo()->prepare('UPDATE vorgaenge SET status="wartet", meldung="Vom Pad genommen." WHERE id=? AND status="am_pad"')->execute([$id]);
     }
 
     public static function abbrechen(int $id): void {

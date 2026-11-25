@@ -11,6 +11,8 @@
     var b = e.target && e.target.closest ? e.target.closest('[data-bestaetigen]') : null;
     if (b && !window.confirm(b.getAttribute('data-bestaetigen'))) e.preventDefault();
   });
+  // Solange ein Vorgang am Pad unterschrieben wird, die Liste alle 5 Sekunden neu laden (ohne das Formular erneut zu senden).
+  if (document.querySelector('.us-status.s-am_pad')) setTimeout(function () { location.replace(location.pathname + location.search); }, 5000);
   // Pad-Software hochladen: ZIP roh senden (file_uploads ist für Module aus), Ergebnis in der Seite zeigen.
   var los = document.getElementById('pad-los');
   if (los) los.addEventListener('click', function () {
