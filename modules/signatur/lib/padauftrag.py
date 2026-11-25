@@ -77,6 +77,7 @@ def ablauf(c: sqlite3.Connection, vorgang: sqlite3.Row, geraet, ausgabe: str, je
             status_setzen(c, vid, 'fehler', 'Verbindung zum Pad getrennt.')
             return 'fehler'
         if art != EV_HOTSPOT or wert not in namen:
+            log(f'Vorgang {vid}: Ereignis {art}/{wert} ignoriert (bekannte Tasten: {sorted(namen)})')
             continue
         taste = namen[wert]
         log(f'Vorgang {vid}: Taste {taste} (Seite {idx + 1} von {len(seiten)})')

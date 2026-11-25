@@ -1,5 +1,9 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.12
+
+- **Fehlersuche Pad:** Im Protokoll des Pad-Dienstes steht jetzt auch jedes Ereignis, das keiner Taste zugeordnet werden konnte, samt den bekannten Tasten. Hinweis: Das bisherige Protokoll stammte noch von einer älteren Version ohne diese Zeilen; bitte Signatur auf beta.12 aktualisieren und den Ablauf mit `sudo journalctl -u kienzle-signatur-pad -n 30 --no-pager` erneut ausgeben.
+
 ## 0.1.0-beta.11
 
 - **Start aus T2med:** Eigener Startkontext `kienzle-signatur` (zentraler Starter der Basis, Verwaltung → Starter). In T2med als Eintrag anlegen: `kienzle-signatur://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}`. Das Modul liest den Patienten aus T2med und trägt ihn in „Neuer Vorgang“ ein; der T2med-Kontext wird am Vorgang gemerkt (für das spätere Zurückschreiben, das noch nicht umgesetzt ist). Voraussetzung: T2med unter Verwaltung → Verbindungen eingerichtet.

@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.57
+
+- **Logo im Browser-Tab:** Kleines Herz mit Puls-Linie (eigene Zeichnung, `assets/favicon.svg`) als Tab-Symbol aller Seiten der Basis und der Module im Rahmen der Suite. Falls der Tab noch kein Herz zeigt: Strg+F5. Nicht im Browser geprüft.
+
 ## 0.21.4-beta.56
 
 - **Zentraler Arbeitsplatz-Starter:** Neue Seite **Einrichten → Starter** (`/verwaltung/arbeitsplaetze`). Ein Starterprogramm je PC (Windows, macOS, Linux) und ein Starter-Schlüssel für alle Module. Die Seite listet die Startkontexte der installierten Module (`[[starters]]` in `module.toml`, z. B. `kienzle-sumup://…`) mit der Adresse für T2med und bietet das Paket mit Starterprogramm, Zertifikat, Schlüssel und Einrichtungsskript an. Neue Module erscheinen von selbst; danach das Paket am PC einmal erneut einrichten. Der Schlüssel liegt verschlüsselt in der Datenbank und lässt sich erneuern.
