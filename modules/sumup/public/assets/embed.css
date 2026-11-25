@@ -27,7 +27,9 @@ body.embed { background: transparent; margin: 0; }
 .embed .col-right .date-label { margin: 0; font-size: 12px; }
 .embed .col-right input { margin-top: 2px; }
 .embed .total { margin: 8px 0; }
-.embed .pay-method { margin: 6px 0; }
+/* Rechte Spalte ist nur 330 px breit: Zahlungsarten in zwei festen Spalten (Karte | Bar, darunter Überweisung | Per Post), sonst ragt die Schrift über die Knöpfe. */
+.embed .pay-method { margin: 6px 0; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.embed .pay-method span { white-space: normal; text-align: center; line-height: 1.15; }
 .embed .basket { margin: 0 0 6px; }
 .embed .basket h3 { margin: 0 0 4px; font-size: 13px; }
 .service-search { width: 100%; box-sizing: border-box; }
@@ -71,3 +73,11 @@ html:has(body.embed), body.embed { overflow-x: hidden; }
 .work-tab .tab-ico.heart { color: #c0392b; }
 .cat-head { margin: 10px 0 2px; padding: 0 4px; font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #738b85; }
 .cat-head:first-child { margin-top: 0; }
+
+/* Schmale Ansicht (kleines Fenster): Spalten untereinander statt nebeneinander, damit nichts übersteht. */
+@media (max-width: 640px) {
+  .embed #selection, .embed.rechnung .invoice { grid-template-columns: minmax(0, 1fr); }
+  .embed.rechnung .invoice-line, .embed.rechnung .invoice > :not(.invoice-line), .embed.rechnung .invoice .invoice-letter-note { grid-column: 1; grid-row: auto; }
+  .embed .free-patient { grid-template-columns: minmax(0, 1fr); grid-auto-flow: row; }
+  .embed #services, .embed #groups { max-height: 45vh; }
+}
