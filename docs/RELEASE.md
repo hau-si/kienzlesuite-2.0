@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.62
+
+- **Erklärvideo im Repository:** `docs/video/Kienzle-Suite-Ueberblick.mp4` (2:38 Minuten, ohne Ton, erfundene Daten), in der README verlinkt. Keine Änderung am Programm.
+
 ## 0.21.4-beta.61
 
 - **Neue Bildschirmfotos und Erklärvideo-Werkzeug:** Alle Bilder in `docs/screenshots` neu mit erfundenen Daten, dazu Starter, Kasse (Vorgänge, Ablage, IGeL, GOÄ-Rechner), Terminzettel, Signatur und ein Schaubild „Weg der Rechnung“. Neue Skripte: `scripts/bildschirmfotos-seiten.py`, `scripts/modul-vorschau/`, `scripts/video-bauen.py`. README und `AGENTS.md` angepasst. Keine Änderung am Programm.
