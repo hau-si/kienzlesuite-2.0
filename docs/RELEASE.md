@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.66
+
+- **Paket-Download „Serverzertifikat der Suite nicht lesbar“ behoben:** Die PHP-Einstellung `open_basedir` erlaubte nur `ca.crt`, nicht `server.crt`; der Starter braucht das Serverzertifikat für Fingerabdruck und Paket. Jetzt ist `server.crt` lesend freigegeben (`installer/vorlagen/php-fpm-core.conf`). **Nach dem Update einmal `sudo bash installer/install.sh`**, das schreibt die PHP-Einstellung neu. Nicht auf dem Server geprüft.
+
 ## 0.21.4-beta.65
 
 - **Seite „Arbeitsplätze“ neu geordnet:** Oben steht das **Paket** (Starter, Zertifikat, Drucker in einem Durchgang), danach der **Name der Suite** (immer nötig). Zertifikat und virtuelle Drucker stehen darunter nur noch zum Aufklappen als Einrichtung **von Hand**, falls das Paket nicht klappt (Anker `#zertifikat`, `#drucker`, `#name`, `#paket` bleiben). Nicht auf der VM geprüft.
