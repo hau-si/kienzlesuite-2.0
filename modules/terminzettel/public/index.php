@@ -51,6 +51,18 @@ try {
             tz_json(['error' => $e->getMessage()], 422);
         }
     }
+    if ($rel === '/logo' && $method === 'POST') {
+        // Logo-Upload per fetch: Datei roh im Anfragekörper (wie bei der Pad-Software der Signatur), Antwort als JSON.
+        if (!$k->csrfGueltig($_SERVER['HTTP_X_KIENZLE_CSRF'] ?? null)) tz_json(['error' => 'Sitzung abgelaufen. Bitte die Seite neu laden.'], 403);
+        try {
+            Seite::logoSpeichern(Seite::rohBytes((string)file_get_contents('php://input', false, null, 0, Seite::LOGO_MAX_BYTES + 1)));
+            tz_json(['ok' => true]);
+        } catch (InvalidArgumentException | RuntimeException $e) {
+            tz_json(['error' => $e->getMessage()], 422);
+        } catch (Throwable) {
+            tz_json(['error' => 'Das Logo konnte nicht verarbeitet werden.'], 500);
+        }
+    }
     if ($rel !== '/' && $rel !== '') { http_response_code(404); echo 'Nicht gefunden.'; exit; }
     if ($method === 'POST') {
         if (!$k->csrfGueltig($_POST['kienzle-csrf'] ?? null)) { http_response_code(403); echo 'Sitzung abgelaufen. Bitte die Seite neu laden.'; exit; }
@@ -79,7 +91,7 @@ try {
     $host = preg_replace('/:\d+$/', '', $host);
     header('Content-Type: text/html; charset=utf-8');
     header('Cache-Control: no-store');
-    echo Ansicht::seite($base, Seite::werte($k->praxis()), $k->csrf(), $k->druckerRollen()['bon'], $meldung, $fehler, $host);
+    echo $k->rahmen('Terminzettel', Ansicht::seite($base, Seite::werte($k->praxis()), $k->csrf(), $k->druckerRollen()['bon'], $meldung, $fehler, $host), ['roh' => true, 'kopf' => Ansicht::kopf($base, $k->csrf())]);
 } catch (Throwable $e) {
     http_response_code(500);
     echo 'Der Terminzettel ist gerade nicht erreichbar.';

@@ -55,7 +55,7 @@ final class SettingsHelp {
         'printing.cups_server' => ['tip' => 'Nur ausfüllen, wenn der Drucker auf einem anderen Rechner eingerichtet ist. Sonst leer.', 'example' => 'kienzlebox'],
         'printing.share' => ['tip' => 'Freigabe des Bondruckers auf dem Druckserver.', 'example' => '//kienzlebox/TMm10'],
         'printing.width_dots' => ['tip' => 'Normalerweise leer lassen; wird nach dem Modell gesetzt.', 'example' => '576'],
-        'letterxpress.enabled' => ['tip' => 'Zeigt bei offenen T2med-Rechnungen „Per Post senden“. Dabei geht die Rechnung mit Patientendaten an Letterxpress (A&O Fischer GmbH & Co. KG). Dafür in der Regel vorher eine Vereinbarung zur Auftragsverarbeitung abschließen und mit dem Datenschutzbeauftragten abstimmen. Die Empfängeradresse liest Letterxpress aus dem Adressfenster der Rechnung; die T2med-Vorlage muss die Anschrift dort drucken.'],
+        'letterxpress.enabled' => ['tip' => 'Zeigt bei offenen T2med-Rechnungen „Per Post senden“. Außerdem verschickt der virtuelle Drucker „vBriefversand“ jede darauf gedruckte T2med-Rechnung sofort per Post (Windows-Einrichtung wie beim Drucker „vKasse“, Papier A4); sie erscheint unter Vorgänge als „per Letterxpress verschickt“ mit Zahlungsart Überweisung. Dabei geht die Rechnung mit Patientendaten an Letterxpress (A&O Fischer GmbH & Co. KG). Dafür in der Regel vorher eine Vereinbarung zur Auftragsverarbeitung abschließen und mit dem Datenschutzbeauftragten abstimmen. Die Empfängeradresse liest Letterxpress aus dem Adressfenster der Rechnung; die T2med-Vorlage muss die Anschrift dort drucken.'],
         'letterxpress.color' => ['tip' => 'Gilt für alle Briefe. Schwarz-Weiß ist günstiger.'],
         'letterxpress.duplex' => ['tip' => 'Druckt auf Vorder- und Rückseite, spart Porto bei mehrseitigen Rechnungen.'],
         'letterxpress.shipping' => ['tip' => 'Automatisch erkennt Letterxpress Inland oder Ausland an der Anschrift.'],
@@ -68,7 +68,7 @@ final class SettingsHelp {
         'office_printing.media' => ['tip' => 'Papierformat im Drucker.', 'options' => ['A4' => 'Standard in Deutschland.', 'Letter' => 'US-Format, nur bei entsprechendem Papier.']],
         'office_printing.invoice_auto' => ['tip' => 'Ist das eingeschaltet, druckt die App die Original-Rechnung aus T2med immer auf dem Praxisdrucker: nach der Zahlung mit Karte oder bar und bei „Später (Überweisung)“. Beim Versand per Post (Letterxpress) wird nicht gedruckt. Ausschalten, wenn Rechnungen nicht automatisch gedruckt werden sollen.'],
         'office_printing.duplex' => ['tip' => 'Mehrseitige Rechnungen beidseitig drucken, wenn der Drucker es kann.'],
-        'invoice_inbox.enabled' => ['tip' => 'Beim Speichern legt die Seite den Drucker „SumUp-Rechnung“ auf diesem Server an (Ausschalten entfernt ihn). In T2med die Rechnung darauf drucken; sie erscheint dann auf der Kartenzahlungsseite zum Kassieren.'],
+        'invoice_inbox.enabled' => ['tip' => 'Beim Speichern legt die Seite den Drucker „vKasse“ auf diesem Server an (Ausschalten entfernt ihn). In T2med die Rechnung darauf drucken; sie erscheint dann auf der Kartenzahlungsseite zum Kassieren.'],
         'invoice_inbox.label_number' => ['tip' => 'Nur nötig, wenn deine T2med-Rechnungsvorlage andere Bezeichnungen verwendet. Der Server kennt „Re.-Nr.:“, „Rechnungsnummer:“ und ähnliche; hier trägst du zusätzlich den Text ein, der unmittelbar vor der Nummer steht. Unter „Rechnungseingang“ siehst du bei abgelehnten Drucken, welche Beschriftungen gefunden wurden.', 'example' => 'Beleg-Nr.'],
         'invoice_inbox.number_prefix' => ['tip' => 'Beginnen deine Rechnungsnummern mit einem festen Kürzel (z. B. „IG2026-309“), trägst du es hier ein, bei mehreren Rechnungsgruppen jedes in eine eigene Zeile. Hilft bei Rechnungen, die T2med als Bild druckt: Die Texterkennung liest das Kürzel oft falsch („1IG“, „16G“); die Kasse ordnet es dann dem passenden eingetragenen Kürzel zu, damit dieselbe Rechnung immer dieselbe Nummer bekommt.', 'example' => 'IG'],
         'invoice_inbox.label_date' => ['tip' => 'Text unmittelbar vor dem Rechnungsdatum (TT.MM.JJJJ).', 'example' => 'Ausgestellt am'],
@@ -83,8 +83,9 @@ final class SettingsHelp {
         'invoice_export.password' => ['tip' => 'Passwort dieses Benutzers. Wird nach dem Speichern nie wieder angezeigt.'],
         'invoice_export.domain' => ['tip' => 'Nur bei Windows-Domänen nötig, sonst leer.', 'example' => 'WORKGROUP'],
         'invoice_export.app_invoices' => ['tip' => 'Auch die direkt auf der Kartenzahlungsseite erstellten Rechnungen ablegen.'],
+        'invoice_export.letter' => ['tip' => 'Rechnungen, die über den virtuellen Drucker „vBriefversand“ (oder „Per Post senden“ an der Kasse) verschickt werden, landen zusätzlich in der Ablage, z. B. für die Steuerberatung. Der Dateiname endet auf _Post. Unabhängig von der Einstellung darunter.'],
         'invoice_export.when' => ['tip' => 'Welche T2med-Rechnungen abgelegt werden.',
-            'options' => ['paid' => 'Erst nach erfolgreicher Kartenzahlung.', 'received' => 'Sofort beim Drucken auf „SumUp-Rechnung“, auch ohne Zahlung.']],
+            'options' => ['paid' => 'Erst nach erfolgreicher Kartenzahlung.', 'received' => 'Sofort beim Drucken auf „vKasse“, auch ohne Zahlung.']],
     ];
 
     public static function for(string $section, string $key): array {

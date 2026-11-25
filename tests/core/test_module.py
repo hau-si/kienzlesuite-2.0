@@ -84,6 +84,11 @@ class Modulverwaltung(unittest.TestCase):
         self.assertEqual(s['available'][0]['source'], 'mitgeliefert')
         self.assertEqual(s['installed'], [])
 
+    def test_umbenanntes_modul_wird_nicht_angeboten(self):
+        # „unterschrift“ heißt jetzt „signatur“; ein altes GitHub-Release darf nicht mehr als verfügbar erscheinen.
+        self.assertIn('unterschrift', self.mo.EXCLUDED)
+        self.assertIn('beispiel', self.mo.EXCLUDED)
+
     def test_installieren(self):
         msg = self.mo.dispatch({'action': 'installieren', 'id': 'test-kasse'})
         self.assertIn('Testkasse 1.0.0 installiert', msg)
@@ -230,6 +235,16 @@ class Modulverwaltung(unittest.TestCase):
         self.assertEqual(m['web']['path'], '/kasse')
         self.assertIn('kassieren', [r['id'] for r in m['rights']])
         self.assertEqual((ROOT / 'modules' / 'sumup' / 'VERSION').read_text().strip(), m['module']['version'])
+
+    def test_uploads_nur_wenn_das_modul_sie_anfordert(self):
+        tz = manifest.check_folder(ROOT / 'modules' / 'terminzettel')
+        self.assertFalse(tz['web']['uploads'])
+        tz['web']['uploads'] = True
+        self.assertIn('php_admin_flag[file_uploads] = on', self.mo.fpm_conf(tz))
+        su = manifest.check_folder(ROOT / 'modules' / 'sumup')
+        self.assertFalse(su['web']['uploads'])
+        self.assertIn('php_admin_flag[file_uploads] = off', self.mo.fpm_conf(su))
+        self.assertIn('php_admin_value[opcache.revalidate_path] = 1', self.mo.fpm_conf(su))
 
 
 if __name__ == '__main__':

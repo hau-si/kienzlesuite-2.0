@@ -49,7 +49,7 @@ try {
     $state = sys_get_temp_dir() . '/ks-tax-' . bin2hex(random_bytes(6)); $dirs[] = $state; mkdir($state, 0700);
     $app = new App(config($state, ['rate' => 1900, 'tax_id' => '12/345/67890', 'exempt_note' => 'Umsatzsteuerfreie Heilbehandlung.']));
     $app->db->migrate();
-    check((int)$app->db->query('PRAGMA user_version')->fetchColumn() === 19, 'Datenbank nicht auf Version 19');
+    check((int)$app->db->query('PRAGMA user_version')->fetchColumn() === 21, 'Datenbank nicht auf Version 21');
     [$v] = (function () use ($app) {
         $launch = $app->launch(['context_id' => 'setup', 'oauth_token' => '', 'fhir_base_url' => '']);
         parse_str(parse_url($launch['url'], PHP_URL_FRAGMENT), $f); $e = $app->exchange($f['launch'], null);
@@ -103,19 +103,6 @@ try {
     $out = shell_exec('python3 -I ' . escapeshellarg(__DIR__ . '/tax_xlsx_check.py') . ' ' . escapeshellarg($state . '/jahr.xlsx') . ' ' . escapeshellarg($state . '/namen.xlsx') . ' 2>&1');
     check(trim((string)$out) === 'ok', 'Excel-Datei fehlerhaft: ' . $out);
     if (getenv('KS_KEEP_XLSX')) copy($state . '/jahr.xlsx', getenv('KS_KEEP_XLSX'));
-
-    // Download nur mit Anmeldung an der Suite und dem Recht „export“.
-    $dirs[] = suite(['KIENZLE_PFAD' => '/kasse'], [], [], $state);
-    $page = new SettingsPage($app->config);
-    problem(fn() => $page->taxExport(['year' => '2026'], fn() => null, fn() => null), 'Export ohne Anmeldung', 401);
-    $dirs[] = suite(staff_server(['paid']), [], [], $state);
-    problem(fn() => (new SettingsPage($app->config))->taxExport(['year' => '2026'], fn() => null, fn() => null), 'Export ohne Recht', 403);
-    $dirs[] = suite(staff_server(['export']), [], [], $state);
-    $page = new SettingsPage($app->config);
-    $headers = []; $data = '';
-    $page->taxExport(['year' => '2026', 'month' => '1'], function ($h) use (&$headers) { $headers[] = $h; }, function ($b) use (&$data) { $data .= $b; });
-    check(str_starts_with($data, "PK\x03\x04") && in_array('Content-Disposition: attachment; filename="Rechnungen-2026-01.xlsx"', $headers, true), 'Download falsch');
-    problem(fn() => $page->taxExport(['year' => 'x'], fn() => null, fn() => null), 'Ungültiges Jahr akzeptiert', 422);
 
     // Einstellungen: Prozentsatz mit Komma, Grenzen.
     $base = config($state);

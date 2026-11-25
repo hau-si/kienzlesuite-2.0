@@ -1,7 +1,7 @@
 #!/usr/bin/php
 <?php
 declare(strict_types=1);
-// Virtueller Drucker „SumUp-Rechnung“: T2med druckt die Rechnung hierher; sie landet im Rechnungseingang der Kasse.
+// Virtueller Drucker „vKasse“: T2med druckt die Rechnung hierher; sie landet im Rechnungseingang der Kasse.
 // Gestartet von ippeveprinter der Basis als ks-sumup, mit dem Pfad des Auftrags als erstem Argument.
 // Ausgaben gehen ins Protokoll des Druckers: nur feste Texte, keine Patientendaten.
 require_once dirname(__DIR__) . '/src/bootstrap.php';

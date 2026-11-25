@@ -14,6 +14,7 @@ final class Seite {
     /** Logobreite in Druckpunkten (Papier 58 mm: 420 Punkte, 80 mm: 576). */
     public const LOGO_DOTS = ['small' => 160, 'medium' => 256, 'large' => 384];
     public const LOGO_SIZES = ['small' => 'Klein', 'medium' => 'Mittel', 'large' => 'Groß'];
+    public const LOGO_ALIGNS = ['left' => 'Links', 'center' => 'Mitte', 'right' => 'Rechts'];
     public const LOGO_MAX_BYTES = 2097152;
     public const SIZES = ['1x1' => 'Normal (1×1)', '1x2' => 'Hoch (1×2)', '2x1' => 'Breit (2×1)', '2x2' => 'Groß (2×2)', '2x3' => 'Groß und hoch (2×3)', '3x3' => 'Sehr groß (3×3)', '4x4' => 'Riesig (4×4)'];
     /** Erklärungen als Tooltip neben der Beschriftung. */
@@ -26,6 +27,7 @@ final class Seite {
             'enabled' => ['bool', 'Terminzettel aus T2med auf dem Bondrucker drucken', true],
             'logo_enabled' => ['bool', 'Logo drucken (wenn eines hochgeladen ist)', true],
             'logo_size' => ['choice', 'Logo: Breite', 'medium', self::LOGO_SIZES],
+            'logo_align' => ['choice', 'Logo: Ausrichtung', 'center', self::LOGO_ALIGNS],
             'name_text' => ['string', 'Praxisname (erste Zeile)', ''],
             'name_size' => ['choice', 'Praxisname: Schriftgröße', '2x2', self::SIZES],
             'name_bold' => ['bool', 'Praxisname: fett', true],
@@ -42,6 +44,12 @@ final class Seite {
             'qr_position' => ['choice', 'Position des QR-Codes', 'below', ['right' => 'Rechts neben dem Termin', 'left' => 'Links neben dem Termin', 'below' => 'Unter dem Termin (mittig)']],
             'qr_size' => ['choice', 'Größe des QR-Codes', 'medium', ['small' => 'Klein', 'medium' => 'Mittel', 'large' => 'Groß']],
             'qr_summary' => ['string', 'Kalender-Titel (Präfix)', 'Termin Arztpraxis'],
+            'cancel_enabled' => ['bool', 'Absage-QR unten auf dem Bon drucken', false],
+            'cancel_to' => ['string', 'Empfänger (E-Mail-Adresse der Praxis)', ''],
+            'cancel_subject' => ['string', 'Betreff', 'Terminabsage'],
+            'cancel_body' => ['text', 'Nachrichtentext', "Guten Tag,\n\nich kann meinen Termin leider nicht wahrnehmen und sage ihn hiermit ab.\n\nMit freundlichen Grüßen"],
+            'cancel_caption' => ['string', 'Aufforderung im Balken über dem QR-Code', 'Verhindert? Bitte absagen.'],
+            'cancel_size' => ['choice', 'Größe des Absage-QR-Codes', 'medium', ['small' => 'Klein', 'medium' => 'Mittel', 'large' => 'Groß']],
             'cut' => ['bool', 'Bon abschneiden', true],
         ];
     }
@@ -59,6 +67,8 @@ final class Seite {
         if (is_array($d) && !array_key_exists('name_text', $d) && !array_key_exists('address_text', $d) && is_string($d['header_text'] ?? null)) $d = self::ausAltemKopf($d);
         $out = [];
         foreach (self::schema() as $k => $f) $out[$k] = is_array($d) && array_key_exists($k, $d) && self::passt($f, $d[$k]) ? $d[$k] : $f[2];
+        if (($out['cancel_caption'] ?? '') === 'Termin absagen: Code mit dem Handy scannen') $out['cancel_caption'] = 'Verhindert? Bitte absagen.';   // alter Standardtext
+        $out['enabled'] = true; // Bondruck ist mit dem Modul immer aktiv
         if (!is_array($d) || (!array_key_exists('name_text', $d) && !array_key_exists('address_text', $d))) {
             $kopf = self::kopfAusPraxis($praxis);
             $out['name_text'] = $kopf['name'];
@@ -95,6 +105,7 @@ final class Seite {
         $out = [];
         foreach (self::schema() as $k => $f) {
             $raw = $in[$k] ?? null;
+            if ($k === 'enabled') { $out[$k] = true; continue; }
             if ($f[0] === 'bool') { $out[$k] = $raw === '1' || $raw === true || $raw === 'on'; continue; }
             $v = is_string($raw) ? str_replace(["\r\n", "\r"], "\n", $raw) : '';
             $v = trim($v, "\n ");
@@ -108,14 +119,56 @@ final class Seite {
             }
             $out[$k] = $v;
         }
+        if ($out['cancel_enabled'] && !preg_match('/^[^\s@<>,;]{1,64}@[^\s@<>,;]{1,60}\.[^\s@<>,;]{2,20}$/D', $out['cancel_to'])) {
+            throw new \InvalidArgumentException('Absage-QR: Bitte eine gültige E-Mail-Adresse als Empfänger eintragen.');
+        }
+        if (mb_strlen($out['cancel_body']) > 400) throw new \InvalidArgumentException('Absage-QR: Der Nachrichtentext darf höchstens 400 Zeichen haben (sonst wird der QR-Code zu dicht).');
         return $out;
     }
 
     /** Die letzten Zeilen des Druckprotokolls (Zeit, Art des Auftrags, Ergebnis; keine Patientendaten). */
+    /** Zeilen des letzten Auftrags (ab „Auftrag erhalten“ bis zum Ende) mit den Zeiten je Schritt, jede Zeit in einer eigenen Zeile. */
+    public static function letzterAuftrag(): array {
+        $all = self::protokoll(40);
+        $start = null;
+        foreach ($all as $i => $l) if (str_contains($l, 'Auftrag erhalten')) $start = $i;
+        if ($start === null) return [];
+        $out = [];
+        foreach (array_slice($all, $start) as $l) {
+            if (($pos = strpos($l, 'Zeiten: ')) !== false) {
+                $out[] = substr($l, 0, $pos) . 'Zeiten:';
+                foreach (explode(' · ', substr($l, $pos + 8)) as $z) $out[] = '    ' . $z;
+            } else $out[] = $l;
+        }
+        return $out;
+    }
+
     public static function protokoll(int $zeilen = 12): array {
         $text = (string)@file_get_contents(self::$data . '/druckprotokoll.txt', false, null, 0, 20000);
         $all = $text === '' ? [] : array_values(array_filter(explode("\n", $text), static fn($l) => $l !== ''));
         return array_slice($all, -$zeilen);
+    }
+
+    /**
+     * Einrichtungs-Überblick für die Suite (docs/MODULE-TOML.md, [setup] overview). Gelesen werden nur die abgelegten Dateien:
+     * basis.json (Bondrucker, Praxisdaten) und das Druckprotokoll (ein Terminzettel aus T2med ist angekommen).
+     * @return list<array{title:string,state:string,hint:string,link:string,optional?:bool}>
+     */
+    public static function ueberblick(): array {
+        $basis = json_decode((string)@file_get_contents(self::$data . '/basis.json'), true);
+        $bon = is_array($basis) ? (string)($basis['drucker']['bon'] ?? '') : '';
+        $werte = self::werte(is_array($basis) ? (array)($basis['praxis'] ?? []) : []);
+        $name = trim($werte['name_text']) !== '';
+        $angekommen = array_filter(self::protokoll(50), static fn($l) => str_contains($l, 'Bon an die Warteschlange')) !== [];
+        return [
+            ['title' => 'Bondrucker für den Terminzettel zugeordnet', 'state' => $bon !== '' ? 'done' : 'open',
+                'hint' => 'Verwaltung → Drucker → „Wofür welcher Drucker?“ (Bondrucker wählen)', 'link' => '/terminzettel/'],
+            ['title' => 'Terminzettel: Praxisname im Kopf', 'state' => $name ? 'done' : 'open', 'optional' => true,
+                'hint' => 'Einstellungen → Kopf: Praxisname, Adresse und Logo für den Bon', 'link' => '/terminzettel/#kopf'],
+            ['title' => 'Terminzettel aus T2med am Bondrucker angekommen', 'state' => $angekommen ? 'done' : 'open',
+                'hint' => 'Am Arbeitsplatz den Drucker „vTermine“ einrichten (Anleitung: Arbeitsplatz einrichten → Virtuelle Drucker) und in T2med unter Einstellungen → Kalender → Terminliste (DIN A6) wählen; dann einen Terminzettel drucken',
+                'link' => '/terminzettel/#drucker'],
+        ];
     }
 
     /** Papierbreite des Bondruckers in mm (58 oder 80) laut Basis (Verwaltung → Drucker), aus basis.json. */
@@ -141,7 +194,9 @@ final class Seite {
         $o['header'] = ['text' => $name !== '' && $adresse !== '' ? $name . "\n" . $adresse : $name . $adresse, 'size' => $values['address_size'], 'bold' => $values['address_bold']];
         if ($name !== '') { $o['header']['first_size'] = $values['name_size']; $o['header']['first_bold'] = $values['name_bold']; }
         $o['header']['enabled'] = $name !== '' || $adresse !== '';
-        $o['logo'] = ['enabled' => $values['logo_enabled'] && self::logoVorhanden(), 'width_dots' => self::LOGO_DOTS[$values['logo_size']]];
+        $o['logo'] = ['enabled' => $values['logo_enabled'] && self::logoVorhanden(), 'width_dots' => self::LOGO_DOTS[$values['logo_size']], 'align' => $values['logo_align']];
+        $o['cancel'] = ['enabled' => $values['cancel_enabled'], 'to' => trim($values['cancel_to']), 'subject' => $values['cancel_subject'], 'body' => $values['cancel_body'],
+            'caption' => $values['cancel_caption'], 'width_dots' => self::QR_SIZES[$values['cancel_size']]];
         $o['footer']['enabled'] = trim($values['footer_text']) !== '';
         $o['qr']['width_dots'] = self::QR_SIZES[$values['qr_size']];
         return $o;
@@ -164,6 +219,13 @@ final class Seite {
         if ($f['error'] !== UPLOAD_ERR_OK || $tmp === '' || ($echterUpload && !is_uploaded_file($tmp))) throw new \InvalidArgumentException('Das Hochladen hat nicht geklappt. Bitte noch einmal versuchen.');
         $bytes = (string)@file_get_contents($tmp, false, null, 0, self::LOGO_MAX_BYTES + 1);
         if ($bytes === '' || strlen($bytes) > self::LOGO_MAX_BYTES) throw new \InvalidArgumentException('Das Logo darf höchstens 2 MB groß sein.');
+        return $bytes;
+    }
+
+    /** Logo als rohe Anfrage (fetch, kein Formular-Upload: Modul-Dienste nehmen keine Multipart-Uploads an): Größe prüfen. */
+    public static function rohBytes(string $bytes): string {
+        if ($bytes === '') throw new \InvalidArgumentException('Bitte zuerst ein Bild auswählen.');
+        if (strlen($bytes) > self::LOGO_MAX_BYTES) throw new \InvalidArgumentException('Das Logo darf höchstens 2 MB groß sein.');
         return $bytes;
     }
 

@@ -57,7 +57,7 @@ step 'PHP: Basis (tests/php)'
 for t in tests/php/core.php tests/php/passkeys.php tests/php/web.php tests/php/cli.php tests/php/firewall.php tests/php/updates.php tests/php/verbindungen.php tests/php/sicherung.php tests/php/einrichtung.php tests/php/drucker.php tests/php/oidc.php tests/php/server.php tests/php/uhrzeit.php tests/php/module.php tests/php/startseite.php tests/php/konto_mail.php; do echo "-- $t"; php "$t"; done
 
 step 'Modul Kasse (modules/sumup/tests)'
-for t in critical reader-cancel invoice t2med-invoice letterxpress auto-print settings tax goae-t2med cash transfer print-format mail-mime suite fhir-error startseite; do
+for t in critical reader-cancel invoice t2med-invoice letterxpress letterdrucker auto-print settings tax goae-t2med cash transfer print-format mail-mime suite fhir-error startseite review discard; do
   echo "-- $t"; php "modules/sumup/tests/$t.php"
 done
 grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/sumup/module.toml | head -1)" modules/sumup/VERSION || { echo 'modules/sumup/VERSION passt nicht zu module.toml'; exit 1; }
@@ -67,6 +67,11 @@ php modules/terminzettel/tests/seite.php
 (cd modules/terminzettel/tests && python3 -B -m unittest discover -s . -p 'test_*.py')
 grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/terminzettel/module.toml | head -1)" modules/terminzettel/VERSION || { echo 'modules/terminzettel/VERSION passt nicht zu module.toml'; exit 1; }
 sh -n modules/terminzettel/printer/kienzle-terminzettel && for h in modules/terminzettel/bin/*; do sh -n "$h"; done
+
+step 'Modul Signatur (modules/signatur/tests)'
+php modules/signatur/tests/signatur.php
+grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/signatur/module.toml | head -1)" modules/signatur/VERSION || { echo 'modules/signatur/VERSION passt nicht zu module.toml'; exit 1; }
+for h in modules/signatur/bin/*; do sh -n "$h"; done
 
 step 'module.toml: alle Module im Repository'
 core/bin/kienzle-modul-pruefen --alle modules

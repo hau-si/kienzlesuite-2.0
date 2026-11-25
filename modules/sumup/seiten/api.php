@@ -22,7 +22,8 @@ try {
     $action = App::string($input, 'action', 32);
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
     if ($origin !== '' && $origin !== rtrim($app->config->get('app', 'base_url'), '/')) throw new Problem('Unzulässiger Ursprung.', 403);
-    if (!Suite::can('kassieren')) throw new Problem('Für die Kasse fehlt das Recht „Kassieren“. Bitte den Admin fragen (Verwaltung → Benutzer).', 403);
+    $vorgang = in_array($action, ['vorgaenge', 'vorgaenge_done'], true) && (Suite::can('export') || Suite::can('paid') || Suite::can('periods'));
+    if (!$vorgang && !Suite::can('kassieren')) throw new Problem('Für die Kasse fehlt das Recht „Kassieren“. Bitte den Admin fragen (Verwaltung → Benutzer).', 403);
     // Marke der Suite für dieses Modul (meta kienzle-csrf der Seite) bei allem außer dem reinen Abfragen des Zustands.
     if ($action !== 'state' && !Suite::modul()->csrfGueltig($_SERVER['HTTP_X_KIENZLE_CSRF'] ?? null)) throw new Problem('Sitzung abgelaufen. Bitte Seite neu laden.', 403);
     if ($action === 'demo') {
@@ -37,18 +38,38 @@ try {
         $result = $app->manualOpen();
         $result['url'] = str_replace('/#launch=', ks_url('#launch='), $result['url']);
     } elseif ($action === 'inbox_visit') {
-        if (!Suite::can('inbox') && !Suite::can('letter')) throw new Problem('Dafür fehlt das Recht „Rechnungseingang“.', 403);
         $result = $app->inboxVisit(App::string($input, 'invoice_id', 32));
         $result['url'] = str_replace('/#launch=', ks_url('kassieren#launch='), $result['url']);
+    } elseif ($action === 'inbox_tag') {
+        $result = $app->inboxTag(App::string($input, 'invoice_id', 32), App::string($input, 'tag', 12), (bool)($input['on'] ?? false));
     } elseif ($action === 'day_stats') {
         $result = $app->dayStats();
     } elseif ($action === 'setup_count') {
         // Rote Zahl am Zahnrad: noch nicht erledigte Punkte des Einrichtungs-Überblicks (nur für Benutzer mit Einstellungsrechten).
-        $items = array_diff(Suite::rights(), ['kassieren']) ? \KienzleSumup\Module::overview($app->config) : [];
+        $items = Suite::settingsRights() ? \KienzleSumup\Module::overview($app->config) : [];
         $result = ['count' => count(array_filter($items, static fn($i) => ($i['state'] ?? '') === 'error' || (($i['state'] ?? '') === 'open' && empty($i['optional'])))),
             'red' => count(array_filter($items, static fn($i) => ($i['state'] ?? '') === 'error'))];
+    } elseif ($action === 'vorgaenge') {
+        $art = App::string($input, 'art', 8);
+        if (in_array($art, ['monat', 'jahr'], true) && !Suite::can('periods')) throw new Problem('Für die Monats- und Jahresansicht fehlt das Recht „Monats- und Jahresansicht der Vorgänge“.', 403);
+        $result = (new \KienzleSumup\Vorgaenge($app->db, $app->config))->list($art, App::string($input, 'date', 10));
+        $result['rights'] = ['export' => Suite::can('export'), 'paid' => Suite::can('paid'), 'periods' => Suite::can('periods')];
+    } elseif ($action === 'vorgaenge_done') {
+        if (!Suite::can('paid')) throw new Problem('Zum Abhaken fehlt das Recht „Bezahlt-Liste abhaken“.', 403);
+        $ids = $input['ids'] ?? null;
+        if (!is_array($ids)) throw new Problem('Ungültige Auswahl.', 422);
+        $result = ['count' => (new \KienzleSumup\Vorgaenge($app->db, $app->config))->markDone($ids, (bool)($input['done'] ?? false))];
+    } elseif ($action === 'inbox_delete') {
+        if (!Suite::can('inbox')) throw new Problem('Zum Löschen fehlt das Recht „Rechnungseingang“.', 403);
+        \KienzleSumup\InboxOverview::delete($app->db, App::string($input, 'invoice_id', 32));
+        $result = ['ok' => true];
+    } elseif ($action === 'processed') {
+        $result = ['items' => $app->processed(7), 'now' => time(), 'rights' => ['storno' => Suite::can('storno')]];
+    } elseif ($action === 'storno') {
+        if (!Suite::can('storno')) throw new Problem('Zum Stornieren fehlt das Recht „Rechnungen stornieren“. Bitte den Admin fragen.', 403);
+        $result = $app->storno(App::string($input, 'payment_id', 32), (string)($input['note'] ?? ''));
     } elseif ($action === 'open_inbox') {
-        $result = ['items' => (Suite::can('inbox') || Suite::can('letter')) ? $app->openInbox() : [], 'letter' => ['enabled' => $app->letterEnabled()]];
+        $result = ['items' => $app->openInbox(), 'now' => time(), 'letter' => ['enabled' => $app->letterEnabled()], 'rights' => ['inbox' => Suite::can('inbox')]];
     } elseif ($action === 'exchange') {
         $result = $app->exchange(App::string($input, 'ticket', 64), $_COOKIE['ks_browser'] ?? null);
         setcookie('ks_browser', $result['cookie'], ['expires' => time() + $app->config->get('app', 'session_hours') * 3600,
@@ -71,6 +92,7 @@ try {
             'print_settings' => $app->savePrintSettings($visit, $input),
             'status' => $app->poll($visit, App::string($input, 'payment_id', 32)),
             'cancel' => $app->cancel($visit, App::string($input, 'payment_id', 32)),
+            'discard' => $app->discard($visit, App::string($input, 'payment_id', 32)),
             'reader_status' => $app->readerAction($visit, App::string($input, 'payment_id', 32)),
             'reader_cancel' => $app->readerAction($visit, App::string($input, 'payment_id', 32), true),
             'document' => $app->document($visit, App::string($input, 'payment_id', 32)),

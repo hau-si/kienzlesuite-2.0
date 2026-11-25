@@ -20,7 +20,7 @@ try {
     $t2med = ['t2med' => ['base_url' => 'https://t2med.example.org/aps/fhir/api/r4', 'launch_urls' => [], 'api_key' => 'k-beispiel', 'ca_pem' => '', 'pin' => ''],
         'letterxpress' => ['username' => 'praxis-test', 'api_key' => 'lxp-geheim', 'modus' => 'live'],
         'ablage' => ['ausgang' => '', 'ziele' => [['id' => 'steuerbuero', 'name' => 'Steuerbüro']]]];
-    $dirs[] = $root = suite(admin_server(), $t2med, [['name' => 'SumUp-Rechnung', 'description' => 'Kienzle-Suite', 'state' => 'bereit'], ['name' => 'Praxisdrucker', 'description' => '', 'state' => 'bereit']]);
+    $dirs[] = $root = suite(admin_server(), $t2med, [['name' => 'vKasse', 'description' => 'Kienzle-Suite', 'state' => 'bereit'], ['name' => 'Praxisdrucker', 'description' => '', 'state' => 'bereit']]);
 
     (new Database(Suite::$data))->migrate();   // wie der Haken install
 
@@ -57,15 +57,19 @@ try {
 
     // Seiten: Kasse nur mit Recht „kassieren“, Einstellungen nur mit Rechten, unbekannte Adressen 404, Dateien aus assets.
     [$code, $html] = page($root, admin_server(['REQUEST_URI' => '/kasse/']));
-    check($code === 200 && str_contains($html, '/kasse/assets/start.js') && str_contains($html, 'kassieren?neu=1') && str_contains($html, 'name="kienzle-csrf" content="' . TEST_CSRF . '"'), 'Startseite der Kasse fehlt');
+    check($code === 200 && str_contains($html, '/kasse/assets/start.js') && str_contains($html, 'id="inv-search"') && str_contains($html, 'id="work"') && str_contains($html, 'name="kienzle-csrf" content="' . TEST_CSRF . '"'), 'Startseite der Kasse fehlt');
     $server = admin_server(['REQUEST_URI' => '/kasse/kassieren']);
     [$code, $html] = page($root, $server);
     check($code === 200 && str_contains($html, 'data-base="/kasse/"') && str_contains($html, 'name="kienzle-csrf" content="' . TEST_CSRF . '"') && str_contains($html, '/kasse/assets/app.js'), 'Kasse nicht unter /kasse/');
     check(str_contains($html, 'Testpatient öffnen') && !preg_match('/id="demo"[^>]*hidden/', $html), 'Testpatient im Testmodus nicht angeboten');
     [$code] = page($root, staff_server(['paid']) + ['REQUEST_URI' => '/kasse/kassieren']);
     check($code === 403, 'Kasse ohne Recht „kassieren“');
-    [$code, $html] = page($root, staff_server(['paid']) + ['REQUEST_URI' => '/kasse/settings.php']);
-    check($code === 200 && str_contains($html, 'settings.js'), 'Einstellungen für Mitarbeiter mit Recht nicht erreichbar');
+    $js = (string)file_get_contents(dirname(__DIR__) . '/public/assets/settings.js');
+    check(str_contains($js, 'const CLIENT_STEPS') && str_contains($js, 'CLIENT_STEPS[id]'), 'settings.js definiert CLIENT_STEPS (sonst bricht die Einstellungsseite ab)');
+    [$code, $html] = page($root, staff_server(['inbox']) + ['REQUEST_URI' => '/kasse/settings.php']);
+    check($code === 200 && str_contains($html, 'settings.js') && str_contains($html, 'id="letter-printer-help"'), 'Einstellungen für Mitarbeiter mit Recht nicht erreichbar');
+    [$code] = page($root, staff_server(['paid', 'export', 'periods']) + ['REQUEST_URI' => '/kasse/settings.php']);
+    check($code === 403, 'Rechte der Vorgänge öffnen die Einstellungen');
     [$code] = page($root, staff_server([]) + ['REQUEST_URI' => '/kasse/settings.php']);
     check($code === 403, 'Einstellungen ohne Recht');
     [$code] = page($root, ['REQUEST_URI' => '/kasse/../etc/passwd'] + $server);
@@ -95,6 +99,31 @@ try {
     check($code === 200 && isset($count['count'], $count['red']) && $count['count'] >= $count['red'], 'Einrichtungszähler fehlt: ' . $out);
     [$code, $out] = page($root, $post + ['HTTP_X_KIENZLE_CSRF' => TEST_CSRF] + staff_server(['kassieren']), json_encode(['action' => 'setup_count']));
     check($code === 200 && (json_decode($out, true)['count'] ?? -1) === 0, 'Zähler ohne Einstellungsrecht nicht 0: ' . $out);
+    // Vorgänge: Tag und Woche für jeden mit Kassenrecht, Monat und Jahr nur mit dem Recht „periods“, Excel nur mit „export“, Abhaken nur mit „paid“.
+    $vg = fn(array $rights, array $in) => page($root, $post + ['HTTP_X_KIENZLE_CSRF' => TEST_CSRF] + staff_server($rights), json_encode($in));
+    [$code, $out] = $vg(['kassieren'], ['action' => 'vorgaenge', 'art' => 'tag', 'date' => date('Y-m-d')]);
+    check($code === 200 && (json_decode($out, true)['rights']['periods'] ?? null) === false, 'Tagesansicht ohne Zusatzrecht: ' . $out);
+    [$code] = $vg(['kassieren'], ['action' => 'vorgaenge', 'art' => 'woche', 'date' => date('Y-m-d')]);
+    check($code === 200, 'Wochenansicht ohne Zusatzrecht');
+    foreach (['monat', 'jahr'] as $art) { [$code] = $vg(['kassieren'], ['action' => 'vorgaenge', 'art' => $art, 'date' => date('Y-m-d')]); check($code === 403, $art . 'sansicht ohne Recht „periods“'); }
+    [$code] = $vg(['periods'], ['action' => 'vorgaenge', 'art' => 'monat', 'date' => date('Y-m-d')]);
+    check($code === 200, 'Monatsansicht mit Recht „periods“');
+    [$code] = $vg(['kassieren'], ['action' => 'storno', 'payment_id' => str_repeat('0', 32)]);
+    check($code === 403, 'Storno ohne Recht „storno“');
+    [$code] = $vg(['kassieren', 'storno'], ['action' => 'storno', 'payment_id' => str_repeat('0', 32)]);
+    check($code !== 403, 'Storno mit Recht „storno“ abgelehnt');
+    [$code] = $vg(['kassieren'], ['action' => 'vorgaenge_done', 'ids' => [], 'done' => true]);
+    check($code === 403, 'Abhaken ohne Recht „paid“');
+    [$code] = $vg(['paid'], ['action' => 'vorgaenge_done', 'ids' => [], 'done' => true]);
+    check($code === 200, 'Abhaken mit Recht „paid“');
+    [$code] = page($root, ['REQUEST_URI' => '/kasse/vorgaenge-export.php', 'REQUEST_METHOD' => 'GET'] + staff_server(['kassieren']), '', [], ['art' => 'tag', 'date' => date('Y-m-d')]);
+    check($code === 403, 'Excel ohne Recht „export“');
+    [$code] = page($root, ['REQUEST_URI' => '/kasse/vorgaenge-export.php', 'REQUEST_METHOD' => 'GET'] + staff_server(['export']), '', [], ['art' => 'monat', 'date' => date('Y-m-d')]);
+    check($code === 403, 'Monats-Excel ohne Recht „periods“');
+    [$code, $out] = page($root, ['REQUEST_URI' => '/kasse/vorgaenge-export.php', 'REQUEST_METHOD' => 'GET'] + staff_server(['export', 'periods']), '', [], ['art' => 'monat', 'date' => date('Y-m-d'), 'pay' => 'cash']);
+    check($code === 200 && str_starts_with($out, 'PK'), 'Monats-Excel mit Rechten: ' . $code);
+    [$code] = page($root, ['REQUEST_URI' => '/kasse/vorgaenge'] + staff_server(['letter']), '', [], []);
+    check($code === 403, 'Vorgänge-Seite ohne Kassenrecht erreichbar');
     [$code, $out] = page($root, $post + ['HTTP_X_KIENZLE_CSRF' => TEST_CSRF] + $server, json_encode(['action' => 'day_stats']));
     check($code === 200 && ($out !== '') && isset(json_decode($out, true)['total_cents']), 'Tageswerte fehlen: ' . $out);
 
@@ -120,11 +149,20 @@ try {
     [$code] = page($root, $post + ['HTTP_X_KIENZLE_CSRF' => TEST_CSRF] + $server, json_encode(['action' => 'exchange', 'ticket' => $ticket]));
     check($code === 401, 'Startcode zweimal eingelöst');
 
-    // Virtueller Drucker „SumUp-Rechnung“: nur PDF/PostScript, Auftrag wird danach gelöscht, ausgeschaltet abgelehnt.
+    // Virtueller Drucker „vKasse“: nur PDF/PostScript, Auftrag wird danach gelöscht, ausgeschaltet abgelehnt.
     $env = 'KIENZLE_DATEN=' . escapeshellarg(Suite::$data) . ' KIENZLE_SUITE_HILFE=' . escapeshellarg(dirname(__DIR__, 3) . '/core/php/modul/Kienzle.php');
     $job = Suite::$data . '/auftrag.bin'; file_put_contents($job, "kein PDF");
     exec($env . ' php ' . escapeshellarg(dirname(__DIR__) . '/printer/kienzle-sumup-rechnung') . ' ' . escapeshellarg($job) . ' 2>&1', $o, $rc);
     check($rc === 1 && str_contains(implode("\n", $o), 'Unbekanntes Druckformat') && !is_file($job), 'Drucker nimmt Unbekanntes an oder lässt den Auftrag liegen');
+
+    // Virtueller Drucker „vBriefversand“: gleiche Formatprüfung, Auftrag wird gelöscht; ohne eingeschaltetes Letterxpress kein Versand.
+    $job = Suite::$data . '/auftrag2.bin'; file_put_contents($job, "kein PDF");
+    $o = [];
+    exec($env . ' php ' . escapeshellarg(dirname(__DIR__) . '/printer/kienzle-letterxpress') . ' ' . escapeshellarg($job) . ' 2>&1', $o, $rc);
+    check($rc === 1 && str_contains(implode("\n", $o), 'Unbekanntes Druckformat') && !is_file($job), 'Drucker vBriefversand nimmt Unbekanntes an oder lässt den Auftrag liegen');
+    $toml = (string)file_get_contents(dirname(__DIR__) . '/module.toml');
+    check(substr_count($toml, '[[printers]]') === 2 && str_contains($toml, 'command = "printer/kienzle-letterxpress"') && is_executable(dirname(__DIR__) . '/printer/kienzle-letterxpress')
+        && is_file(dirname(__DIR__) . '/public/assets/vBriefversand-PDF.ppd'), 'Drucker vBriefversand nicht vollständig angelegt');
 
     // Haken: install legt Grundwerte und Datenbank an; busy meldet laufende Zahlungen (75); Überblick als JSON.
     $fresh = sys_get_temp_dir() . '/ks-haken-' . bin2hex(random_bytes(5)); mkdir($fresh, 0700); $dirs[] = $fresh;

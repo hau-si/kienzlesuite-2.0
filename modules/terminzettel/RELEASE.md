@@ -1,5 +1,63 @@
 # Terminzettel – Release-Notizen
 
+## 1.3.0-beta.13
+
+- **Zeitmessung je Auftrag:** Das Druckprotokoll nennt nach jedem Auftrag die Dauer der Schritte: Umwandlung (PostScript/XPS zu PDF), Textlesen, **Texterkennung** (nur wenn der Beleg keinen Text enthält), Auswertung, Bon aufbauen (mit Logo und QR), Übergabe an den Drucker und gesamt. Bei Fehlern steht die Zeit bis zum Fehler dabei. Es wird nur die Zeit im Modul gemessen, nicht die Wartezeit in der Druckwarteschlange oder im Bondrucker.
+- Auf der Seite gibt es unten einen eingeklappten Block **„Letzter Auftrag und Dauer der Schritte“** (jede Zeit in einer eigenen Zeile), zusätzlich zu „Letzte Druckaufträge“.
+- Messung am Beispiel: Logo laden und umwandeln etwa 5 ms, Absage-Block etwa 20 ms; sie bremsen den Druck nicht.
+
+## 1.3.0-beta.12
+
+- **Absage-QR neu gestaltet:** Oben ein runder schwarzer **Balken** mit Kalender-Symbol und der Aufforderung in zwei Zeilen, darunter der QR-Code in **dickem, rundem Rahmen**; Balken und Rahmen sind gleich breit. Der Satz „Termin absagen: Code mit dem Handy scannen“ entfällt.
+- Neuer Standardtext der Aufforderung: **„Verhindert? Bitte absagen.“** (der alte Standardtext wird bei bestehenden Einstellungen automatisch ersetzt; selbst geänderte Texte bleiben). Das Feld heißt jetzt „Aufforderung im Balken über dem QR-Code“.
+- Fehler behoben, den es sonst beim größten QR-Code gegeben hätte: Der Block (QR plus Rahmen) darf höchstens 384 Punkte breit sein; der QR-Code wird dafür passend verkleinert.
+- Ohne Schrift oder Bildbibliothek bleibt es beim bisherigen Text über einem schlichten QR-Code. Neuer Test `test_absage_block.py`; echte Ausgabe mit `python3-qrcode` und am Bondrucker nicht geprüft.
+
+## 1.3.0-beta.11
+
+- Einstellungen: Die Formularspalte hat dieselbe Breite wie die Seiten der Basis (860 px), die Vorschau steht rechts daneben. Nicht im Browser geprüft.
+
+## 1.3.0-beta.10
+
+- **Logo-Upload hing beim Hochladen** (Chrome drehte ewig, keine Meldung): Das Logo wird jetzt wie die Pad-Software der Signatur **roh per fetch** gesendet (kein Multipart-Formular mehr), Fehler und Erfolg stehen unter dem Knopf, danach lädt die Seite neu. `uploads = true` ist nicht mehr nötig und wurde wieder entfernt. Die genaue Ursache des Hängens ist nicht geklärt (nicht reproduzierbar ohne VM); der neue Weg ist der, der bei der Signatur auf der VM funktioniert.
+
+## 1.3.0-beta.9
+
+- **Logo-Upload ging nicht** („Bitte zuerst ein Bild auswählen“): Der Modul-Dienst nahm keine Formular-Uploads an. (Ersetzt durch beta.10.)
+- Logo: Lage **links, Mitte oder rechts** wählbar (Kopf → „Lage“).
+- Neu: **Absage per E-Mail**. Unten auf dem Bon steht ein QR-Code, der eine vorbereitete E-Mail öffnet (Empfänger, Betreff und Nachrichtentext frei wählbar; Größe Klein/Mittel/Groß; Text über dem Code). Standardmäßig aus. Der Nachrichtentext darf höchstens 400 Zeichen haben; ist der Code zu dicht, wird der Bon ohne ihn gedruckt. Nicht mit echtem Drucker und nicht mit einem Handy gescannt; die QR-Erzeugung ist hier nur ohne `python3-qrcode` getestet (Test übersprungen).
+
+## 1.3.0-beta.8
+
+- Drucker umbenannt: „Terminzettel“ → vTermine (PPD `vTermine-PDF.ppd`, Texte angepasst). Am Arbeitsplatz neu einrichten und in T2med neu wählen.
+
+## 1.3.0-beta.7
+
+- Tooltips bleiben im sichtbaren Bereich (verschoben statt schmaler).
+
+## 1.3.0-beta.6
+
+- Verweis auf den Schritt „Virtuelle Drucker“ unter „Arbeitsplatz einrichten“ der Basis; die Anleitung auf der Seite bleibt.
+- Neuer Einrichtungs-Überblick (`bin/setup-overview`): Bondrucker zugeordnet, Praxisname im Kopf (optional), erster Terminzettel aus T2med am Bondrucker angekommen. Die Bereiche „Kopf“ und „Drucker“ klappen beim Sprung aus der Übersicht auf.
+
+## 1.3.0-beta.5
+
+- Der Haken „Terminzettel … drucken“ entfällt: Der Bondruck ist mit dem Modul immer aktiv.
+- Kurze Beschreibung oben (Terminliste A6 aus T2med → virtueller Drucker → Bondrucker).
+- Alle Bereiche sind standardmäßig zugeklappt; neue Tabler-Symbole statt Zeichen.
+- „Speichern“ sitzt in einer unten mitlaufenden Leiste statt oben in der Ecke.
+- Nicht auf der echten VM geprüft (Aussehen der Symbole, mitlaufende Leiste).
+
+## 1.3.0-beta.4
+
+- Der virtuelle Drucker „Terminzettel“ wird nur noch per IPP freigegeben; Samba ist optional (Verwaltung → Drucker).
+
+## 1.3.0-beta.3
+
+- Die Einstellungsseite steht jetzt im Rahmen der Suite: Die Seitenleiste mit dem Menü bleibt links sichtbar (wie bei der Kasse), die eigene Kopfzeile entfällt.
+- Neu aufgebaut: Kopf, Termine, Endtext, Kalender-QR, Letzte Druckaufträge und die Einrichtung der Arbeitsplätze sind Ausklappzeilen im Stil der Basis. Die Vorschau mit „Beispiel-Terminzettel drucken“ bleibt rechts stehen, auch beim Scrollen. „Speichern“ steht oben rechts.
+- Das eigene Stylesheet ist kleiner, weil Karten, Knöpfe und Hintergrund jetzt von der Basis kommen. Funktionen und Rechte unverändert.
+
 ## 1.3.0-beta.2
 
 - Fehler behoben: Nach dem Update zeigte der Browser noch das alte Skript und den alten Stil (eine Stunde Zwischenspeicher). Das alte Skript las die neuen Auswahlleisten falsch (immer die größte Stufe), daher wirkte die Vorschau viel zu groß und die Seite zerstört. Skript und Stil tragen jetzt eine Versionskennung in der Adresse und laden nach jeder Änderung neu.

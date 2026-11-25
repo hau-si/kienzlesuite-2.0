@@ -13,8 +13,7 @@ final class SettingsPage {
 
     /** Rechte der Mitarbeiter und die Aktionen, die sie erlauben. */
     public const RIGHTS = [
-        'paid' => ['Bezahlt-Liste abhaken', ['t2med_paid', 't2med_done', 't2med_correct']],
-        'inbox' => ['Rechnungseingang ansehen und Rechnungen löschen', ['inbox_overview', 'inbox_delete', 'inbox_delete_many', 'inbox_clear']],
+        'inbox' => ['Rechnungseingang ansehen, nicht erkannte Rechnungen nachbearbeiten, Rechnungen löschen', ['inbox_overview', 'inbox_delete', 'inbox_delete_many', 'inbox_clear', 'inbox_review', 'inbox_review_page', 'inbox_review_apply', 'inbox_review_drop']],
         'letter' => ['Rechnungen per Post (Letterxpress) senden', ['inbox_overview', 'inbox_letter', 'inbox_letter_many']],
         'catalog' => ['Leistungen und GOÄ-Positionen bearbeiten', ['catalog', 'catalog_service_save', 'catalog_service_delete', 'catalog_group_save', 'catalog_group_delete']],
     ];
@@ -37,14 +36,14 @@ final class SettingsPage {
         $admin = Suite::isAdmin();
         $rights = Suite::rights();
         if ($action === 'status') return ['logged_in' => true, 'csrf' => $k->csrf(), 'role' => $admin ? 'admin' : 'staff', 'user' => $k->name() ?: $k->benutzer()];
-        if (!in_array($action, ['get', 'audit', 't2med_paid', 'inbox_overview', 'catalog'], true) && !$k->csrfGueltig($csrf)) throw new Problem('Sitzung abgelaufen. Bitte Seite neu laden.', 403);
+        if (!in_array($action, ['get', 'audit', 'inbox_overview', 'catalog'], true) && !$k->csrfGueltig($csrf)) throw new Problem('Sitzung abgelaufen. Bitte Seite neu laden.', 403);
         $staff = !$admin;
         if ($staff) $this->requireStaffRight($action, $rights);
         if (!$staff && in_array($action, self::CONFIRM, true) && !$k->frischBestaetigt()) {
             throw new Problem(self::CONFIRM_ERROR, 403);
         }
         // Alles, was etwas verändert, im Protokoll festhalten (ohne Werte).
-        if (!in_array($action, ['get', 't2med_paid', 'status', 'audit', 'inbox_overview', 'catalog', 'test'], true)) {
+        if (!in_array($action, ['get', 'status', 'audit', 'inbox_overview', 'catalog', 'test'], true)) {
             $this->audit->write($action, $this->who() . ($action === 'save' ? ' ' . App::string($input, 'section', 40) : ''));
         }
         $result = match ($action) {
@@ -54,9 +53,10 @@ final class SettingsPage {
             'audit' => ['lines' => $this->audit->recent(40)],
             'save' => $this->save(App::string($input, 'section', 40), is_array($input['values'] ?? null) ? $input['values'] : []),
             'test' => ['message' => $this->test(App::string($input, 'kind', 40))],
-            't2med_paid' => $this->t2medPaid($input),
-            't2med_done' => $this->t2medDone($input),
-            't2med_correct' => $this->t2medCorrect($input),
+            'inbox_review' => $this->reviewOpen(App::string($input, 'id', 32)),
+            'inbox_review_page' => ['image' => InvoiceReview::page($this->rejectedPdf(App::string($input, 'id', 32)), (int)($input['page'] ?? 1))],
+            'inbox_review_apply' => $this->reviewApply($input),
+            'inbox_review_drop' => $this->reviewDrop(App::string($input, 'id', 32)),
             'inbox_delete' => $this->inboxDelete($input),
             'inbox_letter' => $this->inboxLetter($input),
             'inbox_letter_many' => $this->inboxMany($input, 'letter'),
@@ -84,7 +84,7 @@ final class SettingsPage {
     private function staffView(array $rights): array {
         $config = $this->config();
         return ['role' => 'staff', 'rights' => $rights, 'mode' => $config->get('sumup', 'mode'), 'fhir_mode' => $config->get('fhir', 'mode'),
-            'version' => Module::version(), 'export_years' => (new TaxExport($this->db, $config))->years()];
+            'version' => Module::version()];
     }
 
     private function config(): Config { return Settings::effective($this->base); }
@@ -99,15 +99,14 @@ final class SettingsPage {
             'mode' => $config->get('sumup', 'mode'), 'fhir_mode' => $config->get('fhir', 'mode'),
             'connections' => ['t2med' => Suite::connected('t2med'), 'mail' => Suite::connected('mail'), 'ablage' => Suite::connected('ablage')],
             'warning' => $broken ? 'Gespeicherte Einstellungen passen nicht zur aktuellen Version und werden ignoriert. Bitte die Bereiche prüfen und neu speichern.' : null,
-            'invoice_printer' => Module::invoicePrinter($config), 'clients' => $this->clients(), 'setup' => Module::overview($config),
-            'export_years' => (new TaxExport($this->db, $config))->years()];
+            'invoice_printer' => Module::invoicePrinter($config), 'letter_printer' => Module::letterPrinter($config), 'clients' => $this->clients(), 'setup' => Module::overview($config)];
     }
 
     private function save(string $section, array $values): array {
         $config = Settings::save($this->db, $this->base, $section, $values);
         Module::refreshOverview($config);
         $message = 'Gespeichert. Gilt ab sofort für alle Arbeitsplätze.';
-        if ($section === 'invoice_inbox' && $config->get('invoice_inbox', 'enabled', false)) $message .= ' Der Drucker „SumUp-Rechnung“ steht in der Suite bereit (Verwaltung → Drucker).';
+        if ($section === 'invoice_inbox' && $config->get('invoice_inbox', 'enabled', false)) $message .= ' Der Drucker „vKasse“ steht in der Suite bereit (Verwaltung → Drucker).';
         return $this->view() + ['message' => $message];
     }
 
@@ -152,26 +151,6 @@ final class SettingsPage {
         ClientPackage::zip($files, $write);
     }
 
-    private function t2medFilter(array $input): array {
-        $status = ($input['status'] ?? 'open') === 'all' ? 'all' : 'open';
-        $year = filter_var($input['year'] ?? 0, FILTER_VALIDATE_INT); $month = filter_var($input['month'] ?? 0, FILTER_VALIDATE_INT);
-        if ($year === false || $month === false) throw new Problem('Ungültiger Zeitraum.', 422);
-        return [$status, $year, $month, ($input['test'] ?? false) === true || ($input['test'] ?? '') === '1'];
-    }
-    private function t2medPaid(array $input): array {
-        [$status, $year, $month, $test] = $this->t2medFilter($input);
-        $export = new TaxExport($this->db, $this->config());
-        return ['rows' => $export->t2medPaid($status, $year, $month, $test), 'open_total' => count($export->t2medPaid('open', 0, 0, $test))];
-    }
-    private function t2medCorrect(array $input): array {
-        $action = App::string($input, 'change', 10);
-        $max = (int)$this->config()->get('app', 'max_amount_cents');
-        $change = ['action' => $action, 'note' => App::string($input, 'note', 200, false)];
-        if ($action === 'amount') $change['amount_cents'] = Money::cents($input['amount'] ?? null, $max);
-        (new TaxExport($this->db, $this->config()))->correctT2medPayment(App::string($input, 'id', 32), $change, $max);
-        $text = ['amount' => 'Betrag korrigiert.', 'void' => 'Zahlung storniert. Eine Erstattung an den Patienten erfolgt nicht automatisch, bitte im SumUp-Konto vornehmen.', 'restore' => 'Korrektur zurückgenommen.'][$action];
-        return $this->t2medPaid($input['filter'] ?? []) + ['message' => $text];
-    }
     private function catalog(): Catalog { return new Catalog($this->db, $this->config()); }
     private function catalogChange(callable $change, string $message): array {
         $catalog = $this->catalog();
@@ -204,40 +183,39 @@ final class SettingsPage {
         if ($errors) $message .= ' Nicht ausgeführt: ' . (count($ids) - $done) . ' (' . mb_substr(implode(' ', $errors), 0, 300) . ')';
         return InboxOverview::build($this->db, $config) + ['message' => $message];
     }
+    private function log(): InboxLog { return new InboxLog($this->config()->get('app', 'state_dir')); }
+    private function rejectedPdf(string $id): string {
+        $file = $this->log()->pdfPath($id);
+        if ($file === null) throw new Problem('Diese Rechnung liegt nicht mehr zur Nachbearbeitung vor (nach ' . InboxLog::KEEP_DAYS . ' Tagen wird sie gelöscht). Bitte in T2med erneut drucken.', 404);
+        return $file;
+    }
+    /** Bildausschnitte und Vorschläge für eine abgelehnte Rechnung. */
+    private function reviewOpen(string $id): array {
+        $file = $this->rejectedPdf($id);
+        $labels = (new App($this->config(), $this->http))->inboxLabels();
+        return ['review' => InvoiceReview::analyze($file, $labels) + ['id' => $id]];
+    }
+    /** Von Hand eingetragene Werte prüfen, die Rechnung in den Eingang legen und den Eintrag samt PDF entfernen. */
+    private function reviewApply(array $input): array {
+        $id = App::string($input, 'id', 32);
+        $file = $this->rejectedPdf($id);
+        $config = $this->config();
+        $app = new App($config, $this->http);
+        $prefixes = (array)($app->inboxLabels()[T2medInvoice::LABEL_KEYS['prefix']] ?? []);
+        $invoice = InvoiceReview::validate($input, (int)$config->get('app', 'max_amount_cents'), $prefixes);
+        $result = $app->storeInvoice($invoice, (string)file_get_contents($file));
+        $this->log()->remove($id);
+        return InboxOverview::build($this->db, $config) + ['message' => 'Rechnung ' . $invoice['number'] . ' übernommen. ' . $result['message']];
+    }
+    private function reviewDrop(string $id): array {
+        if (!preg_match('/^[a-f0-9]{32}$/D', $id)) throw new Problem('Ungültige Auswahl.', 422);
+        $this->log()->remove($id);
+        return InboxOverview::build($this->db, $this->config()) + ['message' => 'Rechnung aus der Nachbearbeitung entfernt.'];
+    }
     private function inboxDelete(array $input): array {
         InboxOverview::delete($this->db, App::string($input, 'id', 32));
         return InboxOverview::build($this->db, $this->config()) + ['message' => 'Rechnung aus dem Eingang gelöscht.'];
     }
-    private function t2medDone(array $input): array {
-        $done = ($input['done'] ?? true) !== false;
-        $count = (new TaxExport($this->db, $this->config()))->markT2medDone(is_array($input['ids'] ?? null) ? $input['ids'] : [], $done);
-        return $this->t2medPaid($input['filter'] ?? []) + ['message' => $count . ($count === 1 ? ' Rechnung' : ' Rechnungen') . ($done ? ' als in T2med abgehakt markiert.' : ' wieder als offen markiert.')];
-    }
-
-    /** Excel-Listen (Steuerberatung bzw. bezahlte T2med-Rechnungen); nur mit Admin-Sitzung. */
-    public function taxExport(array $query, callable $header, callable $write): void {
-        if (Suite::modul()->benutzer() === '') throw new Problem('Bitte über die Kienzle-Suite anmelden.', 401);
-        $need = ($query['kind'] ?? '') === 't2med' ? 'paid' : 'export';
-        if (!Suite::isAdmin() && !in_array($need, Suite::rights(), true)) throw new Problem('Dafür fehlt das Recht. Bitte den Admin fragen.', 403);
-        $this->audit->write('export', $this->who() . ' ' . (string)($query['kind'] ?? 'steuer'));
-        $export = new TaxExport($this->db, $this->config());
-        if (($query['kind'] ?? '') === 't2med') {
-            [$status, $year, $month, $test] = $this->t2medFilter($query);
-            $data = $export->t2medWorkbook($status, $year, $month, $test);
-            $name = TaxExport::t2medFilename($status, $year, $month);
-        } else {
-            $year = filter_var($query['year'] ?? '', FILTER_VALIDATE_INT);
-            $month = filter_var($query['month'] ?? '0', FILTER_VALIDATE_INT);
-            if ($year === false || $month === false) throw new Problem('Ungültiger Zeitraum.', 422);
-            $data = $export->workbook($year, $month, ($query['names'] ?? '') === '1', ($query['test'] ?? '') === '1');
-            $name = TaxExport::filename($year, $month);
-        }
-        $header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        $header('Content-Disposition: attachment; filename="' . $name . '"');
-        $header('Content-Length: ' . strlen($data));
-        $write($data);
-    }
-
     private function clients(): array {
         $out = [];
         foreach (ClientPackage::SYSTEMS as $id => $spec) {

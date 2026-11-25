@@ -1,12 +1,12 @@
-# Terminzettel: T2med-Terminblatt (virtueller Drucker „Terminzettel“) als Bon auf dem Bondrucker, mit Kalender-QR je Termin.
+# Terminzettel: T2med-Terminblatt (virtueller Drucker „vTermine“) als Bon auf dem Bondrucker, mit Kalender-QR je Termin.
 # Auf Grundlage von t2med-terminzettel 1.3.1 von Dr. Thomas Kienzle, für die Kienzle-Suite 2.0 als Modul umgebaut.
 
 [module]
 id = "terminzettel"
 name = "Terminzettel"
-version = "1.3.0-beta.2"
+version = "1.3.0-beta.13"
 core_api = "1"
-description = "Terminblatt aus T2med als Bon auf dem Bondrucker: virtueller Drucker „Terminzettel“, Layout mit Vorschau, Kalender-QR je Termin."
+description = "Terminblatt aus T2med als Bon auf dem Bondrucker: virtueller Drucker „vTermine“, Layout mit Vorschau, Kalender-QR je Termin."
 
 [system]
 packages = ["php-fpm", "php-cli", "python3", "python3-pil", "python3-qrcode", "poppler-utils", "tesseract-ocr", "tesseract-ocr-deu", "ghostscript", "libgxps-utils", "fonts-dejavu-core", "cups-client"]
@@ -25,16 +25,19 @@ id = "layout"
 label = "Terminzettel: Layout, Texte und Kalender-QR ändern"
 
 [[printers]]
-name = "Terminzettel"
-label = "T2med-Terminblatt als Bon (Terminzettel)"
+name = "vTermine"
+label = "Druckt die Terminliste (A6) aus T2med gut lesbar als Bon."
 command = "printer/kienzle-terminzettel"
 formats = ["application/pdf", "application/postscript", "application/vnd.ms-xpsdocument", "text/plain", "application/octet-stream"]
 paper = "A6"
-share = ["samba", "ipp"]
+share = ["ipp"]
 
 [backup]
 paths = ["/var/lib/kienzle/terminzettel"]
 settings = ["/var/lib/kienzle/terminzettel/layout.json"]
+
+[setup]
+overview = "bin/setup-overview"
 
 [hooks]
 install = "bin/install"

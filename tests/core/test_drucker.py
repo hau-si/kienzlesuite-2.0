@@ -230,6 +230,30 @@ class IppEverywhere(Umgebung):
         self.assertFalse((self.t / 'units' / 'kienzle-drucker-beispiel-beispiel-pdf.service').exists())
         self.assertIn(['disable', '--now', 'kienzle-drucker-beispiel-beispiel-pdf.service'], self.cups()['systemctl'])
 
+    def freigaben(self):
+        return json.loads((self.d.STATE / 'freigaben.json').read_text())
+
+    def test_virtuelle_drucker_immer_per_ipp_samba_optional(self):
+        m = self.printer()
+        m['printers'][0]['share'] = []          # Modul nennt nichts: IPP trotzdem an, Samba aus
+        self.registry(m)
+        with mock.patch.object(self.d, '_port_open', side_effect=lambda port: port == 47100 and (self.t / 'units').exists()):
+            self.d.sync()
+        self.assertEqual(self.freigaben()['Beispiel-PDF'], ['ipp'])
+        call = next(c for c in self.cups()['calls'] if c[0] == 'lpadmin' and 'Beispiel-PDF' in c)
+        self.assertIn('printer-is-shared=true', call)
+        # Admin schaltet Samba ein; ein späterer Abgleich ändert die Wahl nicht
+        self.assertIn('gespeichert', self.d.set_share('Beispiel-PDF', ['samba']))
+        self.assertEqual(self.freigaben()['Beispiel-PDF'], ['ipp', 'samba'], 'IPP muss bei virtuellen Druckern immer dabei sein')
+        with mock.patch.object(self.d, '_port_open', return_value=True):
+            self.d.sync()
+        self.assertEqual(self.freigaben()['Beispiel-PDF'], ['ipp', 'samba'])
+        # Samba wieder aus: IPP bleibt
+        self.d.set_share('Beispiel-PDF', [])
+        self.assertEqual(self.freigaben()['Beispiel-PDF'], ['ipp'])
+        call = [c for c in self.cups()['calls'] if c[0] == 'lpadmin' and 'Beispiel-PDF' in c][-1]
+        self.assertIn('printer-is-shared=true', call)
+
     def test_antwortet_nicht(self):
         self.registry(self.printer())
         with mock.patch.object(self.d, '_port_open', return_value=False):

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Virtueller Drucker „Terminzettel“: T2med druckt das Terminblatt hierher; es wird als Bon auf dem Bondrucker ausgegeben.
+# Virtueller Drucker „vTermine“: T2med druckt das Terminblatt hierher; es wird als Bon auf dem Bondrucker ausgegeben.
 # Gestartet von ippeveprinter der Basis als ks-terminzettel, mit dem Pfad des Auftrags als erstem Argument.
 # Meldungen gehen ins Protokoll des Druckers: nur feste Texte, keine Patientendaten.
 exec /usr/bin/python3 -B "$(dirname "$0")/../lib/terminzettel.py" "$@"

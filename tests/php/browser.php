@@ -42,5 +42,6 @@ function admin_browser(Env $env, string $login = 'anna'): array {
     $b->post('/anmelden/code', ['code' => code_now($secret)]);
     check($b->last->status === 303 && $b->last->header('Location') === '/', 'Admin nicht angemeldet: ' . $b->last->status);
     $b->get('/');
+    $b->get('/konto');   // Sitzungsmarke aus einem Formular holen (die Seitenleiste enthält kein Abmelden-Formular mehr)
     return [$b, $id, $secret];
 }

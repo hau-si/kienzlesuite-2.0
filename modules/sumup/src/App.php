@@ -117,11 +117,12 @@ final class App {
         return $visit;
     }
     public function state(array $visit, array $browser): array {
-        $payment = $this->db->one('SELECT * FROM payments WHERE visit_id=? ORDER BY rowid DESC LIMIT 1', [$visit['id']]);
+        $payment = $this->db->one("SELECT * FROM payments WHERE visit_id=? AND payment_status<>'discarded' ORDER BY rowid DESC LIMIT 1", [$visit['id']]);
         return ['visit_id' => $visit['id'], 'csrf' => $browser['csrf'], 'manual' => self::isManual($visit),
             'patient' => ['name' => $visit['patient_name'], 'birthdate' => $visit['patient_birthdate']],
             'completed' => $visit['completed_at'] !== null,
-            'services' => array_map(static fn($s) => ['vat' => (bool)$s['vat']] + $s, $this->db->query('SELECT id,label,price_cents,goae_code,factor,fee_type,on_request,vat,base_cents,default_reason FROM services WHERE active=1 ORDER BY label COLLATE NOCASE')->fetchAll()),
+            't2med' => !self::isManual($visit) && $visit['patient_id'] !== 'inbox' && $visit['oauth_cipher'] !== '',
+            'services' => array_map(static fn($s) => ['vat' => (bool)$s['vat']] + $s, $this->db->query('SELECT id,label,category,price_cents,goae_code,factor,fee_type,on_request,vat,base_cents,default_reason FROM services WHERE active=1 ORDER BY LENGTH(category)=0, category COLLATE NOCASE, label COLLATE NOCASE')->fetchAll()),
             'tax' => array_intersect_key(Tax::settings($this->config), ['small_business' => 1, 'rate' => 1, 'manual_vat' => 1]),
             'groups' => array_map(static fn($g) => ['id' => $g['id'], 'label' => $g['label'], 'services' => json_decode($g['service_ids_json'], true, 32, JSON_THROW_ON_ERROR)], $this->db->query('SELECT * FROM service_groups WHERE active=1 ORDER BY label COLLATE NOCASE')->fetchAll()),
             'local_receipts' => $this->config->practiceReady(), 'bank_ready' => $this->bank->ready(),
@@ -164,8 +165,14 @@ final class App {
         $row = $this->db->one('SELECT * FROM invoice_inbox WHERE id=? AND superseded_at IS NULL', [$invoiceId]);
         $limit = time() - $this->config->get('invoice_inbox', 'max_age_days', 14) * 86400;
         if (!$row || (int)$row['received_at'] < $limit) throw new Problem('Diese Rechnung ist nicht mehr offen.', 409);
-        $paid = $this->db->one("SELECT 1 AS x FROM payments WHERE t2med_invoice=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') LIMIT 1", [$row['invoice_number']]);
+        $paid = $this->db->one("SELECT 1 AS x FROM payments WHERE t2med_invoice=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') AND storno_at IS NULL LIMIT 1", [$row['invoice_number']]);
         if ($paid) throw new Problem('Diese Rechnung ist schon bezahlt oder wird gerade kassiert.', 409);
+        // Hat t2med den Patienten kürzlich per FHIR übergeben, läuft die Zahlung über diesen Vorgang (mit Rückschrieb in die Akte).
+        $linked = $this->linkedVisit((string)$row['patient_name'], (string)$row['patient_birthdate']);
+        if ($linked) {
+            $this->db->query('UPDATE visits SET expires_at=? WHERE id=?', [time() + $this->config->get('app', 'session_hours') * 3600, $linked['id']]);
+            return ['url' => $this->ticketUrl($linked['id'])];
+        }
         $visit = $this->db->one('SELECT * FROM visits WHERE context_id=? AND completed_at IS NULL ORDER BY created_at DESC LIMIT 1', ['inbox-' . $invoiceId]);
         $id = $visit['id'] ?? self::id();
         $expires = time() + $this->config->get('app', 'session_hours') * 3600;
@@ -186,6 +193,14 @@ final class App {
         return $out;
     }
     /** Alle offenen eingegangenen T2med-Rechnungen für die Startseite (mit Patientenname; nur für Benutzer mit Recht „inbox“ oder „letter“). */
+    /** Marke an einer Rechnung im Eingang setzen oder löschen: „parked“ (zurückgestellt, ohne Drucken) oder „transfer“ (überwiesen). */
+    public function inboxTag(string $invoiceId, string $tag, bool $on): array {
+        if (!preg_match('/^[a-f0-9]{32}$/D', $invoiceId)) throw new Problem('Ungültige Rechnung.', 422);
+        $column = ['parked' => 'parked_at', 'transfer' => 'transfer_at'][$tag] ?? throw new Problem('Ungültige Marke.', 422);
+        if (!$this->db->one('SELECT 1 AS x FROM invoice_inbox WHERE id=?', [$invoiceId])) throw new Problem('Diese Rechnung gibt es nicht (mehr).', 404);
+        $this->db->query("UPDATE invoice_inbox SET $column=? WHERE id=?", [$on ? time() : null, $invoiceId]);
+        return ['id' => $invoiceId, 'tag' => $tag, 'on' => $on];
+    }
     public function letterEnabled(): bool { return $this->letter->enabled(); }
     public function openInbox(): array {
         if (!$this->config->get('invoice_inbox', 'enabled', false)) return [];
@@ -193,9 +208,91 @@ final class App {
         foreach (InboxOverview::build($this->db, $this->config)['items'] as $i) {
             if ($i['status'] !== 'offen') continue;
             $out[] = ['id' => $i['id'], 'number' => $i['number'], 'invoice_date' => $i['invoice_date'], 'amount_cents' => $i['amount_cents'], 'patient' => $i['patient'], 'birthdate' => $i['birthdate'],
-                'postable' => $i['postable'], 'letter' => $i['letter']];
+                'postable' => $i['postable'], 'letter' => $i['letter'], 'received_at' => $i['received_at'], 'parked' => $i['parked'], 'transfer' => $i['transfer'], 'printed' => $i['printed'],
+                't2med' => $this->linkedVisit((string)$i['patient'], (string)$i['birthdate']) !== null];
         }
         return $out;
+    }
+    /** Jüngster noch gültiger, aus t2med per FHIR gestarteter Vorgang (mit Zugriff auf die Akte), der zu Name und Geburtsdatum passt. */
+    private function linkedVisit(string $name, string $birthdate): ?array {
+        if ($birthdate === '' || $name === '') return null;
+        $rows = $this->db->query("SELECT * FROM visits WHERE completed_at IS NULL AND expires_at>? AND oauth_cipher<>'' AND patient_id NOT IN ('manual','inbox') AND context_id NOT LIKE 'manual-%' AND context_id NOT LIKE 'inbox-%' ORDER BY created_at DESC LIMIT 50", [time()])->fetchAll();
+        foreach ($rows as $v) {
+            if (T2medInvoice::matches(['patient_name' => $name, 'patient_birthdate' => $birthdate], (string)$v['patient_name'], (string)$v['patient_birthdate'])) return $v;
+        }
+        return null;
+    }
+    // --- Fortlaufende Nummern, Verarbeitete Rechnungen, Storno ---------------------------------
+    private function zone(): \DateTimeZone { return new \DateTimeZone($this->config->get('app', 'timezone')); }
+    /** In der App erzeugte Rechnung (IGeL/GOÄ, nicht T2med) bekommt beim Bezahlen ihre fortlaufende Nummer nach eingestelltem Format. */
+    private function numberIssued(string $id, bool $open = false): void {
+        $p = $this->db->one('SELECT * FROM payments WHERE id=?', [$id]);
+        if (!$p || !($p['payment_status'] === 'successful' || ($open && $p['payment_status'] === 'transfer_open')) || !$p['invoice_json'] || $p['t2med_invoice'] !== null || ($p['doc_number'] ?? '') !== '') return;
+        $run = function () use ($id): void {
+            $row = $this->db->one('SELECT doc_number FROM payments WHERE id=?', [$id]);
+            if (($row['doc_number'] ?? '') !== '') return;
+            $number = DocNumbers::issue($this->db, 'igel', (string)$this->config->get('numbers', 'igel_format', DocNumbers::DEFAULT_IGEL), new \DateTimeImmutable('now', $this->zone()), $this->config->get('sumup', 'mode') === 'mock', $id);
+            $this->db->query('UPDATE payments SET doc_number=? WHERE id=?', [$number, $id]);
+        };
+        if ($this->db->inTransaction) $run(); else $this->db->transaction($run);
+    }
+    /** Anzeigenummer einer Zahlung: T2med-Nummer, eigene Rechnungsnummer oder (ältere Einträge) Transaktionsnummer. */
+    private static function displayNumber(array $p): string { return (string)($p['t2med_invoice'] ?: ($p['doc_number'] ?: ($p['transaction_id'] ?: $p['reference']))); }
+    /** Alle verarbeiteten Zahlungen der letzten Tage für die Startseite (bezahlt per Karte/Bar, Überweisung zurückgestellt, Stornos). */
+    public function processed(int $days = 7): array {
+        $rows = $this->db->query("SELECT p.*, v.patient_name AS pname, s.id AS sid, s.number AS snumber, s.created_at AS sat FROM payments p JOIN visits v ON v.id=p.visit_id LEFT JOIN stornos s ON s.payment_id=p.id
+            WHERE (p.payment_status IN ('successful','transfer_open') OR p.storno_at IS NOT NULL) AND COALESCE(p.paid_at,p.created_at) >= CAST(? AS INTEGER) ORDER BY COALESCE(p.paid_at,p.created_at) DESC LIMIT 300", [time() - $days * 86400])->fetchAll();
+        $out = [];
+        foreach ($rows as $p) {
+            $out[] = ['id' => $p['id'], 'number' => self::displayNumber($p), 'patient' => (string)$p['pname'], 'amount_cents' => (int)($p['corrected_cents'] ?? $p['amount_cents']),
+                'method' => (string)($p['payment_method'] ?: 'card'), 'at' => (int)($p['paid_at'] ?? $p['created_at']), 'open_transfer' => $p['payment_status'] === 'transfer_open' && $p['storno_at'] === null,
+                't2med' => $p['t2med_invoice'] !== null, 'storno' => $p['sid'] ? ['id' => $p['sid'], 'number' => $p['snumber'], 'at' => (int)$p['sat']] : null];
+        }
+        return $out;
+    }
+    /**
+     * Zahlung stornieren (Karte, Bar, Überweisung; IGeL und T2med-Rechnungen): Es entsteht ein eigener Stornobeleg mit neuer Nummer.
+     * Die ursprüngliche Zahlung bleibt für die Buchhaltung unverändert erhalten, zählt aber nicht mehr in Tageswerten und Steuerliste;
+     * eine T2med-Rechnung wird wieder offen. Eine Rückzahlung an den Patienten (Karte: Terminal/SumUp) erfolgt nicht automatisch.
+     */
+    public function storno(string $paymentId, string $note): array {
+        if (!preg_match('/^[a-f0-9]{32}$/D', $paymentId)) throw new Problem('Ungültige Zahlung.', 422);
+        $note = trim(preg_replace('/\s+/u', ' ', $note));
+        if (mb_strlen($note) > 200 || preg_match('/[\x00-\x1f]/', $note)) throw new Problem('Der Grund darf höchstens 200 Zeichen lang sein.', 422);
+        return $this->db->locked('storno-' . $paymentId, function () use ($paymentId, $note): array {
+            $this->numberIssued($paymentId, true);   // eine offene Überweisungsrechnung bekommt für das Storno erst jetzt ihre Nummer
+            $p = $this->db->one('SELECT p.*, v.patient_name AS pname FROM payments p JOIN visits v ON v.id=p.visit_id WHERE p.id=?', [$paymentId]);
+            if (!$p || !in_array($p['payment_status'], ['successful', 'transfer_open'], true)) throw new Problem('Nur bezahlte oder offene Rechnungen lassen sich stornieren.', 409);
+            if ($p['storno_at'] !== null) throw new Problem('Diese Rechnung ist schon storniert.', 409);
+            {
+                return $this->db->transaction(function () use ($p, $note): array {
+                    $now = new \DateTimeImmutable('now', $this->zone());
+                    $number = DocNumbers::issue($this->db, 'storno', (string)$this->config->get('numbers', 'storno_format', DocNumbers::DEFAULT_STORNO), $now, $this->config->get('sumup', 'mode') === 'mock', $p['id']);
+                    $sid = self::id(); $amount = (int)($p['corrected_cents'] ?? $p['amount_cents']);
+                    $this->db->query('INSERT INTO stornos(id,payment_id,number,original_number,amount_cents,method,note,created_at,patient_name) VALUES(?,?,?,?,?,?,?,?,?)',
+                        [$sid, $p['id'], $number, self::displayNumber($p), $amount, $p['payment_method'] ?: 'card', $note, time(), (string)$p['pname']]);
+                    // Eine offene Überweisung ist damit erledigt (keine Zahlung mehr zu erwarten); bezahlte Zahlungen behalten ihren Status.
+                    $this->db->query("UPDATE payments SET payment_status=CASE WHEN payment_status='transfer_open' THEN 'cancelled' ELSE payment_status END, storno_at=?, voided_at=COALESCE(voided_at,?), correction_note=? WHERE id=?", [time(), time(), mb_substr('Storniert mit ' . $number . ($note !== '' ? ': ' . $note : ''), 0, 200), $p['id']]);
+                    return ['id' => $sid, 'number' => $number, 'original_number' => self::displayNumber($p), 'amount_cents' => $amount, 'method' => $p['payment_method'] ?: 'card'];
+                });
+            }
+        });
+    }
+    /** PDF einer verarbeiteten Zahlung (Rechnung/Beleg) für die Startseite. */
+    public function processedPdf(string $paymentId): string {
+        if (!preg_match('/^[a-f0-9]{32}$/D', $paymentId)) throw new Problem('Ungültige Zahlung.', 422);
+        $this->numberIssued($paymentId);
+        $payment = $this->db->one('SELECT * FROM payments WHERE id=?', [$paymentId]) ?? throw new Problem('Zahlung nicht gefunden.', 404);
+        if (!in_array($payment['payment_status'], ['successful', 'transfer_open'], true)) throw new Problem('Für diese Zahlung gibt es keinen Beleg.', 409);
+        return ReceiptPdf::convert($this->receiptSource($payment));
+    }
+    public function stornoPdf(string $stornoId): string {
+        if (!preg_match('/^[a-f0-9]{32}$/D', $stornoId)) throw new Problem('Ungültiger Stornobeleg.', 422);
+        $s = $this->db->one('SELECT * FROM stornos WHERE id=?', [$stornoId]) ?? throw new Problem('Stornobeleg nicht gefunden.', 404);
+        $practice = [];
+        if ($this->config->practiceReady()) foreach (['name', 'street', 'city', 'contact'] as $key) $practice[$key] = $this->config->get('practice', $key, '');
+        return ReceiptPdf::convert(InvoiceReceipt::storno(['mock' => $this->config->get('sumup', 'mode') === 'mock', 'practice' => $practice, 'number' => $s['number'], 'original_number' => $s['original_number'],
+            'date' => (new \DateTimeImmutable('@' . $s['created_at']))->setTimezone($this->zone())->format('d.m.Y H:i'), 'patient' => $s['patient_name'], 'note' => $s['note'], 'amount_cents' => (int)$s['amount_cents']]));
     }
     private static function isManual(array $visit): bool { return str_starts_with((string)$visit['context_id'], 'manual-'); }
     /**
@@ -267,7 +364,7 @@ final class App {
             }
             $fresh = $this->db->one('SELECT * FROM visits WHERE id=?', [$visit['id']]);
             $this->editable($fresh);
-            $pending = $this->db->one("SELECT * FROM payments WHERE visit_id=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful')", [$visit['id']]);
+            $pending = $this->db->one("SELECT * FROM payments WHERE visit_id=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') AND storno_at IS NULL", [$visit['id']]);
             if ($pending) return $this->publicPayment($pending);
             // Barzahlung braucht kein Terminal.
             if ($method === 'card' && $this->readerPayment($visit)) throw new Problem('Das Terminal ist belegt. Du kannst den anderen Vorgang unten prüfen oder abbrechen.', 409);
@@ -325,6 +422,7 @@ final class App {
                     // Bar: sofort bezahlt, eigene fortlaufende Rechnungsnummer je Jahr (Testmodus getrennt).
                     $this->db->query('INSERT INTO payments(id,visit_id,request_id,request_hash,reference,reader_id,amount_cents,services_json,payment_status,created_at,paid_at,transaction_id,invoice_json,payment_method) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                         [$id, $visit['id'], $request, $hash, 'BAR-' . strtoupper($id), 'cash', $amount, json_encode($items, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE), 'successful', time(), time(), $this->cashNumber(), $invoice, 'cash']);
+                    $this->numberIssued($id);
                 } else {
                     $this->db->query('INSERT INTO payments(id,visit_id,request_id,request_hash,reference,reader_id,amount_cents,services_json,payment_status,created_at,invoice_json) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
                         [$id, $visit['id'], $request, $hash, 'POS-' . strtoupper($id), $this->config->get('sumup', 'reader_id') ?: 'mock-reader', $amount, json_encode($items, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE), 'starting', time(), $invoice]);
@@ -369,7 +467,7 @@ final class App {
             $this->editable($fresh);
             $source = $this->payment($visit, $id);
             if (!in_array($source['payment_status'], ['failed', 'cancelled', 'transfer_open'], true)) throw new Problem('Die Zahlungsart kann nur nach einer nicht erfolgten oder abgebrochenen Zahlung gewechselt werden. Bitte den laufenden Vorgang zuerst abbrechen.', 409);
-            if ($this->db->one("SELECT id FROM payments WHERE visit_id=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful')", [$visit['id']])) throw new Problem('Für diesen Vorgang läuft bereits eine andere Zahlung.', 409);
+            if ($this->db->one("SELECT id FROM payments WHERE visit_id=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') AND storno_at IS NULL", [$visit['id']])) throw new Problem('Für diesen Vorgang läuft bereits eine andere Zahlung.', 409);
             $t2med = !empty($source['inbox_id']);
             if ($t2med && !isset(array_column($this->openInvoices($fresh), null, 'id')[$source['inbox_id']])) throw new Problem('Diese Rechnung ist nicht mehr offen. Bitte Seite neu laden.', 409);
             if ($t2med && $method === 'transfer') throw new Problem('Bei T2med-Rechnungen steht der Überweisungs-QR-Code bereits auf der Rechnung. Hier gibt es nur Karte oder Bar.', 409);
@@ -399,6 +497,7 @@ final class App {
             $this->db->transaction(function () use ($id): void {
                 $this->db->query("UPDATE payments SET payment_status='successful',paid_at=?,transaction_id=? WHERE id=? AND payment_status='transfer_open'", [time(), $this->cashNumber('transfer'), $id]);
             });
+            $this->numberIssued($id);
             return $this->publicPayment($this->db->one('SELECT * FROM payments WHERE id=?', [$id]));
         });
     }
@@ -425,7 +524,7 @@ final class App {
             $invoice = T2medInvoice::fromPdf($pdf, $this->config->get('app', 'max_amount_cents'), $this->inboxLabels());
         } catch (Problem $e) {
             // Grund und maskierte Beschriftungszeilen merken (ohne Namen, Daten, PDF), damit neue Vorlagen einstellbar sind.
-            (new InboxLog($this->config->get('app', 'state_dir')))->add($e->getMessage(), T2medInvoice::$lastSource, T2medInvoice::overview(T2medInvoice::$lastText));
+            (new InboxLog($this->config->get('app', 'state_dir')))->add($e->getMessage(), T2medInvoice::$lastSource, T2medInvoice::overview(T2medInvoice::$lastText), $pdf);
             T2medInvoice::$lastText = '';
             throw $e;
         }
@@ -439,22 +538,22 @@ final class App {
     }
 
     /** Eigene Textschnipsel für die Rechnungserkennung. */
-    private function inboxLabels(): array {
+    public function inboxLabels(): array {
         $labels = [];
         foreach (T2medInvoice::LABEL_KEYS as $key) $labels[$key] = (array)$this->config->get('invoice_inbox', $key, []);
         return $labels;
     }
 
     /** Gelesene Rechnung speichern (getrennt vom PDF-Lesen, damit testbar). */
-    public function storeInvoice(array $invoice, ?string $pdf = null): array {
-        if (!$this->config->get('invoice_inbox', 'enabled', false)) throw new Problem('Rechnungseingang ist deaktiviert.', 404);
+    public function storeInvoice(array $invoice, ?string $pdf = null, bool $viaLetter = false): array {
+        if (!$viaLetter && !$this->config->get('invoice_inbox', 'enabled', false)) throw new Problem('Rechnungseingang ist deaktiviert.', 404);
         // Die Original-PDF nur aufbewahren, wenn sie in den Netzwerkordner, zum Praxisdrucker oder per Post (Letterxpress) gehen soll.
-        $keep = ($this->export->enabled() || $this->office->enabled() || $this->letter->enabled()) && $pdf !== null ? $pdf : null;
+        $keep = ($viaLetter || $this->export->enabled() || $this->office->enabled() || $this->letter->enabled()) && $pdf !== null ? $pdf : null;
         $result = $this->db->transaction(function () use ($invoice, $keep): array {
             $this->purgeInbox();
             $number = $invoice['number'];
             // Eine bereits bezahlte oder gerade laufende Rechnung nie erneut anbieten.
-            $paid = $this->db->one("SELECT payment_status FROM payments WHERE t2med_invoice=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') LIMIT 1", [$number]);
+            $paid = $this->db->one("SELECT payment_status FROM payments WHERE t2med_invoice=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') AND storno_at IS NULL LIMIT 1", [$number]);
             if ($paid) throw new Problem($paid['payment_status'] === 'successful' ? 'Rechnung ' . $number . ' ist bereits per Karte bezahlt.' : 'Rechnung ' . $number . ' wird gerade am Terminal kassiert.', 409);
             // Erneuter Druck derselben Rechnungsnummer ersetzt die ältere Fassung.
             $this->db->query('UPDATE invoice_inbox SET superseded_at=? WHERE invoice_number=? AND superseded_at IS NULL', [time(), $number]);
@@ -471,12 +570,50 @@ final class App {
             $status = $this->exportRow($result['id']);
             $result['message'] .= $status['status'] === 'done' ? ' PDF im Netzwerkordner abgelegt.' : ' PDF NICHT im Netzwerkordner abgelegt: ' . $status['error'];
         }
-        unset($result['id']);
+        if (!$viaLetter) unset($result['id']);
         return $result;
     }
+
+    /**
+     * Virtueller Drucker „vBriefversand“: Die Rechnung wird wie im Rechnungseingang gelesen (gleiche Rechnungen aus T2med), erscheint unter Vorgänge
+     * und geht sofort per Post an Letterxpress. Letterxpress nimmt nur PDFs mit lesbarem Text an: fehlt er, ergänzt die Texterkennung ihn vorher.
+     */
+    public function letterPrint(string $pdf): array {
+        if (!$this->letter->enabled()) throw new Problem('Der Versand per Post ist ausgeschaltet (Kasse → Einstellungen → Letterxpress).', 409);
+        [$pdf, $ocr] = PdfText::ensure($pdf);
+        try {
+            $invoice = T2medInvoice::fromPdf($pdf, $this->config->get('app', 'max_amount_cents'), $this->inboxLabels());
+        } catch (Problem $e) {
+            (new InboxLog($this->config->get('app', 'state_dir')))->add($e->getMessage(), 'Drucker vBriefversand', T2medInvoice::overview(T2medInvoice::$lastText));
+            T2medInvoice::$lastText = '';
+            throw $e;
+        }
+        T2medInvoice::$lastText = '';
+        // Ein zweiter Druck derselben Rechnung darf keinen zweiten Brief auslösen (die ältere Fassung wird beim Speichern ersetzt, der Versandstatus gehört zur Nummer).
+        if ($this->db->one("SELECT 1 AS x FROM invoice_inbox WHERE invoice_number=? AND lxp_status<>'' AND lxp_mode='live' LIMIT 1", [$invoice['number']])) {
+            throw new Problem('Rechnung ' . $invoice['number'] . ' wurde bereits per Post gesendet und wird nicht noch einmal verschickt.', 409);
+        }
+        $stored = $this->storeInvoice($invoice, $pdf, true);
+        try {
+            $sent = $this->letter->send($stored['id']);
+        } catch (Problem $e) {
+            $this->db->query('UPDATE invoice_inbox SET lxp_error=? WHERE id=? AND lxp_status=\'\'', [mb_substr($e->getMessage(), 0, 300), $stored['id']]);
+            throw new Problem('Rechnung ' . $invoice['number'] . ' liegt im Rechnungseingang, der Postversand schlug aber fehl: ' . $e->getMessage(), $e->getCode() ?: 502);
+        }
+        $message = $sent['message'] . ($ocr ? ' (Text per Texterkennung ergänzt)' : '');
+        // Für die Steuerberatung: Kopie in der Ablage (Dateiname mit _Post); ein Fehler dort stoppt den Versand nicht, er steht im Protokoll.
+        $filed = null;
+        if ($this->export->letterInvoices()) {
+            $status = $this->exportRow($stored['id'], 'Post');
+            $filed = $status['status'] === 'done';
+            $message .= $filed ? ' PDF in der Ablage gespeichert.' : ' PDF NICHT in der Ablage gespeichert: ' . $status['error'];
+        }
+        return ['ok' => true, 'number' => $invoice['number'], 'ocr' => $ocr, 'filed' => $filed, 'message' => $message];
+    }
+
     /** Original-PDF einer Rechnung ablegen; idempotent, Fehler werden gespeichert statt geworfen. */
-    private function exportRow(string $inboxId): array {
-        return $this->db->locked('invoice-export-' . $inboxId, function () use ($inboxId): array {
+    private function exportRow(string $inboxId, string|bool|null $name = null): array {
+        return $this->db->locked('invoice-export-' . $inboxId, function () use ($inboxId, $name): array {
             $row = $this->db->one('SELECT * FROM invoice_inbox WHERE id=?', [$inboxId]);
             if (!$row) return ['status' => 'failed', 'error' => 'Rechnung nicht mehr vorhanden.', 'path' => ''];
             if ($row['export_status'] === 'done') return ['status' => 'done', 'error' => '', 'path' => $row['export_path']];
@@ -484,7 +621,7 @@ final class App {
             try {
                 // Bei „nach Zahlung“ trägt der Dateiname die Zahlungsart (Karte oder Bar).
                 $method = $this->db->one("SELECT payment_method FROM payments WHERE inbox_id=? AND payment_status='successful' ORDER BY paid_at DESC LIMIT 1", [$inboxId])['payment_method'] ?? 'card';
-                $path = $this->export->export($row, $row['pdf'], $this->export->when() === 'paid' ? ($method === 'cash' ? 'Bar' : true) : false);
+                $path = $this->export->export($row, $row['pdf'], $name ?? ($this->export->when() === 'paid' ? ($method === 'cash' ? 'Bar' : true) : false));
                 // Nach erfolgreicher Ablage keine Kopie der PDF auf dem Anwendungsserver behalten.
                 $this->db->query("UPDATE invoice_inbox SET export_status='done',export_error='',export_path=? WHERE id=?", [$path, $inboxId]);
                 $this->releaseInboxPdf($inboxId);
@@ -552,7 +689,9 @@ final class App {
     private function purgeInbox(): void {
         $limit = time() - $this->config->get('invoice_inbox', 'max_age_days', 14) * 86400;
         // Nur nie kassierte Einträge löschen; Zahlungen behalten ihre Zuordnung.
-        $this->db->query('DELETE FROM invoice_inbox WHERE (received_at < ? OR superseded_at < ?) AND id NOT IN (SELECT inbox_id FROM payments WHERE inbox_id IS NOT NULL)', [$limit, $limit]);
+        // Per Post (Letterxpress) versandte Rechnungen bleiben für die Vorgänge und die Buchhaltung stehen.
+        $this->db->query("DELETE FROM invoice_inbox WHERE (received_at < ? OR superseded_at < ?) AND lxp_status='' AND id NOT IN (SELECT inbox_id FROM payments WHERE inbox_id IS NOT NULL)", [$limit, $limit]);
+        $this->db->query("UPDATE invoice_inbox SET pdf=NULL WHERE pdf IS NOT NULL AND received_at < ? AND lxp_status<>''", [$limit]);
         // Bezahlte, aber nie abgeschlossene Vorgänge: Original-PDF nach Ablauf der Frist ebenfalls löschen.
         $this->db->query("UPDATE invoice_inbox SET pdf=NULL WHERE pdf IS NOT NULL AND received_at < ? AND id IN (SELECT inbox_id FROM payments WHERE inbox_id IS NOT NULL AND payment_status='successful')", [$limit]);
     }
@@ -561,7 +700,7 @@ final class App {
         if (!$this->config->get('invoice_inbox', 'enabled', false) || $visit['patient_birthdate'] === '') return [];
         $limit = time() - $this->config->get('invoice_inbox', 'max_age_days', 14) * 86400;
         $rows = $this->db->query("SELECT i.id,i.invoice_number,i.invoice_date,i.amount_cents,i.patient_name,i.patient_birthdate,i.lxp_status,i.lxp_sent_at,i.lxp_mode,i.lxp_job_id,i.lxp_error,i.printed_at,(i.pdf IS NOT NULL) AS has_pdf FROM invoice_inbox i WHERE i.superseded_at IS NULL AND i.received_at >= ? AND i.patient_birthdate=?
-            AND NOT EXISTS (SELECT 1 FROM payments p WHERE p.t2med_invoice=i.invoice_number AND p.payment_status IN ('starting','pending','unknown','cancel_requested','successful'))
+            AND NOT EXISTS (SELECT 1 FROM payments p WHERE p.t2med_invoice=i.invoice_number AND p.payment_status IN ('starting','pending','unknown','cancel_requested','successful') AND p.storno_at IS NULL)
             ORDER BY i.received_at DESC", [$limit, $visit['patient_birthdate']])->fetchAll();
         $result = [];
         foreach ($rows as $row) {
@@ -588,7 +727,7 @@ final class App {
             }
             $fresh = $this->db->one('SELECT * FROM visits WHERE id=?', [$visit['id']]);
             $this->editable($fresh);
-            $pending = $this->db->one("SELECT * FROM payments WHERE visit_id=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful')", [$visit['id']]);
+            $pending = $this->db->one("SELECT * FROM payments WHERE visit_id=? AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') AND storno_at IS NULL", [$visit['id']]);
             if ($pending) return $this->publicPayment($pending);
             if ($method === 'card' && $this->readerPayment($visit)) throw new Problem('Das Terminal ist belegt. Du kannst den anderen Vorgang unten prüfen oder abbrechen.', 409);
             $payment = $this->db->transaction(function () use ($fresh, $request, $hash, $invoiceId, $input, $method): array {
@@ -633,7 +772,12 @@ final class App {
         $this->editable($fresh);
         $open = array_column($this->openInvoices($fresh), null, 'id');
         if (!isset($open[$invoiceId])) throw new Problem('Diese Rechnung ist nicht mehr offen oder gehört nicht zu diesem Patienten. Bitte Seite neu laden.', 409);
-        return $this->letter->send($invoiceId);
+        $sent = $this->letter->send($invoiceId);
+        if ($this->export->letterInvoices()) {
+            $status = $this->exportRow($invoiceId, 'Post');
+            $sent['message'] .= $status['status'] === 'done' ? ' PDF in der Ablage gespeichert.' : ' PDF NICHT in der Ablage gespeichert: ' . $status['error'];
+        }
+        return $sent;
     }
     /** „Später (Überweisung)“: Original-Rechnung einmal auf dem Praxisdrucker ausgeben (ohne Zahlung). */
     public function invoiceLater(array $visit, array $input): array {
@@ -643,13 +787,14 @@ final class App {
         $this->editable($fresh);
         $open = array_column($this->openInvoices($fresh), null, 'id');
         if (!isset($open[$invoiceId])) throw new Problem('Diese Rechnung ist nicht mehr offen oder gehört nicht zu diesem Patienten. Bitte Seite neu laden.', 409);
+        $this->db->query('UPDATE invoice_inbox SET transfer_at=COALESCE(transfer_at, ?) WHERE id=?', [time(), $invoiceId]);
         $settings = $this->printSettings();
         if (!$settings['t2med_auto']) return ['printed' => false, 'printed_at' => null, 'message' => ''];
         return $this->db->locked('invoice-later-' . $invoiceId, function () use ($invoiceId, $settings): array {
             $row = $this->db->one('SELECT invoice_number,pdf,printed_at FROM invoice_inbox WHERE id=?', [$invoiceId]);
             if (!$row) throw new Problem('Diese Rechnung gibt es nicht (mehr).', 404);
             if ($row['printed_at'] !== null) return ['printed' => true, 'printed_at' => (int)$row['printed_at'], 'message' => 'Diese Rechnung wurde schon gedruckt.'];
-            if ($row['pdf'] === null) throw new Problem('Original-PDF liegt nicht mehr vor. Bitte die Rechnung in T2med erneut auf „SumUp-Rechnung“ drucken.', 409);
+            if ($row['pdf'] === null) throw new Problem('Original-PDF liegt nicht mehr vor. Bitte die Rechnung in T2med erneut auf „vKasse“ drucken.', 409);
             if ($this->config->get('sumup', 'mode') !== 'live') $info = 'Test: ' . $settings['office_label'] . ' (nichts gesendet)';
             else $info = $settings['office_label'] . ', Auftrag ' . $this->office->send($row['pdf'], 'Rechnung ' . $row['invoice_number']);
             $now = time();
@@ -670,13 +815,13 @@ final class App {
         if (!$payment['invoice_json'] && in_array($payment['payment_method'] ?? 'card', ['cash', 'transfer'], true)) return $this->cashQuittung($payment);
         if (!$payment['invoice_json']) return $this->sumup->receiptSource($payment);
         $invoice = json_decode($payment['invoice_json'], true, 32, JSON_THROW_ON_ERROR);
-        $number = $payment['transaction_id'] ?? '';
+        $number = ($payment['doc_number'] ?? '') !== '' ? $payment['doc_number'] : ($payment['transaction_id'] ?? '');
         if ($number === '') throw new Problem('Die SumUp-Transaktions-ID für die Rechnungsnummer fehlt. Bitte den Zahlungsstatus prüfen.', 409);
         $paid = (new \DateTimeImmutable('@' . $payment['paid_at']))->setTimezone(new \DateTimeZone($invoice['timezone']));
         $invoice['number'] = $number; $invoice['issued_date'] = $paid->format('Y-m-d');
         $cash = ($payment['payment_method'] ?? 'card') !== 'card';
         return InvoiceReceipt::source($invoice, ['status' => $payment['payment_status'], 'paid_date' => $paid->format('d.m.Y H:i'),
-            'reference' => $payment['reference'], 'transaction_id' => $number, 'mock' => $invoice['mock'], 'method' => $payment['payment_method'] ?? 'card'],
+            'reference' => $payment['reference'], 'transaction_id' => (string)$payment['transaction_id'], 'mock' => $invoice['mock'], 'method' => $payment['payment_method'] ?? 'card'],
             !$cash && $this->config->get('practice', 'append_sumup_receipt', false) ? $this->sumup->receiptSource($payment) : null);
     }
     /** Bon mit Kontodaten und QR-Code für eine noch offene Überweisung. */
@@ -813,6 +958,7 @@ final class App {
             };
             $this->db->query('UPDATE payments SET payment_status=?,paid_at=COALESCE(paid_at,?),transaction_id=COALESCE(?,transaction_id),error_message=? WHERE id=?',
                 [$status, $status === 'successful' ? ($result['paid_at'] ?? time()) : null, $result['transaction_id'] ?? null, $error, $id]);
+            if ($status === 'successful') $this->numberIssued($id);
         } catch (TransportError $e) {
             $this->db->query('UPDATE payments SET error_message=? WHERE id=?', [$e->getMessage(), $id]);
             throw $e;
@@ -837,6 +983,19 @@ final class App {
             $this->db->query('UPDATE payments SET error_message=? WHERE id=?', [$e->getMessage(), $payment['id']]);
         }
         return $this->db->one('SELECT * FROM payments WHERE id=?', [$payment['id']]);
+    }
+    /** Nicht erfolgte oder abgebrochene Zahlung einer selbst erzeugten Rechnung, für die noch keine Rechnungsnummer vergeben wurde (Karte/Bar ohne Erfolg). */
+    private static function discardable(array $p): bool {
+        return in_array($p['payment_status'], ['failed', 'cancelled'], true) && ($p['doc_number'] ?? '') === '' && ($p['t2med_invoice'] ?? null) === null && ($p['storno_at'] ?? null) === null;
+    }
+    /** Verwerfen: Die erfolglosen Versuche dieses Vorgangs verschwinden aus der Ansicht (Status „discarded“); die Datensätze bleiben für die Nachvollziehbarkeit erhalten. */
+    public function discard(array $visit, string $id): array {
+        return $this->db->locked('payment-' . $id, function () use ($visit, $id): array {
+            $this->editable($this->db->one('SELECT * FROM visits WHERE id=?', [$visit['id']]));
+            if (!self::discardable($this->payment($visit, $id))) throw new Problem('Diese Zahlung kann nicht verworfen werden (Rechnungsnummer vergeben oder noch aktiv).', 409);
+            $this->db->query("UPDATE payments SET payment_status='discarded' WHERE visit_id=? AND payment_status IN ('failed','cancelled') AND (doc_number IS NULL OR doc_number='') AND t2med_invoice IS NULL AND storno_at IS NULL", [$visit['id']]);
+            return ['discarded' => true];
+        });
     }
     public function cancel(array $visit, string $id): array {
         return $this->db->locked('reader', fn() => $this->db->locked('payment-' . $id, function () use ($visit, $id): array {
@@ -934,6 +1093,7 @@ final class App {
             $p = $this->payment($visit, $id);
             if (!in_array($p['payment_status'], ['pending', 'starting', 'unknown', 'cancel_requested'], true)) throw new Problem('Testzahlung ist bereits abgeschlossen.', 409);
             $this->db->query("UPDATE payments SET payment_status=?,paid_at=?,transaction_id=?,error_message='' WHERE id=?", [$status, $status === 'successful' ? time() : null, $status === 'successful' ? 'TEST-' . $id : null, $id]);
+            if ($status === 'successful') $this->numberIssued($id);
         });
     }
     // --- Rechnung automatisch drucken ----------------------------------------------------
@@ -1047,10 +1207,10 @@ final class App {
     }
     private function publicPayment(array $p): array {
         return array_intersect_key($p, array_flip(['id', 'amount_cents', 'currency', 'reference', 'payment_status', 'doc_status', 'paid_at', 'error_message'])) +
-            ['method' => $p['payment_method'] ?? 'card', 'local_receipt' => !empty($p['invoice_json']), 'invoice_number' => !empty($p['invoice_json']) && $p['payment_status'] === 'successful' ? $p['transaction_id'] : null,
+            ['method' => $p['payment_method'] ?? 'card', 'local_receipt' => !empty($p['invoice_json']), 'invoice_number' => !empty($p['invoice_json']) && $p['payment_status'] === 'successful' ? (($p['doc_number'] ?? '') !== '' ? $p['doc_number'] : $p['transaction_id']) : null,
              'transfer' => ($p['payment_method'] ?? 'card') === 'transfer' && $p['payment_status'] === 'transfer_open' && $this->bank->ready()
                  ? $this->bank->info((int)$p['amount_cents'], (string)($p['t2med_invoice'] ?: $p['reference'])) : null,
-             'invoice_id' => $p['inbox_id'] ?? null, 't2med_invoice' => $p['t2med_invoice'] ?? null, 'invoice_export' => $this->exportState($p), 'invoice_print' => $this->printState($p)];
+             'invoice_id' => $p['inbox_id'] ?? null, 't2med_invoice' => $p['t2med_invoice'] ?? null, 'discardable' => self::discardable($p), 'invoice_export' => $this->exportState($p), 'invoice_print' => $this->printState($p)];
     }
     private function exportState(array $p): ?array {
         if (!$this->export->enabled()) return null;

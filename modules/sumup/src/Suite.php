@@ -17,7 +17,9 @@ final class Suite {
     public static string $helper = '/opt/kienzle/core/current/php/modul/Kienzle.php';
     public static string $data = '/var/lib/kienzle/sumup';
     /** Rechte aus module.toml ([[rights]]); Admins des Moduls haben alle. */
-    public const RIGHTS = ['kassieren', 'paid', 'inbox', 'letter', 'catalog', 'export'];
+    public const RIGHTS = ['kassieren', 'paid', 'inbox', 'letter', 'catalog', 'export', 'periods', 'storno'];
+    /** Rechte, die einen Zugang zur Einstellungsseite geben (die übrigen betreffen nur Kasse und Vorgänge). */
+    public const SETTINGS_RIGHTS = ['inbox', 'letter', 'catalog'];
     private static ?\KienzleModul $modul = null;
 
     public static function modul(): \KienzleModul {
@@ -65,6 +67,9 @@ final class Suite {
         if (self::isAdmin()) return self::RIGHTS;
         return array_values(array_intersect(self::RIGHTS, self::modul()->rechte()));
     }
+
+    /** Rechte dieses Benutzers für die Einstellungsseite. */
+    public static function settingsRights(): array { return array_values(array_intersect(self::rights(), self::SETTINGS_RIGHTS)); }
 
     /** Grundwerte aus dem Datenordner (angelegt von bin/install). */
     public static function grundwerte(): array {

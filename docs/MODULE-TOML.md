@@ -66,6 +66,7 @@ Ohne `[web]` erscheint das Modul nicht im Menü (z. B. ein reines Druckmodul).
 | `protocol` | nein | `"http"` (Vorgabe: das Modul spricht HTTP über den Socket) oder `"fastcgi"` (PHP über php-fpm) |
 | `entry` | bei `fastcgi` | Einstiegsdatei im Modulordner, z. B. `public/index.php`; alle Anfragen unter `path` gehen an sie |
 | `starter` | nein | `true`: das Modul bedient den Arbeitsplatz-Starter (`POST https://<server>/api.php` ohne Anmeldung, siehe `docs/MODUL-SCHNITTSTELLE.md`). Nur mit `fastcgi`, höchstens ein Modul. Vorgabe `false` |
+| `uploads` | nein | `true`: Formular-Uploads (`multipart/form-data`, `$_FILES`) sind erlaubt, bis 3 MB je Datei. Sonst ist `file_uploads` im Modul-Dienst aus. Nur mit `fastcgi`. Vorgabe `false` |
 
 ### `[[firewall]]` – optional, höchstens 20
 
@@ -112,7 +113,7 @@ Virtuelle Drucker des Moduls. Die Druckerverwaltung der Basis legt sie an und en
 | `formats` | nein | nur mit `command`: angenommene Dateitypen, Vorgabe `["application/pdf"]`, höchstens 5 |
 | `ppd` | eins von beiden | Ältere Art: CUPS-Warteschlange mit PPD-Datei aus dem Modulordner (CUPS behandelt PPDs als veraltet) |
 | `backend` | nein | nur mit `ppd`: CUPS-Backend im Modulordner (ausführbar, läuft als Benutzer `lp`). Ohne Backend verwirft die Warteschlange die Ausgabe der Filter (Backend `kienzle-leer` der Basis) |
-| `share` | nein | Liste aus `"samba"` und `"ipp"`: wie die Arbeitsplätze den Drucker erreichen |
+| `share` | nein | Liste aus `"samba"` und `"ipp"`: wie die Arbeitsplätze den Drucker erreichen. IPP ist bei virtuellen Druckern immer an (Standardweg für alle Betriebssysteme), auch wenn es hier fehlt; Samba (alte Windows-Freigabe) ist nur eine Vorgabe für neue Drucker, der Admin schaltet es unter Verwaltung → Drucker ein oder aus |
 
 ### `[[connections]]` – optional
 
@@ -205,14 +206,14 @@ settings = ["/var/lib/kienzle/beispiel/einstellungen.json"]
 
 [[printers]]
 name = "Beispiel-Drucker"
-label = "Virtueller Drucker des Beispielmoduls"
+label = "Beispiel: Nimmt Druckaufträge für das Beispielmodul an."
 ppd = "printer/beispiel.ppd"
 backend = "printer/kienzle-beispiel-backend"
 share = ["samba", "ipp"]
 
 [[printers]]
 name = "Beispiel-PDF"
-label = "Virtueller PDF-Drucker des Beispielmoduls (IPP Everywhere)"
+label = "Beispiel: Nimmt PDF-Aufträge für das Beispielmodul an."
 command = "printer/kienzle-beispiel-druck"
 formats = ["application/pdf"]
 share = ["ipp"]

@@ -21,7 +21,7 @@ final class Backup {
         return ['eingerichtet' => (int)($s['eingerichtet'] ?? 0) > 0, 'warnungen' => array_values(array_filter((array)($s['warnungen'] ?? ['Die Datensicherung ist noch nicht eingerichtet.']), 'is_string')),
             'letzte_sicherung' => is_array($s['letzte_sicherung'] ?? null) ? $s['letzte_sicherung'] : null, 'letzte_pruefung' => is_array($s['letzte_pruefung'] ?? null) ? $s['letzte_pruefung'] : null,
             'letzte_probe' => is_array($s['letzte_probe'] ?? null) ? $s['letzte_probe'] : null, 'letztes_aufraeumen' => is_array($s['letztes_aufraeumen'] ?? null) ? $s['letztes_aufraeumen'] : null,
-            'letzte' => is_array($s['letzte'] ?? null) ? $s['letzte'] : null, 'laeuft' => (string)($s['laeuft'] ?? ''),
+            'letzte' => is_array($s['letzte'] ?? null) ? View::frisch($s['letzte']) : null, 'laeuft' => (string)($s['laeuft'] ?? ''),
             'schnappschuesse' => array_values(array_filter((array)($s['schnappschuesse'] ?? []), fn($x) => is_array($x) && preg_match('/^[0-9a-f]{8,16}$/', (string)($x['id'] ?? '')))),
             'blatt' => is_file(self::$state . '/blatt.html'), 'zeitplan' => self::schedule($s['zeitplan'] ?? null),
             'mail_an' => array_values(array_filter((array)($s['mail_an'] ?? []), fn($a) => is_string($a) && filter_var($a, FILTER_VALIDATE_EMAIL))),

@@ -34,6 +34,7 @@ final class ModuleAdmin {
             'since' => (int)($s['running']['since'] ?? 0)] : null;
         $last = is_array($s['last'] ?? null) ? ['ok' => ($s['last']['ok'] ?? false) === true, 'message' => mb_substr((string)($s['last']['message'] ?? ''), 0, 400),
             'time' => (int)($s['last']['time'] ?? 0)] : null;
+        $last = $last !== null ? View::frisch($last) : null;
         $log = @file_get_contents(self::$state . '/module.log');
         $lines = is_string($log) ? array_slice(preg_split('/\R/', rtrim($log)), -20) : [];
         return ['installed' => $installed, 'available' => $available, 'running' => $running, 'pending' => is_file($this->request()), 'last' => $last,

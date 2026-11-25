@@ -68,10 +68,10 @@ async function rawApi(action, data = {}) {
   return result;
 }
 function message(text, error) {
-  const m = $('message'); m.hidden = !text; m.textContent = text || ''; m.classList.toggle('error', !!error);
+  if (text && $('lade')) $('lade').hidden = true; const m = $('message'); m.hidden = !text; m.textContent = text || ''; m.classList.toggle('error', !!error);
   if (text) window.scrollTo({top: 0, behavior: 'smooth'});
 }
-function show(view) { for (const id of ['settings']) if ($(id)) $(id).hidden = id !== view; }
+function show(view) { if ($('lade')) $('lade').hidden = true; for (const id of ['settings']) if ($(id)) $(id).hidden = id !== view; }
 
 function values(form, section) {
   const out = {};
@@ -97,9 +97,8 @@ function render(data) {
   $('mode').classList.toggle('live', data.mode === 'live');
   $('warning').hidden = !data.warning; $('warning').textContent = data.warning || '';
   renderInvoicePrinter(data.invoice_printer || {});
+  renderLetterPrinter(data.letter_printer || {});
   if (data.clients) renderClients(data.clients);
-  if (data.export_years) renderExport(data.export_years, data.mode);
-  if (data.export_years) t2medPaidSetup(data.export_years, data.mode);
   const root = $('sections');
   document.querySelectorAll('[data-generated]').forEach(node => node.remove());
   for (const section of data.sections) {
@@ -173,24 +172,30 @@ function render(data) {
   layoutTabs(data);
 }
 
-// ---- Drucker „SumUp-Rechnung“ (wird beim Einschalten automatisch angelegt) ---------------
-function renderInvoicePrinter(info) {
-  $('invoice-printer-help').hidden = !info.enabled;
-  const box = $('invoice-printer-status'); box.replaceChildren();
+// ---- Virtuelle Drucker „vKasse“ und „vBriefversand“ (legt die Suite aus module.toml an) ---------------
+const PRINTERS = {
+  invoice: {box: 'invoice-printer', queue: 'vKasse', ppd: 'vKasse-PDF.ppd', use: 'In T2med die Rechnung auf diesen Drucker drucken – sie erscheint dann beim Patienten zum Kassieren.'},
+  letter: {box: 'letter-printer', queue: 'vBriefversand', ppd: 'vBriefversand-PDF.ppd', use: 'Für den Sammelversand in T2med vorübergehend den Rechnungsdrucker auf diesen Drucker umstellen: jede gedruckte Rechnung geht sofort per Post an Letterxpress (und erscheint unter Vorgänge). Danach wieder zurückstellen.'},
+};
+function renderInvoicePrinter(info) { renderPrinterHelp(PRINTERS.invoice, info); }
+function renderLetterPrinter(info) { renderPrinterHelp(PRINTERS.letter, info); }
+function renderPrinterHelp(cfg, info) {
+  $(cfg.box + '-help').hidden = !info.enabled;
+  const box = $(cfg.box + '-status'); box.replaceChildren();
   if (!info.enabled) return;
   if (!info.queue) {
-    const p = el('p', 'Der Drucker „SumUp-Rechnung“ fehlt in der Suite. Unter Verwaltung → Drucker „Virtuelle Drucker abgleichen“ wählen; legt die Suite ihn dann nicht an, das Modul unter Verwaltung → Module neu installieren.', 'inline-error');
-    box.append(p); return;
+    box.append(el('p', 'Der Drucker „' + cfg.queue + '“ fehlt in der Suite. Unter Verwaltung → Drucker „Virtuelle Drucker abgleichen“ wählen; legt die Suite ihn dann nicht an, das Modul unter Verwaltung → Module neu installieren.', 'inline-error'));
+    return;
   }
-  if (!info.queue.ours) { box.append(el('p', 'Ein anderer Drucker heißt bereits „SumUp-Rechnung“. Bitte diesen umbenennen oder entfernen.', 'inline-error')); return; }
-  box.append(el('p', 'Eingerichtet (' + info.queue.state + '). In T2med die Rechnung auf diesen Drucker drucken – sie erscheint dann beim Patienten zum Kassieren.', 'notice'));
+  if (!info.queue.ours) { box.append(el('p', 'Ein anderer Drucker heißt bereits „' + cfg.queue + '“. Bitte diesen umbenennen oder entfernen.', 'inline-error')); return; }
+  box.append(el('p', 'Eingerichtet (' + info.queue.state + '), per IPP freigegeben. ' + cfg.use, 'notice'));
   const ol = el('ol', null, 'steps');
   ol.append(el('li', 'Windows: Drucker hinzufügen → „Freigegebenen Drucker über den Namen auswählen“: ' + info.url + ' – Treiber „Microsoft IPP Class Driver“, Papier A4. ' + ippIpNote(info.url, info.ips)));
   const driver = el('li', 'Windows 11: Fehlt der Treiber „Microsoft IPP Class Driver“ oder akzeptiert Windows die Adresse nicht, PowerShell als Administrator öffnen und ausführen:');
-  driver.append(el('pre', ippPowerShell('SumUp-Rechnung', info.url, info.ips, 'A4'), 'audit-list'));
+  driver.append(el('pre', ippPowerShell(cfg.queue, info.url, info.ips, 'A4'), 'audit-list'));
   ol.append(driver);
   ol.append(el('li', 'Druckereigenschaften lassen sich nicht öffnen („Das Handle ist ungültig“) oder der Druck bleibt aus: Die Windows-Einrichtung ist veraltet, z. B. nach Neueinrichtung des Servers. Drucker entfernen und mit dem PowerShell-Skript oben neu einrichten (es startet den Druckspooler neu und entfernt den alten Drucker). Eine Meldung beim Löschen alter Anschlüsse („Anschluss unbekannt“) ist harmlos. Möglichst die IP-Adresse statt des Namens verwenden.'));
-  const mac = el('li'); mac.append(document.createTextNode('Mac: „SumUp-Rechnung“ hinzufügen, als Treiber die Datei '), el('a', 'SumUp-Rechnung-PDF.ppd', null, {href: BASE + 'assets/SumUp-Rechnung-PDF.ppd', download: 'SumUp-Rechnung-PDF.ppd'}), document.createTextNode(' wählen.'));
+  const mac = el('li'); mac.append(document.createTextNode('Mac: „' + cfg.queue + '“ hinzufügen, als Treiber die Datei '), el('a', cfg.ppd, null, {href: BASE + 'assets/' + cfg.ppd, download: cfg.ppd}), document.createTextNode(' wählen.'));
   ol.append(mac); box.append(ol);
 }
 
@@ -204,7 +209,7 @@ const GROUPS = [
   {id: 'sicherheit', label: 'Protokoll', cards: ['s-audit']},
 ];
 const TABS = [
-  {id: 'abrechnung', label: 'Abrechnung', hint: 'laufend', cards: ['s-inbox-list', 's-t2med-paid', 's-export']},
+  {id: 'abrechnung', label: 'Abrechnung', hint: 'laufend', cards: ['s-inbox-list']},
   {id: 'leistungen', label: 'Leistungen', hint: 'GOÄ', cards: ['s-catalog']},
   {id: 'einrichtung', label: 'Einrichtung', hint: 'einmalig', cards: ['s-checklist', ...GROUPS.flatMap(g => g.cards)], groups: GROUPS},
 ];
@@ -302,19 +307,18 @@ function t2medSetupHelp() {
 const PLACES = {web: 'In diesem Webfenster', pc: 'Auf den Kassen-PCs', t2med: 'In T2med'};
 function renderChecklist(data) {
   const invoiceQueue = !!(data.invoice_printer && data.invoice_printer.queue);
-  const flag = key => !!(data.sections.find(s => s.id === key)?.fields.find(f => f.key === 'enabled') || {}).value;
+  const letterQueue = !!(data.letter_printer && data.letter_printer.queue && data.letter_printer.enabled);
   // Punkte der Kasse kommen vom Server (dieselben wie im Einrichtungs-Überblick der Suite), schon in der nötigen Reihenfolge.
-  const own = (data.setup || []).map(i => ({ort: /Starter/.test(i.title) ? 'pc' : 'web', done: i.state === 'done', error: i.state === 'error', label: i.title, card: (i.link || '').split('#')[1] || 's-checklist', detail: i.hint}));
+  const own = (data.setup || []).map(i => ({optional: !!i.optional, ort: /Starter/.test(i.title) ? 'pc' : 'web', done: i.state === 'done', error: i.state === 'error', label: i.title, card: (i.link || '').split('#')[1] || 's-checklist', detail: i.hint}));
   const web = own.filter(i => i.ort === 'web'), pc = own.filter(i => i.ort === 'pc');
   const items = [
     ...web,
-    {ort: 'web', done: flag('letterxpress'), optional: true, label: 'Rechnung per Post über Letterxpress versenden', card: 's-letterxpress'},
-    {ort: 'web', done: flag('invoice_export'), optional: true, label: 'Rechnungen im Netzwerkspeicher ablegen (z. B. für die Steuerberatung)', card: 's-invoice_export'},
     {ort: 'pc', info: true, label: 'Zertifikat der Suite einrichten (einmal je PC, siehe Arbeitsplatz einrichten der Suite)', card: 's-clients'},
     ...pc,
-    ...(invoiceQueue ? [{ort: 'pc', info: true, label: 'Drucker „SumUp-Rechnung“ am Arbeitsplatz installieren (Windows: IPP-Drucker hinzufügen, Papier A4)', card: 'invoice-printer-help', detail: (data.invoice_printer && data.invoice_printer.url) || ''}] : []),
+    ...(invoiceQueue ? [{ort: 'pc', info: true, label: 'Drucker „vKasse“ am Arbeitsplatz installieren (Windows: IPP-Drucker hinzufügen, Papier A4)', card: 'invoice-printer-help', detail: (data.invoice_printer && data.invoice_printer.url) || ''}] : []),
+    ...(letterQueue ? [{ort: 'pc', info: true, label: 'Drucker „vBriefversand“ am Arbeitsplatz installieren (für den Sammelversand per Post; wie „vKasse“, Papier A4)', card: 'letter-printer-help', detail: (data.letter_printer && data.letter_printer.url) || ''}] : []),
     {ort: 't2med', info: true, label: 'Drittanbieter-Zugriff mit Funktionsleisten-Button „Kartenzahlung“ anlegen (Aufruf-Adresse steht bei der T2med-Anbindung)', card: 's-fhir', href: GUIDE_URL, hrefLabel: 'Anleitung mit Bildern'},
-    ...(invoiceQueue ? [{ort: 't2med', info: true, label: 'Rechnungen in T2med auf den zuvor installierten Drucker „SumUp-Rechnung“ drucken', card: 'invoice-printer-help'}] : []),
+    ...(invoiceQueue ? [{ort: 't2med', info: true, label: 'Rechnungen in T2med auf den zuvor installierten Drucker „vKasse“ drucken', card: 'invoice-printer-help'}] : []),
   ];
   const list = $('checklist'); list.replaceChildren();
   const required = items.filter(i => !i.optional && !i.info);
@@ -359,7 +363,6 @@ function staffMode(data) {
   const panel = $('tab-panels'); panel.replaceChildren(); panel.hidden = false;
   const rights = data.rights || [], can = r => rights.includes(r);
   const take = id => { const card = $(id); if (card) { card.hidden = false; panel.append(card); } };
-  if (can('paid')) { take('s-t2med-paid'); t2medPaidSetup(data.export_years || [], data.mode); }
   if (can('inbox') || can('letter')) { take('s-inbox-list'); loadInbox(); }
   if (can('catalog')) { take('s-catalog'); loadCatalog(); }
   if (!panel.children.length) panel.append(el('p', 'Für diesen Zugang sind keine Bereiche freigegeben. Bitte beim Administrator melden.', 'muted'));
@@ -380,109 +383,6 @@ function ippIpNote(url, ips) {
   return byIp.length ? 'Per IP-Adresse (z. B. aus dem VPN): ' + byIp.map(i => i.url + ' (' + i.name + ')').join(' oder ') + '. ' : '';
 }
 
-// ---- Export für die Steuerberatung ------------------------------------------------------
-const MONTH_NAMES = ['Ganzes Jahr', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
-function renderExport(years, mode) {
-  const form = $('export-form'); if (form.dataset.ready) return; form.dataset.ready = '1';
-  const row = el('div', null, 'export-row');
-  const year = el('select', null, null, {name: 'year', 'aria-label': 'Jahr'}); for (const y of years) year.append(el('option', String(y), null, {value: String(y)}));
-  const month = el('select', null, null, {name: 'month', 'aria-label': 'Zeitraum'}); MONTH_NAMES.forEach((n, i) => month.append(el('option', n, null, {value: String(i)})));
-  const yearField = el('div', null, 'field'); yearField.append(el('label', 'Jahr'), year);
-  const monthField = el('div', null, 'field'); const ml = el('div', null, 'label-row'); ml.append(el('label', 'Zeitraum'));
-  const t = tip({label: 'Zeitraum', tip: 'Ganzes Jahr für den Jahresabschluss, ein Monat z. B. für die monatliche Umsatzsteuer-Voranmeldung. Maßgeblich ist das Zahlungsdatum.'}); if (t) ml.append(t);
-  monthField.append(ml, month); row.append(yearField, monthField); form.append(row);
-  const names = el('label', null, 'check'); const nameBox = el('input', null, null, {type: 'checkbox', name: 'names'}); names.append(nameBox, document.createTextNode(' Patientennamen aufnehmen'));
-  const nl = el('div', null, 'label-row'); nl.append(names);
-  const nt = tip({label: 'Patientennamen', tip: 'Nur ankreuzen, wenn die Steuerberatung die Namen braucht. Ohne Namen reichen Rechnungsnummer, Datum und Betrag für die Buchhaltung.'}); if (nt) nl.append(nt);
-  form.append(nl);
-  let testBox = null;
-  if (mode !== 'live') { const test = el('label', null, 'check'); testBox = el('input', null, null, {type: 'checkbox', name: 'test'}); test.append(testBox, document.createTextNode(' Testzahlungen einbeziehen (nur zum Ausprobieren)')); form.append(test); }
-  const now = new Date(); month.value = '0'; year.value = String(now.getFullYear());
-  const buttons = el('div', null, 'row-buttons'); const link = el('a', 'Excel-Tabelle herunterladen', 'button primary', {download: ''}); buttons.append(link); form.append(buttons);
-  const update = () => { link.href = BASE + 'tax-export.php?' + new URLSearchParams({year: year.value, month: month.value, names: nameBox.checked ? '1' : '0', test: testBox && testBox.checked ? '1' : '0'}); };
-  form.onchange = update; update();
-  link.onclick = () => message('Excel-Tabelle für ' + (month.value === '0' ? 'das Jahr ' + year.value : MONTH_NAMES[month.value] + ' ' + year.value) + ' wird geladen.');
-}
-
-// ---- Bezahlte T2med-Rechnungen abhaken -------------------------------------------------
-let t2medFilter = {status: 'open', year: 0, month: 0, test: false};
-function t2medPaidSetup(years, mode) {
-  const box = $('t2med-paid'); if (box.dataset.ready) return; box.dataset.ready = '1';
-  const bar = el('div', null, 'export-row t2med-bar');
-  const status = el('select', null, null, {'aria-label': 'Anzeigen'}); status.append(el('option', 'Noch nicht abgehakt', null, {value: 'open'}), el('option', 'Alle', null, {value: 'all'}));
-  const year = el('select', null, null, {'aria-label': 'Jahr'}); year.append(el('option', 'Alle Jahre', null, {value: '0'})); for (const y of years) year.append(el('option', String(y), null, {value: String(y)}));
-  const month = el('select', null, null, {'aria-label': 'Monat'}); MONTH_NAMES.forEach((n, i) => month.append(el('option', i ? n : 'Alle Monate', null, {value: String(i)})));
-  for (const [label, input] of [['Anzeigen', status], ['Jahr', year], ['Monat', month]]) { const f = el('div', null, 'field'); f.append(el('label', label), input); bar.append(f); }
-  box.append(bar);
-  let test = null;
-  if (mode !== 'live') { const l = el('label', null, 'check'); test = el('input', null, null, {type: 'checkbox'}); l.append(test, document.createTextNode(' Testzahlungen anzeigen (nur zum Ausprobieren – nie in T2med abhaken)')); box.append(l); }
-  const summary = el('p', null, 'muted small', {id: 't2med-summary'}); const table = el('div', null, 't2med-table', {id: 't2med-table'});
-  const buttons = el('div', null, 'row-buttons');
-  const done = el('button', 'Markierte als in T2med abgehakt', 'primary', {type: 'button'});
-  const undo = el('button', 'Markierte wieder öffnen', 'secondary', {type: 'button'});
-  const link = el('a', 'Liste als Excel herunterladen', 'button secondary', {download: ''});
-  buttons.append(done, undo, link); box.append(summary, table, buttons);
-  const read = () => { t2medFilter = {status: status.value, year: Number(year.value), month: year.value === '0' ? 0 : Number(month.value), test: !!(test && test.checked)}; month.disabled = year.value === '0';
-    link.href = BASE + 'tax-export.php?' + new URLSearchParams({kind: 't2med', status: t2medFilter.status, year: t2medFilter.year, month: t2medFilter.month, test: t2medFilter.test ? '1' : '0'}); };
-  const load = async () => { read(); try { renderT2medPaid(await api('t2med_paid', t2medFilter)); } catch (error) { summary.textContent = error.message; } };
-  const mark = (flag, button) => busy(button, async () => {
-    const ids = [...table.querySelectorAll('input[type=checkbox]:checked')].map(c => c.value);
-    if (!ids.length) throw new Error('Bitte zuerst Rechnungen ankreuzen.');
-    const result = await api('t2med_done', {ids, done: flag, filter: t2medFilter}); renderT2medPaid(result); message(result.message);
-  });
-  done.onclick = () => mark(true, done); undo.onclick = () => mark(false, undo);
-  for (const input of [status, year, month, test].filter(Boolean)) input.onchange = load;
-  load();
-}
-function renderT2medPaid(data) {
-  const table = $('t2med-table'); table.replaceChildren();
-  const euro = c => (c / 100).toLocaleString('de-DE', {style: 'currency', currency: 'EUR'});
-  const date = d => d ? d.split('-').reverse().join('.') : '';
-  const sum = data.rows.reduce((t, r) => t + r.amount_cents, 0);
-  const voided = data.rows.filter(r => r.voided).length;
-  badge('abrechnung', data.open_total);
-  $('t2med-summary').textContent = data.rows.length ? (data.rows.length - voided) + ' Rechnungen, zusammen ' + euro(sum) + (voided ? ' (' + voided + ' storniert, nicht mitgezählt)' : '') + '. Noch nicht abgehakt insgesamt: ' + data.open_total + '.' : 'Keine Rechnungen für diese Auswahl.' + (data.open_total ? '' : ' Alles abgehakt.');
-  if (!data.rows.length) return;
-  const t = el('table'); const head = el('tr');
-  const all = el('input', null, null, {type: 'checkbox', 'aria-label': 'Alle auswählen'}); const th = el('th'); th.append(all); head.append(th);
-  for (const h of ['Re.-Nr.', 'Re.-Datum', 'Patient', 'Geb.', 'Betrag', 'Bezahlt', 'Abgehakt', '']) head.append(el('th', h));
-  t.append(head);
-  for (const r of data.rows) {
-    const tr = el('tr', null, (r.done_date ? 'done ' : '') + (r.voided ? 'voided' : '')); const td = el('td'); const c = el('input', null, null, {type: 'checkbox', value: r.id, 'aria-label': 'Rechnung ' + r.number}); td.append(c); tr.append(td);
-    const amount = r.voided ? 'storniert' : euro(r.amount_cents) + (r.corrected ? ' (bezahlt: ' + euro(r.original_cents) + ')' : '');
-    for (const v of [r.number + (r.test ? ' (Test)' : ''), date(r.invoice_date), r.patient, date(r.birthdate), amount, date(r.paid_date) + ' ' + r.paid_time, date(r.done_date) || '–']) tr.append(el('td', v));
-    const fix = el('button', 'Korrigieren', 'secondary small-button', {type: 'button'});
-    fix.onclick = e => { e.stopPropagation(); correctionPanel(r, table, euro); };
-    const last = el('td'); last.append(fix); tr.append(last);
-    tr.onclick = e => { if (e.target === c || e.target === fix) return; c.checked = !c.checked; };
-    t.append(tr);
-  }
-  all.onchange = () => t.querySelectorAll('td input').forEach(c => { c.checked = all.checked; });
-  table.append(t);
-}
-// Nachträgliche Korrektur einer bezahlten Rechnung (nur Statistik und Excel; keine Erstattung bei SumUp).
-function correctionPanel(r, table, euro) {
-  const old = table.querySelector('.t2med-correct'); if (old) old.remove();
-  const box = el('div', null, 't2med-correct');
-  box.append(el('h3', 'Korrektur: Rechnung ' + r.number + (r.patient ? ' – ' + r.patient : '')));
-  box.append(el('p', 'Per Karte bezahlt: ' + euro(r.original_cents) + '. Die Korrektur ändert nur die Statistik und die Excel-Liste. Eine Erstattung an den Patienten erfolgt nicht automatisch, sie muss im SumUp-Konto vorgenommen werden. Das Original bleibt gespeichert.', 'muted small'));
-  const f1 = el('div', null, 'field'); f1.append(el('label', 'Richtiger Betrag in Euro'));
-  const amount = el('input', null, null, {type: 'text', inputmode: 'decimal', value: ((r.voided ? r.original_cents : r.amount_cents) / 100).toFixed(2).replace('.', ',')}); f1.append(amount);
-  const f2 = el('div', null, 'field'); f2.append(el('label', 'Notiz (optional, z. B. Grund)'));
-  const note = el('input', null, null, {type: 'text', maxlength: '200', value: r.note || ''}); f2.append(note);
-  const buttons = el('div', null, 'row-buttons');
-  const send = (change, button, confirmText) => { if (confirmText && !confirm(confirmText)) return; busy(button, async () => {
-    const result = await api('t2med_correct', {id: r.id, change, amount: amount.value, note: note.value, filter: t2medFilter}); renderT2medPaid(result); message(result.message); }); };
-  const save = el('button', 'Betrag ändern', 'primary', {type: 'button'}); save.onclick = () => send('amount', save);
-  const cancel = el('button', 'Zahlung stornieren', 'secondary', {type: 'button'}); cancel.onclick = () => send('void', cancel, 'Zahlung für Rechnung ' + r.number + ' stornieren? Sie zählt dann nicht mehr in der Statistik. Das Geld wird dadurch NICHT erstattet.');
-  buttons.append(save, cancel);
-  if (r.voided || r.corrected) { const undo = el('button', 'Korrektur zurücknehmen', 'secondary', {type: 'button'}); undo.onclick = () => send('restore', undo); buttons.append(undo); }
-  const close = el('button', 'Schließen', 'secondary', {type: 'button'}); close.onclick = () => box.remove(); buttons.append(close);
-  box.append(f1, f2, buttons);
-  table.append(box); box.scrollIntoView({block: 'nearest'});
-}
-
-// ---- Arbeitsplätze ---------------------------------------------------------------------
 const CLIENT_STEPS = {
   windows: ['ZIP-Datei mit Rechtsklick → „Alle extrahieren …“ entpacken.', '„install-windows.cmd“ doppelklicken. Bei „Windows hat den PC geschützt“: „Weitere Informationen“ → „Trotzdem ausführen“.',
     'Die Zertifikatswarnung mit „Ja“ bestätigen – das Fenster liegt manchmal hinter anderen Fenstern (Taskleiste prüfen).', 'Fertig, wenn „Kienzle-SumUp eingerichtet“ erscheint.'],
@@ -663,82 +563,8 @@ function renderInbox(data) {
   box.replaceChildren();
   if (!data.enabled) { box.append(el('p', '„T2med-Rechnungen übernehmen“ ist ausgeschaltet (Karte weiter unten).', 'muted')); return; }
   const euro = c => (c / 100).toLocaleString('de-DE', {style: 'currency', currency: 'EUR'});
-  if (!data.items.length) box.append(el('p', 'Noch keine Rechnung eingegangen.', 'muted'));
-  else {
-    const table = el('table', null, 'fw-table'), head = el('tr');
-    const selected = new Set();
-    const bar = el('div', null, 'row-buttons');
-    const countText = el('span', '', 'muted');
-    const toggleAll = el('input', null, null, {type: 'checkbox', 'aria-label': 'Alle auswählbaren Rechnungen markieren'});
-    const boxes = [];
-    const refresh = () => {
-      for (const b of bar.querySelectorAll('button')) b.disabled = selected.size === 0 || b.dataset.busy === '1';
-      countText.textContent = selected.size ? selected.size + ' ausgewählt' : 'Nichts ausgewählt';
-      toggleAll.checked = boxes.length > 0 && boxes.every(b => b.checked);
-    };
-    toggleAll.onchange = () => { for (const b of boxes) { b.checked = toggleAll.checked; b.onchange(); } };
-    const selectedRows = () => data.items.filter(r => selected.has(r.id));
-    const bulk = (label, action, ask, filter) => {
-      const b = el('button', label, 'secondary', {type: 'button'});
-      b.onclick = () => {
-        const rows = selectedRows().filter(filter);
-        if (!rows.length) { message('Für diese Aktion ist keine der markierten Rechnungen geeignet.'); return; }
-        if (!confirm(ask(rows))) return;
-        busy(b, async () => { const res = await api(action, {ids: rows.map(r => r.id)}); renderInbox(res); message(res.message); });
-      };
-      return b;
-    };
-    if (data.letter_enabled) bar.append(bulk('Auswahl per Post senden', 'inbox_letter_many',
-      rows => rows.length + ' Rechnung(en) (' + euro(rows.reduce((a, r) => a + r.amount_cents, 0)) + ') ' + (data.letter_mode === 'live' ? 'jetzt per Post verschicken' : 'im TESTMODUS an Letterxpress übergeben (es wird nichts verschickt)') + '?\n\nDabei gehen die Rechnungen mit Patientendaten an Letterxpress. Bereits live gesendete Rechnungen werden nicht erneut gesendet.',
-      r => r.postable && !(r.letter || {}).locked));
-    bar.append(bulk('Auswahl löschen', 'inbox_delete_many', rows => rows.length + ' Rechnung(en) aus dem Eingang löschen?', r => r.deletable), countText);
-    if (data.letter_enabled && data.letter_mode !== 'live') bar.append(el('span', 'TESTBETRIEB Post', 'badge test', {title: 'Letterxpress im Testbetrieb: es wird nichts gedruckt oder verschickt'}));
-    box.append(bar);
-    const first = el('th'); first.append(toggleAll); head.append(first);
-    for (const h of ['Eingang', 'Nummer', 'Betrag', 'Patient', 'Geb.', 'Status', ...(data.letter_enabled ? ['Post'] : []), '']) head.append(el('th', h));
-    table.append(head);
-    for (const r of data.items) {
-      const tr = el('tr');
-      const pick = el('td'), check = el('input', null, null, {type: 'checkbox', 'aria-label': 'Rechnung ' + r.number + ' auswählen'});
-      check.disabled = !(r.deletable || (data.letter_enabled && r.postable));
-      check.checked = false;
-      check.onchange = () => { if (check.checked) selected.add(r.id); else selected.delete(r.id); refresh(); };
-      if (!check.disabled) boxes.push(check);
-      pick.append(check); tr.append(pick);
-      const born = r.birthdate ? r.birthdate.split('-').reverse().join('.') : '';
-      for (const v of [when(r.received_at), r.number, euro(r.amount_cents), r.patient, born, inboxState[r.status] || r.status]) tr.append(el('td', v));
-      if (data.letter_enabled) {
-        const l = r.letter || {};
-        const cell = el('td');
-        if (l.status) {
-          const text = l.status === 'unknown' ? 'Postversand unklar – bitte den Postausgang bei Letterxpress prüfen' : (l.mode === 'live' ? 'Per Post gesendet am ' : 'Testbrief an Letterxpress am ') + when(l.sent_at);
-          const icon = el('span', l.status === 'unknown' ? '✉ ?' : '✉', 'post-glyph ' + (l.status === 'unknown' ? 'post-unknown' : l.mode === 'live' ? 'post-sent' : 'post-test'), {title: text, 'aria-label': text, role: 'img'});
-          cell.append(icon);
-        }
-        tr.append(cell);
-      }
-      const last = el('td');
-      if (data.letter_enabled && r.postable && !(r.letter || {}).locked) {
-        const l = r.letter || {};
-        const post = el('button', 'Per Post', 'secondary small-button', {type: 'button', 'aria-label': 'Rechnung ' + r.number + ' per Post senden'});
-        post.onclick = () => {
-          const live = data.letter_mode === 'live';
-          const text = 'Rechnung ' + r.number + ' (' + r.patient + ', ' + euro(r.amount_cents) + ') ' + (live ? 'jetzt per Post über Letterxpress versenden?' : 'im TESTMODUS an Letterxpress übergeben (es wird nichts verschickt)?') + '\n\nDabei gehen die Rechnung mit Patientendaten an Letterxpress.' + (live ? ' Das kostet Porto und Druck.' : '');
-          if (!confirm(text)) return;
-          busy(post, async () => { const res = await api('inbox_letter', {id: r.id}); renderInbox(res); message(res.message); });
-        };
-        last.append(post, ' ');
-      }
-      if (r.deletable) {
-        const del = el('button', 'Löschen', 'secondary small-button', {type: 'button', 'aria-label': 'Rechnung ' + r.number + ' löschen'});
-        del.onclick = () => { if (!confirm('Rechnung ' + r.number + ' (' + r.patient + ', ' + euro(r.amount_cents) + ') aus dem Eingang löschen?')) return; busy(del, async () => { const res = await api('inbox_delete', {id: r.id}); renderInbox(res); message(res.message); }); };
-        last.append(del);
-      }
-      tr.append(last); table.append(tr);
-    }
-    box.append(table);
-    refresh();
-  }
+  const link = el('a', 'Vorgänge öffnen', 'button secondary'); link.href = BASE + 'vorgaenge';
+  box.append(el('p', 'Die Liste der eingegangenen, bezahlten und stornierten Rechnungen mit Excel-Export und Abhaken steht jetzt unter „Vorgänge“ (' + data.items.length + ' Rechnungen zuletzt im Eingang).', 'muted'), link);
   if (data.rejected.length) {
     box.append(el('h3', 'Abgelehnte Drucke'));
     box.append(el('p', 'Diese Rechnungen kamen an, wurden aber nicht übernommen. Die Zeilenübersicht zeigt die erkannten Beschriftungen (Namen und Daten sind unkenntlich gemacht). Fehlt eine Beschriftung, trage sie unter „T2med-Rechnungen übernehmen“ als eigenen Textschnipsel ein.', 'muted small'));
@@ -746,12 +572,76 @@ function renderInbox(data) {
       const details = el('details', null, 'inbox-reject');
       details.append(el('summary', when(r.at) + ' – ' + r.reason + (r.source ? ' [' + r.source + ']' : '')));
       details.append(el('pre', r.lines.length ? r.lines.join('\n') : 'Keine Beschriftungszeilen erkannt.', 'audit-list'));
+      if (r.pdf) {
+        const fix = el('button', 'Von Hand nachbearbeiten', 'secondary', {type: 'button'});
+        const panel = el('div', null, 'review');
+        panel.hidden = true;
+        fix.onclick = () => busy(fix, async () => { if (!panel.hidden) { panel.hidden = true; return; } await openReview(r.id, panel); panel.hidden = false; });
+        details.append(fix, panel);
+      } else {
+        details.append(el('p', 'Die Rechnung liegt nicht mehr zur Nachbearbeitung vor (sie wird nach 7 Tagen gelöscht). Bitte in T2med erneut drucken.', 'muted small'));
+      }
       box.append(details);
     }
     const clear = el('button', 'Liste leeren', 'secondary', {type: 'button'});
     clear.onclick = () => busy(clear, async () => { const r = await api('inbox_clear'); renderInbox(r); message(r.message); });
     box.append(clear);
   }
+}
+// Nicht erkannte Rechnung von Hand zuordnen: je Feld Bildausschnitte der Rechnung, Vorschläge und Eingabefelder.
+async function openReview(id, panel) {
+  const {review} = await api('inbox_review', {id});
+  panel.replaceChildren();
+  panel.append(el('p', 'Prüfe die Werte neben den Ausschnitten, korrigiere sie bei Bedarf und übernimm die Rechnung. Gelesen wurde per ' + review.source + '. Die PDF wird danach aus der Nachbearbeitung gelöscht.', 'muted small'));
+  const chip = {gelesen: ['gelesen', 'review-ok'], unsicher: ['unsicher', 'review-warn'], fehlt: ['nicht gefunden', 'review-miss']};
+  const inputs = {};
+  for (const key of ['number', 'date', 'total', 'patient']) {
+    const f = review.fields[key];
+    const row = el('div', null, 'review-row');
+    const left = el('div');
+    const head = el('p', f.title + ' ', 'review-label');
+    head.append(el('span', chip[f.status][0], 'review-chip ' + chip[f.status][1]));
+    left.append(head);
+    if (f.snippets.length) for (const src of f.snippets) left.append(el('img', null, 'review-snip', {src, alt: 'Ausschnitt der Rechnung: ' + f.title}));
+    else left.append(el('p', 'Die Beschriftung wurde nicht gefunden. Bitte unten in der Seitenansicht nachsehen.', 'muted small'));
+    const right = el('div');
+    if (key === 'patient') {
+      const [name = '', birth = ''] = (f.guess || '').split(' | ');
+      inputs.name = el('input', null, null, {type: 'text', placeholder: 'Vorname Nachname', autocomplete: 'off', value: name.trim(), 'aria-label': 'Patientenname'});
+      inputs.birth = el('input', null, null, {type: 'text', placeholder: 'TT.MM.JJJJ', autocomplete: 'off', value: birth.trim(), 'aria-label': 'Geburtsdatum'});
+      right.append(inputs.name, inputs.birth);
+    } else {
+      inputs[key] = el('input', null, null, {type: 'text', autocomplete: 'off', value: f.guess || '', placeholder: {number: 'z. B. IG2026-309', date: 'TT.MM.JJJJ', total: 'z. B. 84,00'}[key], 'aria-label': f.title});
+      right.append(inputs[key]);
+      if (f.values.length > 1) {
+        const picks = el('p', null, 'review-picks');
+        for (const v of f.values) { const b = el('button', v, 'secondary review-pick', {type: 'button'}); b.onclick = () => { inputs[key].value = v; }; picks.append(b); }
+        right.append(picks);
+      }
+    }
+    row.append(left, right);
+    panel.append(row);
+  }
+  const pages = el('details', null, 'review-pages');
+  pages.append(el('summary', 'Ganze Rechnung ansehen (' + review.pages + ' Seite' + (review.pages > 1 ? 'n' : '') + ')'));
+  let loaded = false;
+  pages.addEventListener('toggle', async () => {
+    if (!pages.open || loaded) return;
+    loaded = true;
+    for (let page = 1; page <= review.pages; page++) {
+      try { const r = await api('inbox_review_page', {id, page}); pages.append(el('img', null, 'review-page', {src: r.image, alt: 'Seite ' + page + ' der Rechnung'})); }
+      catch (error) { pages.append(el('p', error.message, 'muted small')); }
+    }
+  });
+  const apply = el('button', 'Übernehmen und zuordnen', null, {type: 'button'});
+  apply.onclick = () => busy(apply, async () => {
+    const r = await api('inbox_review_apply', {id, number: inputs.number.value, date: inputs.date.value, total: inputs.total.value, name: inputs.name.value, birth: inputs.birth.value});
+    renderInbox(r); message(r.message);
+  });
+  const drop = el('button', 'Verwerfen', 'secondary', {type: 'button'});
+  drop.onclick = () => busy(drop, async () => { if (!confirm('Diese Rechnung aus der Nachbearbeitung entfernen? Die PDF wird gelöscht.')) return; const r = await api('inbox_review_drop', {id}); renderInbox(r); message(r.message); });
+  panel.append(pages, el('div', null, 'review-actions'));
+  panel.lastChild.append(drop, apply);
 }
 async function loadInbox() {
   try { renderInbox(await api('inbox_overview')); }

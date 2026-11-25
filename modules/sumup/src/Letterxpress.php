@@ -42,7 +42,7 @@ final class Letterxpress {
         if ($response['status'] === 401 || $response['status'] === 403) return 'Letterxpress lehnt Benutzername oder API-Key ab.';
         $message = is_array($response['body']) && is_string($response['body']['message'] ?? null) ? preg_replace('/[\x00-\x1f\x7f]/u', ' ', $response['body']['message']) : '';
         if (stripos($message, 'could not be determined') !== false) return 'Letterxpress findet im PDF keine lesbare Anschrift (Adressfenster der Rechnung) und kann Inland/Ausland nicht bestimmen. Anschrift im T2med-Rechnungsformular im Adressfenster prüfen oder unter Einstellungen die Versandart fest auf „Inland“ stellen. (HTTP ' . $response['status'] . ')';
-        if (stripos($message, 'verschl') !== false) return 'Letterxpress lehnt das PDF ab (verschlüsselt oder nicht A4-Hochformat). Das PDF muss A4 hoch und ohne Kennwortschutz sein (Papierformat des Windows-Druckers „SumUp-Rechnung“ prüfen). (HTTP ' . $response['status'] . ')';
+        if (stripos($message, 'verschl') !== false) return 'Letterxpress lehnt das PDF ab (verschlüsselt oder nicht A4-Hochformat). Das PDF muss A4 hoch und ohne Kennwortschutz sein (Papierformat des Windows-Druckers „vKasse“ prüfen). (HTTP ' . $response['status'] . ')';
         return 'Letterxpress antwortet mit HTTP ' . $response['status'] . ($message !== '' ? ': ' . mb_substr($message, 0, 160) : '.');
     }
 
@@ -77,11 +77,11 @@ final class Letterxpress {
         return $this->db->locked('letterxpress-' . $inboxId, function () use ($inboxId): array {
             $row = $this->db->one('SELECT * FROM invoice_inbox WHERE id=?', [$inboxId]);
             if (!$row) throw new Problem('Diese Rechnung gibt es nicht (mehr).', 404);
-            if ($this->db->one("SELECT 1 AS x FROM payments WHERE (inbox_id=? OR t2med_invoice=?) AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') LIMIT 1", [$inboxId, $row['invoice_number']]))
+            if ($this->db->one("SELECT 1 AS x FROM payments WHERE (inbox_id=? OR t2med_invoice=?) AND payment_status IN ('starting','pending','unknown','cancel_requested','successful') AND storno_at IS NULL LIMIT 1", [$inboxId, $row['invoice_number']]))
                 throw new Problem('Diese Rechnung ist bezahlt oder wird gerade kassiert und wird nicht mehr per Post verschickt.', 409);
             if (self::locked($row)) throw new Problem($row['lxp_status'] === 'unknown'
                 ? 'Der Versand dieser Rechnung ist unklar. Bitte zuerst den Postausgang bei Letterxpress prüfen.' : 'Diese Rechnung wurde bereits per Post gesendet.', 409);
-            if ($row['pdf'] === null || !str_starts_with((string)$row['pdf'], '%PDF-')) throw new Problem('Original-PDF liegt nicht mehr vor. Bitte die Rechnung in T2med erneut auf „SumUp-Rechnung“ drucken.', 409);
+            if ($row['pdf'] === null || !str_starts_with((string)$row['pdf'], '%PDF-')) throw new Problem('Original-PDF liegt nicht mehr vor. Bitte die Rechnung in T2med erneut auf „vKasse“ drucken.', 409);
             $file = base64_encode(self::unprotected((string)$row['pdf']));
             $letter = ['base64_file' => $file, 'base64_file_checksum' => md5($file),
                 'filename_original' => 'Rechnung-' . preg_replace('/[^A-Za-z0-9._-]/', '_', $row['invoice_number']) . '.pdf',

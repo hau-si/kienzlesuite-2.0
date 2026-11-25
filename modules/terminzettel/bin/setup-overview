@@ -1,0 +1,3 @@
+#!/bin/sh
+# Haken „setup-overview“ des Moduls terminzettel (läuft als ks-terminzettel): Einrichtungs-Überblick als JSON.
+exec /usr/bin/php "$(dirname "$0")/../lib/ueberblick.php"

@@ -1,5 +1,110 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.32
+
+- **Zahlungsversuch verwerfen (IGeL):** Nach „Zahlung nicht erfolgt“ oder „Zahlung abgebrochen“ gibt es zusätzlich zu „Erneut versuchen“ den Knopf **Verwerfen**, solange noch keine Rechnungsnummer vergeben wurde. Er setzt Auswahl und Betrag zurück; die erfolglosen Versuche verschwinden aus der Ansicht, bleiben aber mit Status „discarded“ in der Datenbank. Nicht möglich bei bezahlten oder überwiesenen Zahlungen (Nummer vergeben) und bei T2med-Rechnungen. Neuer Test `tests/discard.php`. Nicht im Browser geprüft.
+
+## 2.3.4-beta.31
+
+- **Zahlart springt nicht mehr zurück:** Die Rechnungsliste in der Kassenansicht wird nur noch neu gezeichnet, wenn sich die Rechnungen geändert haben (vorher alle 10 Sekunden). Eine gewählte Zahlart (z. B. „Per Post“) und der Fokus bleiben stehen. Gilt für Start aus T2med (FHIR) wie für die Ansicht mit Seitenleiste.
+- **Zahlungsknöpfe an festem Platz:** Karte, Bar, Überweisung und Per Post stehen in einem festen Raster aus vier Spalten; beim Wechsel zwischen IGeL- und T2med-Rechnung ändern sich Lage und Breite nicht mehr.
+- Einstellungen: „Wird geladen …“ statt leerer Seite, Breite wie die Seiten der Basis (940 px; Startseite und Vorgänge bleiben breit).
+- Nicht im Browser geprüft.
+
+## 2.3.4-beta.30
+
+- Kassenansicht: Eine von Hand gewählte Zahlart (Bar, Überweisung, Per Post) **springt nicht mehr nach einigen Sekunden auf „Karte“ zurück**. Ursache war die automatische Aktualisierung alle 10 Sekunden, die die Auswahl neu aufbaute. „Karte“ ist nur noch die Vorauswahl; die Wahl wird je Rechnung gemerkt, solange die Seite offen ist. Nicht im Browser geprüft.
+
+## 2.3.4-beta.29
+
+- **Nicht erkannte T2med-Rechnungen von Hand nachbearbeiten** (Kasse → Einstellungen → Rechnungseingang → „Abgelehnte Drucke“ → „Von Hand nachbearbeiten“): Die Rechnung wird in der Seite gesucht, und zu Rechnungsnummer, Datum, Gesamtbetrag (mit Zahlbetrag) sowie Patient und Geburtsdatum erscheint je ein **Bildausschnitt** der Rechnung neben einem Eingabefeld mit Vorschlag (gelesen, unsicher oder nicht gefunden; bei mehreren Werten zum Anklicken). Bei Bild-PDFs per Texterkennung, sonst aus der Textebene. Darunter lässt sich die ganze Rechnung ansehen. „Übernehmen und zuordnen“ prüft die Eingaben (Datum, Betrag im erlaubten Bereich, Nummer, Name), legt die Rechnung in den Rechnungseingang und löscht die PDF; „Verwerfen“ löscht sie ebenfalls.
+- Dafür bleibt die abgelehnte PDF (mit Patientendaten) **höchstens 7 Tage** in einem privaten Ordner des Moduls (`rejected/`, Rechte 0700/0600) und wird danach, beim Leeren der Liste und nach der Übernahme gelöscht. Die Liste selbst zeigt weiter nur maskierte Zeilen.
+- Recht „Rechnungseingang“ (Mitarbeiter) umfasst die Nachbearbeitung; Aktionen stehen im Änderungsprotokoll.
+- Gilt für den Rechnungseingang (Drucker vKasse). Rechnungen, die der Drucker vBriefversand ablehnt, werden nicht gemerkt (kein Postversand ohne geprüfte Rechnung). Nicht im Browser und nicht mit echten T2med-Rechnungen geprüft, nur mit erfundenen Beispiel-PDFs (Text und Bild).
+
+## 2.3.4-beta.28
+
+- Drucker umbenannt: „SumUp-Rechnung“ → vKasse, „Letterxpress“ → vBriefversand; Texte, Anleitungen und PPD-Dateien angepasst. Drucker an den Arbeitsplätzen neu einrichten und in T2med neu wählen.
+- Fußzeile „Kasse v… auf Grundlage von …“ entfernt.
+- Die Schalter „T2med-Rechnung“ (mit Herz) und „IGeL-Leistungen“ (mit Igel) tragen Symbole.
+- Leistungen lassen sich einer Gruppe zuordnen (z. B. Blutwerte, Sonographie, Bescheinigungen, Beratung, Untersuchungen); die Auswahlliste zeigt sie mit Überschriften, die Suche blendet leere Gruppen aus. Neues Feld „Gruppe“ beim Anlegen und Bearbeiten (Datenbankversion 21, bestehende Leistungen bleiben ohne Gruppe).
+- Nicht auf der echten VM geprüft.
+
+## 2.3.4-beta.27
+
+- Behoben: Die Einstellungen der Kasse zeigten nur „CLIENT_STEPS is not defined“. Die Anleitung für die Arbeitsplatz-Pakete (Windows, Mac, Linux) fehlte im Skript und ist wieder da; ein Test prüft das jetzt.
+
+## 2.3.4-beta.26
+
+- Tooltips der Kasse (Einstellungen und eingebettete Kassenansicht) bleiben im sichtbaren Bereich; Themenblöcke schneiden sie nicht mehr am Rand ab.
+
+## 2.3.4-beta.25
+
+- Kassenansicht in der Startseite: kein waagerechter Scrollbalken mehr unter dem rechten Anzeigebereich (der eingebettete Rahmen schneidet Überstand ab). Ursache nicht am Bildschirm nachgestellt; nicht auf der echten VM geprüft.
+
+## 2.3.4-beta.24
+
+- Seitenleiste der Suite in der Kasse: Stile der Kasse (Logo-Schrift, Abstand unter dem Namen) machten sie höher als in den anderen Modulen. Dadurch gab es einen Scrollbalken und beim Seitenwechsel einen Sprung. Beides ist behoben, die Leiste sieht wie im Terminzettel aus. Nicht auf der echten VM geprüft.
+
+## 2.3.4-beta.23
+
+- Einstellungen → Arbeitsplätze verweist auf den neuen Schritt „Virtuelle Drucker“ unter „Arbeitsplatz einrichten“ der Basis.
+- Einrichtungs-Überblick der Suite enthält jetzt auch die optionalen Punkte „Rechnung per Post über Letterxpress“ und „Rechnungen im Netzwerkspeicher ablegen“ (in den Einstellungen kommen sie von dort).
+
+## 2.3.4-beta.22
+
+- Die virtuellen Drucker „SumUp-Rechnung“ und „Letterxpress“ werden nur noch per IPP freigegeben (`share = ["ipp"]`); Samba schaltet der Admin bei Bedarf unter Verwaltung → Drucker ein.
+- Einstellungen → Arbeitsplätze: Neben der Hilfe für „SumUp-Rechnung“ gibt es jetzt eine Karte „Drucker „Letterxpress““ (IPP-Adresse, Windows-Skript, Mac-Datei `Letterxpress-PDF.ppd`, Hinweis zum Sammelversand) und einen Punkt in der Einrichtungsliste. Der Starter selbst richtet keine Drucker ein; er öffnet nur die Kasse aus T2med.
+
+## 2.3.4-beta.21
+
+- **Neuer virtueller Drucker „Letterxpress“** (wird wie „SumUp-Rechnung“ von der Basis angelegt und freigegeben, Papier A4, PDF/PostScript, eigene Durchreich-PPD `Letterxpress-PDF.ppd` für den Mac). Jede aus T2med darauf gedruckte Rechnung wird wie im Rechnungseingang gelesen (gleiche Rechnungen, gleiche Erkennung, Rechnungseingang muss dafür nicht eingeschaltet sein) und **sofort per Post an Letterxpress** gesendet. Voraussetzung: Letterxpress ist eingeschaltet (Einstellungen → Letterxpress, Zugang unter Verwaltung → Verbindungen).
+- **Lesbarer Text:** Letterxpress nimmt nur PDFs mit Textebene an. Hat das PDF keine (z. B. reines Bild von einem Windows-Treiber), ergänzt die Texterkennung (tesseract, 300 dpi, bis 10 Seiten) den Text vor dem Versand; die vorhandenen Pakete reichen, es wird nichts nachinstalliert.
+- **Sammelversand:** Der Drucker ist dafür gedacht, viele T2med-Rechnungen auf einmal zu versenden: in T2med vorübergehend den Rechnungsdrucker auf „Letterxpress“ umstellen, drucken, danach zurückstellen.
+- **Ablage für die Steuerberatung:** Neue Einstellung „Über den Drucker „Letterxpress“ verschickte Rechnungen ablegen“ (Einstellungen → Ablage im Netzwerkordner, ab dort wie bei den Zahlungen: gleiches Ziel und gleicher Unterordner). Dann landet jede per Post verschickte Rechnung zusätzlich als PDF im Netzwerkordner, Dateiname endet auf `_Post`. Gilt auch für „Per Post senden“ an der Kasse. Ein Fehler der Ablage stoppt den Versand nicht, er steht im Protokoll. Standardmäßig aus.
+- Ein zweiter Druck derselben Rechnung verschickt keinen zweiten Brief, wenn der erste live gesendet wurde (Testbriefe sperren nicht). Schlägt der Versand fehl, liegt die Rechnung trotzdem im Eingang (mit Fehlertext), der Drucker meldet es im Protokoll.
+- **Vorgänge:** Per Post versandte Rechnungen stehen in der Liste mit Zahlungsart **Überweisung**, Status „per Letterxpress verschickt“ (im Testmodus mit „(Test)“, bei unklarem Ausgang „Postversand unklar“) und im Excel-Export; neuer Status-Filter „Per Post“. Das gilt auch für Rechnungen, die über „Per Post senden“ an der Kasse verschickt werden. Diese Rechnungen werden nicht mehr nach 14 Tagen aus dem Eingang gelöscht (das PDF schon).
+- Einrichtungs-Überblick: Punkt „Drucker Letterxpress bereit/fehlt“ bei eingeschaltetem Letterxpress.
+- Nicht auf der echten VM und nicht mit echtem Letterxpress geprüft (nur Nachbildung der API und Texterkennung mit erfundenen Beispielrechnungen).
+
+## 2.3.4-beta.20
+
+- **Die neue Vorgänge-Liste ersetzt „Export für die Steuerberatung“ und „T2med-Rechnungen als bezahlt abhaken“** in den Einstellungen; beide Bereiche und die Download-Adresse `tax-export.php` entfallen. Die Excel-Liste enthält zusätzlich die Spalten „davon Netto“ und „davon MwSt.“ für IGeL-Rechnungen. Die nachträgliche Betragskorrektur an T2med-Zahlungen entfällt (dafür gibt es das Storno).
+- **Neue Benutzerrechte** (Verwaltung → Benutzer): „Monats- und Jahresansicht der Vorgänge“ (`periods`); die Ansichten Tag und Woche gehören zum Recht „Kassieren“. „Excel-Export der Vorgänge“ (`export`) und „T2med-Rechnungen in den Vorgängen abhaken“ (`paid`) gelten jetzt für die neue Liste. Wer nur diese Rechte hat, bekommt keinen Zugang zu den Einstellungen mehr (nur Rechnungseingang, Post und Leistungen öffnen sie).
+- **Neues Benutzerrecht „Rechnungen stornieren“** (`storno`): Ohne dieses Recht fehlt die Stornieren-Funktion in der Detailansicht, und die Anfrage wird abgelehnt.
+- Neue Schaltflächen in der Liste: **Alle Zahlungen · 💳 SumUp (Karte) · 💶 Bar · 🏦 Überweisung**; sie wirken auch auf die Excel-Liste.
+
+## 2.3.4-beta.19
+
+- **Neue Seite „Vorgänge“** (Startseite → „📋 Vorgänge & Export“): alle T2med-Rechnungen und IGeL-Zahlungen eines **Tages, einer Woche, eines Monats oder eines Jahres** (mit Blättern ◀ ▶ und Datumswahl) als übersichtliche Liste mit Art (T2med/IGeL), Nummer, Patient, Zahlungsart, Status (bezahlt, offen, zurückgestellt, storniert) und Betrag, dazu Filter nach Art und Status, Namenssuche und Summe. **Excel-Export** der angezeigten Liste (Recht „Excel-Listen“).
+- **Abhaken bei T2med-Rechnungen**: Spalte „In T2med“ zeigt, ob die bezahlte Rechnung in T2med als abgerechnet markiert wurde; mehrere markieren und abhaken oder Haken entfernen (Recht „Bezahlt-Liste abhaken“).
+- Diese Liste **ersetzt die alte Rechnungseingangsliste** in den Einstellungen; dort bleiben nur der Hinweis und die abgelehnten Drucke. Rechnungen aus dem Eingang löschen geht jetzt über „Löschen“ an der Rechnung in der Startseite (Recht „Rechnungseingang“). Das Versenden per Post bleibt an der einzelnen Rechnung; der Sammelversand entfällt.
+- **Offene Rechnungen lassen sich stornieren** (z. B. IGeL mit Überweisung, die noch nicht bezahlt ist): Die Rechnung bekommt dafür ihre Nummer und eine Stornorechnung mit neuer Nummer.
+- In den Listen der Startseite lässt sich zusätzlich nach **Art T2med / IGeL** filtern.
+
+## 2.3.4-beta.18
+
+- **Verarbeitete Rechnungen der letzten 7 Tage** stehen links in der Liste: neue Reiter **Offen · Bezahlt · Zurückgestellt · Alle**. „Bezahlt“ zeigt Karte, Bar und bezahlte Überweisungen (mit Symbol je Zahlungsart, T2med-Rechnungen und IGeL), „Zurückgestellt“ zeigt zurückgestellte und per Überweisung offene Rechnungen. Der frühere Reiter „Überwiesen“ ist darin aufgegangen.
+- **Storno bei allen Zahlungsarten** (Karte, Bar, Überweisung; IGeL und T2med-Rechnungen): Klick auf eine verarbeitete Rechnung → „Stornieren …“. Es entsteht eine **Stornorechnung mit eigener neuer Nummer** (PDF); die ursprüngliche Rechnung bleibt unverändert für die Buchhaltung erhalten, zählt aber nicht mehr in Tageswerten und Steuerliste. Eine stornierte T2med-Rechnung wird wieder offen. Die Rückzahlung selbst (Karte am Terminal/im SumUp-Konto, Bargeld, Überweisung) erfolgt nicht automatisch; die Abfrage vor dem Storno weist darauf hin.
+- **Rechnungsnummern für IGeL-Leistungen frei gestaltbar** unter Einstellungen → „Rechnungsnummern“: Platzhalter `{JJJJ}`, `{JJ}`, `{MM}`, `{NNNN}` (Voreinstellung `IGEL-{JJJJ}-{NNNN}`); ebenso das Format der Stornonummer (`STORNO-{JJJJ}-{NNNN}`). Die Nummer wird beim Bezahlen vergeben, gilt für Karte, Bar und Überweisung (bisher: SumUp-Transaktions-ID bzw. BAR-/UEB-Nummern), zählt jährlich neu, wenn das Jahr im Format steht, und wird nie ein zweites Mal vergeben. Bereits bezahlte ältere Rechnungen behalten ihre Nummer.
+- Intern: Datenbankversion 20 (Tabellen `doc_numbers`, `stornos`, Spalten `doc_number`, `storno_at`), neue API-Aktionen `processed` und `storno`, neue Seite `beleg.php` für die PDFs.
+
+## 2.3.4-beta.17
+
+- **Patient aus T2med wird gemerkt**: Hat T2med den Patienten kürzlich per FHIR an die Kasse übergeben und liegt eine passende T2med-Rechnung vor (Name + Geburtsdatum), läuft die Zahlung über diesen Vorgang. Karte, Bar und auch IGeL-Zahlungen werden dann wie beim Start aus T2med in der Akte dokumentiert.
+- Kopfzeile der Rechnungsansicht zeigt den Patienten, bei Verbindung mit ❤ **T2med**; in der Rechnungsliste steht dieselbe Marke.
+- Neuer Umschalter **T2med-Rechnung | IGeL-Leistungen**: für denselben Patienten lassen sich zusätzlich IGeL-Leistungen kassieren.
+- Zahlungsknöpfe der T2med-Rechnung vereinheitlicht: dieselben Symbolfelder wie in der freien Eingabe (💳 Karte, 💶 Bar, 🏦 Überweisung, ✉ Per Post) und ein großer Knopf.
+
+## 2.3.4-beta.16
+
+- Startseite der Kasse neu gestaltet, ohne Scrollen: links die Rechnungen aus dem Eingang, rechts die Kassenansicht in zwei Spalten (Leistungen und Zahlung). Die Marke „Kasse“ in der Arbeitsfläche entfällt.
+- Rechnungsliste: Filter **Offen / Zurückgestellt / Überwiesen / Alle** mit Zählern, Namenssuche, Marken je Rechnung („neu · vor 3 Min“ für Rechnungen der letzten 10 Minuten, „zurückgestellt“, „überwiesen“, „per Post“). Neueste Rechnung zuerst; beim Öffnen der Startseite ist die neueste offene Rechnung vorgewählt, **Karte ist vorbelegt** (ein Klick kassiert). Eine später aus T2med eintreffende Rechnung wird nur dann automatisch vorgewählt, wenn gerade nichts in Arbeit ist.
+- **Zurückstellen** (neu): die Rechnung bleibt im Rechnungseingang, verschwindet aber aus der Liste „Offen“ und lässt sich unter „Zurückgestellt“ direkt anklicken und bezahlen. „Überwiesen“ lässt sich von Hand setzen und wird bei „Patient zahlt später (Überweisung)“ automatisch gesetzt (diese Taste druckt weiterhin, falls eingestellt).
+- Freie Eingabe: Suche nach GOÄ-Ziffer oder Namensteilen in der Leistungsliste (mehrere Wörter, alle müssen vorkommen), Zahnrad oben rechts in der Liste führt zur Bearbeitung der Leistungen.
+- Rechnungen aus dem Eingang sieht jeder mit dem Recht „Kassieren“ (bisher zusätzlich „Rechnungseingang“ nötig); die Einstellungen bleiben an ihre Rechte gebunden.
+- Intern: neue Spalten `parked_at` und `transfer_at`, neue API-Aktion `inbox_tag`; eingebettete Ansicht mit `embed.css`.
+
 ## 2.3.4-beta.15
 
 - In der Startseite eingebettete Kassenansicht: Marke „Kasse“ und Willkommenskarte werden dort nicht mehr doppelt gezeigt.

@@ -2,7 +2,7 @@
 declare(strict_types=1);
 // Einstellungen und Abrechnung der Kasse. Anmeldung über die Suite; Admins des Moduls sehen alles, Mitarbeiter ihre Bereiche.
 use KienzleSumup\Suite;
-if (!array_diff(Suite::rights(), ['kassieren'])) {
+if (!Suite::settingsRights()) {
     http_response_code(403);
     header('Content-Type: text/plain; charset=utf-8');
     exit("Für die Einstellungen der Kasse fehlt das Recht. Bitte den Admin fragen (Verwaltung → Benutzer der Suite).\n");
@@ -18,29 +18,26 @@ ob_start();
 <header class="seitenkopf"><div><p class="eyebrow">Kasse</p><h1>Einstellungen</h1></div><span id="mode" class="badge" hidden></span></header>
 <p id="message" class="notice" role="status" hidden></p>
 
+<p id="lade" class="muted" role="status">Wird geladen …</p>
 <div id="settings" hidden>
 <nav id="tabs" class="tab-bar" role="tablist" aria-label="Bereiche"><span id="update-bell" hidden></span></nav>
 <p id="warning" class="inline-error" hidden></p>
 <div id="tab-panels"></div>
 <div id="sections" hidden></div>
 <section class="card settings-card" id="s-checklist"><h2>Einrichtung – Überblick</h2><p class="muted">Diese Schritte sind nur einmal nötig, geordnet nach dem Ort, an dem sie erledigt werden. Ein Klick auf einen Punkt öffnet die passende Einstellung.</p><div id="checklist"></div></section>
-<section class="card settings-card" id="s-t2med-paid"><h2>T2med-Rechnungen als bezahlt abhaken</h2>
-<p>Alle über den Drucker „SumUp-Rechnung“ übernommenen und per Karte bezahlten T2med-Rechnungen, nach Rechnungsnummer sortiert. In T2med unter Rechnungen die Nummern als bezahlt markieren und hier anschließend abhaken – dann erscheinen beim nächsten Mal nur die neuen. Mit „Korrigieren“ lässt sich eine Zahlung nachträglich stornieren oder der Betrag für Statistik und Excel ändern (keine Erstattung bei SumUp).</p>
-<div id="t2med-paid" class="settings-form"></div></section>
-<section class="card settings-card" id="s-export"><h2>Export für die Steuerberatung</h2>
-<p>Alle hier im Rechnungstool erstellten und bezahlten Rechnungen (bar und Karte, in der Spalte „Zahlungsart“ gekennzeichnet) als Excel-Tabelle – für ein ganzes Jahr oder einen Monat. T2med-Rechnungen sind nicht enthalten; sie stehen in T2med.</p>
-<form id="export-form" class="settings-form export-form"></form>
-<p class="muted small">Die Datei hat drei Blätter: <strong>Rechnungen</strong> (je Rechnung Brutto, Netto und MwSt. je Satz), <strong>Positionen</strong> (jede Leistung einzeln) und <strong>Monatssummen</strong>. Patientennamen nur, wenn angekreuzt.</p></section>
 <section class="card settings-card" id="s-clients"><h2>Arbeitsplätze einrichten</h2>
-<p>Auf dem Kassen-PC diese Seite öffnen, an der Suite anmelden und das passende Paket laden. Es enthält die Einrichtung des Starters, mit dem T2med die Kasse öffnet. Das Zertifikat der Suite vorher einmal einrichten: <a href="/hilfe/arbeitsplatz">Arbeitsplatz einrichten</a>.</p>
+<p>Auf dem Kassen-PC diese Seite öffnen, an der Suite anmelden und das passende Paket laden. Es enthält die Einrichtung des Starters, mit dem T2med die Kasse öffnet. Das Zertifikat der Suite vorher einmal einrichten: <a href="/hilfe/arbeitsplatz">Arbeitsplatz einrichten</a>. Dort steht auch, wie die virtuellen Drucker „vKasse“ und „vBriefversand“ am PC eingerichtet werden (<a href="/hilfe/arbeitsplatz#drucker">Schritt „Virtuelle Drucker“</a>).</p>
 <div id="client-downloads" class="row-buttons"></div>
 <div id="client-steps" class="steps"></div>
 <p class="muted small">Die Pakete enthalten den Starter-Schlüssel der Praxis: nicht per E-Mail verschicken, nach der Einrichtung löschen. Der Starter prüft genau das aktuelle Serverzertifikat der Suite; bekommt der Server ein neues Zertifikat (neuer Name, Erneuerung nach gut zwei Jahren), das Paket auf jedem Kassen-PC erneut ausführen.</p></section>
-<section class="card settings-card" id="invoice-printer-help" hidden><h2>Drucker „SumUp-Rechnung“</h2>
+<section class="card settings-card" id="invoice-printer-help" hidden><h2>Drucker „vKasse“</h2>
 <div id="invoice-printer-status"></div>
 </section>
+<section class="card settings-card" id="letter-printer-help" hidden><h2>Drucker „vBriefversand“</h2>
+<div id="letter-printer-status"></div>
+</section>
 <section class="card settings-card" id="s-inbox-list"><h2>Rechnungseingang</h2>
-<p class="muted">Von T2med auf „SumUp-Rechnung“ gedruckte Rechnungen. Mit Name und Geburtsdatum des Patienten (nur nach Anmeldung sichtbar). Nicht bezahlte Rechnungen lassen sich löschen. „Offen“ heißt: Wird beim passenden Patienten zum Kassieren angeboten.</p>
+<p class="muted">Die Rechnungsliste steht jetzt unter „Vorgänge“ (Startseite der Kasse). Hier erscheinen nur Rechnungen, die der Drucker „vKasse“ angenommen, aber nicht übernommen hat.</p>
 <div class="row-buttons"><button id="inbox-load" class="secondary" type="button">Aktualisieren</button></div>
 <div id="inbox-box"><p class="muted">Wird geladen …</p></div></section>
 <section class="card settings-card" id="s-catalog"><h2>Leistungen und GOÄ-Positionen</h2>
@@ -52,7 +49,6 @@ ob_start();
 <pre id="audit-list" class="audit-list" hidden></pre></section>
 <p class="settings-foot"><a href="<?= $base ?>">Zur Kasse</a> · <a href="/">Zur Kienzle-Suite</a></p>
 </div>
-<footer>Kasse v<?= $version ?> · auf Grundlage von kienzle-sumup von Dr. Thomas Kienzle</footer>
 <?php
 $inhalt = (string)ob_get_clean();
 $kopf = '<link rel="stylesheet" href="' . $base . 'assets/style.css?v=' . $version . '"><link rel="stylesheet" href="' . $base . 'assets/rahmen.css?v=' . $version . '">'

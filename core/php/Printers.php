@@ -40,7 +40,7 @@ final class Printers {
         $n = is_array($s['netz'] ?? null) ? $s['netz'] : [];
         $net = ['arbeitsgruppe' => mb_substr((string)($n['arbeitsgruppe'] ?? 'WORKGROUP'), 0, 15)];
         return ['queues' => $queues, 'found' => $found, 'jobs' => $jobs, 'net' => $net, 'searched' => (int)($s['gesucht'] ?? 0), 'error' => mb_substr((string)($s['fehler'] ?? ''), 0, 300),
-            'last' => is_array($s['letzte'] ?? null) ? $s['letzte'] : null, 'pending' => is_file($this->request()), 'service' => is_file(self::$unit)];
+            'last' => is_array($s['letzte'] ?? null) ? View::frisch($s['letzte']) : null, 'pending' => is_file($this->request()), 'service' => is_file(self::$unit)];
     }
 
     public function search(): void { $this->write(['action' => 'suchen']); }
@@ -56,7 +56,11 @@ final class Printers {
 
     public function remove(string $name): void { $this->write(['action' => 'entfernen', 'name' => $this->known($name)]); }
     public function testPage(string $name): void { $this->write(['action' => 'testseite', 'name' => $this->known($name)]); }
-    public function share(string $name, array $share): void { $this->write(['action' => 'freigabe', 'name' => $this->known($name), 'freigabe' => self::shares($share)]); }
+    public function share(string $name, array $share): void {
+        $virtual = array_filter($this->status()['queues'], fn($q) => $q['name'] === $name && $q['modul'] !== '') !== [];
+        // Virtuelle Drucker der Module sind immer per IPP freigegeben; Samba (alte Windows-Freigabe) ist optional.
+        $this->write(['action' => 'freigabe', 'name' => $this->known($name), 'freigabe' => self::shares($virtual ? [...$share, 'ipp'] : $share)]);
+    }
     public function sync(): void { $this->write(['action' => 'abgleichen']); }
 
     public function cancelJob(string $id): void {

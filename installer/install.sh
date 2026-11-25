@@ -302,6 +302,8 @@ if [ -z "$nosystemd" ]; then
     echo 'Hinweis: ufw ist aktiv. Die Firewall der Suite (Verwaltung → Firewall) arbeitet unabhängig davon; bitte nur eine von beiden verwenden.'
   fi
   systemctl restart kienzle-core-php.service
+  # Modul-Dienste (php-fpm) neu starten, sonst liefern sie nach einem Basis-Update noch den alten Rahmen (Seitenleiste) aus dem Zwischenspeicher.
+  for u in $(systemctl list-unit-files 'kienzle-*-php.service' --no-legend 2>/dev/null | awk '{print $1}'); do [ "$u" = kienzle-core-php.service ] || systemctl restart "$u" || true; done
   systemctl enable nginx.service >/dev/null 2>&1 || true
   systemctl restart nginx.service
   # Erreichbarkeit prüfen: über den ersten Namen mit Prüfung gegen die eigene CA.

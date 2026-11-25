@@ -44,6 +44,7 @@ final class View {
         'start:einrichtung' => '<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2h9"/>',
         'modul:sumup' => '<rect x="4" y="13" width="16" height="7" rx="1"/><path d="M7 13V6h10v7M9 9h6M8 17h.01M12 17h.01M16 17h.01"/>',
         'modul:terminzettel' => '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',
+        'modul:signatur' => '<path d="M3 17c3-4 4-8 6-8s0 6 2 6 2-4 4-4 1 3 3 3 3-1 3-1"/><path d="M3 21h18"/>',
         'st:disk' => '<rect x="3" y="14" width="18" height="6" rx="1"/><path d="M5 14l3-9h8l3 9M7 17h.01"/>',
         'st:ram' => '<rect x="3" y="8" width="18" height="8" rx="1"/><path d="M7 16v3M11 16v3M15 16v3M7 8V5M11 8V5M15 8V5"/>',
         'st:cpu' => '<rect x="6" y="6" width="12" height="12" rx="1"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>',
@@ -53,6 +54,9 @@ final class View {
         'st:post' => '<path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/>',
         'st:sms' => '<path d="M21 12a8 8 0 01-11.6 7.1L3 21l1.9-5.4A8 8 0 1121 12z"/>',
         'st:aktualisieren' => '<path d="M21 12a9 9 0 01-15.5 6.2M3 12A9 9 0 0118.5 5.8"/><path d="M18 2v4h-4M6 22v-4h4"/>',
+        'st:oeffnen' => '<path d="M7 17L17 7M8 7h9v9"/>',
+        'st:neustart' => '<path d="M20 11a8 8 0 10-2.3 6.3"/><path d="M20 4v7h-7"/>',
+        'st:start' => '<path d="M7 4l13 8-13 8z"/>',
         'st:mehr' => '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
         'st:papierkorb' => '<path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"/>',
         'st:herunter' => '<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
@@ -71,7 +75,7 @@ final class View {
         'Protokoll' => '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
         'Passkeys' => '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>',
         'Schlüsselblatt' => '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>',
-        'Authenticator' => '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>',
+        'Authenticator' => '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
         'Handynummer' => '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>',
         'Passwort' => '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>',
         'Kontodaten' => '<path d="M3 10l9-6 9 6M5 10v8M9 10v8M15 10v8M19 10v8M3 20h18"/>',
@@ -146,7 +150,7 @@ final class View {
         $brand = '<a class="brand" href="/" title="Start"><span class="mark" aria-hidden="true">K' . (!empty($nav['offenLogo']) ? '<span class="logo-dot" title="Die Einrichtung ist noch nicht abgeschlossen"></span>' : '') . '</span><span><strong>Kienzle-Suite</strong>'
             . '<span class="sub">' . self::h($practice !== '' ? $practice : 'Praxis') . '</span></span></a>';
         $head = '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=25"><script src="/assets/core.js" defer></script>' . ($extra['kopf'] ?? '') . '</head><body'
+            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=36"><script src="/assets/core.js?v=5" defer></script>' . ($extra['kopf'] ?? '') . '</head><body'
             . (self::$starter !== '' ? ' data-starter="' . self::h(self::$starter) . '"' : '') . ($extra['body'] ?? '') . '>';
         if (!$nav) {
             return $head . '<div class="solo">' . $brand . '<main><h1>' . self::h($title) . '</h1>' . self::cards($body) . '</main></div></body></html>';
@@ -154,15 +158,15 @@ final class View {
         $path = (string)($nav['pfad'] ?? '');
         $badges = ['/verwaltung/einrichtung' => [(int)($nav['einrichtung'] ?? 0), 'Offene Punkte'], '/verwaltung/sicherung' => [(int)($nav['sicherung'] ?? 0), 'Hinweise zur Sicherung'],
             '/verwaltung/updates' => [(int)($nav['updates'] ?? 0), 'Neue Version verfügbar'], '/verwaltung/module' => [(int)($nav['module'] ?? 0), 'Neue Modulversion verfügbar']];
-        $link = function (string $href, string $label, ?string $icon = null) use ($path, $badges, $nav): string {
+        $link = function (string $href, string $label, ?string $icon = null, string $sub = '') use ($path, $badges, $nav): string {
             $current = $path === $href || ($href !== '/' && str_starts_with($path, $href . '/'));
             [$n, $hint] = $badges[$href] ?? [0, ''];
             $todo = in_array(strtok($href, '?#') ?: $href, (array)($nav['offen'] ?? []), true);
-            return '<a href="' . $href . '"' . ($current ? ' class="current" aria-current="page"' : '') . '><span>' . ($icon ?? self::icon($href)) . self::h($label) . '</span>'
+            return '<a href="' . $href . '"' . ($current ? ' class="current" aria-current="page"' : '') . '><span>' . ($icon ?? self::icon($href)) . ($sub !== '' ? '<span class="menu-konto">' . self::h($label) . '<small>' . self::h($sub) . '</small></span>' : self::h($label)) . '</span>'
                 . ($n > 0 ? '<span class="badge" title="' . self::h($hint) . '">' . $n . '</span>' : '')
                 . ($todo ? '<span class="todo-dot" title="Hier muss noch etwas eingegeben oder bestätigt werden (siehe Einrichtung auf der Startseite)"></span>' : '') . '</a>';
         };
-        $menu = '<nav class="menu" aria-label="Menü"><div class="menu-group">' . $link('/konto', 'Mein Konto') . '</div>';
+        $menu = '<nav class="menu" aria-label="Menü"><div class="menu-group">' . $link('/konto', 'Mein Konto', null, (string)($nav['login'] ?? '')) . '</div>';
         // Anwendungen: nur noch ein Eintrag je Modul (mit Symbol des Moduls); der Punkt zeigt offene Einstellungen. Einklappbar, weil weitere Module dazukommen.
         if (!empty($nav['apps'])) {
             $links = '';
@@ -171,18 +175,19 @@ final class View {
                 $meta = (array)($nav['appmeta'][$href] ?? []);
                 $current = $path === rtrim($href, '/') || str_starts_with($path, $href);
                 $open = $open || $current;
-                $links .= '<a href="' . self::h($href) . '"' . ($current ? ' class="current" aria-current="page"' : '') . '><span>' . self::icon('modul:' . (string)($meta['id'] ?? ''), 'app') . self::h($label) . '</span>'
-                    . (!empty($meta['todo']) ? '<span class="todo-dot" title="Hier muss noch etwas eingegeben oder bestätigt werden (siehe Einrichtung auf der Startseite)"></span>' : '') . '</a>';
+                $links .= '<div class="menu-app" draggable="true" data-app="' . self::h($href) . '"><a href="' . self::h($href) . '"' . ($current ? ' class="current" aria-current="page"' : '') . ' draggable="false" title="Zum Sortieren ziehen oder Alt + Pfeil nach oben/unten"><span>' . self::icon('modul:' . (string)($meta['id'] ?? ''), 'app') . self::h($label) . '</span>'
+                    . (!empty($meta['todo']) ? '<span class="todo-dot" title="Hier muss noch etwas eingegeben oder bestätigt werden (siehe Einrichtung auf der Startseite)"></span>' : '') . '</a></div>';
             }
-            $menu .= '<details class="menu-group menu-fold" open><summary class="menu-title">Anwendungen</summary>' . $links . '</details>';
+            // Reihenfolge wählt jeder selbst: per Ziehen (oder Alt + Pfeiltaste), im Browser gemerkt, siehe core.js.
+            $menu .= '<details class="menu-group menu-fold" data-menu="anwendungen" open><summary class="menu-title">Anwendungen</summary>' . $links . '</details>';
         }
         $group = null;
         if ($nav['admin']) {
             foreach (self::MENU as $title2 => $items) {
                 if (isset($items[$path]) || array_filter(array_keys($items), fn($h) => str_starts_with($path, $h . '/'))) $group = $title2;
-                $menu .= '<div class="menu-group"><span class="menu-title">' . self::h($title2) . '</span>';
+                $menu .= '<details class="menu-group menu-fold" data-menu="' . self::h(strtolower($title2)) . '" open><summary class="menu-title">' . self::h($title2) . '</summary>';
                 foreach ($items as $href => $label) $menu .= $link($href, $label);
-                $menu .= '</div>';
+                $menu .= '</details>';
             }
         }
         $menu .= '</nav>';
@@ -191,9 +196,8 @@ final class View {
             $restart = '<details class="menu-fold"' . (str_starts_with($path, '/verwaltung/neustart') ? ' open' : '') . '><summary class="menu-title">' . self::icon('/verwaltung/neustart') . 'Neu starten</summary>'
                 . $link('/verwaltung/neustart?art=dienste', 'Dienste neu starten') . $link('/verwaltung/neustart?art=server', 'Server neu starten') . '</details>';
         }
-        // Modulseiten kennen die Sitzungs-Marke nicht (nur eine eigene): dort führt „Mein Konto“ zum Abmelden.
-        $foot = '<div class="side-foot">' . $restart . (($nav['csrf'] ?? '') !== '' ? '<form method="post" action="/abmelden" class="inline">' . self::csrf($nav['csrf'])
-            . '<button class="link">Abmelden (' . self::h($nav['login']) . ')</button></form>' : '<a class="link" href="/konto">' . self::h($nav['login']) . ' · Abmelden</a>') . '</div>';
+        // Anmeldename steht bei „Mein Konto“, Abmelden auf der Seite „Mein Konto“.
+        $foot = '<div class="side-foot">' . $restart . '</div>';
         $eyebrow ??= $group;
         $inner = !empty($extra['roh']) ? $body : ($eyebrow ? '<p class="eyebrow">' . self::h($eyebrow) . '</p>' : '') . '<h1>' . self::h($title) . '</h1>' . self::cards($body);
         return $head . '<div class="layout"><aside class="side">' . $brand . $menu . $foot . '</aside><main' . (!empty($extra['roh']) ? ' class="modul"' : '') . '>' . $inner . '</main></div></body></html>';
@@ -241,6 +245,11 @@ final class View {
 
     public static function error(?string $message): string { return $message ? '<p class="error" role="alert">' . self::h($message) . '</p>' : ''; }
 
+    /** Ergebnis einer Aktion nur kurz nach der Aktion zeigen (sonst stünde „Gespeichert.“ noch Tage später da). */
+    public static function frisch(?array $last, int $seconds = 600): ?array {
+        $t = (int)($last['zeit'] ?? $last['time'] ?? 0);
+        return $last !== null && $t > 0 && $t >= time() - $seconds ? $last : null;
+    }
     public static function notice(?string $message): string { return $message ? '<p class="notice" role="status">' . self::h($message) . '</p>' : ''; }
 
     public static function input(string $name, string $label, string $type = 'text', string $value = '', string $extra = ''): string {

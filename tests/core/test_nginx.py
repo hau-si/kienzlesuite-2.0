@@ -87,6 +87,7 @@ class Vorlage(unittest.TestCase):
 
     def test_interne_pfade(self):
         auth = block(self.conf, 'location ^~ /_auth/ {')
+        self.assertIn('client_max_body_size 25m;', auth)  # sonst 413 schon bei der Anmeldeprüfung großer Uploads
         self.assertIn('internal;', auth)
         self.assertGreater(auth.index('fastcgi_param REQUEST_URI $uri;'), auth.index('include fastcgi_params;'))   # überschreibt den Vorgabewert
         h = block(self.conf, 'location = /_health {')
@@ -135,7 +136,7 @@ class Befehl(unittest.TestCase):
             r = self.run_cli(tmp, 'schreiben', str(ROOT / 'modules'))
             self.assertEqual(r.returncode, 0, r.stderr)
             reg = json.loads((Path(tmp) / 'modules.json').read_text())
-            self.assertEqual([m['module']['id'] for m in reg['modules']], ['beispiel', 'sumup', 'terminzettel'])
+            self.assertEqual([m['module']['id'] for m in reg['modules']], ['beispiel', 'signatur', 'sumup', 'terminzettel'])
             self.assertIn('/_auth/beispiel', (Path(tmp) / 'kienzle.conf').read_text())
             self.assertEqual(oct((Path(tmp) / 'modules.json').stat().st_mode & 0o777), '0o640')
 

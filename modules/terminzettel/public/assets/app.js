@@ -1,4 +1,27 @@
 'use strict';
+// Logo hochladen: Datei roh per fetch senden (kein Formular-Upload), danach Seite neu laden.
+(() => {
+  const los = document.getElementById('logo-los');
+  if (!los) return;
+  const status = document.getElementById('logo-status');
+  los.addEventListener('click', () => {
+    const datei = document.getElementById('logo-datei').files[0];
+    const meta = document.querySelector('meta[name="kienzle-csrf"]');
+    if (!datei) { status.textContent = 'Bitte zuerst ein Bild auswählen.'; return; }
+    if (datei.size > 2097152) { status.textContent = 'Das Logo darf höchstens 2 MB groß sein.'; return; }
+    los.disabled = true;
+    status.textContent = 'Wird hochgeladen …';
+    fetch(los.getAttribute('data-ziel'), {method: 'POST', credentials: 'same-origin', body: datei,
+      headers: {'Content-Type': 'application/octet-stream', 'X-Kienzle-CSRF': meta ? meta.content : ''}})
+      .then(r => r.text().then(t => { let j = null; try { j = JSON.parse(t); } catch (e) { j = null; } return {ok: r.ok, status: r.status, j}; }))
+      .then(r => {
+        if (r.ok && r.j && r.j.ok) { status.textContent = 'Logo gespeichert. Seite wird neu geladen …'; location.reload(); return; }
+        status.textContent = (r.j && r.j.error) || ('Das Hochladen hat nicht geklappt (HTTP ' + r.status + ').');
+        los.disabled = false;
+      })
+      .catch(() => { status.textContent = 'Keine Verbindung zum Server. Bitte noch einmal versuchen.'; los.disabled = false; });
+  });
+})();
 // Live-Vorschau des Bons: schickt die Formularwerte (ohne zu speichern) und zeigt das Ergebnis.
 (() => {
   const form = document.getElementById('layout');
@@ -43,4 +66,14 @@
   form.addEventListener('input', refresh);
   form.addEventListener('change', refresh);
   refresh();
+})();
+
+// Sprung von der Einrichtungsübersicht (…/#drucker): den passenden Bereich aufklappen.
+(() => {
+  const open = () => {
+    const el = location.hash.length > 1 ? document.getElementById(decodeURIComponent(location.hash.slice(1))) : null;
+    if (el && el.tagName === 'DETAILS') { el.open = true; el.scrollIntoView(); }
+  };
+  open();
+  window.addEventListener('hashchange', open);
 })();

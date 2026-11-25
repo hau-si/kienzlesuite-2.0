@@ -54,8 +54,10 @@ function updateTotal() {
   $('pay-method-note').hidden = !((cash || transfer) && !state.local_receipts);
   $('pay-method-note').textContent = 'Für Bar und Überweisung bitte zuerst Praxisname und Anschrift unter Einstellungen eintragen.';
   document.querySelectorAll('.invoice-pay').forEach(b => b.disabled = busy || !!state.reader_payment);
+  document.querySelectorAll('.invoice-go').forEach(b => b.disabled = busy || (!!state.reader_payment && !!document.querySelector('input[name^="inv-method-"][value="card"]:checked')));
 }
-let invoiceSeen = null, invoiceLater = new Set();
+let invoiceSeen = null, invoiceLater = new Set(), renderedInvoices = '';
+const invoiceSignature = list => JSON.stringify((list || []).map(i => [i.id, i.number, i.amount_cents, i.printed_at, i.letter]));
 function invoiceRequest(invoice, method) {
   const key = 'ks-invoice-'+visitId;
   // Schlüssel vor dem Netzaufruf speichern; bei verlorener Antwort denselben Vorgang prüfen.
@@ -65,6 +67,7 @@ function invoiceRequest(invoice, method) {
   return [key, request];
 }
 function renderInvoices() {
+  renderedInvoices = invoiceSignature(state.invoices);
   const all = state.invoices || [], list = all.filter(i => !invoiceLater.has(i.id));
   const fresh = invoiceSeen === null ? new Set() : new Set(list.filter(i => !invoiceSeen.has(i.id)).map(i => i.id));
   invoiceSeen = new Set(all.map(i => i.id));
@@ -88,10 +91,32 @@ function renderInvoices() {
     const later = element('button','Patient zahlt später (Überweisung)','text-button invoice-later');
     later.onclick = () => run(async() => {
       // Ist der Rechnungsdruck eingeschaltet, kommt die Rechnung jetzt einmal auf den Praxisdrucker (für die Überweisung).
-      if (state.print?.t2med_auto && !invoice.printed_at) { const result = await api('invoice_later', {invoice_id: invoice.id}); if (result.message) message(result.message); }
+      const result = await api('invoice_later', {invoice_id: invoice.id}); if (result.message) message(result.message);
       invoiceLater.add(invoice.id); await load();
     });
-    box.append(line, card, cash, later);
+    // Einheitliche Zahlungswahl wie in der freien Eingabe: Chips mit Symbolen + ein Knopf. Die Einzelknöpfe bleiben (versteckt) als Auslöser.
+    for (const b of [card, cash, later]) b.hidden = true;
+    const chips = element('div', '', 'pay-method'); chips.setAttribute('role', 'radiogroup'); chips.setAttribute('aria-label', 'Zahlungsart');
+    const options = [['card', '💳 Karte (SumUp)'], ['cash', '💶 Bar'], ['later', '🏦 Überweisung']];
+    const canPost = !!(state.letter?.enabled && invoice.letter?.postable && !invoice.letter?.locked);
+    if (canPost) options.push(['post', '✉ Per Post']);
+    const go = element('button', '', 'primary wide invoice-go');
+    const labels = {card: euro(invoice.amount_cents) + ' mit Karte kassieren', cash: euro(invoice.amount_cents) + ' bar erhalten', later: 'Überweisung: Rechnung zurückstellen und drucken', post: 'Per Post senden (Letterxpress)'};
+    const radios = {};
+    // Die Liste wird alle paar Sekunden neu aufgebaut: eine von Hand gewählte Zahlart bleibt erhalten, „Karte“ ist nur die Vorauswahl.
+    const chosen = options.some(o => o[0] === chosenMethod.get(invoice.id)) ? chosenMethod.get(invoice.id) : 'card';
+    for (const [value, text] of options) {
+      const l = document.createElement('label'), r = document.createElement('input'); r.type = 'radio'; r.name = 'inv-method-' + invoice.id; r.value = value; r.checked = value === chosen;
+      r.onchange = () => { chosenMethod.set(invoice.id, value); go.textContent = labels[value]; go.classList.toggle('cash', value !== 'card'); };
+      radios[value] = r; l.append(r, element('span', text)); chips.append(l);
+    }
+    go.textContent = labels[chosen]; go.classList.toggle('cash', chosen !== 'card');
+    go.onclick = () => {
+      const value = Object.keys(radios).find(k => radios[k].checked);
+      const target = {card, cash, later}[value] || box.querySelector('.invoice-letter');
+      if (target) target.click();
+    };
+    box.append(line, chips, go, card, cash, later);
     if (invoice.printed_at) box.append(element('p', '🖨 Rechnung gedruckt am ' + new Date(invoice.printed_at * 1000).toLocaleString('de-DE', {dateStyle: 'short', timeStyle: 'short'}), 'muted invoice-letter-note'));
     if (state.letter?.enabled && invoice.letter?.postable) {
       const sent = invoice.letter || {};
@@ -104,7 +129,7 @@ function renderInvoices() {
         icon.title = stamp; box.append(icon);
       }
       if (!sent.locked) {
-        const post = element('button', 'Per Post senden (Letterxpress)', 'text-button invoice-letter');
+        const post = element('button', 'Per Post senden (Letterxpress)', 'text-button invoice-letter'); post.hidden = true;
         post.onclick = () => run(async() => {
           const live = state.letter.mode === 'live';
           const text = 'Rechnung ' + invoice.number + ' über ' + euro(invoice.amount_cents) + ' für ' + state.patient.name + ' ' + (live ? 'jetzt per Post über Letterxpress versenden?' : 'im TESTMODUS an Letterxpress übergeben (es wird nichts verschickt)?')
@@ -120,10 +145,12 @@ function renderInvoices() {
   }
   updateTotal();
 }
+const chosenMethod = new Map();   // Rechnungs-ID → von Hand gewählte Zahlart (übersteht das Neuaufbauen der Liste)
 // Neue gedruckte Rechnungen erscheinen ohne Neuladen, solange kein Zahlungsvorgang angezeigt wird.
 setInterval(async () => {
   if (busy || document.hidden || !$('payment').hidden || !state?.patient) return;
-  try { const s = await api('state'); state.invoices = s.invoices; renderInvoices(); } catch {}
+  // Nur neu zeichnen, wenn sich die Rechnungen wirklich geändert haben: sonst verliert eine gerade gewählte Zahlart (und der Fokus) ihren Platz.
+  try { const s = await api('state'); if (invoiceSignature(s.invoices) === renderedInvoices) return; state.invoices = s.invoices; renderInvoices(); } catch {}
 }, 10000);
 function selectedIds() {
   const ids=new Set(selected);
@@ -137,7 +164,11 @@ function vatText(s) {
 function serviceDescription(s) {
   return [s.goae_code ? 'GOÄ '+s.goae_code+' · Faktor '+s.factor.replace('.',',') : '', vatText(s)].filter(Boolean).join(' · ');
 }
+// Für die Startseite: „in Arbeit“ (Auswahl, Betrag oder laufende Zahlung), damit sie nicht mitten im Vorgang auf eine neue Rechnung umschaltet.
+function markDirty() { document.body.dataset.dirty = (selected.size || selectedGroups.size || $('manual').value.trim() || (typeof state !== 'undefined' && state && state.payment)) ? '1' : ''; }
+$('manual').addEventListener('input', markDirty);
 function renderBasket() {
+  markDirty();
   const ids=selectedIds(); $('basket-lines').replaceChildren(); $('basket').hidden=!ids.size;
   for(const s of state.services.filter(s=>ids.has(s.id))) {
     const row=element('div','','basket-line'), line=element('div','','position');
@@ -154,20 +185,39 @@ function renderBasket() {
   }
   updateTotal();
 }
+// Suche in der Leistungsliste: Ziffer oder Namensteile (alle Wörter müssen vorkommen); ausgewählte Positionen bleiben immer sichtbar.
+function filterServices() {
+  const terms = ($('service-search').value || '').toLowerCase().split(/\s+/).filter(Boolean);
+  for (const row of document.querySelectorAll('#services > label, #groups > label')) {
+    const text = row.dataset.search || '', checked = row.querySelector('input')?.checked;
+    row.hidden = terms.length > 0 && !checked && !terms.every(t => text.includes(t));
+  }
+  // Gruppenüberschrift nur zeigen, wenn darunter noch etwas sichtbar ist.
+  document.querySelectorAll('#services > .cat-head').forEach(head => {
+    let next = head.nextElementSibling, any = false;
+    while (next && !next.classList.contains('cat-head')) { if (!next.hidden) any = true; next = next.nextElementSibling; }
+    head.hidden = !any;
+  });
+}
 function renderServices() {
   $('services').replaceChildren(); $('manage-list').replaceChildren(); $('groups').replaceChildren(); $('group-list').replaceChildren(); $('group-members').replaceChildren();
   const active = new Set(state.services.map(s => s.id)); selected = new Set([...selected].filter(id => active.has(id)));
   const activeGroups = new Set(state.groups.map(g=>g.id)); selectedGroups=new Set([...selectedGroups].filter(id=>activeGroups.has(id)));
   $('groups-section').hidden=!state.groups.length;
   $('empty').hidden = state.services.length > 0;
+  const hasCats = state.services.some(s => s.category);
+  let lastCat = null;
+  $('category-list').replaceChildren(...[...new Set(['Blutwerte', 'Sonographie', 'Bescheinigungen', 'Beratung', 'Untersuchungen', ...state.services.map(s => s.category).filter(Boolean)])].map(c => { const o = document.createElement('option'); o.value = c; return o; }));
   for (const service of state.services) {
+    if (hasCats && (service.category || '') !== lastCat) { lastCat = service.category || ''; $('services').append(element('div', lastCat || 'Weitere Leistungen', 'cat-head')); }
     const label = element('label','','service'); const checkbox = document.createElement('input'); checkbox.type='checkbox'; checkbox.checked=selected.has(service.id);
     checkbox.addEventListener('change', () => { checkbox.checked ? selected.add(service.id) : selected.delete(service.id); startRequest=null; renderBasket(); });
     const name=element('span',service.label,'label'); if(serviceDescription(service)) name.append(element('small',serviceDescription(service),'muted'));
+    label.dataset.search = [service.label, service.goae_code, serviceDescription(service)].join(' ').toLowerCase();
     label.append(checkbox, name, element('span',euro(service.price_cents),'price')); $('services').append(label);
-    const row = element('div','','manage-row'); row.append(element('span', service.label+' · '+euro(service.price_cents)+(serviceDescription(service)?' · '+serviceDescription(service):'')));
+    const row = element('div','','manage-row'); row.append(element('span', (service.category ? service.category+' · ' : '')+service.label+' · '+euro(service.price_cents)+(serviceDescription(service)?' · '+serviceDescription(service):'')));
     const edit = element('button','Bearbeiten','text-button'); edit.onclick=() => {
-      $('service-id').value=service.id; $('service-label').value=service.label; $('service-price').value=(service.price_cents/100).toFixed(2).replace('.',',');
+      $('service-id').value=service.id; $('service-label').value=service.label; $('service-category').value=service.category || ''; $('service-price').value=(service.price_cents/100).toFixed(2).replace('.',',');
       $('service-goae').value=service.goae_code; $('service-factor').value=(service.factor || '2.3').replace('.',','); $('service-fee-type').value=service.fee_type;
       $('service-on-request').checked=!!service.on_request; $('service-reason').value=service.default_reason || ''; $('goae-fields').open=!!service.goae_code; $('service-vat').checked=!!service.vat;
       $('service-base').value=service.base_cents?(service.base_cents/100).toFixed(2).replace('.',','):''; $('service-target').value=service.base_cents?$('service-price').value:''; goaeResult('');
@@ -183,6 +233,7 @@ function renderServices() {
     const label=element('label','','service'), checkbox=document.createElement('input'); checkbox.type='checkbox'; checkbox.checked=selectedGroups.has(group.id);
     checkbox.onchange=()=>{checkbox.checked?selectedGroups.add(group.id):selectedGroups.delete(group.id);startRequest=null;renderBasket();};
     const name=element('span',group.label,'label'); name.append(element('small',state.services.filter(s=>group.services.includes(s.id)).map(s=>s.label).join(', '),'muted'));
+    label.dataset.search = [group.label, ...state.services.filter(s=>group.services.includes(s.id)).map(s=>s.label+' '+s.goae_code)].join(' ').toLowerCase();
     label.append(checkbox,name,element('span',euro(sum),'price')); $('groups').append(label);
     const row=element('div','','manage-row'); row.append(element('span',group.label+' · '+euro(sum)));
     const edit=element('button','Bearbeiten','text-button'); edit.onclick=()=>{
@@ -197,6 +248,7 @@ function renderServices() {
     row.append(edit,del); $('group-list').append(row);
   }
   renderBasket();
+  filterServices();
 }
 function renderVatOption() {
   const tax=state.tax||{small_business:false,rate:1900}, rate=(tax.rate/100).toLocaleString('de-DE');
@@ -266,7 +318,7 @@ function renderPayment() {
   $('receipt-data-note').hidden=!showing || p.payment_status!=='successful' || !p.local_receipt;
   renderReader();
   if (showing) manage(false);
-  for (const id of ['document','receipt','receipt-mail','receipt-print','receipt-share','retry','cancel','mock-controls','mock-fhir-label','transfer-box','confirm-transfer','switch-cash','switch-transfer','switch-later']) $(id).hidden=true;
+  for (const id of ['document','receipt','receipt-mail','receipt-print','receipt-share','retry','discard','cancel','mock-controls','mock-fhir-label','transfer-box','confirm-transfer','switch-cash','switch-transfer','switch-later']) $(id).hidden=true;
   if(!showing || receiptPrintPayment!==p.id) { $('receipt-print-status').hidden=true; $('receipt-print').textContent='Beleg drucken'; }
   if(!showing || p.payment_status!=='successful' || receiptShare?.paymentId!==p.id) { $('receipt-share-panel').hidden=true; receiptShare=null; }
   if(!showing || p.payment_status!=='successful' || receiptRecipient?.paymentId!==p.id) {
@@ -306,7 +358,7 @@ function renderPayment() {
     description='Der Patient überweist mit den Kontodaten oder dem QR-Code. Sobald das Geld eingegangen ist, den Zahlungseingang bestätigen. Bis dahin kann auf eine andere Zahlart gewechselt werden.';
     renderTransfer(p); $('confirm-transfer').hidden=false; $('switch-cash').hidden=false; $('cancel').hidden=false; $('cancel').textContent='Überweisung abbrechen';
   } else if(['failed','cancelled'].includes(p.payment_status)) {
-    title=p.payment_status==='failed'?'Zahlung nicht erfolgt':'Zahlung abgebrochen'; symbol='×'; description='Du kannst die Zahlung erneut starten oder die Zahlart wechseln.'; $('retry').hidden=false;
+    title=p.payment_status==='failed'?'Zahlung nicht erfolgt':'Zahlung abgebrochen'; symbol='×'; description='Du kannst die Zahlung erneut starten oder die Zahlart wechseln.'; $('retry').hidden=false; $('discard').hidden=!p.discardable;
     $('switch-cash').hidden=false; $('switch-transfer').hidden=!state.bank_ready || !!p.t2med_invoice; $('switch-later').hidden=!p.t2med_invoice;
   } else {
     title=p.payment_status==='unknown' || p.payment_status==='starting'?'Zahlung wird geprüft':p.payment_status==='cancel_requested'?'Abbruch wird geprüft':'Zahlung läuft';
@@ -384,11 +436,13 @@ async function load() {
   $('mode').hidden=!state.mock && !state.fhir_mock;
   $('mode').textContent=state.mock?'TESTMODUS':state.fhir_mock?'T2MED TESTMODUS':'';$('mode').classList.toggle('test',/TESTMODUS/.test($('mode').textContent));
   $('patient-name').textContent=state.patient.name; document.querySelector('.patient .eyebrow').textContent=state.manual ? 'OHNE PATIENTENAKTE' : 'AKTUELLER PATIENT';
+  $('patient-link').hidden=!state.t2med;
   $('patient-birth').textContent=state.patient.birthdate ? 'Geboren am '+state.patient.birthdate.split('-').reverse().join('.') : '';
   $('free-patient').hidden=!state.manual; $('practice-hint').hidden=state.local_receipts;
   if(!$('service-date').value) $('service-date').value=state.today;
   $('service-date').max=state.today;
-  renderVatOption(); renderServices(); renderInvoices(); renderPrintBox(); renderPayment();
+  renderVatOption(); renderServices(); renderInvoices(); renderPrintBox(); renderPayment(); markDirty();
+  if (window.parent !== window) parent.postMessage('ks-refresh', location.origin);   // Startseite: Rechnungsliste aktualisieren
 }
 async function poll() {
   if(busy) { timer=setTimeout(poll,2200); return; }
@@ -404,7 +458,7 @@ $('service-fee-type').onchange=()=>{
   const fee=state.fee_types[$('service-fee-type').value];
   if(Number($('service-factor').value.replace(',','.'))*100>fee.max) $('service-factor').value=String(fee.threshold/100).replace('.',',');
 };
-$('service-form').onsubmit=e=>{ e.preventDefault(); run(async()=>{ await api('service_save',{id:$('service-id').value,label:$('service-label').value,price:$('service-price').value,goae_code:$('service-goae').value,factor:$('service-factor').value,fee_type:$('service-fee-type').value,on_request:$('service-on-request').checked,default_reason:$('service-reason').value,vat:$('service-vat').checked,base:$('service-goae').value?$('service-base').value:''}); resetForm(); await load(); }); };
+$('service-form').onsubmit=e=>{ e.preventDefault(); run(async()=>{ await api('service_save',{id:$('service-id').value,label:$('service-label').value,category:$('service-category').value,price:$('service-price').value,goae_code:$('service-goae').value,factor:$('service-factor').value,fee_type:$('service-fee-type').value,on_request:$('service-on-request').checked,default_reason:$('service-reason').value,vat:$('service-vat').checked,base:$('service-goae').value?$('service-base').value:''}); resetForm(); await load(); }); };
 $('group-reset').onclick=resetGroup;
 $('group-form').onsubmit=e=>{e.preventDefault();run(async()=>{
   await api('group_save',{id:$('group-id').value,label:$('group-label').value,services:[...$('group-members').querySelectorAll('input:checked')].map(el=>el.value)});
@@ -423,6 +477,14 @@ $('pay').onclick=()=>run(async()=>{
   retrySelection=false; state.reader_payment=null; readerMessage='';
   sessionStorage.removeItem('ks-start-'+visitId); startRequest=null;
   document.querySelector('input[name="pay-method"][value="card"]').checked=true; renderPayment();
+});
+$('discard').onclick=()=>run(async()=>{
+  if(!confirm('Diesen Zahlungsversuch verwerfen? Es ist noch keine Rechnungsnummer vergeben; die Eingaben werden zurückgesetzt.')) return;
+  await api('discard',{payment_id:state.payment.id});
+  retrySelection=false; startRequest=null; selected.clear(); selectedGroups.clear(); reasons={}; $('manual').value='';
+  try { sessionStorage.removeItem('ks-start-'+visitId); } catch {}
+  document.querySelector('input[name="pay-method"][value="card"]').checked=true;
+  await load();
 });
 $('retry').onclick=()=>{ retrySelection=true; startRequest=null; renderPayment(); updateTotal(); };
 $('switch-cash').onclick=()=>run(async()=>{
@@ -553,12 +615,19 @@ $('manual-form').onsubmit=event=>{ event.preventDefault(); run(async()=>{
 }); };
 $('demo').onclick=()=>run(async()=>{ const result=await api('demo'); location.href=result.url; location.reload(); });
 // Aus der Startseite: gewünschte Zahlungsart einer Rechnung gleich auslösen (die Abfragen bleiben wie bei Klick auf den Knopf).
+$('service-search').addEventListener('input', filterServices);
 function autoAction(invoiceId, action) {
   const box = document.querySelector('.invoice[data-id="'+invoiceId+'"]'); if (!box) { message('Diese Rechnung ist nicht mehr offen.'); return; }
   const sel = {card:'.invoice-pay', cash:'.invoice-cash', later:'.invoice-later', post:'.invoice-letter'}[action];
   const button = sel && box.querySelector(sel);
   if (button) button.click(); else if (action === 'post') message('Per Post senden ist für diese Rechnung nicht möglich (Letterxpress aus oder Anschrift fehlt).');
 }
+document.querySelectorAll('.work-tab').forEach(b => b.onclick = () => {
+  document.body.dataset.tab = b.dataset.tab;
+  document.querySelectorAll('.work-tab').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+  if (b.dataset.tab === 'igel') $('service-search').focus();
+  if (window.parent !== window) parent.postMessage('ks-refresh', location.origin);
+});
 async function init() {
   const query = new URL(location.href).searchParams, auto = {invoice: query.get('rechnung'), action: query.get('aktion')};
   if (query.get('neu') || query.get('rechnung')) { $('welcome').hidden = true; document.querySelector('.top .brand').hidden = true; }   // eingebettet in der Startseite: gleich die Arbeitsfläche zeigen, nicht die Willkommenskarte

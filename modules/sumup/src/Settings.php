@@ -31,6 +31,10 @@ final class Settings {
         'practice' => ['label' => 'Belege (Praxisname und Anschrift: Verwaltung → Praxis)', 'fields' => [
             'append_sumup_receipt' => ['type' => 'bool', 'label' => 'Originalen SumUp-Beleg statt lokaler Zahlungsbestätigung anhängen'],
         ]],
+        'numbers' => ['label' => 'Rechnungsnummern (in der App erzeugte Rechnungen und Stornos)', 'fields' => [
+            'igel_format' => ['type' => 'string', 'label' => 'Format der Rechnungsnummer für IGeL-Leistungen', 'default' => 'IGEL-{JJJJ}-{NNNN}', 'help' => 'Platzhalter: {JJJJ} Jahr, {JJ} Jahr zweistellig, {MM} Monat, {NNNN} laufende Nummer (Anzahl der N = Mindeststellen). Beispiel: IGEL-{JJJJ}-{NNNN} ergibt IGEL-2026-0001. Enthält das Format das Jahr, beginnt die Zählung jedes Jahr neu. Vergebene Nummern werden nie wieder verwendet. Gilt für Karte, Bar und Überweisung; T2med-Rechnungen behalten ihre T2med-Nummer.'],
+            'storno_format' => ['type' => 'string', 'label' => 'Format der Nummer einer Stornorechnung', 'default' => 'STORNO-{JJJJ}-{NNNN}', 'help' => 'Jede Stornierung bekommt eine eigene neue Nummer; die stornierte Rechnung bleibt für die Buchhaltung erhalten.'],
+        ]],
         'bank' => ['label' => 'Überweisung (Kontodaten: Verwaltung → Praxis)', 'fields' => [
             'purpose' => ['type' => 'string', 'label' => 'Verwendungszweck', 'default' => 'Rechnung {nummer}', 'optional' => true],
         ]],
@@ -56,7 +60,7 @@ final class Settings {
             'invoice_auto' => ['type' => 'bool', 'label' => 'T2med-Rechnungen immer automatisch drucken (Karte, Bar und „Später“)', 'default' => true],
         ]],
         'invoice_inbox' => ['label' => 'T2med-Rechnungen übernehmen', 'fields' => [
-            'enabled' => ['type' => 'bool', 'label' => 'Rechnungen über den Drucker „SumUp-Rechnung“ übernehmen'],
+            'enabled' => ['type' => 'bool', 'label' => 'Rechnungen über den Drucker „vKasse“ übernehmen'],
             'max_age_days' => ['type' => 'int', 'label' => 'Offene Rechnungen anbieten für (Tage)', 'default' => 14],
             'label_number' => ['type' => 'list', 'label' => 'Eigene Textschnipsel vor der Rechnungsnummer (einer pro Zeile)', 'optional' => true],
             'label_date' => ['type' => 'list', 'label' => 'Eigene Textschnipsel vor dem Rechnungsdatum', 'optional' => true],
@@ -78,6 +82,7 @@ final class Settings {
             'directory' => ['type' => 'string', 'label' => 'Unterordner ({jahr} und {monat} möglich)', 'default' => 'Rechnungen/{jahr}/{monat}'],
             'app_invoices' => ['type' => 'bool', 'label' => 'Auch in der App erzeugte Rechnungen ablegen'],
             'when' => ['type' => 'choice', 'label' => 'T2med-Rechnungen ablegen', 'choices' => ['paid' => 'nur per Karte bezahlte', 'received' => 'jede gedruckte']],
+            'letter' => ['type' => 'bool', 'label' => 'Über den Drucker „vBriefversand“ verschickte Rechnungen ablegen'],
         ]],
     ];
 
@@ -200,7 +205,7 @@ final class Settings {
     public static function queues(): array {
         $out = [];
         try {
-            foreach (Suite::modul()->drucker() as $q) if ($q['name'] !== 'SumUp-Rechnung') $out[$q['name']] = $q['name'] . ($q['description'] !== '' ? ' – ' . $q['description'] : '');
+            foreach (Suite::modul()->drucker() as $q) if ($q['name'] !== 'vKasse') $out[$q['name']] = $q['name'] . ($q['description'] !== '' ? ' – ' . $q['description'] : '');
         } catch (\Throwable) {}
         return $out;
     }

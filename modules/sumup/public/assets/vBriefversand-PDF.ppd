@@ -5,10 +5,10 @@
 *LanguageEncoding: ISOLatin1
 *PCFileName: "SUMUPPDF.PPD"
 *Manufacturer: "Kienzle-SumUp"
-*Product: "(SumUp-Rechnung PDF)"
-*ModelName: "Kienzle-SumUp Rechnung PDF"
-*ShortNickName: "SumUp-Rechnung PDF"
-*NickName: "Kienzle-SumUp Rechnung PDF"
+*Product: "(vBriefversand PDF)"
+*ModelName: "Kienzle vBriefversand PDF"
+*ShortNickName: "vBriefversand PDF"
+*NickName: "Kienzle vBriefversand PDF"
 *PSVersion: "(3010.000) 0"
 *LanguageLevel: "3"
 *ColorDevice: False

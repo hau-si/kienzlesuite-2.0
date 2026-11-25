@@ -95,6 +95,8 @@ final class Config {
             $this->cupsTarget('office_printing');
             if (!in_array($this->get('office_printing', 'media', 'A4'), ['A4', 'Letter'], true)) throw new \RuntimeException('office_printing.media muss A4 oder Letter sein.');
         }
+        DocNumbers::validate((string)$this->get('numbers', 'igel_format', DocNumbers::DEFAULT_IGEL), 'numbers.igel_format');
+        DocNumbers::validate((string)$this->get('numbers', 'storno_format', DocNumbers::DEFAULT_STORNO), 'numbers.storno_format');
         if (!is_bool($this->get('invoice_inbox', 'enabled', false))) throw new \RuntimeException('invoice_inbox.enabled muss true oder false sein.');
         if ($this->get('invoice_inbox', 'enabled', false)) {
             if (!preg_match('/^[a-f0-9]{64}$/D', (string)$this->get('invoice_inbox', 'key'))) throw new \RuntimeException('invoice_inbox.key muss 32 zufällige Bytes als Hex enthalten.');
@@ -110,7 +112,8 @@ final class Config {
         if (!is_bool($this->get('invoice_export', 'enabled', false))) throw new \RuntimeException('invoice_export.enabled muss true oder false sein.');
         if ($this->get('invoice_export', 'enabled', false)) {
             if (!is_bool($this->get('invoice_export', 'app_invoices', false))) throw new \RuntimeException('invoice_export.app_invoices muss true oder false sein.');
-            if (!$this->get('invoice_inbox', 'enabled', false) && !$this->get('invoice_export', 'app_invoices', false)) throw new \RuntimeException('Ablage der Rechnungs-PDF benötigt den Rechnungseingang oder invoice_export.app_invoices = true.');
+            if (!is_bool($this->get('invoice_export', 'letter', false))) throw new \RuntimeException('invoice_export.letter muss true oder false sein.');
+            if (!$this->get('invoice_inbox', 'enabled', false) && !$this->get('invoice_export', 'app_invoices', false) && !$this->get('invoice_export', 'letter', false)) throw new \RuntimeException('Ablage der Rechnungs-PDF benötigt den Rechnungseingang oder invoice_export.app_invoices = true.');
             // Ziel des Netzwerkspeichers der Suite (Verbindung „ablage“); die Zugangsdaten kennt nur die Basis.
             $target = $this->get('invoice_export', 'ziel', '');
             if (!is_string($target) || !preg_match('/^[a-z][a-z0-9-]{1,30}$/D', $target)) throw new \RuntimeException('Für die Ablage zuerst unter Verwaltung → Verbindungen einen Netzwerkspeicher einrichten und hier als Ziel wählen.');

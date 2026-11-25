@@ -1,5 +1,119 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.55
+
+- **Festplatten-Balken wird wieder angezeigt:** Die Sicherheitsrichtlinie der Seite erlaubt keine `style`-Angaben im HTML, deshalb blieb der Belegungsbalken leer. Die Breite wird jetzt per Skript gesetzt (`core.js?v=5`).
+- Falls die Start-Kacheln (Server, Betrieb, Dienste, je drei pro Zeile) nach dem Update noch alt aussehen: einmal Strg+F5, damit `core.css?v=36` neu geladen wird. Nicht im Browser auf der VM geprüft.
+
+## 0.21.4-beta.54
+
+- **Meldungen bleiben bei der Aktion:** Die Rückmeldung nach einem Klick („Gespeichert.“, Fehlertext) erscheint nicht mehr ganz oben auf der Seite, sondern direkt hinter dem Block mit dem angeklickten Knopf und wird ins Bild gerollt (`core.js?v=4`, `core.css?v=36`). Fehlt der Block oder wechselt die Seite, bleibt sie oben.
+- **Modulverwaltung:** Bei Installation und Aktualisierung eines Moduls zeigt ein Hinweisfeld mit **drehendem Kreis** „… läuft“, bleibt beim Scrollen sichtbar, und die Seite lädt sich selbst neu. Die Dienste des Moduls werden bei der Aktualisierung neu gestartet; die Meldung am Ende sagt jetzt „aktualisiert, Dienste neu gestartet“.
+- Nicht im Browser auf der VM geprüft.
+
+## 0.21.4-beta.53
+
+- **Alte Erfolgsmeldungen** („Gespeichert. Die Suite ist jetzt erreichbar unter …“, „Virtuelle Drucker abgeglichen“, „Letterxpress gespeichert“, „Empfänger gespeichert“, Modul-Meldungen) erscheinen nur noch **10 Minuten** nach der Aktion, nicht mehr bei jedem späteren Aufruf der Seite.
+- Startseite, **Server-Zustand**: Kacheln in **drei Spalten**, gegliedert in **Server** (Prozessor, Arbeitsspeicher, Festplatte, Temperatur), **Betrieb** (Läuft seit, Letzte Sicherung) und **Dienste** (Guthaben Letterxpress, seven.io).
+- Mein Konto: Der Pfeil bei „Passwort ändern“ sitzt wie bei den anderen Zeilen rechts; „Authenticator-App“ hat ein eigenes Symbol (Schild mit Haken).
+- Benutzer und Gruppen: Avatar und Anmeldename in einer Zeile, Name ohne Umbruch, „Zugang“ darf umbrechen.
+- Nicht im Browser auf der VM geprüft (`core.css?v=35`).
+
+## 0.21.4-beta.52
+
+- Seitenleiste: Der Anmeldename steht jetzt unter **Mein Konto** (oben), unten entfällt „Abmelden (Name)“. **Abmelden** gibt es als Knopf auf der Seite „Mein Konto“ (neben dem Profil). Nicht im Browser geprüft.
+- Mein Konto: Der Anzeigename steht als Text mit kleinem **Stift**; erst ein Klick darauf zeigt das Feld zum Ändern (mit „Speichern“).
+
+## 0.21.4-beta.51
+
+- Seitenleiste: Die Reihenfolge der Anwendungen ändert man jetzt **per Ziehen** (Ziehen und Ablegen) statt mit Pfeilen und „Reihenfolge ändern“. Per Tastatur: Alt + Pfeil nach oben/unten auf dem Eintrag. Die Reihenfolge merkt sich weiter der Browser. Auf Touch-Geräten (Handy, Tablet) funktioniert Ziehen nicht.
+- Seitenleiste in Kasse und Terminzettel zeigte nach einem Basis-Update noch die alte Leiste (ohne Einklappfeile bei Praxis und Betrieb): Die Modul-Dienste (php-fpm) hielten die alte Datei im Zwischenspeicher, weil `current` ein Symlink ist. Jetzt lösen die Modul-Dienste den Symlink bei jedem Aufruf neu auf (`opcache.revalidate_path`), und der Installer startet sie neu. **Einmal `sudo bash installer/install.sh`** (startet die Modul-Dienste neu), danach erscheinen die Pfeile in allen Modulen. Nicht im Browser und nicht auf der VM geprüft.
+
+- `module.toml`: neuer Schlüssel `[web] uploads = true` erlaubt Formular-Uploads (`$_FILES`, bis 3 MB je Datei) im Modul-Dienst; ohne ihn bleibt `file_uploads` aus. Beschreibung in `docs/MODULE-TOML.md`.  Bisher von keinem Modul genutzt (der Terminzettel sendet sein Logo roh per fetch).
+
+## 0.21.4-beta.50
+
+- Verwaltung → Module: Das alte, in „Signatur“ umbenannte Modul „unterschrift“ wird nicht mehr als verfügbar angeboten (stand wegen eines alten GitHub-Releases weiter in der Liste). Nicht auf der VM geprüft.
+
+## 0.21.4-beta.49
+
+- Seitenleiste: Die Gruppen **Praxis** und **Betrieb** lassen sich wie **Anwendungen** einklappen (Pfeil an der Überschrift). Die Gruppe mit der aktuellen Seite bleibt immer offen.
+- Seitenleiste: Die Reihenfolge der **Anwendungen** (Module) ist frei wählbar: unter den Modulen auf „Reihenfolge ändern“ klicken, mit ▲ ▼ verschieben, „Fertig“. Zugeklappte Gruppen und Reihenfolge merkt sich der Browser (je Browser, nicht je Benutzerkonto); neue Module erscheinen hinten. Gilt in der Basis und in allen Modulseiten. Auf schmalen Bildschirmen (Handy) bleiben alle Gruppen offen. Nicht im Browser geprüft.
+
+## 0.21.4-beta.48
+
+- Uploads in Modulen über 1 MB scheiterten mit „client intended to send too large body“: Die Anmeldeprüfung (`/_auth/…`) fiel auf das Limit des Servers von 1 MB zurück, obwohl die Module bis 25 MB zulassen. Betrifft das Hochladen der Pad-Software im Modul Signatur (6,8 MB). Das Limit gilt jetzt auch dort mit 25 MB. Nach dem Update erzeugt die Basis die nginx-Einstellungen neu (`sudo bash installer/install.sh` oder Verwaltung → Module). Nicht auf dem Server geprüft.
+
+## 0.21.4-beta.47
+
+- PowerShell-Skript für die virtuellen Drucker (Arbeitsplatz einrichten): Fehler werden nicht mehr verschluckt. Das Skript meldet, wenn Windows nach dem Einschalten der IPP-Funktion neu starten muss, wenn der Server unter dem Namen oder auf Port 631 nicht erreichbar ist, und nennt am Ende den Grund, falls der Drucker nicht angelegt wurde. Nicht an einem Windows-PC geprüft.
+
+## 0.21.4-beta.46
+
+- Startseite → Server-Zustand: Prozessor, Arbeitsspeicher, Festplatte (mit Hochrechnung), Temperatur und Laufzeit fehlten auf dem echten Server ganz. Ursache: Die PHP-Einstellung `open_basedir` der Basis erlaubte weder `/proc` noch `/sys` noch den Plattenordner; die Tests liefen nur mit Testordnern. Jetzt sind genau diese Dateien lesend freigegeben (`installer/vorlagen/php-fpm-core.conf`), die Platte wird in `/var/lib/kienzle/core` gemessen, und ein Test prüft die Vorlage. **Nach dem Update einmal `sudo bash installer/install.sh`**, das schreibt die PHP-Einstellung neu; danach erscheinen die Kacheln. Nicht auf dem Server geprüft.
+
+## 0.21.4-beta.45
+
+- Das neue Modul heißt **Signatur** (vorher „Unterschrift“, Kennung `signatur`, Adresse `/signatur`). Seitenleisten-Symbol angepasst. Wer „Unterschrift“ 0.1.0-beta.1 schon installiert hat, entfernt es und installiert „Signatur“ neu; es gab noch keine Daten, die erhalten bleiben müssten. Nicht auf der VM geprüft.
+
+## 0.21.4-beta.44
+
+- Neues Modul **Unterschrift** (0.1.0-beta.1) liegt bei: Vorlagen und Vorgänge für Dokumente am Unterschriftenpad. Symbol in der Seitenleiste ergänzt. Pad-Anbindung und Rückschreiben nach T2med folgen; nicht auf der echten VM geprüft.
+
+## 0.21.4-beta.43
+
+- Virtuelle Drucker umbenannt: „SumUp-Rechnung“ → **vKasse**, „Letterxpress“ → **vBriefversand**, „Terminzettel“ → **vTermine**. Alle Beschreibungstexte, Anleitungen, PPD-Dateien (`vKasse-PDF.ppd`, `vBriefversand-PDF.ppd`, `vTermine-PDF.ppd`) und Tests sind angepasst. **Achtung:** Die alten Warteschlangen werden beim Abgleich entfernt, die neuen angelegt. An jedem Arbeitsplatz muss der Drucker neu eingerichtet und in T2med neu gewählt werden (Arbeitsplatz einrichten → Virtuelle Drucker). Die Zuordnung „Rechnungsdrucker“ in der Kasse bleibt auf dem Praxisdrucker.
+- Verwaltung → Drucker: Jede Karte eines virtuellen Druckers nennt in einem Satz, was er macht.
+- Nicht auf der echten VM geprüft (Abgleich der Warteschlangen nach der Umbenennung).
+
+## 0.21.4-beta.42
+
+- Tooltips (Info-Zeichen „i“): Sie ragen nicht mehr über den Fensterrand. Reicht der Platz nicht, wird der ganze Tooltip verschoben (im Zweifel in die Mitte), nicht schmaler gemacht. Gilt für die Basis und die Module; nicht auf der echten VM geprüft.
+
+## 0.21.4-beta.41
+
+- Startseite, Server-Zustand: Prozessor und Arbeitsspeicher als Kacheln mit Balken (Prozent belegt). Die Festplatte ist eine breite Kachel: Der Balken zeigt den heutigen Stand und schraffiert die Hochrechnung für in 12 Monaten, dazu den Zuwachs pro Monat und wie lange der Platz reicht.
+- Die Hochrechnung braucht einen Verlauf: Beim Aufruf der Startseite wird einmal je Tag der belegte Platz gemerkt (bis zu 400 Tage). Gerechnet wird aus den letzten 90 Tagen; bis mindestens 3 Tage vorliegen, steht dort „Hochrechnung folgt“. Der Verlauf wächst nur an Tagen, an denen ein Admin die Startseite öffnet.
+- Die Seite „Server“ verweist auf den Server-Zustand der Startseite (er bleibt dort, wo alle Admins zuerst hinsehen).
+- Fällt eine Kachel (Sicherung, Guthaben) aus, verschwindet nicht mehr die ganze Karte „Server-Zustand“.
+- Nicht auf der echten VM geprüft.
+
+## 0.21.4-beta.40
+
+- Arbeitsplatz einrichten: Der Hinweis zum Namen richtet sich nach dem eingestellten Servernamen (FRITZ!Box wird nur genannt, wenn der Name auf „.fritz.box“ endet).
+- Neuer Schritt „Virtuelle Drucker einrichten“ (nach Zertifikat und Name, vor dem Kassen-Starter; nur wenn Module virtuelle Drucker anbieten), mit der vollständigen Anleitung je Drucker (Windows, PowerShell-Skript, Mac, T2med). Die Anleitung bei Verwaltung → Drucker bleibt unverändert.
+- Verweise darauf in der Einrichtungsübersicht der Basis.
+- Nicht getestet und nicht auf der echten VM geprüft.
+- Einrichtung: Neuer Punkt „Virtuelle Drucker der Module auf den Arbeitsplätzen eingerichtet“ (nur wenn ein Modul virtuelle Drucker anbietet; wird nach einer Namensänderung wieder offen). Der Punkt „Arbeitsplatz-Starter“ führt jetzt in die Einstellungen des Moduls.
+- Blauer Punkt: Er stand bei „Module“, obwohl der offene Punkt (Starter) beim Modul zu erledigen war. Er erscheint jetzt beim Modul selbst; die Seite „Module“ nennt außerdem, welche Einrichtungspunkte offen sind (bei der Basis und je Modul).
+- SMS (seven.io): Die Guthabenabfrage liest den Betrag jetzt auch, wenn er als Text („20,50“) oder als Objekt (amount/balance) kommt; bisher stand dann „unbekannt“. Nicht mit dem echten Konto geprüft.
+
+## 0.21.4-beta.39
+
+- **Virtuelle Drucker: IPP immer an, Samba optional.** Verwaltung → Drucker zeigt jeden virtuellen Drucker als Karte: IPP-Adresse mit Knopf „Kopieren“, „Freigabe per IPP: immer an“, ein Schalter „Windows-Freigabe (Samba, alt)“ (speichert sofort, Erläuterung im Hinweis „i“: standardmäßig aus, von neuem Windows nicht mehr unterstützt, IPP ist der Standardweg für alle Betriebssysteme) und „Testseite“. Das Häkchen für IPP und „Freigabe speichern“ entfallen.
+- Neue virtuelle Drucker starten nur mit IPP (`share = ["ipp"]` in allen Modulen). Der Druckerdienst gibt virtuelle Drucker immer per IPP frei, auch wenn ein Modul nichts nennt; die Samba-Wahl des Admins bleibt bei einem Abgleich erhalten (bisher setzte der Abgleich sie auf die Vorgabe des Moduls zurück). Bereits mit Samba freigegebene Drucker behalten es.
+- Anleitung für die Arbeitsplätze: Voraussetzung neu formuliert (nur Firewall IPP 631), PPD-Datei je Drucker (auch „Letterxpress“), Hinweis zum Sammelversand.
+- Nicht auf der echten VM geprüft (Seite, Kopieren, Sofort-Speichern mit Skript).
+
+## 0.21.4-beta.38
+
+- Verwaltung → Server: Der Verweis „Name, Anschrift, Konto und Steuer der Praxis“ (zeigte nur auf „Praxis“) entfällt.
+- Arbeitsplätze einrichten: Ist die Kasse installiert, steht als dritter Schritt der **Starter** für T2med mit einem Knopf zu Kasse → Einstellungen → „Arbeitsplätze einrichten“, wo das Paket geladen wird.
+
+## 0.21.4-beta.37
+
+- „Mein Konto“ aufgeräumt: Oben steht das Profil, dort lässt sich jetzt der **Anzeigename ändern** (leer lassen zeigt den Benutzernamen; der Benutzername zum Anmelden bleibt). Darunter sind E-Mail-Adresse, Passwort, Handynummer (SMS-Ersatz, nur Admins), Authenticator-App, Passkeys und gemerkte Geräte Ausklappzeilen mit Statusmarke („bestätigt“, „nicht eingerichtet“ …) statt sieben Blöcken mit langem Text. Wartet eine E-Mail-Adresse auf Bestätigung, ist diese Zeile geöffnet.
+
+## 0.21.4-beta.36
+
+- Die Seitenleiste in den Modulen (Kasse, Terminzettel) sieht jetzt aus wie in der Verwaltung: Für Admins zeigt sie die roten Zähler (Updates, Module, Sicherung), den Punkt am Logo bei offener Einrichtung und den orangen Punkt an Modulen mit offener Einstellung. Mitarbeiter sehen davon nichts, wie bisher.
+- Die Zähler werden 30 Sekunden zwischengespeichert, damit die Prüfung jeder Modul-Anfrage schnell bleibt. Die Modul-Hilfsklasse (`KienzleModul::menue()`) liefert sie mit; vorhandene Module brauchen keine Änderung.
+
+## 0.21.4-beta.35
+
+- Modulübersicht neu gestaltet: Das **Logo** der Kachel öffnet das Modul (kleines ↗ am Logo), der Knopf „Öffnen“ entfällt. Ein **rundes Pfeil-Symbol** unter dem Namen dient für beides: mit neuer Version steht dort „Auf 2.x aktualisieren“, sonst „aktuell“ mit einem Rundpfeil zum Suchen nach Updates („Nach Update suchen“ im Menü entfällt).
+- Starten, Neu starten und Entfernen stehen weiter hinter „⋯“, jetzt mit einheitlichen Symbolen. **Entfernen ist doppelt abgesichert**: Nach „Entfernen …“ muss der Name des Moduls eingetippt werden (der Server prüft das ebenfalls), dazu optional „Auch alle Daten löschen“.
+
 ## 0.21.4-beta.34
 
 - Dokumentation: README und Bildschirmfotos auf den aktuellen Stand gebracht (neu: Übersicht, Mein Konto, Gruppen, Einrichtung, Verbindungen, Kasse-Startseite und -Einstellungen); die Bilder entstehen jetzt reproduzierbar mit `scripts/bildschirmfotos.sh` (erfundene Daten, Vorschau der Kasse in `scripts/kasse-vorschau/`). AGENTS.md enthält den vollständigen Stand für neue Sitzungen. Keine Funktionsänderung.

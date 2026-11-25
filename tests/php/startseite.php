@@ -42,7 +42,7 @@ function test_startseite_kacheln_und_guthaben(): void {
     [$b] = admin_browser($env);
     $b->web = function () use ($b, $c, $env, $sys) { $w = $b->defaultWeb(null, null, $c, new Backup($env->db, $env->modules)); $w->system = $sys; return $w; };
     $p = $b->get('/')->body;
-    check(str_contains($p, 'Server-Zustand') && str_contains($p, 'Speicherplatz') && str_contains($p, 'Arbeitsspeicher') && str_contains($p, '5 % ausgelastet') === false && str_contains($p, '10 % ausgelastet'), 'Kacheln für Speicher, RAM und CPU');
+    check(str_contains($p, 'Server-Zustand') && str_contains($p, 'Festplatte') && str_contains($p, 'Hochrechnung folgt') && str_contains($p, 'Arbeitsspeicher') && str_contains($p, '5 % ausgelastet') === false && str_contains($p, '10 % ausgelastet'), 'Kacheln für Speicher, RAM und CPU');
     check(str_contains($p, '<div class="tile bad"><span class="t-ico">') && str_contains($p, '90 °C'), 'Hohe Temperatur nicht als Warnung');
     check(str_contains($p, 'Letzte Sicherung') && str_contains($p, 'in Ordnung') && str_contains($p, 'href="/verwaltung/sicherung"'), 'Sicherungs-Kachel');
     check(str_contains($p, '12,50 €') && str_contains($p, 'Guthaben Letterxpress') && str_contains($p, 'Guthaben seven.io') && str_contains($p, '3,20 €') && str_contains($p, '<div class="tile warn">'), 'Guthaben (unter 5 € = gelb)');
@@ -77,13 +77,17 @@ function test_seitenleiste_und_konto_einklappbar(): void {
     [$b] = admin_browser($env);
     $b->web = fn() => $b->defaultWeb(null, null, $c);
     $p = $b->get('/')->body;
-    check(substr_count($p, '<span class="menu-title">Einstellungen</span>') === 0 && str_contains($p, '<details class="menu-group menu-fold" open><summary class="menu-title">Anwendungen</summary>'), 'Seitenleiste: eine Gruppe Anwendungen, einklappbar');
+    check(substr_count($p, '<span class="menu-title">Einstellungen</span>') === 0 && str_contains($p, '<details class="menu-group menu-fold" data-menu="anwendungen" open><summary class="menu-title">Anwendungen</summary>'), 'Seitenleiste: eine Gruppe Anwendungen, einklappbar');
+    check(str_contains($p, '<details class="menu-group menu-fold" data-menu="praxis" open><summary class="menu-title">Praxis</summary>') && str_contains($p, '<details class="menu-group menu-fold" data-menu="betrieb" open><summary class="menu-title">Betrieb</summary>'), 'Seitenleiste: Praxis und Betrieb einklappbar');
+    check(substr_count($p, 'class="menu-app" draggable="true"') >= 2 && !str_contains($p, 'data-richtung') && !str_contains($p, 'data-sortieren'), 'Seitenleiste: Anwendungen per Ziehen sortierbar, keine Pfeile/Knöpfe');
     check(preg_match('#<a href="/[a-z]+/"[^>]*><span><svg class="ico"#', $p) === 1, 'Symbol vor dem Modul in der Seitenleiste');
     $k = $b->get('/konto')->body;
+    check(str_contains($p, 'class="menu-konto"') && str_contains($p, '<small>') && !str_contains($p, 'Abmelden (') && !str_contains($p, 'action="/abmelden"'), 'Seitenleiste: Anmeldename bei Mein Konto, kein Abmelden unten');
+    check(str_contains($k, 'class="profil-abmelden"') && str_contains($k, 'action="/abmelden"'), 'Mein Konto: Abmelden-Knopf');
     foreach (['Passwort ändern', 'Authenticator-App', 'Gemerkte Geräte'] as $titel) {
         check(preg_match('#<details class="fold"><summary><h2>[^<]*(?:<svg.*?</svg>)?' . preg_quote($titel, '#') . '#s', $k) === 1, 'Konto: „' . $titel . '“ nicht einklappbar');
     }
-    check(preg_match('#<summary><h2>.*?Authenticator-App <span class="tag ok">✓ eingerichtet</span>#s', $k) === 1, 'Konto: Status im eingeklappten Kopf');
+    check(preg_match('#<summary><h2>.*?Authenticator-App</h2><span class="tag ok fold-status">eingerichtet</span>#s', $k) === 1, 'Konto: Status im eingeklappten Kopf');
 }
 
 run_tests();

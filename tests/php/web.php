@@ -118,7 +118,7 @@ function test_mitarbeiter_ohne_otp_und_rechte_je_modul(): void {
     check(str_contains($seite, '<aside class="side">') && str_contains($seite, 'href="/kasse/" class="current"') && str_contains($seite, '<p id="inhalt">Hallo</p>') && str_contains($seite, '/kasse/assets/x.css')
         && !str_contains($seite, '/verwaltung/server') && !str_contains($seite, 'action="/abmelden"') && str_contains($seite, 'class="modul"'), 'Rahmen für Modulseiten falsch');
     $start = $b->get('/')->body;
-    check(str_contains($start, '<summary class="menu-title">Anwendungen</summary>') && !str_contains($start, '<span class="menu-title">Einstellungen</span>'), 'Anwendungen fehlen oder Einstellungen stehen doppelt in der Seitenleiste');
+    check(str_contains($start, '<summary class="menu-title">Anwendungen</summary>') && str_contains($start, 'data-menu="anwendungen"') && !str_contains($start, '<span class="menu-title">Einstellungen</span>'), 'Anwendungen fehlen oder Einstellungen stehen doppelt in der Seitenleiste');
     check($b->get('/_auth/beispiel')->status === 403, 'Zugang zu nicht freigegebenem Modul');
     $env->users->setAccess($id, 'kasse', false, []);
     $env->db->store('erstadmin:kasse', (string)$id);
@@ -137,6 +137,32 @@ function test_basis_admin_darf_in_modulen_alles(): void {
     check($r->header('X-Kienzle-Rechte') !== '' && count(explode(',', $r->header('X-Kienzle-Rechte'))) === count($env->modules->rightIds('kasse')), 'Basis-Admin hat nicht alle Rechte');
     [$uid] = $env->user('bert');
     check($b->get('/_auth/kasse')->status === 204 && $env->users->access($uid) === [], 'Mitarbeiter ohne Zugang bekommt Zugang');
+    // Seitenleiste in Modulen wie in der Basis: Admins bekommen Zähler und offene Punkte, zwischengespeichert; Mitarbeiter nichts davon
+    $menu = json_decode(rawurldecode((string)$r->header('X-Kienzle-Menue')), true);
+    check(is_array($menu) && $menu['admin'] === true && isset($menu['zaehler']['updates'], $menu['zaehler']['einrichtung']) && is_array($menu['offen']) && is_array($menu['todo']), 'Menü der Module ohne Zähler für Admins');
+    $env->db->store('menue.hinweise', json_encode(['t' => time(), 'zaehler' => ['updates' => 2, 'module' => 1, 'sicherung' => 0, 'einrichtung' => 3], 'offen' => ['/kasse/']]));
+    $menu = json_decode(rawurldecode((string)$b->get('/_auth/kasse')->header('X-Kienzle-Menue')), true);
+    check($menu['zaehler'] === ['updates' => 2, 'module' => 1, 'sicherung' => 0, 'einrichtung' => 3], 'Zähler nicht aus dem Zwischenspeicher');
+    $k = new KienzleModul('kasse', ['KIENZLE_MENUE' => $b->last->header('X-Kienzle-Menue'), 'KIENZLE_BENUTZER' => 'admin', 'REQUEST_URI' => '/kasse/']);
+    $seite = $k->rahmen('Kasse', '<p>x</p>', ['roh' => true]);
+    check(str_contains($seite, 'class="badge" title="Neue Version verfügbar">2<') && str_contains($seite, 'class="logo-dot"'), 'Zähler fehlen in der Seitenleiste des Moduls');
+}
+
+function test_anzeigename_im_konto_aendern(): void {
+    $env = new Env();
+    [$b, $id] = admin_browser($env);
+    $seite = $b->get('/konto')->body;
+    check(str_contains($seite, 'action="/konto/name"') && str_contains($seite, '<details class="fold">') && str_contains($seite, 'class="name-edit"') && str_contains($seite, 'aria-label="Namen ändern"'), 'Konto: Namensfeld (Stift) oder Ausklappzeilen fehlen');
+    $b->post('/konto/name', ['display' => "  Anna Beispiel\x01 "]);
+    check($env->users->find($id)['display'] === 'Anna Beispiel' && str_contains($b->last->body, 'Name gespeichert.') && str_contains($b->last->body, 'value="Anna Beispiel"'), 'Anzeigename nicht gespeichert');
+    $login = $env->users->find($id)['login'];
+    check($login !== 'Anna Beispiel', 'Benutzername darf sich nicht ändern');
+    $b->post('/konto/name', ['display' => str_repeat('a', 81)]);
+    check($b->last->status === 422 && $env->users->find($id)['display'] === 'Anna Beispiel', 'Zu langer Name wird angenommen');
+    $b->post('/konto/name', ['display' => '']);
+    check($env->users->find($id)['display'] === '', 'Name lässt sich nicht leeren');
+    $b->get('/konto');
+    check(str_contains($b->last->body, 'Benutzername ' . $login), 'Benutzername wird nicht angezeigt');
 }
 
 function test_modul_admin_braucht_otp(): void {
@@ -196,7 +222,7 @@ function test_verwaltung_braucht_bestaetigung_und_csrf(): void {
     check($c2[2] === $c0[2], 'Wieder beachten wirkt nicht');
     $prax = $b->get('/verwaltung/praxis')->body;
     check(str_contains($prax, 'class="h-ico"') && str_contains($prax, 'Anschrift <span class="tag opt">nicht ausgefüllt</span>') && str_contains($prax, 'Kontodaten für Überweisungen <span class="tag ok">✓ ausgefüllt</span>'), 'Praxis und Daten: Symbole oder Statusschilder fehlen');
-    check(str_contains($b->get('/konto')->body, 'Authenticator-App <span class="tag ok">✓ eingerichtet</span>'), 'Konto: Statusschild der Authenticator-App fehlt');
+    check(str_contains($b->get('/konto')->body, 'Authenticator-App</h2><span class="tag ok fold-status">eingerichtet</span>'), 'Konto: Statusschild der Authenticator-App fehlt');
     $page = $b->get('/verwaltung/sicherheit')->body;
     check(str_contains($page, 'Firewall <span class="tag') && str_contains($page, 'Zugang (Abmeldezeiten)') && str_contains($page, 'Protokoll</h2>') && str_contains($page, 'name="idle_einheit"'), 'Sicherheit unvollständig');
     check($b->post('/verwaltung/zugang', ['idle' => '2', 'idle_einheit' => 'd', 'max' => '3', 'max_einheit' => 'd'])->status === 200 && $env->auth->idleSeconds() === 172800, 'Zugang in Tagen nicht gespeichert');
@@ -217,6 +243,7 @@ function test_verwaltung_braucht_bestaetigung_und_csrf(): void {
 function test_rollen_matrix_speichern(): void {
     $env = new Env();
     [$b] = admin_browser($env);
+    $b->get('/verwaltung/benutzer/neu');   // die Sitzungsmarke steht im Formular (die Seitenleiste hat kein Abmelden-Formular mehr)
     $b->post('/verwaltung/benutzer', ['login' => 'dora', 'display' => 'Dora']);
     $id = (int)$env->users->byLogin('dora')['id'];
     // Rolle MFA, aber „paid“ einzeln abgewählt und „catalog“ einzeln dazu

@@ -107,14 +107,11 @@ try {
     $staff = new SettingsPage(KienzleSumup\Suite::baseConfig());
     $sv = $staff->handle('get', [], null);
     check($sv['role'] === 'staff' && $sv['rights'] === ['paid', 'inbox'] && !isset($sv['sections']) && !str_contains(json_encode($sv), 'api_key'), 'Mitarbeiter-Ansicht enthält Einstellungen');
-    $staff->handle('t2med_paid', [], null); $staff->handle('inbox_overview', [], null);
+    $staff->handle('inbox_overview', [], null);
     check($staff->handle('inbox_overview', [], null)['letter_enabled'] === false, 'Postversand ohne Recht sichtbar');
     foreach (['save' => ['section' => 'sumup', 'values' => []], 'catalog' => [], 'inbox_letter' => ['id' => 'x'], 'audit' => [], 'test' => ['kind' => 'sumup'], 'catalog_service_delete' => ['id' => 'x']] as $act => $in)
         problem(fn() => $staff->handle($act, $in, TEST_CSRF), "Mitarbeiter darf $act", 403);
-    problem(fn() => $staff->handle('t2med_done', ['ids' => []], null), 'Mitarbeiter ohne CSRF-Marke', 403);
     problem(function () use ($staff) { $staff->clientDownload('windows', fn($h) => null, fn($d) => null); }, 'Mitarbeiter lädt Paket mit Schlüssel', 403);
-    problem(function () use ($staff) { $staff->taxExport(['kind' => 'steuer', 'year' => '2026'], fn($h) => null, fn($d) => null); }, 'Mitarbeiter ohne Export-Recht exportiert', 403);
-    $staff->taxExport(['kind' => 't2med', 'status' => 'open', 'year' => '0', 'month' => '0'], fn($h) => null, fn($d) => null);
     // Kaputte Überlagerung (z. B. andere Version): Datei gilt weiter.
     $db->query("UPDATE settings SET value='kaputt' WHERE key='config_overrides'");
     check(Settings::effective($base) === $base, 'Unlesbare Einstellungen nicht ignoriert');

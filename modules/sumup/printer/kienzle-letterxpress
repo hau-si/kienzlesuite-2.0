@@ -1,0 +1,40 @@
+#!/usr/bin/php
+<?php
+declare(strict_types=1);
+// Virtueller Drucker „vBriefversand“: T2med druckt die Rechnung hierher; sie wird wie im Rechnungseingang gelesen, erscheint unter „Vorgänge“
+// (Überweisung, „per Letterxpress verschickt“) und geht sofort per Post an Letterxpress. Ohne lesbaren Text im PDF ergänzt die Texterkennung ihn.
+// Gestartet von ippeveprinter der Basis als ks-sumup, mit dem Pfad des Auftrags als erstem Argument.
+// Ausgaben gehen ins Protokoll des Druckers: nur feste Texte, keine Patientendaten.
+require_once dirname(__DIR__) . '/src/bootstrap.php';
+use KienzleSumup\{Problem, T2medInvoice};
+
+$file = $argv[1] ?? '';
+try {
+    if ($file === '' || !is_file($file)) throw new Problem('Kein Druckauftrag übergeben.');
+    $size = (int)filesize($file);
+    if ($size <= 0 || $size > T2medInvoice::MAX_PDF) throw new Problem('Die Rechnung ist leer oder zu groß.');
+    $data = (string)file_get_contents($file);
+    if (str_starts_with($data, '%!PS')) {
+        // PostScript (z. B. von macOS): mit Ghostscript in PDF umwandeln.
+        $gs = is_executable('/usr/bin/gs') ? '/usr/bin/gs' : throw new Problem('PostScript erhalten, aber Ghostscript fehlt.');
+        $out = tempnam(sys_get_temp_dir(), 'ks-letter-');
+        $r = KienzleSumup\Command::run([$gs, '-q', '-dSAFER', '-dNOPAUSE', '-dBATCH', '-sDEVICE=pdfwrite', '-sOutputFile=' . $out, $file], '', 60, 65536);
+        $data = $r['code'] === 0 ? (string)file_get_contents($out) : '';
+        @unlink($out);
+        if (!str_starts_with($data, '%PDF-')) throw new Problem('PostScript konnte nicht in PDF umgewandelt werden.');
+    }
+    if (!str_starts_with($data, '%PDF-')) throw new Problem('Unbekanntes Druckformat. Bitte die Rechnung als PDF drucken.');
+    $result = ks_app()->letterPrint($data);
+    // Die Meldung enthält Rechnungsnummer und Auftragsnummer, keinen Patientennamen.
+    fwrite(STDERR, 'INFO: ' . $result['message'] . "\n");
+    $rc = 0;
+} catch (Problem $e) {
+    // Problem-Texte sind feste Programmtexte ohne Patientendaten; abgelehnte Drucke stehen im Rechnungseingang-Protokoll.
+    fwrite(STDERR, 'ERROR: ' . $e->getMessage() . "\n");
+    $rc = 1;
+} catch (\Throwable $e) {
+    fwrite(STDERR, 'ERROR: Unerwarteter Fehler (' . get_class($e) . ").\n");
+    $rc = 1;
+}
+if ($file !== '' && is_file($file)) @unlink($file);   // Auftrag mit Patientendaten nicht liegen lassen
+exit($rc);

@@ -1,10 +1,15 @@
 # Kienzle-Suite 2.0
 
 Praxis-Appliance für Hausarztpraxen mit T2med: **eine Basis**, einmal auf einer VM installiert, und **Module**, die
-einzeln dazukommen – Kartenzahlung (SumUp), Terminzettel, Fax, Telefon, Kienzlezeit. Verwaltung komplett im
+einzeln dazukommen – Kasse (SumUp), Terminzettel, Signatur, später Fax, Telefon und Kienzlezeit. Verwaltung komplett im
 Webinterface; Firewall, Benutzer, Admin-Zugang mit OTP, Updates und verschlüsselte Sicherung gibt es nur einmal, in der Basis.
 
-Stand: **Basis 0.21.4-beta.34** mit den Modulen **Kasse** 2.3.4-beta.15 (SumUp, Rechnungseingang, Überweisung mit QR-Code, Startseite mit freier Eingabe) und **Terminzettel** 1.3.0-beta.2 (T2med-Terminzettel auf dem Bondrucker). Installierbar nur auf einer Test-VM ([docs/VM-TEST.md](docs/VM-TEST.md)); Fax, Telefon und Kienzlezeit sind geplant ([docs/PLAN.md](docs/PLAN.md)).
+Stand (24.11.2026): **Basis 0.21.4-beta.55** mit den Modulen
+- **Kasse** 2.3.4-beta.30: SumUp-Kartenzahlung, Rechnungseingang aus T2med (jetzt mit Nachbearbeitung nicht erkannter Rechnungen anhand von Bildausschnitten), Überweisung mit QR-Code, Startseite mit freier Eingabe, Vorgänge mit Excel-Export, Post per Letterxpress.
+- **Terminzettel** 1.3.0-beta.10: T2med-Termine auf dem Bondrucker, mit Praxislogo (links, Mitte oder rechts), Kalender-QR und neu einem Absage-QR (vorbereitete E-Mail).
+- **Signatur** 0.1.0-beta.4: Vorlagen und Vorgänge für Unterschriften am signotec-Pad (Pad-Dienst und Rückschreiben nach T2med noch nicht gebaut).
+
+Installierbar nur auf einer Test-VM ([docs/VM-TEST.md](docs/VM-TEST.md)); Fax, Telefon und Kienzlezeit sind geplant ([docs/PLAN.md](docs/PLAN.md)).
 
 ![Basis und Module](docs/architektur-whiteboard.png)
 
@@ -16,11 +21,11 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 
 ![Anmeldung](docs/screenshots/anmelden.png)
 
-**Übersicht und Menü:** Die Seitenleiste der Suite führt zu den Anwendungen und zur Verwaltung. Auch die Seiten der Module erscheinen im selben Rahmen.
+**Übersicht und Menü:** Die Seitenleiste der Suite führt zu den Anwendungen und zur Verwaltung; oben steht „Mein Konto“ mit dem Anmeldenamen. Die Anwendungen lassen sich per Ziehen sortieren, die Gruppen einklappen (gemerkt im Browser). Auch die Seiten der Module erscheinen im selben Rahmen.
 
 ![Start](docs/screenshots/start.png)
 
-**Mein Konto:** Profil mit Avatar und Gruppen, E-Mail-Adresse (Bestätigung per Zahlencode), Passwort, Handynummer, Authenticator-App und Passkeys.
+**Mein Konto:** Profil mit Avatar, Gruppen und Abmelden-Knopf (der Name lässt sich über den kleinen Stift ändern), E-Mail-Adresse (Bestätigung per Zahlencode), Passwort, Handynummer, Authenticator-App und Passkeys.
 
 ![Mein Konto](docs/screenshots/konto.png)
 
@@ -38,7 +43,7 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 
 ![Verbindungen](docs/screenshots/verbindungen.png)
 
-**Kasse – Startseite:** Links die Kasse für freie Eingabe, IGeL und GOÄ (auch ohne T2med-Rechnung, Name und Geburtsdatum optional), rechts die offenen T2med-Rechnungen mit Direktwahl Karte, Bar, Überweisung oder Per Post (Letterxpress) und die Tageswerte. Aus T2med startet die Kasse weiterhin schlank ohne Menü.
+**Kasse – Startseite:** Links die Rechnungen aus T2med mit Filter (offen, zurückgestellt, überwiesen), Namenssuche und Marken; die neueste ist vorgewählt, Karte ist vorbelegt, ein Klick kassiert. „Zurückstellen“ blendet eine Rechnung aus der Liste aus, ohne sie zu drucken. Rechts die Kasse für freie Eingabe, IGeL und GOÄ (Suche nach Ziffer oder Namen, auch ohne T2med-Rechnung) in zwei Spalten ohne Scrollen. Aus T2med startet die Kasse weiterhin schlank ohne Menü.
 
 ![Kasse](docs/screenshots/kasse-start.png)
 

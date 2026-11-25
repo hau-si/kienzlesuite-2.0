@@ -77,14 +77,20 @@ function test_seite_menue_und_rechte(): void {
     $page = $b->get('/verwaltung/module');
     check($page->status === 200 && str_contains($page->body, 'Neue Version <strong>2.1.0</strong> (GitHub, nicht signiert)') && str_contains($page->body, 'Telefon &lt;b&gt;'), 'Seite unvollständig oder nicht maskiert');
     check(str_contains($page->body, 'class="mod-grid"') && str_contains($page->body, 'mod-tile available') && str_contains($page->body, '<span class="tag">verfügbar</span>') && str_contains($page->body, 'class="mod-remove"')
-        && str_contains($page->body, '<button class="danger">') && str_contains($page->body, 'Update 2.1.0') && str_contains($page->body, ' Installieren</button>'), 'Modulkacheln: installiert, verfügbar, Update, rotes Entfernen');
+        && str_contains($page->body, '<button class="danger">') && str_contains($page->body, 'Auf 2.1.0 aktualisieren') && str_contains($page->body, ' Installieren</button>'), 'Modulkacheln: installiert, verfügbar, Update, rotes Entfernen');
     check(str_contains($b->get('/')->body, 'title="Neue Modulversion verfügbar">1</span>'), 'Hinweis im Menü fehlt');
     $r = $b->post('/verwaltung/module', ['aktion' => 'installieren', 'id' => 'telefon']);
     check($r->status === 303 && mreq($env)['id'] === 'telefon', 'Installieren über die Seite');
     check($b->get('/verwaltung/module')->header('Refresh') === '4', 'Seite lädt beim Warten nicht neu');
     check(str_contains(implode("\n", $env->audit->recent()), 'modul-installieren telefon'), 'nicht protokolliert');
     unlink($env->dir . '/anfragen/module.json');
-    $b->post('/verwaltung/module', ['aktion' => 'entfernen', 'id' => 'kasse']);
+    check(str_contains($page->body, 'class="t-ico mod-open" href="/kasse/"') && str_contains($page->body, 'name="bestaetigung"') && !str_contains($page->body, '>Öffnen</a>'), 'Logo öffnet nicht das Modul oder Namensbestätigung fehlt');
+    $r = $b->post('/verwaltung/module', ['aktion' => 'entfernen', 'id' => 'kasse']);
+    check($r->status === 409 || $r->status === 422, 'Entfernen ohne Namensbestätigung akzeptiert (' . $r->status . ')');
+    check(!is_file($env->dir . '/anfragen/module.json'), 'Entfernen ohne Bestätigung wurde angefordert');
+    $r = $b->post('/verwaltung/module', ['aktion' => 'entfernen', 'id' => 'kasse', 'bestaetigung' => 'falsch']);
+    check(!is_file($env->dir . '/anfragen/module.json'), 'Entfernen mit falschem Namen wurde angefordert');
+    $b->post('/verwaltung/module', ['aktion' => 'entfernen', 'id' => 'kasse', 'bestaetigung' => ' kasse ']);
     check(mreq($env)['daten_loeschen'] === false, 'Daten ohne Häkchen gelöscht');
     unlink($env->dir . '/anfragen/module.json');
     $env->db->query('UPDATE sessions SET confirmed_at=0');

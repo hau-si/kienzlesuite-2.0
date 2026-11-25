@@ -7,7 +7,7 @@ namespace Kienzle\Core;
  * Liest nur /proc und /sys (kein Befehl, keine Rechte nötig); fehlt ein Wert (z. B. Temperatur in einer VM), bleibt er null.
  */
 final class SystemStatus {
-    public function __construct(private string $proc = '/proc', private string $sys = '/sys', private string $dir = '/var/lib/kienzle') {}
+    public function __construct(private string $proc = '/proc', private string $sys = '/sys', private string $dir = '/var/lib/kienzle/core') {}
 
     /** @return array{disk:?array{frei:float,gesamt:float},ram:?array{frei:float,gesamt:float},cpu:?array{last:float,kerne:int,prozent:int},temp:?float,laufzeit:?int} */
     public function read(): array {
@@ -45,6 +45,29 @@ final class SystemStatus {
 
     private function laufzeit(): ?int {
         return preg_match('/^(\d+)/', (string)@file_get_contents($this->proc . '/uptime', false, null, 0, 100), $m) ? (int)$m[1] : null;
+    }
+
+    /** Neuen Messpunkt (Tagesbeginn, belegte Bytes) anhängen, höchstens einen je Tag; Punkte älter als 400 Tage fallen weg. @param list<array{0:int,1:float}> $punkte @return list<array{0:int,1:float}> */
+    public static function verlaufErgaenzen(array $punkte, float $belegt, int $jetzt): array {
+        $tag = $jetzt - $jetzt % 86400;
+        $punkte = array_values(array_filter($punkte, static fn($p) => is_array($p) && count($p) === 2 && $p[0] > $jetzt - 400 * 86400));
+        if ($punkte && end($punkte)[0] >= $tag) { $punkte[count($punkte) - 1] = [$tag, $belegt]; return $punkte; }
+        $punkte[] = [$tag, $belegt];
+        return $punkte;
+    }
+
+    /**
+     * Hochrechnung des Plattenbedarfs aus den Messpunkten der letzten 90 Tage (gerade Linie vom ersten zum letzten Punkt).
+     * Null, solange der Verlauf kürzer als 3 Tage ist. @param list<array{0:int,1:float}> $punkte
+     * @return ?array{pro_jahr:float,pro_monat:float,tage:int,monate_rest:?float}
+     */
+    public static function prognose(array $punkte, float $frei, int $jetzt): ?array {
+        $p = array_values(array_filter($punkte, static fn($x) => is_array($x) && count($x) === 2 && $x[0] >= $jetzt - 90 * 86400));
+        if (count($p) < 2) return null;
+        $tage = (int)round(($p[count($p) - 1][0] - $p[0][0]) / 86400);
+        if ($tage < 3) return null;
+        $proTag = ($p[count($p) - 1][1] - $p[0][1]) / $tage;
+        return ['pro_jahr' => $proTag * 365, 'pro_monat' => $proTag * 30.4, 'tage' => $tage, 'monate_rest' => $proTag > 0 ? $frei / ($proTag * 30.4) : null];
     }
 
     /** Größe lesbar: „123 GB“, „4,2 GB“, „512 MB“. */

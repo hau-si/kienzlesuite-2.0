@@ -20,7 +20,7 @@ final class Connections {
             'letterxpress' => is_array($s['letterxpress'] ?? null) ? $s['letterxpress'] : null,
             'ablage' => array_values(array_filter((array)($s['ablage'] ?? []), 'is_array')), 'tests' => (array)($s['tests'] ?? []), 'guthaben' => (array)($s['guthaben'] ?? []),
             'hostkeys' => (array)($s['hostkeys'] ?? []), 'zertifikate' => (array)($s['zertifikate'] ?? []), 'nutzung' => array_values(array_filter((array)($s['nutzung'] ?? []), 'is_array')),
-            'hinweise' => array_values(array_filter((array)($s['hinweise'] ?? []), 'is_string')), 'letzte' => is_array($s['letzte'] ?? null) ? $s['letzte'] : null,
+            'hinweise' => array_values(array_filter((array)($s['hinweise'] ?? []), 'is_string')), 'letzte' => is_array($s['letzte'] ?? null) ? View::frisch($s['letzte']) : null,
             'sftp_schluessel' => (string)($s['sftp_schluessel'] ?? ''), 'pending' => is_file($this->request()), 'service' => is_file(self::$unit)];
     }
 

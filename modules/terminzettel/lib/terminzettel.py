@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import re
@@ -94,6 +95,30 @@ def eprint(*args: object) -> None:
 
 
 LOG_FILE = "druckprotokoll.txt"
+
+
+_START = time.monotonic()
+_ZEITEN: dict[str, float] = {}
+
+
+@contextlib.contextmanager
+def zeit(name: str):
+    """Dauer eines Schritts messen (für das Druckprotokoll: Wo bleibt die Zeit?)."""
+    begin = time.monotonic()
+    try:
+        yield
+    finally:
+        _ZEITEN[name] = _ZEITEN.get(name, 0.0) + time.monotonic() - begin
+
+
+def sekunden(value: float) -> str:
+    return (f"{value:.1f}" if value >= 0.1 else f"{value:.2f}").replace(".", ",") + " s"
+
+
+def zeiten_text() -> str:
+    """z. B. „Umwandlung 0,8 s · Texterkennung 6,2 s · … · gesamt 7,5 s“ (nur Schritte, die gelaufen sind)."""
+    teile = [f"{name} {sekunden(value)}" for name, value in _ZEITEN.items()]
+    return " · ".join(teile + [f"gesamt {sekunden(time.monotonic() - _START)}"])
 
 
 def job_log(text: str) -> None:
@@ -231,7 +256,7 @@ def apply_overlay(cfg: dict[str, Any], web: Any, *, printing: bool = False) -> d
         width = logo.get("width_dots", 288)
         if type(width) is not int or not 32 <= width <= 384:
             raise TicketError("Logo-Breite muss zwischen 32 und 384 Punkten liegen.")
-        cfg["logo"] = {"enabled": logo["enabled"], "width_dots": width}
+        cfg["logo"] = {"enabled": logo["enabled"], "width_dots": width, "align": _choice(logo.get("align", "center"), ("left", "center", "right"))}
     heading = web.get("heading")
     if isinstance(heading, dict):
         if "text" in heading:
@@ -246,6 +271,18 @@ def apply_overlay(cfg: dict[str, Any], web: Any, *, printing: bool = False) -> d
             if type(appointments["show_patient"]) is not bool:
                 raise TicketError("Ungültige Auswahl in den Terminzettel-Einstellungen.")
             layout["show_patient"] = appointments["show_patient"]
+    cancel = web.get("cancel")
+    if isinstance(cancel, dict):
+        if type(cancel.get("enabled")) is not bool:
+            raise TicketError("Ungültige Auswahl in den Terminzettel-Einstellungen.")
+        width = cancel.get("width_dots", 292)
+        if type(width) is not int or not 64 <= width <= 384:
+            raise TicketError("QR-Größe muss zwischen 64 und 384 Punkten liegen.")
+        to = _text(cancel.get("to", ""), 100).strip()
+        if cancel["enabled"] and not re.fullmatch(r"[^\s@<>,;]{1,64}@[^\s@<>,;]{1,60}\.[^\s@<>,;]{2,20}", to):
+            raise TicketError("Absage-QR: Bitte eine gültige E-Mail-Adresse als Empfänger eintragen.")
+        cfg["cancel_qr"] = {"enabled": cancel["enabled"], "to": to, "subject": _text(cancel.get("subject", ""), 100),
+                            "body": _text(cancel.get("body", ""), 400), "caption": _text(cancel.get("caption", ""), 80), "width_dots": width}
     qr = web.get("qr")
     if isinstance(qr, dict):
         calendar = cfg.setdefault("calendar_qr", {})
@@ -290,10 +327,24 @@ def run_checked(args: list[str], *, input_bytes: bytes | None = None,
     return proc.stdout
 
 
+def _ocr_text(source: str, data: bytes | None, temp_dir: str | None) -> str:
+    """Seite als Bild lesen (Tesseract) und die Textschicht mit Spalten zurückgeben; Bild und Ergebnis laufen nur per Pipe."""
+    image = run_checked(["pdftoppm", "-f", "1", "-l", "1", "-singlefile",
+                         "-scale-to", "2500", "-gray", "-png", source],
+                        input_bytes=data, temp_dir=temp_dir)
+    # Die Textschicht erhält Spalten und Einrückungen für mehrzeilige Termintypen.
+    searchable = run_checked(["tesseract", "stdin", "stdout", "-l", "deu", "--psm", "6",
+                              "-c", "tessedit_create_pdf=1", "-c", "textonly_pdf=1"],
+                             input_bytes=image, temp_dir=temp_dir)
+    return run_checked(["pdftotext", "-layout", "-", "-"],
+                       input_bytes=searchable, temp_dir=temp_dir).decode("utf-8", "strict")
+
+
 def extract_pdf_text(source: str, cfg: dict[str, Any], *, data: bytes | None = None,
                      temp_dir: str | None = None) -> str:
-    text = run_checked(["pdftotext", "-layout", source, "-"],
-                       input_bytes=data, temp_dir=temp_dir).decode("utf-8", "strict")
+    with zeit("Textlesen"):
+        text = run_checked(["pdftotext", "-layout", source, "-"],
+                           input_bytes=data, temp_dir=temp_dir).decode("utf-8", "strict")
     if text.strip():
         return text
     if not cfg_bool(cfg.get("input", {}), "ocr_if_needed", True):
@@ -303,16 +354,8 @@ def extract_pdf_text(source: str, cfg: dict[str, Any], *, data: bytes | None = N
     if not re.search(rb"^Pages:\s+1\s*$", info, re.MULTILINE):
         raise TicketError("Für die Texterkennung ist genau eine PDF-Seite erforderlich.")
     try:
-        image = run_checked(["pdftoppm", "-f", "1", "-l", "1", "-singlefile",
-                             "-scale-to", "2500", "-gray", "-png", source],
-                            input_bytes=data, temp_dir=temp_dir)
-        # Die Textschicht erhält Spalten und Einrückungen für mehrzeilige Termintypen.
-        # Bild, Textschicht und Ergebnis werden ausschließlich per Pipe übergeben.
-        searchable = run_checked(["tesseract", "stdin", "stdout", "-l", "deu", "--psm", "6",
-                                  "-c", "tessedit_create_pdf=1", "-c", "textonly_pdf=1"],
-                                 input_bytes=image, temp_dir=temp_dir)
-        text = run_checked(["pdftotext", "-layout", "-", "-"],
-                           input_bytes=searchable, temp_dir=temp_dir).decode("utf-8", "strict")
+        with zeit("Texterkennung"):
+            text = _ocr_text(source, data, temp_dir)
     except TicketError:
         raise TicketError("Texterkennung fehlgeschlagen. Bitte Tesseract und das deutsche Sprachpaket prüfen.") from None
     if not text.strip():
@@ -336,13 +379,14 @@ def extract_text(data: bytes, cfg: dict[str, Any]) -> str:
                 fcntl.flock(lock, fcntl.LOCK_EX)
                 source, pdf = Path(td) / "input", Path(td) / "input.pdf"
                 source.write_bytes(data)
-                if data.startswith(b"%!PS"):
-                    run_checked(["gs", "-q", "-dSAFER", "-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite",
-                                 "-sOutputFile=" + str(pdf), str(source)], temp_dir=td)
-                else:
-                    # Ubuntu liefert das Werkzeug aus libgxps-utils als „xpstopdf“; „gxps2pdf“ nur ältere Pakete.
-                    tool = "xpstopdf" if shutil.which("xpstopdf", path="/usr/bin:/bin") else "gxps2pdf"
-                    run_checked([tool, str(source), str(pdf)], temp_dir=td)
+                with zeit("Umwandlung"):
+                    if data.startswith(b"%!PS"):
+                        run_checked(["gs", "-q", "-dSAFER", "-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite",
+                                     "-sOutputFile=" + str(pdf), str(source)], temp_dir=td)
+                    else:
+                        # Ubuntu liefert das Werkzeug aus libgxps-utils als „xpstopdf“; „gxps2pdf“ nur ältere Pakete.
+                        tool = "xpstopdf" if shutil.which("xpstopdf", path="/usr/bin:/bin") else "gxps2pdf"
+                        run_checked([tool, str(source), str(pdf)], temp_dir=td)
                 return extract_pdf_text(str(pdf), cfg, temp_dir=td)
     encoding = str(cfg.get("input", {}).get("text_encoding", "utf-8"))
     # Der Windows-Treiber „Generic / Text Only“ liefert ANSI (Windows-1252): Umlaute sind dann kein gültiges UTF-8.
@@ -702,10 +746,109 @@ def append_logo(r: EscPosRenderer, cfg: dict[str, Any]) -> None:
         image = bitmap(LOGO, int(section.get("width_dots", 288)), r.page_width)
         if image is None:
             return
-        r.set_align("center")
+        align = section.get("align", "center")
+        r.set_align(align if align in ("left", "center", "right") else "center")
         r.raw(raster_image(image))
     except Exception:  # Logo ist Zierde: ein Fehler darf den Ausdruck nie verhindern
         eprint("Logo konnte nicht gedruckt werden.")
+
+
+def cancel_mailto(cancel: dict[str, Any]) -> bytes:
+    """mailto:-Adresse für den Absage-QR: Empfänger, Betreff und Nachrichtentext (UTF-8, prozentkodiert)."""
+    from urllib.parse import quote
+    body = str(cancel.get("body", "")).replace("\n", "\r\n")
+    return ("mailto:" + quote(str(cancel.get("to", "")), safe="@.+-_") + "?subject=" + quote(str(cancel.get("subject", "")), safe="")
+            + "&body=" + quote(body, safe="")).encode("ascii")
+
+
+FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+
+
+def _bar_lines(caption: str) -> list[str]:
+    """Aufforderung für den Balken in höchstens zwei Zeilen: nach dem ersten Fragezeichen, sonst nach der Wortmitte."""
+    text = " ".join(caption.split())
+    head, sep, rest = text.partition("?")
+    if sep and rest.strip():
+        return [head.strip() + "?", rest.strip()]
+    words = text.split()
+    if len(words) < 3:
+        return [text]
+    half = len(words) // 2
+    return [" ".join(words[:half]), " ".join(words[half:])]
+
+
+def cancel_block_image(qr_image, caption: str):
+    """Absage-Block als 1-Bit-Bild: oben ein runder schwarzer Balken mit Kalender-Symbol und der Aufforderung (zwei Zeilen),
+    darunter der QR-Code in dickem, rundem Rahmen. Balken und Rahmen sind gleich breit."""
+    from PIL import Image, ImageDraw, ImageFont
+    frame, pad, gap = 6, 10, 10
+    qw, qh = qr_image.size
+    width = qw + 2 * (frame + pad)
+    top = 0
+    bar = None
+    if caption:
+        lines = _bar_lines(caption)
+        icon = 38
+        room = width - 2 * 14 - icon - 12
+        size = 30
+        while size > 13:
+            font = ImageFont.truetype(FONT_BOLD, size)
+            if max(font.getlength(line) for line in lines) <= room:
+                break
+            size -= 1
+        font = ImageFont.truetype(FONT_BOLD, size)
+        line_height = int(size * 1.25)
+        bar_h = max(icon + 20, line_height * len(lines) + 20)
+        bar = (lines, font, line_height, bar_h, icon)
+        top = bar_h + gap
+    height = top + qh + 2 * (frame + pad)
+    img = Image.new("L", (width, height), 255)
+    d = ImageDraw.Draw(img)
+    if bar:
+        lines, font, line_height, bar_h, icon = bar
+        d.rounded_rectangle((0, 0, width - 1, bar_h - 1), radius=18, fill=0)
+        ix, iy = 14, (bar_h - icon) // 2
+        d.rounded_rectangle((ix, iy + 5, ix + icon - 1, iy + icon - 1), radius=5, outline=255, width=3)
+        d.line((ix, iy + 15, ix + icon - 1, iy + 15), fill=255, width=3)
+        for px in (ix + 10, ix + icon - 11):
+            d.line((px, iy, px, iy + 9), fill=255, width=3)
+        cx, cy, k = ix + icon // 2, iy + 26, 5
+        d.line((cx - k, cy - k, cx + k, cy + k), fill=255, width=3)
+        d.line((cx - k, cy + k, cx + k, cy - k), fill=255, width=3)
+        tx = ix + icon + 12
+        y = (bar_h - line_height * len(lines)) // 2
+        for line in lines:
+            d.text((tx, y + (line_height - font.size) // 2 - 1), line, font=font, fill=255)
+            y += line_height
+    d.rounded_rectangle((0, top, width - 1, height - 1), radius=24, outline=0, width=frame)
+    img.paste(qr_image.convert("L"), (frame + pad, top + frame + pad))
+    return img.convert("1", dither=Image.NONE)
+
+
+def append_cancel_qr(r: EscPosRenderer, cfg: dict[str, Any]) -> None:
+    """Absage-QR auf dem Bon: Balken mit der Aufforderung oben, darunter der QR-Code im runden Rahmen; er öffnet eine vorbereitete
+    E-Mail zum Absagen. Ein Fehler darf den Ausdruck nie verhindern (ohne Schrift oder Bildbibliothek gibt es Text und schlichten QR)."""
+    cancel = cfg.get("cancel_qr", {})
+    if not isinstance(cancel, dict) or not cfg_bool(cancel, "enabled", False):
+        return
+    try:
+        from calendar_qr import build_qr_image
+        from escpos import raster_image
+        caption = str(cancel.get("caption", "")).strip()
+        # 32 Punkte für Rahmen und Abstand (2 × (6 + 10)): Der ganze Block darf höchstens 384 Punkte breit sein (Rastergrenze).
+        room = min(int(cancel.get("width_dots", 292)), r.page_width - 32, 352)
+        qr = build_qr_image(cancel_mailto(cancel), {"max_width_dots": max(64, room)})
+        r.line("")
+        try:
+            image = cancel_block_image(qr, caption)
+        except Exception:
+            image = qr
+            if caption:
+                r.wrapped(caption, align="center", bold=True, size=r.sizes["footer"])
+        r.set_align("center")
+        r.raw(raster_image(image))
+    except Exception:
+        eprint("Absage-QR konnte nicht gedruckt werden (Text zu lang?).")
 
 
 def render_escpos(ticket: ParsedTicket, cfg: dict[str, Any]) -> bytes:
@@ -764,6 +907,7 @@ def render_escpos(ticket: ParsedTicket, cfg: dict[str, Any]) -> bytes:
             r.line(separator * r.cols(r.sizes["footer"]), align="left", bold=False, size=r.sizes["footer"])
         r.block("footer", r.sizes["footer"])
 
+    append_cancel_qr(r, cfg)
     return r.finish()
 
 
@@ -821,12 +965,14 @@ def render(ticket: ParsedTicket, cfg: dict[str, Any]) -> bytes:
 def make_payload(data: bytes, cfg: dict[str, Any]) -> bytes:
     text = safe_text(extract_text(data, cfg))
     try:
-        ticket = parse_t2med(text)
+        with zeit("Auswertung"):
+            ticket = parse_t2med(text)
     except TicketError:
         raise
     except ValueError:
         raise TicketError("Ungültiger Beleg: eine Seite, ein Patient und vollständige Termine erforderlich.") from None
-    return render(ticket, cfg)
+    with zeit("Bon aufbauen (mit Logo und QR)"):
+        return render(ticket, cfg)
 
 
 def send_cups(payload: bytes, cfg: dict[str, Any], *, copies: int = 1) -> None:
@@ -878,13 +1024,15 @@ def main() -> int:
         if args.check:
             print("Belegprüfung erfolgreich.")
         else:
-            send_cups(payload, cfg)
+            with zeit("Übergabe an den Drucker"):
+                send_cups(payload, cfg)
             job_log("Bon an die Warteschlange „" + str(cfg.get("output", {}).get("queue", "")) + "“ übergeben")
+            job_log("Zeiten: " + zeiten_text())
         return 0
     except TicketError as exc:
         eprint("terminzettel: " + str(exc))
         if not args.check:
-            job_log("Fehler: " + str(exc))
+            job_log("Fehler: " + str(exc) + " (nach " + sekunden(time.monotonic() - _START) + ")")
         return 1
     except (Exception, KeyboardInterrupt):
         # Fremde Fehlertexte können Beleginhalte enthalten. Keine Tracebacks oder Rohmeldungen.

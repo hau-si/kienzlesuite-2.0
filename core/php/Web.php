@@ -82,6 +82,7 @@ final class Web {
             'POST /konto/codes' => fn() => $this->newCodes(),
             'POST /konto/telefon' => fn() => $this->savePhone($r),
             'POST /konto/email' => fn() => $this->saveEmail($r),
+            'POST /konto/name' => fn() => $this->saveName($r),
             'POST /konto/email-code' => fn() => $this->confirmEmail($r),
             'POST /konto/geraete' => fn() => $this->revoke($r),
             'POST /konto/passkey/optionen' => fn() => $this->passkeyRegisterOptions(),
@@ -117,6 +118,14 @@ final class Web {
         $ips = array_values(array_filter($this->config->hostnames, fn($n) => filter_var($n, FILTER_VALIDATE_IP)));
         $name = array_values(array_filter($this->config->hostnames, fn($n) => !filter_var($n, FILTER_VALIDATE_IP)))[0] ?? 'kienzle.praxis.internal';
         $ip = $ips[0] ?? '192.0.2.10';
+        if (str_ends_with($name, '.fritz.box')) {
+            $routerText = '<p>Der Name <code>' . V::h($name) . '</code> endet auf „.fritz.box“: Eine FRITZ!Box kennt Geräte im Netz automatisch unter ihrem Rechnernamen. '
+                . 'Dann muss der Rechnername des Servers genau zu diesem Namen passen (Verwaltung → Server).</p>'
+                . '<p>Anderer Router oder ein eigener DNS-Server: den Namen <code>' . V::h($name) . '</code> mit der Adresse <code>' . V::h($ip) . '</code> eintragen (meist die IT).</p>';
+        } else {
+            $routerText = '<p>Den Namen <code>' . V::h($name) . '</code> mit der Adresse <code>' . V::h($ip) . '</code> im Router oder einem eigenen DNS-Server eintragen (meist die IT). '
+                . 'Manche Router kennen Geräte im Netz auch automatisch unter ihrem Rechnernamen mit einer eigenen Endung; dann unter Verwaltung → Server genau diesen Namen mit der Endung des Routers wählen.</p>';
+        }
         $body = '<p class="lead">Zwei Dinge braucht jeder PC der Praxis einmal: Er muss der Suite vertrauen (Zertifikat) und ihren Namen kennen.</p>'
             . '<h2 id="zertifikat">1. Der Suite vertrauen (Zertifikat)</h2>'
             . '<p>Ohne diesen Schritt zeigt der Browser „Nicht sicher“. Die Datei ist kein Programm, sondern der Ausweis der Suite.</p>'
@@ -137,15 +146,27 @@ final class Web {
             . 'Zertifizierungsstellen → Importieren → „Dieser CA vertrauen, um Websites zu identifizieren“.</li></ol></details>'
             . '<h2 id="name">2. Den Namen der Suite bekannt machen</h2>'
             . '<p>Die Suite heißt <strong>' . V::h($name) . '</strong> und hat die Adresse <strong>' . V::h($ip) . '</strong>. Damit der Name funktioniert, gibt es zwei Wege:</p>'
-            . '<details class="how" open><summary>Einmal im Router (empfohlen, gilt für alle PCs)</summary><p>Viele Router kennen Geräte im Netz automatisch unter ihrem Rechnernamen, '
-            . 'eine FRITZ!Box z. B. als <code>rechnername.fritz.box</code>. Dann unter „Server“ genau diesen Namen mit der Endung „.fritz.box“ wählen. '
-            . 'Andere Router oder ein eigener DNS-Server: den Namen <code>' . V::h($name) . '</code> mit der Adresse <code>' . V::h($ip) . '</code> eintragen (meist die IT).</p></details>'
+            . '<details class="how" open><summary>Einmal im Router (empfohlen, gilt für alle PCs)</summary>' . $routerText . '</details>'
             . '<details class="how"><summary>Oder auf jedem PC in der Datei hosts</summary><ol class="steps">'
             . '<li>Windows: Startmenü → „Editor“ mit der rechten Maustaste → <strong>Als Administrator ausführen</strong>.</li>'
             . '<li>Datei → Öffnen → <code>C:\Windows\System32\drivers\etc\hosts</code> (unten „Alle Dateien“ wählen).</li>'
             . '<li>Am Ende diese Zeile einfügen und speichern:<br><code>' . V::h($ip . '   ' . $name) . '</code></li>'
             . '<li>Mac: im Terminal <code>sudo nano /etc/hosts</code>, dieselbe Zeile ergänzen, speichern.</li></ol></details>'
             . '<p>Danach die Suite unter <a href="https://' . V::h($name) . '/">https://' . V::h($name) . '/</a> öffnen.</p>';
+        // Virtuelle Drucker der Module (nur wenn vorhanden): nach Zertifikat und Name, vor dem Starter.
+        $nr = 3;
+        $drucker = $this->virtualPrinterHelp($this->printers ? $this->printers->status()['queues'] : [], true);
+        if ($drucker !== '') {
+            $body .= '<h2 id="drucker">' . $nr++ . '. Virtuelle Drucker einrichten</h2>'
+                . '<p>Nur für PCs, von denen aus T2med auf die virtuellen Drucker der Module druckt. Zuerst Schritt 1 und 2 erledigen: Die Drucker-Adresse enthält den Namen der Suite.</p>' . $drucker;
+        }
+        // Ist die Kasse installiert, braucht jeder PC, an dem aus T2med kassiert wird, zusätzlich den Starter (Paket aus den Kasse-Einstellungen).
+        if (($starter = $this->modules->starterPath()) !== '') {
+            $body .= '<h2 id="starter">' . $nr . '. Kasse: Starter für T2med installieren</h2>'
+                . '<p>Damit der Knopf in T2med die Kasse öffnet, braucht jeder Kassen-PC einmal den <strong>Starter</strong>. Das Paket lädt ein Admin der Kasse und führt es auf dem PC einmal aus.</p>'
+                . '<p class="row-buttons"><a class="button" href="' . V::h($starter) . '/settings.php#s-clients">Starter der Kasse einrichten</a></p>'
+                . '<p class="muted">Zuerst Schritt 1 und 2 erledigen: Der Starter prüft das Zertifikat der Suite und braucht ihren Namen.</p>';
+        }
         return Response::html(V::page('Arbeitsplätze einrichten', $body, $this->nav(), $this->config->practice, 'Einrichten'));
     }
 
@@ -170,6 +191,7 @@ final class Web {
         $address = 'https://' . $short . $suffix . '/';
         $body = V::error($error) . ($st['last'] ? '<p class="' . (($st['last']['ok'] ?? false) ? 'notice' : 'error') . '">' . V::h((string)($st['last']['meldung'] ?? '')) . '</p>' : '')
             . ($st['pending'] ? '<p class="notice">Wird übernommen …</p>' : '')
+            . '<p class="muted">Auslastung von Prozessor und Arbeitsspeicher, Festplatte mit Hochrechnung des Platzbedarfs und die Guthaben stehen auf der <a href="/#server-zustand">Startseite unter „Server-Zustand“</a>.</p>'
             . '<h2>Servername</h2>'
             . '<form method="post" action="/verwaltung/server">' . $this->hidden('speichern')
             . '<label>Name des Servers<span class="name-row">'
@@ -185,7 +207,6 @@ final class Web {
             . V::checkbox('neue_ca', '1', 'Falls nötig: neue Zertifizierungsstelle erstellen', false)
             . V::checkbox('ohne_ip', '1', 'Nicht mehr über die IP-Adresse erreichbar', false) . '</details>'
             . '<button' . ($st['pending'] ? ' disabled' : '') . '>Speichern</button></form>'
-            . '<h2>Name, Anschrift, Konto und Steuer der Praxis</h2><p class="muted">Stehen gemeinsam unter <a href="/verwaltung/praxis">Praxis</a>.</p>'
             . '<h2>Danach</h2><ol class="steps"><li>Den Namen im Router eintragen – oder auf jedem PC in der Datei hosts: '
             . '<a href="/hilfe/arbeitsplatz#name">Anleitung</a>.</li><li>Die Suite unter <strong>' . V::h($address) . '</strong> öffnen und dort neu anmelden.</li>'
             . '<li>Falls schon Passkeys eingerichtet sind: unter „Mein Konto“ neu anlegen (sie gelten für den alten Namen).</li></ol>'
@@ -437,7 +458,10 @@ final class Web {
             ->with('X-Kienzle-Praxis', rawurlencode(json_encode(['name' => $this->config->practice] + $this->address() + $this->master(), JSON_UNESCAPED_UNICODE)));
     }
 
-    /** Schlankes Menü für die Seitenleiste in Modulseiten: nur Anwendungen des Benutzers (ohne Zähler, damit die Prüfung jeder Modul-Anfrage schnell bleibt). */
+    /**
+     * Menü für die Seitenleiste in Modulseiten: Anwendungen des Benutzers, für Admins zusätzlich die Zähler (Updates, Module, Sicherung, Einrichtung) und
+     * die offenen Einstellungen wie in der Basis. Die Zähler werden 30 Sekunden zwischengespeichert, damit die Prüfung jeder Modul-Anfrage schnell bleibt.
+     */
     private function moduleMenu(int $uid, bool $admin, string $login): string {
         $apps = $meta = [];
         foreach ($this->users->access($uid) as $id => $_) {
@@ -445,7 +469,34 @@ final class Web {
             $apps[$p . '/'] = $this->modules->name($id);
             $meta[$p . '/'] = $id;
         }
-        return rawurlencode(json_encode(['apps' => $apps, 'ids' => $meta, 'admin' => $admin, 'login' => $login], JSON_UNESCAPED_UNICODE));
+        $out = ['apps' => $apps, 'ids' => $meta, 'admin' => $admin, 'login' => $login];
+        if ($admin) {
+            $h = $this->menuHints();
+            $out['zaehler'] = $h['zaehler'];
+            $out['offen'] = $h['offen'];
+            $out['todo'] = [];
+            foreach ($this->users->access($uid) as $id => $a) {
+                if (($p = $this->modules->webPath($id)) !== null && $a['admin'] && ($u = $this->modules->settingsUrl($id)) !== null && in_array($u, $h['offen'], true)) $out['todo'][] = $p . '/';
+            }
+        }
+        return rawurlencode(json_encode($out, JSON_UNESCAPED_UNICODE));
+    }
+
+    /** Zähler und offene Einstellungen für die Seitenleiste der Module (kurz zwischengespeichert). */
+    private function menuHints(): array {
+        try {
+            $c = json_decode((string)$this->db->setting('menue.hinweise'), true);
+            if (is_array($c) && is_int($c['t'] ?? null) && time() - $c['t'] < 30 && is_array($c['zaehler'] ?? null) && is_array($c['offen'] ?? null)) return $c;
+        } catch (\Throwable) {
+        }
+        $c = ['t' => time(), 'zaehler' => [
+            'updates' => $this->updates ? $this->updates->count() : 0, 'module' => $this->store ? $this->store->count() : 0,
+            'sicherung' => $this->backup ? $this->backup->count() : 0, 'einrichtung' => $this->openSteps()], 'offen' => $this->openPaths()];
+        try {
+            $this->db->store('menue.hinweise', json_encode($c));
+        } catch (\Throwable) {
+        }
+        return $c;
     }
 
     /** CSRF-Marke, die ein Modul in seine Formulare schreibt und mit X-Kienzle-Csrf vergleicht. */
@@ -661,7 +712,7 @@ final class Web {
             $server = '';
             try {
                 [$tiles, $pending] = $this->statusTiles();
-                if ($tiles !== '') $server = '<section class="card"><h2>Server-Zustand</h2><div class="tiles">' . $tiles . '</div></section>';
+                if ($tiles !== '') $server = '<section class="card" id="server-zustand"><h2>Server-Zustand</h2>' . $tiles . '</section>';
             } catch (\Throwable) { /* ohne Werte keine Karte */ }
             $setup = '';
             try {
@@ -687,37 +738,63 @@ final class Web {
             . ($percent !== null ? '<progress class="progress" value="' . $percent . '" max="100" aria-label="' . V::h($label) . '">' . $percent . ' %</progress>' : '') . '</div>' . $extra . '</div>';
     }
 
+    /** Festplatte als breite Kachel: Balken für heute und – schraffiert – für die Hochrechnung in einem Jahr (Verlauf wird einmal je Tag gemerkt). */
+    private function diskTile(float $frei, float $gesamt): string {
+        $belegt = $gesamt - $frei;
+        $used = (int)round(100 * $belegt / $gesamt);
+        $prog = null;
+        try {
+            $alt = json_decode((string)$this->db->setting('system.verlauf'), true);
+            $punkte = SystemStatus::verlaufErgaenzen(is_array($alt) ? $alt : [], $belegt, time());
+            if ($punkte !== $alt) $this->db->store('system.verlauf', json_encode($punkte, JSON_THROW_ON_ERROR));
+            $prog = SystemStatus::prognose($punkte, $frei, time());
+        } catch (\Throwable) {
+        }
+        $zukunft = $prog !== null && $prog['pro_jahr'] > 0 ? min(100 - $used, (int)round(100 * $prog['pro_jahr'] / $gesamt)) : 0;
+        $level = $used >= 95 ? 'bad' : ($used >= 85 ? 'warn' : 'ok');
+        if ($prog === null) $text = 'Hochrechnung folgt: Der Zuwachs wird täglich gemessen und nach einigen Tagen berechnet.';
+        elseif ($prog['pro_jahr'] <= 0) $text = 'Kein Zuwachs messbar (Verlauf über ' . $prog['tage'] . ' Tage).';
+        else {
+            $rest = $prog['monate_rest'];
+            $text = 'Zuwachs etwa ' . SystemStatus::bytes($prog['pro_monat']) . ' pro Monat, gemessen über ' . $prog['tage'] . ' Tage. In 12 Monaten etwa ' . SystemStatus::bytes($belegt + $prog['pro_jahr']) . ' belegt'
+                . ($rest !== null && $rest < 120 ? ($rest >= 24 ? ', der Platz reicht noch rund ' . (int)round($rest / 12) . ' Jahre' : ', der Platz reicht noch rund ' . max(1, (int)round($rest)) . ' Monate') : '') . '.';
+        }
+        return '<div class="tile wide ' . $level . '"><span class="t-ico">' . V::icon('st:disk') . '</span><div class="t-body"><span class="t-label">Festplatte</span><strong class="t-val">' . $used . ' % belegt, ' . V::h(SystemStatus::bytes($frei)) . ' frei</strong>'
+            . '<div class="dbar" role="img" aria-label="Festplatte ' . $used . ' % belegt' . ($zukunft ? ', in 12 Monaten etwa ' . ($used + $zukunft) . ' %' : '') . '"><span class="dnow" data-breite="' . $used . '"></span>' . ($zukunft ? '<span class="dnext" data-links="' . $used . '" data-breite="' . $zukunft . '"></span>' : '') . '</div>'
+            . '<div class="dkey"><span>heute ' . V::h(SystemStatus::bytes($belegt)) . '</span>' . ($zukunft ? '<span>in 12 Monaten etwa ' . V::h(SystemStatus::bytes($belegt + $prog['pro_jahr'])) . ' (' . ($used + $zukunft) . ' %)</span>' : '') . '<span>' . V::h(SystemStatus::bytes($gesamt)) . '</span></div>'
+            . '<small class="muted">' . V::h($text) . '</small></div></div>';
+    }
+
     /** Kacheln für den Server-Zustand und ob gerade eine Abfrage läuft. @return array{0:string,1:bool} */
     private function statusTiles(): array {
         $sys = ($this->system ?? new SystemStatus())->read();
-        $t = '';
-        if ($sys['disk']) {
-            $used = (int)round(100 * (1 - $sys['disk']['frei'] / $sys['disk']['gesamt']));
-            $t .= $this->tile('st:disk', 'Speicherplatz', SystemStatus::bytes($sys['disk']['frei']) . ' frei', 'von ' . SystemStatus::bytes($sys['disk']['gesamt']) . ' (' . $used . ' % belegt)', $used >= 95 ? 'bad' : ($used >= 85 ? 'warn' : 'ok'), $used);
+        $grp = ['Server' => '', 'Betrieb' => '', 'Dienste' => ''];
+        $lvl = fn(int $u): string => $u >= 95 ? 'bad' : ($u >= 85 ? 'warn' : 'ok');
+        if ($sys['cpu']) {
+            $p = $sys['cpu']['prozent'];
+            $grp['Server'] .= $this->tile('st:cpu', 'Prozessor', $p . ' % ausgelastet', 'Last ' . number_format($sys['cpu']['last'], 2, ',', '') . ' bei ' . $sys['cpu']['kerne'] . ($sys['cpu']['kerne'] === 1 ? ' Kern' : ' Kernen') . ' (Minutenmittel)', $lvl($p), $p);
         }
         if ($sys['ram']) {
             $used = (int)round(100 * (1 - $sys['ram']['frei'] / $sys['ram']['gesamt']));
-            $t .= $this->tile('st:ram', 'Arbeitsspeicher', SystemStatus::bytes($sys['ram']['frei']) . ' frei', 'von ' . SystemStatus::bytes($sys['ram']['gesamt']) . ' (' . $used . ' % belegt)', $used >= 95 ? 'bad' : ($used >= 85 ? 'warn' : 'ok'), $used);
+            $grp['Server'] .= $this->tile('st:ram', 'Arbeitsspeicher', $used . ' % belegt', SystemStatus::bytes($sys['ram']['gesamt'] - $sys['ram']['frei']) . ' von ' . SystemStatus::bytes($sys['ram']['gesamt']) . ', ' . SystemStatus::bytes($sys['ram']['frei']) . ' verfügbar', $lvl($used), $used);
         }
-        if ($sys['cpu']) {
-            $p = $sys['cpu']['prozent'];
-            $t .= $this->tile('st:cpu', 'Prozessor', $p . ' % ausgelastet', 'Last ' . number_format($sys['cpu']['last'], 2, ',', '') . ' bei ' . $sys['cpu']['kerne'] . ($sys['cpu']['kerne'] === 1 ? ' Kern' : ' Kernen') . ' (Minutenmittel)', $p >= 95 ? 'bad' : ($p >= 80 ? 'warn' : 'ok'), $p);
-        }
-        if ($sys['temp'] !== null) $t .= $this->tile('st:temp', 'Temperatur', number_format($sys['temp'], 0, ',', '') . ' °C', 'höchster Messwert', $sys['temp'] >= 85 ? 'bad' : ($sys['temp'] >= 75 ? 'warn' : 'ok'));
-        if ($sys['laufzeit'] !== null) $t .= $this->tile('st:zeit', 'Läuft seit', SystemStatus::dauer($sys['laufzeit']), 'seit dem letzten Neustart');
-        if ($this->backup) {
+        if ($sys['disk']) $grp['Server'] .= $this->diskTile($sys['disk']['frei'], $sys['disk']['gesamt']);
+        if ($sys['temp'] !== null) $grp['Server'] .= $this->tile('st:temp', 'Temperatur', number_format($sys['temp'], 0, ',', '') . ' °C', 'höchster Messwert', $sys['temp'] >= 85 ? 'bad' : ($sys['temp'] >= 75 ? 'warn' : 'ok'));
+        if ($sys['laufzeit'] !== null) $grp['Betrieb'] .= $this->tile('st:zeit', 'Läuft seit', SystemStatus::dauer($sys['laufzeit']), 'seit dem letzten Neustart');
+        if ($this->backup) try {
             $b = $this->backup->status();
             $l = $b['letzte_sicherung'];
-            if (!$b['eingerichtet']) $t .= $this->tile('st:backup', 'Letzte Sicherung', 'nicht eingerichtet', 'Ohne Sicherung gehen Daten bei einem Ausfall verloren.', 'warn', null, '', '/verwaltung/sicherung');
-            elseif (!$l) $t .= $this->tile('st:backup', 'Letzte Sicherung', 'noch keine', 'Die erste Sicherung steht noch aus.', 'warn', null, '', '/verwaltung/sicherung');
+            if (!$b['eingerichtet']) $grp['Betrieb'] .= $this->tile('st:backup', 'Letzte Sicherung', 'nicht eingerichtet', 'Ohne Sicherung gehen Daten bei einem Ausfall verloren.', 'warn', null, '', '/verwaltung/sicherung');
+            elseif (!$l) $grp['Betrieb'] .= $this->tile('st:backup', 'Letzte Sicherung', 'noch keine', 'Die erste Sicherung steht noch aus.', 'warn', null, '', '/verwaltung/sicherung');
             else {
                 $alt = time() - (int)($l['zeit'] ?? 0);
                 $ok = ($l['ok'] ?? false) === true;
-                $t .= $this->tile('st:backup', 'Letzte Sicherung', V::date((int)($l['zeit'] ?? 0)), $ok ? ($alt > 3 * 86400 ? 'Älter als drei Tage' : 'in Ordnung') : 'Fehlgeschlagen', !$ok ? 'bad' : ($alt > 3 * 86400 ? 'warn' : 'ok'), null, '', '/verwaltung/sicherung');
+                $grp['Betrieb'] .= $this->tile('st:backup', 'Letzte Sicherung', V::date((int)($l['zeit'] ?? 0)), $ok ? ($alt > 3 * 86400 ? 'Älter als drei Tage' : 'in Ordnung') : 'Fehlgeschlagen', !$ok ? 'bad' : ($alt > 3 * 86400 ? 'warn' : 'ok'), null, '', '/verwaltung/sicherung');
             }
+        } catch (\Throwable) {
         }
         $pending = false;
-        if ($this->connections) {
+        if ($this->connections) try {
             $st = $this->connections->status();
             $pending = (bool)$st['pending'];
             foreach (['letterxpress' => ['st:post', 'Guthaben Letterxpress', 'Brief-Versand'], 'sms' => ['st:sms', 'Guthaben seven.io', 'SMS-Versand']] as $key => [$icon, $label, $sub]) {
@@ -726,11 +803,14 @@ final class Web {
                 $wert = is_array($g) && isset($g['wert']) && is_numeric($g['wert']) ? (float)$g['wert'] : null;
                 $knopf = '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'guthaben', 'id' => $key === 'sms' ? 'sms' : '', 'zurueck' => 'start'])
                     . '<button class="icon-btn" title="Guthaben jetzt abfragen" aria-label="' . V::h($label) . ' aktualisieren"' . ($pending ? ' disabled' : '') . '>' . V::icon('st:aktualisieren') . '</button></form>';
-                $t .= $this->tile($icon, $label, $wert !== null ? number_format($wert, 2, ',', '.') . ' €' : ($g ? 'unbekannt' : 'noch nicht abgefragt'),
+                $grp['Dienste'] .= $this->tile($icon, $label, $wert !== null ? number_format($wert, 2, ',', '.') . ' €' : ($g ? 'unbekannt' : 'noch nicht abgefragt'),
                     $pending ? 'wird abgefragt …' : ($g ? $sub . ', abgefragt ' . V::date((int)($g['zeit'] ?? 0)) : $sub . ': mit dem Pfeil abfragen'),
                     $wert !== null && $wert < 5 ? 'warn' : 'ok', null, $knopf);
             }
+        } catch (\Throwable) {
         }
+        $t = '';
+        foreach ($grp as $title => $tiles) if ($tiles !== '') $t .= '<h3 class="tiles-title">' . V::h($title) . '</h3><div class="tiles">' . $tiles . '</div>';
         return [$t, $pending];
     }
 
@@ -820,39 +900,63 @@ final class Web {
         $roles = $this->users->roles($uid);
         $chips = ((int)$user['admin'] === 1 ? '<span class="tag rollentag">' . V::role('Admin') . 'Basis-Admin</span>' : '')
             . implode('', array_map(fn($n) => '<span class="tag rollentag">' . V::role($n) . V::h($n) . '</span>', $roles));
-        $profil = '<div class="profil">' . V::avatar($user['display'] ?: $user['login'], $roles, (int)$user['admin'] === 1)
-            . '<div><strong>' . V::h($user['display'] ?: $user['login']) . '</strong><div class="muted small">' . V::h($user['login']) . ($mail !== '' ? ' · ' . V::h($mail) : '') . '</div>'
-            . ($chips !== '' ? '<div class="rollen-zeile">' . $chips . '</div>' : '<div class="muted small">Keine Gruppe zugewiesen</div>') . '</div></div>';
-        $body = V::error($error) . V::notice($notice) . $profil
-            . '<h2>E-Mail-Adresse</h2><p>Mit einer bestätigten Adresse kannst du dir auf der Anmeldeseite selbst einen Link zum Neusetzen des Passworts schicken lassen'
-            . ($this->users->needsOtp($user) ? ' (für Admin-Konten mit Authenticator-App gilt das nicht: sie werden an der Server-Konsole zurückgesetzt)' : '') . '.'
+        $name = (string)($user['display'] ?: $user['login']);
+        $needsOtp = $this->users->needsOtp($user);
+        $phone = $this->phoneOf($uid);
+        // Profil mit änderbarem Anzeigenamen (der Benutzername zum Anmelden bleibt)
+        $profil = '<section class="card konto"><div class="profil">' . V::avatar($name, $roles, (int)$user['admin'] === 1) . '<div class="profil-text">'
+            . '<details class="name-edit"><summary><strong class="name-anzeige">' . V::h($name) . '</strong><span class="stift" title="Namen ändern" role="img" aria-label="Namen ändern"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/></svg></span></summary>'
+            . '<form method="post" action="/konto/name" class="name-form">' . $csrf . '<label class="sr-only" for="k-name">Anzeigename</label>'
+            . '<input id="k-name" name="display" value="' . V::h((string)$user['display']) . '" maxlength="80" placeholder="' . V::h((string)$user['login']) . '" autocomplete="name"><button class="secondary">Speichern</button></form></details>'
+            . '<div class="muted small">Benutzername ' . V::h($user['login']) . ($mail !== '' ? ' · ' . V::h($mail) : '') . '</div>'
+            . ($chips !== '' ? '<div class="rollen-zeile">' . $chips . '</div>' : '<div class="muted small">Keine Gruppe zugewiesen</div>') . '</div>'
+            . '<form method="post" action="/abmelden" class="profil-abmelden">' . $csrf . '<button class="secondary">Abmelden</button></form></div></section>';
+        $fold = static fn(string $title, string $tag, string $inner, bool $open = false): string => '<details class="fold"' . ($open ? ' open' : '') . '><summary><h2>' . $title . '</h2>' . $tag . '</summary><div class="fold-body">' . $inner . '</div></details>';
+        $ok = static fn(bool $good, string $yes, string $no): string => '<span class="tag ' . ($good ? 'ok' : 'warn') . ' fold-status">' . V::h($good ? $yes : $no) . '</span>';
+        $folds = $fold('E-Mail-Adresse', $ok($mail !== '', 'bestätigt', $pending !== '' ? 'wartet auf Bestätigung' : 'nicht hinterlegt'),
+            '<p class="muted">Mit einer bestätigten Adresse kannst du dir auf der Anmeldeseite selbst einen Link zum Neusetzen des Passworts schicken lassen'
+            . ($needsOtp ? ' (für Admin-Konten mit Authenticator-App gilt das nicht: sie werden an der Server-Konsole zurückgesetzt)' : '') . '.'
             . ($this->mailReady() ? '' : ' <strong>Der E-Mail-Versand ist noch nicht eingerichtet</strong> (Verwaltung → Verbindungen).') . '</p>'
             . ($pending !== '' ? '<p class="notice">Wartet auf Bestätigung: ' . V::h($pending) . '. Den Code aus der E-Mail hier eingeben.</p><form method="post" action="/konto/email-code" class="box">' . $csrf
                 . V::input('code', 'Bestätigungscode (z. B. 1234-5678-9012-3456)', 'text', '', 'inputmode="numeric" autocomplete="one-time-code" maxlength="24" required placeholder="0000-0000-0000-0000"') . '<button>Code bestätigen</button></form>' : '')
             . '<form method="post" action="/konto/email" class="box">' . $csrf . V::input('email', 'E-Mail-Adresse (leer lassen zum Entfernen)', 'email', $mail !== '' ? $mail : $pending, 'maxlength="254" autocomplete="email" placeholder="name@praxis.de"')
-            . '<button>Bestätigungscode schicken</button></form>'
-            . '<h2>Passwort ändern</h2><form method="post" action="/konto/passwort" class="box">' . $csrf
+            . '<button>Bestätigungscode schicken</button></form>', $pending !== '');
+        $folds .= $fold('Passwort ändern', '', '<form method="post" action="/konto/passwort" class="box">' . $csrf
             . V::input('current', 'Bisheriges Passwort', 'password', '', 'autocomplete="current-password" required')
             . V::input('password', 'Neues Passwort', 'password', '', 'autocomplete="new-password" required')
             . V::input('password2', 'Neues Passwort wiederholen', 'password', '', 'autocomplete="new-password" required')
-            . '<button>Ändern</button></form>'
-            . ($this->users->needsOtp($user) ? '<h2>Handynummer für SMS-Code (Ersatz)</h2><p>Hast du die Authenticator-App nicht dabei, kann ein Code per SMS geschickt werden. Das geht nur, wenn unter Verwaltung → Verbindungen SMS eingerichtet ist.</p>'
-                . '<form method="post" action="/konto/telefon" class="box">' . $csrf . V::input('telefon', 'Handynummer (leer lassen zum Entfernen)', 'tel', $this->phoneOf($uid), 'maxlength="30" placeholder="01701234567" autocomplete="tel"')
-                . '<button>Speichern</button></form>' : '')
-            . '<h2>Authenticator-App</h2><p>' . ($otp ? 'Eingerichtet. Übrige Wiederherstellungscodes: ' . $this->users->recoveryLeft($uid) . '.' : 'Nicht eingerichtet' . ($this->users->needsOtp($user) ? ' (für Admins Pflicht).' : '.')) . '</p>'
+            . '<button>Ändern</button></form>');
+        if ($needsOtp) $folds .= $fold('Handynummer für SMS-Code (Ersatz)', $ok($phone !== '', 'hinterlegt', 'nicht hinterlegt'),
+            '<p class="muted">Hast du die Authenticator-App nicht dabei, kann ein Code per SMS geschickt werden. Das geht nur, wenn unter Verwaltung → Verbindungen SMS eingerichtet ist.</p>'
+            . '<form method="post" action="/konto/telefon" class="box">' . $csrf . V::input('telefon', 'Handynummer (leer lassen zum Entfernen)', 'tel', $phone, 'maxlength="30" placeholder="01701234567" autocomplete="tel"')
+            . '<button>Speichern</button></form>');
+        $folds .= $fold('Authenticator-App', $ok($otp, 'eingerichtet', 'nicht eingerichtet'),
+            '<p>' . ($otp ? 'Eingerichtet. Übrige Wiederherstellungscodes: ' . $this->users->recoveryLeft($uid) . '.' : 'Nicht eingerichtet' . ($needsOtp ? ' (für Admins Pflicht).' : '.')) . '</p>'
             . '<p><a class="button" href="/konto/otp">' . ($otp ? 'Neu einrichten' : 'Einrichten') . '</a></p>'
-            . ($otp ? '<form method="post" action="/konto/codes">' . $csrf . '<button>Neue Wiederherstellungscodes erzeugen</button></form>' : '') . ''
-            . ($this->passkeys ? '<h2>Passkeys</h2><p>Anmelden ohne Passwort mit Fingerabdruck, Gesicht oder PIN des Geräts. Funktioniert nur unter der Adresse <code>'
-                . V::h($this->passkeys->origin()) . '</code>.' . ($this->users->needsOtp($user) ? ' Die Authenticator-App bleibt als Rückfall nötig.' : '') . '</p>'
-                . ($keys !== '' ? '<table><tr><th>Passkey</th><th>Zuletzt</th><th></th></tr>' . $keys . '</table>' : '<p>Noch kein Passkey.</p>')
-                . '<div class="box" data-passkey-register data-csrf="' . V::h($this->session['csrf']) . '">' . V::input('label', 'Bezeichnung', 'text', '', 'maxlength="60" placeholder="z. B. Laptop Empfang"')
-                . '<button type="button">Passkey hinzufügen</button><p class="error" hidden></p></div>' : '')
-            . '<h2>Gemerkte Geräte</h2>' . ($devices !== '' ? '<table><tr><th>Gerät</th><th>Zuletzt</th><th></th></tr>' . $devices . '</table>'
-                . '<form method="post" action="/konto/geraete">' . $csrf . '<input type="hidden" name="id" value="all"><button class="link">Alle abmelden</button></form>' : '<p>Keine.</p>') . '';
-        V::$status = ['E-Mail-Adresse' => [$mail !== '', 'bestätigt', $pending !== '' ? 'wartet auf Bestätigung' : 'nicht hinterlegt'], 'Authenticator-App' => [$otp, 'eingerichtet', 'nicht eingerichtet'], 'Passkeys' => [$keys !== '', 'eingerichtet', 'nicht eingerichtet'],
-            'Handynummer für SMS-Code (Ersatz)' => [$this->phoneOf($uid) !== '', 'hinterlegt', 'nicht hinterlegt'],
-            'Gemerkte Geräte' => [$devices !== '', 'vorhanden', 'keine']];
+            . ($otp ? '<form method="post" action="/konto/codes">' . $csrf . '<button class="secondary">Neue Wiederherstellungscodes erzeugen</button></form>' : ''));
+        if ($this->passkeys) $folds .= $fold('Passkeys', $ok($keys !== '', 'eingerichtet', 'nicht eingerichtet'),
+            '<p class="muted">Anmelden ohne Passwort mit Fingerabdruck, Gesicht oder PIN des Geräts. Funktioniert nur unter der Adresse <code>' . V::h($this->passkeys->origin()) . '</code>.'
+            . ($needsOtp ? ' Die Authenticator-App bleibt als Rückfall nötig.' : '') . '</p>'
+            . ($keys !== '' ? '<table><tr><th>Passkey</th><th>Zuletzt</th><th></th></tr>' . $keys . '</table>' : '<p>Noch kein Passkey.</p>')
+            . '<div class="box" data-passkey-register data-csrf="' . V::h($this->session['csrf']) . '">' . V::input('label', 'Bezeichnung', 'text', '', 'maxlength="60" placeholder="z. B. Laptop Empfang"')
+            . '<button type="button">Passkey hinzufügen</button><p class="error" hidden></p></div>');
+        $folds .= $fold('Gemerkte Geräte', '<span class="tag fold-status">' . ($devices !== '' ? count($this->auth->devices($uid, $this->token)) : 0) . '</span>',
+            $devices !== '' ? '<table><tr><th>Gerät</th><th>Zuletzt</th><th></th></tr>' . $devices . '</table><form method="post" action="/konto/geraete">' . $csrf . '<input type="hidden" name="id" value="all"><button class="link">Alle abmelden</button></form>' : '<p>Keine.</p>');
+        $body = V::error($error) . V::notice($notice) . $profil . '<section class="card konto">' . $folds . '</section>';
+        V::$status = [];
         return Response::html(V::page('Mein Konto', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+    }
+
+    private function saveName(Request $r): Response {
+        $uid = (int)$this->session['user_id'];
+        $user = $this->users->find($uid);
+        try {
+            $this->users->rename($uid, $r->field('display', 120));
+        } catch (Problem $e) {
+            return $this->account($e->getMessage());
+        }
+        $this->audit->write($user['login'], 'name-geaendert');
+        return $this->account(null, 'Name gespeichert.');
     }
 
     private function savePhone(Request $r): Response {
@@ -1041,13 +1145,13 @@ final class Web {
             $roles = $u['admin'] ? ['Basis-Admin'] : [];
             foreach ($u['access'] as $m => $a) $roles[] = $this->modules->name($m) . ($a['admin'] ? ' (Admin)' : '');
             $icons = ($u['admin'] ? V::role('Admin') : '') . implode('', array_map([V::class, 'role'], $u['roles']));
-            $rows .= '<tr><td>' . V::avatar($u['display'] ?: $u['login'], $u['roles'], (bool)$u['admin'], true) . ' <a href="/verwaltung/benutzer/' . $u['id'] . '">' . V::h($u['login']) . '</a></td><td>' . V::h($u['display']) . '</td><td>' . $icons . ' ' . V::h(implode(', ', $roles) ?: '–')
+            $rows .= '<tr><td class="nowrap">' . V::avatar($u['display'] ?: $u['login'], $u['roles'], (bool)$u['admin'], true) . ' <a href="/verwaltung/benutzer/' . $u['id'] . '">' . V::h($u['login']) . '</a></td><td class="nowrap">' . V::h($u['display']) . '</td><td>' . $icons . ' ' . V::h(implode(', ', $roles) ?: '–')
                 . '</td><td>' . ($u['active'] ? ($u['password'] ? ($u['otp'] ? 'Passwort + App' : 'Passwort') : 'Einrichtung offen') : 'gesperrt') . '</td></tr>';
         }
         $groups = self::stripCards(self::inner($this->groupsPage()));
         return Response::html(V::page('Benutzer und Gruppen', V::notice($notice) . '<section class="card"><details class="fold" open><summary><h2>Benutzer</h2></summary>'
             . '<p><a class="button" href="/verwaltung/benutzer/neu">Benutzer anlegen</a></p>'
-            . '<table><tr><th>Anmeldename</th><th>Name</th><th>Zugang</th><th>Anmeldung</th></tr>' . $rows . '</table></details>'
+            . '<table class="user-table"><tr><th>Anmeldename</th><th>Name</th><th>Zugang</th><th>Anmeldung</th></tr>' . $rows . '</table></details>'
             . '<details class="fold" id="gruppen"' . (str_contains((string)($this->req?->query['bereich'] ?? ''), 'gruppen') ? ' open' : '') . '><summary><h2>Gruppen</h2></summary>' . $groups . '</details></section>',
             $this->nav(), $this->config->practice));
     }
@@ -1390,8 +1494,9 @@ final class Web {
         $actions = ['installieren' => 'Installation', 'aktualisieren' => 'Aktualisierung', 'entfernen' => 'Entfernen'];
         $body = V::error($error);
         if ($busy) {
-            $body .= '<p class="notice">' . ($st['running'] ? V::h(($actions[$st['running']['action']] ?? 'Vorgang') . ' von „' . $st['running']['id'] . '“ läuft …')
-                : 'Auftrag wird übernommen …') . ' Das kann einige Minuten dauern (Pakete werden geladen). Die Seite aktualisiert sich selbst.</p>';
+            $what = $st['running'] ? V::h(($actions[$st['running']['action']] ?? 'Vorgang') . ' von „' . $st['running']['id'] . '“ läuft …') : 'Auftrag wird übernommen …';
+            $body .= '<div class="working" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><div><strong>' . $what . '</strong>'
+                . '<p>Das kann einige Minuten dauern (Pakete werden geladen). Danach werden die Dienste des Moduls automatisch neu gestartet. Bitte nichts anderes anklicken; die Seite lädt sich selbst neu.</p></div></div>';
         } elseif ($st['last']) {
             $body .= $st['last']['ok'] ? V::notice($st['last']['message']) : V::error('Nicht erfolgreich: ' . $st['last']['message']);
         }
@@ -1412,22 +1517,32 @@ final class Web {
                 $stopped = !$all && !$unknown;
                 $state = $unknown ? '<span class="tag">Status unbekannt</span>' : ($all ? '<span class="tag ok">✓ läuft</span>' : '<span class="tag warn">' . ($active === 0 ? 'gestoppt' : 'teilweise gestoppt') . '</span>');
             }
+            $menuItem = fn(string $aktion, string $label, string $icon) => '<form method="post" action="/verwaltung/module">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="' . $aktion . '">'
+                . '<button class="mod-item"' . $off . '>' . V::icon($icon) . ' ' . $label . '</button></form>';
             $more = '<details class="mod-more"><summary class="icon-btn" title="Mehr" aria-label="Mehr zu ' . V::h($m['name']) . '">' . V::icon('st:mehr') . '</summary><div class="mod-menu">'
                 . ($m['dienste'] ? '<small class="muted">Dienste: ' . V::h(implode(', ', array_map(fn($d) => preg_replace('/^kienzle-|\.service$/', '', $d['name']) . ($d['aktiv'] === true ? ' ✓' : ($d['aktiv'] === false ? ' ✗' : ' ?')), $m['dienste']))) . '</small>' : '')
-                . ($stopped ? $post('dienst-start', 'Starten', $hidden) : '')
-                . ($m['dienste'] ? $post('dienst-neustart', 'Neu starten', $hidden, 'secondary') : '')
-                . (!$m['update'] ? $post('pruefen', 'Nach Update suchen', '', 'secondary') : '')
+                . ($stopped ? $menuItem('dienst-start', 'Starten', 'st:start') : '')
+                . ($m['dienste'] ? $menuItem('dienst-neustart', 'Neu starten', 'st:neustart') : '')
+                . '<details class="mod-del"><summary class="mod-item danger-text">' . V::icon('st:papierkorb') . ' Entfernen …</summary>'
                 . '<form method="post" action="/verwaltung/module" class="mod-remove">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="entfernen">'
+                . '<small><strong>' . V::h($m['name']) . ' entfernen.</strong> Ohne Häkchen bleiben die Daten erhalten; eine spätere Installation übernimmt sie.</small>'
                 . '<label class="check"><input type="checkbox" name="daten" value="1"> Auch alle Daten löschen (nicht rückgängig zu machen)</label>'
-                . '<small class="muted">Ohne Häkchen bleiben die Daten erhalten; eine spätere Installation übernimmt sie.</small><button class="danger"' . $off . '>' . V::icon('st:papierkorb') . ' Modul entfernen</button></form></div></details>';
-            $upd = $m['update'] ? '<span class="tag warn">Update ' . V::h($m['update']['version']) . '</span>' : '<span class="tag">aktuell</span>';
-            $tiles .= '<div class="mod-tile"><div class="mod-head"><span class="t-ico">' . V::icon('modul:' . $m['id']) . '</span>' . $state . '</div>'
+                . '<label class="muted">Zur Bestätigung den Namen „' . V::h($m['name']) . '“ eintippen<input name="bestaetigung" autocomplete="off" required maxlength="80" placeholder="' . V::h($m['name']) . '"></label>'
+                . '<button class="danger"' . $off . '>' . V::icon('st:papierkorb') . ' Modul entfernen</button></form></details></div></details>';
+            $formUpd = fn(string $aktion, string $label, string $class, string $icon, string $title = '') => '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="' . $aktion . '">'
+                . '<button class="' . $class . '" title="' . V::h($title ?: strip_tags($label)) . '"' . $off . '>' . V::icon($icon) . ($label !== '' ? ' ' . $label : '') . '</button></form>';
+            // Ein rundes Pfeil-Symbol für beides: Update einspielen (wenn eins da ist) oder nach einem Update suchen.
+            $upd = $m['update']
+                ? '<div class="mod-upd">' . $formUpd('aktualisieren', 'Auf ' . V::h($m['update']['version']) . ' aktualisieren', 'upd-pill', 'st:aktualisieren', 'Update auf ' . $m['update']['version'] . ' installieren') . '</div>'
+                : '<div class="mod-upd"><span class="tag">aktuell</span>' . $formUpd('pruefen', '', 'icon-btn round', 'st:aktualisieren', 'Nach Update suchen') . '</div>';
+            $logo = $m['path'] ? '<a class="t-ico mod-open" href="' . V::h($m['path']) . '/" title="' . V::h($m['name']) . ' öffnen" aria-label="' . V::h($m['name']) . ' öffnen">' . V::icon('modul:' . $m['id']) . '<span class="go">' . V::icon('st:oeffnen') . '</span></a>'
+                : '<span class="t-ico">' . V::icon('modul:' . $m['id']) . '</span>';
+            $tiles .= '<div class="mod-tile"><div class="mod-head">' . $logo . $state . '</div>'
                 . '<p class="mod-name">' . V::h($m['name']) . '</p><p class="muted mod-sub">Version ' . V::h($m['version']) . '</p>' . ($m['description'] !== '' ? '<p class="muted mod-desc">' . V::h($m['description']) . '</p>' : '')
                 . $upd
                 . ($m['update'] ? '<p class="muted mod-desc">Neue Version <strong>' . V::h($m['update']['version']) . '</strong>' . ($m['update']['source'] === 'github' ? ' (GitHub' . ($m['update']['signed'] === false ? ', nicht signiert' : '') . ')' : ' (mit der Basis geliefert)')
-                    . '. Vorher wird ein Schnappschuss der Moduldaten angelegt; schlägt etwas fehl, springt das Modul zurück.</p>'
-                    . '<form method="post" action="/verwaltung/module">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="aktualisieren"><button' . $off . '>Aktualisieren</button></form>' : '')
-                . '<div class="mod-foot">' . ($m['path'] ? '<a class="button secondary" href="' . V::h($m['path']) . '/">Öffnen</a>' : '') . $more . '</div></div>';
+                    . '. Vorher wird ein Schnappschuss der Moduldaten angelegt; schlägt etwas fehl, springt das Modul zurück.</p>' : '')
+                . '<div class="mod-foot">' . $more . '</div></div>';
         }
         foreach ($st['available'] as $m) {
             $tiles .= '<div class="mod-tile available"><div class="mod-head"><span class="t-ico">' . V::icon('modul:' . $m['id']) . '</span><span class="tag">verfügbar</span></div>'
@@ -1437,7 +1552,20 @@ final class Web {
                 . '<div class="mod-foot"><form method="post" action="/verwaltung/module">' . $csrf . '<input type="hidden" name="aktion" value="installieren"><input type="hidden" name="id" value="' . V::h($m['id']) . '">'
                 . '<button' . $off . '>' . V::icon('st:herunter') . ' Installieren</button></form></div></div>';
         }
-        $body .= '<h2>Module</h2>' . ($tiles !== '' ? '<div class="mod-grid">' . $tiles . '</div>' : '<p>Noch keine Module installiert, und es sind keine weiteren verfügbar.</p>');
+        // Erklärung zum blauen Punkt: offene Einrichtungspunkte, die hier (oder bei einem Modul) zu erledigen sind.
+        $hinweise = '';
+        if ($this->overview) {
+            $here = array_filter($this->overview->core(), fn($i) => Overview::needed($i) && strtok($i['link'], '?#') === '/verwaltung/module');
+            if ($here) $hinweise .= '<p class="notice">Hier noch offen: ' . V::h(implode('; ', array_map(fn($i) => $i['title'], $here))) . ' – <a href="/verwaltung/einrichtung">Einrichtung</a>.</p>';
+            foreach ($this->overview->modules() as $om) {
+                $need = array_filter($om['items'], fn($i) => Overview::needed($i));
+                if (!$need) continue;
+                $u = $this->modules->settingsUrl($om['id']);
+                $hinweise .= '<p class="notice"><span class="todo-dot" aria-hidden="true"></span> ' . V::h($om['name']) . ': noch ' . count($need) . ' Einrichtungspunkt' . (count($need) === 1 ? '' : 'e') . ' offen'
+                    . ($u !== null ? ' – <a href="' . V::h($u) . '">Einstellungen öffnen</a>' : '') . '.</p>';
+            }
+        }
+        $body .= $hinweise . '<h2>Module</h2>' . ($tiles !== '' ? '<div class="mod-grid">' . $tiles . '</div>' : '<p>Noch keine Module installiert, und es sind keine weiteren verfügbar.</p>');
         $body .= '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="status"><button class="secondary"' . $off . '>Status der Dienste aktualisieren</button></form> '
             . '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="pruefen"><button class="secondary"' . $off . '>Nach Modulen sehen</button></form> '
             . '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="automatisch"><input type="hidden" name="an" value="' . ($st['auto'] ? '0' : '1') . '">'
@@ -1461,6 +1589,9 @@ final class Web {
                 case 'installieren': $store->install($id); $this->db->store('erstadmin:' . $id, (string)(int)$this->session['user_id']); $this->audit->write($admin, 'modul-installieren', $id); break;
                 case 'aktualisieren': $store->update($id); $this->audit->write($admin, 'modul-aktualisieren', $id); break;
                 case 'entfernen':
+                    $name = '';
+                    foreach ($store->status()['installed'] as $m) if ($m['id'] === $id) $name = (string)$m['name'];
+                    if ($name === '' || mb_strtolower(trim($r->field('bestaetigung', 80))) !== mb_strtolower($name)) throw new Problem('Zum Entfernen bitte den Namen des Moduls („' . ($name !== '' ? $name : $id) . '“) zur Bestätigung eintippen.', 422);
                     $data = $r->field('daten', 1) === '1';
                     $store->remove($id, $data);
                     $this->audit->write($admin, 'modul-entfernen', $id . ($data ? ' samt-daten' : ''));
@@ -1834,9 +1965,33 @@ final class Web {
         return $this->printers;
     }
 
-    private function shareBoxes(array $share): string {
-        return V::checkbox('samba', '1', 'für Windows freigeben (Samba)', in_array('samba', $share, true))
-            . V::checkbox('ipp', '1', 'für macOS und andere freigeben (IPP)', in_array('ipp', $share, true));
+    private const SAMBA_HINT = 'Alte Windows-Freigabe (Samba, Port 445). Standardmäßig aus und von neuem Windows (ab 11 24H2) nicht mehr unterstützt. IPP ist bereits für alle virtuellen Drucker freigegeben und der Standardweg für alle Betriebssysteme.';
+
+    /** Name oder Adresse, unter der die Arbeitsplätze den Server erreichen (für die IPP-Adresse der virtuellen Drucker). */
+    private function printerHost(): string {
+        $host = strtolower((string)preg_replace('/:\d+$/', '', (string)($_SERVER['HTTP_HOST'] ?? 'server')));
+        return $this->config->ownHost($host) ? $host : 'server';
+    }
+
+    /** Karte eines virtuellen Druckers: IPP-Adresse zum Kopieren, IPP immer an, Samba als Schalter (speichert sofort), Testseite. */
+    /** Ein Satz, was der virtuelle Drucker macht (Beschriftung aus module.toml). */
+    private function printerPurpose(array $q): string {
+        foreach ((array)($this->modules->all()[$q['modul']]['printers'] ?? []) as $p) if (($p['name'] ?? '') === $q['name']) return (string)($p['label'] ?? '');
+        return '';
+    }
+
+    private function virtualPrinterCard(array $q, string $host, string $dis): string {
+        $url = 'http://' . $host . ':631/printers/' . rawurlencode((string)$q['name']);
+        $samba = in_array('samba', $q['share'], true);
+        return '<div class="vp-karte"><div class="vp-kopf"><strong>' . V::h($q['name']) . '</strong> <span class="tag ' . ($q['state'] === 'bereit' || $q['state'] === 'idle' ? 'ok' : 'warn') . '">' . V::h($q['state']) . '</span>'
+            . '<span class="muted small vp-modul">Modul ' . V::h($this->modules->name($q['modul'])) . '</span></div>'
+            . ($this->printerPurpose($q) !== '' ? '<p class="vp-zweck">' . V::h($this->printerPurpose($q)) . '</p>' : '')
+            . '<div class="vp-adresse"><code>' . V::h($url) . '</code><button type="button" class="link" data-copy="' . V::h($url) . '" title="Adresse kopieren">Kopieren</button></div>'
+            . '<div class="vp-fuss"><span class="muted small">Freigabe per IPP: immer an</span>'
+            . '<form method="post" action="/verwaltung/drucker" class="inline vp-samba" data-auto>' . $this->hidden('freigabe', ['name' => $q['name']]) . '<input type="hidden" name="ipp" value="1">'
+            . '<label><input type="checkbox" name="samba" value="1"' . ($samba ? ' checked' : '') . $dis . '> Windows-Freigabe (Samba, alt)</label>'
+            . '<span class="hilfe" tabindex="0" role="note" aria-label="' . V::h(self::SAMBA_HINT) . '" data-tip="' . V::h(self::SAMBA_HINT) . '">i</span><noscript><button' . $dis . '>Speichern</button></noscript></form>'
+            . '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('testseite', ['name' => $q['name']]) . '<button class="secondary"' . $dis . '>Testseite</button></form></div></div>';
     }
 
     public const PRINTER_ROLES = ['buero' => 'Praxisdrucker (A4, Rechnungen)', 'bon' => 'Bondrucker (Belege)'];
@@ -1860,26 +2015,22 @@ final class Web {
         $body = V::error($error) . ($st['last'] ? '<p class="' . (($st['last']['ok'] ?? false) ? 'notice' : 'error') . '">' . V::h((string)($st['last']['meldung'] ?? '')) . '</p>' : '')
             . ($busy ? '<p class="notice">Vorgang läuft …</p>' : '') . ($st['error'] !== '' ? '<p class="error">' . V::h($st['error']) . '</p>' : '')
             . (!$st['service'] ? '<p class="error">Der Druckerdienst ist nicht eingerichtet. Bitte den Installer ausführen.</p>' : '')
-            . '<p>Drucker werden einmal hier eingerichtet; alle Module können sie nutzen. Echte Drucker brauchen keine Freigabe. Die Freigabe der virtuellen Drucker wirkt erst, '
-            . 'wenn die <a href="/verwaltung/firewall">Firewall</a> Drucken (IPP 631 bzw. Windows-Freigabe 445) aus den Praxisnetzen zulässt.</p>';
+            . '<p>Drucker werden einmal hier eingerichtet; alle Module können sie nutzen. Echte Drucker brauchen keine Freigabe. Virtuelle Drucker sind immer per IPP freigegeben; das wirkt erst, '
+            . 'wenn die <a href="/verwaltung/firewall">Firewall</a> Drucken (IPP, Port 631) aus den Praxisnetzen zulässt.</p>';
         $rows = $virtualRows = '';
+        $host = $this->printerHost();
         foreach ($st['queues'] as $q) {
+            if ($q['modul'] !== '') { $virtualRows .= $this->virtualPrinterCard($q, $host, $dis); continue; }
             $actions = '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('testseite', ['name' => $q['name']]) . '<button' . $dis . '>Testseite</button></form> ';
-            if ($q['managed']) {
-                // Freigaben gibt es nur für die virtuellen Drucker der Module: Die Arbeitsplätze drucken dorthin, echte Drucker braucht kein Arbeitsplatz direkt.
-                if ($q['modul'] !== '') $actions .= '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('freigabe', ['name' => $q['name']]) . $this->shareBoxes($q['share'])
-                    . '<button' . $dis . '>Freigabe speichern</button></form> ';
-                if ($q['modul'] === '') $actions .= '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('entfernen', ['name' => $q['name']])
-                    . '<button class="danger"' . $dis . '>Entfernen</button></form>';
-            }
-            $row = '<tr><td><strong>' . V::h($q['name']) . '</strong><br><small>' . V::h($q['description']) . '</small></td><td>' . V::h($q['address']) . '</td><td>'
-                . V::h($q['state']) . '</td><td>' . ($q['modul'] !== '' ? 'Modul ' . V::h($this->modules->name($q['modul'])) : ($q['managed'] ? 'Suite' : 'fremd')) . '</td><td>' . $actions . '</td></tr>';
-            if ($q['modul'] !== '') $virtualRows .= $row; else $rows .= $row;
+            if ($q['managed']) $actions .= '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('entfernen', ['name' => $q['name']])
+                . '<button class="danger"' . $dis . '>Entfernen</button></form>';
+            $rows .= '<tr><td><strong>' . V::h($q['name']) . '</strong><br><small>' . V::h($q['description']) . '</small></td><td>' . V::h($q['address']) . '</td><td>'
+                . V::h($q['state']) . '</td><td>' . ($q['managed'] ? 'Suite' : 'fremd') . '</td><td>' . $actions . '</td></tr>';
         }
         $head = '<table><tr><th>Name</th><th>Adresse</th><th>Zustand</th><th>Von</th><th></th></tr>';
         $body .= '<h2>Drucker</h2><p class="muted">Echte Drucker und Bondrucker, die in der Praxis stehen.</p>' . ($rows !== '' ? $head . $rows . '</table>' : '<p>Noch keine.</p>')
-            . '<h2>Virtuelle Drucker</h2><p class="muted">Legen Module an (z. B. „SumUp-Rechnung“, „Terminzettel“): In T2med oder anderen Programmen drucken, das Modul verarbeitet den Auftrag. Sie werden nicht von Hand angelegt.</p>'
-            . ($virtualRows !== '' ? $head . $virtualRows . '</table>' : '<p>Noch keine.</p>')
+            . '<h2>Virtuelle Drucker</h2><p class="muted">Legen Module an (z. B. „vKasse“, „vTermine“): In T2med oder anderen Programmen drucken, das Modul verarbeitet den Auftrag. Sie werden nicht von Hand angelegt.</p>'
+            . ($virtualRows !== '' ? '<div class="vp-liste">' . $virtualRows . '</div>' : '<p>Noch keine.</p>')
             . $this->virtualPrinterHelp($st['queues'])
             . '<form method="post" action="/verwaltung/drucker">' . $this->hidden('abgleichen') . '<button' . $dis . '>Virtuelle Drucker der Module abgleichen</button></form>';
         $roles = $this->printerRoles();
@@ -1930,28 +2081,32 @@ final class Web {
     }
 
     /** Aufklappbare Anleitung: virtuelle Drucker der Module an den Arbeitsplätzen einrichten (Windows, Mac, T2med), im Format der Kasse. */
-    private function virtualPrinterHelp(array $queues): string {
-        $host = strtolower((string)preg_replace('/:\d+$/', '', (string)($_SERVER['HTTP_HOST'] ?? 'server')));
-        if (!$this->config->ownHost($host)) $host = 'server';
-        $ppd = ['terminzettel' => '/terminzettel/assets/Terminzettel-PDF.ppd', 'sumup' => '/kasse/assets/SumUp-Rechnung-PDF.ppd'];
+    private function virtualPrinterHelp(array $queues, bool $inline = false): string {
+        $host = $this->printerHost();
+        $ppd = ['vTermine' => '/terminzettel/assets/vTermine-PDF.ppd', 'vKasse' => '/kasse/assets/vKasse-PDF.ppd', 'vBriefversand' => '/kasse/assets/vBriefversand-PDF.ppd'];
         $blocks = '';
         foreach ($queues as $q) {
             if ($q['modul'] === '') continue;
             $name = (string)$q['name'];
             $url = 'http://' . $host . ':631/printers/' . rawurlencode($name);
             $paper = preg_match('/terminzettel/i', $name) ? 'A6' : 'A4';
-            $script = "Enable-WindowsOptionalFeature -Online -FeatureName Printing-Foundation-InternetPrinting-Client -NoRestart | Out-Null\n"
+            $script = "# Windows-Funktion fürs Drucken über IPP einschalten; nach dem ersten Einschalten kann ein Neustart von Windows nötig sein\n"
+                . "\$f = Enable-WindowsOptionalFeature -Online -FeatureName Printing-Foundation-InternetPrinting-Client -NoRestart\n"
+                . "if (\$f.RestartNeeded) { Write-Warning 'Windows bitte neu starten und dieses Skript danach noch einmal ausführen.' }\n"
+                . "# Ist der Server im Netz erreichbar (Name und Port 631)?\n"
+                . "if (-not (Test-NetConnection -ComputerName \"" . $host . "\" -Port 631 -InformationLevel Quiet)) { Write-Warning 'Server unter diesem Namen nicht erreichbar (Name oder Firewall, Port 631). Statt des Namens die IP-Adresse des Servers verwenden.' }\n"
                 . "# Druckspooler neu starten und auf den laufenden Dienst warten; alten Drucker entfernen (behebt „Das Handle ist ungültig“)\n"
                 . "Restart-Service Spooler -Force\n(Get-Service Spooler).WaitForStatus('Running', '00:00:30')\nStart-Sleep 3\n"
                 . "Get-Printer -Name \"" . $name . "\" -ErrorAction SilentlyContinue | Remove-Printer\n"
-                . "Add-PrinterDriver -Name \"Microsoft IPP Class Driver\"\n\$url = \"" . $url . "\"\n"
+                . "Add-PrinterDriver -Name \"Microsoft IPP Class Driver\"\n\$url = \"" . $url . "\"\n\$fehler = ''\n"
                 . "# Anschluss und Drucker anlegen, bis zu viermal (direkt nach dem Neustart des Spoolers ist der Anschluss manchmal noch nicht nutzbar)\n"
                 . "for (\$i = 1; \$i -le 4 -and -not (Get-Printer -Name \"" . $name . "\" -ErrorAction SilentlyContinue); \$i++) {\n"
-                . "  Add-PrinterPort -Name \$url -ErrorAction SilentlyContinue\n  Start-Sleep 3\n"
-                . "  Add-Printer -Name \"" . $name . "\" -DriverName \"Microsoft IPP Class Driver\" -PortName \$url -ErrorAction SilentlyContinue\n}\n"
-                . "Get-Printer -Name \"" . $name . "\" | Select-Object Name, DriverName, PortName"
+                . "  if (-not (Get-PrinterPort -Name \$url -ErrorAction SilentlyContinue)) { try { Add-PrinterPort -Name \$url -ErrorAction Stop } catch { \$fehler = \$_.Exception.Message } }\n  Start-Sleep 3\n"
+                . "  try { Add-Printer -Name \"" . $name . "\" -DriverName \"Microsoft IPP Class Driver\" -PortName \$url -ErrorAction Stop } catch { \$fehler = \$_.Exception.Message }\n}\n"
+                . "if (Get-Printer -Name \"" . $name . "\" -ErrorAction SilentlyContinue) { Get-Printer -Name \"" . $name . "\" | Select-Object Name, DriverName, PortName }\n"
+                . "else { Write-Warning ('Drucker nicht angelegt. Grund: ' + \$fehler) }"
                ;
-            $mac = isset($ppd[$q['modul']]) ? ' <a href="' . V::h($ppd[$q['modul']]) . '" download>PDF-Beschreibungsdatei (PPD) herunterladen</a>' : '';
+            $mac = isset($ppd[$name]) ? ' <a href="' . V::h($ppd[$name]) . '" download>PDF-Beschreibungsdatei (PPD) herunterladen</a>' : '';
             $blocks .= '<h3>Drucker „' . V::h($name) . '“</h3><ol>'
                 . '<li>Windows: Drucker hinzufügen → „Freigegebenen Drucker über den Namen auswählen“: <code>' . V::h($url) . '</code> – Treiber „Microsoft IPP Class Driver“, Papier ' . $paper . '. '
                 . 'Per IP-Adresse (z. B. aus dem VPN) statt des Namens: <code>http://&lt;IP-Adresse&gt;:631/printers/' . V::h(rawurlencode($name)) . '</code>.</li>'
@@ -1960,13 +2115,14 @@ final class Web {
                 . '<li>Mac: „' . V::h($name) . '“ hinzufügen, als Treiber die Datei wählen.' . $mac . '</li></ol>';
         }
         if ($blocks === '') return '';
-        return '<details class="box"><summary><strong>Anleitung: virtuelle Drucker an den Arbeitsplätzen einrichten</strong></summary>'
+        return ($inline ? '<div class="box">' : '<details class="box"><summary><strong>Anleitung: virtuelle Drucker an den Arbeitsplätzen einrichten</strong></summary>')
             . '<p>Nur die virtuellen Drucker der Module werden an den Arbeitsplätzen (T2med-PC) eingerichtet. Echte Drucker und der Bondrucker brauchen keine Freigabe und keine Einrichtung am Arbeitsplatz: die Module drucken von hier aus.</p>'
-            . '<p><strong>Voraussetzung:</strong> Haken bei „für Windows freigeben (Samba)“ bzw. „für macOS und andere freigeben (IPP)“ beim virtuellen Drucker und in der <a href="/verwaltung/firewall">Firewall</a> Drucken (IPP, Port 631) aus dem Praxisnetz erlauben. '
-            . 'Windows 11 Pro ab 24H2 lässt Gastzugriff auf Windows-Freigaben (Samba) nicht mehr zu: dort immer über IPP einrichten.</p>'
+            . '<p><strong>Voraussetzung:</strong> In der <a href="/verwaltung/firewall">Firewall</a> Drucken (IPP, Port 631) aus dem Praxisnetz erlauben. IPP ist bei jedem virtuellen Drucker immer freigegeben und der Standardweg für Windows, Mac und alle anderen. '
+            . 'Die Windows-Freigabe (Samba) ist optional und standardmäßig aus; neues Windows (ab 11 24H2) unterstützt sie nicht mehr.</p>'
             . $blocks
-            . '<h3>In T2med</h3><ul><li>„Terminzettel“: Einstellungen → Kalender → Terminliste (DIN A6), Drucker „Terminzettel“ wählen.</li>'
-            . '<li>„SumUp-Rechnung“: Rechnung aus T2med auf diesen Drucker drucken, sie erscheint danach beim Patienten in der Kasse.</li></ul></details>';
+            . '<h3>In T2med</h3><ul><li>„vTermine“: Einstellungen → Kalender → Terminliste (DIN A6), Drucker „vTermine“ wählen.</li>'
+            . '<li>„vKasse“: Rechnung aus T2med auf diesen Drucker drucken, sie erscheint danach beim Patienten in der Kasse.</li>'
+            . '<li>„vBriefversand“: Für den Sammelversand per Post in T2med vorübergehend den Rechnungsdrucker auf diesen Drucker umstellen; jede Rechnung geht sofort an Letterxpress.</li></ul>' . ($inline ? '</div>' : '</details>');
     }
 
     private function saveRoles(Request $r): void {
@@ -2044,7 +2200,8 @@ final class Web {
             . '<progress class="progress" value="' . $pct . '" max="100" aria-label="Fortschritt der Einrichtung">' . $pct . ' %</progress>'
             . ($again ? '<div class="notice warn"><p><strong>Der Servername wurde geändert.</strong> ' . $again . ' Punkt' . ($again === 1 ? '' : 'e') . ' unten stehen deshalb wieder rot und müssen erneut erledigt werden.</p></div>' : '')
             . '<p class="legend"><span class="lg done">✓ erledigt</span><span class="lg open">○ offen</span><span class="lg error">! Fehler oder erneut nötig</span><span class="lg info">i optional</span>'
-            . ' · Orte: ' . implode(', ', array_map(fn($p) => '<strong>' . V::h($p[0]) . '</strong> (' . V::h($p[1]) . ')', Overview::PLACES)) . '</p>';
+            . ' · Orte: ' . implode(', ', array_map(fn($p) => '<strong>' . V::h($p[0]) . '</strong> (' . V::h($p[1]) . ')', Overview::PLACES)) . '</p>'
+            . ($this->virtualPrinterHelp($this->printers ? $this->printers->status()['queues'] : [], true) !== '' ? '<p class="muted">Arbeitsplätze: Zertifikat, Name und die virtuellen Drucker der Module (für T2med) richtest du auf jedem PC nach <a href="/hilfe/arbeitsplatz#drucker">Arbeitsplatz einrichten</a> ein.</p>' : '');
         foreach (Overview::GROUPS as $gid => $glabel) {
             $part = array_values(array_filter($core, fn($i) => ($i['gruppe'] ?? 'betrieb') === $gid));
             if (!$part) continue;

@@ -75,6 +75,10 @@ final class T2medInvoice {
         }
         return '/(?:' . implode($glue, $parts) . ')/u';
     }
+    /** Beschriftungen eines Felds als fertige Ausdrücke (für die Nachbearbeitung abgelehnter Rechnungen). */
+    public static function labelPatterns(string $field, array $labels): array {
+        return array_map(fn($part) => '/' . $part . '/u', self::labelParts($field, $labels));
+    }
     /** Beschriftungen eines Felds einzeln (eingebaute und eigene), als Regex-Teile ohne Begrenzer. */
     private static function labelParts(string $field, array $labels): array {
         return explode("\x00", substr(self::labelRegex($field, $labels, "\x00"), 4, -3));
@@ -236,12 +240,12 @@ final class T2medInvoice {
         if (count($values) > 1) throw new Problem($label . ' der Rechnung ist nicht eindeutig (' . count($values) . ' verschiedene Werte).', 422);
         return $values[0];
     }
-    private static function cents(string $value): int {
+    public static function cents(string $value): int {
         if (!preg_match('/^(-?)(\d{1,3}(?:\.\d{3})*|\d+),(\d{2})$/D', $value, $m)) throw new Problem('Betrag der Rechnung ist nicht lesbar.', 422);
         $cents = (int)str_replace('.', '', $m[2]) * 100 + (int)$m[3];
         return $m[1] === '-' ? -$cents : $cents;
     }
-    private static function date(string $value): string {
+    public static function date(string $value): string {
         $d = \DateTimeImmutable::createFromFormat('!d.m.Y', $value);
         if (!$d || $d->format('d.m.Y') !== $value) throw new Problem('Datum der Rechnung ist ungültig.', 422);
         return $d->format('Y-m-d');

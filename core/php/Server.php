@@ -14,7 +14,7 @@ final class Server {
 
     public function status(): array {
         $s = json_decode((string)@file_get_contents(self::$state . '/status.json'), true);
-        return ['names' => $this->config->hostnames, 'practice' => $this->config->practice, 'last' => is_array($s['letzte'] ?? null) ? $s['letzte'] : null,
+        return ['names' => $this->config->hostnames, 'practice' => $this->config->practice, 'last' => is_array($s['letzte'] ?? null) ? View::frisch($s['letzte']) : null,
             'pending' => is_file($this->request()), 'service' => is_file(self::$unit)];
     }
 
