@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.63
+
+- **Starter nur noch an einer Stelle:** Die Hilfeseite „Arbeitsplätze“ und der Einrichtungs-Überblick verweisen auf die Seite „Starter“ (Verwaltung → Starter) statt auf das Paket der Kasse.
+- **Starter-Schlüssel erneuern mit Rückfrage:** Der Knopf steckt in einem eingeklappten Bereich „nur im Fehlerfall“, verlangt ein Häkchen und wird sonst vom Server abgelehnt.
+- **T2med-Aufruf der Kasse heißt jetzt `kienzle-kasse://`** (statt `kienzle-sumup://`). Die Adresse im T2med-Drittanbieter-Zugriff ändern und das Starter-Paket auf den Arbeitsplätzen neu ausführen. Nicht auf der VM geprüft.
+
 ## 0.21.4-beta.62
 
 - **Erklärvideo im Repository:** `docs/video/Kienzle-Suite-Ueberblick.mp4` (2:38 Minuten, ohne Ton, erfundene Daten), in der README verlinkt. Keine Änderung am Programm.

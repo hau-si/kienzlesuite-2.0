@@ -43,7 +43,7 @@ $r = $admin->get('/verwaltung/updates'); echo str_pad('updates', 14) . $r->statu
 // Arbeitsplatz-Starter: Startkontexte der Module (Kasse, Signatur) und ein Zertifikat der erfundenen Suite.
 $mods = [];
 foreach ($env->modules->all() as $id => $m) {
-    if ($id === 'kasse') $m['starters'] = [['schema' => 'kienzle-sumup', 'label' => 'Kasse']];
+    if ($id === 'kasse') $m['starters'] = [['schema' => 'kienzle-kasse', 'label' => 'Kasse']];
     $mods[] = $m;
 }
 foreach ([['terminzettel', 'Terminzettel', '/terminzettel', []], ['signatur', 'Signatur', '/signatur', [['schema' => 'kienzle-signatur', 'label' => 'Signatur']]]] as [$id, $name, $path, $starters]) {

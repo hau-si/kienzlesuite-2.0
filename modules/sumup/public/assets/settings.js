@@ -98,7 +98,6 @@ function render(data) {
   $('warning').hidden = !data.warning; $('warning').textContent = data.warning || '';
   renderInvoicePrinter(data.invoice_printer || {});
   renderLetterPrinter(data.letter_printer || {});
-  if (data.clients) renderClients(data.clients);
   const root = $('sections');
   document.querySelectorAll('[data-generated]').forEach(node => node.remove());
   for (const section of data.sections) {
@@ -306,10 +305,10 @@ function t2medSetupHelp() {
   const d = el('details', null, 'tz-how'); d.append(el('summary', 'In T2med einrichten: Button „Kartenzahlung“ in der Funktionsleiste'));
   const ol = el('ol');
   ol.append(el('li', 'In T2med in der Suche „Drittanbieter-Zugriffe verwalten“ öffnen (fehlt die Funktion, muss ein Admin sie für den Benutzer erst freischalten) und den Eintrag mit dem Stift bearbeiten.'));
-  const li = el('li', 'Als Adresse eintragen (genau so, mit den Platzhaltern) und eine Bezeichnung vergeben, z. B. „Kartenzahlung“:'); li.append(el('br'), el('code', 'kienzle-sumup://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}', 'code-copy')); ol.append(li);
+  const li = el('li', 'Als Adresse eintragen (genau so, mit den Platzhaltern) und eine Bezeichnung vergeben, z. B. „Kartenzahlung“:'); li.append(el('br'), el('code', 'kienzle-kasse://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}', 'code-copy')); ol.append(li);
   ol.append(el('li', 'Auf Plus klicken, oben rechts mit dem Häkchen speichern und in der Liste davor auf „aktualisieren“ (Pfeile) klicken.'));
   ol.append(el('li', 'Dann „Funktionsleisten verwalten“: Konfiguration anlegen oder bearbeiten (Name, Benutzer, Benutzergruppe, Station), „Aktion hinzufügen“, die Aktion unter der vergebenen Bezeichnung suchen, Farbe und Kürzel oder Icon wählen und bestätigen.'));
-  ol.append(el('li', 'Der Starter-Aufruf funktioniert erst, wenn auf dem Arbeitsplatz das Starter-Paket installiert ist (Karte „Arbeitsplätze einrichten“).'));
+  ol.append(el('li', 'Der Starter-Aufruf funktioniert erst, wenn auf dem Arbeitsplatz das Starter-Paket installiert ist (Suite: Verwaltung → Starter).'));
   ol.append(el('li', 'Die FHIR-Adresse, die T2med beim Aufruf mitgibt, muss in der Suite unter Verwaltung → Verbindungen → T2med bei „Erlaubte fhirBasisUrl aus T2med“ stehen (die Adresse des FHIR-Servers gilt immer als erlaubt). Bei einer Fehlermeldung zeigt die Seite die tatsächlichen Werte.'));
   const guide = el('li'); guide.append('Mit Bildern: ', el('a', 'Anleitung „T2med einrichten“', null, {href: GUIDE_URL, target: '_blank', rel: 'noopener'})); ol.append(guide);
   d.append(ol); return d;
@@ -325,7 +324,8 @@ function renderChecklist(data) {
   const web = own.filter(i => i.ort === 'web'), pc = own.filter(i => i.ort === 'pc');
   const items = [
     ...web,
-    {ort: 'pc', info: true, label: 'Zertifikat der Suite einrichten (einmal je PC, siehe Arbeitsplatz einrichten der Suite)', card: 's-clients'},
+    {ort: 'pc', info: true, label: 'Zertifikat der Suite einrichten (einmal je PC, siehe Arbeitsplatz einrichten der Suite)', card: 's-clients', href: '/hilfe/arbeitsplatz', hrefLabel: 'Anleitung'},
+    {ort: 'pc', info: true, label: 'Starter auf den Kassen-PCs installieren (ein Paket für alle Module)', card: 's-clients', href: '/verwaltung/arbeitsplaetze', hrefLabel: 'Seite „Starter“ der Suite'},
     ...pc,
     ...(invoiceQueue ? [{ort: 'pc', info: true, label: 'Drucker „vKasse“ am Arbeitsplatz installieren (Windows: IPP-Drucker hinzufügen, Papier A4)', card: 'invoice-printer-help', detail: (data.invoice_printer && data.invoice_printer.url) || ''}] : []),
     ...(letterQueue ? [{ort: 'pc', info: true, label: 'Drucker „vBriefversand“ am Arbeitsplatz installieren (für den Sammelversand per Post; wie „vKasse“, Papier A4)', card: 'letter-printer-help', detail: (data.letter_printer && data.letter_printer.url) || ''}] : []),
@@ -393,31 +393,6 @@ function ippPowerShell(queue, url, ips, paper) {
 function ippIpNote(url, ips) {
   const byIp = ippByIp(url, ips);
   return byIp.length ? 'Per IP-Adresse (z. B. aus dem VPN): ' + byIp.map(i => i.url + ' (' + i.name + ')').join(' oder ') + '. ' : '';
-}
-
-const CLIENT_STEPS = {
-  windows: ['ZIP-Datei mit Rechtsklick → „Alle extrahieren …“ entpacken.', '„install-windows.cmd“ doppelklicken. Bei „Windows hat den PC geschützt“: „Weitere Informationen“ → „Trotzdem ausführen“.',
-    'Die Zertifikatswarnung mit „Ja“ bestätigen – das Fenster liegt manchmal hinter anderen Fenstern (Taskleiste prüfen).', 'Fertig, wenn „Kienzle-SumUp eingerichtet“ erscheint.'],
-  macos: ['ZIP-Datei doppelklicken.', '„install-macos.command“ mit Rechtsklick → „Öffnen“ starten.', 'Mac-Passwort für das Zertifikat eingeben.'],
-  linux: ['ZIP-Datei entpacken.', 'Im entpackten Ordner im Terminal: bash install-linux.sh', 'server.crt im Browser als vertrauenswürdig importieren.'],
-};
-function guessSystem() { const p = navigator.userAgent; return /Windows/.test(p) ? 'windows' : /Mac OS X|Macintosh/.test(p) ? 'macos' : /Linux|X11/.test(p) ? 'linux' : 'windows'; }
-function renderClients(clients) {
-  const box = $('client-downloads'); box.replaceChildren(); const steps = $('client-steps'); steps.replaceChildren();
-  const mine = guessSystem();
-  for (const c of clients || []) {
-    const link = el('a', 'Paket für ' + c.label + ' laden', c.id === mine ? 'button primary' : 'button secondary', {href: BASE + 'client-download.php?os=' + c.id, download: ''});
-    link.onclick = () => { renderSteps(c.id); message('Paket für ' + c.label + ' wird geladen. Anleitung steht unten und in LIESMICH.txt.'); };
-    box.append(link);
-  }
-  const t = tip({label: 'Arbeitsplätze', tip: 'Jeder Arbeitsplatz, an dem aus T2med kassiert wird, braucht den Starter einmal. Danach öffnet der Knopf in T2med die Kartenzahlung.' }); if (t) box.append(t);
-  renderSteps(mine);
-  function renderSteps(id) {
-    steps.replaceChildren(el('strong', 'So geht es unter ' + (clients.find(c => c.id === id) || {}).label + ':'));
-    const ol = el('ol'); for (const s of CLIENT_STEPS[id]) ol.append(el('li', s)); steps.append(ol);
-    const c = clients.find(x => x.id === id);
-    if (c && !c.bundled) steps.append(el('p', 'Hinweis: Der Server hat die Starterprogramme nicht vorrätig; der Arbeitsplatz lädt sie bei der Einrichtung von GitHub (Internet nötig).', 'muted small'));
-  }
 }
 
 (async () => {

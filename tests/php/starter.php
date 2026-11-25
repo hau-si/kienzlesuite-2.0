@@ -10,7 +10,7 @@ function st_env(): array {
     $env = new Env();
     $mods = [];
     foreach ($env->modules->all() as $id => $m) {
-        if ($id === 'kasse') $m['starters'] = [['schema' => 'kienzle-sumup', 'label' => 'Kasse'], ['schema' => 'kienzle-igel', 'label' => 'IGeL <b>']];
+        if ($id === 'kasse') $m['starters'] = [['schema' => 'kienzle-kasse', 'label' => 'Kasse'], ['schema' => 'kienzle-igel', 'label' => 'IGeL <b>']];
         $mods[] = $m;
     }
     $env->modules = Modules::fromArray($mods);
@@ -52,7 +52,7 @@ function test_seite_und_paket(): void {
     [$env, $st] = st_env();
     [$b] = admin_browser($env); st_web($env, $st, $b);
     $page = $b->get('/verwaltung/arbeitsplaetze');
-    check($page->status === 200 && str_contains($page->body, 'kienzle-sumup://?kontextId=') && str_contains($page->body, 'kienzle-igel://'), 'Startkontexte fehlen');
+    check($page->status === 200 && str_contains($page->body, 'kienzle-kasse://?kontextId=') && str_contains($page->body, 'kienzle-igel://'), 'Startkontexte fehlen');
     check(!str_contains($page->body, 'IGeL <b>') && str_contains($page->body, 'IGeL &lt;b&gt;'), 'nicht maskiert');
     check(str_contains($page->body, '/verwaltung/arbeitsplaetze/windows.zip'), 'Paket-Link fehlt');
     $zip = $b->get('/verwaltung/arbeitsplaetze/linux.zip');
@@ -61,7 +61,9 @@ function test_seite_und_paket(): void {
     check(str_contains($zip->body, $st->key()) && str_contains($zip->body, '"server_url": "https://kienzle.example.org"'), 'client.json');
     check($b->get('/verwaltung/arbeitsplaetze/amiga.zip')->status === 404, 'unbekanntes System');
     $alt = $st->key();
-    check($b->post('/verwaltung/arbeitsplaetze', ['aktion' => 'erneuern'])->status === 200 && $st->key() !== $alt, 'Erneuern über die Seite');
+    $vorher = $st->key();
+    check($b->post('/verwaltung/arbeitsplaetze', ['aktion' => 'erneuern'])->status >= 400 && $st->key() === $vorher, 'Erneuern ohne Bestätigung darf nichts ändern');
+    check($b->post('/verwaltung/arbeitsplaetze', ['aktion' => 'erneuern', 'bestaetigt' => '1'])->status === 200 && $st->key() !== $alt, 'Erneuern über die Seite');
     check($b->post('/verwaltung/arbeitsplaetze', ['aktion' => 'boese'])->status === 400, 'unbekannte Aktion');
     $map = $env->modules->starterMap();
     check($map === ['kasse' => '/kasse'], 'starterMap');

@@ -87,7 +87,7 @@ class Vorlage(unittest.TestCase):
 
     def test_startkontexte_pruefung_durch_die_basis(self):
         reg = registry()
-        reg['modules'][1]['starters'] = [{'schema': 'kienzle-sumup', 'label': 'Kasse'}]
+        reg['modules'][1]['starters'] = [{'schema': 'kienzle-kasse', 'label': 'Kasse'}]
         conf = nginx.render(HOSTS, reg)
         b = block(conf, 'location = /starter/kasse {')
         self.assertIn('auth_request /_starter-pruefen;', b)

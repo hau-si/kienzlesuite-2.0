@@ -186,11 +186,11 @@ final class Web {
             $body .= '<h2 id="drucker">' . $nr++ . '. Virtuelle Drucker einrichten</h2>'
                 . '<p>Nur für PCs, von denen aus T2med auf die virtuellen Drucker der Module druckt. Zuerst Schritt 1 und 2 erledigen: Die Drucker-Adresse enthält den Namen der Suite.</p>' . $drucker;
         }
-        // Ist die Kasse installiert, braucht jeder PC, an dem aus T2med kassiert wird, zusätzlich den Starter (Paket aus den Kasse-Einstellungen).
+        // Ist die Kasse installiert, braucht jeder PC, an dem aus T2med kassiert wird, zusätzlich den Starter (zentrales Paket unter Verwaltung → Starter).
         if (($starter = $this->modules->starterPath()) !== '') {
-            $body .= '<h2 id="starter">' . $nr . '. Kasse: Starter für T2med installieren</h2>'
-                . '<p>Damit der Knopf in T2med die Kasse öffnet, braucht jeder Kassen-PC einmal den <strong>Starter</strong>. Das Paket lädt ein Admin der Kasse und führt es auf dem PC einmal aus.</p>'
-                . '<p class="row-buttons"><a class="button" href="' . V::h($starter) . '/settings.php#s-clients">Starter der Kasse einrichten</a></p>'
+            $body .= '<h2 id="starter">' . $nr . '. Starter für T2med installieren</h2>'
+                . '<p>Damit der Knopf in T2med die Kasse öffnet, braucht jeder Kassen-PC einmal den <strong>Starter</strong>. Das Paket (ein Starter für alle Module) lädt ein Admin unter Verwaltung → Starter und führt es auf dem PC einmal aus.</p>'
+                . '<p class="row-buttons"><a class="button" href="/verwaltung/arbeitsplaetze">Zur Seite „Starter“</a></p>'
                 . '<p class="muted">Zuerst Schritt 1 und 2 erledigen: Der Starter prüft das Zertifikat der Suite und braucht ihren Namen.</p>';
         }
         return Response::html(V::page('Arbeitsplätze einrichten', $body, $this->nav(), $this->config->practice, 'Einrichten'));
@@ -1791,7 +1791,7 @@ final class Web {
             . '<button>Speichern</button></form>'
             . '<div class="box wide"><h3>Eintrag in T2med (Drittanbieter-Zugriffe verwalten → Neue URL hinzufügen)</h3>'
             . '<p>Als Adresse genau so eintragen, mit den Platzhaltern, und eine Bezeichnung wie „Kartenzahlung“ vergeben:</p>'
-            . '<p><code class="secret">kienzle-sumup://?kontextId=${kontextId}&amp;fhirBasisUrl=${fhirBasisUrl}&amp;oAuthToken=${oAuthToken}</code></p>'
+            . '<p><code class="secret">kienzle-kasse://?kontextId=${kontextId}&amp;fhirBasisUrl=${fhirBasisUrl}&amp;oAuthToken=${oAuthToken}</code></p>'
             . '<p class="muted small">Ausführliche Anleitung mit Bildern: in der Kasse unter Einstellungen → Zahlung &amp; T2med. Der Starter muss auf dem Arbeitsplatz installiert sein.</p></div>'
             . ($t2 ? '<p>Zertifikat: ' . (($t2['zertifikat'] ?? '') !== '' ? '<code>' . V::h((string)$t2['zertifikat']) . '</code>' . ($t2['pin'] ? ' (fest hinterlegt)' : '') : '<strong>nicht hinterlegt</strong> (nur öffentlich beglaubigte Zertifikate werden angenommen)') . '</p>'
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('zertifikat-holen') . '<button>Zertifikat des Servers abrufen</button></form> '
@@ -2102,15 +2102,18 @@ final class Web {
             if (!$st->hasPrograms($key)) $missing[] = $spec['label'];
         }
         $body .= '</p>' . (!empty($missing) ? '<p class="muted">Für ' . V::h(implode(', ', $missing)) . ' liegen auf dem Server noch keine Starterprogramme; das Paket enthält dann nur die Skripte.</p>' : '');
-        $body .= '<h2>Starter-Schlüssel</h2><p class="muted">Ein Schlüssel für alle Module. Nach dem Erneuern funktionieren alte Pakete nicht mehr; die Arbeitsplätze brauchen dann ein neues Paket.</p>'
-            . '<form method="post" action="/verwaltung/arbeitsplaetze" class="box">' . $this->hidden('erneuern')
-            . '<button class="secondary">Schlüssel erneuern</button></form>'
-            . '<p class="muted">Der Starter der Kasse (bisheriger Weg über api.php) bleibt unverändert bestehen.</p>';
+        $body .= '<h2>Starter-Schlüssel</h2><p class="muted">Ein Schlüssel für alle Module. Er muss nur im Fehlerfall erneuert werden, zum Beispiel wenn ein Paket in falsche Hände geraten ist.</p>'
+            . '<details class="box"><summary><strong>Schlüssel erneuern (nur im Fehlerfall)</strong></summary>'
+            . '<p class="error">Achtung: Nach dem Erneuern funktionieren alle bisher eingerichteten Arbeitsplätze nicht mehr. Auf jedem Arbeitsplatz muss danach ein neues Paket ausgeführt werden.</p>'
+            . '<form method="post" action="/verwaltung/arbeitsplaetze">' . $this->hidden('erneuern')
+            . '<p><label><input type="checkbox" name="bestaetigt" value="1" required> Ja, ich will den Schlüssel erneuern und alle Arbeitsplätze neu einrichten.</label></p>'
+            . '<button class="danger">Schlüssel jetzt erneuern</button></form></details>';
         return Response::html(V::page('Starter', $body, $this->nav(), $this->config->practice, 'Einrichten'), $error ? 422 : 200);
     }
 
     private function starterAction(Request $r, string $admin): Response {
         if ($r->field('aktion') !== 'erneuern') throw new Problem('Unbekannte Aktion.', 400);
+        if ($r->field('bestaetigt', 1) !== '1') throw new Problem('Bitte das Erneuern des Schlüssels ausdrücklich bestätigen.', 422);
         $this->st()->renew();
         $this->audit->write($admin, 'starter-schluessel-erneuert', '');
         return $this->starterPage(null, 'Neuer Starter-Schlüssel erzeugt. Die Pakete bitte neu laden und die Arbeitsplätze neu einrichten.');

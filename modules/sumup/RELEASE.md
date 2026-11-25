@@ -1,5 +1,10 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.38
+
+- **Startkontext heißt `kienzle-kasse`** statt `kienzle-sumup`. In T2med unter „Drittanbieter-Zugriffe verwalten“ die Adresse auf `kienzle-kasse://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}` ändern, danach auf den Arbeitsplätzen das Paket von Verwaltung → Starter neu ausführen.
+- **Kein eigenes Starter-Paket mehr in den Einstellungen:** Unter „Arbeitsplätze“ steht ein Punkt „Starter“ mit Knöpfen zur zentralen Seite der Suite. Der Überblick führt dorthin. Nicht auf der VM geprüft.
+
 ## 2.3.4-beta.37
 
 - **Ablage der T2med-Rechnung beim Drucken auf „vKasse“:** Bei „jede gedruckte“ blieb die Ablage im Netzwerkordner leer, obwohl die Rechnung ankam. Ursache war der Drucker selbst (Basis beta.60). Zusätzlich: Schlägt die Ablage beim Drucken fehl, steht im Protokoll des Druckers jetzt eine Warnung statt „übernommen“, und **das Bezahlen der Rechnung holt die Ablage nach**. Bereits Abgelegtes wird nie doppelt abgelegt. Mit Prüfablage getestet, nicht auf der VM.
