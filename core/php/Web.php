@@ -39,7 +39,31 @@ final class Web {
                 ? Response::json(['error' => $e->getMessage()], $e->http)
                 : Response::html(V::page('Hinweis', V::error($e->getMessage()) . '<p><a href="/">Zur Startseite</a></p>', $this->nav(), $this->config->practice), $e->http);
         }
-        return self::secure($response);
+        return self::secure($this->applyFlash($req, $response));
+    }
+
+    /**
+     * Rückmeldung nach „Absenden → Weiterleitung“: Der Server merkt sich den Text zur Sitzung und setzt ihn auf der nächsten Seite
+     * oben in main (core.js rückt ihn dann direkt hinter den angeklickten Knopf). Ohne diese Meldung bliebe die Seite stumm.
+     */
+    private function flash(string $text): void {
+        if (!$this->token) return;
+        $key = 'flash:' . substr(hash('sha256', $this->token), 0, 24);
+        $this->db->query("DELETE FROM settings WHERE key LIKE 'flash:%' AND updated_at < ?", [time() - 3600]);
+        $this->db->store($key, json_encode(['t' => mb_substr($text, 0, 300), 'at' => time()], JSON_UNESCAPED_UNICODE));
+    }
+
+    private function applyFlash(Request $req, Response $response): Response {
+        if (!$this->token || $req->method !== 'GET' || $response->status !== 200 || !str_starts_with((string)$response->header('Content-Type'), 'text/html')) return $response;
+        $key = 'flash:' . substr(hash('sha256', $this->token), 0, 24);
+        $raw = $this->db->setting($key);
+        if ($raw === null) return $response;
+        $this->db->query('DELETE FROM settings WHERE key=?', [$key]);
+        $f = json_decode($raw, true);
+        if (!is_array($f) || time() - (int)($f['at'] ?? 0) > 120 || !is_string($f['t'] ?? null) || $f['t'] === '') return $response;
+        $meldung = V::notice($f['t']);
+        $response->body = (string)preg_replace_callback('/<main\b[^>]*>/', static fn(array $m): string => $m[0] . $meldung, $response->body, 1);
+        return $response;
     }
 
     private function route(Request $r): Response {
@@ -331,6 +355,7 @@ final class Web {
             $this->ov()->nameChanged($r->field('neue_ca') === '1');
             try { $this->ov()->refresh(); } catch (Problem) { /* Module werden beim nächsten Öffnen neu geprüft */ }
         }
+        $this->flash('Gespeichert.');
         return Response::redirect('/verwaltung/server');
     }
 
@@ -430,6 +455,7 @@ final class Web {
             if ($a === 'loeschen') {
                 $o->deleteClient($r->field('id', 40));
                 $this->audit->write($admin, 'sso-dienst-entfernt', $r->field('id', 40));
+                $this->flash('Dienst entfernt.');
                 return Response::redirect('/verwaltung/sso');
             }
             throw new Problem('Unbekannte Aktion.', 422);
@@ -1276,6 +1302,7 @@ final class Web {
         } catch (Problem $e) {
             return $this->groupsPage($e->getMessage());
         }
+        $this->flash('Gespeichert.');
         return Response::redirect('/verwaltung/benutzer?bereich=gruppen');
     }
 
@@ -1469,18 +1496,21 @@ final class Web {
             return $this->firewallPage($e->getMessage(), $again);
         }
         $this->audit->write($admin, 'firewall-geladen', implode(',', $config['cidrs']) . ($config['strict'] ? ' alles-zu' : ' nur-ports') . ($config['modules'] ? ' ' . implode(',', $config['modules']) : ''));
+        $this->flash('Regeln geladen. Bitte erreichbar prüfen und bestätigen.');
         return Response::redirect('/verwaltung/sicherheit?bereich=firewall');
     }
 
     private function firewallConfirm(string $admin): Response {
         $this->fw()->confirm();
         $this->audit->write($admin, 'firewall-bestaetigt');
+        $this->flash('Firewall bestätigt.');
         return Response::redirect('/verwaltung/sicherheit?bereich=firewall');
     }
 
     private function firewallOff(string $admin): Response {
         $this->fw()->disable();
         $this->audit->write($admin, 'firewall-ausgeschaltet');
+        $this->flash('Firewall ausgeschaltet.');
         return Response::redirect('/verwaltung/sicherheit?bereich=firewall');
     }
 
@@ -1605,6 +1635,7 @@ final class Web {
         } catch (Problem $e) {
             return $this->modulesPage($e->getMessage());
         }
+        $this->flash('Erledigt.');
         return Response::redirect('/verwaltung/module');
     }
 
@@ -1683,6 +1714,11 @@ final class Web {
         } catch (Problem $e) {
             return $this->updatesPage($e->getMessage());
         }
+        $this->flash(match ($r->field('aktion', 20)) {
+            'pruefen' => 'Prüfung abgeschlossen.', 'kanal' => 'Kanal gespeichert.',
+            'installieren' => 'Update gestartet. Die Seite lädt sich selbst neu und ist einige Minuten nicht erreichbar.',
+            default => 'Rückkehr zur früheren Version gestartet.',
+        });
         return Response::redirect('/verwaltung/updates');
     }
 
@@ -1926,6 +1962,7 @@ final class Web {
             return $this->connectionsPage($e->getMessage());
         }
         $this->audit->write($admin, 'verbindung', $what);
+        if ($f('zurueck', 10) !== 'start') $this->flash('Gespeichert.');
         return Response::redirect($f('zurueck', 10) === 'start' ? '/' : '/verwaltung/verbindungen');
     }
 
@@ -2234,6 +2271,7 @@ final class Web {
             throw $e;
         }
         $this->audit->write($admin, 'drucker-' . $a, $a === 'abbrechen' ? $r->field('auftrag', 60) : ($a === 'arbeitsgruppe' ? $r->field('arbeitsgruppe', 20) : $r->field('name', 60)));
+        $this->flash('Auftrag an den Druckerdienst übergeben.');
         return Response::redirect('/verwaltung/drucker');
     }
 
@@ -2309,6 +2347,7 @@ final class Web {
         } else {
             throw new Problem('Unbekannte Aktion.', 422);
         }
+        $this->flash('Gespeichert.');
         return Response::redirect('/verwaltung/einrichtung');
     }
 
@@ -2465,6 +2504,7 @@ final class Web {
             return $this->backupPage($e->getMessage());
         }
         $this->audit->write($admin, 'sicherung-' . $a, $a === 'wiederherstellen' ? $r->field('teil', 40) . ' ' . $r->field('snapshot', 20) : '');
+        $this->flash('Auftrag an den Sicherungsdienst übergeben.');
         return Response::redirect('/verwaltung/sicherung');
     }
 

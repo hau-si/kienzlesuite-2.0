@@ -97,7 +97,7 @@
       let ziel = null;
       try { ziel = JSON.parse(sessionStorage.getItem(KEY) || 'null'); sessionStorage.removeItem(KEY); } catch (err) { return; }
       if (!ziel || ziel.path !== location.pathname || Date.now() - ziel.at > 30000) return;
-      const meldung = document.querySelector('main > p.notice[role=status], main > p.error');
+      const meldung = document.querySelector('main > p.notice[role=status], main > p.error, main .us > p.ok[role=status], main .us > p.fehler[role=alert]');
       if (!meldung || meldung.closest('.working')) return;
       let form = document.forms[ziel.index];
       if (!form || (form.getAttribute('action') || '') !== ziel.action) form = Array.prototype.find.call(document.forms, (f) => (f.getAttribute('action') || '') === ziel.action);

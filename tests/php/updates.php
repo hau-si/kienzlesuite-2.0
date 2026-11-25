@@ -66,7 +66,10 @@ function test_seite_und_menue(): void {
     check(str_contains($b->get('/')->body, '<span class="badge" title="Neue Version verfügbar">1</span>'), 'Hinweis im Menü fehlt');
     $r = $b->post('/verwaltung/updates', ['aktion' => 'installieren', 'version' => '9.0.0']);
     check($r->status === 303 && req($env)['version'] === '9.0.0', 'Installieren über die Seite');
-    check($b->get('/verwaltung/updates')->header('Refresh') === '5', 'Seite lädt beim Warten nicht neu');
+    $g = $b->get('/verwaltung/updates');
+    check($g->header('Refresh') === '5', 'Seite lädt beim Warten nicht neu');
+    check(preg_match('#<main[^>]*><p class="notice" role="status">Update gestartet#', $g->body) === 1, 'Rückmeldung nach „Jetzt installieren“ fehlt');
+    check(!str_contains($b->get('/verwaltung/updates')->body, 'Update gestartet. Die Seite'), 'Rückmeldung nur einmal zeigen');
     check(str_contains(implode("\n", $env->audit->recent()), 'update-installieren 9.0.0'), 'nicht protokolliert');
     unlink($env->dir . '/anfragen/update.json');
     $b->post('/verwaltung/updates', ['aktion' => 'kanal', 'kanal' => 'beta', 'unsigniert' => '1']);
