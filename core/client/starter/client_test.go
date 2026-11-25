@@ -17,7 +17,7 @@ func testConfig(t *testing.T, srv *httptest.Server) *Config {
 	t.Helper()
 	sum := sha256.Sum256(srv.Certificate().Raw)
 	return &Config{ServerURL: srv.URL, LauncherKey: "0123456789abcdef0123456789abcdef", CertSHA256: hex.EncodeToString(sum[:]),
-		Contexts: map[string]string{"kienzle-sumup": "/api.php", "kienzle-signatur": "/starter/signatur"}}
+		Contexts: map[string]string{"kienzle-kasse": "/starter/kasse", "kienzle-signatur": "/starter/signatur"}}
 }
 
 func TestStartMitSchemaUndPfad(t *testing.T) {
@@ -48,7 +48,7 @@ func TestStartMitSchemaUndPfad(t *testing.T) {
 		t.Fatal(link)
 	}
 	// Kasse wie bisher
-	if _, err := run(cfg, "kienzle-sumup://?kontextId=ctx-2&fhirBasisUrl=x&oAuthToken=y", srv.Client()); err != nil || gotPath != "/api.php" {
+	if _, err := run(cfg, "kienzle-kasse://?kontextId=ctx-2&fhirBasisUrl=x&oAuthToken=y", srv.Client()); err != nil || gotPath != "/starter/kasse" {
 		t.Fatalf("Kasse: %v %q", err, gotPath)
 	}
 }
@@ -63,10 +63,10 @@ func TestUnbekanntesSchemaUndFehler(t *testing.T) {
 	if _, err := run(cfg, "kienzle-fremd://?kontextId=a", srv.Client()); err == nil || !strings.Contains(err.Error(), "nicht eingerichtet") {
 		t.Fatalf("unbekanntes Schema: %v", err)
 	}
-	if _, err := run(cfg, "kienzle-sumup://?fhirBasisUrl=x", srv.Client()); err == nil {
+	if _, err := run(cfg, "kienzle-kasse://?fhirBasisUrl=x", srv.Client()); err == nil {
 		t.Fatal("ohne Kontext muss es scheitern")
 	}
-	if _, err := run(cfg, "kienzle-sumup://?kontextId=a", srv.Client()); err == nil || !strings.Contains(err.Error(), "Starter nicht autorisiert") {
+	if _, err := run(cfg, "kienzle-kasse://?kontextId=a", srv.Client()); err == nil || !strings.Contains(err.Error(), "Starter nicht autorisiert") {
 		t.Fatalf("Serverfehler: %v", err)
 	}
 }
@@ -76,7 +76,7 @@ func TestFremderLinkWirdNichtGeoeffnet(t *testing.T) {
 		w.Write([]byte(`{"url":"https://boese.example.org/#launch=` + strings.Repeat("a", 64) + `"}`))
 	}))
 	defer srv.Close()
-	if _, err := run(testConfig(t, srv), "kienzle-sumup://?kontextId=a", srv.Client()); err == nil {
+	if _, err := run(testConfig(t, srv), "kienzle-kasse://?kontextId=a", srv.Client()); err == nil {
 		t.Fatal("Link auf fremden Server muss abgelehnt werden")
 	}
 }
@@ -86,7 +86,7 @@ func TestZertifikatPruefung(t *testing.T) {
 	defer srv.Close()
 	cfg := testConfig(t, srv)
 	cfg.CertSHA256 = strings.Repeat("0", 64)
-	if _, err := run(cfg, "kienzle-sumup://?kontextId=a", nil); err == nil || !strings.Contains(err.Error(), "stimmt nicht") {
+	if _, err := run(cfg, "kienzle-kasse://?kontextId=a", nil); err == nil || !strings.Contains(err.Error(), "stimmt nicht") {
 		t.Fatalf("falscher Fingerabdruck muss scheitern: %v", err)
 	}
 }
@@ -100,9 +100,8 @@ func TestConfigPruefung(t *testing.T) {
 	}
 	key := strings.Repeat("a", 24)
 	hash := strings.Repeat("b", 64)
-	c, err := loadConfig(write(`{"server_url":"https://s.example.org","launcher_key":"` + key + `","certificate_sha256":"` + hash + `"}`))
-	if err != nil || c.Contexts["kienzle-sumup"] != "/api.php" {
-		t.Fatalf("alte Pakete: %v %v", err, c)
+	if _, err := loadConfig(write(`{"server_url":"https://s.example.org","launcher_key":"` + key + `","certificate_sha256":"` + hash + `"}`)); err == nil {
+		t.Fatal("ohne Startkontexte darf die Konfiguration nicht gelten")
 	}
 	bad := []string{
 		`{"server_url":"http://s.example.org","launcher_key":"` + key + `","certificate_sha256":"` + hash + `"}`,
@@ -120,7 +119,7 @@ func TestConfigPruefung(t *testing.T) {
 }
 
 func TestURLArgument(t *testing.T) {
-	if urlArgument([]string{"--url", "kienzle-sumup://?a=1"}) != "kienzle-sumup://?a=1" || urlArgument([]string{"kienzle-sumup://x"}) != "kienzle-sumup://x" || urlArgument(nil) != "" {
+	if urlArgument([]string{"--url", "kienzle-kasse://?a=1"}) != "kienzle-kasse://?a=1" || urlArgument([]string{"kienzle-kasse://x"}) != "kienzle-kasse://x" || urlArgument(nil) != "" {
 		t.Fatal("Argumente")
 	}
 }
@@ -130,7 +129,7 @@ func TestPinnedClientMitRichtigemFingerabdruck(t *testing.T) {
 		w.Write([]byte(`{"url":"https://` + r.Host + `/#launch=` + strings.Repeat("a", 64) + `"}`))
 	}))
 	defer srv.Close()
-	if _, err := run(testConfig(t, srv), "kienzle-sumup://?kontextId=a", nil); err != nil {
+	if _, err := run(testConfig(t, srv), "kienzle-kasse://?kontextId=a", nil); err != nil {
 		t.Fatalf("richtiger Fingerabdruck muss gehen: %v", err)
 	}
 }

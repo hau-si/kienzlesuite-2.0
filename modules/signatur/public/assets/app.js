@@ -11,6 +11,63 @@
     var b = e.target && e.target.closest ? e.target.closest('[data-bestaetigen]') : null;
     if (b && !window.confirm(b.getAttribute('data-bestaetigen'))) e.preventDefault();
   });
+  // Weitere Patientendaten (aus T2med oder der Kasse) in die Felder eintragen; das Aufklappfeld öffnet sich, sobald etwas drinsteht.
+  function kontaktFuellen(d) {
+    var geb = String(d.geburtsdatum || '');
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(geb);
+    if (m) geb = m[3] + '.' + m[2] + '.' + m[1];
+    var feldWert = function (id, w) { var f = document.getElementById(id); if (f && w) { f.value = w; return true; } return false; };
+    feldWert('n-vorname', String(d.vorname || '').slice(0, 80)); feldWert('n-nachname', String(d.nachname || '').slice(0, 80));
+    var g = String(d.geschlecht || ''), gf = document.getElementById('n-geschlecht');
+    if (gf && (g === 'male' || g === 'female')) gf.value = g; else if (gf && g === 'other') gf.value = 'other';
+    // Übernahme in T2med nur, wenn der Aufruf aus T2med kam (Patienten-ID vorhanden): Ausgangswerte merken, Häkchen anbieten.
+    if (/^[A-Za-z0-9._-]{1,64}$/.test(String(d.patient_id || ''))) {
+      feldWert('n-patient-id', d.patient_id); feldWert('n-telefon-alt', String(d.telefon || '').slice(0, 40)); feldWert('n-email-alt', String(d.email || '').slice(0, 254));
+      var kb = document.getElementById('n-kontakt-box'); if (kb) kb.hidden = false;
+    }
+    var werte = { 'n-geburtsdatum': geb.slice(0, 20), 'n-telefon': String(d.telefon || '').slice(0, 40), 'n-email': String(d.email || '').slice(0, 254), 'n-adresse': String(d.adresse || '').slice(0, 200) };
+    var etwas = false;
+    Object.keys(werte).forEach(function (id) { var f = document.getElementById(id); if (f && werte[id]) { f.value = werte[id]; etwas = true; } });
+    var box = document.getElementById('n-kontakt');
+    if (box && etwas) box.open = true;
+  }
+  // Patient ist vorgewählt (aus T2med oder der Kasse): Kasten oben zeigen, Patientenfeld im Formular ausblenden.
+  function patientZeigen(quelle, d) {
+    var kasten = document.getElementById('n-gewaehlt'), feld = document.getElementById('n-patient-feld'), name = document.getElementById('n-patient');
+    if (!kasten || !feld || !name || !name.value) return;
+    document.getElementById('n-gewaehlt-quelle').textContent = quelle === 'kasse' ? 'PATIENT AUS DER KASSE' : 'PATIENT AUS T2MED';
+    document.getElementById('n-gewaehlt-name').textContent = name.value;
+    var geb = String(d.geburtsdatum || ''), m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(geb);
+    document.getElementById('n-gewaehlt-info').textContent = geb ? 'Geboren am ' + (m ? m[3] + '.' + m[2] + '.' + m[1] : geb) : '';
+    kasten.hidden = false; feld.hidden = true;
+    kasten.scrollIntoView({ block: 'nearest' });
+  }
+  (function () {
+    var weg = document.getElementById('n-gewaehlt-weg');
+    if (!weg) return;
+    weg.addEventListener('click', function () {
+      var form = document.getElementById('n-patient').form;
+      ['n-patient', 'n-kontext', 'n-patient-id', 'n-telefon-alt', 'n-email-alt', 'n-vorname', 'n-nachname', 'n-geburtsdatum', 'n-telefon', 'n-email', 'n-adresse', 'n-leistungen', 'n-quelle', 'n-quelle-ref'].forEach(function (id) { var f = document.getElementById(id); if (f) f.value = ''; });
+      var g = document.getElementById('n-geschlecht'); if (g) g.value = '';
+      ['n-leistung', 'n-betrag'].forEach(function (id) { var f = document.getElementById(id); if (f) { f.value = ''; f.readOnly = false; } });
+      var l = document.getElementById('n-liste'); if (l) l.hidden = true;
+      var kb = document.getElementById('n-kontakt-box'); if (kb) kb.hidden = true;
+      Array.prototype.forEach.call(form.querySelectorAll('p.notice, p.error'), function (p) { p.remove(); });
+      document.getElementById('n-gewaehlt').hidden = true; document.getElementById('n-patient-feld').hidden = false;
+      document.getElementById('n-patient').focus();
+    });
+  })();
+  // Platzhalter-Knöpfe in den Vorlagen: {{name}} an der Cursorstelle des Textfelds einfügen.
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest ? e.target.closest('[data-platzhalter]') : null;
+    if (!b) return;
+    var t = document.getElementById(b.getAttribute('data-ziel') || '');
+    if (!t) return;
+    var w = b.getAttribute('data-platzhalter'), von = t.selectionStart, bis = t.selectionEnd;
+    if (typeof von !== 'number') { von = bis = t.value.length; }
+    t.value = t.value.slice(0, von) + w + t.value.slice(bis);
+    t.focus(); t.selectionStart = t.selectionEnd = von + w.length;
+  });
   // Start aus T2med: #launch=<Code> einlösen (einmalig) und den Patienten in „Neuer Vorgang“ eintragen.
   (function () {
     var m = /^#launch=([0-9a-f]{64})$/.exec(location.hash || '');
@@ -28,14 +85,58 @@
           feld.value = a.j.patient || '';
           var k = document.getElementById('n-kontext');
           if (k) k.value = a.j.kontext || '';
+          kontaktFuellen(a.j);
           hinweis.textContent = 'Patient aus T2med übernommen: ' + (a.j.patient || '');
         } else {
           hinweis.textContent = a.j.error || 'Der Start aus T2med ist fehlgeschlagen.';
         }
         feld.form.insertBefore(hinweis, feld.form.firstChild);
-        if (a.ok) feld.form.scrollIntoView({ block: 'nearest' });
+        if (a.ok) patientZeigen('t2med', a.j);
       })
       .catch(function () { /* ohne Netz bleibt die Startseite wie gewohnt */ });
+  })();
+  // Übergabe aus der Kasse: #uebergabe=<base64url-JSON> mit Patient, Verweis und Leistungsliste in „Neuer Vorgang“ eintragen.
+  // Das Fragment geht nie an den Server; geprüft wird die Liste beim Anlegen noch einmal auf dem Server.
+  (function () {
+    var m = /^#uebergabe=([A-Za-z0-9_-]{1,12000})$/.exec(location.hash || '');
+    var feld = document.getElementById('n-patient');
+    if (!m || !feld) return;
+    history.replaceState(null, '', location.pathname + location.search);
+    var hinweis = document.createElement('p');
+    try {
+      var b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
+      var roh = atob(b64 + '==='.slice((b64.length + 3) % 4));
+      var d = JSON.parse(new TextDecoder().decode(Uint8Array.from(roh, function (c) { return c.charCodeAt(0); })));
+      var liste = Array.isArray(d.leistungen) ? d.leistungen.slice(0, 40).map(function (z) {
+        return { code: String(z.code || '').slice(0, 12), label: String(z.label || '').slice(0, 120), cent: Math.max(0, Math.round(Number(z.cent) || 0)) };
+      }).filter(function (z) { return z.label; }) : [];
+      if (!liste.length) throw new Error('leer');
+      feld.value = String(d.patient || '').slice(0, 80);
+      kontaktFuellen(d);
+      document.getElementById('n-leistungen').value = JSON.stringify(liste);
+      document.getElementById('n-quelle').value = 'kasse';
+      document.getElementById('n-quelle-ref').value = /^[A-Za-z0-9._-]{1,64}$/.test(String(d.ref || '')) ? String(d.ref) : '';
+      var euro = function (c) { return (c / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; };
+      var ul = document.getElementById('n-liste-eintraege'), summe = 0;
+      ul.textContent = '';
+      liste.forEach(function (z) {
+        var li = document.createElement('li');
+        li.textContent = (z.code ? 'GOÄ ' + z.code + ': ' : '') + z.label + ' – ' + euro(z.cent);
+        ul.appendChild(li); summe += z.cent;
+      });
+      document.getElementById('n-liste-summe').textContent = liste.length + ' Leistung(en), zusammen ' + euro(summe) + '. Summe und Leistungen gehen aus der Kasse in das Dokument.';
+      document.getElementById('n-liste').hidden = false;
+      var l = document.getElementById('n-leistung'), b = document.getElementById('n-betrag');
+      if (l) { l.value = liste.map(function (z) { return z.label; }).join(', ').slice(0, 120); l.readOnly = true; }
+      if (b) { b.value = (summe / 100).toFixed(2).replace('.', ','); b.readOnly = true; }
+      hinweis.className = 'notice';
+      hinweis.textContent = 'Aus der Kasse übernommen: ' + feld.value + ' mit ' + liste.length + ' Leistung(en). Bitte das Dokument wählen und den Vorgang anlegen.';
+    } catch (e) {
+      hinweis.className = 'error';
+      hinweis.textContent = 'Die Übergabe aus der Kasse konnte nicht gelesen werden. Bitte in der Kasse erneut „Zur Unterschrift“ wählen.';
+    }
+    feld.form.insertBefore(hinweis, feld.form.firstChild);
+    if (hinweis.className === 'notice') patientZeigen('kasse', d); else feld.form.scrollIntoView({ block: 'nearest' });
   })();
   // Vorgangsliste: Suche und Filter wirken sofort im Browser.
   var tabelle = document.getElementById('vg-tabelle');

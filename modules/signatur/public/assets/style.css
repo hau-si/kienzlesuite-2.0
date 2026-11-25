@@ -58,3 +58,27 @@ main.modul { max-width: 940px; margin: 0; padding: 32px 40px 48px; }
 @media (max-width: 800px) { .us-pad-fest, .us-treffer-zeile { grid-template-columns: 1fr 1fr; } }
 
 .ok.nahe, .fehler.nahe { margin: 10px 0; }
+
+.us-platz { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 2px 0 6px; }
+.us-platz button { font-family: ui-monospace, monospace; }
+
+.us-gewaehlt { border-left: 4px solid var(--teal, #12695d); }
+.us-gewaehlt .us-patient { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+.button.mit-icon { display: inline-flex; align-items: center; gap: 8px; }
+
+/* Start: links Vorgänge, rechts groß Patient und Dokumentauswahl (wie die Leistungsliste der Kasse) */
+main.modul { max-width: 1180px; }
+.us-grid { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr); gap: 18px; align-items: start; }
+@media (max-width: 900px) { .us-grid { grid-template-columns: 1fr; } }
+.us-kopf { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.us-vz { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.us-vz:last-child { border-bottom: 0; }
+.us-vz.am-pad { background: #f2f9f7; margin: 0 -12px; padding: 12px; border-radius: 10px; }
+.us-vz-kopf { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.us-vz .aktionen { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+.us-dokliste { display: grid; margin-bottom: 8px; }
+.us-form label.us-dok { display: flex; gap: 13px; align-items: center; min-height: 62px; border-bottom: 1px solid #edf0ee; cursor: pointer; font-weight: 400; margin: 0; }
+.us-dok input { width: 21px; height: 21px; accent-color: var(--teal); flex-shrink: 0; }
+.us-dok span { display: grid; gap: 2px; }
+.us-gewaehlt .us-name { font-size: 26px; letter-spacing: -.5px; }

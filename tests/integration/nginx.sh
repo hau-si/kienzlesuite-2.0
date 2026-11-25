@@ -241,30 +241,26 @@ if lpstat -v Beispiel-PDF >/dev/null 2>&1; then fail 'IPP-Drucker nach Entfernen
 pkill -u ks-beispiel -f ippeveprinter || true
 
 echo '== Modul Kasse über die Modulverwaltung'
-[ -f /opt/kienzle/core/current/modules/sumup/module.toml ] || fail 'Kasse nicht mit der Basis geliefert'
+[ -f /opt/kienzle/core/current/modules/kasse/module.toml ] || fail 'Kasse nicht mit der Basis geliefert'
 [ ! -e /opt/kienzle/core/current/modules/beispiel ] || fail 'Beispielmodul mitgeliefert'
-/opt/kienzle/core/current/bin/kienzle-module liste | grep -q '^verfügbar *sumup' || fail 'Kasse nicht im Angebot'
-/opt/kienzle/core/current/bin/kienzle-module installieren sumup > "$T/kasse-installieren.log" 2>&1 || fail 'Kasse installieren'
-[ "$(stat -c '%a %U' /var/lib/kienzle/sumup)" = '700 ks-sumup' ] || fail 'Datenordner der Kasse'
-[ "$(stat -c '%a %U %G' /run/kienzle/sumup)" = '750 ks-sumup www-data' ] || fail 'Socket-Ordner der Kasse'
-[ "$(stat -c '%U' /opt/kienzle/sumup/current/src/App.php)" = root ] || fail 'Programm der Kasse nicht root-eigen'
-[ -f /var/lib/kienzle/sumup/grundwerte.json ] && [ "$(stat -c '%a %U' /var/lib/kienzle/sumup/grundwerte.json)" = '600 ks-sumup' ] || fail 'Grundwerte der Kasse'
-grep -q '^User=ks-sumup' /etc/systemd/system/kienzle-sumup-php.service || fail 'Einheit der Kasse'
-runuser -u ks-sumup -- "/usr/sbin/php-fpm$phpv" --nodaemonize --fpm-config /etc/kienzle/module/sumup/php-fpm.conf > "$T/kasse-php.log" 2>&1 &
-for _ in $(seq 1 50); do [ -S /run/kienzle/sumup/web.sock ] && break; sleep 0.2; done
-[ -S /run/kienzle/sumup/web.sock ] || fail 'php-fpm der Kasse startet nicht'
+/opt/kienzle/core/current/bin/kienzle-module liste | grep -q '^verfügbar *kasse' || fail 'Kasse nicht im Angebot'
+/opt/kienzle/core/current/bin/kienzle-module installieren kasse > "$T/kasse-installieren.log" 2>&1 || fail 'Kasse installieren'
+[ "$(stat -c '%a %U' /var/lib/kienzle/kasse)" = '700 ks-kasse' ] || fail 'Datenordner der Kasse'
+[ "$(stat -c '%a %U %G' /run/kienzle/kasse)" = '750 ks-kasse www-data' ] || fail 'Socket-Ordner der Kasse'
+[ "$(stat -c '%U' /opt/kienzle/kasse/current/src/App.php)" = root ] || fail 'Programm der Kasse nicht root-eigen'
+[ -f /var/lib/kienzle/kasse/grundwerte.json ] && [ "$(stat -c '%a %U' /var/lib/kienzle/kasse/grundwerte.json)" = '600 ks-kasse' ] || fail 'Grundwerte der Kasse'
+grep -q '^User=ks-kasse' /etc/systemd/system/kienzle-kasse-php.service || fail 'Einheit der Kasse'
+runuser -u ks-kasse -- "/usr/sbin/php-fpm$phpv" --nodaemonize --fpm-config /etc/kienzle/module/kasse/php-fpm.conf > "$T/kasse-php.log" 2>&1 &
+for _ in $(seq 1 50); do [ -S /run/kienzle/kasse/web.sock ] && break; sleep 0.2; done
+[ -S /run/kienzle/kasse/web.sock ] || fail 'php-fpm der Kasse startet nicht'
 nginx -s reload; sleep 1
-lkey=$(python3 -c 'import json; print(json.load(open("/var/lib/kienzle/sumup/grundwerte.json"))["launcher_key"])')
-r=$(c -H "Authorization: Bearer $lkey" -H 'Content-Type: application/json' -d '{"action":"launch","context_id":"demo","fhir_base_url":"","oauth_token":""}' "https://$host/api.php")
-python3 -c 'import json,sys; u=json.loads(sys.argv[1])["url"]; sys.exit(0 if u.startswith("https://"+sys.argv[2]+"/#launch=") else 1)' "$r" "$host" || fail "Starter über /api.php: $r"
-[ "$(c -o /dev/null -w '%{http_code}' -H 'Authorization: Bearer falsch' -H 'Content-Type: application/json' -d '{}' "https://$host/api.php")" = 401 ] || fail 'Starter mit falschem Schlüssel'
 [ "$(code "https://$host/kasse/")" = "303 https://$host/anmelden?weiter=/kasse/" ] || fail 'Kasse ohne Anmeldung'
 [ "$(c -b "$T/bert" -o /dev/null -w '%{http_code}' "https://$host/kasse/")" = 403 ] || fail 'Kasse ohne Recht erreichbar'
 runuser -u ks-core -- php -r '
 require "/opt/kienzle/core/current/php/bootstrap.php";
 $c = Kienzle\Core\Config::load("/etc/kienzle/core/core.json"); $db = new Kienzle\Core\Database($c->dataDir);
 $u = new Kienzle\Core\Users($db, Kienzle\Core\Secrets::fromFile($c->secretKey), new Kienzle\Core\Modules($c->modules));
-$u->setAccess((int)$u->byLogin("bert")["id"], "sumup", false, ["kassieren"]);' || fail 'Recht Kassieren vergeben'
+$u->setAccess((int)$u->byLogin("bert")["id"], "kasse", false, ["kassieren"]);' || fail 'Recht Kassieren vergeben'
 page=$(c -b "$T/bert" "https://$host/kasse/")
 grep -q 'data-base="/kasse/"' <<< "$page" || fail "Kasse-Seite: $(head -c 400 <<< "$page")"
 [ "$(code -b "$T/bert" "https://$host/kasse/assets/app.js")" = '200 ' ] || fail 'Dateien der Kasse'
@@ -274,8 +270,8 @@ python3 -c 'import json,sys; u=json.loads(sys.argv[1])["url"]; sys.exit(0 if u.s
 [ "$(c -b "$T/bert" -o /dev/null -w '%{http_code}' "https://$host/kasse/settings.php")" = 403 ] || fail 'Einstellungen ohne Recht'
 lpstat -v vKasse 2>/dev/null | grep -q 'ipp://localhost:471' || echo 'Hinweis: Drucker „vKasse“ im Container nicht angelegt.'
 c -b "$T/dora" "https://$host/verwaltung/module" | grep -q 'Kasse <span class="tag">2.' || fail 'Seite Module'
-/opt/kienzle/core/current/bin/kienzle-module entfernen sumup > /dev/null || fail 'Kasse entfernen'
-[ ! -e /opt/kienzle/sumup ] && [ -d /var/lib/kienzle/sumup ] || fail 'Entfernen: Programm noch da oder Daten weg'
-pkill -u ks-sumup -f php-fpm || true
+/opt/kienzle/core/current/bin/kienzle-module entfernen kasse > /dev/null || fail 'Kasse entfernen'
+[ ! -e /opt/kienzle/kasse ] && [ -d /var/lib/kienzle/kasse ] || fail 'Entfernen: Programm noch da oder Daten weg'
+pkill -u ks-kasse -f php-fpm || true
 
 echo 'Ende-zu-Ende-Prüfung bestanden.'

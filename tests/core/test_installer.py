@@ -42,7 +42,7 @@ class Vorlagen(unittest.TestCase):
         text = (VORLAGEN / 'php-fpm-core.conf').read_text()
         basedir = re.search(r'^php_admin_value\[open_basedir\] = (.*)$', text, re.M).group(1).split(':')
         for d in ('/var/lib/kienzle/firewall/', '/var/lib/kienzle/update/', '/var/lib/kienzle/verbindungen/', '/var/lib/kienzle/sicherung/',
-                  '/var/lib/kienzle/ueberblick/', '/usr/bin/qrencode'):
+                  '/var/lib/kienzle/ueberblick/', '/usr/bin/qrencode', '/etc/kienzle/ca/ca.crt', '/etc/kienzle/ca/server.crt'):
             self.assertIn(d, basedir)
         for unit in ('firewall', 'update', 'verbindungen', 'sicherung'):
             self.assertIn(f'/etc/systemd/system/kienzle-{unit}.path', basedir)

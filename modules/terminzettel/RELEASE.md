@@ -1,5 +1,13 @@
 # Terminzettel – Release-Notizen
 
+## 1.3.0-beta.16
+
+- **Keine blauen Punkte mehr:** Die Hinweise der Einrichtung (Bondrucker, Zettel aus T2med angekommen) bleiben in der Übersicht sichtbar, zählen aber nicht mehr als „noch zu tun“ und setzen keinen Punkt im Menü.
+
+## 1.3.0-beta.15
+
+- **Vorschau wieder gut lesbar:** Das Bild wurde in der schmalen Spalte ohne Glättung verkleinert, Buchstaben fransten aus. Die Vorschau ist jetzt ein Graustufenbild, wird vom Browser glatt verkleinert, und die Spalte ist etwas breiter. Der Ausdruck selbst ändert sich nicht. Nicht auf der VM geprüft.
+
 ## 1.3.0-beta.14
 
 - Die beiden fast gleichen Blöcke „Letzter Auftrag und Dauer der Schritte“ und „Letzte Druckaufträge“ sind zu einem Block **„Druckaufträge und Dauer der Schritte“** zusammengefasst: oben der letzte Auftrag mit jeder Zeit in einer eigenen Zeile, darunter „Davor“ mit bis zu 12 Zeilen der früheren Aufträge (ohne den letzten Auftrag doppelt zu zeigen). Ohne Auftrag steht wie bisher der Hinweis zur Einrichtung von „vTermine“. Nur in den Tests geprüft, nicht auf der VM.

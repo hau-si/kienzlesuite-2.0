@@ -8,12 +8,12 @@ main.modul { max-width: 1260px; margin: 0; padding: 32px 40px 48px; }
 .tz .fehler { color: var(--error); background: #fbeeea; }
 .tz code { word-break: break-all; background: var(--soft); padding: 1px 5px; border-radius: 5px; font-size: 13px; }
 .tz ol li { margin: 6px 0; }
-.tz-gitter { display: grid; grid-template-columns: minmax(0, 860px) minmax(260px, 300px); gap: 14px; align-items: start; }
+.tz-gitter { display: grid; grid-template-columns: minmax(0, 860px) minmax(320px, 400px); gap: 14px; align-items: start; }
 .tz-links { min-width: 0; }
 .tz-rechts { position: sticky; top: 16px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
 .tz-rechts h2 { font-size: 15px; margin: 0 0 8px; }
 .vorschau { background: #e9efed; border-radius: 10px; padding: 10px; margin-bottom: 10px; text-align: center; }
-.vorschau img { max-width: 100%; image-rendering: pixelated; background: #fff; }
+.vorschau img { max-width: 100%; background: #fff; }
 .tz-rechts button { width: 100%; }
 @media (max-width: 900px) { .tz-gitter { grid-template-columns: 1fr; } .tz-rechts { position: static; } main.modul { padding: 20px 16px 40px; } }
 

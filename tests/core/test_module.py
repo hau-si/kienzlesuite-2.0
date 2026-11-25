@@ -229,19 +229,19 @@ class Modulverwaltung(unittest.TestCase):
         self.mo.handle()
         self.assertIn('ungültig', self.mo.read_status()['last']['message'])
 
-    def test_sumup_modul_gueltig(self):
-        m = manifest.check_folder(ROOT / 'modules' / 'sumup')
-        self.assertTrue(m['web']['starter'])
+    def test_kasse_modul_gueltig(self):
+        m = manifest.check_folder(ROOT / 'modules' / 'kasse')
+        self.assertEqual([x['schema'] for x in m['starters']], ['kienzle-kasse'])
         self.assertEqual(m['web']['path'], '/kasse')
         self.assertIn('kassieren', [r['id'] for r in m['rights']])
-        self.assertEqual((ROOT / 'modules' / 'sumup' / 'VERSION').read_text().strip(), m['module']['version'])
+        self.assertEqual((ROOT / 'modules' / 'kasse' / 'VERSION').read_text().strip(), m['module']['version'])
 
     def test_uploads_nur_wenn_das_modul_sie_anfordert(self):
         tz = manifest.check_folder(ROOT / 'modules' / 'terminzettel')
         self.assertFalse(tz['web']['uploads'])
         tz['web']['uploads'] = True
         self.assertIn('php_admin_flag[file_uploads] = on', self.mo.fpm_conf(tz))
-        su = manifest.check_folder(ROOT / 'modules' / 'sumup')
+        su = manifest.check_folder(ROOT / 'modules' / 'kasse')
         self.assertFalse(su['web']['uploads'])
         self.assertIn('php_admin_flag[file_uploads] = off', self.mo.fpm_conf(su))
         self.assertIn('php_admin_value[opcache.revalidate_path] = 1', self.mo.fpm_conf(su))

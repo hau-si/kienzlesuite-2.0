@@ -22,7 +22,7 @@ check(Seite::ueberblick()[0]['state'] === 'open', 'Überblick: Mustertexte offen
 
 // Platzhalter
 Seite::pruefePlatzhalter('Name {{patient}} am {{ datum }}');
-wirft(fn() => Seite::pruefePlatzhalter('Hallo {{vorname}}'), 'unbekannter Platzhalter');
+wirft(fn() => Seite::pruefePlatzhalter('Hallo {{nix}}'), 'unbekannter Platzhalter');
 wirft(fn() => Seite::pruefePlatzhalter('Hallo {{patient'), 'offene Klammer');
 wirft(fn() => Seite::pruefePlatzhalter('Hallo patient}}'), 'schließende Klammer ohne Anfang');
 check(Seite::einsetzen('A {{patient}} B {{betrag}}', ['patient' => 'Max Mustermann', 'betrag' => '']) === 'A Max Mustermann B …', 'Einsetzen mit Lücke');
@@ -88,7 +88,7 @@ $liste = Ansicht::seite('/vorgaenge', 'tok', Seite::vorgaenge(), Seite::vorlagen
 $einst = Ansicht::seite('/einstellungen', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null);
 $start = Ansicht::seite('/', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null, null, null, [], Seite::aktuellerVorgang());
 check(!str_contains($liste, '<script>x') && str_contains($liste, '&lt;script&gt;x') && !str_contains($einst, '<b>Titel</b>') && str_contains($einst, '&lt;b&gt;Titel'), 'Ausgabe maskiert');
-check(str_contains($start, 'name="kienzle-csrf" value="tok"') && str_contains($start, 'Neuer Vorgang') && str_contains($start, 'Zuletzt angelegter Vorgang') && str_contains($einst, 'id="vorlagen"'), 'Start und Einstellungen');
+check(str_contains($start, 'name="kienzle-csrf" value="tok"') && str_contains($start, 'Dokument wählen') && str_contains($start, 'us-links') && str_contains($start, 'name="vorlage_id"') && str_contains($start, 'Anderen Patienten wählen') && str_contains($einst, 'id="vorlagen"'), 'Start und Einstellungen');
 check(str_contains($liste, 'id="vg-suche"') && str_contains($liste, 'data-suche="') && str_contains($liste, 'id="vg-art"'), 'Liste mit Suche und Filtern');
 check(!str_contains($start, 'id="vorlagen"') && !str_contains($liste, 'id="vorlagen"'), 'Vorlagen nur unter Einstellungen');
 $nurVorgang = Ansicht::seite('/', 'tok', [], [], true, false, null, null);
@@ -242,7 +242,7 @@ Seite::padLoeschen($px);
 // Start aus T2med: Patient per FHIR (hier ersetzt), einmaliger Startcode, 5 Minuten gültig
 $fhir = new class(['base_url' => 'https://t2med.example.org/aps/fhir/api/r4', 'launch_urls' => ['https://192.0.2.7/aps/fhir/api/r4/']]) extends Fhir {
     public array $aufrufe = [];
-    public function patient(string $kontext, string $token): array { $this->aufrufe[] = [$kontext, $token]; return ['id' => 'p1', 'name' => 'Max Mustermann', 'geburtsdatum' => '1980-04-12']; }
+    public function patient(string $kontext, string $token): array { $this->aufrufe[] = [$kontext, $token]; return ['id' => 'p1', 'name' => 'Max Mustermann', 'geburtsdatum' => '1980-04-12', 'telefon' => '0711 1234', 'email' => 'max@example.invalid', 'adresse' => 'Hauptstr. 1, 70173 Stuttgart', 'vorname' => 'Max', 'nachname' => 'Mustermann', 'geschlecht' => 'male']; }
 };
 check($fhir->erlaubt('https://192.0.2.7/aps/fhir/api/r4') && $fhir->erlaubt('https://t2med.example.org/aps/fhir/api/r4/') && !$fhir->erlaubt('https://boese.example.org/') && !$fhir->erlaubt(''), 'FHIR-Adresse nur aus der Basis');
 $eingabe = ['context_id' => 'kontext-1', 'fhir_base_url' => 'https://192.0.2.7/aps/fhir/api/r4', 'oauth_token' => 'tok'];
@@ -250,7 +250,8 @@ $a = Start::anlegen($eingabe, $fhir, 'kienzle.example.org', 1000);
 check(preg_match('~^https://kienzle\.example\.org/#launch=([0-9a-f]{64})&m=signatur$~D', $a['url'], $mm) === 1 && $fhir->aufrufe === [['kontext-1', 'tok']], 'Startlink');
 check(Start::einloesen($mm[1], 1000 + Start::GUELTIG + 1) === null, 'abgelaufener Code');
 $a = Start::anlegen($eingabe, $fhir, 'kienzle.example.org', 2000); preg_match('~launch=([0-9a-f]{64})~', $a['url'], $mm);
-check(Start::einloesen($mm[1], 2100) === ['patient' => 'Max Mustermann', 'geburtsdatum' => '1980-04-12', 'kontext' => 'kontext-1'], 'Code einlösen');
+check(Start::einloesen($mm[1], 2100) === ['patient' => 'Max Mustermann', 'geburtsdatum' => '1980-04-12', 'kontext' => 'kontext-1', 'telefon' => '0711 1234', 'email' => 'max@example.invalid', 'adresse' => 'Hauptstr. 1, 70173 Stuttgart', 'vorname' => 'Max', 'nachname' => 'Mustermann', 'geschlecht' => 'male', 'patient_id' => 'p1'], 'Code einlösen');
+check(Speicher::tokenHolen('kontext-1', 2100) === 'tok' && Speicher::tokenHolen('kontext-1', 2000 + 4 * 3600 + 1) === null, 'Token verschlüsselt gemerkt und nach 4 Stunden weg');
 check(Start::einloesen($mm[1], 2100) === null && Start::einloesen('abc') === null, 'Code nur einmal');
 wirft(fn() => Start::anlegen(['fhir_base_url' => 'https://boese.example.org'] + $eingabe, $fhir, 'kienzle.example.org'), 'fremde FHIR-Adresse');
 wirft(fn() => Start::anlegen(['context_id' => '../x'] + $eingabe, $fhir, 'kienzle.example.org'), 'ungültiger Kontext');
@@ -258,5 +259,73 @@ wirft(fn() => Start::anlegen(['oauth_token' => ''] + $eingabe, $fhir, 'kienzle.e
 wirft(fn() => Start::anlegen($eingabe, $fhir, 'evil.example.org/x'), 'ungültiger Servername');
 $vid = Seite::vorgangAnlegen(['vorlage_id' => Seite::vorlagen()[0]['id'], 'patient' => 'Max Mustermann', 'pad_id' => Seite::pads(true)[0]['id'] ?? 0], 'admin', [], 'kontext-1');
 check(Seite::vorgang($vid)['kontext'] === 'kontext-1', 'Kontext am Vorgang');
+
+// Leistungsliste aus der Kasse: Summe und Texte kommen aus der Liste, nicht aus dem Formular
+$padT = (int)(Seite::pads(true)[0]['id'] ?? 0);
+$kvl = Seite::vorlageSpeichern(['art' => 'igel', 'titel' => 'Kasse-Test', 'text' => "Leistungen:\n{{leistungen}}\nSumme {{betrag}} Euro", 'aktiv' => 1]);
+$liste = json_encode([['code' => '410', 'label' => 'Ultraschall Oberbauch', 'cent' => 3000], ['code' => '', 'label' => 'Beratung', 'cent' => 1550]]);
+$kid = Seite::vorgangAnlegen(['vorlage_id' => $kvl, 'pad_id' => $padT, 'patient' => 'Kasse Beispiel', 'leistung' => 'ignoriert', 'betrag' => '1,00', 'leistungen_json' => $liste, 'quelle' => 'kasse', 'quelle_ref' => 'abc123'], 'empfang', $praxis, '', $t0);
+$kv = Seite::vorgang($kid);
+check($kv['quelle'] === 'kasse' && $kv['quelle_ref'] === 'abc123' && count(json_decode($kv['leistungen'], true)) === 2, 'Herkunft und Liste gespeichert');
+check(str_contains($kv['text'], 'GOÄ 410: Ultraschall Oberbauch – 30,00 €') && str_contains($kv['text'], '– Beratung – 15,50 €') && str_contains($kv['text'], '45,50'), 'Text mit Leistungsliste und Summe: ' . $kv['text']);
+check(!str_contains($kv['text'], 'ignoriert') && !str_contains($kv['text'], '1,00'), 'Formularwerte dürfen die Liste nicht überschreiben');
+wirft(fn() => Seite::leistungenPruefen('kein json'), 'Liste kein JSON');
+wirft(fn() => Seite::leistungenPruefen(json_encode([['label' => 'X', 'cent' => -5]])), 'negativer Preis');
+wirft(fn() => Seite::leistungenPruefen(json_encode([['label' => 'X', 'cent' => '30']])), 'Preis kein Ganzzahl');
+wirft(fn() => Seite::leistungenPruefen(json_encode(array_fill(0, 41, ['label' => 'X', 'cent' => 1]))), 'zu viele Positionen');
+wirft(fn() => Seite::vorgangAnlegen(['vorlage_id' => $kvl, 'pad_id' => $padT, 'patient' => 'A', 'leistungen_json' => $liste, 'quelle' => 'kasse', 'quelle_ref' => '../x'], 'x', $praxis), 'ungültiger Verweis');
+check(Seite::leistungenPruefen('') === [], 'leere Liste');
+$ohne = Seite::vorgang(Seite::vorgangAnlegen(['vorlage_id' => $kvl, 'pad_id' => $padT, 'patient' => 'Ohne Liste', 'leistung' => 'Einzelne Leistung', 'betrag' => '20'], 'empfang', $praxis, '', $t0));
+check($ohne['quelle'] === '' && str_contains($ohne['text'], 'Einzelne Leistung'), 'Ohne Liste bleibt es bei der Leistung');
+
+// Kontaktdaten als Platzhalter
+$kt = Seite::vorlageSpeichern(['art' => 'sonstige', 'titel' => 'Kontakt-Test', 'text' => 'Tel {{telefon}} Mail {{email}} Geb {{geburtsdatum}} Adr {{adresse}}', 'aktiv' => 1]);
+$kd = Seite::vorgang(Seite::vorgangAnlegen(['vorlage_id' => $kt, 'pad_id' => $padT, 'patient' => 'K', 'telefon' => '0711 1234', 'email' => 'max@example.invalid', 'geburtsdatum' => '1980-04-12', 'adresse' => 'Hauptstr. 1, 70173 Stuttgart'], 'x', $praxis));
+check($kd['text'] === 'Tel 0711 1234 Mail max@example.invalid Geb 12.04.1980 Adr Hauptstr. 1, 70173 Stuttgart', 'Kontaktdaten als Platzhalter');
+$kl = Seite::vorgang(Seite::vorgangAnlegen(['vorlage_id' => $kt, 'pad_id' => $padT, 'patient' => 'K'], 'x', $praxis));
+check($kl['text'] === 'Tel … Mail … Geb … Adr …', 'Ohne Kontaktdaten bleiben Auslassungspunkte');
+wirft(fn() => Seite::vorgangAnlegen(['vorlage_id' => $kt, 'pad_id' => $padT, 'patient' => 'K', 'email' => 'kein-mail'], 'x', $praxis), 'ungültige E-Mail');
+wirft(fn() => Seite::vorgangAnlegen(['vorlage_id' => $kt, 'pad_id' => $padT, 'patient' => 'K', 'telefon' => 'abc<script>'], 'x', $praxis), 'ungültiges Telefon');
+
+// Anrede-Platzhalter
+$at = Seite::vorlageSpeichern(['art' => 'sonstige', 'titel' => 'Anrede-Test', 'text' => '{{briefanrede}}|{{anrede}}|{{vorname}}|{{nachname}}', 'aktiv' => 1]);
+$an = fn(array $x) => Seite::vorgang(Seite::vorgangAnlegen(['vorlage_id' => $at, 'pad_id' => $padT, 'patient' => 'Max Mustermann'] + $x, 'x', $praxis))['text'];
+check($an(['geschlecht' => 'male', 'vorname' => 'Max', 'nachname' => 'Mustermann']) === 'Sehr geehrter Herr Mustermann|Herr|Max|Mustermann', 'Briefanrede Herr');
+check($an(['geschlecht' => 'female', 'vorname' => 'Erika', 'nachname' => 'Musterfrau']) === 'Sehr geehrte Frau Musterfrau|Frau|Erika|Musterfrau', 'Briefanrede Frau');
+check($an(['geschlecht' => 'other', 'vorname' => 'Alex', 'nachname' => 'Beispiel']) === 'Guten Tag Alex Beispiel|…|Alex|Beispiel', 'Briefanrede neutral');
+check($an([]) === 'Guten Tag Max Mustermann|…|Max|Mustermann', 'Namen aus dem Gesamtnamen');
+wirft(fn() => $an(['geschlecht' => 'x']), 'ungültiges Geschlecht');
+
+// In T2med übernehmen (nur Telefon/E-Mail, nur auf Knopfdruck, nach der Unterschrift)
+$fake = new class(['base_url' => 'https://t2med.example.org/aps/fhir/api/r4']) extends Fhir {
+    public array $aufrufe = []; public int $putStatus = 200;
+    protected function anfrage(string $url, string $token, string $methode = 'GET', ?array $body = null, array $mehr = []): array {
+        $this->aufrufe[] = [$methode, $url, $token, $mehr, $body];
+        if ($methode === 'GET') return ['status' => 200, 'body' => ['resourceType' => 'Patient', 'id' => 'p1', 'meta' => ['versionId' => 'abc/_history/4'], 'address' => [['city' => 'Stuttgart']],
+            'telecom' => [['system' => 'phone', 'value' => '0711 1', 'use' => 'home'], ['system' => 'email', 'value' => 'alt@example.invalid', 'use' => 'work']]]];
+        return ['status' => $this->putStatus, 'body' => null];
+    }
+};
+Start::anlegen($eingabe, $fhir, 'kienzle.example.org', time());
+$kid2 = Seite::vorgangAnlegen(['vorlage_id' => $at, 'pad_id' => $padT, 'patient' => 'Max Mustermann', 'patient_id' => 'p1', 'telefon_alt' => '0711 1234', 'email_alt' => 'max@example.invalid',
+    'telefon' => '0711 9999', 'email' => 'max@example.invalid', 'kontakt_uebernehmen' => '1'], 'x', $praxis, 'kontext-1');
+$k2 = Seite::vorgang($kid2);
+check($k2['kontakt_status'] === 'offen' && json_decode($k2['kontakt_neu'], true) === ['telefon' => '0711 9999', 'email' => ''], 'Nur geänderte Angaben vorgemerkt');
+wirft(fn() => Seite::kontaktUebernehmen($kid2, $fake), 'vor der Unterschrift keine Übernahme');
+Speicher::pdo()->prepare("UPDATE vorgaenge SET status='unterschrieben' WHERE id=?")->execute([$kid2]);
+check(Seite::kontaktUebernehmen($kid2, $fake) === 'Telefon in T2med übernommen.', 'Übernahme meldet Telefon');
+$put = $fake->aufrufe[1];
+check($put[0] === 'PUT' && $put[2] === 'tok' && in_array('If-Match: W/"4"', $put[3], true) && $put[4]['address'] === [['city' => 'Stuttgart']] && $put[4]['telecom'][0]['value'] === '0711 9999' && $put[4]['telecom'][1]['value'] === 'alt@example.invalid', 'PUT mit If-Match, Rest unverändert');
+check(Seite::vorgang($kid2)['kontakt_status'] === 'geschrieben', 'Status geschrieben');
+$ohneHaken = Seite::vorgang(Seite::vorgangAnlegen(['vorlage_id' => $at, 'pad_id' => $padT, 'patient' => 'A B', 'patient_id' => 'p1', 'telefon' => '0711 5', 'telefon_alt' => '0711 6'], 'x', $praxis, 'kontext-1'));
+check($ohneHaken['kontakt_status'] === '', 'Ohne Häkchen nichts vorgemerkt');
+$kid3 = Seite::vorgangAnlegen(['vorlage_id' => $at, 'pad_id' => $padT, 'patient' => 'A B', 'patient_id' => 'p1', 'email' => 'neu@example.invalid', 'email_alt' => 'x@example.invalid', 'kontakt_uebernehmen' => '1'], 'x', $praxis, 'kontext-1');
+Speicher::pdo()->prepare("UPDATE vorgaenge SET status='unterschrieben' WHERE id=?")->execute([$kid3]);
+$fake->putStatus = 409;
+wirft(fn() => Seite::kontaktUebernehmen($kid3, $fake), 'Versionskonflikt');
+check(Seite::vorgang($kid3)['kontakt_status'] === 'fehler' && str_contains(Seite::vorgang($kid3)['kontakt_meldung'], 'geändert'), 'Fehler gemerkt');
+wirft(fn() => $fake->kontaktSchreiben('../x', 'tok', '0711 1', ''), 'ungültige Patienten-ID');
+$fake->aufrufe = [];
+check($fake->kontaktSchreiben('p1', 'tok', '0711 1', 'alt@example.invalid') === ['telefon' => false, 'email' => false] && count($fake->aufrufe) === 1, 'Unveränderte Werte: kein PUT');
 
 echo "Signatur-Tests grün.\n";

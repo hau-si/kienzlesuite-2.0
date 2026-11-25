@@ -170,11 +170,11 @@ final class Seite {
         $name = trim($werte['name_text']) !== '';
         $angekommen = array_filter(self::protokoll(50), static fn($l) => str_contains($l, 'Bon an die Warteschlange')) !== [];
         return [
-            ['title' => 'Bondrucker für den Terminzettel zugeordnet', 'state' => $bon !== '' ? 'done' : 'open',
+            ['title' => 'Bondrucker für den Terminzettel zugeordnet', 'optional' => true, 'state' => $bon !== '' ? 'done' : 'open',
                 'hint' => 'Verwaltung → Drucker → „Wofür welcher Drucker?“ (Bondrucker wählen)', 'link' => '/terminzettel/'],
             ['title' => 'Terminzettel: Praxisname im Kopf', 'state' => $name ? 'done' : 'open', 'optional' => true,
                 'hint' => 'Einstellungen → Kopf: Praxisname, Adresse und Logo für den Bon', 'link' => '/terminzettel/#kopf'],
-            ['title' => 'Terminzettel aus T2med am Bondrucker angekommen', 'state' => $angekommen ? 'done' : 'open',
+            ['title' => 'Terminzettel aus T2med am Bondrucker angekommen', 'optional' => true, 'state' => $angekommen ? 'done' : 'open',
                 'hint' => 'Am Arbeitsplatz den Drucker „vTermine“ einrichten (Anleitung: Arbeitsplatz einrichten → Virtuelle Drucker) und in T2med unter Einstellungen → Kalender → Terminliste (DIN A6) wählen; dann einen Terminzettel drucken',
                 'link' => '/terminzettel/#drucker'],
         ];

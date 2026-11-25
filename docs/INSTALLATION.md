@@ -74,7 +74,7 @@ Mehrfaches Ausführen ist erlaubt; Schlüssel, Zertifizierungsstelle, Daten und 
 | `sudo bash installer/install.sh --wiederherstellen` | Neue VM nach Totalausfall: Angaben vom Schlüsselblatt eingeben, alles kommt zurück |
 | `sudo kienzle-sicherung einstellungen-einspielen DATEI` | Export der Einstellungen zurücklegen, danach Installer erneut ausführen |
 | `sudo kienzle-module liste` | Installierte und verfügbare Module (sonst Verwaltung → Module im Webinterface) |
-| `sudo kienzle-module installieren sumup` / `entfernen sumup [--daten-loeschen]` | Modul an der Konsole installieren bzw. entfernen |
+| `sudo kienzle-module installieren kasse` / `entfernen kasse [--daten-loeschen]` | Modul an der Konsole installieren bzw. entfernen |
 
 ## Nach einem Totalausfall
 

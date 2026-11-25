@@ -10,7 +10,8 @@ final class Seite {
     public const ARTEN = ['igel' => 'IGeL-Vertrag', 'aufklaerung' => 'Patientenaufklärung', 'datenschutz' => 'Datenschutzerklärung', 'sonstige' => 'Sonstiges Dokument'];
     public const STATI = ['wartet' => 'Wartet auf Unterschrift', 'am_pad' => 'Wird am Pad unterschrieben', 'unterschrieben' => 'Unterschrieben', 'uebertragen' => 'In T2med abgelegt', 'fehler' => 'Fehler', 'abgebrochen' => 'Abgebrochen'];
     /** Platzhalter in Vertragstexten: {{name}} wird beim Anlegen des Vorgangs eingesetzt. */
-    public const PLATZHALTER = ['patient' => 'Name des Patienten', 'datum' => 'Heutiges Datum', 'praxis' => 'Name der Praxis', 'leistung' => 'Leistung oder Thema', 'betrag' => 'Betrag in Euro'];
+    public const PLATZHALTER = ['patient' => 'Name des Patienten', 'datum' => 'Heutiges Datum', 'praxis' => 'Name der Praxis', 'leistung' => 'Leistung oder Thema', 'vorname' => 'Vorname des Patienten', 'nachname' => 'Nachname des Patienten', 'anrede' => 'Anrede: Herr oder Frau (nur wenn T2med das Geschlecht kennt)', 'briefanrede' => 'Briefanrede, z. B. Sehr geehrter Herr Mustermann', 'geburtsdatum' => 'Geburtsdatum des Patienten', 'telefon' => 'Telefonnummer des Patienten', 'email' => 'E-Mail-Adresse des Patienten', 'adresse' => 'Anschrift des Patienten', 'leistungen' => 'Liste der Leistungen mit Preisen (aus der Kasse, sonst die Leistung)', 'betrag' => 'Betrag in Euro'];
+    public const MAX_LEISTUNGEN = 40;
     public const MAX_TEXT = 20000;
     /** Wie lange abgeschlossene Vorgänge (übertragen, abgebrochen) aufbewahrt werden, in Tagen. */
     public const AUFBEWAHRUNG_TAGE = 30;
@@ -18,7 +19,7 @@ final class Seite {
     /** Mustertexte beim ersten Start. Nur Beispiele: vor Gebrauch von der Praxis (ggf. juristisch) prüfen lassen. */
     public static function muster(): array {
         return [
-            ['igel', 'IGeL-Vertrag (Muster)', "Individuelle Gesundheitsleistung\n\nPatient/in: {{patient}}\nDatum: {{datum}}\nLeistung: {{leistung}}\nVoraussichtliche Kosten: {{betrag}} Euro\n\nIch wünsche die genannte Leistung, die nicht zum Leistungsumfang der gesetzlichen Krankenversicherung gehört. Ich wurde darüber informiert, dass ich die Kosten selbst trage und dass ich die Leistung auch ablehnen kann.\n\n{{praxis}}"],
+            ['igel', 'IGeL-Vertrag (Muster)', "Individuelle Gesundheitsleistung\n\nPatient/in: {{patient}}\nDatum: {{datum}}\nLeistungen:\n{{leistungen}}\nVoraussichtliche Kosten insgesamt: {{betrag}} Euro\n\nIch wünsche die genannte Leistung, die nicht zum Leistungsumfang der gesetzlichen Krankenversicherung gehört. Ich wurde darüber informiert, dass ich die Kosten selbst trage und dass ich die Leistung auch ablehnen kann.\n\n{{praxis}}"],
             ['aufklaerung', 'Patientenaufklärung (Muster)', "Aufklärung und Einwilligung\n\nPatient/in: {{patient}}\nDatum: {{datum}}\nThema: {{leistung}}\n\nIch wurde über Ablauf, Nutzen und mögliche Risiken aufgeklärt und konnte Fragen stellen. Ich willige in die besprochene Maßnahme ein.\n\n{{praxis}}"],
             ['datenschutz', 'Datenschutzerklärung (Muster)', "Information zum Datenschutz\n\nPatient/in: {{patient}}\nDatum: {{datum}}\n\nIch habe die Informationen zur Verarbeitung meiner Gesundheitsdaten in der Praxis erhalten und zur Kenntnis genommen.\n\n{{praxis}}"],
         ];
@@ -104,6 +105,25 @@ final class Seite {
     // ---- Vorgänge ----
 
     /**
+     * Leistungsliste aus der Kasse (JSON: [{code, label, cent}]) prüfen und bereinigen. Leer: keine Liste.
+     * @return list<array{code:string,label:string,cent:int}>
+     */
+    public static function leistungenPruefen(mixed $json): array {
+        if (!is_string($json) || trim($json) === '') return [];
+        if (strlen($json) > 20000) throw new \InvalidArgumentException('Die Leistungsliste ist zu lang.');
+        $liste = json_decode($json, true);
+        if (!is_array($liste) || !array_is_list($liste) || count($liste) > self::MAX_LEISTUNGEN) throw new \InvalidArgumentException('Die Leistungsliste ist ungültig.');
+        $out = [];
+        foreach ($liste as $z) {
+            if (!is_array($z) || !is_int($z['cent'] ?? null) || $z['cent'] < 0 || $z['cent'] > 99999999) throw new \InvalidArgumentException('Die Leistungsliste enthält einen ungültigen Preis.');
+            $out[] = ['code' => self::zeile($z['code'] ?? '', 'GOÄ-Ziffer', 12, false), 'label' => self::zeile($z['label'] ?? '', 'Leistung', 120), 'cent' => $z['cent']];
+        }
+        return $out;
+    }
+
+    private static function euro(int $cent): string { return number_format($cent / 100, 2, ',', '.'); }
+
+    /**
      * Legt einen Vorgang an. Der Text wird jetzt eingesetzt und fest gespeichert: Spätere Änderungen an der Vorlage
      * ändern nichts an dem, was der Patient unterschreibt. $kontext ist die T2med-Kontext-ID (leer, wenn nicht aus T2med).
      */
@@ -117,6 +137,43 @@ final class Seite {
         if ($betrag !== '' && !preg_match('/^\d{1,6}([.,]\d{1,2})?$/D', $betrag)) throw new \InvalidArgumentException('Der Betrag muss eine Zahl sein, z. B. 45,00.');
         if ($betrag !== '') $betrag = number_format((float)str_replace(',', '.', $betrag), 2, ',', '.');
         $kontext = self::zeile($kontext, 'Kontext', 100, false);
+        $geburtsdatum = self::zeile($in['geburtsdatum'] ?? '', 'Geburtsdatum', 20, false);
+        if ($geburtsdatum !== '' && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/D', $geburtsdatum, $g)) $geburtsdatum = $g[3] . '.' . $g[2] . '.' . $g[1];
+        $telefon = self::zeile($in['telefon'] ?? '', 'Telefonnummer', 40, false);
+        if ($telefon !== '' && !preg_match('/^[0-9 +()\/.-]{3,40}$/D', $telefon)) throw new \InvalidArgumentException('Die Telefonnummer darf nur Ziffern, Leerzeichen und + ( ) / . - enthalten.');
+        $email = self::zeile($in['email'] ?? '', 'E-Mail-Adresse', 254, false);
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Die E-Mail-Adresse ist ungültig.');
+        $adresse = self::zeile($in['adresse'] ?? '', 'Anschrift', 200, false);
+        $vorname = self::zeile($in['vorname'] ?? '', 'Vorname', 80, false);
+        $nachname = self::zeile($in['nachname'] ?? '', 'Nachname', 80, false);
+        if ($vorname === '' && $nachname === '') {
+            // Ohne getrennte Angaben: letztes Wort des Namens als Nachname.
+            $teile = preg_split('/\s+/u', trim($patient)) ?: [];
+            if (count($teile) > 1) { $nachname = (string)array_pop($teile); $vorname = implode(' ', $teile); } else $nachname = $patient;
+        }
+        $geschlecht = (string)($in['geschlecht'] ?? '');
+        if (!in_array($geschlecht, ['', 'male', 'female', 'other', 'unknown'], true)) throw new \InvalidArgumentException('Ungültige Angabe zum Geschlecht.');
+        $anrede = $geschlecht === 'male' ? 'Herr' : ($geschlecht === 'female' ? 'Frau' : '');
+        $briefanrede = $anrede === '' ? 'Guten Tag ' . trim($vorname . ' ' . $nachname) : ($geschlecht === 'male' ? 'Sehr geehrter Herr ' : 'Sehr geehrte Frau ') . $nachname;
+        // T2med übernehmen: nur mit Patienten-ID aus einem Start aus T2med und bei tatsächlich geänderten Angaben.
+        $patientId = self::zeile($in['patient_id'] ?? '', 'Patienten-ID', 64, false);
+        if ($patientId !== '' && !preg_match('/^[A-Za-z0-9._-]{1,64}$/D', $patientId)) throw new \InvalidArgumentException('Ungültige Patienten-ID.');
+        $telAlt = self::zeile($in['telefon_alt'] ?? '', 'Telefon', 40, false);
+        $mailAlt = self::zeile($in['email_alt'] ?? '', 'E-Mail', 254, false);
+        $kontaktNeu = ['telefon' => $telefon !== '' && $telefon !== $telAlt ? $telefon : '', 'email' => $email !== '' && $email !== $mailAlt ? $email : ''];
+        $kontaktStatus = !empty($in['kontakt_uebernehmen']) && $patientId !== '' && $kontext !== '' && ($kontaktNeu['telefon'] !== '' || $kontaktNeu['email'] !== '') ? 'offen' : '';
+        // Leistungsliste aus der Kasse: Summe und Texte kommen aus der Liste, nicht aus dem Formular.
+        $liste = self::leistungenPruefen($in['leistungen_json'] ?? '');
+        $quelle = $liste || ($in['quelle'] ?? '') === 'kasse' ? 'kasse' : '';
+        $quelleRef = $quelle === '' ? '' : self::zeile($in['quelle_ref'] ?? '', 'Verweis', 64, false);
+        if ($quelleRef !== '' && !preg_match('/^[A-Za-z0-9._-]{1,64}$/D', $quelleRef)) throw new \InvalidArgumentException('Ungültiger Verweis auf den Kassenvorgang.');
+        $leistungenText = $leistung;
+        if ($liste) {
+            $zeilen = array_map(static fn(array $z): string => '– ' . ($z['code'] !== '' ? 'GOÄ ' . $z['code'] . ': ' : '') . $z['label'] . ' – ' . self::euro($z['cent']) . ' €', $liste);
+            $leistungenText = implode("\n", $zeilen);
+            $leistung = mb_substr(implode(', ', array_map(static fn(array $z): string => $z['label'], $liste)), 0, 120);
+            $betrag = self::euro(array_sum(array_column($liste, 'cent')));
+        }
         // Pad: bei genau einem aktiven Pad automatisch, sonst muss eines gewählt werden; ohne Pads bleibt es offen (0).
         $aktivePads = self::pads(true);
         $padId = 0;
@@ -126,14 +183,41 @@ final class Seite {
             if (!in_array($padId, array_map(fn($p) => (int)$p['id'], $aktivePads), true)) throw new \InvalidArgumentException('Bitte das Pad wählen, an dem unterschrieben wird.');
         }
         $text = self::einsetzen((string)$vorlage['text'], [
-            'patient' => $patient, 'datum' => date('d.m.Y', $jetzt), 'praxis' => (string)($praxis['name'] ?? ''), 'leistung' => $leistung, 'betrag' => $betrag,
+            'patient' => $patient, 'datum' => date('d.m.Y', $jetzt), 'praxis' => (string)($praxis['name'] ?? ''), 'leistung' => $leistung, 'leistungen' => $leistungenText, 'betrag' => $betrag,
+            'geburtsdatum' => $geburtsdatum, 'telefon' => $telefon, 'email' => $email, 'adresse' => $adresse,
+            'vorname' => $vorname, 'nachname' => $nachname, 'anrede' => $anrede, 'briefanrede' => $briefanrede,
         ]);
         self::aufraeumen($jetzt);
-        self::pdo()->prepare('INSERT INTO vorgaenge (vorlage_id, art, titel, text, patient, kontext, kontext_bis, status, druck_vorher, druck_nachher, erstellt, erstellt_von, pad_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, "wartet", ?, ?, ?, ?, ?)')
+        self::pdo()->prepare('INSERT INTO vorgaenge (vorlage_id, art, titel, text, patient, kontext, kontext_bis, status, druck_vorher, druck_nachher, erstellt, erstellt_von, pad_id, quelle, quelle_ref, leistungen, patient_id, kontakt_alt, kontakt_neu, kontakt_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, "wartet", ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
             ->execute([(int)$vorlage['id'], $vorlage['art'], $vorlage['titel'], $text, $patient, $kontext, $kontext === '' ? 0 : $jetzt + 4 * 3600,
-                !empty($in['druck_vorher']) ? 1 : 0, !empty($in['druck_nachher']) ? 1 : 0, $jetzt, self::zeile($benutzer, 'Benutzer', 80, false), $padId]);
+                !empty($in['druck_vorher']) ? 1 : 0, !empty($in['druck_nachher']) ? 1 : 0, $jetzt, self::zeile($benutzer, 'Benutzer', 80, false), $padId, $quelle, $quelleRef, $liste ? json_encode($liste, JSON_UNESCAPED_UNICODE) : '',
+                $kontaktStatus !== '' ? $patientId : '', $kontaktStatus !== '' ? json_encode(['telefon' => $telAlt, 'email' => $mailAlt], JSON_UNESCAPED_UNICODE) : '', $kontaktStatus !== '' ? json_encode($kontaktNeu, JSON_UNESCAPED_UNICODE) : '', $kontaktStatus]);
         return (int)self::pdo()->lastInsertId();
+    }
+
+    /**
+     * Geänderte Kontaktdaten eines unterschriebenen Vorgangs in T2med übernehmen (nur auf Knopfdruck, nur Telefon und E-Mail).
+     * @return string Meldung für die Anzeige
+     */
+    public static function kontaktUebernehmen(int $id, Fhir $fhir, ?int $jetzt = null): string {
+        $jetzt ??= time();
+        $v = self::vorgang($id);
+        if (!$v || !in_array($v['kontakt_status'], ['offen', 'fehler'], true)) throw new \InvalidArgumentException('Zu diesem Vorgang ist keine Übernahme in T2med vorgesehen.');
+        if (!in_array($v['status'], ['unterschrieben', 'uebertragen'], true)) throw new \InvalidArgumentException('Die Übernahme ist erst nach der Unterschrift möglich.');
+        $token = Speicher::tokenHolen((string)$v['kontext'], $jetzt);
+        if ($token === null || !self::kontextGueltig($v, $jetzt)) throw new \InvalidArgumentException('Die T2med-Verbindung ist abgelaufen. Bitte den Patienten neu aus T2med aufrufen und einen neuen Vorgang anlegen.');
+        $neu = json_decode((string)$v['kontakt_neu'], true) ?: [];
+        try {
+            $r = $fhir->kontaktSchreiben((string)$v['patient_id'], $token, (string)($neu['telefon'] ?? ''), (string)($neu['email'] ?? ''));
+            $teile = array_filter([$r['telefon'] ? 'Telefon' : '', $r['email'] ? 'E-Mail' : '']);
+            $meldung = $teile ? implode(' und ', $teile) . ' in T2med übernommen.' : 'T2med hatte die Angaben schon.';
+            self::pdo()->prepare("UPDATE vorgaenge SET kontakt_status='geschrieben', kontakt_meldung=? WHERE id=?")->execute([$meldung, $id]);
+            return $meldung;
+        } catch (\RuntimeException $e) {
+            self::pdo()->prepare("UPDATE vorgaenge SET kontakt_status='fehler', kontakt_meldung=? WHERE id=?")->execute([mb_substr($e->getMessage(), 0, 300), $id]);
+            throw new \InvalidArgumentException($e->getMessage());
+        }
     }
 
     /** Alle Pads, nach Name sortiert; $nurAktive: nur die, die für neue Vorgänge wählbar sind. */
@@ -257,10 +341,10 @@ final class Seite {
         $musterOffen = (int)self::pdo()->query('SELECT COUNT(*) FROM vorlagen WHERE muster=1 AND aktiv=1')->fetchColumn();
         $pad = Pad::status()['installiert'];
         return [
-            ['title' => 'Pad-Software von signotec hochladen', 'state' => $pad ? 'done' : 'open',
+            ['title' => 'Pad-Software von signotec hochladen', 'optional' => true, 'state' => $pad ? 'done' : 'open',
              'hint' => $pad ? 'Die Bibliotheken von signotec sind hinterlegt.' : 'Die Software für das Unterschriftenpad liegt nicht bei und muss einmal von einem Admin hochgeladen werden.',
              'link' => '/signatur/einstellungen#pad'],
-            ['title' => 'Vertragstexte der Praxis anpassen', 'state' => $musterOffen > 0 ? 'open' : 'done',
+            ['title' => 'Vertragstexte der Praxis anpassen', 'optional' => true, 'state' => $musterOffen > 0 ? 'open' : 'done',
              'hint' => $musterOffen > 0 ? 'Die mitgelieferten Mustertexte sind nur Beispiele. Bitte prüfen und für Ihre Praxis ändern oder abschalten.' : 'Alle aktiven Vorlagen wurden von der Praxis bearbeitet.',
              'link' => '/signatur/einstellungen#vorlagen'],
         ];

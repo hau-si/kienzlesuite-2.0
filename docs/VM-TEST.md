@@ -138,7 +138,7 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
 2. [ ] Verwaltung → Module: „Kasse 2.0.x – Mit der Basis geliefert“ steht unter „Verfügbar“. „Installieren“ (Bestätigung
        mit Passwort und Code). Die Seite aktualisiert sich; nach einigen Minuten (Pakete) steht die Kasse unter „Installiert“.
        Bei Fehlern: Protokoll auf der Seite, `journalctl -u kienzle-module-anwenden`.
-3. [ ] `systemctl status kienzle-sumup-php` läuft als `ks-sumup`; `ls -ld /var/lib/kienzle/sumup` zeigt `drwx------ ks-sumup`.
+3. [ ] `systemctl status kienzle-kasse-php` läuft als `ks-kasse`; `ls -ld /var/lib/kienzle/kasse` zeigt `drwx------ ks-kasse`.
 4. [ ] Verwaltung → Benutzer: einem Mitarbeiter das Recht „Kasse: Kartenzahlung …“ geben; sich als dieser anmelden:
        Start zeigt „Kasse“, `/kasse/` öffnet die Kasse, „Testpatient öffnen (Testmodus)“ funktioniert, Mock-Zahlung gelingt.
 5. [ ] Als Admin des Moduls: `/kasse/settings.php` (Einstellungen). Praxisdaten speichern verlangt einmal die Bestätigung
@@ -151,7 +151,7 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
 8. [ ] Kassen-PC: Zertifikat der Suite einrichten (Arbeitsplatz einrichten), in der Kasse unter Einstellungen → Arbeitsplätze das
        Paket für Windows laden (Bestätigung), installieren. In T2med den Button „Kartenzahlung“ anlegen (Anleitung in der Kasse).
        Klick beim Patienten: Browser öffnet die Suite, nach der Anmeldung (falls nötig) die Kasse mit dem Patienten.
-9. [ ] Verwaltung → Module → Kasse → Entfernen ohne Häkchen: Kasse weg, `/var/lib/kienzle/sumup` bleibt; erneut installieren:
+9. [ ] Verwaltung → Module → Kasse → Entfernen ohne Häkchen: Kasse weg, `/var/lib/kienzle/kasse` bleibt; erneut installieren:
        Einstellungen und Leistungen sind wieder da.
 
 ## Modul Terminzettel 1.0.0 (Basis ab 0.19.0)

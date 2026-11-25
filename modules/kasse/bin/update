@@ -1,0 +1,3 @@
+#!/bin/sh
+# Haken „update“ des Moduls kasse (läuft als ks-kasse).
+exec /usr/bin/php "$(dirname "$0")/kienzle-kasse" update

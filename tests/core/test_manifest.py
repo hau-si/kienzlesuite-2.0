@@ -78,7 +78,7 @@ class Gueltig(unittest.TestCase):
         blocks = code_blocks((ROOT / 'docs' / 'ARCHITEKTUR.md').read_text(encoding='utf-8'), 'toml')
         self.assertEqual(len(blocks), 1)
         m = manifest.check_text(blocks[0])
-        self.assertEqual(m['module']['id'], 'sumup')
+        self.assertEqual(m['module']['id'], 'kasse')
 
     def test_minimal(self):
         text = BEISPIEL
@@ -219,12 +219,18 @@ class Web(Fehler):
         up = 'upstream = "unix:/run/kienzle/beispiel/web.sock"'
         m = manifest.check_text(replace(up, up + '\nprotocol = "fastcgi"\nentry = "public/index.php"'))
         self.assertEqual(m['web'], {'path': '/beispiel', 'upstream': 'unix:/run/kienzle/beispiel/web.sock', 'protocol': 'fastcgi', 'entry': 'public/index.php',
-                          'starter': False, 'einstellungen': None, 'uploads': False})
+                          'einstellungen': None, 'uploads': False})
         self.assertEqual(manifest.check_text(BEISPIEL)['web']['protocol'], 'http')
         self.invalid(replace(up, up + '\nprotocol = "fastcgi"'), 'web', '„entry“ fehlt')
         self.invalid(replace(up, up + '\nprotocol = "uwsgi"'), 'web.protocol')
         self.invalid(replace(up, up + '\nentry = "public/index.php"'), 'web.entry', 'nur mit')
         self.invalid(replace(up, up + '\nprotocol = "fastcgi"\nentry = "../x.php"'), 'web.entry')
+
+    def test_alter_schluessel_web_starter_wird_angenommen(self):
+        # Bereits installierte Module (z. B. Kasse vor der Umbenennung) tragen noch „starter = true“; die Basis darf sie deshalb nicht ablehnen.
+        up = 'upstream = "unix:/run/kienzle/beispiel/web.sock"'
+        manifest.check_text(replace(up, up + '\nstarter = true'))
+        self.invalid(replace(up, up + '\nstarter = "ja"'), 'web.starter', 'true oder false')
 
     def test_startkontexte(self):
         fcgi = replace('upstream = "unix:/run/kienzle/beispiel/web.sock"\n', 'upstream = "unix:/run/kienzle/beispiel/web.sock"\nprotocol = "fastcgi"\nentry = "public/index.php"\n')

@@ -42,12 +42,12 @@ function test_server(): void {
     check($h->status === 200 && str_contains($h->body, 'id="zertifikat"') && str_contains($h->body, '192.0.2.5   kienzle.example.org'), 'Hilfe ohne Anmeldung');
     // Starter der Kasse: nur wenn ein installiertes Modul einen Starter hat, mit Verweis auf dessen Einstellungen
     $starter = $env->modules->starterPath();
-    check(($starter !== '') === str_contains($h->body, 'id="starter"') && ($starter === '' || str_contains($h->body, 'href="' . $starter . '/settings.php#s-clients"')), 'Hilfe Arbeitsplätze: Starter-Hinweis');
+    check(($starter !== '') === str_contains($h->body, 'id="paket"'), 'Hilfe Arbeitsplätze: Starter-Hinweis');
     $json = json_decode((string)shell_exec(escapeshellarg(dirname(__DIR__, 2) . '/core/bin/kienzle-modul-pruefen') . ' --alle --json ' . escapeshellarg(dirname(__DIR__, 2) . '/modules')), true);
-    $kasse = array_values(array_filter($json['modules'], fn($x) => $x['module']['id'] === 'sumup'))[0];
+    $kasse = array_values(array_filter($json['modules'], fn($x) => $x['module']['id'] === 'kasse'))[0];
     $env->modules = \Kienzle\Core\Modules::fromArray([$kasse]);
     $mitKasse = (new Browser($env))->get('/hilfe/arbeitsplatz')->body;
-    check(str_contains($mitKasse, 'id="starter"') && str_contains($mitKasse, 'href="/kasse/settings.php#s-clients"'), 'Hilfe Arbeitsplätze: Starter der Kasse fehlt');
+    check(str_contains($mitKasse, 'id="paket"') && str_contains($mitKasse, 'Als Admin anmelden'), 'Hilfe Arbeitsplätze: Paketabschnitt für die Kasse fehlt');
     check(!str_contains($b->get('/verwaltung/server')->body, 'Name, Anschrift, Konto und Steuer der Praxis'), 'Server: Verweis auf Praxis noch da');
     $env->user('bert');
     $m = new Browser($env);
