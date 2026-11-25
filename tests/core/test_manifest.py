@@ -226,6 +226,12 @@ class Web(Fehler):
         self.invalid(replace(up, up + '\nentry = "public/index.php"'), 'web.entry', 'nur mit')
         self.invalid(replace(up, up + '\nprotocol = "fastcgi"\nentry = "../x.php"'), 'web.entry')
 
+    def test_alter_schluessel_web_starter_wird_angenommen(self):
+        # Bereits installierte Module (z. B. Kasse vor der Umbenennung) tragen noch „starter = true“; die Basis darf sie deshalb nicht ablehnen.
+        up = 'upstream = "unix:/run/kienzle/beispiel/web.sock"'
+        manifest.check_text(replace(up, up + '\nstarter = true'))
+        self.invalid(replace(up, up + '\nstarter = "ja"'), 'web.starter', 'true oder false')
+
     def test_startkontexte(self):
         fcgi = replace('upstream = "unix:/run/kienzle/beispiel/web.sock"\n', 'upstream = "unix:/run/kienzle/beispiel/web.sock"\nprotocol = "fastcgi"\nentry = "public/index.php"\n')
         m = manifest.check_text(fcgi + '\n[[starters]]\nschema = "kienzle-beispiel"\nlabel = "Beispiel"\n')

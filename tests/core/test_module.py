@@ -115,6 +115,60 @@ class Modulverwaltung(unittest.TestCase):
         with self.assertRaises(self.mo.Fehler):
             self.mo.dispatch({'action': 'installieren', 'id': 'test-kasse'})
 
+    def _alt_und_neu(self, neu_version='2.0.0'):
+        """Altes Modul „test-alt“ installieren; danach liegt „test-kasse“ (replaces = test-alt) zur Installation bereit."""
+        d = self.t / 'mitgeliefert' / 'test-alt'
+        (d / 'bin').mkdir(parents=True)
+        (d / 'public').mkdir()
+        (d / 'module.toml').write_text(module_toml('1.0.0').replace('test-kasse', 'test-alt'))
+        (d / 'public' / 'index.php').write_text('<?php echo "alt";\n')
+        for h in ('install', 'update', 'remove', 'busy', 'health'):
+            (d / 'bin' / h).write_text(HOOK.replace('$1', h))
+            (d / 'bin' / h).chmod(0o755)
+        self.mo.dispatch({'action': 'installieren', 'id': 'test-alt'})
+        alt = self.t / 'daten' / 'test-alt'
+        (alt / 'kasse.sqlite').write_text('zahlungen')
+        (self.t / 'spool' / 'test-alt').mkdir()
+        (self.t / 'spool' / 'test-alt' / 'job.json').write_text('{}')
+        neu = self.bundle(neu_version)
+        (neu / 'module.toml').write_text((neu / 'module.toml').read_text().replace('id = "test-kasse"\n', 'id = "test-kasse"\nreplaces = "test-alt"\n'))
+        shutil.rmtree(self.t / 'mitgeliefert' / 'test-alt')
+        return alt
+
+    def test_umbenanntes_modul_uebernimmt_daten_des_alten(self):
+        alt = self._alt_und_neu()
+        msg = self.mo.dispatch({'action': 'installieren', 'id': 'test-kasse'})
+        self.assertIn('Daten und Rechte des bisherigen Moduls', msg)
+        self.assertEqual((self.data() / 'kasse.sqlite').read_text(), 'zahlungen')
+        self.assertFalse(alt.exists())
+        self.assertEqual((self.t / 'spool' / 'test-kasse' / 'job.json').read_text(), '{}')
+        self.assertFalse((self.t / 'spool' / 'test-alt').exists())
+        self.assertFalse((self.t / 'opt' / 'test-alt').exists())
+        reg = json.loads((self.t / 'modules.json').read_text())
+        self.assertEqual([m['module']['id'] for m in reg['modules']], ['test-kasse'])
+        self.assertEqual([m['id'] for m in self.mo.check()['installed']], ['test-kasse'])
+
+    def test_umzug_wird_bei_fehler_zurueckgenommen(self):
+        alt = self._alt_und_neu()
+        (alt / 'FEHLER-health').write_text('')      # liegt nach dem Umzug im Datenordner des neuen Moduls: dessen Health-Haken schlägt fehl
+        with self.assertRaises(self.mo.Fehler):
+            self.mo.dispatch({'action': 'installieren', 'id': 'test-kasse'})
+        self.assertEqual((alt / 'kasse.sqlite').read_text(), 'zahlungen')
+        self.assertFalse(self.data().exists() and (self.data() / 'kasse.sqlite').exists())
+        self.assertTrue((self.t / 'opt' / 'test-alt' / 'current').exists())
+        self.assertFalse((self.t / 'opt' / 'test-alt' / 'current.umzug').exists())
+        self.assertEqual((self.t / 'spool' / 'test-alt' / 'job.json').read_text(), '{}')
+        reg = json.loads((self.t / 'modules.json').read_text())
+        self.assertEqual([m['module']['id'] for m in reg['modules']], ['test-alt'])
+
+    def test_umzug_nicht_waehrend_das_alte_modul_beschaeftigt_ist(self):
+        alt = self._alt_und_neu()
+        (alt / 'BESCHAEFTIGT').write_text('')
+        with self.assertRaises(self.mo.Fehler) as e:
+            self.mo.dispatch({'action': 'installieren', 'id': 'test-kasse'})
+        self.assertIn('beschäftigt', str(e.exception))
+        self.assertTrue((alt / 'kasse.sqlite').exists())
+
     def test_aktualisieren_und_ruecksprung(self):
         self.mo.dispatch({'action': 'installieren', 'id': 'test-kasse'})
         (self.data() / 'kasse.sqlite').write_text('daten 1.0.0')

@@ -37,8 +37,30 @@ final class Database {
                     foreach (is_array($rights) ? $rights : [] as $right) if (is_string($right)) $ins->execute([$r['user_id'], $r['module'] . ':' . $right]);
                 }
             }
+            // Version 4: Das Modul „sumup“ heißt jetzt „kasse“. Rechte, Gruppen und Erstadmin werden kopiert (die alten Einträge bleiben, bis das alte Modul ersetzt ist).
+            if ($version > 0 && $version < 4) $this->moduleKopieren('sumup', 'kasse');
             $this->pdo->exec('PRAGMA user_version=' . self::VERSION);
         });
+    }
+
+    /** Rechte und Einstellungen eines umbenannten Moduls unter der neuen ID anlegen (nur Fehlendes; mehrfach ausführbar). */
+    private function moduleKopieren(string $alt, string $neu): void {
+        $this->pdo->prepare('INSERT OR IGNORE INTO user_overrides(user_id,perm,allow) SELECT user_id, ? || substr(perm, ?), allow FROM user_overrides WHERE perm LIKE ?')
+            ->execute([$neu . ':', strlen($alt) + 1 + 1, $alt . ':%']);
+        $this->pdo->prepare('UPDATE oidc_clients SET module=? WHERE module=?')->execute([$neu, $alt]);
+        $this->pdo->prepare('INSERT OR IGNORE INTO settings(key,value,updated_at) SELECT ?, value, updated_at FROM settings WHERE key=?')->execute(['erstadmin:' . $neu, 'erstadmin:' . $alt]);
+        $row = $this->pdo->query("SELECT value FROM settings WHERE key='benutzer.gruppen'")->fetch();
+        $groups = $row ? json_decode((string)$row['value'], true) : null;
+        if (!is_array($groups)) return;
+        foreach ($groups as $name => $g) {
+            if (!is_array($g)) continue;
+            $admin = array_values(array_filter((array)($g['admin'] ?? []), 'is_string'));
+            $rechte = array_values(array_filter((array)($g['rechte'] ?? []), 'is_string'));
+            if (in_array($alt, $admin, true) && !in_array($neu, $admin, true)) $admin[] = $neu;
+            foreach ($rechte as $r) if (str_starts_with($r, $alt . ':') && !in_array($neu . substr($r, strlen($alt)), $rechte, true)) $rechte[] = $neu . substr($r, strlen($alt));
+            $groups[$name] = ['admin' => $admin, 'rechte' => $rechte] + $g;
+        }
+        $this->pdo->prepare('UPDATE settings SET value=? WHERE key=?')->execute([json_encode($groups, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE), 'benutzer.gruppen']);
     }
 
     public function query(string $sql, array $params = []): \PDOStatement {

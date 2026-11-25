@@ -260,7 +260,7 @@ final class Seite {
             ['title' => 'Pad-Software von signotec hochladen', 'state' => $pad ? 'done' : 'open',
              'hint' => $pad ? 'Die Bibliotheken von signotec sind hinterlegt.' : 'Die Software für das Unterschriftenpad liegt nicht bei und muss einmal von einem Admin hochgeladen werden.',
              'link' => '/signatur/einstellungen#pad'],
-            ['title' => 'Vertragstexte der Praxis anpassen', 'state' => $musterOffen > 0 ? 'open' : 'done',
+            ['title' => 'Vertragstexte der Praxis anpassen', 'optional' => true, 'state' => $musterOffen > 0 ? 'open' : 'done',
              'hint' => $musterOffen > 0 ? 'Die mitgelieferten Mustertexte sind nur Beispiele. Bitte prüfen und für Ihre Praxis ändern oder abschalten.' : 'Alle aktiven Vorlagen wurden von der Praxis bearbeitet.',
              'link' => '/signatur/einstellungen#vorlagen'],
         ];

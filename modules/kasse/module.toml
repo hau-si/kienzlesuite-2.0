@@ -4,6 +4,7 @@
 
 [module]
 id = "kasse"
+replaces = "sumup"
 name = "Kasse"
 version = "2.3.4-beta.40"
 core_api = "1"

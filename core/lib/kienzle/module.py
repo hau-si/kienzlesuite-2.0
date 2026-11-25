@@ -54,7 +54,8 @@ HEALTH_SECONDS = int(E('KIENZLE_MODULE_HEALTH_SECONDS', '60'))
 SYSTEMD_RUN = Path(E('KIENZLE_SYSTEMD_RUN', '/run/systemd/system'))
 KEEP_RELEASES = 3
 KEEP_SNAPSHOTS = 3
-# beispiel: nur für Tests, nie installierbar; unterschrift (jetzt signatur) und sumup (jetzt kasse): die alten GitHub-Releases werden nicht mehr angeboten
+# beispiel: nur für Tests, nie installierbar; unterschrift: umbenannt in signatur, sumup: umbenannt in kasse (module.toml: replaces);
+# die alten GitHub-Releases werden nicht mehr angeboten
 EXCLUDED = frozenset({'beispiel', 'unterschrift', 'sumup'})
 ID = re.compile(r'^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$')
 UNIT_NAME = re.compile(r'^kienzle-[a-z0-9-]+\.(service|timer|path|socket)$')
@@ -595,6 +596,85 @@ def restore(mid: str, snap: Path) -> None:
 
 
 # ---- Abläufe -----------------------------------------------------------------------------------------------------
+# ---- Umbenanntes Modul: Daten und Dienste des alten Moduls übernehmen ---------------------------------------------
+def _chown_tree(path: Path, user: str) -> None:
+    if OWNER or os.geteuid() != 0:
+        return
+    shutil.chown(path, user=user)
+    for root, dirs, files in os.walk(path):
+        for n in dirs + files:
+            try:
+                os.lchown(os.path.join(root, n), pwd.getpwnam(user).pw_uid, -1)
+            except OSError:
+                pass
+
+
+def _umzug_start(alt: str, neu: str, alt_m: dict) -> dict:
+    """Altes Modul anhalten und aus der Registrierung nehmen, seine Daten unter der neuen ID bereitstellen. Fehler: alles zurück."""
+    if busy(alt_m):
+        raise Fehler(f'{alt_m["module"]["name"]} ist gerade beschäftigt (z. B. laufende Zahlung). Bitte später erneut versuchen.')
+    state = {'alt': alt, 'neu': neu, 'moves': [], 'versteckt': None, 'm': alt_m}
+    snapshot(alt, alt_m['module']['version'])   # Sicherheitskopie vor dem Umzug
+    stop(alt)
+    current = PROGRAMS / alt / 'current'
+    hidden = PROGRAMS / alt / 'current.umzug'
+    try:
+        os.replace(current, hidden)
+        state['versteckt'] = (current, hidden)
+        register()   # nginx ohne das alte Modul (gleicher Webpfad)
+        for base in (DATA, SPOOL):
+            src, dst = base / alt, base / neu
+            if not src.is_dir():
+                continue
+            if dst.exists():
+                if dst.is_dir() and not dst.is_symlink() and not any(dst.iterdir()):
+                    dst.rmdir()
+                else:
+                    raise Fehler(f'{dst} ist nicht leer; die Daten von „{alt}“ können nicht übernommen werden.')
+            src.rename(dst)
+            state['moves'].append((src, dst))
+            _chown_tree(dst, owner(neu))
+    except (Fehler, OSError) as e:
+        _umzug_zurueck(state)
+        raise Fehler(f'Umzug von „{alt}“ nach „{neu}“ fehlgeschlagen: {e}') from None
+    log(f'{neu}: Daten von „{alt}“ übernommen.')
+    return state
+
+
+def _umzug_zurueck(state: dict) -> None:
+    """Daten zurück an den alten Ort, altes Modul wieder starten."""
+    alt = state['alt']
+    for src, dst in reversed(state['moves']):
+        try:
+            if dst.is_dir() and not src.exists():
+                dst.rename(src)
+                _chown_tree(src, owner(alt))
+        except OSError as e:
+            log(f'{alt}: Daten konnten nicht zurückgelegt werden ({dst} → {src}): {e}')
+    if state['versteckt']:
+        current, hidden = state['versteckt']
+        try:
+            if hidden.exists() and not current.exists():
+                os.replace(hidden, current)
+        except OSError as e:
+            log(f'{alt}: altes Programm konnte nicht zurückgelegt werden: {e}')
+    try:
+        register()
+    except Fehler as e:
+        log(f'{alt}: {e}')
+    start(unit_names(alt))
+    log(f'{alt}: Umzug zurückgenommen, das alte Modul läuft wieder.')
+
+
+def _umzug_ende(state: dict) -> None:
+    """Neues Modul läuft: das alte entfernen (Daten sind schon umgezogen), seinen Dienst-Benutzer löschen."""
+    alt = state['alt']
+    _remove(alt, state['m'], delete_data=False, run_hook=False)
+    if not OWNER:
+        _run(['/usr/sbin/userdel', f'ks-{alt}'], timeout=60)
+    log(f'{alt}: ersetzt durch {state["neu"]} und entfernt.')
+
+
 def install(mid: str, version: str | None = None) -> str:
     """Installieren oder aktualisieren. Liefert die Meldung für das Webinterface."""
     if not ID.match(mid) or mid == 'core':
@@ -617,6 +697,16 @@ def install(mid: str, version: str | None = None) -> str:
     account(mid)
     if have:
         stop(mid)
+    # Frühere ID (module.toml: replaces): Daten, Spool und Dienst des alten Moduls übernehmen.
+    ersetzt = (m['module'].get('replaces') or '') if not have else ''
+    alt_m = installed().get(ersetzt) if ersetzt else None
+    umzug = None
+    if alt_m is not None:
+        try:
+            umzug = _umzug_start(ersetzt, mid, alt_m)
+        except Fehler:
+            shutil.rmtree(work, ignore_errors=True)
+            raise
     previous = deploy(folder, m)
     try:
         names = units(PROGRAMS / mid / 'current', m)
@@ -643,11 +733,17 @@ def install(mid: str, version: str | None = None) -> str:
             log(f'{mid}: auf {current} zurückgesprungen.')
             raise Fehler(f'{e} Zurück auf {current}.') from None
         _remove(mid, m, delete_data=False, run_hook=False)
+        if umzug is not None:
+            _umzug_zurueck(umzug)
         raise
     finally:
         shutil.rmtree(work, ignore_errors=True)
+    if umzug is not None:
+        _umzug_ende(umzug)
     cleanup(mid)
     log(f'{mid}: {new} {"aktualisiert" if have else "installiert"}.')
+    if umzug is not None:
+        return f'{m["module"]["name"]} {new} installiert; Daten und Rechte des bisherigen Moduls „{ersetzt}“ wurden übernommen, das alte Modul ist entfernt.'
     return f'{m["module"]["name"]} {new} ' + ('aktualisiert, Dienste neu gestartet.' if have else 'installiert. Rechte vergeben unter Verwaltung → Benutzer.')
 
 

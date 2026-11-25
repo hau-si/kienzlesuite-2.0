@@ -7,7 +7,7 @@
 
 ## 2.3.4-beta.39
 
-- Verweise auf die neue Seite „Arbeitsplätze“ (Paket für den Arbeitsplatz) statt auf „Starter“. Die Migration von „sumup“ ist entfernt. Nicht auf der VM geprüft.
+- Verweise auf die neue Seite „Arbeitsplätze“ (Paket für den Arbeitsplatz) statt auf „Starter“. Die Migration von „sumup“ (Daten, Rechte) bleibt noch im Code. Nicht auf der VM geprüft.
 
 ## 2.3.4-beta.38
 
