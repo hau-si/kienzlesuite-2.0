@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.55
+
+- **Festplatten-Balken wird wieder angezeigt:** Die Sicherheitsrichtlinie der Seite erlaubt keine `style`-Angaben im HTML, deshalb blieb der Belegungsbalken leer. Die Breite wird jetzt per Skript gesetzt (`core.js?v=5`).
+- Falls die Start-Kacheln (Server, Betrieb, Dienste, je drei pro Zeile) nach dem Update noch alt aussehen: einmal Strg+F5, damit `core.css?v=36` neu geladen wird. Nicht im Browser auf der VM geprüft.
+
 ## 0.21.4-beta.54
 
 - **Meldungen bleiben bei der Aktion:** Die Rückmeldung nach einem Klick („Gespeichert.“, Fehlertext) erscheint nicht mehr ganz oben auf der Seite, sondern direkt hinter dem Block mit dem angeklickten Knopf und wird ins Bild gerollt (`core.js?v=4`, `core.css?v=36`). Fehlt der Block oder wechselt die Seite, bleibt sie oben.

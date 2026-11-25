@@ -78,6 +78,7 @@ final class Ansicht {
             . '<aside class="tz-rechts"><h2>Vorschau (Beispieldaten)</h2><div id="vorschau" class="vorschau"><img id="bild" alt="Vorschau des Bons" hidden><p id="hinweis" class="muted">Wird geladen …</p></div><p id="ungespeichert" class="fehler" hidden>Ungespeicherte Änderungen: Die Vorschau zeigt den Stand des Formulars. Gedruckt wird erst nach „Speichern“.</p>'
             . '<form method="post" action="' . $h($base) . '/"><input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"><input type="hidden" name="aktion" value="testdruck">'
             . '<button class="zweit"' . ($queue === '' ? ' disabled' : '') . '>Beispiel-Terminzettel drucken</button></form></aside></div>'
+            . (($letzter = Seite::letzterAuftrag()) ? '<details class="fold"><summary><h2>' . $iLog . ' Letzter Auftrag und Dauer der Schritte</h2></summary><div class="tz-body"><pre>' . $h(implode("\n", $letzter)) . '</pre></div></details>' : '')
             . '<details class="fold"><summary><h2>' . $iLog . ' Letzte Druckaufträge</h2></summary><div class="tz-body">' . (($log = Seite::protokoll()) ? '<pre>' . $h(implode("\n", $log)) . '</pre>'
                 : '<p class="muted">Noch kein Auftrag angekommen. Kommt nach dem Drucken aus T2med hier nichts an, erreicht der Auftrag den virtuellen Drucker „vTermine“ nicht (Arbeitsplatz, Treiber, Firewall).</p>') . '</div></details>'
             . '<details class="fold" id="drucker"><summary><h2>' . $iDrucker . ' Drucker „vTermine“ auf den Arbeitsplätzen einrichten</h2></summary><div class="tz-body"><ol>'

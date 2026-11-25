@@ -117,6 +117,12 @@ check(json_decode((string)file_get_contents("$dir/layout.json"), true)['model'] 
 
 file_put_contents("$dir/druckprotokoll.txt", "a\nb\nc\n");
 check(Seite::protokoll(2) === ['b', 'c'], 'Druckprotokoll');
+file_put_contents("$dir/druckprotokoll.txt", "25.11.2026 11:00:00  Auftrag erhalten: PDF, 100 Bytes\n25.11.2026 11:00:01  Bon übergeben\n25.11.2026 11:05:00  Auftrag erhalten: PostScript, 5000 Bytes\n25.11.2026 11:05:01  Bon an die Warteschlange „bon“ übergeben\n25.11.2026 11:05:01  Zeiten: Umwandlung 0,8 s · Texterkennung 6,2 s · gesamt 7,5 s\n");
+$letzter = Seite::letzterAuftrag();
+check(count($letzter) === 6 && str_contains($letzter[0], 'PostScript') && str_ends_with($letzter[2], 'Zeiten:') && $letzter[3] === '    Umwandlung 0,8 s' && $letzter[5] === '    gesamt 7,5 s', 'Letzter Auftrag mit Zeiten je Zeile');
+file_put_contents("$dir/druckprotokoll.txt", "kein Auftrag\n");
+check(Seite::letzterAuftrag() === [], 'Ohne Auftrag keine Anzeige');
+file_put_contents("$dir/druckprotokoll.txt", "a\nb\nc\n");
 
 // Vorschau und Testdruck mit Ersatz für Python und lp
 $gelaufen = [];

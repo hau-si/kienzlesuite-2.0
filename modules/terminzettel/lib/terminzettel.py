@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import re
@@ -94,6 +95,30 @@ def eprint(*args: object) -> None:
 
 
 LOG_FILE = "druckprotokoll.txt"
+
+
+_START = time.monotonic()
+_ZEITEN: dict[str, float] = {}
+
+
+@contextlib.contextmanager
+def zeit(name: str):
+    """Dauer eines Schritts messen (für das Druckprotokoll: Wo bleibt die Zeit?)."""
+    begin = time.monotonic()
+    try:
+        yield
+    finally:
+        _ZEITEN[name] = _ZEITEN.get(name, 0.0) + time.monotonic() - begin
+
+
+def sekunden(value: float) -> str:
+    return (f"{value:.1f}" if value >= 0.1 else f"{value:.2f}").replace(".", ",") + " s"
+
+
+def zeiten_text() -> str:
+    """z. B. „Umwandlung 0,8 s · Texterkennung 6,2 s · … · gesamt 7,5 s“ (nur Schritte, die gelaufen sind)."""
+    teile = [f"{name} {sekunden(value)}" for name, value in _ZEITEN.items()]
+    return " · ".join(teile + [f"gesamt {sekunden(time.monotonic() - _START)}"])
 
 
 def job_log(text: str) -> None:
@@ -302,10 +327,24 @@ def run_checked(args: list[str], *, input_bytes: bytes | None = None,
     return proc.stdout
 
 
+def _ocr_text(source: str, data: bytes | None, temp_dir: str | None) -> str:
+    """Seite als Bild lesen (Tesseract) und die Textschicht mit Spalten zurückgeben; Bild und Ergebnis laufen nur per Pipe."""
+    image = run_checked(["pdftoppm", "-f", "1", "-l", "1", "-singlefile",
+                         "-scale-to", "2500", "-gray", "-png", source],
+                        input_bytes=data, temp_dir=temp_dir)
+    # Die Textschicht erhält Spalten und Einrückungen für mehrzeilige Termintypen.
+    searchable = run_checked(["tesseract", "stdin", "stdout", "-l", "deu", "--psm", "6",
+                              "-c", "tessedit_create_pdf=1", "-c", "textonly_pdf=1"],
+                             input_bytes=image, temp_dir=temp_dir)
+    return run_checked(["pdftotext", "-layout", "-", "-"],
+                       input_bytes=searchable, temp_dir=temp_dir).decode("utf-8", "strict")
+
+
 def extract_pdf_text(source: str, cfg: dict[str, Any], *, data: bytes | None = None,
                      temp_dir: str | None = None) -> str:
-    text = run_checked(["pdftotext", "-layout", source, "-"],
-                       input_bytes=data, temp_dir=temp_dir).decode("utf-8", "strict")
+    with zeit("Textlesen"):
+        text = run_checked(["pdftotext", "-layout", source, "-"],
+                           input_bytes=data, temp_dir=temp_dir).decode("utf-8", "strict")
     if text.strip():
         return text
     if not cfg_bool(cfg.get("input", {}), "ocr_if_needed", True):
@@ -315,16 +354,8 @@ def extract_pdf_text(source: str, cfg: dict[str, Any], *, data: bytes | None = N
     if not re.search(rb"^Pages:\s+1\s*$", info, re.MULTILINE):
         raise TicketError("Für die Texterkennung ist genau eine PDF-Seite erforderlich.")
     try:
-        image = run_checked(["pdftoppm", "-f", "1", "-l", "1", "-singlefile",
-                             "-scale-to", "2500", "-gray", "-png", source],
-                            input_bytes=data, temp_dir=temp_dir)
-        # Die Textschicht erhält Spalten und Einrückungen für mehrzeilige Termintypen.
-        # Bild, Textschicht und Ergebnis werden ausschließlich per Pipe übergeben.
-        searchable = run_checked(["tesseract", "stdin", "stdout", "-l", "deu", "--psm", "6",
-                                  "-c", "tessedit_create_pdf=1", "-c", "textonly_pdf=1"],
-                                 input_bytes=image, temp_dir=temp_dir)
-        text = run_checked(["pdftotext", "-layout", "-", "-"],
-                           input_bytes=searchable, temp_dir=temp_dir).decode("utf-8", "strict")
+        with zeit("Texterkennung"):
+            text = _ocr_text(source, data, temp_dir)
     except TicketError:
         raise TicketError("Texterkennung fehlgeschlagen. Bitte Tesseract und das deutsche Sprachpaket prüfen.") from None
     if not text.strip():
@@ -348,13 +379,14 @@ def extract_text(data: bytes, cfg: dict[str, Any]) -> str:
                 fcntl.flock(lock, fcntl.LOCK_EX)
                 source, pdf = Path(td) / "input", Path(td) / "input.pdf"
                 source.write_bytes(data)
-                if data.startswith(b"%!PS"):
-                    run_checked(["gs", "-q", "-dSAFER", "-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite",
-                                 "-sOutputFile=" + str(pdf), str(source)], temp_dir=td)
-                else:
-                    # Ubuntu liefert das Werkzeug aus libgxps-utils als „xpstopdf“; „gxps2pdf“ nur ältere Pakete.
-                    tool = "xpstopdf" if shutil.which("xpstopdf", path="/usr/bin:/bin") else "gxps2pdf"
-                    run_checked([tool, str(source), str(pdf)], temp_dir=td)
+                with zeit("Umwandlung"):
+                    if data.startswith(b"%!PS"):
+                        run_checked(["gs", "-q", "-dSAFER", "-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite",
+                                     "-sOutputFile=" + str(pdf), str(source)], temp_dir=td)
+                    else:
+                        # Ubuntu liefert das Werkzeug aus libgxps-utils als „xpstopdf“; „gxps2pdf“ nur ältere Pakete.
+                        tool = "xpstopdf" if shutil.which("xpstopdf", path="/usr/bin:/bin") else "gxps2pdf"
+                        run_checked([tool, str(source), str(pdf)], temp_dir=td)
                 return extract_pdf_text(str(pdf), cfg, temp_dir=td)
     encoding = str(cfg.get("input", {}).get("text_encoding", "utf-8"))
     # Der Windows-Treiber „Generic / Text Only“ liefert ANSI (Windows-1252): Umlaute sind dann kein gültiges UTF-8.
@@ -933,12 +965,14 @@ def render(ticket: ParsedTicket, cfg: dict[str, Any]) -> bytes:
 def make_payload(data: bytes, cfg: dict[str, Any]) -> bytes:
     text = safe_text(extract_text(data, cfg))
     try:
-        ticket = parse_t2med(text)
+        with zeit("Auswertung"):
+            ticket = parse_t2med(text)
     except TicketError:
         raise
     except ValueError:
         raise TicketError("Ungültiger Beleg: eine Seite, ein Patient und vollständige Termine erforderlich.") from None
-    return render(ticket, cfg)
+    with zeit("Bon aufbauen (mit Logo und QR)"):
+        return render(ticket, cfg)
 
 
 def send_cups(payload: bytes, cfg: dict[str, Any], *, copies: int = 1) -> None:
@@ -990,13 +1024,15 @@ def main() -> int:
         if args.check:
             print("Belegprüfung erfolgreich.")
         else:
-            send_cups(payload, cfg)
+            with zeit("Übergabe an den Drucker"):
+                send_cups(payload, cfg)
             job_log("Bon an die Warteschlange „" + str(cfg.get("output", {}).get("queue", "")) + "“ übergeben")
+            job_log("Zeiten: " + zeiten_text())
         return 0
     except TicketError as exc:
         eprint("terminzettel: " + str(exc))
         if not args.check:
-            job_log("Fehler: " + str(exc))
+            job_log("Fehler: " + str(exc) + " (nach " + sekunden(time.monotonic() - _START) + ")")
         return 1
     except (Exception, KeyboardInterrupt):
         # Fremde Fehlertexte können Beleginhalte enthalten. Keine Tracebacks oder Rohmeldungen.

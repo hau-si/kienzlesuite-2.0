@@ -279,3 +279,11 @@ document.addEventListener('change', function (e) {
   }
   setTimeout(function () { bereit = true; }, 0);
 })();
+
+/* Balkenbreiten: Die Sicherheitsrichtlinie erlaubt keine style-Attribute im HTML, daher setzt das Skript sie. */
+(function () {
+  document.querySelectorAll('[data-breite]').forEach(function (e) {
+    e.style.width = (parseFloat(e.getAttribute('data-breite')) || 0) + '%';
+    if (e.hasAttribute('data-links')) e.style.left = (parseFloat(e.getAttribute('data-links')) || 0) + '%';
+  });
+})();

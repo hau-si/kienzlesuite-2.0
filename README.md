@@ -4,7 +4,7 @@ Praxis-Appliance für Hausarztpraxen mit T2med: **eine Basis**, einmal auf einer
 einzeln dazukommen – Kasse (SumUp), Terminzettel, Signatur, später Fax, Telefon und Kienzlezeit. Verwaltung komplett im
 Webinterface; Firewall, Benutzer, Admin-Zugang mit OTP, Updates und verschlüsselte Sicherung gibt es nur einmal, in der Basis.
 
-Stand (24.11.2026): **Basis 0.21.4-beta.54** mit den Modulen
+Stand (24.11.2026): **Basis 0.21.4-beta.55** mit den Modulen
 - **Kasse** 2.3.4-beta.30: SumUp-Kartenzahlung, Rechnungseingang aus T2med (jetzt mit Nachbearbeitung nicht erkannter Rechnungen anhand von Bildausschnitten), Überweisung mit QR-Code, Startseite mit freier Eingabe, Vorgänge mit Excel-Export, Post per Letterxpress.
 - **Terminzettel** 1.3.0-beta.10: T2med-Termine auf dem Bondrucker, mit Praxislogo (links, Mitte oder rechts), Kalender-QR und neu einem Absage-QR (vorbereitete E-Mail).
 - **Signatur** 0.1.0-beta.4: Vorlagen und Vorgänge für Unterschriften am signotec-Pad (Pad-Dienst und Rückschreiben nach T2med noch nicht gebaut).

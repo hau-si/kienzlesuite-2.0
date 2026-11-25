@@ -760,7 +760,7 @@ final class Web {
                 . ($rest !== null && $rest < 120 ? ($rest >= 24 ? ', der Platz reicht noch rund ' . (int)round($rest / 12) . ' Jahre' : ', der Platz reicht noch rund ' . max(1, (int)round($rest)) . ' Monate') : '') . '.';
         }
         return '<div class="tile wide ' . $level . '"><span class="t-ico">' . V::icon('st:disk') . '</span><div class="t-body"><span class="t-label">Festplatte</span><strong class="t-val">' . $used . ' % belegt, ' . V::h(SystemStatus::bytes($frei)) . ' frei</strong>'
-            . '<div class="dbar" role="img" aria-label="Festplatte ' . $used . ' % belegt' . ($zukunft ? ', in 12 Monaten etwa ' . ($used + $zukunft) . ' %' : '') . '"><span class="dnow" style="width:' . $used . '%"></span>' . ($zukunft ? '<span class="dnext" style="left:' . $used . '%;width:' . $zukunft . '%"></span>' : '') . '</div>'
+            . '<div class="dbar" role="img" aria-label="Festplatte ' . $used . ' % belegt' . ($zukunft ? ', in 12 Monaten etwa ' . ($used + $zukunft) . ' %' : '') . '"><span class="dnow" data-breite="' . $used . '"></span>' . ($zukunft ? '<span class="dnext" data-links="' . $used . '" data-breite="' . $zukunft . '"></span>' : '') . '</div>'
             . '<div class="dkey"><span>heute ' . V::h(SystemStatus::bytes($belegt)) . '</span>' . ($zukunft ? '<span>in 12 Monaten etwa ' . V::h(SystemStatus::bytes($belegt + $prog['pro_jahr'])) . ' (' . ($used + $zukunft) . ' %)</span>' : '') . '<span>' . V::h(SystemStatus::bytes($gesamt)) . '</span></div>'
             . '<small class="muted">' . V::h($text) . '</small></div></div>';
     }

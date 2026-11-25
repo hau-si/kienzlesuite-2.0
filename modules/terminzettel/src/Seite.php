@@ -127,6 +127,22 @@ final class Seite {
     }
 
     /** Die letzten Zeilen des Druckprotokolls (Zeit, Art des Auftrags, Ergebnis; keine Patientendaten). */
+    /** Zeilen des letzten Auftrags (ab „Auftrag erhalten“ bis zum Ende) mit den Zeiten je Schritt, jede Zeit in einer eigenen Zeile. */
+    public static function letzterAuftrag(): array {
+        $all = self::protokoll(40);
+        $start = null;
+        foreach ($all as $i => $l) if (str_contains($l, 'Auftrag erhalten')) $start = $i;
+        if ($start === null) return [];
+        $out = [];
+        foreach (array_slice($all, $start) as $l) {
+            if (($pos = strpos($l, 'Zeiten: ')) !== false) {
+                $out[] = substr($l, 0, $pos) . 'Zeiten:';
+                foreach (explode(' · ', substr($l, $pos + 8)) as $z) $out[] = '    ' . $z;
+            } else $out[] = $l;
+        }
+        return $out;
+    }
+
     public static function protokoll(int $zeilen = 12): array {
         $text = (string)@file_get_contents(self::$data . '/druckprotokoll.txt', false, null, 0, 20000);
         $all = $text === '' ? [] : array_values(array_filter(explode("\n", $text), static fn($l) => $l !== ''));

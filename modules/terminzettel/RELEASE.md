@@ -1,5 +1,11 @@
 # Terminzettel – Release-Notizen
 
+## 1.3.0-beta.13
+
+- **Zeitmessung je Auftrag:** Das Druckprotokoll nennt nach jedem Auftrag die Dauer der Schritte: Umwandlung (PostScript/XPS zu PDF), Textlesen, **Texterkennung** (nur wenn der Beleg keinen Text enthält), Auswertung, Bon aufbauen (mit Logo und QR), Übergabe an den Drucker und gesamt. Bei Fehlern steht die Zeit bis zum Fehler dabei. Es wird nur die Zeit im Modul gemessen, nicht die Wartezeit in der Druckwarteschlange oder im Bondrucker.
+- Auf der Seite gibt es unten einen eingeklappten Block **„Letzter Auftrag und Dauer der Schritte“** (jede Zeit in einer eigenen Zeile), zusätzlich zu „Letzte Druckaufträge“.
+- Messung am Beispiel: Logo laden und umwandeln etwa 5 ms, Absage-Block etwa 20 ms; sie bremsen den Druck nicht.
+
 ## 1.3.0-beta.12
 
 - **Absage-QR neu gestaltet:** Oben ein runder schwarzer **Balken** mit Kalender-Symbol und der Aufforderung in zwei Zeilen, darunter der QR-Code in **dickem, rundem Rahmen**; Balken und Rahmen sind gleich breit. Der Satz „Termin absagen: Code mit dem Handy scannen“ entfällt.
