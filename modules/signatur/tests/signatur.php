@@ -259,4 +259,22 @@ wirft(fn() => Start::anlegen($eingabe, $fhir, 'evil.example.org/x'), 'ungültige
 $vid = Seite::vorgangAnlegen(['vorlage_id' => Seite::vorlagen()[0]['id'], 'patient' => 'Max Mustermann', 'pad_id' => Seite::pads(true)[0]['id'] ?? 0], 'admin', [], 'kontext-1');
 check(Seite::vorgang($vid)['kontext'] === 'kontext-1', 'Kontext am Vorgang');
 
+// Leistungsliste aus der Kasse: Summe und Texte kommen aus der Liste, nicht aus dem Formular
+$padT = (int)(Seite::pads(true)[0]['id'] ?? 0);
+$kvl = Seite::vorlageSpeichern(['art' => 'igel', 'titel' => 'Kasse-Test', 'text' => "Leistungen:\n{{leistungen}}\nSumme {{betrag}} Euro", 'aktiv' => 1]);
+$liste = json_encode([['code' => '410', 'label' => 'Ultraschall Oberbauch', 'cent' => 3000], ['code' => '', 'label' => 'Beratung', 'cent' => 1550]]);
+$kid = Seite::vorgangAnlegen(['vorlage_id' => $kvl, 'pad_id' => $padT, 'patient' => 'Kasse Beispiel', 'leistung' => 'ignoriert', 'betrag' => '1,00', 'leistungen_json' => $liste, 'quelle' => 'kasse', 'quelle_ref' => 'abc123'], 'empfang', $praxis, '', $t0);
+$kv = Seite::vorgang($kid);
+check($kv['quelle'] === 'kasse' && $kv['quelle_ref'] === 'abc123' && count(json_decode($kv['leistungen'], true)) === 2, 'Herkunft und Liste gespeichert');
+check(str_contains($kv['text'], 'GOÄ 410: Ultraschall Oberbauch – 30,00 €') && str_contains($kv['text'], '– Beratung – 15,50 €') && str_contains($kv['text'], '45,50'), 'Text mit Leistungsliste und Summe: ' . $kv['text']);
+check(!str_contains($kv['text'], 'ignoriert') && !str_contains($kv['text'], '1,00'), 'Formularwerte dürfen die Liste nicht überschreiben');
+wirft(fn() => Seite::leistungenPruefen('kein json'), 'Liste kein JSON');
+wirft(fn() => Seite::leistungenPruefen(json_encode([['label' => 'X', 'cent' => -5]])), 'negativer Preis');
+wirft(fn() => Seite::leistungenPruefen(json_encode([['label' => 'X', 'cent' => '30']])), 'Preis kein Ganzzahl');
+wirft(fn() => Seite::leistungenPruefen(json_encode(array_fill(0, 41, ['label' => 'X', 'cent' => 1]))), 'zu viele Positionen');
+wirft(fn() => Seite::vorgangAnlegen(['vorlage_id' => $kvl, 'pad_id' => $padT, 'patient' => 'A', 'leistungen_json' => $liste, 'quelle' => 'kasse', 'quelle_ref' => '../x'], 'x', $praxis), 'ungültiger Verweis');
+check(Seite::leistungenPruefen('') === [], 'leere Liste');
+$ohne = Seite::vorgang(Seite::vorgangAnlegen(['vorlage_id' => $kvl, 'pad_id' => $padT, 'patient' => 'Ohne Liste', 'leistung' => 'Einzelne Leistung', 'betrag' => '20'], 'empfang', $praxis, '', $t0));
+check($ohne['quelle'] === '' && str_contains($ohne['text'], 'Einzelne Leistung'), 'Ohne Liste bleibt es bei der Leistung');
+
 echo "Signatur-Tests grün.\n";

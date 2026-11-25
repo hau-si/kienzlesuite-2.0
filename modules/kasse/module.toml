@@ -4,9 +4,8 @@
 
 [module]
 id = "kasse"
-replaces = "sumup"
 name = "Kasse"
-version = "2.3.4-beta.40"
+version = "2.3.4-beta.41"
 core_api = "1"
 description = "Kartenzahlung am SumUp Solo aus T2med, T2med-Rechnungseingang über den Drucker „vKasse“, GOÄ-Leistungen, Barzahlung, Belege per E-Mail, Druck und Post."
 

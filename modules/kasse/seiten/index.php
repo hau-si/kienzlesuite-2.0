@@ -17,12 +17,15 @@ $version = ks_h(trim((string)file_get_contents(dirname(__DIR__) . '/VERSION')));
 $csrf = ks_h(Suite::modul()->csrf());
 $base = ks_h(Suite::base() . '/');
 // Eingebettet in der Startseite (…?neu=1 für freie Eingabe, …?rechnung=<id> für eine T2med-Rechnung): kompakte Arbeitsfläche ohne Kopf.
+// Modul „Signatur“ (Unterschrift am Pad): Pfad, wenn es installiert ist und der Benutzer es sehen darf; dann gibt es den Knopf „Zur Unterschrift“.
+$signatur = '';
+foreach (Suite::modul()->menue()['ids'] as $href => $modulId) if ($modulId === 'signatur') $signatur = $href;
 $modus = isset($_GET['rechnung']) ? 'embed rechnung' : (isset($_GET['neu']) ? 'embed frei' : '');
 ?>
 <!doctype html>
 <html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="kienzle-csrf" content="<?= $csrf ?>"><title>Kasse · Kienzle-Suite</title><link rel="stylesheet" href="<?= $base ?>assets/style.css?v=<?= $version ?>"><link rel="stylesheet" href="<?= $base ?>assets/embed.css?v=<?= $version ?>"><script src="<?= $base ?>assets/tipfit.js?v=<?= $version ?>" defer></script><script src="<?= $base ?>assets/goae-calc.js?v=<?= $version ?>" defer></script><script src="<?= $base ?>assets/app.js?v=<?= $version ?>" defer></script></head>
-<body class="<?= $modus ?>" data-base="<?= $base ?>"><main>
+<body class="<?= $modus ?>" data-base="<?= $base ?>" data-signatur="<?= ks_h($signatur) ?>"><main>
 <header class="top"><a class="brand" href="/"><span class="mark" aria-hidden="true">K</span><div><strong>Kasse</strong><span>Kienzle-Suite · T2med</span></div></a><span id="mode" class="badge" hidden>TESTMODUS</span></header>
 <section id="welcome" class="card"><h1>Kartenzahlung</h1><p>Bitte diese Seite aus der Patientenakte in T2med öffnen.</p><form id="manual-form" class="manual-form" autocomplete="off"><h2>Manuelle Kartenzahlung</h2><p class="muted small">Ohne Patientenakte: Betreff und Betrag werden an SumUp übergeben und die Zahlung startet am Kartenterminal. Keine Patientendaten eintragen.</p><label for="manual-label">Betreff</label><input id="manual-label" maxlength="80" required placeholder="z. B. Selbstzahler-Leistung"><label for="manual-amount">Betrag in Euro</label><input id="manual-amount" inputmode="decimal" maxlength="12" required placeholder="z. B. 25,00"><button class="primary wide" type="submit">Kartenzahlung starten</button></form><a class="button secondary wide settings-link" href="<?= $base ?>settings.php">⚙ Einstellungen der Kasse</a><button id="demo" class="secondary"<?= $demo ? '' : ' hidden' ?>>Testpatient öffnen (Testmodus)</button></section>
 <div id="workspace" hidden>
@@ -47,6 +50,8 @@ $modus = isset($_GET['rechnung']) ? 'embed rechnung' : (isset($_GET['neu']) ? 'e
 <label class="date-label" for="service-date">Leistungsdatum</label><input id="service-date" type="date" required>
 <div class="manual"><label for="manual">Sonstiger Betrag <span class="muted">optional</span></label><div class="amount-input"><input id="manual" type="text" inputmode="decimal" placeholder="0,00" autocomplete="off" maxlength="12"><span>€</span></div></div>
 <div class="total"><span>Gesamt</span><strong id="total">0,00 €</strong></div>
+<button id="sign-send" type="button" class="secondary wide" hidden>✍ Zur Unterschrift (Signatur)</button>
+<p id="sign-note" class="muted small" hidden></p>
 <div id="reader-busy" class="reader-busy" hidden>
 <h2 id="reader-title">Terminal belegt</h2><p id="reader-description" role="status"></p>
 <p id="reader-reference" class="reference muted"></p>

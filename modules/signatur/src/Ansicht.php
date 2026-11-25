@@ -89,10 +89,11 @@ final class Ansicht {
             if (!$aktive) {
                 $o .= '<p class="muted">Es gibt keine aktive Vorlage. Bitte unter Einstellungen eine Vorlage anlegen oder aktivieren.</p>';
             } else {
-                $o .= '<form method="post" class="us-form" autocomplete="off">' . $csrfFeld . '<input type="hidden" name="aktion" value="neu"><input type="hidden" name="kontext" id="n-kontext" value="">'
+                $o .= '<form method="post" class="us-form" autocomplete="off">' . $csrfFeld . '<input type="hidden" name="aktion" value="neu"><input type="hidden" name="kontext" id="n-kontext" value=""><input type="hidden" name="leistungen_json" id="n-leistungen" value=""><input type="hidden" name="quelle" id="n-quelle" value=""><input type="hidden" name="quelle_ref" id="n-quelle-ref" value="">'
                     . '<label for="n-vorlage">Dokument</label><select id="n-vorlage" name="vorlage_id">' . $opt . '</select>'
                     . $padOpt
                     . '<label for="n-patient">Patient</label><input id="n-patient" name="patient" maxlength="80" required placeholder="z. B. Max Mustermann">'
+                    . '<div id="n-liste" class="us-liste" hidden><strong>Leistungen aus der Kasse</strong><ul id="n-liste-eintraege"></ul><p class="muted" id="n-liste-summe"></p></div>'
                     . '<label for="n-leistung">Leistung oder Thema</label><input id="n-leistung" name="leistung" maxlength="120" placeholder="z. B. Ultraschall der Schilddrüse">'
                     . '<label for="n-betrag">Betrag in Euro</label><input id="n-betrag" name="betrag" inputmode="decimal" maxlength="12" placeholder="z. B. 45,00">'
                     . '<label class="check"><input type="checkbox" name="druck_vorher" value="1"> Dokument vor der Unterschrift für den Patienten drucken</label>'

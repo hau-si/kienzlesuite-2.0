@@ -118,6 +118,9 @@ try {
     check($code === 422, 'Storno mit Recht „storno“ und ungültiger Zahlung: ' . $code);
     [$code] = $vg(['export'], ['action' => 'storno', 'payment_id' => str_repeat('a', 32), 'note' => '']);
     check($code === 403, 'Storno ohne Recht „storno“: ' . $code);
+    $appJs = (string)file_get_contents(dirname(__DIR__) . '/public/assets/app.js');
+    $indexPhp = (string)file_get_contents(dirname(__DIR__) . '/seiten/index.php');
+    check(str_contains($appJs, '#uebergabe=') && str_contains($appJs, 'signaturSenden') && str_contains($indexPhp, 'id="sign-send"') && str_contains($indexPhp, "=== 'signatur'"), 'Knopf „Zur Unterschrift“ (Übergabe an Signatur) fehlt');
     $js = (string)file_get_contents(dirname(__DIR__) . '/public/assets/vorgaenge.js');
     check(str_contains($js, 'sortieren(') && str_contains($js, "api('storno'") && str_contains((string)file_get_contents(dirname(__DIR__) . '/seiten/vorgaenge.php'), 'data-key="number"'), 'Sortierung und Storno in der Vorgänge-Liste');
     [$code] = $vg(['kassieren'], ['action' => 'vorgaenge', 'art' => 'woche', 'date' => date('Y-m-d')]);

@@ -37,6 +37,48 @@
       })
       .catch(function () { /* ohne Netz bleibt die Startseite wie gewohnt */ });
   })();
+  // Übergabe aus der Kasse: #uebergabe=<base64url-JSON> mit Patient, Verweis und Leistungsliste in „Neuer Vorgang“ eintragen.
+  // Das Fragment geht nie an den Server; geprüft wird die Liste beim Anlegen noch einmal auf dem Server.
+  (function () {
+    var m = /^#uebergabe=([A-Za-z0-9_-]{1,12000})$/.exec(location.hash || '');
+    var feld = document.getElementById('n-patient');
+    if (!m || !feld) return;
+    history.replaceState(null, '', location.pathname + location.search);
+    var hinweis = document.createElement('p');
+    try {
+      var b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
+      var roh = atob(b64 + '==='.slice((b64.length + 3) % 4));
+      var d = JSON.parse(new TextDecoder().decode(Uint8Array.from(roh, function (c) { return c.charCodeAt(0); })));
+      var liste = Array.isArray(d.leistungen) ? d.leistungen.slice(0, 40).map(function (z) {
+        return { code: String(z.code || '').slice(0, 12), label: String(z.label || '').slice(0, 120), cent: Math.max(0, Math.round(Number(z.cent) || 0)) };
+      }).filter(function (z) { return z.label; }) : [];
+      if (!liste.length) throw new Error('leer');
+      feld.value = String(d.patient || '').slice(0, 80);
+      document.getElementById('n-leistungen').value = JSON.stringify(liste);
+      document.getElementById('n-quelle').value = 'kasse';
+      document.getElementById('n-quelle-ref').value = /^[A-Za-z0-9._-]{1,64}$/.test(String(d.ref || '')) ? String(d.ref) : '';
+      var euro = function (c) { return (c / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; };
+      var ul = document.getElementById('n-liste-eintraege'), summe = 0;
+      ul.textContent = '';
+      liste.forEach(function (z) {
+        var li = document.createElement('li');
+        li.textContent = (z.code ? 'GOÄ ' + z.code + ': ' : '') + z.label + ' – ' + euro(z.cent);
+        ul.appendChild(li); summe += z.cent;
+      });
+      document.getElementById('n-liste-summe').textContent = liste.length + ' Leistung(en), zusammen ' + euro(summe) + '. Summe und Leistungen gehen aus der Kasse in das Dokument.';
+      document.getElementById('n-liste').hidden = false;
+      var l = document.getElementById('n-leistung'), b = document.getElementById('n-betrag');
+      if (l) { l.value = liste.map(function (z) { return z.label; }).join(', ').slice(0, 120); l.readOnly = true; }
+      if (b) { b.value = (summe / 100).toFixed(2).replace('.', ','); b.readOnly = true; }
+      hinweis.className = 'notice';
+      hinweis.textContent = 'Aus der Kasse übernommen: ' + feld.value + ' mit ' + liste.length + ' Leistung(en). Bitte Dokument wählen und den Vorgang anlegen.';
+    } catch (e) {
+      hinweis.className = 'error';
+      hinweis.textContent = 'Die Übergabe aus der Kasse konnte nicht gelesen werden. Bitte in der Kasse erneut „Zur Unterschrift“ wählen.';
+    }
+    feld.form.insertBefore(hinweis, feld.form.firstChild);
+    feld.form.scrollIntoView({ block: 'nearest' });
+  })();
   // Vorgangsliste: Suche und Filter wirken sofort im Browser.
   var tabelle = document.getElementById('vg-tabelle');
   if (tabelle) {

@@ -43,7 +43,6 @@ mit dem Archiv `modules/<id>/…` (`scripts/release-bauen <id>`). Das Programm l
 | `version` | ja | `X.Y.Z`, optional mit Vorabkennung: `2.1.0-beta.3` |
 | `core_api` | ja | Text, z. B. `"1"`; muss in `core/API` stehen |
 | `description` | nein | kurze Beschreibung (höchstens 300 Zeichen) |
-| `replaces` | nein | frühere ID des Moduls (z. B. `"sumup"` bei der Kasse). Bei der Installation übernimmt die Basis Datenordner, Ablage-Spool und Rechte des alten Moduls, startet das neue und entfernt danach das alte samt Dienst-Benutzer. Schlägt etwas fehl, läuft das alte Modul unverändert weiter |
 
 ### `[system]` – Pflicht
 

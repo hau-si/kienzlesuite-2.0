@@ -7,7 +7,7 @@ final class Speicher {
     public static string $data = '/var/lib/kienzle/signatur';
     private static ?\PDO $pdo = null;
     private static string $pfad = '';
-    public const VERSION = 3;
+    public const VERSION = 4;
 
     public static function pdo(): \PDO {
         $datei = self::$data . '/signatur.db';
@@ -80,6 +80,12 @@ final class Speicher {
                 kontext TEXT NOT NULL,
                 bis INTEGER NOT NULL
             )');
+        }
+        if ($v < 4) {
+            // Vorgänge aus der Kasse: Herkunft, Verweis auf den Kassenvorgang und die übergebene Leistungsliste (JSON).
+            $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN quelle TEXT NOT NULL DEFAULT ""');
+            $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN quelle_ref TEXT NOT NULL DEFAULT ""');
+            $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN leistungen TEXT NOT NULL DEFAULT ""');
         }
         $pdo->exec('PRAGMA user_version=' . self::VERSION);
         $pdo->commit();

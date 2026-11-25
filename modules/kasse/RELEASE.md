@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.41
+
+- **Knopf „Zur Unterschrift (Signatur)“ vor dem Kassieren:** Ist das Modul Signatur installiert und für den Benutzer sichtbar, übergibt der Knopf Patient und die gewählten Positionen (mit GOÄ-Ziffer und Preis, einschließlich „Sonstiger Betrag“) an Signatur, in einem neuen Tab. Dort Dokument wählen und den Vorgang anlegen, danach hier wie gewohnt kassieren. Nicht auf der VM geprüft.
+
 ## 2.3.4-beta.40
 
 - **Vorgänge: Stornieren direkt in der Liste.** Bei bezahlten und offenen Rechnungen steht rechts der Knopf „Stornieren“ (mit Rückfrage und optionalem Grund; es entsteht wie bisher eine Stornorechnung mit neuer Nummer). Sichtbar und erlaubt nur mit dem Recht „Rechnungen stornieren“, das jetzt auch allein zum Öffnen der Vorgänge genügt.
@@ -7,7 +11,7 @@
 
 ## 2.3.4-beta.39
 
-- Verweise auf die neue Seite „Arbeitsplätze“ (Paket für den Arbeitsplatz) statt auf „Starter“. Die Migration von „sumup“ (Daten, Rechte) bleibt noch im Code. Nicht auf der VM geprüft.
+- Verweise auf die neue Seite „Arbeitsplätze“ (Paket für den Arbeitsplatz) statt auf „Starter“. Die Migration von „sumup“ ist entfernt. Nicht auf der VM geprüft.
 
 ## 2.3.4-beta.38
 

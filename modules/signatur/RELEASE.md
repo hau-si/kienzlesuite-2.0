@@ -1,5 +1,9 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.18
+
+- **Leistungsliste aus der Kasse:** „Neuer Vorgang“ nimmt eine Liste von Leistungen samt Patient entgegen (Übergabe über die Adresse, `#uebergabe=…`). Summe und Leistungen kommen aus der Liste ins Dokument, neuer Platzhalter `{{leistungen}}` (ohne Liste die eingegebene Leistung). Der Vorgang merkt sich Herkunft („kasse“), Verweis auf den Kassenvorgang und die Liste (Schema 4). Das Muster „IGeL-Vertrag“ nutzt `{{leistungen}}`; bereits gespeicherte Vorlagen bleiben unverändert und können den Platzhalter selbst einbauen. PDF, Rückgabe an die Kasse und Speichern in T2med folgen. Nicht auf der VM geprüft.
+
 ## 0.1.0-beta.17
 
 - **Abgebrochene Vorgänge wieder aufnehmen:** In der Vorgangsliste hat ein abgebrochener Vorgang jetzt den Knopf „Wieder aufnehmen“. Er kehrt zu „Wartet auf Unterschrift“ zurück, war er schon unterschrieben, zu „Unterschrieben“; am Vorgang steht „Wieder aufgenommen.“ Eine abgelaufene T2med-Verbindung wird wie bisher angezeigt. Nicht im Browser geprüft.

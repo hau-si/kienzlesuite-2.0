@@ -1,12 +1,16 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.65
+
+- **Seite „Arbeitsplätze“ neu geordnet:** Oben steht das **Paket** (Starter, Zertifikat, Drucker in einem Durchgang), danach der **Name der Suite** (immer nötig). Zertifikat und virtuelle Drucker stehen darunter nur noch zum Aufklappen als Einrichtung **von Hand**, falls das Paket nicht klappt (Anker `#zertifikat`, `#drucker`, `#name`, `#paket` bleiben). Nicht auf der VM geprüft.
+
 ## 0.21.4-beta.64
 
 - **Starter gehört zu „Arbeitsplätze“:** Die eigene Seite „Starter“ im Menü entfällt. Auf der Seite „Arbeitsplätze“ steht unten der Abschnitt „Paket für einen Arbeitsplatz“ (Startkontexte, Download je System, Schlüssel erneuern, nur für angemeldete Admins). Die alte Adresse leitet dorthin weiter.
 - **Ein Paket richtet den ganzen Arbeitsplatz ein:** Starterprogramm, Zertifikat, Aufruf aus T2med und die virtuellen Drucker der Module (vKasse, vTermine, vBriefversand) in einem Durchgang. Windows fragt für die Drucker einmal nach Administratorrechten (`install-drucker.ps1`), macOS und Linux nutzen `lpadmin` über sudo. Die Texte zur Druckereinrichtung bleiben als Rückfall auf der Seite.
 - **Erneutes Ausführen aktualisiert nur Änderungen:** Jede Zeile meldet „neu“, „aktualisiert“ oder „unverändert“ (Starterprogramm, Einstellungen, Zertifikat, Aufruf je Kontext, Drucker). Nicht auf der VM geprüft.
 - Das Erklärvideo liegt nicht mehr im Repository (zu groß, README-Link entfernt).
-- Modul „sumup“ heißt „kasse“. Die einmalige Migration bleibt vorerst im Code (`replaces = "sumup"`): Beim Installieren von „kasse“ unter Verwaltung → Module werden Daten, Rechte und Gruppen von „sumup“ übernommen, das alte Modul wird entfernt. Danach wird sie entfernt.
+- Die Umbenennung „sumup“ → „kasse“ ist abgeschlossen; der einmalige Umzug (`replaces`, Daten und Rechte, Datenbank-Schritt) ist wieder aus dem Code entfernt. Die Datenbank-Versionsnummer bleibt bei 4.
 - Prüfung von `module.toml`: der alte Schlüssel `web.starter` wird wieder angenommen (und ignoriert), damit ein installiertes altes Kasse-Modul die Basis-Aktualisierung nicht mehr blockiert.
 
 ## 0.21.4-beta.63

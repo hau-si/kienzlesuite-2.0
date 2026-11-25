@@ -152,8 +152,10 @@ final class Web {
             $routerText = '<p>Den Namen <code>' . V::h($name) . '</code> mit der Adresse <code>' . V::h($ip) . '</code> im Router oder einem eigenen DNS-Server eintragen (meist die IT). '
                 . 'Manche Router kennen Geräte im Netz auch automatisch unter ihrem Rechnernamen mit einer eigenen Endung; dann unter Verwaltung → Server genau diesen Namen mit der Endung des Routers wählen.</p>';
         }
-        $body = '<p class="lead">Zwei Dinge braucht jeder PC der Praxis einmal: Er muss der Suite vertrauen (Zertifikat) und ihren Namen kennen.</p>'
-            . '<h2 id="zertifikat">1. Der Suite vertrauen (Zertifikat)</h2>'
+        $lead = '<p class="lead">Pro PC genügt ein Paket: Es richtet den Starter für T2med, das Zertifikat der Suite und die virtuellen Drucker auf einmal ein, und wer es später noch einmal ausführt, aktualisiert nur das, was sich geändert hat. '
+            . 'Der PC muss außerdem den Namen der Suite kennen (Schritt 2). Klappt etwas nicht, steht unten jeder Schritt auch zum Einrichten von Hand.</p>';
+        $zertifikat = ''
+            . '<details class="box" id="zertifikat"><summary><strong>Zertifikat von Hand einrichten</strong></summary>'
             . '<p>Ohne diesen Schritt zeigt der Browser „Nicht sicher“. Die Datei ist kein Programm, sondern der Ausweis der Suite.</p>'
             . '<p class="row-buttons"><a class="button" href="/ca.crt">Zertifikat herunterladen</a></p>'
             . ($fp !== '' ? '<p class="muted">Zum Vergleich – so muss der Fingerabdruck (SHA-256) lauten:<br><code>' . V::h($fp) . '</code></p>' : '')
@@ -169,8 +171,9 @@ final class Web {
             . '<details class="how"><summary>Android</summary><ol class="steps"><li>Zertifikat laden.</li><li>Einstellungen → Sicherheit → Weitere Einstellungen → Verschlüsselung und Anmeldedaten → '
             . 'Zertifikat installieren → <strong>CA-Zertifikat</strong> (Namen der Menüs je nach Hersteller etwas anders).</li></ol></details>'
             . '<details class="how"><summary>Firefox (eigener Zertifikatsspeicher)</summary><ol class="steps"><li>Einstellungen → Datenschutz &amp; Sicherheit → Zertifikate → Zertifikate anzeigen → '
-            . 'Zertifizierungsstellen → Importieren → „Dieser CA vertrauen, um Websites zu identifizieren“.</li></ol></details>'
-            . '<h2 id="name">2. Den Namen der Suite bekannt machen</h2>'
+            . 'Zertifizierungsstellen → Importieren → „Dieser CA vertrauen, um Websites zu identifizieren“.</li></ol></details></details>';
+        $namen = ''
+            . '<h2 id="name">2. Den Namen der Suite bekannt machen (immer nötig)</h2>'
             . '<p>Die Suite heißt <strong>' . V::h($name) . '</strong> und hat die Adresse <strong>' . V::h($ip) . '</strong>. Damit der Name funktioniert, gibt es zwei Wege:</p>'
             . '<details class="how" open><summary>Einmal im Router (empfohlen, gilt für alle PCs)</summary>' . $routerText . '</details>'
             . '<details class="how"><summary>Oder auf jedem PC in der Datei hosts</summary><ol class="steps">'
@@ -179,21 +182,20 @@ final class Web {
             . '<li>Am Ende diese Zeile einfügen und speichern:<br><code>' . V::h($ip . '   ' . $name) . '</code></li>'
             . '<li>Mac: im Terminal <code>sudo nano /etc/hosts</code>, dieselbe Zeile ergänzen, speichern.</li></ol></details>'
             . '<p>Danach die Suite unter <a href="https://' . V::h($name) . '/">https://' . V::h($name) . '/</a> öffnen.</p>';
-        // Virtuelle Drucker der Module (nur wenn vorhanden): nach Zertifikat und Name, vor dem Starter.
-        $nr = 3;
-        $drucker = $this->virtualPrinterHelp($this->printers ? $this->printers->status()['queues'] : [], true);
-        if ($drucker !== '') {
-            $body .= '<h2 id="drucker">' . $nr++ . '. Virtuelle Drucker einrichten</h2>'
-                . '<p>Nur für PCs, von denen aus T2med auf die virtuellen Drucker der Module druckt. Zuerst Schritt 1 und 2 erledigen: Die Drucker-Adresse enthält den Namen der Suite.</p>' . $drucker;
-        }
         // Starter, Pakete und Schlüssel: gehören zu den Arbeitsplätzen (Admins sehen die Pakete direkt hier).
+        $paket = '';
         if ($this->modules->starterPath() !== '' || $this->modules->starters()) {
-            $body .= '<h2 id="paket">' . $nr . '. Paket für einen Arbeitsplatz (Starter, Zertifikat, Drucker)</h2>';
+            $paket = '<h2 id="paket">1. Paket für einen Arbeitsplatz (Starter, Zertifikat, Drucker)</h2>';
             $admin = ($this->session['stage'] ?? '') === 'full' && (int)($this->session['user_admin'] ?? 0) === 1 && $this->starter !== null;
-            $body .= $admin ? $this->starterAbschnitt($error, $notice)
+            $paket .= $admin ? $this->starterAbschnitt($error, $notice)
                 : '<p>Ein Paket pro PC richtet Starter (für T2med), Zertifikat und die virtuellen Drucker auf einmal ein. Es enthält den Starter-Schlüssel der Praxis und ist deshalb nur für angemeldete Admins abrufbar: '
                 . '<a href="/anmelden?weiter=/hilfe/arbeitsplatz">Als Admin anmelden</a>.</p>';
         }
+        $drucker = $this->virtualPrinterHelp($this->printers ? $this->printers->status()['queues'] : [], false);
+        $druckerBlock = $drucker !== '' ? '<div id="drucker">' . $drucker . '</div>' : '';
+        $von = '<h2 id="hand">Von Hand einrichten (falls das Paket nicht klappt)</h2>' . $zertifikat . $druckerBlock;
+        if ($paket === '') $namen = str_replace('2. Den Namen', '1. Den Namen', $namen);
+        $body = $lead . $paket . $namen . $von;
         return Response::html(V::page('Arbeitsplätze einrichten', $body, $this->nav(), $this->config->practice, 'Einrichten'));
     }
 

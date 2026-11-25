@@ -228,7 +228,7 @@ class Interpreter:
             for x in range(0, paper.width, 12):
                 draw.line([(x, height - 4), (x + 6, height - 4)], fill=120, width=2)
         out = io.BytesIO()
-        paper.convert("1", dither=self.Image.NONE).save(out, "PNG", optimize=True)
+        paper.save(out, "PNG", optimize=True)   # 8 Bit Graustufen: der Browser verkleinert die Vorschau glatt, Buchstaben bleiben lesbar
         return out.getvalue()
 
 

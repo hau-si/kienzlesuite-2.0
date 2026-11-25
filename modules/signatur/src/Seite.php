@@ -10,7 +10,8 @@ final class Seite {
     public const ARTEN = ['igel' => 'IGeL-Vertrag', 'aufklaerung' => 'Patientenaufklärung', 'datenschutz' => 'Datenschutzerklärung', 'sonstige' => 'Sonstiges Dokument'];
     public const STATI = ['wartet' => 'Wartet auf Unterschrift', 'am_pad' => 'Wird am Pad unterschrieben', 'unterschrieben' => 'Unterschrieben', 'uebertragen' => 'In T2med abgelegt', 'fehler' => 'Fehler', 'abgebrochen' => 'Abgebrochen'];
     /** Platzhalter in Vertragstexten: {{name}} wird beim Anlegen des Vorgangs eingesetzt. */
-    public const PLATZHALTER = ['patient' => 'Name des Patienten', 'datum' => 'Heutiges Datum', 'praxis' => 'Name der Praxis', 'leistung' => 'Leistung oder Thema', 'betrag' => 'Betrag in Euro'];
+    public const PLATZHALTER = ['patient' => 'Name des Patienten', 'datum' => 'Heutiges Datum', 'praxis' => 'Name der Praxis', 'leistung' => 'Leistung oder Thema', 'leistungen' => 'Liste der Leistungen mit Preisen (aus der Kasse, sonst die Leistung)', 'betrag' => 'Betrag in Euro'];
+    public const MAX_LEISTUNGEN = 40;
     public const MAX_TEXT = 20000;
     /** Wie lange abgeschlossene Vorgänge (übertragen, abgebrochen) aufbewahrt werden, in Tagen. */
     public const AUFBEWAHRUNG_TAGE = 30;
@@ -18,7 +19,7 @@ final class Seite {
     /** Mustertexte beim ersten Start. Nur Beispiele: vor Gebrauch von der Praxis (ggf. juristisch) prüfen lassen. */
     public static function muster(): array {
         return [
-            ['igel', 'IGeL-Vertrag (Muster)', "Individuelle Gesundheitsleistung\n\nPatient/in: {{patient}}\nDatum: {{datum}}\nLeistung: {{leistung}}\nVoraussichtliche Kosten: {{betrag}} Euro\n\nIch wünsche die genannte Leistung, die nicht zum Leistungsumfang der gesetzlichen Krankenversicherung gehört. Ich wurde darüber informiert, dass ich die Kosten selbst trage und dass ich die Leistung auch ablehnen kann.\n\n{{praxis}}"],
+            ['igel', 'IGeL-Vertrag (Muster)', "Individuelle Gesundheitsleistung\n\nPatient/in: {{patient}}\nDatum: {{datum}}\nLeistungen:\n{{leistungen}}\nVoraussichtliche Kosten insgesamt: {{betrag}} Euro\n\nIch wünsche die genannte Leistung, die nicht zum Leistungsumfang der gesetzlichen Krankenversicherung gehört. Ich wurde darüber informiert, dass ich die Kosten selbst trage und dass ich die Leistung auch ablehnen kann.\n\n{{praxis}}"],
             ['aufklaerung', 'Patientenaufklärung (Muster)', "Aufklärung und Einwilligung\n\nPatient/in: {{patient}}\nDatum: {{datum}}\nThema: {{leistung}}\n\nIch wurde über Ablauf, Nutzen und mögliche Risiken aufgeklärt und konnte Fragen stellen. Ich willige in die besprochene Maßnahme ein.\n\n{{praxis}}"],
             ['datenschutz', 'Datenschutzerklärung (Muster)', "Information zum Datenschutz\n\nPatient/in: {{patient}}\nDatum: {{datum}}\n\nIch habe die Informationen zur Verarbeitung meiner Gesundheitsdaten in der Praxis erhalten und zur Kenntnis genommen.\n\n{{praxis}}"],
         ];
@@ -104,6 +105,25 @@ final class Seite {
     // ---- Vorgänge ----
 
     /**
+     * Leistungsliste aus der Kasse (JSON: [{code, label, cent}]) prüfen und bereinigen. Leer: keine Liste.
+     * @return list<array{code:string,label:string,cent:int}>
+     */
+    public static function leistungenPruefen(mixed $json): array {
+        if (!is_string($json) || trim($json) === '') return [];
+        if (strlen($json) > 20000) throw new \InvalidArgumentException('Die Leistungsliste ist zu lang.');
+        $liste = json_decode($json, true);
+        if (!is_array($liste) || !array_is_list($liste) || count($liste) > self::MAX_LEISTUNGEN) throw new \InvalidArgumentException('Die Leistungsliste ist ungültig.');
+        $out = [];
+        foreach ($liste as $z) {
+            if (!is_array($z) || !is_int($z['cent'] ?? null) || $z['cent'] < 0 || $z['cent'] > 99999999) throw new \InvalidArgumentException('Die Leistungsliste enthält einen ungültigen Preis.');
+            $out[] = ['code' => self::zeile($z['code'] ?? '', 'GOÄ-Ziffer', 12, false), 'label' => self::zeile($z['label'] ?? '', 'Leistung', 120), 'cent' => $z['cent']];
+        }
+        return $out;
+    }
+
+    private static function euro(int $cent): string { return number_format($cent / 100, 2, ',', '.'); }
+
+    /**
      * Legt einen Vorgang an. Der Text wird jetzt eingesetzt und fest gespeichert: Spätere Änderungen an der Vorlage
      * ändern nichts an dem, was der Patient unterschreibt. $kontext ist die T2med-Kontext-ID (leer, wenn nicht aus T2med).
      */
@@ -117,6 +137,18 @@ final class Seite {
         if ($betrag !== '' && !preg_match('/^\d{1,6}([.,]\d{1,2})?$/D', $betrag)) throw new \InvalidArgumentException('Der Betrag muss eine Zahl sein, z. B. 45,00.');
         if ($betrag !== '') $betrag = number_format((float)str_replace(',', '.', $betrag), 2, ',', '.');
         $kontext = self::zeile($kontext, 'Kontext', 100, false);
+        // Leistungsliste aus der Kasse: Summe und Texte kommen aus der Liste, nicht aus dem Formular.
+        $liste = self::leistungenPruefen($in['leistungen_json'] ?? '');
+        $quelle = $liste || ($in['quelle'] ?? '') === 'kasse' ? 'kasse' : '';
+        $quelleRef = $quelle === '' ? '' : self::zeile($in['quelle_ref'] ?? '', 'Verweis', 64, false);
+        if ($quelleRef !== '' && !preg_match('/^[A-Za-z0-9._-]{1,64}$/D', $quelleRef)) throw new \InvalidArgumentException('Ungültiger Verweis auf den Kassenvorgang.');
+        $leistungenText = $leistung;
+        if ($liste) {
+            $zeilen = array_map(static fn(array $z): string => '– ' . ($z['code'] !== '' ? 'GOÄ ' . $z['code'] . ': ' : '') . $z['label'] . ' – ' . self::euro($z['cent']) . ' €', $liste);
+            $leistungenText = implode("\n", $zeilen);
+            $leistung = mb_substr(implode(', ', array_map(static fn(array $z): string => $z['label'], $liste)), 0, 120);
+            $betrag = self::euro(array_sum(array_column($liste, 'cent')));
+        }
         // Pad: bei genau einem aktiven Pad automatisch, sonst muss eines gewählt werden; ohne Pads bleibt es offen (0).
         $aktivePads = self::pads(true);
         $padId = 0;
@@ -126,13 +158,13 @@ final class Seite {
             if (!in_array($padId, array_map(fn($p) => (int)$p['id'], $aktivePads), true)) throw new \InvalidArgumentException('Bitte das Pad wählen, an dem unterschrieben wird.');
         }
         $text = self::einsetzen((string)$vorlage['text'], [
-            'patient' => $patient, 'datum' => date('d.m.Y', $jetzt), 'praxis' => (string)($praxis['name'] ?? ''), 'leistung' => $leistung, 'betrag' => $betrag,
+            'patient' => $patient, 'datum' => date('d.m.Y', $jetzt), 'praxis' => (string)($praxis['name'] ?? ''), 'leistung' => $leistung, 'leistungen' => $leistungenText, 'betrag' => $betrag,
         ]);
         self::aufraeumen($jetzt);
-        self::pdo()->prepare('INSERT INTO vorgaenge (vorlage_id, art, titel, text, patient, kontext, kontext_bis, status, druck_vorher, druck_nachher, erstellt, erstellt_von, pad_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, "wartet", ?, ?, ?, ?, ?)')
+        self::pdo()->prepare('INSERT INTO vorgaenge (vorlage_id, art, titel, text, patient, kontext, kontext_bis, status, druck_vorher, druck_nachher, erstellt, erstellt_von, pad_id, quelle, quelle_ref, leistungen)
+            VALUES (?, ?, ?, ?, ?, ?, ?, "wartet", ?, ?, ?, ?, ?, ?, ?, ?)')
             ->execute([(int)$vorlage['id'], $vorlage['art'], $vorlage['titel'], $text, $patient, $kontext, $kontext === '' ? 0 : $jetzt + 4 * 3600,
-                !empty($in['druck_vorher']) ? 1 : 0, !empty($in['druck_nachher']) ? 1 : 0, $jetzt, self::zeile($benutzer, 'Benutzer', 80, false), $padId]);
+                !empty($in['druck_vorher']) ? 1 : 0, !empty($in['druck_nachher']) ? 1 : 0, $jetzt, self::zeile($benutzer, 'Benutzer', 80, false), $padId, $quelle, $quelleRef, $liste ? json_encode($liste, JSON_UNESCAPED_UNICODE) : '']);
         return (int)self::pdo()->lastInsertId();
     }
 

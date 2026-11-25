@@ -56,7 +56,7 @@ LIMITS = {'starters': 5, 'packages': 50, 'services': 20, 'firewall': 20, 'rights
           'connections': len(CONNECTIONS)}
 
 SCHEMA_SECTIONS = {
-    'module': {'id', 'name', 'version', 'core_api', 'description', 'replaces'},
+    'module': {'id', 'name', 'version', 'core_api', 'description'},
     'system': {'packages', 'services', 'user', 'data'},
     'web': {'path', 'upstream', 'protocol', 'entry', 'starter', 'einstellungen', 'uploads'},   # starter: alter Schlüssel, wird nur noch angenommen und ignoriert
     'firewall': {'name', 'port', 'proto', 'scope'},
@@ -217,12 +217,6 @@ class _Checker:
                                           f'(unterstützt: {", ".join(sorted(supported_api()))}).')
         out['core_api'] = api
         out['description'] = self.text(t, 'description', 'module', required=False, limit=300)
-        # Früherer Name dieses Moduls: Bei der Installation werden Daten und Rechte des alten Moduls übernommen und das alte Modul entfernt.
-        old = self.pattern(t, 'replaces', 'module', ID, 'sumup', required=False) if 'replaces' in t else None
-        if old is not None and old == out.get('id'):
-            self.error('module.replaces', 'darf nicht die eigene ID sein.')
-            old = None
-        out['replaces'] = old
         return out
 
     def system(self, t: dict, mid: str | None) -> dict:

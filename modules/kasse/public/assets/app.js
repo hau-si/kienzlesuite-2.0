@@ -40,6 +40,30 @@ function manualCents() {
 }
 function payMethod() { return document.querySelector('input[name="pay-method"]:checked')?.value || 'card'; }
 document.querySelectorAll('input[name="pay-method"]').forEach(r => r.addEventListener('change', () => { startRequest=null; updateTotal(); }));
+// Zur Unterschrift: Leistungsliste samt Patient an das Modul Signatur übergeben (Fragment in der Adresse, geht nicht an den Server).
+const SIGNATUR = document.body.dataset.signatur || '';
+function signaturKnopf(sum) {
+  const knopf = $('sign-send'); if (!knopf) return;
+  knopf.hidden = !SIGNATUR || !state || !state.patient;
+  knopf.disabled = !(sum > 0) || busy;
+}
+function signaturListe() {
+  const ids = selectedIds(), liste = state.services.filter(s => ids.has(s.id)).map(s => ({code: s.goae_code || '', label: s.label, cent: s.price_cents}));
+  const manual = manualCents();
+  if (Number.isFinite(manual) && manual > 0) liste.push({code: '', label: 'Sonstiger Betrag', cent: manual});
+  return liste;
+}
+function signaturSenden() {
+  const liste = signaturListe();
+  if (!liste.length) return;
+  const roh = JSON.stringify({patient: state.patient.name, ref: visitId || '', leistungen: liste});
+  const bytes = new TextEncoder().encode(roh); let bin = ''; bytes.forEach(b => { bin += String.fromCharCode(b); });
+  const kodiert = btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  if (kodiert.length > 12000) { alert('Die Liste ist für die Übergabe zu lang. Bitte weniger Positionen wählen.'); return; }
+  window.open(SIGNATUR + '#uebergabe=' + kodiert, '_blank', 'noopener');
+  const note = $('sign-note'); note.hidden = false; note.textContent = 'In Signatur geöffnet. Dort Dokument wählen und den Vorgang anlegen; danach hier wie gewohnt kassieren.';
+}
+$('sign-send').addEventListener('click', signaturSenden);
 function updateTotal() {
   if (!state) return;
   const ids=selectedIds();
@@ -49,6 +73,7 @@ function updateTotal() {
   $('pay-transfer-label').hidden = !state.bank_ready;
   $('pay').textContent = transfer ? (sum > 0 ? euro(sum) + ' per Überweisung – Rechnung erstellen' : 'Per Überweisung') : cash ? (sum > 0 ? euro(sum) + ' bar erhalten – Rechnung erstellen' : 'Bar kassieren') : (sum > 0 ? euro(sum) + ' mit Karte kassieren' : 'Mit Karte kassieren');
   $('pay').classList.toggle('cash', cash || transfer);
+  signaturKnopf(sum);
   // Barzahlung braucht kein freies Terminal, aber Praxisdaten für die Rechnung.
   $('pay').disabled = busy || (!cash && !!state.reader_payment) || ((cash || transfer) && !state.local_receipts) || !(sum > 0 && sum <= state.max_amount_cents);
   $('pay-method-note').hidden = !((cash || transfer) && !state.local_receipts);
