@@ -134,4 +134,34 @@ if ($echt) {
     Pad::entfernen();
 }
 
+// Pads: anlegen, prüfen, ändern, auswählen, löschen
+check(Seite::pads() === [], 'anfangs keine Pads');
+$vorl = (int)Seite::vorlagen(true)[0]['id'];
+$neu = ['vorlage_id' => $vorl, 'patient' => 'Max Mustermann'];
+$v0 = Seite::vorgangAnlegen($neu, 'Dr. med. Erika Beispiel');
+check((int)Seite::vorgang($v0)['pad_id'] === 0, 'ohne Pads bleibt die Zuordnung offen');
+foreach ([['name' => '', 'adresse' => '192.0.2.10'], ['name' => 'A', 'adresse' => 'nicht gültig!'], ['name' => 'A', 'adresse' => '192.0.2.10', 'port' => '0'], ['name' => 'A', 'adresse' => '192.0.2.10', 'port' => '99999'], ['name' => 'A', 'adresse' => '192.0.2.10', 'port' => 'abc']] as $bad)
+    wirft(fn() => Seite::padSpeichern($bad), 'ungültiges Pad ' . json_encode($bad));
+$p1 = Seite::padSpeichern(['name' => 'Pad Empfang', 'arbeitsplatz' => 'Anmeldung', 'adresse' => '192.0.2.10', 'aktiv' => '1']);
+check(Seite::pad($p1)['port'] === 1002 || (int)Seite::pad($p1)['port'] === 1002, 'Vorgabeport 1002');
+$v1 = Seite::vorgangAnlegen($neu, 'x');
+check((int)Seite::vorgang($v1)['pad_id'] === $p1, 'ein aktives Pad wird automatisch zugeordnet');
+$p2 = Seite::padSpeichern(['name' => 'Pad Labor', 'adresse' => 'pad-labor.example.org', 'port' => '1002', 'aktiv' => '1']);
+wirft(fn() => Seite::vorgangAnlegen($neu, 'x'), 'bei mehreren Pads muss gewählt werden');
+wirft(fn() => Seite::vorgangAnlegen($neu + ['pad_id' => 9999], 'x'), 'unbekanntes Pad');
+$v2 = Seite::vorgangAnlegen($neu + ['pad_id' => $p2], 'x');
+check((int)Seite::vorgang($v2)['pad_id'] === $p2, 'gewähltes Pad gespeichert');
+Seite::padSpeichern(['id' => $p2, 'name' => 'Pad Labor', 'adresse' => '192.0.2.11', 'port' => '1002']);
+check(Seite::pad($p2)['adresse'] === '192.0.2.11' && (int)Seite::pad($p2)['aktiv'] === 0, 'ändern; ohne Haken inaktiv');
+$v3 = Seite::vorgangAnlegen($neu, 'x');
+check((int)Seite::vorgang($v3)['pad_id'] === $p1, 'inaktive Pads zählen nicht');
+$html = Ansicht::seite('tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null, null, null, Seite::pads());
+check(!str_contains($html, 'name="pad_id"'), 'kein Auswahlfeld bei einem aktiven Pad');
+check(!str_contains($html, 'Unterschriftenpads'), 'Pad-Verwaltung nur für Admins');
+Seite::padSpeichern(['id' => $p2, 'name' => 'Pad Labor', 'adresse' => '192.0.2.11', 'aktiv' => '1']);
+$html = Ansicht::seite('tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null, null, Pad::status(), Seite::pads());
+check(str_contains($html, 'name="pad_id"') && str_contains($html, 'Pad Empfang (Anmeldung)') && str_contains($html, 'Unterschriftenpads'), 'Auswahl und Verwaltung sichtbar');
+Seite::padLoeschen($p1);
+check((int)Seite::vorgang($v1)['pad_id'] === 0 && (int)Seite::vorgang($v2)['pad_id'] === $p2, 'Löschen entzieht nur wartenden Vorgängen die Zuordnung dieses Pads');
+
 echo "Signatur-Tests grün.\n";

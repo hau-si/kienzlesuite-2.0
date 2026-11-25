@@ -12,12 +12,12 @@ final class Ansicht {
 
     private static function datum(int $t): string { return $t > 0 ? date('d.m.Y H:i', $t) : '–'; }
 
-    public static function seite(string $csrf, array $vorgaenge, array $vorlagen, bool $darfVorgang, bool $darfVorlage, ?string $meldung, ?string $fehler, ?array $bearbeite = null, ?array $pad = null): string {
+    public static function seite(string $csrf, array $vorgaenge, array $vorlagen, bool $darfVorgang, bool $darfVorlage, ?string $meldung, ?string $fehler, ?array $bearbeite = null, ?array $pad = null, array $pads = []): string {
         $h = 'sg_h';
         $csrfFeld = '<input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '">';
         $o = '<div class="us"><div class="seitenkopf"><div><p class="eyebrow">Signatur</p><h1>Unterschriften</h1></div></div>'
             . '<p class="us-intro muted">Dokumente am Unterschriftenpad unterschreiben lassen: Vorgang anlegen, der Patient unterschreibt sofort oder später, das PDF kommt in die T2med-Akte. '
-            . 'Die Anbindung des Pads und das Ablegen in T2med sind noch nicht eingebaut; Vorlagen und Vorgänge können schon vorbereitet werden.</p>';
+            . 'Die Anzeige am Pad und das Ablegen in T2med sind noch nicht eingebaut; Pads, Vorlagen und Vorgänge können schon vorbereitet werden.</p>';
         if ($meldung) $o .= '<p class="ok" role="status">' . $h($meldung) . '</p>';
         if ($fehler) $o .= '<p class="fehler" role="alert">' . $h($fehler) . '</p>';
 
@@ -25,12 +25,20 @@ final class Ansicht {
         if ($darfVorgang) {
             $opt = '';
             foreach ($aktive as $v) $opt .= '<option value="' . (int)$v['id'] . '">' . $h(Seite::ARTEN[$v['art']] ?? $v['art']) . ': ' . $h($v['titel']) . '</option>';
+            $padOpt = '';
+            $aktivePads = array_values(array_filter($pads, fn($p) => (int)$p['aktiv']));
+            if (count($aktivePads) > 1) {
+                $padOpt = '<label for="n-pad">Pad (Arbeitsplatz)</label><select id="n-pad" name="pad_id" required><option value="">Bitte wählen</option>';
+                foreach ($aktivePads as $p) $padOpt .= '<option value="' . (int)$p['id'] . '">' . $h($p['name'] . ($p['arbeitsplatz'] !== '' ? ' (' . $p['arbeitsplatz'] . ')' : '')) . '</option>';
+                $padOpt .= '</select>';
+            }
             $o .= '<section class="card"><h2>Neuer Vorgang</h2>';
             if (!$aktive) {
                 $o .= '<p class="muted">Es gibt keine aktive Vorlage. Bitte unten eine Vorlage anlegen oder aktivieren.</p>';
             } else {
                 $o .= '<form method="post" class="us-form" autocomplete="off">' . $csrfFeld . '<input type="hidden" name="aktion" value="neu">'
                     . '<label for="n-vorlage">Dokument</label><select id="n-vorlage" name="vorlage_id">' . $opt . '</select>'
+                    . $padOpt
                     . '<label for="n-patient">Patient</label><input id="n-patient" name="patient" maxlength="80" required placeholder="z. B. Max Mustermann">'
                     . '<label for="n-leistung">Leistung oder Thema</label><input id="n-leistung" name="leistung" maxlength="120" placeholder="z. B. Ultraschall der Schilddrüse">'
                     . '<label for="n-betrag">Betrag in Euro</label><input id="n-betrag" name="betrag" inputmode="decimal" maxlength="12" placeholder="z. B. 45,00">'
@@ -45,13 +53,15 @@ final class Ansicht {
         if (!$vorgaenge) {
             $o .= '<p class="muted">Noch keine Vorgänge.</p>';
         } else {
-            $o .= '<table class="us-tabelle"><thead><tr><th>Angelegt</th><th>Patient</th><th>Dokument</th><th>Status</th><th></th></tr></thead><tbody>';
+            $o .= '<table class="us-tabelle"><thead><tr><th>Angelegt</th><th>Patient</th><th>Dokument</th><th>Pad</th><th>Status</th><th></th></tr></thead><tbody>';
+            $padNamen = [];
+            foreach ($pads as $p) $padNamen[(int)$p['id']] = $p['name'];
             foreach ($vorgaenge as $v) {
                 $abbrechbar = !in_array($v['status'], ['uebertragen', 'abgebrochen'], true);
                 $stat = '<span class="us-status s-' . $h($v['status']) . '">' . $h(Seite::STATI[$v['status']] ?? $v['status']) . '</span>';
                 if ($v['meldung'] !== '') $stat .= '<div class="muted klein-text">' . $h($v['meldung']) . '</div>';
                 if ($v['status'] === 'wartet' && $v['kontext'] !== '' && !Seite::kontextGueltig($v)) $stat .= '<div class="muted klein-text">T2med-Verbindung abgelaufen: Das Ablegen braucht einen neuen Aufruf aus T2med.</div>';
-                $o .= '<tr><td>' . $h(self::datum((int)$v['erstellt'])) . '</td><td>' . $h($v['patient']) . '</td><td>' . $h($v['titel']) . '</td><td>' . $stat . '</td><td>'
+                $o .= '<tr><td>' . $h(self::datum((int)$v['erstellt'])) . '</td><td>' . $h($v['patient']) . '</td><td>' . $h($v['titel']) . '</td><td>' . $h($padNamen[(int)($v['pad_id'] ?? 0)] ?? '–') . '</td><td>' . $stat . '</td><td>'
                     . ($darfVorgang && $abbrechbar ? '<form method="post" class="inline">' . $csrfFeld . '<input type="hidden" name="aktion" value="abbrechen"><input type="hidden" name="id" value="' . (int)$v['id'] . '"><button class="danger small" type="submit">Abbrechen</button></form>' : '')
                     . '</td></tr>';
             }
@@ -60,8 +70,29 @@ final class Ansicht {
         $o .= '</section>';
 
         if ($darfVorlage) $o .= self::vorlagen($csrfFeld, $vorlagen, $bearbeite);
-        if ($pad !== null) $o .= self::pad($csrfFeld, $pad);
+        if ($pad !== null) $o .= self::pads($csrfFeld, $pads) . self::pad($csrfFeld, $pad);
         return $o . '</div>';
+    }
+
+    /** Bereich „Unterschriftenpads“ nur für Admins: ein Pad je Arbeitsplatz mit Name, Adresse und Port. */
+    private static function pads(string $csrfFeld, array $pads): string {
+        $h = 'sg_h';
+        $o = '<details class="fold" id="pads"' . ($pads ? '' : ' open') . '><summary><h2>Unterschriftenpads</h2></summary><div class="us-body">'
+            . '<p class="muted">Je Arbeitsplatz mit Pad einen Eintrag. Das Delta muss im Ethernet-Modus laufen (Servicemenü am Pad); Adresse und Port stehen dort. Bei mehreren aktiven Pads wählt man beim Anlegen eines Vorgangs, an welchem unterschrieben wird.</p>';
+        $feld = static function (array $p, string $csrfFeld, string $knopf) use ($h): string {
+            $i = (int)($p['id'] ?? 0);
+            return '<form method="post" class="us-pad-zeile" autocomplete="off">' . $csrfFeld . '<input type="hidden" name="aktion" value="pad-speichern"><input type="hidden" name="id" value="' . $i . '">'
+                . '<label>Name<input name="name" maxlength="40" required value="' . $h($p['name'] ?? '') . '" placeholder="z. B. Pad Empfang"></label>'
+                . '<label>Arbeitsplatz<input name="arbeitsplatz" maxlength="60" value="' . $h($p['arbeitsplatz'] ?? '') . '" placeholder="z. B. Anmeldung"></label>'
+                . '<label>Adresse<input name="adresse" maxlength="100" required value="' . $h($p['adresse'] ?? '') . '" placeholder="z. B. 192.0.2.10"></label>'
+                . '<label>Port<input name="port" inputmode="numeric" maxlength="5" value="' . $h((string)($p['port'] ?? 1002)) . '"></label>'
+                . '<label class="check"><input type="checkbox" name="aktiv" value="1"' . (!isset($p['aktiv']) || (int)$p['aktiv'] ? ' checked' : '') . '> aktiv</label>'
+                . '<button class="primary small" type="submit">' . $knopf . '</button>'
+                . ($i > 0 ? '<button class="danger small" type="submit" name="aktion" value="pad-loeschen" formnovalidate>Löschen</button>' : '') . '</form>';
+        };
+        foreach ($pads as $p) $o .= $feld($p, $csrfFeld, 'Speichern');
+        $o .= '<h3>Neues Pad</h3>' . $feld([], $csrfFeld, 'Pad hinzufügen');
+        return $o . '</div></details>';
     }
 
     /** Bereich „Pad-Software“ nur für Admins: Anleitung, Lizenzhinweis, Upload der ZIP-Datei von signotec. */

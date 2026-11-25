@@ -1,5 +1,11 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.8
+
+- **Mehrere Pads:** Neuer Bereich „Unterschriftenpads“ (nur Admins): je Arbeitsplatz ein Pad mit Name, Arbeitsplatz, Adresse (IP oder Rechnername), Port (Vorgabe 1002) und Haken „aktiv“. Beim Anlegen eines Vorgangs wird bei genau einem aktiven Pad dieses automatisch genommen, bei mehreren muss das Pad gewählt werden. Die Vorgangsliste zeigt eine Spalte „Pad“. Löschen eines Pads entzieht wartenden Vorgängen die Zuordnung.
+- Datenbank-Schema 2 (Tabelle `pads`, Spalte `pad_id` an den Vorgängen); bestehende Daten bleiben erhalten.
+- Noch nicht eingebaut: der Dienst, der die Vorgänge am Pad anzeigt und die Unterschrift aufnimmt (kommt als Nächstes). Nicht im Browser geprüft.
+
 ## 0.1.0-beta.7
 
 - Verbindungstest: Das Programm wechselt in den Ordner der Pad-Bibliothek, weil sie dort `STPad.ini` sucht. Vorher brach es ab, wenn der Arbeitsordner für `ks-signatur` nicht lesbar war (Fehler „Permission denied: ./STPad.ini“). Nicht an echter Hardware geprüft.

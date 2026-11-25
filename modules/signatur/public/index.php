@@ -76,6 +76,12 @@ try {
             } elseif ($aktion === 'vorlage-loeschen' && $darfVorlage) {
                 Seite::vorlageLoeschen((int)($_POST['id'] ?? 0));
                 $meldung = 'Vorlage gelöscht.';
+            } elseif ($aktion === 'pad-speichern' && $k->istAdmin()) {
+                Seite::padSpeichern($_POST);
+                $meldung = 'Pad gespeichert.';
+            } elseif ($aktion === 'pad-loeschen' && $k->istAdmin()) {
+                Seite::padLoeschen((int)($_POST['id'] ?? 0));
+                $meldung = 'Pad gelöscht. Wartende Vorgänge dafür brauchen ein neues Pad.';
             } elseif ($aktion === 'pad-entfernen' && $k->istAdmin()) {
                 Pad::entfernen();
                 $meldung = 'Pad-Software entfernt.';
@@ -89,7 +95,7 @@ try {
     Seite::aufraeumen();
     header('Content-Type: text/html; charset=utf-8');
     header('Cache-Control: no-store');
-    echo $k->rahmen('Signatur', Ansicht::seite($k->csrf(), Seite::vorgaenge(), Seite::vorlagen(), $darfVorgang, $darfVorlage, $meldung, $fehler, $bearbeite, $k->istAdmin() ? Pad::status() : null), ['roh' => true, 'kopf' => Ansicht::kopf($base, $k->csrf())]);
+    echo $k->rahmen('Signatur', Ansicht::seite($k->csrf(), Seite::vorgaenge(), Seite::vorlagen(), $darfVorgang, $darfVorlage, $meldung, $fehler, $bearbeite, $k->istAdmin() ? Pad::status() : null, Seite::pads()), ['roh' => true, 'kopf' => Ansicht::kopf($base, $k->csrf())]);
 } catch (Throwable $e) {
     http_response_code(500);
     echo 'Die Signatur-Seite ist gerade nicht erreichbar.';
