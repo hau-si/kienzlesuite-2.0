@@ -1,5 +1,17 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.57
+
+- **Logo im Browser-Tab:** Kleines Herz mit Puls-Linie (eigene Zeichnung, `assets/favicon.svg`) als Tab-Symbol aller Seiten der Basis und der Module im Rahmen der Suite. Falls der Tab noch kein Herz zeigt: Strg+F5. Nicht im Browser geprüft.
+
+## 0.21.4-beta.56
+
+- **Zentraler Arbeitsplatz-Starter:** Neue Seite **Einrichten → Starter** (`/verwaltung/arbeitsplaetze`). Ein Starterprogramm je PC (Windows, macOS, Linux) und ein Starter-Schlüssel für alle Module. Die Seite listet die Startkontexte der installierten Module (`[[starters]]` in `module.toml`, z. B. `kienzle-sumup://…`) mit der Adresse für T2med und bietet das Paket mit Starterprogramm, Zertifikat, Schlüssel und Einrichtungsskript an. Neue Module erscheinen von selbst; danach das Paket am PC einmal erneut einrichten. Der Schlüssel liegt verschlüsselt in der Datenbank und lässt sich erneuern.
+- nginx: je Modul mit Startkontexten `POST /starter/<modul>`, vorher prüft die Basis den Schlüssel (`/_starter-pruefen`, mit Bremse nach Fehlversuchen). Das Modul bekommt nur geprüfte Aufrufe. Der alte Weg `/api.php` der Kasse bleibt unverändert.
+- `core.js` (v6) leitet `#launch=…&m=<modul>` nach der Anmeldung an das richtige Modul weiter.
+- Das Starterprogramm (Go, `core/client/starter`) wird von `scripts/starter-bauen` gebaut und liegt im Basis-Archiv (`client-dist`); CI baut es vor dem Release.
+- Nicht auf der VM, nicht mit T2med und nicht im Browser geprüft; Go-Tests und Cross-Kompilierung sind grün.
+
 ## 0.21.4-beta.55
 
 - **Festplatten-Balken wird wieder angezeigt:** Die Sicherheitsrichtlinie der Seite erlaubt keine `style`-Angaben im HTML, deshalb blieb der Belegungsbalken leer. Die Breite wird jetzt per Skript gesetzt (`core.js?v=5`).

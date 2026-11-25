@@ -3,7 +3,7 @@ declare(strict_types=1);
 // Modul signatur: Datenbank, Vorlagen, Platzhalter, Vorgänge, Aufbewahrung, Ansicht. Nur erfundene Daten.
 require dirname(__DIR__, 3) . '/core/php/modul/Kienzle.php';
 require dirname(__DIR__) . '/src/bootstrap.php';
-use KienzleSignatur\{Ansicht, Pad, Seite, Speicher};
+use KienzleSignatur\{Ansicht, Fhir, Pad, Seite, Speicher, Start};
 
 function check(bool $ok, string $msg): void { if (!$ok) { fwrite(STDERR, "FEHLER: $msg\n"); exit(1); } }
 function wirft(callable $f, string $msg): void { try { $f(); } catch (InvalidArgumentException) { return; } fwrite(STDERR, "FEHLER: $msg\n"); exit(1); }
@@ -84,12 +84,16 @@ check(Seite::vorlage($vorl) === null && Seite::vorgang((int)$igel['id'])['vorlag
 Seite::vorlageSpeichern(['id' => 0, 'art' => 'igel', 'titel' => '<b>Titel</b>', 'text' => 'Text', 'aktiv' => '1']);
 $aktiv = Seite::vorlagen(true);
 $xss = Seite::vorgang(Seite::vorgangAnlegen(['vorlage_id' => (int)$aktiv[0]['id'], 'patient' => '<script>x</script>'], 'x', $praxis));
-$html = Ansicht::seite('tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, 'Gespeichert.', null);
-check(!str_contains($html, '<script>x') && str_contains($html, '&lt;script&gt;x') && !str_contains($html, '<b>Titel</b>'), 'Ausgabe maskiert');
-check(str_contains($html, 'name="kienzle-csrf" value="tok"') && str_contains($html, 'Neuer Vorgang') && str_contains($html, 'id="vorlagen"'), 'Seite mit allen Bereichen');
-$nurVorgang = Ansicht::seite('tok', [], [], true, false, null, null);
-check(!str_contains($nurVorgang, 'id="vorlagen"') && str_contains($nurVorgang, 'keine aktive Vorlage'), 'ohne Vorlagenrecht kein Vorlagenbereich');
-$nurVorlage = Ansicht::seite('tok', [], Seite::vorlagen(), false, true, null, null);
+$liste = Ansicht::seite('/vorgaenge', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, 'Gespeichert.', null);
+$einst = Ansicht::seite('/einstellungen', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null);
+$start = Ansicht::seite('/', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null, null, null, [], Seite::aktuellerVorgang());
+check(!str_contains($liste, '<script>x') && str_contains($liste, '&lt;script&gt;x') && !str_contains($einst, '<b>Titel</b>') && str_contains($einst, '&lt;b&gt;Titel'), 'Ausgabe maskiert');
+check(str_contains($start, 'name="kienzle-csrf" value="tok"') && str_contains($start, 'Neuer Vorgang') && str_contains($start, 'Zuletzt angelegter Vorgang') && str_contains($einst, 'id="vorlagen"'), 'Start und Einstellungen');
+check(str_contains($liste, 'id="vg-suche"') && str_contains($liste, 'data-suche="') && str_contains($liste, 'id="vg-art"'), 'Liste mit Suche und Filtern');
+check(!str_contains($start, 'id="vorlagen"') && !str_contains($liste, 'id="vorlagen"'), 'Vorlagen nur unter Einstellungen');
+$nurVorgang = Ansicht::seite('/', 'tok', [], [], true, false, null, null);
+check(str_contains($nurVorgang, 'keine aktive Vorlage'), 'ohne aktive Vorlage Hinweis');
+$nurVorlage = Ansicht::seite('/einstellungen', 'tok', [], Seite::vorlagen(), false, true, null, null);
 check(!str_contains($nurVorlage, '<h2>Neuer Vorgang</h2>') && str_contains($nurVorlage, 'id="vorlagen"'), 'ohne Vorgangsrecht kein Formular');
 check(str_contains(Ansicht::kopf('/signatur', 'tok'), '/signatur/assets/app.js'), 'Kopf bindet Skript ein');
 
@@ -121,9 +125,9 @@ check(is_file(Pad::ordnerPfad() . '/libSTPadLib.so') && is_file(Pad::ordnerPfad(
 check(!file_exists($dir . '/evil.so') && !file_exists(dirname($dir) . '/evil.so') && count(glob($dir . '/signotec/*')) === 4, 'nur feste Dateinamen, nichts außerhalb');
 check(decoct(fileperms(Pad::ordnerPfad() . '/libSTPadLib.so') & 0777) === '640', 'Dateirechte 0640');
 check(Seite::ueberblick()[0]['state'] === 'done', 'Überblick: Pad-Software erledigt');
-$htmlAdmin = Ansicht::seite('tok', [], [], true, true, null, null, null, Pad::status());
+$htmlAdmin = Ansicht::seite('/einstellungen', 'tok', [], [], true, true, null, null, null, Pad::status());
 check(str_contains($htmlAdmin, 'id="pad-los"') && str_contains($htmlAdmin, 'signoPAD-API Linux 9.0.1') && str_contains($htmlAdmin, 'Pad-Software entfernen'), 'Admin sieht Upload und Stand');
-check(!str_contains(Ansicht::seite('tok', [], [], true, true, null, null), 'id="pad-los"'), 'ohne Admin kein Upload');
+check(!str_contains(Ansicht::seite('/einstellungen', 'tok', [], [], true, true, null, null), 'id="pad-los"'), 'ohne Admin kein Upload');
 Pad::entfernen();
 check(!Pad::status()['installiert'] && !is_dir(Pad::ordnerPfad()), 'Pad-Software entfernt');
 // Echte signotec-Datei, falls im Arbeitsverzeichnis vorhanden (nicht im Repository)
@@ -133,5 +137,113 @@ if ($echt) {
     check($st['installiert'] && preg_match('/^\d+\.\d+/', $st['version']) === 1, 'echte signotec-ZIP wird akzeptiert');
     Pad::entfernen();
 }
+
+// Pads: anlegen, prüfen, ändern, auswählen, löschen
+check(Seite::pads() === [], 'anfangs keine Pads');
+$vorl = (int)Seite::vorlagen(true)[0]['id'];
+$neu = ['vorlage_id' => $vorl, 'patient' => 'Max Mustermann'];
+$v0 = Seite::vorgangAnlegen($neu, 'Dr. med. Erika Beispiel');
+check((int)Seite::vorgang($v0)['pad_id'] === 0, 'ohne Pads bleibt die Zuordnung offen');
+foreach ([['name' => '', 'adresse' => '192.0.2.10'], ['name' => 'A', 'adresse' => 'nicht gültig!'], ['name' => 'A', 'adresse' => '192.0.2.10', 'port' => '0'], ['name' => 'A', 'adresse' => '192.0.2.10', 'port' => '99999'], ['name' => 'A', 'adresse' => '192.0.2.10', 'port' => 'abc']] as $bad)
+    wirft(fn() => Seite::padSpeichern($bad), 'ungültiges Pad ' . json_encode($bad));
+$p1 = Seite::padSpeichern(['name' => 'Pad Empfang', 'arbeitsplatz' => 'Anmeldung', 'adresse' => '192.0.2.10', 'aktiv' => '1']);
+check(Seite::pad($p1)['port'] === 1002 || (int)Seite::pad($p1)['port'] === 1002, 'Vorgabeport 1002');
+$v1 = Seite::vorgangAnlegen($neu, 'x');
+check((int)Seite::vorgang($v1)['pad_id'] === $p1, 'ein aktives Pad wird automatisch zugeordnet');
+$p2 = Seite::padSpeichern(['name' => 'Pad Labor', 'adresse' => 'pad-labor.example.org', 'port' => '1002', 'aktiv' => '1']);
+wirft(fn() => Seite::vorgangAnlegen($neu, 'x'), 'bei mehreren Pads muss gewählt werden');
+wirft(fn() => Seite::vorgangAnlegen($neu + ['pad_id' => 9999], 'x'), 'unbekanntes Pad');
+$v2 = Seite::vorgangAnlegen($neu + ['pad_id' => $p2], 'x');
+check((int)Seite::vorgang($v2)['pad_id'] === $p2, 'gewähltes Pad gespeichert');
+Seite::padSpeichern(['id' => $p2, 'name' => 'Pad Labor', 'adresse' => '192.0.2.11', 'port' => '1002']);
+check(Seite::pad($p2)['adresse'] === '192.0.2.11' && (int)Seite::pad($p2)['aktiv'] === 0, 'ändern; ohne Haken inaktiv');
+$v3 = Seite::vorgangAnlegen($neu, 'x');
+check((int)Seite::vorgang($v3)['pad_id'] === $p1, 'inaktive Pads zählen nicht');
+$html = Ansicht::seite('/vorgaenge', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null, null, null, Seite::pads());
+check(!str_contains($html, 'name="pad_id"'), 'kein Auswahlfeld bei einem aktiven Pad');
+check(!str_contains($html, 'Unterschriftenpads'), 'Pad-Verwaltung nur für Admins');
+Seite::padSpeichern(['id' => $p2, 'name' => 'Pad Labor', 'adresse' => '192.0.2.11', 'aktiv' => '1']);
+$html = Ansicht::seite('/', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null, null, Pad::status(), Seite::pads()) . Ansicht::seite('/einstellungen', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null, null, Pad::status(), Seite::pads());
+check(str_contains($html, 'name="pad_id"') && str_contains($html, 'Pad Empfang (Anmeldung)') && str_contains($html, 'Unterschriftenpads'), 'Auswahl und Verwaltung sichtbar');
+Seite::padLoeschen($p1);
+check((int)Seite::vorgang($v1)['pad_id'] === 0 && (int)Seite::vorgang($v2)['pad_id'] === $p2, 'Löschen entzieht nur wartenden Vorgängen die Zuordnung dieses Pads');
+
+// Am Pad zeigen
+$pa = Seite::padSpeichern(['name' => 'Pad A', 'adresse' => '192.0.2.20', 'aktiv' => '1']);
+$vp = Seite::vorgangAnlegen($neu + ['pad_id' => $pa], 'x');
+$ohnePad = Seite::vorgangAnlegen($neu + ['pad_id' => $pa], 'x');
+Speicher::pdo()->prepare('UPDATE vorgaenge SET pad_id=0 WHERE id=?')->execute([$ohnePad]);
+wirft(fn() => Seite::amPadZeigen($ohnePad), 'ohne Pad nicht am Pad zeigen');
+wirft(fn() => Seite::amPadZeigen(99999), 'unbekannter Vorgang');
+Seite::amPadZeigen($vp);
+check(Seite::vorgang($vp)['status'] === 'am_pad', 'Status am_pad');
+$zweiter = Seite::vorgangAnlegen($neu + ['pad_id' => $pa], 'x');
+wirft(fn() => Seite::amPadZeigen($zweiter), 'ein Pad zeigt nur einen Vorgang');
+wirft(fn() => Seite::amPadZeigen($vp), 'schon am Pad');
+$html = Ansicht::seite('/vorgaenge', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null, null, null, Seite::pads());
+check(str_contains($html, 'Vom Pad nehmen') && str_contains($html, 'Am Pad zeigen') && str_contains($html, 's-am_pad'), 'Knöpfe und Status in der Liste');
+Seite::vomPadNehmen($vp);
+check(Seite::vorgang($vp)['status'] === 'wartet', 'vom Pad genommen');
+wirft(fn() => Seite::vomPadNehmen($vp), 'nicht am Pad');
+Seite::amPadZeigen($vp);
+Seite::abbrechen($vp);
+check(Seite::vorgang($vp)['status'] === 'abgebrochen', 'am Pad abbrechbar');
+check(in_array((int)$vp, array_map(fn($v) => (int)$v['id'], Seite::vorgaenge(true)), true) === false, 'abgebrochen nicht in offenen');
+
+// Löschen abgebrochener Vorgänge
+$lv = Seite::vorgangAnlegen($neu + ['pad_id' => $pa], 'x');
+wirft(fn() => Seite::vorgangLoeschen($lv), 'nur abgebrochene löschbar');
+Seite::abbrechen($lv);
+Seite::vorgangLoeschen($lv);
+check(Seite::vorgang($lv) === null, 'abgebrochener Vorgang gelöscht');
+wirft(fn() => Seite::vorgangLoeschen($lv), 'schon gelöscht');
+check(str_contains(Ansicht::seite('/vorgaenge', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null), 'value="vorgang-loeschen"'), 'Löschknopf in der Liste');
+$gelb = Seite::aktuellerVorgang();
+check($gelb !== null && $gelb['status'] !== 'abgebrochen', 'aktueller Vorgang ist offen');
+
+// Pad-Ansicht: feste Zeilen mit Stift und Mülleimer, Bearbeiten nur auf Wunsch, Erledigt-Zeichen, Suche im Netz
+$px = Seite::padSpeichern(['name' => 'Pad <Test>', 'arbeitsplatz' => 'Anmeldung', 'adresse' => '192.0.2.31', 'aktiv' => '1']);
+Ansicht::$padSuche = null; Ansicht::$padBearbeiten = 0;
+$admin = Ansicht::seite('/einstellungen', 'tok', [], [], true, true, null, null, null, Pad::status(), Seite::pads());
+check(str_contains($admin, 'class="us-pad-fest"') && str_contains($admin, 'aria-label="Pad Pad &lt;Test&gt; bearbeiten"') && str_contains($admin, 'aria-label="Pad Pad &lt;Test&gt; löschen"'), 'feste Zeile mit Stift und Mülleimer');
+check(!str_contains($admin, 'value="Pad &lt;Test&gt;"'), 'eingerichtete Pads zeigen keine Eingabefelder');
+check(str_contains($admin, 'Servicemenü') && str_contains($admin, 'obere rechte Ecke') && str_contains($admin, 'Delta</strong> und <strong>Alpha'), 'Anleitung Servicemenü');
+Ansicht::$padBearbeiten = $px;
+check(str_contains(Ansicht::seite('/einstellungen', 'tok', [], [], true, true, null, null, null, Pad::status(), Seite::pads()), 'value="Pad &lt;Test&gt;"'), 'Bearbeiten zeigt Felder');
+Ansicht::$padBearbeiten = 0;
+check(str_contains($admin, '✓ erledigt') === Pad::status()['installiert'] && (Pad::status()['installiert'] || str_contains($admin, 'tag warn')), 'Erledigt-Zeichen nur mit Software');
+$netz = tmpfile(); $pfad = stream_get_meta_data($netz)['uri'];
+file_put_contents($pfad, "Main:\n  +-- 192.168.77.0/24 2 0 2\n     |-- 192.168.77.0\n        /32 link BROADCAST\n     |-- 192.168.77.5\n        /32 host LOCAL\n     |-- 127.0.0.1\n        /32 host LOCAL\n     |-- 203.0.113.9\n        /32 host LOCAL\n");
+check(Pad::eigeneNetze($pfad) === ['192.168.77'], 'eigene private Netze');
+check(Pad::netzGueltig('192.168.1') && Pad::netzGueltig('10.1.2') && Pad::netzGueltig('172.20.5') && !Pad::netzGueltig('172.32.1') && !Pad::netzGueltig('8.8.8') && !Pad::netzGueltig('192.168.1.5') && !Pad::netzGueltig('192.168.999'), 'nur private Netze');
+wirft(fn() => Pad::suchen('8.8.8'), 'kein öffentliches Netz durchsuchen');
+check(Pad::suchen('192.168.77', 1002, fn($a) => in_array($a, ['192.168.77.20', '192.168.77.82'], true)) === ['192.168.77.20', '192.168.77.82'], 'Treffer der Suche');
+Ansicht::$padSuche = ['netz' => '192.168.77', 'netze' => ['192.168.77'], 'treffer' => ['192.168.77.20', '192.0.2.31']];
+$treffer = Ansicht::seite('/einstellungen', 'tok', [], [], true, true, null, null, null, Pad::status(), Seite::pads());
+check(str_contains($treffer, 'value="192.168.77.20"') && str_contains($treffer, 'Hinzufügen') && str_contains($treffer, 'schon eingerichtet'), 'Treffer zum Hinzufügen');
+Ansicht::$padSuche = ['netz' => '192.168.77', 'netze' => ['192.168.77'], 'treffer' => []];
+check(str_contains(Ansicht::seite('/einstellungen', 'tok', [], [], true, true, null, null, null, Pad::status(), Seite::pads()), 'nichts auf Port 1002 gefunden'), 'leere Suche');
+Ansicht::$padSuche = null;
+Seite::padLoeschen($px);
+
+// Start aus T2med: Patient per FHIR (hier ersetzt), einmaliger Startcode, 5 Minuten gültig
+$fhir = new class(['base_url' => 'https://t2med.example.org/aps/fhir/api/r4', 'launch_urls' => ['https://192.0.2.7/aps/fhir/api/r4/']]) extends Fhir {
+    public array $aufrufe = [];
+    public function patient(string $kontext, string $token): array { $this->aufrufe[] = [$kontext, $token]; return ['id' => 'p1', 'name' => 'Max Mustermann', 'geburtsdatum' => '1980-04-12']; }
+};
+check($fhir->erlaubt('https://192.0.2.7/aps/fhir/api/r4') && $fhir->erlaubt('https://t2med.example.org/aps/fhir/api/r4/') && !$fhir->erlaubt('https://boese.example.org/') && !$fhir->erlaubt(''), 'FHIR-Adresse nur aus der Basis');
+$eingabe = ['context_id' => 'kontext-1', 'fhir_base_url' => 'https://192.0.2.7/aps/fhir/api/r4', 'oauth_token' => 'tok'];
+$a = Start::anlegen($eingabe, $fhir, 'kienzle.example.org', 1000);
+check(preg_match('~^https://kienzle\.example\.org/#launch=([0-9a-f]{64})&m=signatur$~D', $a['url'], $mm) === 1 && $fhir->aufrufe === [['kontext-1', 'tok']], 'Startlink');
+check(Start::einloesen($mm[1], 1000 + Start::GUELTIG + 1) === null, 'abgelaufener Code');
+$a = Start::anlegen($eingabe, $fhir, 'kienzle.example.org', 2000); preg_match('~launch=([0-9a-f]{64})~', $a['url'], $mm);
+check(Start::einloesen($mm[1], 2100) === ['patient' => 'Max Mustermann', 'geburtsdatum' => '1980-04-12', 'kontext' => 'kontext-1'], 'Code einlösen');
+check(Start::einloesen($mm[1], 2100) === null && Start::einloesen('abc') === null, 'Code nur einmal');
+wirft(fn() => Start::anlegen(['fhir_base_url' => 'https://boese.example.org'] + $eingabe, $fhir, 'kienzle.example.org'), 'fremde FHIR-Adresse');
+wirft(fn() => Start::anlegen(['context_id' => '../x'] + $eingabe, $fhir, 'kienzle.example.org'), 'ungültiger Kontext');
+wirft(fn() => Start::anlegen(['oauth_token' => ''] + $eingabe, $fhir, 'kienzle.example.org'), 'ohne Token');
+wirft(fn() => Start::anlegen($eingabe, $fhir, 'evil.example.org/x'), 'ungültiger Servername');
+$vid = Seite::vorgangAnlegen(['vorlage_id' => Seite::vorlagen()[0]['id'], 'patient' => 'Max Mustermann', 'pad_id' => Seite::pads(true)[0]['id'] ?? 0], 'admin', [], 'kontext-1');
+check(Seite::vorgang($vid)['kontext'] === 'kontext-1', 'Kontext am Vorgang');
 
 echo "Signatur-Tests grün.\n";

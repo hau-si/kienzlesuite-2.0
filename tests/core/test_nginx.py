@@ -85,6 +85,24 @@ class Vorlage(unittest.TestCase):
         with self.assertRaises(nginx.Fehler):
             nginx.render(HOSTS, reg)
 
+    def test_startkontexte_pruefung_durch_die_basis(self):
+        reg = registry()
+        reg['modules'][1]['starters'] = [{'schema': 'kienzle-sumup', 'label': 'Kasse'}]
+        conf = nginx.render(HOSTS, reg)
+        b = block(conf, 'location = /starter/kasse {')
+        self.assertIn('auth_request /_starter-pruefen;', b)
+        self.assertIn('limit_except POST { deny all; }', b)
+        self.assertIn('fastcgi_param KIENZLE_STARTER_GEPRUEFT 1;', b)
+        self.assertIn('fastcgi_param KIENZLE_OEFFENTLICH starter;', b)
+        self.assertNotIn('KIENZLE_BENUTZER', b)
+        p = block(conf, 'location = /_starter-pruefen {')
+        self.assertIn('internal;', p)
+        self.assertIn('fastcgi_param REQUEST_URI /_starter-pruefen;', p)
+        self.assertNotIn('location = /starter/', nginx.render(HOSTS, registry()))      # ohne Startkontexte kein Ort
+        reg['modules'][0]['starters'] = [{'schema': 'kienzle-b', 'label': 'B'}]   # HTTP-Modul
+        with self.assertRaises(nginx.Fehler):
+            nginx.render(HOSTS, reg)
+
     def test_interne_pfade(self):
         auth = block(self.conf, 'location ^~ /_auth/ {')
         self.assertIn('client_max_body_size 25m;', auth)  # sonst 413 schon bei der Anmeldeprüfung großer Uploads

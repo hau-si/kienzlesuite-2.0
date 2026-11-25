@@ -49,9 +49,10 @@ HOOKS = ('install', 'update', 'remove', 'busy', 'health')
 # Zentrale Verbindungen der Basis, die ein Modul anmelden kann (Zugangsdaten bekommen nur anmeldende Module).
 CONNECTIONS = ('t2med', 'mail', 'ablage', 'letterxpress')
 SHARES = ('samba', 'ipp')
+STARTER_SCHEMA = re.compile(r'^kienzle-[a-z0-9-]{1,30}$')
 FORMAT = re.compile(r'^[a-z]+/[a-z0-9.+-]{1,60}$')
 
-LIMITS = {'packages': 50, 'services': 20, 'firewall': 20, 'rights': 30, 'printers': 10, 'paths': 20,
+LIMITS = {'starters': 5, 'packages': 50, 'services': 20, 'firewall': 20, 'rights': 30, 'printers': 10, 'paths': 20,
           'connections': len(CONNECTIONS)}
 
 SCHEMA_SECTIONS = {
@@ -63,11 +64,12 @@ SCHEMA_SECTIONS = {
     'backup': {'paths', 'snapshot', 'settings'},
     'printers': {'name', 'label', 'ppd', 'backend', 'command', 'formats', 'paper', 'share'},
     'connections': {'id', 'purpose', 'required'},
+    'starters': {'schema', 'label'},
     'setup': {'overview'},
     'hooks': {*HOOKS, 'apparmor'},
 }
 TABLES = {'module', 'system', 'web', 'backup', 'setup', 'hooks'}
-ARRAYS = {'firewall', 'rights', 'printers', 'connections'}
+ARRAYS = {'firewall', 'rights', 'printers', 'connections', 'starters'}
 REQUIRED_TABLES = ('module', 'system')
 
 
@@ -192,6 +194,7 @@ class _Checker:
         out['backup'] = self.backup(data['backup'], mid) if 'backup' in data else None
         out['printers'] = self.printers(data.get('printers', []))
         out['connections'] = self.connections(data.get('connections', []))
+        out['starters'] = self.starters(data.get('starters', []), out['web'])
         out['setup'] = self.setup(data.get('setup', {}))
         out['hooks'] = self.hooks(data.get('hooks', {}))
         return None if self.errors else out
@@ -406,6 +409,30 @@ class _Checker:
             out.append({'id': cid, 'purpose': purpose, 'required': required is True})
         return out
 
+    def starters(self, items: list, web: dict | None) -> list:
+        """Startkontexte für den Arbeitsplatz-Starter: je Eintrag ein URL-Schema (kienzle-…://), das T2med aufruft. Der Starter
+        schickt den Kontext an https://<server>/starter/<modul-id>; dort liegt das Modul (nur FastCGI)."""
+        if not items:
+            return []
+        if len(items) > LIMITS['starters']:
+            self.error('starters', f'höchstens {LIMITS["starters"]} Einträge.')
+            return []
+        if web is None or web['protocol'] != 'fastcgi':
+            self.error('starters', 'Startkontexte brauchen ein Modul mit [web] und protocol = "fastcgi".')
+            return []
+        out, seen = [], set()
+        for n, t in enumerate(items, 1):
+            where = f'starters[{n}]'
+            schema = t.get('schema')
+            if not isinstance(schema, str) or not STARTER_SCHEMA.match(schema):
+                self.error(f'{where}.schema', 'muss mit „kienzle-“ beginnen, danach Kleinbuchstaben, Ziffern und Bindestriche (z. B. kienzle-signatur).')
+                schema = None
+            elif schema in seen:
+                self.error(f'{where}.schema', f'„{schema}“ ist doppelt.')
+            seen.add(schema)
+            out.append({'schema': schema, 'label': self.text(t, 'label', where, limit=60)})
+        return out
+
     def setup(self, t: dict) -> dict:
         return {'overview': self.rel_path(t['overview'], 'setup.overview') if 'overview' in t else None}
 
@@ -550,6 +577,8 @@ def check_list(folders: list) -> dict:
             claim(('path', m['web']['path']), mid, f'Webpfad {m["web"]["path"]}')
             if m['web']['starter']:
                 claim(('starter',), mid, 'Arbeitsplatz-Starter (/api.php)')
+        for st in m.get('starters', []):
+            claim(('schema', st['schema']), mid, f'Startschema {st["schema"]}')
         for p in m['printers']:
             claim(('printer', p['name'].lower()), mid, f'Drucker „{p["name"]}“')
         for f in m['firewall']:

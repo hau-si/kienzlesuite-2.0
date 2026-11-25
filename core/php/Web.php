@@ -19,7 +19,7 @@ final class Web {
         private Config $config, private Database $db, private Users $users, private Auth $auth, private ?Passkeys $passkeys,
         private Modules $modules, private AuditLog $audit, ?callable $qr = null, private ?Firewall $firewall = null, private ?Updates $updates = null,
         private ?Connections $connections = null, private ?Backup $backup = null, private ?Overview $overview = null, private ?Printers $printers = null, private ?Oidc $oidc = null, private ?Server $server = null,
-        private ?ModuleAdmin $store = null,
+        private ?ModuleAdmin $store = null, private ?Starter $starter = null,
     ) {
         $this->qr = $qr ?? static function (string $uri): ?string {
             if (!is_executable('/usr/bin/qrencode')) return null;
@@ -31,6 +31,7 @@ final class Web {
     public function handle(Request $req): Response {
         $this->req = $req;
         V::$starter = $this->modules->starterPath();
+        V::$starterMap = $this->modules->starterMap();
         try {
             $response = $this->route($req);
         } catch (Problem $e) {
@@ -44,6 +45,7 @@ final class Web {
     private function route(Request $r): Response {
         if ($r->path === '/_health') return $this->health();
         if (!$this->config->ownHost($r->header('host'))) throw new Problem('Unbekannter Servername.', 421);
+        if ($r->path === '/_starter-pruefen') return $this->starterPruefen($r);
         if (preg_match('#^/_auth/([a-z][a-z0-9-]{1,28})$#D', $r->path, $m)) return $this->forward($r, $m[1]);
         // OpenID Connect: Abfragen der Dienste selbst (ohne Cookie, ohne Origin des Browsers).
         if ($this->oidc && ($r->path === '/.well-known/openid-configuration' || in_array($r->path, ['/oidc/jwks', '/oidc/token', '/oidc/userinfo'], true))) return $this->oidcApi($r);
@@ -1120,6 +1122,8 @@ final class Web {
         if ($r->path === '/verwaltung/praxis') return $get ? $this->practicePage() : $this->practiceSave($r, $admin);
         if ($r->path === '/verwaltung/server') return $get ? $this->serverPage() : $this->serverSave($r, $admin);
         if ($r->path === '/verwaltung/sso') return $get ? $this->ssoPage() : $this->ssoAction($r, $admin);
+        if ($r->path === '/verwaltung/arbeitsplaetze') return $get ? $this->starterPage() : $this->starterAction($r, $admin);
+        if ($get && preg_match('#^/verwaltung/arbeitsplaetze/(windows|macos|linux)\.zip$#D', $r->path, $m)) return $this->starterPaket($m[1], $admin);
         if ($r->path === '/verwaltung/drucker') return $get ? $this->printersPage() : $this->printersAction($r, $admin);
         if ($r->path === '/verwaltung/einrichtung') return $get ? $this->overviewPage() : $this->overviewAction($r, $admin);
         if ($r->path === '/verwaltung/sicherung') return $get ? $this->backupPage() : $this->backupAction($r, $admin);
@@ -2006,6 +2010,74 @@ final class Web {
         $out = [];
         foreach (self::PRINTER_ROLES as $k => $_) $out[$k] = is_array($d) && is_string($d[$k] ?? null) && in_array($d[$k], $names, true) ? $d[$k] : '';
         return $out;
+    }
+
+    // --- Arbeitsplatz-Starter (zentral für alle Module) ---------------------------------------------------------
+
+    private function st(): Starter {
+        if (!$this->starter) throw new Problem('Die Starterverwaltung ist auf diesem Server nicht verfügbar.', 503);
+        return $this->starter;
+    }
+
+    /** Prüfung für nginx (auth_request vor /starter/<modul>): 204 bei richtigem Starter-Schlüssel, sonst 401; Fehlversuche werden gebremst. */
+    private function starterPruefen(Request $r): Response {
+        $throttle = new Throttle($this->db, Throttle::normalize($r->remote));
+        try { $throttle->check('starter'); } catch (Problem) { return new Response(429); }
+        if ($this->starter && $this->starter->verify($r->header('authorization'))) { $throttle->clear('starter'); return new Response(204); }
+        $throttle->fail('starter', 10, 600);
+        return new Response(401);
+    }
+
+    private function serverUrl(): string {
+        $name = array_values(array_filter($this->config->hostnames, fn($n) => !filter_var($n, FILTER_VALIDATE_IP)))[0] ?? $this->config->hostnames[0];
+        return 'https://' . $name;
+    }
+
+    /** @return array<string,string> Schema → Pfad auf dem Server */
+    private function starterKontexte(): array {
+        $out = [];
+        foreach ($this->modules->starters() as $s) $out[$s['schema']] = '/starter/' . $s['modul'];
+        return $out;
+    }
+
+    private function starterPage(?string $error = null, ?string $notice = null): Response {
+        $st = $this->st();
+        $list = $this->modules->starters();
+        $body = V::error($error) . ($notice ? '<p class="notice">' . V::h($notice) . '</p>' : '')
+            . '<p>Ein Starterprogramm pro Arbeitsplatz öffnet Module direkt aus T2med (aktueller Patient wird mitgegeben). Es wird einmal je PC eingerichtet und bedient alle '
+            . 'installierten Module; neue Module erscheinen hier von selbst, danach das Paket auf den PCs einmal erneut einrichten.</p>';
+        if (!$list) return Response::html(V::page('Starter', $body . '<p class="muted">Kein installiertes Modul bietet einen Startkontext an.</p>', $this->nav(), $this->config->practice, 'Einrichten'));
+        $rows = '';
+        foreach ($list as $s) $rows .= '<tr><td>' . V::h($this->modules->name($s['modul'])) . '</td><td>' . V::h($s['label']) . '</td><td><code>' . V::h($s['schema'] . '://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}') . '</code></td></tr>';
+        $body .= '<h2>Startkontexte</h2><p class="muted">Diese Adresse in T2med als Eintrag „Programm/URL“ je Kontext anlegen.</p>'
+            . '<table><thead><tr><th>Modul</th><th>Kontext</th><th>Adresse in T2med</th></tr></thead><tbody>' . $rows . '</tbody></table>';
+        $body .= '<h2>Paket für einen Arbeitsplatz</h2><p>Das Paket enthält Starterprogramm, Zertifikat, Starter-Schlüssel und Einrichtungsskript. Nur für Admins, nach der Einrichtung löschen.</p><p class="row-buttons">';
+        foreach (Starter::SYSTEMS as $key => $spec) {
+            $body .= '<a class="button" href="/verwaltung/arbeitsplaetze/' . $key . '.zip">' . V::h($spec['label']) . '</a> ';
+            if (!$st->hasPrograms($key)) $missing[] = $spec['label'];
+        }
+        $body .= '</p>' . (!empty($missing) ? '<p class="muted">Für ' . V::h(implode(', ', $missing)) . ' liegen auf dem Server noch keine Starterprogramme; das Paket enthält dann nur die Skripte.</p>' : '');
+        $body .= '<h2>Starter-Schlüssel</h2><p class="muted">Ein Schlüssel für alle Module. Nach dem Erneuern funktionieren alte Pakete nicht mehr; die Arbeitsplätze brauchen dann ein neues Paket.</p>'
+            . '<form method="post" action="/verwaltung/arbeitsplaetze" class="box">' . $this->hidden('erneuern')
+            . '<button class="secondary">Schlüssel erneuern</button></form>'
+            . '<p class="muted">Der Starter der Kasse (bisheriger Weg über api.php) bleibt unverändert bestehen.</p>';
+        return Response::html(V::page('Starter', $body, $this->nav(), $this->config->practice, 'Einrichten'), $error ? 422 : 200);
+    }
+
+    private function starterAction(Request $r, string $admin): Response {
+        if ($r->field('aktion') !== 'erneuern') throw new Problem('Unbekannte Aktion.', 400);
+        $this->st()->renew();
+        $this->audit->write($admin, 'starter-schluessel-erneuert', '');
+        return $this->starterPage(null, 'Neuer Starter-Schlüssel erzeugt. Die Pakete bitte neu laden und die Arbeitsplätze neu einrichten.');
+    }
+
+    private function starterPaket(string $system, string $admin): Response {
+        $files = $this->st()->files($system, $this->starterKontexte(), $this->serverUrl());
+        $out = '';
+        Starter::zip($files, function (string $b) use (&$out) { $out .= $b; });
+        $this->audit->write($admin, 'starter-paket-geladen', $system);
+        return (new Response(200, $out, [['Content-Type', 'application/zip']]))
+            ->with('Content-Disposition', 'attachment; filename="' . Starter::filename($system) . '"')->with('Cache-Control', 'no-store');
     }
 
     private function printersPage(?string $error = null): Response {

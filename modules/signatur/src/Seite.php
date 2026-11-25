@@ -8,7 +8,7 @@ namespace KienzleSignatur;
  */
 final class Seite {
     public const ARTEN = ['igel' => 'IGeL-Vertrag', 'aufklaerung' => 'Patientenaufklärung', 'datenschutz' => 'Datenschutzerklärung', 'sonstige' => 'Sonstiges Dokument'];
-    public const STATI = ['wartet' => 'Wartet auf Unterschrift', 'unterschrieben' => 'Unterschrieben', 'uebertragen' => 'In T2med abgelegt', 'fehler' => 'Fehler', 'abgebrochen' => 'Abgebrochen'];
+    public const STATI = ['wartet' => 'Wartet auf Unterschrift', 'am_pad' => 'Wird am Pad unterschrieben', 'unterschrieben' => 'Unterschrieben', 'uebertragen' => 'In T2med abgelegt', 'fehler' => 'Fehler', 'abgebrochen' => 'Abgebrochen'];
     /** Platzhalter in Vertragstexten: {{name}} wird beim Anlegen des Vorgangs eingesetzt. */
     public const PLATZHALTER = ['patient' => 'Name des Patienten', 'datum' => 'Heutiges Datum', 'praxis' => 'Name der Praxis', 'leistung' => 'Leistung oder Thema', 'betrag' => 'Betrag in Euro'];
     public const MAX_TEXT = 20000;
@@ -117,15 +117,62 @@ final class Seite {
         if ($betrag !== '' && !preg_match('/^\d{1,6}([.,]\d{1,2})?$/D', $betrag)) throw new \InvalidArgumentException('Der Betrag muss eine Zahl sein, z. B. 45,00.');
         if ($betrag !== '') $betrag = number_format((float)str_replace(',', '.', $betrag), 2, ',', '.');
         $kontext = self::zeile($kontext, 'Kontext', 100, false);
+        // Pad: bei genau einem aktiven Pad automatisch, sonst muss eines gewählt werden; ohne Pads bleibt es offen (0).
+        $aktivePads = self::pads(true);
+        $padId = 0;
+        if (count($aktivePads) === 1) $padId = (int)$aktivePads[0]['id'];
+        elseif ($aktivePads) {
+            $padId = (int)($in['pad_id'] ?? 0);
+            if (!in_array($padId, array_map(fn($p) => (int)$p['id'], $aktivePads), true)) throw new \InvalidArgumentException('Bitte das Pad wählen, an dem unterschrieben wird.');
+        }
         $text = self::einsetzen((string)$vorlage['text'], [
             'patient' => $patient, 'datum' => date('d.m.Y', $jetzt), 'praxis' => (string)($praxis['name'] ?? ''), 'leistung' => $leistung, 'betrag' => $betrag,
         ]);
         self::aufraeumen($jetzt);
-        self::pdo()->prepare('INSERT INTO vorgaenge (vorlage_id, art, titel, text, patient, kontext, kontext_bis, status, druck_vorher, druck_nachher, erstellt, erstellt_von)
-            VALUES (?, ?, ?, ?, ?, ?, ?, "wartet", ?, ?, ?, ?)')
+        self::pdo()->prepare('INSERT INTO vorgaenge (vorlage_id, art, titel, text, patient, kontext, kontext_bis, status, druck_vorher, druck_nachher, erstellt, erstellt_von, pad_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, "wartet", ?, ?, ?, ?, ?)')
             ->execute([(int)$vorlage['id'], $vorlage['art'], $vorlage['titel'], $text, $patient, $kontext, $kontext === '' ? 0 : $jetzt + 4 * 3600,
-                !empty($in['druck_vorher']) ? 1 : 0, !empty($in['druck_nachher']) ? 1 : 0, $jetzt, self::zeile($benutzer, 'Benutzer', 80, false)]);
+                !empty($in['druck_vorher']) ? 1 : 0, !empty($in['druck_nachher']) ? 1 : 0, $jetzt, self::zeile($benutzer, 'Benutzer', 80, false), $padId]);
         return (int)self::pdo()->lastInsertId();
+    }
+
+    /** Alle Pads, nach Name sortiert; $nurAktive: nur die, die für neue Vorgänge wählbar sind. */
+    public static function pads(bool $nurAktive = false): array {
+        return self::pdo()->query('SELECT * FROM pads' . ($nurAktive ? ' WHERE aktiv=1' : '') . ' ORDER BY name COLLATE NOCASE, id')->fetchAll();
+    }
+
+    public static function pad(int $id): ?array {
+        $st = self::pdo()->prepare('SELECT * FROM pads WHERE id=?');
+        $st->execute([$id]);
+        return $st->fetch() ?: null;
+    }
+
+    /** Pad anlegen (id 0) oder ändern. Adresse: IPv4-Adresse oder Rechnername; Port 1 bis 65535 (Vorgabe 1002). */
+    public static function padSpeichern(array $in): int {
+        $name = self::zeile($in['name'] ?? '', 'Name', 40);
+        $platz = self::zeile($in['arbeitsplatz'] ?? '', 'Arbeitsplatz', 60, false);
+        $adresse = self::zeile($in['adresse'] ?? '', 'Adresse', 100);
+        $ok = filter_var($adresse, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false || preg_match('/^(?=.{1,100}$)[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*$/D', $adresse);
+        if (!$ok) throw new \InvalidArgumentException('Die Adresse muss eine IP-Adresse (z. B. 192.0.2.10) oder ein Rechnername sein.');
+        $portText = trim((string)($in['port'] ?? ''));
+        $port = $portText === '' ? 1002 : (ctype_digit($portText) ? (int)$portText : 0);
+        if ($port < 1 || $port > 65535) throw new \InvalidArgumentException('Der Port muss eine Zahl zwischen 1 und 65535 sein (Vorgabe 1002).');
+        $aktiv = !empty($in['aktiv']) ? 1 : 0;
+        $id = (int)($in['id'] ?? 0);
+        if ($id > 0) {
+            if (!self::pad($id)) throw new \InvalidArgumentException('Pad nicht gefunden.');
+            self::pdo()->prepare('UPDATE pads SET name=?, arbeitsplatz=?, adresse=?, port=?, aktiv=? WHERE id=?')->execute([$name, $platz, $adresse, $port, $aktiv, $id]);
+            return $id;
+        }
+        self::pdo()->prepare('INSERT INTO pads (name, arbeitsplatz, adresse, port, aktiv) VALUES (?, ?, ?, ?, ?)')->execute([$name, $platz, $adresse, $port, $aktiv]);
+        return (int)self::pdo()->lastInsertId();
+    }
+
+    /** Löscht ein Pad; Vorgänge, die darauf warten, verlieren die Zuordnung und müssen ein neues Pad bekommen. */
+    public static function padLoeschen(int $id): void {
+        if (!self::pad($id)) throw new \InvalidArgumentException('Pad nicht gefunden.');
+        self::pdo()->prepare('DELETE FROM pads WHERE id=?')->execute([$id]);
+        self::pdo()->prepare('UPDATE vorgaenge SET pad_id=0 WHERE pad_id=? AND status="wartet"')->execute([$id]);
     }
 
     public static function vorgang(int $id): ?array {
@@ -136,8 +183,43 @@ final class Seite {
 
     /** Vorgänge, neueste zuerst. $offen: nur die, die noch bearbeitet werden müssen (wartet, unterschrieben, Fehler). */
     public static function vorgaenge(bool $offen = false, int $max = 200): array {
-        $sql = 'SELECT * FROM vorgaenge' . ($offen ? ' WHERE status IN ("wartet","unterschrieben","fehler")' : '') . ' ORDER BY erstellt DESC, id DESC LIMIT ' . max(1, min(1000, $max));
+        $sql = 'SELECT * FROM vorgaenge' . ($offen ? ' WHERE status IN ("wartet","am_pad","unterschrieben","fehler")' : '') . ' ORDER BY erstellt DESC, id DESC LIMIT ' . max(1, min(1000, $max));
         return self::pdo()->query($sql)->fetchAll();
+    }
+
+    /** Zeigt den Vorgang am zugeordneten Pad: Status „am_pad“, der Pad-Dienst holt ihn ab. Nur aus „wartet“ oder „fehler“. */
+    public static function amPadZeigen(int $id): void {
+        $v = self::vorgang($id);
+        if (!$v) throw new \InvalidArgumentException('Vorgang nicht gefunden.');
+        if (!in_array($v['status'], ['wartet', 'fehler'], true)) throw new \InvalidArgumentException('Dieser Vorgang kann gerade nicht am Pad gezeigt werden.');
+        $pad = (int)$v['pad_id'] > 0 ? self::pad((int)$v['pad_id']) : null;
+        if (!$pad || !(int)$pad['aktiv']) throw new \InvalidArgumentException('Dem Vorgang ist kein aktives Pad zugeordnet.');
+        $busy = self::pdo()->prepare('SELECT COUNT(*) FROM vorgaenge WHERE status="am_pad" AND pad_id=? AND id<>?');
+        $busy->execute([(int)$pad['id'], $id]);
+        if ((int)$busy->fetchColumn() > 0) throw new \InvalidArgumentException('An diesem Pad wird gerade ein anderer Vorgang unterschrieben.');
+        self::pdo()->prepare('UPDATE vorgaenge SET status="am_pad", meldung="" WHERE id=? AND status IN ("wartet","fehler")')->execute([$id]);
+    }
+
+    /** Nimmt einen Vorgang vom Pad zurück (der Pad-Dienst räumt das Display). */
+    public static function vomPadNehmen(int $id): void {
+        $v = self::vorgang($id);
+        if (!$v || $v['status'] !== 'am_pad') throw new \InvalidArgumentException('Dieser Vorgang ist nicht am Pad.');
+        self::pdo()->prepare('UPDATE vorgaenge SET status="wartet", meldung="Vom Pad genommen." WHERE id=? AND status="am_pad"')->execute([$id]);
+    }
+
+    /** Der Vorgang für die Startseite: der gerade am Pad (neuester), sonst der zuletzt angelegte offene. */
+    public static function aktuellerVorgang(): ?array {
+        $r = self::pdo()->query('SELECT * FROM vorgaenge WHERE status="am_pad" ORDER BY id DESC LIMIT 1')->fetch();
+        if ($r) return $r;
+        return self::pdo()->query('SELECT * FROM vorgaenge WHERE status IN ("wartet","fehler","unterschrieben") ORDER BY erstellt DESC, id DESC LIMIT 1')->fetch() ?: null;
+    }
+
+    /** Löscht einen abgebrochenen Vorgang endgültig (Patientendaten sollen nicht länger als nötig liegen). */
+    public static function vorgangLoeschen(int $id): void {
+        $v = self::vorgang($id);
+        if (!$v) throw new \InvalidArgumentException('Vorgang nicht gefunden.');
+        if ($v['status'] !== 'abgebrochen') throw new \InvalidArgumentException('Nur abgebrochene Vorgänge lassen sich löschen.');
+        self::pdo()->prepare('DELETE FROM vorgaenge WHERE id=? AND status="abgebrochen"')->execute([$id]);
     }
 
     public static function abbrechen(int $id): void {
@@ -168,10 +250,10 @@ final class Seite {
         return [
             ['title' => 'Pad-Software von signotec hochladen', 'state' => $pad ? 'done' : 'open',
              'hint' => $pad ? 'Die Bibliotheken von signotec sind hinterlegt.' : 'Die Software für das Unterschriftenpad liegt nicht bei und muss einmal von einem Admin hochgeladen werden.',
-             'link' => '/signatur/#pad'],
+             'link' => '/signatur/einstellungen#pad'],
             ['title' => 'Vertragstexte der Praxis anpassen', 'state' => $musterOffen > 0 ? 'open' : 'done',
              'hint' => $musterOffen > 0 ? 'Die mitgelieferten Mustertexte sind nur Beispiele. Bitte prüfen und für Ihre Praxis ändern oder abschalten.' : 'Alle aktiven Vorlagen wurden von der Praxis bearbeitet.',
-             'link' => '/signatur/#vorlagen'],
+             'link' => '/signatur/einstellungen#vorlagen'],
         ];
     }
 }

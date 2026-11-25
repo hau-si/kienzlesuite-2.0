@@ -115,6 +115,20 @@ Virtuelle Drucker des Moduls. Die Druckerverwaltung der Basis legt sie an und en
 | `backend` | nein | nur mit `ppd`: CUPS-Backend im Modulordner (ausführbar, läuft als Benutzer `lp`). Ohne Backend verwirft die Warteschlange die Ausgabe der Filter (Backend `kienzle-leer` der Basis) |
 | `share` | nein | Liste aus `"samba"` und `"ipp"`: wie die Arbeitsplätze den Drucker erreichen. IPP ist bei virtuellen Druckern immer an (Standardweg für alle Betriebssysteme), auch wenn es hier fehlt; Samba (alte Windows-Freigabe) ist nur eine Vorgabe für neue Drucker, der Admin schaltet es unter Verwaltung → Drucker ein oder aus |
 
+### `[[starters]]` – optional
+
+Startkontexte für den zentralen Arbeitsplatz-Starter der Basis (Verwaltung → Starter). Nur mit `[web] protocol = "fastcgi"`. Höchstens 5 Einträge je Modul.
+
+| Feld | Pflicht | Bedeutung |
+|---|---|---|
+| `schema` | ja | URL-Schema, das T2med aufruft, `kienzle-<name>` (Kleinbuchstaben, Ziffern, Bindestrich); über alle Module eindeutig |
+| `label` | ja | Name des Kontexts für die Anzeige auf der Seite „Starter“ |
+
+Das Starterprogramm sendet `POST https://<server>/starter/<modul-id>` (JSON mit `context_id`, `fhir_base_url`, `oauth_token`, `action = "launch"`).
+Die Basis prüft vorher den Starter-Schlüssel; das Modul sieht `KIENZLE_OEFFENTLICH=starter` und `KIENZLE_STARTER_GEPRUEFT=1` und antwortet mit
+`{"url": "https://<server>/#launch=<64 Hex-Zeichen>&m=<modul-id>"}`. Die Basis leitet nach der Anmeldung an `<web.path>/#launch=…` weiter; das Modul
+löst den Code ein.
+
 ### `[[connections]]` – optional
 
 Zentrale Verbindungen, die die Basis verwaltet (Seite „Verbindungen“). Nur Module, die eine Verbindung hier anmelden,

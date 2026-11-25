@@ -4,12 +4,13 @@
 [module]
 id = "signatur"
 name = "Signatur"
-version = "0.1.0-beta.5"
+version = "0.1.0-beta.14"
 core_api = "1"
 description = "Verträge, Aufklärungen und Datenschutzerklärungen am Unterschriftenpad unterschreiben lassen, auch zeitversetzt, und als PDF in T2med ablegen."
 
 [system]
-packages = ["php-fpm", "php-cli", "php-sqlite3", "php-mbstring", "php-zip"]
+packages = ["php-fpm", "php-cli", "php-sqlite3", "php-mbstring", "php-zip", "python3", "python3-pil", "fonts-dejavu-core"]
+services = ["kienzle-signatur-pad.service"]
 user = "ks-signatur"
 data = "/var/lib/kienzle/signatur"
 
@@ -18,6 +19,7 @@ path = "/signatur"
 upstream = "unix:/run/kienzle/signatur/web.sock"
 protocol = "fastcgi"
 entry = "public/index.php"
+einstellungen = "/einstellungen"
 
 [[rights]]
 id = "vorgaenge"
@@ -26,6 +28,11 @@ label = "Signatur: Vorgänge anlegen, ansehen und abbrechen"
 [[rights]]
 id = "vorlagen"
 label = "Signatur: Vorlagen und Vertragstexte ändern"
+
+# Startkontext für den zentralen Arbeitsplatz-Starter der Basis (Verwaltung → Starter): POST https://<server>/starter/signatur
+[[starters]]
+schema = "kienzle-signatur"
+label = "Signatur"
 
 [[connections]]
 id = "t2med"

@@ -1,5 +1,13 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.34
+
+- **Zahlungsknöpfe passen wieder:** In der eingebetteten Kassenansicht der Startseite (Freie Eingabe und Rechnung aus dem Eingang) ragte die Schrift der Knöpfe Karte/Bar/Überweisung über den Rand, weil vier Spalten in die schmale rechte Spalte gepresst wurden. Dort stehen die Zahlungsarten jetzt in zwei festen Spalten (Karte | Bar, darunter Überweisung | Per Post), die Schrift darf umbrechen. In kleinen Fenstern stehen Leistungen und Zahlung untereinander. Im Browser (Chromium, Vorschau mit erfundenen Daten) geprüft, nicht auf der VM. Test in `tests/suite.php`.
+
+## 2.3.4-beta.33
+
+- **Zentraler Starter:** Die Kasse meldet ihren Startkontext `kienzle-sumup` bei der Basis an (Verwaltung → Starter). Dort gibt es ein Paket für alle Module; der bisherige Weg über `/api.php` und das Kassen-Paket bleibt unverändert. Der zentrale Aufruf (`/starter/sumup`) wird von der Basis geprüft, die Kasse nimmt ihn nur mit dieser Prüfung an. Neuer Test in `tests/suite.php`. Nicht mit T2med und nicht im Browser geprüft.
+
 ## 2.3.4-beta.32
 
 - **Zahlungsversuch verwerfen (IGeL):** Nach „Zahlung nicht erfolgt“ oder „Zahlung abgebrochen“ gibt es zusätzlich zu „Erneut versuchen“ den Knopf **Verwerfen**, solange noch keine Rechnungsnummer vergeben wurde. Er setzt Auswahl und Betrag zurück; die erfolglosen Versuche verschwinden aus der Ansicht, bleiben aber mit Status „discarded“ in der Datenbank. Nicht möglich bei bezahlten oder überwiesenen Zahlungen (Nummer vergeben) und bei T2med-Rechnungen. Neuer Test `tests/discard.php`. Nicht im Browser geprüft.

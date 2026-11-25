@@ -76,6 +76,9 @@ try {
     check($code === 404, 'Unbekannte Adresse nicht abgewiesen');
     [$code, $css] = page($root, ['REQUEST_URI' => '/kasse/assets/style.css'] + $server);
     check($code === 200 && str_contains($css, '--teal'), 'Stylesheet nicht ausgeliefert');
+    // Eingebettete Kassenansicht: rechte Spalte ist schmal, Zahlungsarten in zwei Spalten mit Umbruch (sonst ragt die Schrift über die Knöpfe).
+    $embed = (string) file_get_contents(dirname(__DIR__) . '/public/assets/embed.css');
+    check(str_contains($embed, '.embed .pay-method { margin: 6px 0; grid-template-columns: repeat(2, minmax(0, 1fr)); }') && str_contains($embed, '.embed .pay-method span { white-space: normal;'), 'Zahlungsknöpfe der eingebetteten Ansicht zu schmal');
     [$code] = page($root, ['REQUEST_URI' => '/kasse/assets/..%2fsrc%2fSuite.php'] + $server);
     check($code === 404, 'Datei außerhalb von assets ausgeliefert');
     [$code, $help] = page($root, ['REQUEST_URI' => '/kasse/hilfe/t2med'] + $server);
@@ -138,6 +141,13 @@ try {
     [$code, $out] = page($root, $starter + ['HTTP_AUTHORIZATION' => 'Bearer ' . $g['launcher_key']], $launch);
     $r = json_decode($out, true);
     check($code === 200 && preg_match('~^https://kasse\.example\.org/#launch=[0-9a-f]{64}$~D', (string)($r['url'] ?? '')) === 1, 'Starter: Startlink muss auf „/“ zeigen (Starter 1.4.1): ' . $out);
+    // Zentraler Weg (POST /starter/sumup): nginx hat den Schlüssel schon geprüft (KIENZLE_STARTER_GEPRUEFT); ohne dieses Merkmal gilt weiter der eigene Schlüssel.
+    $zentral = ['REQUEST_URI' => '/starter/sumup', 'KIENZLE_STARTER_GEPRUEFT' => '1'] + $starter;
+    [$code, $out] = page($root, $zentral, $launch);
+    $rz = json_decode($out, true);
+    check($code === 200 && preg_match('~^https://kasse\.example\.org/#launch=[0-9a-f]{64}&m=sumup$~D', (string)($rz['url'] ?? '')) === 1, 'Zentraler Starter: Startlink mit Modulkennung: ' . $out);
+    [$code] = page($root, ['REQUEST_URI' => '/starter/sumup', 'KIENZLE_STARTER_GEPRUEFT' => '0'] + $starter, $launch);
+    check($code === 401, 'Zentraler Weg ohne Prüfung durch die Basis');
     // Der Startcode gilt 5 Minuten und nur einmal; Austausch nur mit Anmeldung an der Suite.
     $ticket = substr($r['url'], -64);
     $db = new Database(Suite::$data);

@@ -126,13 +126,21 @@ final class Seite {
         return $out;
     }
 
-    /** Die letzten Zeilen des Druckprotokolls (Zeit, Art des Auftrags, Ergebnis; keine Patientendaten). */
     /** Zeilen des letzten Auftrags (ab „Auftrag erhalten“ bis zum Ende) mit den Zeiten je Schritt, jede Zeit in einer eigenen Zeile. */
     public static function letzterAuftrag(): array {
-        $all = self::protokoll(40);
+        return self::druckauftraege()['letzter'];
+    }
+
+    /**
+     * Druckprotokoll für die Seite: der letzte Auftrag (Zeiten je Schritt in eigenen Zeilen) und davor bis zu $frueher Zeilen
+     * der vorherigen Aufträge. Ohne erkannten Auftrag stehen die letzten Zeilen unter „frueher“.
+     * @return array{letzter:list<string>,frueher:list<string>}
+     */
+    public static function druckauftraege(int $frueher = 12): array {
+        $all = self::protokoll(40 + $frueher);
         $start = null;
         foreach ($all as $i => $l) if (str_contains($l, 'Auftrag erhalten')) $start = $i;
-        if ($start === null) return [];
+        if ($start === null) return ['letzter' => [], 'frueher' => array_slice($all, -$frueher)];
         $out = [];
         foreach (array_slice($all, $start) as $l) {
             if (($pos = strpos($l, 'Zeiten: ')) !== false) {
@@ -140,9 +148,10 @@ final class Seite {
                 foreach (explode(' · ', substr($l, $pos + 8)) as $z) $out[] = '    ' . $z;
             } else $out[] = $l;
         }
-        return $out;
+        return ['letzter' => $out, 'frueher' => array_slice(array_slice($all, 0, $start), -$frueher)];
     }
 
+    /** Die letzten Zeilen des Druckprotokolls (Zeit, Art des Auftrags, Ergebnis; keine Patientendaten). */
     public static function protokoll(int $zeilen = 12): array {
         $text = (string)@file_get_contents(self::$data . '/druckprotokoll.txt', false, null, 0, 20000);
         $all = $text === '' ? [] : array_values(array_filter(explode("\n", $text), static fn($l) => $l !== ''));

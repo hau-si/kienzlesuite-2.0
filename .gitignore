@@ -3,3 +3,4 @@ __pycache__/
 dist/
 *.pem
 !installer/release-keys/*.pub.pem
+core/client-dist/

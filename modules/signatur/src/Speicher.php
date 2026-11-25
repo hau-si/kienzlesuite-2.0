@@ -7,7 +7,7 @@ final class Speicher {
     public static string $data = '/var/lib/kienzle/signatur';
     private static ?\PDO $pdo = null;
     private static string $pfad = '';
-    public const VERSION = 1;
+    public const VERSION = 3;
 
     public static function pdo(): \PDO {
         $datei = self::$data . '/signatur.db';
@@ -58,6 +58,28 @@ final class Speicher {
             )');
             $pdo->exec('CREATE INDEX vorgaenge_status ON vorgaenge(status, erstellt)');
             self::musterAnlegen($pdo);
+        }
+        if ($v < 2) {
+            // Mehrere Pads (je Arbeitsplatz eines); der Vorgang merkt sich, an welchem Pad er unterschrieben wird.
+            $pdo->exec('CREATE TABLE pads (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                arbeitsplatz TEXT NOT NULL DEFAULT "",
+                adresse TEXT NOT NULL,
+                port INTEGER NOT NULL DEFAULT 1002,
+                aktiv INTEGER NOT NULL DEFAULT 1
+            )');
+            $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN pad_id INTEGER NOT NULL DEFAULT 0');
+        }
+        if ($v < 3) {
+            // Startcodes aus T2med (kienzle-signatur://): einmalig, 5 Minuten gültig; enthalten den Patienten für die Startseite.
+            $pdo->exec('CREATE TABLE starts (
+                hash TEXT PRIMARY KEY,
+                patient TEXT NOT NULL,
+                geburtsdatum TEXT NOT NULL DEFAULT "",
+                kontext TEXT NOT NULL,
+                bis INTEGER NOT NULL
+            )');
         }
         $pdo->exec('PRAGMA user_version=' . self::VERSION);
         $pdo->commit();

@@ -112,12 +112,16 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
   })();
 
-  // Arbeitsplatz-Starter (z. B. Kasse aus T2med): Der Starter öffnet https://<server>/#launch=<einmaliger Code>.
-  // Ohne Anmeldung den Code bis nach der Anmeldung im Tab merken, danach an das Modul weitergeben (data-starter).
+  // Arbeitsplatz-Starter (T2med → Modul): Der Starter öffnet https://<server>/#launch=<einmaliger Code>[&m=<Modul>].
+  // Ohne Anmeldung den Code bis nach der Anmeldung im Tab merken, danach an das Modul weitergeben
+  // (data-starter-map: Modul → Pfad; ohne &m der Kassen-Starter data-starter).
   (function starter() {
-    const target = document.body && document.body.dataset.starter;
-    if (!target) return;
-    let hash = /^#launch=[0-9a-f]{64}$/.test(location.hash) ? location.hash : '';
+    const alt = document.body && document.body.dataset.starter;
+    let karte = {};
+    try { karte = JSON.parse((document.body && document.body.dataset.starterMap) || '{}') || {}; } catch (e) { karte = {}; }
+    if (!alt && !Object.keys(karte).length) return;
+    const gueltig = h => /^#launch=[0-9a-f]{64}(&m=[a-z][a-z0-9-]{1,28})?$/.test(h);
+    let hash = gueltig(location.hash) ? location.hash : '';
     if (hash) history.replaceState(null, '', location.pathname + location.search);
     const login = location.pathname === '/anmelden' || location.pathname.startsWith('/anmelden/') || location.pathname === '/konto/otp';
     try {
@@ -125,7 +129,10 @@
       hash = hash || sessionStorage.getItem('kienzle-launch') || '';
       sessionStorage.removeItem('kienzle-launch');
     } catch (e) { /* ohne sessionStorage: nur direkte Weitergabe */ }
-    if (/^#launch=[0-9a-f]{64}$/.test(hash)) location.replace(target + '/' + hash);
+    if (!gueltig(hash)) return;
+    const teile = hash.split('&m=');
+    const ziel = teile[1] ? (Object.prototype.hasOwnProperty.call(karte, teile[1]) ? karte[teile[1]] : '') : alt;
+    if (ziel) location.replace(ziel + '/' + teile[0]);
   })();
 })();
 

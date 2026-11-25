@@ -57,6 +57,13 @@ function test_startseite_kacheln_und_guthaben(): void {
     check($w->header('Refresh') === '3; url=/' && str_contains($w->body, 'wird abgefragt'), 'Während der Abfrage lädt die Seite neu');
 }
 
+function test_logo_im_tab(): void {
+    $svg = (string)file_get_contents(dirname(__DIR__, 2) . '/core/public/assets/favicon.svg');
+    check(str_starts_with($svg, '<svg') && !str_contains($svg, '<script') && simplexml_load_string($svg) !== false, 'favicon.svg ungültig');
+    $b = admin_browser(new Env())[0];
+    check(str_contains($b->get('/')->body, '<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">'), 'Logo-Verweis fehlt im Kopf');
+}
+
 function test_startseite_ohne_einrichtung(): void {
     [$env, $c] = con_env(['sms' => null, 'letterxpress' => null]);
     Backup::$state = $env->dir . '/sicherung'; mkdir(Backup::$state);

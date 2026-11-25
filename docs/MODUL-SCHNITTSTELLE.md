@@ -51,6 +51,9 @@ selbst und nginx kommen hinein; ein anderes Modul kann den Socket nicht an nginx
 
 ## Arbeitsplatz-Starter
 
+Neu und für alle Module gedacht: Startkontexte (`[[starters]]` in `module.toml`, siehe `docs/MODULE-TOML.md`). nginx legt je Modul `POST /starter/<modul-id>`
+an und lässt die Basis den Starter-Schlüssel prüfen (`auth_request`); das Modul bekommt nur geprüfte Aufrufe (`KIENZLE_STARTER_GEPRUEFT=1`).
+
 Ein Modul mit `[web] starter = true` (z. B. die Kasse) bekommt `POST https://<server>/api.php` **ohne** Anmeldung der Suite.
 nginx setzt dann nur `KIENZLE_OEFFENTLICH=starter` und `KIENZLE_PFAD`, keine Benutzerangaben; das Modul muss den Aufrufer selbst
 prüfen (Starter-Schlüssel) und darf dort nur den Start annehmen. Der Starter öffnet danach `https://<server>/#launch=<64 Hexzeichen>`.
