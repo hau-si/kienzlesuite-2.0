@@ -1616,7 +1616,7 @@ final class Web {
         $id = $r->field('id', 40);
         try {
             switch ($r->field('aktion', 20)) {
-                case 'pruefen': $store->check(); break;
+                case 'pruefen': $this->pruefSperre(); $store->check(); break;
                 case 'status': $store->refreshStates(); break;
                 case 'dienst-start': case 'dienst-neustart': $restart = $r->field('aktion', 20) === 'dienst-neustart'; $store->startService($id, $restart); $this->audit->write($admin, $restart ? 'modul-dienst-neustart' : 'modul-dienst-start', $id); break;
                 case 'automatisch': $on = $r->field('an', 1) === '1'; $store->auto($on); $this->audit->write($admin, 'modul-automatisch', $on ? 'an' : 'aus'); break;
@@ -1697,11 +1697,19 @@ final class Web {
         return $busy ? $response->with('Refresh', '5') : $response;
     }
 
+    /** Klicksperre: Update-Abfragen (Basis und Module) höchstens alle 30 Sekunden, damit das GitHub-Limit nicht aufgebraucht wird. */
+    private function pruefSperre(): void {
+        $last = (int)$this->db->setting('sperre:update-pruefen');
+        $rest = $last + 30 - time();
+        if ($rest > 0) throw new Problem('Bitte kurz warten: Die nächste Abfrage ist in ' . $rest . ' Sekunden möglich (Schutz vor dem GitHub-Limit).', 429);
+        $this->db->store('sperre:update-pruefen', (string)time());
+    }
+
     private function updatesAction(Request $r, string $admin): Response {
         $up = $this->up();
         try {
             switch ($r->field('aktion', 20)) {
-                case 'pruefen': $up->check(); $this->audit->write($admin, 'update-pruefen'); break;
+                case 'pruefen': $this->pruefSperre(); $up->check(); $this->audit->write($admin, 'update-pruefen'); break;
                 case 'kanal':
                     $mode = $r->field('signatur', 10) ?: ($r->field('unsigniert') === '1' ? 'beta' : 'aus');
                     $up->setChannel($r->field('kanal', 10), $mode);

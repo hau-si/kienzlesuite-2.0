@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.59
+
+- **Klicksperre bei Update-Abfragen:** „Jetzt nach Updates suchen“ (Basis und Module) geht höchstens alle 30 Sekunden. Davor erscheint „Bitte kurz warten …“ mit der Restzeit. Grund: GitHub erlaubt ohne Anmeldung nur 60 Abfragen pro Stunde und IP-Adresse (Fehler „HTTP 403 rate limit exceeded“). Nicht auf der VM geprüft.
+
 ## 0.21.4-beta.58
 
 - **Rückmeldung nach Knopfdruck überall:** Viele Aktionen leiteten nach dem Absenden ohne Meldung weiter, besonders **Updates** („Jetzt nach Updates suchen“, „Jetzt installieren“, Kanal speichern, Zurück auf frühere Version), aber auch Server, Dienste, Gruppen, Firewall, Module, Verbindungen, Drucker, Einrichtung und Sicherung. Jetzt merkt sich der Server einen kurzen Text zur Sitzung und zeigt ihn einmalig auf der nächsten Seite; `core.js` (v7) setzt ihn direkt hinter den angeklickten Knopf. Das gilt auch für die Meldungen der Signatur-Seiten. Nicht im Browser geprüft.

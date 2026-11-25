@@ -77,6 +77,10 @@ function test_seite_und_menue(): void {
     unlink($env->dir . '/anfragen/update.json');
     $b->post('/verwaltung/updates', ['aktion' => 'kanal', 'kanal' => 'stabil', 'signatur' => 'aus']);
     check(req($env) === ['action' => 'kanal', 'kanal' => 'stabil', 'signatur' => 'aus'] && str_contains(implode("\n", $env->audit->recent()), 'signatur-aus'), 'Signaturprüfung abschalten');
+    $b->post('/verwaltung/updates', ['aktion' => 'pruefen']);
+    unlink($env->dir . '/anfragen/update.json');
+    check(str_contains($b->post('/verwaltung/updates', ['aktion' => 'pruefen'])->body, 'Sekunden möglich') && !is_file($env->dir . '/anfragen/update.json'), 'Klicksperre für Update-Abfragen');
+    $env->db->query("UPDATE settings SET value='0' WHERE key='sperre:update-pruefen'");
     $env->db->query('UPDATE sessions SET confirmed_at=0');
     check(str_starts_with((string)$b->post('/verwaltung/updates', ['aktion' => 'pruefen'])->header('Location'), '/bestaetigen'), 'Update ohne Bestätigung');
     $env->user('bert');
