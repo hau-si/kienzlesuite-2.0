@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.34
+
+- **Zahlungsknöpfe passen wieder:** In der eingebetteten Kassenansicht der Startseite (Freie Eingabe und Rechnung aus dem Eingang) ragte die Schrift der Knöpfe Karte/Bar/Überweisung über den Rand, weil vier Spalten in die schmale rechte Spalte gepresst wurden. Dort stehen die Zahlungsarten jetzt in zwei festen Spalten (Karte | Bar, darunter Überweisung | Per Post), die Schrift darf umbrechen. In kleinen Fenstern stehen Leistungen und Zahlung untereinander. Im Browser (Chromium, Vorschau mit erfundenen Daten) geprüft, nicht auf der VM. Test in `tests/suite.php`.
+
 ## 2.3.4-beta.33
 
 - **Zentraler Starter:** Die Kasse meldet ihren Startkontext `kienzle-sumup` bei der Basis an (Verwaltung → Starter). Dort gibt es ein Paket für alle Module; der bisherige Weg über `/api.php` und das Kassen-Paket bleibt unverändert. Der zentrale Aufruf (`/starter/sumup`) wird von der Basis geprüft, die Kasse nimmt ihn nur mit dieser Prüfung an. Neuer Test in `tests/suite.php`. Nicht mit T2med und nicht im Browser geprüft.

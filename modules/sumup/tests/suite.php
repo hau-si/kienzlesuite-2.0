@@ -76,6 +76,9 @@ try {
     check($code === 404, 'Unbekannte Adresse nicht abgewiesen');
     [$code, $css] = page($root, ['REQUEST_URI' => '/kasse/assets/style.css'] + $server);
     check($code === 200 && str_contains($css, '--teal'), 'Stylesheet nicht ausgeliefert');
+    // Eingebettete Kassenansicht: rechte Spalte ist schmal, Zahlungsarten in zwei Spalten mit Umbruch (sonst ragt die Schrift über die Knöpfe).
+    $embed = (string) file_get_contents(dirname(__DIR__) . '/public/assets/embed.css');
+    check(str_contains($embed, '.embed .pay-method { margin: 6px 0; grid-template-columns: repeat(2, minmax(0, 1fr)); }') && str_contains($embed, '.embed .pay-method span { white-space: normal;'), 'Zahlungsknöpfe der eingebetteten Ansicht zu schmal');
     [$code] = page($root, ['REQUEST_URI' => '/kasse/assets/..%2fsrc%2fSuite.php'] + $server);
     check($code === 404, 'Datei außerhalb von assets ausgeliefert');
     [$code, $help] = page($root, ['REQUEST_URI' => '/kasse/hilfe/t2med'] + $server);

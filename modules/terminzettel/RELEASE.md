@@ -1,5 +1,9 @@
 # Terminzettel – Release-Notizen
 
+## 1.3.0-beta.14
+
+- Die beiden fast gleichen Blöcke „Letzter Auftrag und Dauer der Schritte“ und „Letzte Druckaufträge“ sind zu einem Block **„Druckaufträge und Dauer der Schritte“** zusammengefasst: oben der letzte Auftrag mit jeder Zeit in einer eigenen Zeile, darunter „Davor“ mit bis zu 12 Zeilen der früheren Aufträge (ohne den letzten Auftrag doppelt zu zeigen). Ohne Auftrag steht wie bisher der Hinweis zur Einrichtung von „vTermine“. Nur in den Tests geprüft, nicht auf der VM.
+
 ## 1.3.0-beta.13
 
 - **Zeitmessung je Auftrag:** Das Druckprotokoll nennt nach jedem Auftrag die Dauer der Schritte: Umwandlung (PostScript/XPS zu PDF), Textlesen, **Texterkennung** (nur wenn der Beleg keinen Text enthält), Auswertung, Bon aufbauen (mit Logo und QR), Übergabe an den Drucker und gesamt. Bei Fehlern steht die Zeit bis zum Fehler dabei. Es wird nur die Zeit im Modul gemessen, nicht die Wartezeit in der Druckwarteschlange oder im Bondrucker.
