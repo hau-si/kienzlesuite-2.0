@@ -5,7 +5,7 @@ declare(strict_types=1);
  * (auth_request) und Benutzer, Rolle und Rechte als KIENZLE_* übergeben.
  */
 require_once dirname(__DIR__) . '/src/bootstrap.php';
-use KienzleSignatur\{Ansicht, Pad, Seite};
+use KienzleSignatur\{Ansicht, Pad, Seite, Start};
 
 header('X-Frame-Options: DENY');
 header('X-Content-Type-Options: nosniff');
@@ -14,6 +14,35 @@ $root = dirname(__DIR__);
 $base = preg_match('#^/[a-z0-9-]{1,31}$#D', (string)($_SERVER['KIENZLE_PFAD'] ?? '')) ? (string)$_SERVER['KIENZLE_PFAD'] : '/signatur';
 $path = (string)parse_url((string)($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
 $rel = str_starts_with($path, $base . '/') ? substr($path, strlen($base)) : '/';
+
+if (($_SERVER['KIENZLE_OEFFENTLICH'] ?? '') === 'starter') {
+    // POST /starter/signatur: nur mit der Prüfung der Basis (auth_request), nie direkt aus dem Browser.
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    header('Referrer-Policy: no-referrer');
+    $antwort = static function (array $d, int $code = 200): never { http_response_code($code); echo json_encode($d, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); exit; };
+    try {
+        if (($_SERVER['KIENZLE_STARTER_GEPRUEFT'] ?? '') !== '1') $antwort(['error' => 'Starter nicht autorisiert.'], 401);
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') $antwort(['error' => 'POST erforderlich.'], 405);
+        if (($_SERVER['HTTP_SEC_FETCH_SITE'] ?? '') !== '' || ($_SERVER['HTTP_ORIGIN'] ?? '') !== '') $antwort(['error' => 'Nur für den Arbeitsplatz-Starter.'], 403);
+        if (!str_starts_with(strtolower((string)($_SERVER['CONTENT_TYPE'] ?? '')), 'application/json')) $antwort(['error' => 'JSON erforderlich.'], 415);
+        $roh = (string)file_get_contents('php://input', false, null, 0, 32769);
+        $eingabe = strlen($roh) <= 32768 ? json_decode($roh, true) : null;
+        if (!is_array($eingabe)) $antwort(['error' => 'Ungültige Anfrage.'], 400);
+        $verbindung = sg_modul()->verbindung('t2med') ?? [];
+        $ca = '';
+        if (trim((string)($verbindung['ca_pem'] ?? '')) !== '') {
+            $ca = KienzleSignatur\Speicher::$data . '/t2med-ca.pem';
+            if (!is_file($ca) || file_get_contents($ca) !== trim((string)$verbindung['ca_pem']) . "\n") { file_put_contents($ca, trim((string)$verbindung['ca_pem']) . "\n"); chmod($ca, 0600); }
+        }
+        $antwort(KienzleSignatur\Start::anlegen($eingabe, new KienzleSignatur\Fhir($verbindung, $ca), (string)($_SERVER['HTTP_HOST'] ?? '')));
+    } catch (InvalidArgumentException | RuntimeException $e) {
+        $antwort(['error' => $e->getMessage()], 422);
+    } catch (Throwable $e) {
+        error_log('signatur starter: ' . get_class($e));
+        $antwort(['error' => 'Der Start konnte nicht verarbeitet werden. Bitte erneut aus T2med öffnen.'], 500);
+    }
+}
 
 try {
     $k = sg_modul();
@@ -28,6 +57,15 @@ try {
         header('Content-Type: ' . $types[$ext]);
         header('Cache-Control: private, max-age=3600');
         readfile($file);
+        exit;
+    }
+    if ($rel === '/start-einloesen') {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || !$darfVorgang || !$k->csrfGueltig($_POST['kienzle-csrf'] ?? null)) { http_response_code(403); echo '{"error":"Nicht erlaubt."}'; exit; }
+        $z = Start::einloesen((string)($_POST['code'] ?? ''));
+        if (!$z) { http_response_code(410); echo '{"error":"Startlink abgelaufen oder schon verwendet. Bitte erneut aus T2med öffnen."}'; exit; }
+        echo json_encode($z, JSON_UNESCAPED_UNICODE);
         exit;
     }
     if ($rel === '/pad-hochladen') {
@@ -51,7 +89,10 @@ try {
             $antwort(['error' => 'Interner Fehler (' . get_class($e) . '): ' . $e->getMessage()], 500);
         }
     }
-    if ($rel !== '/' && $rel !== '') { http_response_code(404); echo 'Nicht gefunden.'; exit; }
+    if ($rel === '') $rel = '/';
+    if (!in_array($rel, ['/', '/vorgaenge', '/einstellungen'], true)) { http_response_code(404); echo 'Nicht gefunden.'; exit; }
+    if ($rel === '/einstellungen' && !$darfVorlage && !$k->istAdmin()) $k->verweigern();
+    if ($rel !== '/einstellungen' && !$darfVorgang) $k->verweigern();
     header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
     $meldung = $fehler = null;
     $bearbeite = null;
@@ -60,7 +101,7 @@ try {
         try {
             $aktion = (string)($_POST['aktion'] ?? '');
             if ($aktion === 'neu' && $darfVorgang) {
-                Seite::vorgangAnlegen($_POST, $k->benutzer(), $k->praxis());
+                Seite::vorgangAnlegen($_POST, $k->benutzer(), $k->praxis(), (string)($_POST['kontext'] ?? ''));
                 $meldung = 'Vorgang angelegt. Er wartet auf die Unterschrift.';
             } elseif ($aktion === 'am-pad' && $darfVorgang) {
                 Seite::amPadZeigen((int)($_POST['id'] ?? 0));
@@ -68,6 +109,9 @@ try {
             } elseif ($aktion === 'vom-pad' && $darfVorgang) {
                 Seite::vomPadNehmen((int)($_POST['id'] ?? 0));
                 $meldung = 'Vorgang vom Pad genommen.';
+            } elseif ($aktion === 'vorgang-loeschen' && $darfVorgang) {
+                Seite::vorgangLoeschen((int)($_POST['id'] ?? 0));
+                $meldung = 'Vorgang gelöscht.';
             } elseif ($aktion === 'abbrechen' && $darfVorgang) {
                 Seite::abbrechen((int)($_POST['id'] ?? 0));
                 $meldung = 'Vorgang abgebrochen.';
@@ -101,7 +145,7 @@ try {
     Seite::aufraeumen();
     header('Content-Type: text/html; charset=utf-8');
     header('Cache-Control: no-store');
-    echo $k->rahmen('Signatur', Ansicht::seite($k->csrf(), Seite::vorgaenge(), Seite::vorlagen(), $darfVorgang, $darfVorlage, $meldung, $fehler, $bearbeite, $k->istAdmin() ? Pad::status() : null, Seite::pads()), ['roh' => true, 'kopf' => Ansicht::kopf($base, $k->csrf())]);
+    echo $k->rahmen('Signatur', Ansicht::seite($rel, $k->csrf(), Seite::vorgaenge(), Seite::vorlagen(), $darfVorgang, $darfVorlage, $meldung, $fehler, $bearbeite, $k->istAdmin() ? Pad::status() : null, Seite::pads(), Seite::aktuellerVorgang()), ['roh' => true, 'kopf' => Ansicht::kopf($base, $k->csrf())]);
 } catch (Throwable $e) {
     http_response_code(500);
     echo 'Die Signatur-Seite ist gerade nicht erreichbar.';

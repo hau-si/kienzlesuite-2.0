@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Baut den Arbeitsplatz-Starter (core/client/starter, Go) für Windows, macOS und Linux nach core/client-dist
+# und schreibt SHA256SUMS. release-bauen legt diese Dateien in das Basis-Archiv; das Paket der Seite „Starter“ enthält sie.
+#   scripts/starter-bauen
+set -euo pipefail
+cd -- "$(dirname -- "$0")/../core/client/starter"
+out=../../client-dist
+rm -rf -- "$out"; mkdir -p "$out"
+build() { # Betriebssystem Architektur Dateiname [GOARM]
+  GOOS=$1 GOARCH=$2 GOARM=${4:-} CGO_ENABLED=0 go build -trimpath -ldflags '-s -w' -o "$out/$3" .
+}
+build windows amd64 kienzle-starter-windows-amd64.exe
+build windows arm64 kienzle-starter-windows-arm64.exe
+build darwin amd64 kienzle-starter-darwin-amd64
+build darwin arm64 kienzle-starter-darwin-arm64
+build linux amd64 kienzle-starter-linux-amd64
+build linux arm64 kienzle-starter-linux-arm64
+build linux arm kienzle-starter-linux-arm 7
+(cd "$out" && sha256sum kienzle-starter-* > SHA256SUMS)
+echo "Starter gebaut: $(ls "$out" | wc -l) Dateien in core/client-dist"

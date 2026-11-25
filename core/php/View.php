@@ -8,7 +8,7 @@ final class View {
 
     /** Menü der Seitenleiste: Gruppe => [Pfad => Bezeichnung]. Nur Admins sehen die Gruppen ab „Einrichten“. */
     public const MENU = [
-        'Einrichten' => ['/verwaltung/server' => 'Server', '/hilfe/arbeitsplatz' => 'Arbeitsplätze'],
+        'Einrichten' => ['/verwaltung/server' => 'Server', '/hilfe/arbeitsplatz' => 'Arbeitsplätze', '/verwaltung/arbeitsplaetze' => 'Starter'],
         'Praxis' => ['/verwaltung/praxis' => 'Praxis', '/verwaltung/benutzer' => 'Benutzer und Gruppen', '/verwaltung/drucker' => 'Drucker', '/verwaltung/verbindungen' => 'Verbindungen', '/verwaltung/sso' => 'Dienste'],
         'Betrieb' => ['/verwaltung/sicherung' => 'Sicherung', '/verwaltung/updates' => 'Updates', '/verwaltung/module' => 'Module', '/verwaltung/sicherheit' => 'Sicherheit'],
     ];
@@ -29,6 +29,7 @@ final class View {
         'app' => '<rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/>',
         'settings' => '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>',
         '/verwaltung/server' => '<rect x="3" y="4" width="18" height="6" rx="1"/><rect x="3" y="14" width="18" height="6" rx="1"/><path d="M7 7h.01M7 17h.01"/>',
+        '/verwaltung/arbeitsplaetze' => '<rect x="3" y="4" width="18" height="12" rx="1"/><path d="M8 20h8M12 16v4M10 8l4 2-4 2z"/>',
         '/hilfe/arbeitsplatz' => '<rect x="3" y="4" width="18" height="12" rx="1"/><path d="M8 20h8M12 16v4"/>',
         '/verwaltung/praxis' => '<path d="M4 21V5l8-2 8 2v16"/><path d="M9 21v-5h6v5M9 9h.01M15 9h.01M9 13h.01M15 13h.01"/>',
         '/verwaltung/benutzer' => '<circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-5.5 7-5.5s7 2 7 5.5"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14.5c2.5.6 4 2.3 4 5.5"/>',
@@ -140,6 +141,8 @@ final class View {
 
     /** Webpfad des Moduls mit Arbeitsplatz-Starter (web.starter), z. B. „/kasse“: core.js leitet „#launch=…“ dorthin weiter. */
     public static string $starter = '';
+    /** Modul-ID → Webpfad der Module mit Startkontexten ([[starters]]); leer, wenn es keine gibt. */
+    public static array $starterMap = [];
 
     /** Ganze Seite. $nav: null = ohne Menü (Anmeldung), sonst ['login', 'admin' => bool, 'csrf', 'pfad', Zähler]. $eyebrow: Gruppe über dem Titel. */
     /**
@@ -150,8 +153,9 @@ final class View {
         $brand = '<a class="brand" href="/" title="Start"><span class="mark" aria-hidden="true">K' . (!empty($nav['offenLogo']) ? '<span class="logo-dot" title="Die Einrichtung ist noch nicht abgeschlossen"></span>' : '') . '</span><span><strong>Kienzle-Suite</strong>'
             . '<span class="sub">' . self::h($practice !== '' ? $practice : 'Praxis') . '</span></span></a>';
         $head = '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=36"><script src="/assets/core.js?v=5" defer></script>' . ($extra['kopf'] ?? '') . '</head><body'
-            . (self::$starter !== '' ? ' data-starter="' . self::h(self::$starter) . '"' : '') . ($extra['body'] ?? '') . '>';
+            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="stylesheet" href="/assets/core.css?v=36"><script src="/assets/core.js?v=6" defer></script>' . ($extra['kopf'] ?? '') . '</head><body'
+            . (self::$starter !== '' ? ' data-starter="' . self::h(self::$starter) . '"' : '')
+            . (self::$starterMap ? ' data-starter-map="' . self::h((string)json_encode(self::$starterMap)) . '"' : '') . ($extra['body'] ?? '') . '>';
         if (!$nav) {
             return $head . '<div class="solo">' . $brand . '<main><h1>' . self::h($title) . '</h1>' . self::cards($body) . '</main></div></body></html>';
         }

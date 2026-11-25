@@ -11,6 +11,50 @@
     var b = e.target && e.target.closest ? e.target.closest('[data-bestaetigen]') : null;
     if (b && !window.confirm(b.getAttribute('data-bestaetigen'))) e.preventDefault();
   });
+  // Start aus T2med: #launch=<Code> einlösen (einmalig) und den Patienten in „Neuer Vorgang“ eintragen.
+  (function () {
+    var m = /^#launch=([0-9a-f]{64})$/.exec(location.hash || '');
+    var feld = document.getElementById('n-patient');
+    if (!m || !feld) return;
+    history.replaceState(null, '', location.pathname + location.search);
+    var csrf = document.querySelector('meta[name="kienzle-csrf"]');
+    var daten = new URLSearchParams({ 'kienzle-csrf': csrf ? csrf.content : '', code: m[1] });
+    fetch(location.pathname.replace(/\/$/, '') + '/start-einloesen', { method: 'POST', body: daten, credentials: 'same-origin' })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (a) {
+        var hinweis = document.createElement('p');
+        hinweis.className = a.ok ? 'notice' : 'error';
+        if (a.ok) {
+          feld.value = a.j.patient || '';
+          var k = document.getElementById('n-kontext');
+          if (k) k.value = a.j.kontext || '';
+          hinweis.textContent = 'Patient aus T2med übernommen: ' + (a.j.patient || '');
+        } else {
+          hinweis.textContent = a.j.error || 'Der Start aus T2med ist fehlgeschlagen.';
+        }
+        feld.form.insertBefore(hinweis, feld.form.firstChild);
+        if (a.ok) feld.form.scrollIntoView({ block: 'nearest' });
+      })
+      .catch(function () { /* ohne Netz bleibt die Startseite wie gewohnt */ });
+  })();
+  // Vorgangsliste: Suche und Filter wirken sofort im Browser.
+  var tabelle = document.getElementById('vg-tabelle');
+  if (tabelle) {
+    var suche = document.getElementById('vg-suche'), art = document.getElementById('vg-art'), stat = document.getElementById('vg-status');
+    var zeilen = Array.prototype.slice.call(tabelle.tBodies[0].rows);
+    var filtern = function () {
+      var q = suche.value.trim().toLowerCase(), n = 0;
+      zeilen.forEach(function (z) {
+        var ok = (!q || (z.getAttribute('data-suche') || '').indexOf(q) !== -1) && (!art.value || z.getAttribute('data-art') === art.value) && (!stat.value || z.getAttribute('data-status') === stat.value);
+        z.hidden = !ok;
+        if (ok) n++;
+      });
+      document.getElementById('vg-zahl').textContent = n + ' von ' + zeilen.length + ' Vorgängen';
+      document.getElementById('vg-leer').hidden = n !== 0;
+    };
+    [suche, art, stat].forEach(function (e) { e.addEventListener('input', filtern); e.addEventListener('change', filtern); });
+    filtern();
+  }
   // Solange ein Vorgang am Pad unterschrieben wird, die Liste alle 5 Sekunden neu laden (ohne das Formular erneut zu senden).
   if (document.querySelector('.us-status.s-am_pad')) setTimeout(function () { location.replace(location.pathname + location.search); }, 5000);
   // Pad-Software hochladen: ZIP roh senden (file_uploads ist für Module aus), Ergebnis in der Seite zeigen.

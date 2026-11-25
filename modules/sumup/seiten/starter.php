@@ -2,7 +2,7 @@
 declare(strict_types=1);
 // Arbeitsplatz-Starter (Kienzle-SumUp 1.x): POST https://<server>/api.php mit „Authorization: Bearer <Starter-Schlüssel>“.
 // Ohne Anmeldung der Suite; erlaubt ist nur „launch“. Antwort: einmaliger Link https://<server>/#launch=<code>,
-// den die Basis nach der Anmeldung an /kasse/ weitergibt.
+// den die Basis nach der Anmeldung an /kasse/ weitergibt. Neu: zentral über POST /starter/sumup (Schlüssel prüft die Basis).
 use KienzleSumup\{App, Problem, Throttle};
 
 header('Content-Type: application/json; charset=utf-8');
@@ -20,15 +20,19 @@ try {
     catch (\JsonException) { throw new Problem('Ungültige JSON-Anfrage.'); }
     if (!is_array($input)) throw new Problem('Ungültige Anfrage.');
     $app = ks_app();
+    // Zentraler Weg (POST /starter/sumup): Die Basis hat den Starter-Schlüssel schon geprüft (nginx auth_request).
+    $zentral = ($_SERVER['KIENZLE_STARTER_GEPRUEFT'] ?? '') === '1';
     $throttle = new Throttle($app->db);
-    $throttle->check('launcher');
-    if (!hash_equals('Bearer ' . $app->config->get('app', 'launcher_key'), (string)($_SERVER['HTTP_AUTHORIZATION'] ?? ''))) {
+    if (!$zentral) $throttle->check('launcher');
+    if (!$zentral && !hash_equals('Bearer ' . $app->config->get('app', 'launcher_key'), (string)($_SERVER['HTTP_AUTHORIZATION'] ?? ''))) {
         $throttle->fail('launcher', 10, 600);
         usleep(500000);
         throw new Problem('Starter nicht autorisiert.', 401);
     }
     // Felder aus dem T2med-Aufruf: context_id, fhir_base_url, oauth_token (dazu action = launch).
-    echo json_encode($app->launch($input), JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $antwort = $app->launch($input);
+    if ($zentral && isset($antwort['url']) && is_string($antwort['url'])) $antwort['url'] .= '&m=sumup';   // core.js leitet an das Modul weiter
+    echo json_encode($antwort, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 } catch (Problem $e) {
     http_response_code($e->http); echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 } catch (\Throwable $e) {

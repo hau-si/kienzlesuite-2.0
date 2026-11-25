@@ -79,6 +79,7 @@ def ablauf(c: sqlite3.Connection, vorgang: sqlite3.Row, geraet, ausgabe: str, je
         if art != EV_HOTSPOT or wert not in namen:
             continue
         taste = namen[wert]
+        log(f'Vorgang {vid}: Taste {taste} (Seite {idx + 1} von {len(seiten)})')
         if taste == 'Abbrechen':
             geraet.raeumen()
             status_setzen(c, vid, 'wartet', 'Am Pad abgebrochen.')
@@ -96,7 +97,11 @@ def ablauf(c: sqlite3.Connection, vorgang: sqlite3.Row, geraet, ausgabe: str, je
         elif taste == 'OK':
             ergebnis = geraet.bestaetigen(ausgabe, vid)
             if ergebnis is None:
-                continue  # noch nichts unterschrieben: weiter warten
+                # Noch nichts unterschrieben oder die Bibliothek meldet einen Fehler: weiter warten, Grund an der Liste zeigen.
+                hinweis = getattr(geraet, 'hinweis', '') or 'Bitte zuerst im Feld unterschreiben.'
+                c.execute('UPDATE vorgaenge SET meldung=? WHERE id=? AND status="am_pad"', (hinweis[:300], vid))
+                c.commit()
+                continue
             geraet.danke(padseiten.hinweisseite('Vielen Dank'))
             status_setzen(c, vid, 'unterschrieben', '', zeit=int(jetzt()))
             return 'unterschrieben'
@@ -123,6 +128,7 @@ class PadGeraet:
             f.argtypes = args
             f.restype = None if name == 'STControlSetCallback' else I
         self.queue: list[tuple[int, int]] = []
+        self.hinweis = ''
         import threading
         self.signal = threading.Event()
 
@@ -170,11 +176,19 @@ class PadGeraet:
         return self.queue.pop(0) if self.queue else None
 
     def bestaetigen(self, ausgabe: str, vid: int):
+        """Bestätigt die Unterschrift und speichert sie. Bei Misserfolg steht der Grund in self.hinweis (für Seite und Protokoll)."""
         L = self.lib
-        if L.STSignatureConfirm() < 0:
+        self.hinweis = ''
+        rc = L.STSignatureConfirm()
+        if rc < 0:
+            self.hinweis = f'Bestätigen nicht möglich: {self.pt.fehlertext(L, rc)}'
+            log(self.hinweis)
             return None
         groesse = ctypes.c_int(0)
-        if L.STSignatureGetSignData(None, ctypes.byref(groesse)) < 0 or groesse.value < 1:
+        rc = L.STSignatureGetSignData(None, ctypes.byref(groesse))
+        if rc < 0 or groesse.value < 1:
+            self.hinweis = f'Keine Unterschriftsdaten (Rückgabe {rc}, Größe {groesse.value}): {self.pt.fehlertext(L, rc) if rc < 0 else "leer"}'
+            log(self.hinweis)
             L.STSignatureRetry()
             return None
         puffer = (ctypes.c_ubyte * groesse.value)()

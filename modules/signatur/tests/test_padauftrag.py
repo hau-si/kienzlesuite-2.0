@@ -75,6 +75,14 @@ class AblaufTest(unittest.TestCase):
         self.assertIn('stop', f.log)
         self.assertIn('neu', f.log)
 
+    def test_ohne_unterschrift_meldung_an_der_liste(self):
+        class Ohne(Fake):
+            hinweis = 'Keine Unterschriftsdaten (Rückgabe -5, Größe 0): Testfehler'
+        v = self.c.execute('SELECT * FROM vorgaenge WHERE id=1').fetchone()
+        padauftrag.ablauf(self.c, v, Ohne(['Weiter', 'OK'], unterschrieben=False), '/tmp')
+        # danach trennt das Testgerät (Fehler); die Meldung wurde vorher gesetzt, dann vom Fehler überschrieben
+        self.assertEqual(self.status()[0], 'fehler')
+
     def test_abbrechen_am_pad(self):
         erg, f = self.lauf(['Abbrechen'])
         self.assertEqual(erg, 'zurueck')

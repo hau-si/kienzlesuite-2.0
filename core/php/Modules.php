@@ -49,6 +49,23 @@ final class Modules {
         return '';
     }
 
+    /** @return list<array{modul:string,pfad:string,schema:string,label:string}> Startkontexte der Module ([[starters]] in module.toml), nach Schema sortiert */
+    public function starters(): array {
+        $out = [];
+        foreach ($this->modules as $id => $m) foreach ($m['starters'] ?? [] as $s) {
+            $out[] = ['modul' => $id, 'pfad' => (string)($m['web']['path'] ?? ''), 'schema' => (string)$s['schema'], 'label' => (string)$s['label']];
+        }
+        usort($out, fn($a, $b) => $a['schema'] <=> $b['schema']);
+        return $out;
+    }
+
+    /** @return array<string,string> Modul-ID → Webpfad für Module mit Startkontexten (core.js leitet „#launch=…&m=<id>“ dorthin weiter) */
+    public function starterMap(): array {
+        $map = [];
+        foreach ($this->starters() as $s) $map[$s['modul']] = $s['pfad'];
+        return $map;
+    }
+
     /** Adresse der Einstellungsseite des Moduls (Webpfad + web.einstellungen), sonst null. */
     public function settingsUrl(string $id): ?string {
         $w = $this->modules[$id]['web'] ?? null;

@@ -12,14 +12,66 @@ final class Ansicht {
 
     private static function datum(int $t): string { return $t > 0 ? date('d.m.Y H:i', $t) : '–'; }
 
-    public static function seite(string $csrf, array $vorgaenge, array $vorlagen, bool $darfVorgang, bool $darfVorlage, ?string $meldung, ?string $fehler, ?array $bearbeite = null, ?array $pad = null, array $pads = []): string {
+    /** Seitenkopf mit Unterseiten wie in der Kasse: Start, Vorgänge, Einstellungen. */
+    private static function kopfzeile(string $route, bool $darfVorlage, bool $admin): string {
+        $link = static fn(string $ziel, string $text, string $r): string => '<a class="button ' . ($route === $r ? 'primary' : 'secondary') . '" href="' . sg_h(sg_basis()) . $ziel . '"' . ($route === $r ? ' aria-current="page"' : '') . '>' . $text . '</a>';
+        return '<header class="seitenkopf"><div><p class="eyebrow">Signatur</p><h1>' . ['/' => 'Unterschriften', '/vorgaenge' => 'Vorgänge', '/einstellungen' => 'Einstellungen'][$route] . '</h1></div>'
+            . '<span class="start-tools">' . ($route === '/' ? '' : $link('/', '← Start', '')) . ($route !== '/vorgaenge' ? $link('/vorgaenge', 'Alle Vorgänge', '/vorgaenge') : '')
+            . ($route !== '/einstellungen' && ($darfVorlage || $admin) ? $link('/einstellungen', 'Einstellungen', '/einstellungen') : '') . '</span></header>';
+    }
+
+    /** Eine Zeile der Vorgangsliste mit Daten für die Filter (Art, Status, Suchtext). */
+    private static function zeile(array $v, array $padNamen, string $csrfFeld, bool $darfVorgang): string {
+        $h = 'sg_h';
+        $abbrechbar = !in_array($v['status'], ['uebertragen', 'abgebrochen'], true);
+        $stat = '<span class="us-status s-' . $h($v['status']) . '">' . $h(Seite::STATI[$v['status']] ?? $v['status']) . '</span>';
+        if ($v['meldung'] !== '') $stat .= '<div class="muted klein-text">' . $h($v['meldung']) . '</div>';
+        if ($v['status'] === 'wartet' && $v['kontext'] !== '' && !Seite::kontextGueltig($v)) $stat .= '<div class="muted klein-text">T2med-Verbindung abgelaufen: Das Ablegen braucht einen neuen Aufruf aus T2med.</div>';
+        $suche = mb_strtolower($v['patient'] . ' ' . $v['titel'] . ' ' . (Seite::ARTEN[$v['art']] ?? $v['art']));
+        return '<tr data-art="' . $h($v['art']) . '" data-status="' . $h($v['status']) . '" data-suche="' . $h($suche) . '"><td>' . $h(self::datum((int)$v['erstellt'])) . '</td><td>' . $h($v['patient']) . '</td><td>' . $h($v['titel']) . '</td><td>'
+            . $h($padNamen[(int)($v['pad_id'] ?? 0)] ?? '–') . '</td><td>' . $stat . '</td><td class="us-aktionen">' . self::aktionen($v, $csrfFeld, $darfVorgang) . '</td></tr>';
+    }
+
+    /** Knöpfe zu einem Vorgang je nach Status. */
+    private static function aktionen(array $v, string $csrfFeld, bool $darfVorgang): string {
+        if (!$darfVorgang) return '';
+        $o = '';
+        if (in_array($v['status'], ['wartet', 'fehler'], true) && (int)($v['pad_id'] ?? 0) > 0) $o .= self::knopf($csrfFeld, 'am-pad', (int)$v['id'], 'Am Pad zeigen', 'primary small');
+        if ($v['status'] === 'am_pad') $o .= self::knopf($csrfFeld, 'vom-pad', (int)$v['id'], 'Vom Pad nehmen', 'small');
+        if (!in_array($v['status'], ['uebertragen', 'abgebrochen'], true)) $o .= self::knopf($csrfFeld, 'abbrechen', (int)$v['id'], 'Abbrechen', 'danger small');
+        if ($v['status'] === 'abgebrochen') $o .= self::knopf($csrfFeld, 'vorgang-loeschen', (int)$v['id'], 'Löschen', 'danger small', 'Diesen abgebrochenen Vorgang endgültig löschen?');
+        return $o;
+    }
+
+    public static function seite(string $route, string $csrf, array $vorgaenge, array $vorlagen, bool $darfVorgang, bool $darfVorlage, ?string $meldung, ?string $fehler, ?array $bearbeite = null, ?array $pad = null, array $pads = [], ?array $aktuell = null): string {
         $h = 'sg_h';
         $csrfFeld = '<input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '">';
-        $o = '<div class="us"><div class="seitenkopf"><div><p class="eyebrow">Signatur</p><h1>Unterschriften</h1></div></div>'
-            . '<p class="us-intro muted">Dokumente am Unterschriftenpad unterschreiben lassen: Vorgang anlegen, der Patient unterschreibt sofort oder später, das PDF kommt in die T2med-Akte. '
-            . 'Die Anzeige am Pad und das Ablegen in T2med sind noch nicht eingebaut; Pads, Vorlagen und Vorgänge können schon vorbereitet werden.</p>';
+        $admin = $pad !== null;
+        $o = '<div class="us">' . self::kopfzeile($route, $darfVorlage, $admin);
         if ($meldung) $o .= '<p class="ok" role="status">' . $h($meldung) . '</p>';
         if ($fehler) $o .= '<p class="fehler" role="alert">' . $h($fehler) . '</p>';
+        $padNamen = [];
+        foreach ($pads as $p) $padNamen[(int)$p['id']] = $p['name'];
+
+        if ($route === '/vorgaenge') return $o . self::vorgangsliste($csrfFeld, $vorgaenge, $padNamen, $darfVorgang) . '</div>';
+        if ($route === '/einstellungen') {
+            if ($darfVorlage) $o .= self::vorlagen($csrfFeld, $vorlagen, $bearbeite);
+            if ($admin) $o .= self::pads($csrfFeld, $pads) . self::pad($csrfFeld, $pad);
+            return $o . '</div>';
+        }
+
+        // Start: der Vorgang, der gerade am Pad ist (sonst der zuletzt angelegte offene), dann „Neuer Vorgang“.
+        $o .= '<section class="card us-aktuell"><h2>' . ($aktuell && $aktuell['status'] === 'am_pad' ? 'Gerade am Pad' : 'Zuletzt angelegter Vorgang') . '</h2>';
+        if (!$aktuell) {
+            $o .= '<p class="muted">Kein offener Vorgang. Unten einen neuen anlegen.</p>';
+        } else {
+            $stat = '<span class="us-status s-' . $h($aktuell['status']) . '">' . $h(Seite::STATI[$aktuell['status']] ?? $aktuell['status']) . '</span>';
+            $o .= '<div class="us-patient"><div><strong class="us-name">' . $h($aktuell['patient']) . '</strong><div class="muted">' . $h($aktuell['titel']) . ' · angelegt ' . $h(self::datum((int)$aktuell['erstellt'])) . '</div>'
+                . '<div class="muted">Pad: ' . $h($padNamen[(int)($aktuell['pad_id'] ?? 0)] ?? 'nicht zugeordnet') . '</div></div><div>' . $stat
+                . ($aktuell['meldung'] !== '' ? '<div class="muted klein-text">' . $h($aktuell['meldung']) . '</div>' : '') . '</div></div>'
+                . '<div class="aktionen">' . self::aktionen($aktuell, $csrfFeld, $darfVorgang) . '</div>';
+        }
+        $o .= '</section>';
 
         $aktive = array_values(array_filter($vorlagen, fn($v) => (int)$v['aktiv']));
         if ($darfVorgang) {
@@ -34,9 +86,9 @@ final class Ansicht {
             }
             $o .= '<section class="card"><h2>Neuer Vorgang</h2>';
             if (!$aktive) {
-                $o .= '<p class="muted">Es gibt keine aktive Vorlage. Bitte unten eine Vorlage anlegen oder aktivieren.</p>';
+                $o .= '<p class="muted">Es gibt keine aktive Vorlage. Bitte unter Einstellungen eine Vorlage anlegen oder aktivieren.</p>';
             } else {
-                $o .= '<form method="post" class="us-form" autocomplete="off">' . $csrfFeld . '<input type="hidden" name="aktion" value="neu">'
+                $o .= '<form method="post" class="us-form" autocomplete="off">' . $csrfFeld . '<input type="hidden" name="aktion" value="neu"><input type="hidden" name="kontext" id="n-kontext" value="">'
                     . '<label for="n-vorlage">Dokument</label><select id="n-vorlage" name="vorlage_id">' . $opt . '</select>'
                     . $padOpt
                     . '<label for="n-patient">Patient</label><input id="n-patient" name="patient" maxlength="80" required placeholder="z. B. Max Mustermann">'
@@ -48,36 +100,27 @@ final class Ansicht {
             }
             $o .= '</section>';
         }
-
-        $o .= '<section class="card" id="vorgaenge"><h2>Vorgänge</h2>';
-        if (!$vorgaenge) {
-            $o .= '<p class="muted">Noch keine Vorgänge.</p>';
-        } else {
-            $o .= '<table class="us-tabelle"><thead><tr><th>Angelegt</th><th>Patient</th><th>Dokument</th><th>Pad</th><th>Status</th><th></th></tr></thead><tbody>';
-            $padNamen = [];
-            foreach ($pads as $p) $padNamen[(int)$p['id']] = $p['name'];
-            foreach ($vorgaenge as $v) {
-                $abbrechbar = !in_array($v['status'], ['uebertragen', 'abgebrochen'], true);
-                $stat = '<span class="us-status s-' . $h($v['status']) . '">' . $h(Seite::STATI[$v['status']] ?? $v['status']) . '</span>';
-                if ($v['meldung'] !== '') $stat .= '<div class="muted klein-text">' . $h($v['meldung']) . '</div>';
-                if ($v['status'] === 'wartet' && $v['kontext'] !== '' && !Seite::kontextGueltig($v)) $stat .= '<div class="muted klein-text">T2med-Verbindung abgelaufen: Das Ablegen braucht einen neuen Aufruf aus T2med.</div>';
-                $o .= '<tr><td>' . $h(self::datum((int)$v['erstellt'])) . '</td><td>' . $h($v['patient']) . '</td><td>' . $h($v['titel']) . '</td><td>' . $h($padNamen[(int)($v['pad_id'] ?? 0)] ?? '–') . '</td><td>' . $stat . '</td><td>'
-                    . ($darfVorgang && in_array($v['status'], ['wartet', 'fehler'], true) && (int)($v['pad_id'] ?? 0) > 0 ? self::knopf($csrfFeld, 'am-pad', (int)$v['id'], 'Am Pad zeigen', 'primary small') : '')
-                    . ($darfVorgang && $v['status'] === 'am_pad' ? self::knopf($csrfFeld, 'vom-pad', (int)$v['id'], 'Vom Pad nehmen', 'small') : '')
-                    . ($darfVorgang && $abbrechbar ? self::knopf($csrfFeld, 'abbrechen', (int)$v['id'], 'Abbrechen', 'danger small') : '')
-                    . '</td></tr>';
-            }
-            $o .= '</tbody></table>';
-        }
-        $o .= '</section>';
-
-        if ($darfVorlage) $o .= self::vorlagen($csrfFeld, $vorlagen, $bearbeite);
-        if ($pad !== null) $o .= self::pads($csrfFeld, $pads) . self::pad($csrfFeld, $pad);
         return $o . '</div>';
     }
 
-    private static function knopf(string $csrfFeld, string $aktion, int $id, string $text, string $klasse): string {
-        return '<form method="post" class="inline">' . $csrfFeld . '<input type="hidden" name="aktion" value="' . $aktion . '"><input type="hidden" name="id" value="' . $id . '"><button class="' . $klasse . '" type="submit">' . $text . '</button></form> ';
+    /** Vorgangsliste mit Suche (Patient, Vorgang, Dokumentart) und Filtern nach Dokumentart und Status; die Filter wirken im Browser (app.js). */
+    private static function vorgangsliste(string $csrfFeld, array $vorgaenge, array $padNamen, bool $darfVorgang): string {
+        $h = 'sg_h';
+        $o = '<section class="card" id="vorgaenge"><div class="us-filter">'
+            . '<input type="search" id="vg-suche" placeholder="Suchen: Patient, Vorgang, Dokument" aria-label="Vorgänge durchsuchen" autocomplete="off">'
+            . '<select id="vg-art" aria-label="Dokumentart"><option value="">Alle Dokumentarten</option>';
+        foreach (Seite::ARTEN as $k => $l) $o .= '<option value="' . $h($k) . '">' . $h($l) . '</option>';
+        $o .= '</select><select id="vg-status" aria-label="Status"><option value="">Alle Status</option>';
+        foreach (Seite::STATI as $k => $l) $o .= '<option value="' . $h($k) . '">' . $h($l) . '</option>';
+        $o .= '</select></div><p class="muted" id="vg-zahl" role="status" aria-live="polite"></p>';
+        if (!$vorgaenge) return $o . '<p class="muted">Noch keine Vorgänge.</p></section>';
+        $o .= '<table class="us-tabelle" id="vg-tabelle"><thead><tr><th>Angelegt</th><th>Patient</th><th>Dokument</th><th>Pad</th><th>Status</th><th></th></tr></thead><tbody>';
+        foreach ($vorgaenge as $v) $o .= self::zeile($v, $padNamen, $csrfFeld, $darfVorgang);
+        return $o . '</tbody></table><p class="muted" id="vg-leer" hidden>Kein Vorgang passt zu Suche und Filtern.</p></section>';
+    }
+
+    private static function knopf(string $csrfFeld, string $aktion, int $id, string $text, string $klasse, string $frage = ''): string {
+        return '<form method="post" class="inline">' . $csrfFeld . '<input type="hidden" name="aktion" value="' . $aktion . '"><input type="hidden" name="id" value="' . $id . '"><button class="' . $klasse . '" type="submit"' . ($frage !== '' ? ' data-bestaetigen="' . sg_h($frage) . '"' : '') . '>' . $text . '</button></form> ';
     }
 
     /** Bereich „Unterschriftenpads“ nur für Admins: ein Pad je Arbeitsplatz mit Name, Adresse und Port. */

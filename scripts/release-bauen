@@ -42,6 +42,13 @@ def main() -> int:
     listed = [n for n in listed if not n.startswith('modules/beispiel/')]
     sources = {name: ROOT / name for name in listed}
     if a.teil == 'core':
+        # Gebaute Starterprogramme (scripts/starter-bauen): nicht in git, gehören aber ins Basis-Archiv.
+        dist = ROOT / 'core' / 'client-dist'
+        if dist.is_dir():
+            for f in sorted(dist.iterdir()):
+                if f.is_file():
+                    sources[f'core/client-dist/{f.name}'] = f
+    if a.teil == 'core':
         version = (ROOT / 'core' / 'VERSION').read_text().strip()
         extra = {'core_api': sorted(modman.supported_api())}
     else:

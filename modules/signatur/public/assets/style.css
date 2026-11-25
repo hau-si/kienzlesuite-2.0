@@ -35,3 +35,12 @@ main.modul { max-width: 940px; margin: 0; padding: 32px 40px 48px; }
 .us-pad-zeile label.check { display: flex; align-items: center; gap: 6px; font-weight: 400; font-size: 14px; padding-bottom: 8px; }
 @media (max-width: 800px) { .us-pad-zeile { grid-template-columns: 1fr 1fr; } }
 .us-status.s-am_pad { background: #dff0ee; color: var(--teal); }
+
+.seitenkopf { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.start-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.us-filter { display: grid; grid-template-columns: 1fr 220px 220px; gap: 8px; margin-bottom: 6px; }
+@media (max-width: 800px) { .us-filter { grid-template-columns: 1fr; } }
+.us-patient { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+.us-name { font-size: 20px; }
+.us-aktuell .aktionen { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+.us-aktionen { white-space: nowrap; }

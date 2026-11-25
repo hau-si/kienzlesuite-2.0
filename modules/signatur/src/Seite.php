@@ -207,6 +207,21 @@ final class Seite {
         self::pdo()->prepare('UPDATE vorgaenge SET status="wartet", meldung="Vom Pad genommen." WHERE id=? AND status="am_pad"')->execute([$id]);
     }
 
+    /** Der Vorgang für die Startseite: der gerade am Pad (neuester), sonst der zuletzt angelegte offene. */
+    public static function aktuellerVorgang(): ?array {
+        $r = self::pdo()->query('SELECT * FROM vorgaenge WHERE status="am_pad" ORDER BY id DESC LIMIT 1')->fetch();
+        if ($r) return $r;
+        return self::pdo()->query('SELECT * FROM vorgaenge WHERE status IN ("wartet","fehler","unterschrieben") ORDER BY erstellt DESC, id DESC LIMIT 1')->fetch() ?: null;
+    }
+
+    /** Löscht einen abgebrochenen Vorgang endgültig (Patientendaten sollen nicht länger als nötig liegen). */
+    public static function vorgangLoeschen(int $id): void {
+        $v = self::vorgang($id);
+        if (!$v) throw new \InvalidArgumentException('Vorgang nicht gefunden.');
+        if ($v['status'] !== 'abgebrochen') throw new \InvalidArgumentException('Nur abgebrochene Vorgänge lassen sich löschen.');
+        self::pdo()->prepare('DELETE FROM vorgaenge WHERE id=? AND status="abgebrochen"')->execute([$id]);
+    }
+
     public static function abbrechen(int $id): void {
         $v = self::vorgang($id);
         if (!$v) throw new \InvalidArgumentException('Vorgang nicht gefunden.');
@@ -235,10 +250,10 @@ final class Seite {
         return [
             ['title' => 'Pad-Software von signotec hochladen', 'state' => $pad ? 'done' : 'open',
              'hint' => $pad ? 'Die Bibliotheken von signotec sind hinterlegt.' : 'Die Software für das Unterschriftenpad liegt nicht bei und muss einmal von einem Admin hochgeladen werden.',
-             'link' => '/signatur/#pad'],
+             'link' => '/signatur/einstellungen#pad'],
             ['title' => 'Vertragstexte der Praxis anpassen', 'state' => $musterOffen > 0 ? 'open' : 'done',
              'hint' => $musterOffen > 0 ? 'Die mitgelieferten Mustertexte sind nur Beispiele. Bitte prüfen und für Ihre Praxis ändern oder abschalten.' : 'Alle aktiven Vorlagen wurden von der Praxis bearbeitet.',
-             'link' => '/signatur/#vorlagen'],
+             'link' => '/signatur/einstellungen#vorlagen'],
         ];
     }
 }

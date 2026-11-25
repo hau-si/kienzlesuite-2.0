@@ -11,6 +11,11 @@ spl_autoload_register(static function (string $class): void {
 $daten = (string)getenv('KIENZLE_DATEN');
 if (preg_match('#^/[A-Za-z0-9/_.-]{1,200}$#D', $daten) && !str_contains($daten, '..')) KienzleSignatur\Speicher::$data = $daten;
 
+/** Webpfad des Moduls (von der Basis in KIENZLE_PFAD übergeben), für Links zwischen den Unterseiten. */
+function sg_basis(): string {
+    $p = (string)($_SERVER['KIENZLE_PFAD'] ?? '');
+    return preg_match('#^/[a-z0-9-]{1,31}$#D', $p) ? $p : '/signatur';
+}
 function sg_h(string $s): string { return htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 
 function sg_modul(): KienzleModul {

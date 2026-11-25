@@ -138,6 +138,13 @@ try {
     [$code, $out] = page($root, $starter + ['HTTP_AUTHORIZATION' => 'Bearer ' . $g['launcher_key']], $launch);
     $r = json_decode($out, true);
     check($code === 200 && preg_match('~^https://kasse\.example\.org/#launch=[0-9a-f]{64}$~D', (string)($r['url'] ?? '')) === 1, 'Starter: Startlink muss auf „/“ zeigen (Starter 1.4.1): ' . $out);
+    // Zentraler Weg (POST /starter/sumup): nginx hat den Schlüssel schon geprüft (KIENZLE_STARTER_GEPRUEFT); ohne dieses Merkmal gilt weiter der eigene Schlüssel.
+    $zentral = ['REQUEST_URI' => '/starter/sumup', 'KIENZLE_STARTER_GEPRUEFT' => '1'] + $starter;
+    [$code, $out] = page($root, $zentral, $launch);
+    $rz = json_decode($out, true);
+    check($code === 200 && preg_match('~^https://kasse\.example\.org/#launch=[0-9a-f]{64}&m=sumup$~D', (string)($rz['url'] ?? '')) === 1, 'Zentraler Starter: Startlink mit Modulkennung: ' . $out);
+    [$code] = page($root, ['REQUEST_URI' => '/starter/sumup', 'KIENZLE_STARTER_GEPRUEFT' => '0'] + $starter, $launch);
+    check($code === 401, 'Zentraler Weg ohne Prüfung durch die Basis');
     // Der Startcode gilt 5 Minuten und nur einmal; Austausch nur mit Anmeldung an der Suite.
     $ticket = substr($r['url'], -64);
     $db = new Database(Suite::$data);

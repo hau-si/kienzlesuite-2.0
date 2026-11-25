@@ -54,7 +54,7 @@ if command -v node >/dev/null; then
 fi
 
 step 'PHP: Basis (tests/php)'
-for t in tests/php/core.php tests/php/passkeys.php tests/php/web.php tests/php/cli.php tests/php/firewall.php tests/php/updates.php tests/php/verbindungen.php tests/php/sicherung.php tests/php/einrichtung.php tests/php/drucker.php tests/php/oidc.php tests/php/server.php tests/php/uhrzeit.php tests/php/module.php tests/php/startseite.php tests/php/konto_mail.php; do echo "-- $t"; php "$t"; done
+for t in tests/php/core.php tests/php/passkeys.php tests/php/web.php tests/php/cli.php tests/php/firewall.php tests/php/updates.php tests/php/verbindungen.php tests/php/sicherung.php tests/php/einrichtung.php tests/php/drucker.php tests/php/oidc.php tests/php/server.php tests/php/uhrzeit.php tests/php/module.php tests/php/startseite.php tests/php/konto_mail.php tests/php/starter.php; do echo "-- $t"; php "$t"; done
 
 step 'Modul Kasse (modules/sumup/tests)'
 for t in critical reader-cancel invoice t2med-invoice letterxpress letterdrucker auto-print settings tax goae-t2med cash transfer print-format mail-mime suite fhir-error startseite review discard; do
@@ -73,6 +73,10 @@ php modules/signatur/tests/signatur.php
 (cd modules/signatur/tests && python3 -B -m unittest discover -s . -p 'test_*.py')
 grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/signatur/module.toml | head -1)" modules/signatur/VERSION || { echo 'modules/signatur/VERSION passt nicht zu module.toml'; exit 1; }
 for h in modules/signatur/bin/*; do sh -n "$h"; done
+
+step 'Arbeitsplatz-Starter (core/client/starter)'
+if command -v go >/dev/null; then (cd core/client/starter && go vet ./... && go test ./...); else echo 'go nicht installiert – Starter-Tests übersprungen.'; fi
+for h in core/client/install-linux.sh core/client/install-macos.command; do bash -n "$h"; done
 
 step 'module.toml: alle Module im Repository'
 core/bin/kienzle-modul-pruefen --alle modules

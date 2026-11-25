@@ -1,5 +1,16 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.11
+
+- **Start aus T2med:** Eigener Startkontext `kienzle-signatur` (zentraler Starter der Basis, Verwaltung → Starter). In T2med als Eintrag anlegen: `kienzle-signatur://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}`. Das Modul liest den Patienten aus T2med und trägt ihn in „Neuer Vorgang“ ein; der T2med-Kontext wird am Vorgang gemerkt (für das spätere Zurückschreiben, das noch nicht umgesetzt ist). Voraussetzung: T2med unter Verwaltung → Verbindungen eingerichtet.
+- Neue Datenbank-Tabelle für einmalige Startcodes (5 Minuten gültig). Neue Tests in `tests/signatur.php`. Nicht mit T2med und nicht im Browser geprüft.
+
+## 0.1.0-beta.10
+
+- **Seiten wie in der Kasse:** Die Signatur hat jetzt eine **Startseite** mit dem Vorgang, der gerade am Pad ist (sonst der zuletzt angelegte offene), samt Patient, Dokument, Pad, Status und Knöpfen, darunter „Neuer Vorgang“. Die **Vorgangsliste** (Knopf „Alle Vorgänge“) hat ein Suchfeld für Patient, Vorgang und Dokumentart sowie Filter nach Dokumentart und Status. **Vorlagen, Pads und Pad-Software** liegen unter „Einstellungen“ (auch in der Seitenleiste der Basis für Admins).
+- **Abgebrochene Vorgänge lassen sich löschen** (Knopf „Löschen“ mit Rückfrage, nur bei Status „Abgebrochen“).
+- **Fehlersuche bei „OK“ am Pad:** Meldet die Pad-Bibliothek beim Bestätigen einen Fehler oder liefert keine Unterschriftsdaten, steht der Grund (Rückgabewert, Größe) jetzt am Vorgang in der Liste und im Protokoll des Dienstes (`journalctl -u kienzle-signatur-pad`). Ohne Unterschrift im Feld erscheint „Bitte zuerst im Feld unterschreiben.“ Jeder Tastendruck am Pad wird mit Seitennummer protokolliert. Behebt noch nicht die Ursache, dass nach „OK“ das Feld wieder leer war; dafür werden diese Angaben gebraucht. Nicht an echter Hardware geprüft.
+
 ## 0.1.0-beta.9
 
 - **Unterschreiben am Pad:** In der Vorgangsliste gibt es den Knopf **„Am Pad zeigen“** (Vorgang braucht ein zugeordnetes, aktives Pad; je Pad immer nur ein Vorgang). Das Pad zeigt dann den Vertragstext seitenweise (Abbrechen, Zurück, Weiter), danach die Unterschriftsseite mit Feld und den Schaltflächen Abbrechen, Zurück, Löschen und OK. Nach OK steht der Vorgang auf „Unterschrieben“; Bild (PNG) und Rohdaten mit Druckstärke liegen im Datenordner unter `unterschriften/<Nummer>.png` und `.sdb`. „Vom Pad nehmen“ räumt das Display wieder.

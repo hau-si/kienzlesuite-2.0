@@ -108,6 +108,21 @@ def _starter(m: dict) -> list[str]:
             f'        fastcgi_param KIENZLE_PFAD {_safe(web["path"])};', f'        fastcgi_pass unix:{socket};', '    }']
 
 
+def _starter_kontext(m: dict) -> list[str]:
+    """Startkontexte des Moduls (module.toml [[starters]]): POST https://<server>/starter/<modul-id>. Anders als /api.php prüft hier die Basis
+    den Starter-Schlüssel (auth_request), das Modul bekommt nur geprüfte Aufrufe (KIENZLE_STARTER_GEPRUEFT) und weiß nicht, wer es war."""
+    mid = _safe(m['module']['id'])
+    web = m['web']
+    if web['protocol'] != 'fastcgi':
+        raise Fehler(f'{mid}: Startkontexte nur für FastCGI-Module.')
+    socket = _safe(web['upstream'].removeprefix('unix:'))
+    return [f'    # Startkontexte des Moduls {mid} (Starter-Schlüssel prüft die Basis)', f'    location = /starter/{mid} {{',
+            '        limit_except POST { deny all; }', '        client_max_body_size 64k;', '        auth_request /_starter-pruefen;'] + _fastcgi_common() + [
+            f'        fastcgi_param SCRIPT_FILENAME {MODULE_ROOT.format(id=mid)}/{_safe(web["entry"])};',
+            f'        fastcgi_param SCRIPT_NAME {_safe(web["path"])};', '        fastcgi_param KIENZLE_OEFFENTLICH starter;',
+            '        fastcgi_param KIENZLE_STARTER_GEPRUEFT 1;', f'        fastcgi_param KIENZLE_PFAD {_safe(web["path"])};', f'        fastcgi_pass unix:{socket};', '    }']
+
+
 def render(hostnames: list[str], registry: dict) -> str:
     names = server_names(hostnames)
     out = ['# Kienzle-Suite – erzeugt von kienzle-web. Nicht von Hand ändern: Änderungen gehen beim nächsten Erzeugen verloren.',
@@ -130,6 +145,10 @@ def render(hostnames: list[str], registry: dict) -> str:
            '        client_max_body_size 25m;', '        fastcgi_pass_request_body off;', '        fastcgi_param CONTENT_LENGTH "";'] + _fastcgi_common() + [
            '        fastcgi_param REQUEST_URI $uri;  # sonst stünde hier die ursprüngliche Adresse',
            f'        fastcgi_param SCRIPT_FILENAME {CORE_ROOT}/public/index.php;', f'        fastcgi_pass unix:{CORE_SOCKET};', '    }', '',
+           '    # Prüfung des Starter-Schlüssels für /starter/<modul> (nur intern über auth_request; der Schlüssel steht im Kopf Authorization)',
+           '    location = /_starter-pruefen {', '        internal;', '        fastcgi_pass_request_body off;', '        fastcgi_param CONTENT_LENGTH "";'] + _fastcgi_common() + [
+           '        fastcgi_param REQUEST_URI /_starter-pruefen;', f'        fastcgi_param SCRIPT_FILENAME {CORE_ROOT}/public/index.php;',
+           f'        fastcgi_pass unix:{CORE_SOCKET};', '    }', '',
            '    location = /_health {', '        allow 127.0.0.1;', '        allow ::1;', '        deny all;'] + _fastcgi_common() + [
            f'        fastcgi_param SCRIPT_FILENAME {CORE_ROOT}/public/index.php;', f'        fastcgi_pass unix:{CORE_SOCKET};', '    }', '',
            '    location = /ca.crt {', f'        alias {CA_DIR}/ca.crt;', '        default_type application/x-x509-ca-cert;',
@@ -140,6 +159,8 @@ def render(hostnames: list[str], registry: dict) -> str:
             out += _module(m) + ['']
             if m['web'].get('starter'):
                 out += _starter(m) + ['']
+            if m.get('starters'):
+                out += _starter_kontext(m) + ['']
     out += ['    # Basis: alle übrigen Pfade', '    location / {'] + _fastcgi_common() + [
             f'        fastcgi_param SCRIPT_FILENAME {CORE_ROOT}/public/index.php;', f'        fastcgi_pass unix:{CORE_SOCKET};', '    }', '}', '']
     return '\n'.join(out)
