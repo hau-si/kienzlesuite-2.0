@@ -122,7 +122,7 @@ class PadGeraet:
         for name, args in {
             'STDisplaySetTarget': [I], 'STControlSetCallback': [cb_typ, ctypes.c_void_p], 'STDisplaySetImageFromFile': [I, I, W],
             'STSensorSetSignRect': [I, I, I, I], 'STSensorAddHotSpot': [I, I, I, I], 'STSensorClearHotSpots': [], 'STSignatureStart': [],
-            'STSignatureRetry': [], 'STSignatureConfirm': [], 'STSignatureCancel': [I], 'STSignatureGetSignData': [ctypes.c_void_p, ctypes.POINTER(I)],
+            'STSignatureRetry': [], 'STSignatureConfirm': [], 'STSignatureStop': [], 'STSignatureCancel': [I], 'STSignatureGetSignData': [ctypes.c_void_p, ctypes.POINTER(I)],
             'STSignatureSaveAsFileEx': [W, I, I, I, I, I, ctypes.c_uint, I],
         }.items():
             f = getattr(L, name)
@@ -180,6 +180,18 @@ class PadGeraet:
         """Bestätigt die Unterschrift und speichert sie. Bei Misserfolg steht der Grund in self.hinweis (für Seite und Protokoll)."""
         L = self.lib
         self.hinweis = ''
+        # Erst anhalten (löscht das Display nicht): Ohne erfasste Punkte bleibt das Feld stehen und die Aufnahme läuft weiter.
+        # STSignatureConfirm würde das Display leeren, auch wenn nichts erfasst wurde.
+        punkte = L.STSignatureStop()
+        log(f'Vorgang {vid}: {punkte} Punkte erfasst')
+        if punkte == 0:
+            self.hinweis = 'Noch keine Unterschrift erkannt. Bitte im Feld unterschreiben, dann „OK“.'
+            L.STSignatureStart()
+            return None
+        if punkte < 0:
+            self.hinweis = f'Anhalten nicht möglich: {self.pt.fehlertext(L, punkte)}'
+            log(self.hinweis)
+            return None
         rc = L.STSignatureConfirm()
         if rc < 0:
             self.hinweis = f'Bestätigen nicht möglich: {self.pt.fehlertext(L, rc)}'

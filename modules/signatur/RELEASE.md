@@ -1,5 +1,10 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.13
+
+- **Unterschrift verschwand bei „OK“:** Laut Protokoll lag es nicht an der Taste, sondern daran, dass beim Bestätigen keine Unterschrift erfasst war (Fehler -17, „keine Aufnahme gestartet“). Die Pad-Bibliothek leert beim Bestätigen das ganze Display, dadurch erschien das Feld leer und die Aufnahme begann von vorn. Jetzt wird zuerst angehalten (Display bleibt) und die Zahl der erfassten Punkte geprüft: bei 0 Punkten bleibt das Feld stehen, die Aufnahme läuft weiter und die Liste zeigt „Noch keine Unterschrift erkannt“. Das Protokoll nennt die Zahl der Punkte („N Punkte erfasst“).
+- Wird auch beim Unterschreiben 0 Punkte gemeldet, liegt es an der Aufnahme selbst; dann bitte das Protokoll erneut ausgeben. Nicht am echten Pad geprüft.
+
 ## 0.1.0-beta.12
 
 - **Fehlersuche Pad:** Im Protokoll des Pad-Dienstes steht jetzt auch jedes Ereignis, das keiner Taste zugeordnet werden konnte, samt den bekannten Tasten. Hinweis: Das bisherige Protokoll stammte noch von einer älteren Version ohne diese Zeilen; bitte Signatur auf beta.12 aktualisieren und den Ablauf mit `sudo journalctl -u kienzle-signatur-pad -n 30 --no-pager` erneut ausgeben.
