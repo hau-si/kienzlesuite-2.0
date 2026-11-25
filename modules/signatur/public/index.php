@@ -126,6 +126,9 @@ try {
             } elseif ($aktion === 'vorlage-loeschen' && $darfVorlage) {
                 Seite::vorlageLoeschen((int)($_POST['id'] ?? 0));
                 $meldung = 'Vorlage gelöscht.';
+            } elseif ($aktion === 'pad-suchen' && $k->istAdmin()) {
+                $netz = trim((string)($_POST['netz'] ?? ''));
+                Ansicht::$padSuche = ['netz' => $netz, 'netze' => [$netz], 'treffer' => Pad::suchen($netz)];
             } elseif ($aktion === 'pad-speichern' && $k->istAdmin()) {
                 Seite::padSpeichern($_POST);
                 $meldung = 'Pad gespeichert.';
@@ -142,6 +145,7 @@ try {
             $fehler = $e->getMessage();
         }
     }
+    if ($k->istAdmin() && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') Ansicht::$padBearbeiten = (int)($_GET['pad'] ?? 0);
     Seite::aufraeumen();
     header('Content-Type: text/html; charset=utf-8');
     header('Cache-Control: no-store');

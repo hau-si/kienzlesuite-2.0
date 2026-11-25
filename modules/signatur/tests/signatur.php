@@ -201,6 +201,31 @@ check(str_contains(Ansicht::seite('/vorgaenge', 'tok', Seite::vorgaenge(), Seite
 $gelb = Seite::aktuellerVorgang();
 check($gelb !== null && $gelb['status'] !== 'abgebrochen', 'aktueller Vorgang ist offen');
 
+// Pad-Ansicht: feste Zeilen mit Stift und Mülleimer, Bearbeiten nur auf Wunsch, Erledigt-Zeichen, Suche im Netz
+$px = Seite::padSpeichern(['name' => 'Pad <Test>', 'arbeitsplatz' => 'Anmeldung', 'adresse' => '192.0.2.31', 'aktiv' => '1']);
+Ansicht::$padSuche = null; Ansicht::$padBearbeiten = 0;
+$admin = Ansicht::seite('/einstellungen', 'tok', [], [], true, true, null, null, null, Pad::status(), Seite::pads());
+check(str_contains($admin, 'class="us-pad-fest"') && str_contains($admin, 'aria-label="Pad Pad &lt;Test&gt; bearbeiten"') && str_contains($admin, 'aria-label="Pad Pad &lt;Test&gt; löschen"'), 'feste Zeile mit Stift und Mülleimer');
+check(!str_contains($admin, 'value="Pad &lt;Test&gt;"'), 'eingerichtete Pads zeigen keine Eingabefelder');
+check(str_contains($admin, 'Servicemenü') && str_contains($admin, 'obere rechte Ecke') && str_contains($admin, 'Delta</strong> und <strong>Alpha'), 'Anleitung Servicemenü');
+Ansicht::$padBearbeiten = $px;
+check(str_contains(Ansicht::seite('/einstellungen', 'tok', [], [], true, true, null, null, null, Pad::status(), Seite::pads()), 'value="Pad &lt;Test&gt;"'), 'Bearbeiten zeigt Felder');
+Ansicht::$padBearbeiten = 0;
+check(str_contains($admin, '✓ erledigt') === Pad::status()['installiert'] && (Pad::status()['installiert'] || str_contains($admin, 'tag warn')), 'Erledigt-Zeichen nur mit Software');
+$netz = tmpfile(); $pfad = stream_get_meta_data($netz)['uri'];
+file_put_contents($pfad, "Main:\n  +-- 192.168.77.0/24 2 0 2\n     |-- 192.168.77.0\n        /32 link BROADCAST\n     |-- 192.168.77.5\n        /32 host LOCAL\n     |-- 127.0.0.1\n        /32 host LOCAL\n     |-- 203.0.113.9\n        /32 host LOCAL\n");
+check(Pad::eigeneNetze($pfad) === ['192.168.77'], 'eigene private Netze');
+check(Pad::netzGueltig('192.168.1') && Pad::netzGueltig('10.1.2') && Pad::netzGueltig('172.20.5') && !Pad::netzGueltig('172.32.1') && !Pad::netzGueltig('8.8.8') && !Pad::netzGueltig('192.168.1.5') && !Pad::netzGueltig('192.168.999'), 'nur private Netze');
+wirft(fn() => Pad::suchen('8.8.8'), 'kein öffentliches Netz durchsuchen');
+check(Pad::suchen('192.168.77', 1002, fn($a) => in_array($a, ['192.168.77.20', '192.168.77.82'], true)) === ['192.168.77.20', '192.168.77.82'], 'Treffer der Suche');
+Ansicht::$padSuche = ['netz' => '192.168.77', 'netze' => ['192.168.77'], 'treffer' => ['192.168.77.20', '192.0.2.31']];
+$treffer = Ansicht::seite('/einstellungen', 'tok', [], [], true, true, null, null, null, Pad::status(), Seite::pads());
+check(str_contains($treffer, 'value="192.168.77.20"') && str_contains($treffer, 'Hinzufügen') && str_contains($treffer, 'schon eingerichtet'), 'Treffer zum Hinzufügen');
+Ansicht::$padSuche = ['netz' => '192.168.77', 'netze' => ['192.168.77'], 'treffer' => []];
+check(str_contains(Ansicht::seite('/einstellungen', 'tok', [], [], true, true, null, null, null, Pad::status(), Seite::pads()), 'nichts auf Port 1002 gefunden'), 'leere Suche');
+Ansicht::$padSuche = null;
+Seite::padLoeschen($px);
+
 // Start aus T2med: Patient per FHIR (hier ersetzt), einmaliger Startcode, 5 Minuten gültig
 $fhir = new class(['base_url' => 'https://t2med.example.org/aps/fhir/api/r4', 'launch_urls' => ['https://192.0.2.7/aps/fhir/api/r4/']]) extends Fhir {
     public array $aufrufe = [];

@@ -90,4 +90,53 @@ final class Pad {
         foreach (array_merge(self::BIBLIOTHEKEN, ['info.json', 'Lizenzvertrag-signotec.txt']) as $f) @unlink(self::ordner() . '/' . $f);
         @rmdir(self::ordner());
     }
+
+    /** Private IPv4-Netze (a.b.c) dieses Servers aus /proc/net/fib_trie, ohne Loopback; höchstens 4. */
+    public static function eigeneNetze(string $datei = '/proc/net/fib_trie'): array {
+        $netze = [];
+        $letzte = '';
+        foreach (preg_split('/\R/', (string)@file_get_contents($datei)) ?: [] as $zeile) {
+            if (preg_match('/\|--\s+(\d{1,3}(?:\.\d{1,3}){3})\s*$/', $zeile, $m)) { $letzte = $m[1]; continue; }
+            if ($letzte !== '' && str_contains($zeile, '/32 host LOCAL') && self::netzGueltig(implode('.', array_slice(explode('.', $letzte), 0, 3)))) {
+                $netze[implode('.', array_slice(explode('.', $letzte), 0, 3))] = true;
+            }
+        }
+        return array_slice(array_keys($netze), 0, 4);
+    }
+
+    /** Nur private Netze (10.x.y, 172.16–31.x, 192.168.x) im Format „a.b.c“: es wird nie im Internet gesucht. */
+    public static function netzGueltig(string $netz): bool {
+        if (!preg_match('/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/D', $netz, $m) || max((int)$m[1], (int)$m[2], (int)$m[3]) > 255) return false;
+        return (int)$m[1] === 10 || ((int)$m[1] === 172 && (int)$m[2] >= 16 && (int)$m[2] <= 31) || ((int)$m[1] === 192 && (int)$m[2] === 168);
+    }
+
+    /**
+     * Sucht in einem /24-Netz (a.b.c.1–254) Geräte mit offenem Port 1002 (Ethernet-Modus von Delta und Alpha).
+     * Alle Verbindungen laufen gleichzeitig, die Suche dauert rund zwei Sekunden. $pruefen ist für Tests ersetzbar.
+     * @return list<string> gefundene Adressen
+     */
+    public static function suchen(string $netz, int $port = 1002, ?callable $pruefen = null, float $wartezeit = 2.0): array {
+        if (!self::netzGueltig($netz)) throw new \InvalidArgumentException('Bitte ein privates Netz angeben, z. B. 192.168.1');
+        $adressen = array_map(fn($i) => $netz . '.' . $i, range(1, 254));
+        if ($pruefen) return array_values(array_filter($adressen, $pruefen));
+        $offen = $sockets = [];
+        foreach ($adressen as $a) {
+            $s = @stream_socket_client("tcp://$a:$port", $nr, $text, 0, STREAM_CLIENT_ASYNC_CONNECT | STREAM_CLIENT_CONNECT);
+            if ($s) { stream_set_blocking($s, false); $sockets[$a] = $s; }
+        }
+        $ende = microtime(true) + $wartezeit;
+        while ($sockets && microtime(true) < $ende) {
+            $w = array_values($sockets); $r = $e = [];
+            if (@stream_select($r, $w, $e, 0, 200000) < 1) continue;
+            foreach ($w as $s) {
+                $a = array_search($s, $sockets, true);
+                // Ein abgelehnter Verbindungsaufbau meldet sich ebenfalls als „schreibbar“; echte Verbindungen haben einen Gegenstellennamen.
+                if ($a !== false && @stream_socket_get_name($s, true) !== false) $offen[] = $a;
+                if ($a !== false) { fclose($s); unset($sockets[$a]); }
+            }
+        }
+        foreach ($sockets as $s) fclose($s);
+        usort($offen, fn($x, $y) => ip2long($x) <=> ip2long($y));
+        return $offen;
+    }
 }

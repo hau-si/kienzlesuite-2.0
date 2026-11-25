@@ -1,5 +1,13 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.14
+
+- **Pads: feste Zeilen statt Eingabefelder.** Eingerichtete Pads erscheinen als Zeile mit Name, Arbeitsplatz, Adresse:Port und Status; am Ende ein **Stift** (Bearbeiten, nur dann erscheinen die Felder) und ein **Mülleimer** (Löschen mit Rückfrage). Neu anlegen bleibt darunter.
+- **Pad im Netzwerk suchen** (ähnlich der Druckersuche): Die Suche prüft die Adressen 1–254 eines privaten Netzes (Vorgabe: Netz dieses Servers) auf offenen Port 1002 und bietet Treffer zum Hinzufügen an; das gilt für feste Adressen und DHCP. Es gibt kein Suchprotokoll des Herstellers; gefunden wird, was auf Port 1002 antwortet. Gesucht wird nie außerhalb privater Netze (10.x, 172.16–31.x, 192.168.x). Nicht an echtem Pad und echtem Netz geprüft.
+- **Anleitung „Pad ins Netzwerk bringen (Servicemenü)“** für Delta und Alpha: Strom trennen, Stift an die obere rechte Ecke, Strom wieder anschließen, Ethernet und feste Adresse oder DHCP wählen, Adresse eintragen. Nach Angaben von signotec.
+- **Pad-Software:** Mit hochgeladener Software zeigt der Bereich „✓ erledigt“ und ist zugeklappt; sonst „offen“.
+- Neue Tests in `tests/signatur.php`.
+
 ## 0.1.0-beta.13
 
 - **Unterschrift verschwand bei „OK“:** Laut Protokoll lag es nicht an der Taste, sondern daran, dass beim Bestätigen keine Unterschrift erfasst war (Fehler -17, „keine Aufnahme gestartet“). Die Pad-Bibliothek leert beim Bestätigen das ganze Display, dadurch erschien das Feld leer und die Aufnahme begann von vorn. Jetzt wird zuerst angehalten (Display bleibt) und die Zahl der erfassten Punkte geprüft: bei 0 Punkten bleibt das Feld stehen, die Aufnahme läuft weiter und die Liste zeigt „Noch keine Unterschrift erkannt“. Das Protokoll nennt die Zahl der Punkte („N Punkte erfasst“).

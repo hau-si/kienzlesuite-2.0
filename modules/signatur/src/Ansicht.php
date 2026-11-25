@@ -123,12 +123,20 @@ final class Ansicht {
         return '<form method="post" class="inline">' . $csrfFeld . '<input type="hidden" name="aktion" value="' . $aktion . '"><input type="hidden" name="id" value="' . $id . '"><button class="' . $klasse . '" type="submit"' . ($frage !== '' ? ' data-bestaetigen="' . sg_h($frage) . '"' : '') . '>' . $text . '</button></form> ';
     }
 
-    /** Bereich „Unterschriftenpads“ nur für Admins: ein Pad je Arbeitsplatz mit Name, Adresse und Port. */
+    /** Ergebnis der Netzwerksuche (Adressen) und das Pad, das gerade bearbeitet wird (id); von public/index.php gesetzt. */
+    public static ?array $padSuche = null;
+    public static int $padBearbeiten = 0;
+
+    private const STIFT = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>';
+    private const MUELL = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>';
+
+    /** Bereich „Unterschriftenpads“ nur für Admins: eingerichtete Pads als feste Zeilen (Stift, Mülleimer), darunter Anlegen und Suche im Netz. */
     private static function pads(string $csrfFeld, array $pads): string {
         $h = 'sg_h';
-        $o = '<details class="fold" id="pads"' . ($pads ? '' : ' open') . '><summary><h2>Unterschriftenpads</h2></summary><div class="us-body">'
-            . '<p class="muted">Je Arbeitsplatz mit Pad einen Eintrag. Das Delta muss im Ethernet-Modus laufen (Servicemenü am Pad); Adresse und Port stehen dort. Bei mehreren aktiven Pads wählt man beim Anlegen eines Vorgangs, an welchem unterschrieben wird.</p>';
-        $feld = static function (array $p, string $csrfFeld, string $knopf) use ($h): string {
+        $o = '<details class="fold" id="pads"' . ($pads || self::$padSuche !== null || self::$padBearbeiten ? ' open' : '') . '><summary><h2>Unterschriftenpads</h2>'
+            . ($pads ? '<span class="tag ok">' . count($pads) . ' eingerichtet</span>' : '') . '</summary><div class="us-body">'
+            . '<p class="muted">Je Arbeitsplatz mit Pad einen Eintrag. Das Pad muss im Ethernet-Modus laufen (siehe „Pad ins Netzwerk bringen“); Adresse und Port stehen im Servicemenü. Bei mehreren aktiven Pads wählt man beim Anlegen eines Vorgangs, an welchem unterschrieben wird.</p>';
+        $feld = static function (array $p, string $knopf) use ($h, $csrfFeld): string {
             $i = (int)($p['id'] ?? 0);
             return '<form method="post" class="us-pad-zeile" autocomplete="off">' . $csrfFeld . '<input type="hidden" name="aktion" value="pad-speichern"><input type="hidden" name="id" value="' . $i . '">'
                 . '<label>Name<input name="name" maxlength="40" required value="' . $h($p['name'] ?? '') . '" placeholder="z. B. Pad Empfang"></label>'
@@ -137,10 +145,49 @@ final class Ansicht {
                 . '<label>Port<input name="port" inputmode="numeric" maxlength="5" value="' . $h((string)($p['port'] ?? 1002)) . '"></label>'
                 . '<label class="check"><input type="checkbox" name="aktiv" value="1"' . (!isset($p['aktiv']) || (int)$p['aktiv'] ? ' checked' : '') . '> aktiv</label>'
                 . '<button class="primary small" type="submit">' . $knopf . '</button>'
-                . ($i > 0 ? '<button class="danger small" type="submit" name="aktion" value="pad-loeschen" formnovalidate data-bestaetigen="Dieses Pad wirklich löschen?">Löschen</button>' : '') . '</form>';
+                . ($i > 0 ? '<a class="button secondary small" href="?#pads">Abbrechen</a>' : '') . '</form>';
         };
-        foreach ($pads as $p) $o .= $feld($p, $csrfFeld, 'Speichern');
-        $o .= '<h3>Neues Pad</h3>' . $feld([], $csrfFeld, 'Pad hinzufügen');
+        foreach ($pads as $p) {
+            $i = (int)$p['id'];
+            if (self::$padBearbeiten === $i) { $o .= $feld($p, 'Speichern'); continue; }
+            $o .= '<div class="us-pad-fest"><div><strong>' . $h($p['name']) . '</strong><div class="muted">' . ($p['arbeitsplatz'] !== '' ? $h($p['arbeitsplatz']) : 'kein Arbeitsplatz angegeben') . '</div></div>'
+                . '<div><code>' . $h($p['adresse']) . ':' . (int)$p['port'] . '</code></div>'
+                . '<div>' . ((int)$p['aktiv'] ? '<span class="tag ok">aktiv</span>' : '<span class="tag">pausiert</span>') . '</div>'
+                . '<div class="us-pad-aktion"><a class="icon-knopf" href="?pad=' . $i . '#pads" title="Bearbeiten" aria-label="Pad ' . $h($p['name']) . ' bearbeiten">' . self::STIFT . '</a>'
+                . '<form method="post" class="inline">' . $csrfFeld . '<input type="hidden" name="aktion" value="pad-loeschen"><input type="hidden" name="id" value="' . $i . '">'
+                . '<button class="icon-knopf" type="submit" title="Löschen" aria-label="Pad ' . $h($p['name']) . ' löschen" data-bestaetigen="Dieses Pad wirklich löschen?">' . self::MUELL . '</button></form></div></div>';
+        }
+        $o .= '<h3>Neues Pad</h3>' . $feld([], 'Pad hinzufügen');
+        $o .= '<h3>Pad im Netzwerk suchen</h3><p class="muted">Sucht in Ihrem Netz nach Geräten, die auf Port 1002 antworten (Ethernet-Modus von Delta und Alpha). Das gilt für feste Adressen und für DHCP. Gefunden wird, was gerade eingeschaltet ist; ob es ein Pad ist, zeigt erst der Verbindungstest.</p>';
+        $netze = self::$padSuche['netze'] ?? Pad::eigeneNetze();
+        $o .= '<form method="post" class="us-suche" autocomplete="off">' . $csrfFeld . '<input type="hidden" name="aktion" value="pad-suchen">'
+            . '<label>Netz (die ersten drei Zahlen)<input name="netz" maxlength="15" required pattern="\d{1,3}\.\d{1,3}\.\d{1,3}" value="' . $h((string)($netze[0] ?? '')) . '" placeholder="z. B. 192.168.1"></label>'
+            . '<button class="primary small" type="submit">Suchen</button></form>';
+        if (self::$padSuche !== null) {
+            $bekannt = array_column($pads, 'adresse');
+            $o .= '<div class="us-treffer" role="status">';
+            if (!self::$padSuche['treffer']) $o .= '<p class="muted">Im Netz ' . $h(self::$padSuche['netz']) . ' wurde nichts auf Port 1002 gefunden. Läuft das Pad im Ethernet-Modus, ist es eingeschaltet und im selben Netz?</p>';
+            foreach (self::$padSuche['treffer'] as $a) {
+                if (in_array($a, $bekannt, true)) { $o .= '<div class="us-pad-fest"><code>' . $h($a) . '</code><span class="tag ok">schon eingerichtet</span></div>'; continue; }
+                $o .= '<form method="post" class="us-pad-zeile us-treffer-zeile" autocomplete="off">' . $csrfFeld . '<input type="hidden" name="aktion" value="pad-speichern"><input type="hidden" name="id" value="0">'
+                    . '<input type="hidden" name="adresse" value="' . $h($a) . '"><input type="hidden" name="port" value="1002"><input type="hidden" name="aktiv" value="1">'
+                    . '<div><code>' . $h($a) . ':1002</code><div class="muted">antwortet auf Port 1002</div></div>'
+                    . '<label>Name<input name="name" maxlength="40" required placeholder="z. B. Pad Empfang"></label>'
+                    . '<label>Arbeitsplatz<input name="arbeitsplatz" maxlength="60" placeholder="z. B. Anmeldung"></label>'
+                    . '<button class="primary small" type="submit">Hinzufügen</button></form>';
+            }
+            $o .= '</div>';
+        }
+        $o .= '<h3 id="netz">Pad ins Netzwerk bringen (Servicemenü)</h3>'
+            . '<p class="muted">Gilt für <strong>Delta</strong> und <strong>Alpha</strong> mit Netzwerkanschluss (nur diese beiden werden über die Adresse angesprochen). Angaben nach signotec; an diesem Pad nicht von uns geprüft.</p>'
+            . '<ol class="us-schritte">'
+            . '<li><strong>Pad ausschalten:</strong> das Pad vom Strom trennen, also Netzteil, USB-Kabel oder bei Power over Ethernet das Netzwerkkabel abziehen.</li>'
+            . '<li><strong>Stift ansetzen:</strong> mit dem Stift die <strong>obere rechte Ecke des Displays</strong> berühren und den Stift dort gedrückt halten.</li>'
+            . '<li><strong>Einschalten:</strong> bei gehaltenem Stift das Pad wieder mit Strom verbinden. Beim Hochfahren leuchtet die LED (Alpha: rot); sobald das <strong>Servicemenü</strong> auf dem Display erscheint, den Stift loslassen.</li>'
+            . '<li><strong>Verbindungsart:</strong> im Menü <strong>Ethernet</strong> wählen (Voreinstellung ist USB).</li>'
+            . '<li><strong>Adresse:</strong> unter „IP-Konfiguration“ entweder eine <strong>feste Adresse</strong> eintragen (weißes Feld antippen, Zahlen eingeben) oder den Haken bei <strong>DHCP</strong> setzen. Mit dem grünen Haken bestätigen; das Pad startet neu.</li>'
+            . '<li><strong>DHCP:</strong> Beim Delta (ab Firmware 1.42) erscheint nach dem Neustart die vom Router vergebene Adresse auf dem Display und muss bestätigt werden. Sie ist später im Servicemenü wieder abrufbar. Damit sie sich nicht ändert, im Router für das Pad eine feste Zuordnung (Reservierung) einrichten.</li>'
+            . '<li><strong>Hier eintragen:</strong> die Adresse oben bei „Neues Pad“ eingeben (Port <code>1002</code>) oder mit „Pad im Netzwerk suchen“ finden lassen.</li></ol>';
         return $o . '</div></details>';
     }
 
@@ -150,7 +197,8 @@ final class Ansicht {
         $stand = $pad['installiert']
             ? '<p class="ok" role="status">Installiert' . ($pad['version'] !== '' ? ': signoPAD-API Linux ' . $h($pad['version']) : '') . ($pad['zeit'] > 0 ? ', hochgeladen am ' . $h(date('d.m.Y H:i', (int)$pad['zeit'])) : '') . ($pad['von'] !== '' ? ' von ' . $h($pad['von']) : '') . '.</p>'
             : '<p class="muted">Noch nicht hochgeladen. Ohne diese Software kann das Pad nicht angesprochen werden.</p>';
-        $o = '<details class="fold" id="pad"><summary><h2>Pad-Software von signotec</h2></summary><div class="us-body">' . $stand
+        $o = '<details class="fold" id="pad"' . ($pad['installiert'] ? '' : ' open') . '><summary><h2>Pad-Software von signotec</h2>'
+            . ($pad['installiert'] ? '<span class="tag ok">✓ erledigt</span>' : '<span class="tag warn">offen</span>') . '</summary><div class="us-body">' . $stand
             . '<p>Die Software zum Ansprechen des Unterschriftenpads liefern wir nicht mit. Sie laden sie bei signotec herunter und hier hoch. So geht es:</p>'
             . '<ol class="us-schritte">'
             . '<li><strong>Herunterladen:</strong> Auf Ihrem Computer bei signotec das Paket <strong>signoPAD-API Linux</strong> herunterladen, eine ZIP-Datei mit dem Namen <code>signoPAD-API_Linux_9.0.1.zip</code> (die Versionsnummer kann neuer sein, rund 7 MB). Direkt: <a href="https://backend.signotec.com/wp-content/uploads/2025/11/signoPAD-API_Linux_9.0.1.zip" target="_blank" rel="noopener noreferrer">Version 9.0.1</a>; neuere Versionen auf <a href="https://www.signotec.com/en/help-centre/signopad-api/" target="_blank" rel="noopener noreferrer">signotec: signoPAD-API</a> unter Download für Linux. Es muss die Linux-Fassung sein, nicht Windows, Java oder Web.</li>'
