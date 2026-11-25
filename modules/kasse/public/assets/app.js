@@ -53,15 +53,18 @@ function signaturListe() {
   if (Number.isFinite(manual) && manual > 0) liste.push({code: '', label: 'Sonstiger Betrag', cent: manual});
   return liste;
 }
-function signaturSenden() {
+async function signaturSenden() {
   const liste = signaturListe();
   if (!liste.length) return;
-  const roh = JSON.stringify({patient: state.patient.name, ref: visitId || '', leistungen: liste});
+  // Kontaktdaten frisch aus T2med; ohne sie öffnet Signatur trotzdem, die Felder bleiben dann zum Ausfüllen leer.
+  let kontakt = {};
+  try { kontakt = await api('patient_kontakt'); } catch (e) { kontakt = {}; }
+  const roh = JSON.stringify({patient: state.patient.name, geburtsdatum: kontakt.geburtsdatum || state.patient.birthdate || '', vorname: kontakt.vorname || '', nachname: kontakt.nachname || '', geschlecht: kontakt.geschlecht || '', telefon: kontakt.telefon || '', email: kontakt.email || '', adresse: kontakt.adresse || '', ref: visitId || '', leistungen: liste});
   const bytes = new TextEncoder().encode(roh); let bin = ''; bytes.forEach(b => { bin += String.fromCharCode(b); });
   const kodiert = btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   if (kodiert.length > 12000) { alert('Die Liste ist für die Übergabe zu lang. Bitte weniger Positionen wählen.'); return; }
   window.open(SIGNATUR + '#uebergabe=' + kodiert, '_blank', 'noopener');
-  const note = $('sign-note'); note.hidden = false; note.textContent = 'In Signatur geöffnet. Dort Dokument wählen und den Vorgang anlegen; danach hier wie gewohnt kassieren.';
+  const note = $('sign-note'); note.hidden = false; note.textContent = 'In Signatur geöffnet. Dort Dokument wählen und den Vorgang anlegen; danach hier wie gewohnt kassieren.' + (kontakt.hinweis ? ' ' + kontakt.hinweis : '');
 }
 $('sign-send').addEventListener('click', signaturSenden);
 function updateTotal() {

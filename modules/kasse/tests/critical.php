@@ -58,7 +58,7 @@ final class FakeHttp extends HttpClient {
         if (str_contains($url,'/Patient?')) {
             if ($this->patientUnavailable) throw new TransportError('Zertifikat-Testfehler (cURL 60)',false);
             return ['status'=>200,'body'=>['resourceType'=>'Patient','id'=>'patient-1','name'=>[['given'=>['Erika'],'family'=>'Musterfrau']],
-                'telecom'=>[['system'=>'email','value'=>'old@example.invalid','use'=>'old','rank'=>1],['system'=>'email','value'=>'second@example.invalid','rank'=>2],['system'=>'email','value'=>'erika@example.invalid','rank'=>1],['system'=>'phone','value'=>'12345']]]];
+                'gender'=>'female','telecom'=>[['system'=>'email','value'=>'old@example.invalid','use'=>'old','rank'=>1],['system'=>'email','value'=>'second@example.invalid','rank'=>2],['system'=>'email','value'=>'erika@example.invalid','rank'=>1],['system'=>'phone','value'=>'12345']]]];
         }
         if (str_ends_with($url,'/metadata')) return ['status'=>200,'body'=>['resourceType'=>'CapabilityStatement','rest'=>[['mode'=>'server','resource'=>[['type'=>'Observation','conditionalCreate'=>$this->conditional]]]]]];
         if (str_contains($url,'/Observation?')) return ['status'=>200,'body'=>['resourceType'=>'Bundle','entry'=>$this->existingRecord && $this->record ? [['resource'=>['id'=>'record-1']+$this->record]] : []]];
@@ -177,6 +177,7 @@ try {
     $postsBefore=$http->posts('api.sumup.com');$fhirBefore=$http->posts('t2med.test');
     $sumupCallsBefore=count(array_filter($http->calls,fn($call)=>str_contains($call[1],'sumup.com')));
     check($app->receiptRecipient($v,$p['id'])['email']==='erika@example.invalid','Automatischer E-Mail-Vorschlag fehlt');
+    $kk=$app->patientKontakt($v);check($kk['email']==='erika@example.invalid'&&$kk['telefon']==='12345'&&$kk['hinweis']===''&&$kk['vorname']==='Erika'&&$kk['nachname']==='Musterfrau'&&$kk['geschlecht']==='female','Kontaktdaten für Signatur fehlen');
     check(count(array_filter($http->calls,fn($call)=>str_contains($call[1],'sumup.com')))===$sumupCallsBefore,'E-Mail-Vorschlag ruft SumUp auf');
     $url='https://receipts-ng.sumup.com/v0.1/receipts/transaction-1?mid=MTEST&format=svg';
     $http->links=[['rel'=>'receipt','href'=>$url]];

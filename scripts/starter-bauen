@@ -7,7 +7,10 @@ cd -- "$(dirname -- "$0")/../core/client/starter"
 out=../../client-dist
 rm -rf -- "$out"; mkdir -p "$out"
 build() { # Betriebssystem Architektur Dateiname [GOARM]
-  GOOS=$1 GOARCH=$2 GOARM=${4:-} CGO_ENABLED=0 go build -trimpath -ldflags '-s -w' -o "$out/$3" .
+  local flags='-s -w'
+  # Windows: ohne Konsolenfenster (sonst blitzt beim Aufruf aus T2med ein schwarzes Fenster auf); Fehler stehen in starter.log.
+  [ "$1" = windows ] && flags='-s -w -H=windowsgui'
+  GOOS=$1 GOARCH=$2 GOARM=${4:-} CGO_ENABLED=0 go build -trimpath -ldflags "$flags" -o "$out/$3" .
 }
 build windows amd64 kienzle-starter-windows-amd64.exe
 build windows arm64 kienzle-starter-windows-arm64.exe

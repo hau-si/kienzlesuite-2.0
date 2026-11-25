@@ -7,7 +7,7 @@ final class Speicher {
     public static string $data = '/var/lib/kienzle/signatur';
     private static ?\PDO $pdo = null;
     private static string $pfad = '';
-    public const VERSION = 4;
+    public const VERSION = 6;
 
     public static function pdo(): \PDO {
         $datei = self::$data . '/signatur.db';
@@ -24,6 +24,41 @@ final class Speicher {
 
     /** Für Tests: Verbindung schließen, damit ein anderer Datenordner gilt. */
     public static function zuruecksetzen(): void { self::$pdo = null; self::$pfad = ''; }
+
+    /** Schlüssel für die Zugriffstoken: eigene Datei im Datenordner, nur für dieses Modul lesbar. */
+    private static function schluessel(): string {
+        $datei = self::$data . '/token.key';
+        if (!is_file($datei)) {
+            if (!is_dir(self::$data) && !mkdir(self::$data, 0700, true) && !is_dir(self::$data)) throw new \RuntimeException('Datenordner nicht anlegbar.');
+            $fd = fopen($datei, 'xb');
+            if ($fd) { fwrite($fd, bin2hex(random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES))); fclose($fd); }
+            @chmod($datei, 0600);
+        }
+        $hex = trim((string)@file_get_contents($datei));
+        $key = ctype_xdigit($hex) && strlen($hex) === 64 ? hex2bin($hex) : false;
+        if ($key === false) throw new \RuntimeException('Der Schlüssel für Zugriffstoken ist nicht lesbar.');
+        return $key;
+    }
+
+    /** Token zu einem T2med-Kontext ablegen (verschlüsselt, bis $bis); überschreibt einen älteren Eintrag. */
+    public static function tokenMerken(string $kontext, string $token, int $bis): void {
+        $nonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+        $cipher = base64_encode($nonce . sodium_crypto_secretbox($token, $nonce, self::schluessel()));
+        self::pdo()->prepare('INSERT OR REPLACE INTO tokens (kontext, cipher, bis) VALUES (?, ?, ?)')->execute([$kontext, $cipher, $bis]);
+    }
+
+    /** Token zu einem Kontext; null, wenn es keines gibt oder es abgelaufen ist. */
+    public static function tokenHolen(string $kontext, ?int $jetzt = null): ?string {
+        $jetzt ??= time();
+        self::pdo()->prepare('DELETE FROM tokens WHERE bis < ?')->execute([$jetzt]);
+        $st = self::pdo()->prepare('SELECT cipher FROM tokens WHERE kontext = ? AND bis >= ?');
+        $st->execute([$kontext, $jetzt]);
+        $c = $st->fetchColumn();
+        $roh = is_string($c) ? base64_decode($c, true) : false;
+        if ($roh === false || strlen($roh) < SODIUM_CRYPTO_SECRETBOX_NONCEBYTES + 16) return null;
+        $t = sodium_crypto_secretbox_open(substr($roh, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES), substr($roh, 0, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES), self::schluessel());
+        return $t === false ? null : $t;
+    }
 
     private static function migrieren(\PDO $pdo): void {
         $v = (int)$pdo->query('PRAGMA user_version')->fetchColumn();
@@ -86,6 +121,16 @@ final class Speicher {
             $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN quelle TEXT NOT NULL DEFAULT ""');
             $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN quelle_ref TEXT NOT NULL DEFAULT ""');
             $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN leistungen TEXT NOT NULL DEFAULT ""');
+        }
+        if ($v < 5) {
+            // Kontaktdaten des Patienten aus T2med für die Platzhalter {{telefon}}, {{email}}, {{adresse}}.
+            foreach (['telefon', 'email', 'adresse'] as $spalte) $pdo->exec('ALTER TABLE starts ADD COLUMN ' . $spalte . ' TEXT NOT NULL DEFAULT ""');
+        }
+        if ($v < 6) {
+            // Namen und Geschlecht für Anrede-Platzhalter; Patienten-ID und Zugriffstoken (verschlüsselt, höchstens 4 h) für „In T2med übernehmen“.
+            foreach (['vorname', 'nachname', 'geschlecht', 'pid'] as $spalte) $pdo->exec('ALTER TABLE starts ADD COLUMN ' . $spalte . ' TEXT NOT NULL DEFAULT ""');
+            $pdo->exec('CREATE TABLE tokens (kontext TEXT PRIMARY KEY, cipher TEXT NOT NULL, bis INTEGER NOT NULL)');
+            foreach (['patient_id', 'kontakt_alt', 'kontakt_neu', 'kontakt_status', 'kontakt_meldung'] as $spalte) $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN ' . $spalte . ' TEXT NOT NULL DEFAULT ""');
         }
         $pdo->exec('PRAGMA user_version=' . self::VERSION);
         $pdo->commit();

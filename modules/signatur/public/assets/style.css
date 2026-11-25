@@ -58,3 +58,9 @@ main.modul { max-width: 940px; margin: 0; padding: 32px 40px 48px; }
 @media (max-width: 800px) { .us-pad-fest, .us-treffer-zeile { grid-template-columns: 1fr 1fr; } }
 
 .ok.nahe, .fehler.nahe { margin: 10px 0; }
+
+.us-platz { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 2px 0 6px; }
+.us-platz button { font-family: ui-monospace, monospace; }
+
+.us-gewaehlt { border-left: 4px solid var(--teal, #12695d); }
+.us-gewaehlt .us-patient { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }

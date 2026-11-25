@@ -27,6 +27,11 @@ final class Ansicht {
         $stat = '<span class="us-status s-' . $h($v['status']) . '">' . $h(Seite::STATI[$v['status']] ?? $v['status']) . '</span>';
         if ($v['meldung'] !== '') $stat .= '<div class="muted klein-text">' . $h($v['meldung']) . '</div>';
         if ($v['status'] === 'wartet' && $v['kontext'] !== '' && !Seite::kontextGueltig($v)) $stat .= '<div class="muted klein-text">T2med-Verbindung abgelaufen: Das Ablegen braucht einen neuen Aufruf aus T2med.</div>';
+        if (($v['kontakt_status'] ?? '') !== '') {
+            $k = json_decode((string)$v['kontakt_neu'], true) ?: [];
+            $was = implode(' und ', array_filter([($k['telefon'] ?? '') !== '' ? 'Telefon ' . $k['telefon'] : '', ($k['email'] ?? '') !== '' ? 'E-Mail ' . $k['email'] : '']));
+            $stat .= '<div class="muted klein-text">' . ($v['kontakt_status'] === 'geschrieben' ? 'In T2med übernommen: ' : 'Für T2med vorgemerkt: ') . $h($was) . ($v['kontakt_status'] === 'fehler' ? ' – ' . $h((string)$v['kontakt_meldung']) : '') . '</div>';
+        }
         $suche = mb_strtolower($v['patient'] . ' ' . $v['titel'] . ' ' . (Seite::ARTEN[$v['art']] ?? $v['art']));
         return '<tr data-art="' . $h($v['art']) . '" data-status="' . $h($v['status']) . '" data-suche="' . $h($suche) . '"><td>' . $h(self::datum((int)$v['erstellt'])) . '</td><td>' . $h($v['patient']) . '</td><td>' . $h($v['titel']) . '</td><td>'
             . $h($padNamen[(int)($v['pad_id'] ?? 0)] ?? '–') . '</td><td>' . $stat . '</td><td class="us-aktionen">' . self::aktionen($v, $csrfFeld, $darfVorgang) . '</td></tr>';
@@ -38,6 +43,7 @@ final class Ansicht {
         $o = '';
         if (in_array($v['status'], ['wartet', 'fehler'], true) && (int)($v['pad_id'] ?? 0) > 0) $o .= self::knopf($csrfFeld, 'am-pad', (int)$v['id'], 'Am Pad zeigen', 'primary small');
         if ($v['status'] === 'am_pad') $o .= self::knopf($csrfFeld, 'vom-pad', (int)$v['id'], 'Vom Pad nehmen', 'small');
+        if (in_array($v['kontakt_status'] ?? '', ['offen', 'fehler'], true) && in_array($v['status'], ['unterschrieben', 'uebertragen'], true)) $o .= self::knopf($csrfFeld, 'kontakt-uebernehmen', (int)$v['id'], 'Kontaktdaten in T2med übernehmen', 'primary small', 'Telefon und E-Mail dieses Patienten in T2med ändern? Alle anderen Angaben bleiben unverändert.');
         if (!in_array($v['status'], ['uebertragen', 'abgebrochen'], true)) $o .= self::knopf($csrfFeld, 'abbrechen', (int)$v['id'], 'Abbrechen', 'danger small');
         if ($v['status'] === 'abgebrochen') $o .= self::knopf($csrfFeld, 'wiederaufnehmen', (int)$v['id'], 'Wieder aufnehmen', 'primary small');
         if ($v['status'] === 'abgebrochen') $o .= self::knopf($csrfFeld, 'vorgang-loeschen', (int)$v['id'], 'Löschen', 'danger small', 'Diesen abgebrochenen Vorgang endgültig löschen?');
@@ -61,6 +67,9 @@ final class Ansicht {
             return $o . '</div>';
         }
 
+        // Patient aus T2med oder der Kasse: Kasten oben (JS blendet ihn ein und das Patientenfeld unten aus).
+        if ($darfVorgang) $o .= '<section class="card us-gewaehlt" id="n-gewaehlt" hidden><div class="us-patient"><div><div class="eyebrow muted" id="n-gewaehlt-quelle">AUSGEWÄHLTER PATIENT</div><strong class="us-name" id="n-gewaehlt-name"></strong><div class="muted" id="n-gewaehlt-info"></div></div>'
+            . '<button type="button" class="small" id="n-gewaehlt-weg">Anderen Patienten wählen</button></div></section>';
         // Start: der Vorgang, der gerade am Pad ist (sonst der zuletzt angelegte offene), dann „Neuer Vorgang“.
         $o .= '<section class="card us-aktuell"><h2>' . ($aktuell && $aktuell['status'] === 'am_pad' ? 'Gerade am Pad' : 'Zuletzt angelegter Vorgang') . '</h2>';
         if (!$aktuell) {
@@ -92,8 +101,19 @@ final class Ansicht {
                 $o .= '<form method="post" class="us-form" autocomplete="off">' . $csrfFeld . '<input type="hidden" name="aktion" value="neu"><input type="hidden" name="kontext" id="n-kontext" value=""><input type="hidden" name="leistungen_json" id="n-leistungen" value=""><input type="hidden" name="quelle" id="n-quelle" value=""><input type="hidden" name="quelle_ref" id="n-quelle-ref" value="">'
                     . '<label for="n-vorlage">Dokument</label><select id="n-vorlage" name="vorlage_id">' . $opt . '</select>'
                     . $padOpt
-                    . '<label for="n-patient">Patient</label><input id="n-patient" name="patient" maxlength="80" required placeholder="z. B. Max Mustermann">'
+                    . '<div id="n-patient-feld"><label for="n-patient">Patient</label><input id="n-patient" name="patient" maxlength="80" required placeholder="z. B. Max Mustermann"></div>'
                     . '<div id="n-liste" class="us-liste" hidden><strong>Leistungen aus der Kasse</strong><ul id="n-liste-eintraege"></ul><p class="muted" id="n-liste-summe"></p></div>'
+                    . '<details class="fold us-kontakt" id="n-kontakt"><summary>Weitere Patientendaten (für Platzhalter im Dokument)</summary><div class="us-body">'
+                    . '<input type="hidden" name="patient_id" id="n-patient-id" value=""><input type="hidden" name="telefon_alt" id="n-telefon-alt" value=""><input type="hidden" name="email_alt" id="n-email-alt" value="">'
+                    . '<label for="n-vorname">Vorname</label><input id="n-vorname" name="vorname" maxlength="80">'
+                    . '<label for="n-nachname">Nachname</label><input id="n-nachname" name="nachname" maxlength="80">'
+                    . '<label for="n-geschlecht">Anrede (aus T2med)</label><select id="n-geschlecht" name="geschlecht"><option value="">Keine Angabe (Guten Tag …)</option><option value="male">Herr</option><option value="female">Frau</option><option value="other">Divers oder unbestimmt (Guten Tag …)</option></select>'
+                    . '<label for="n-geburtsdatum">Geburtsdatum</label><input id="n-geburtsdatum" name="geburtsdatum" maxlength="20" placeholder="TT.MM.JJJJ">'
+                    . '<label for="n-telefon">Telefon</label><input id="n-telefon" name="telefon" maxlength="40" inputmode="tel">'
+                    . '<label for="n-email">E-Mail</label><input id="n-email" name="email" type="email" maxlength="254">'
+                    . '<label for="n-adresse">Anschrift</label><input id="n-adresse" name="adresse" maxlength="200">'
+                    . '<label class="check" id="n-kontakt-box" hidden><input type="checkbox" name="kontakt_uebernehmen" value="1"> Geänderte Telefonnummer und E-Mail nach der Unterschrift in T2med übernehmen (Knopf in der Vorgangsliste)</label>'
+                    . '</div></details>'
                     . '<label for="n-leistung">Leistung oder Thema</label><input id="n-leistung" name="leistung" maxlength="120" placeholder="z. B. Ultraschall der Schilddrüse">'
                     . '<label for="n-betrag">Betrag in Euro</label><input id="n-betrag" name="betrag" inputmode="decimal" maxlength="12" placeholder="z. B. 45,00">'
                     . '<label class="check"><input type="checkbox" name="druck_vorher" value="1"> Dokument vor der Unterschrift für den Patienten drucken</label>'
@@ -220,9 +240,8 @@ final class Ansicht {
 
     private static function vorlagen(string $csrfFeld, array $vorlagen, ?array $bearbeite): string {
         $h = 'sg_h';
-        $platz = implode(' ', array_map(fn($k) => '<code>{{' . $h($k) . '}}</code>', array_keys(Seite::PLATZHALTER)));
         $o = '<details class="fold" id="vorlagen"' . ($bearbeite ? ' open' : '') . '><summary><h2>Vorlagen und Vertragstexte</h2></summary><div class="us-body">'
-            . '<p class="muted">Platzhalter im Text: ' . $platz . '. Sie werden beim Anlegen des Vorgangs eingesetzt; der Text bleibt danach unverändert. '
+            . '<p class="muted">Platzhalter wie {{patient}} lassen sich unter dem Textfeld per Klick an der Cursorstelle einfügen. Sie werden beim Anlegen des Vorgangs eingesetzt; der Text bleibt danach unverändert. '
             . 'Die mitgelieferten Mustertexte sind nur Beispiele und müssen für Ihre Praxis geprüft werden.</p>';
         foreach ($vorlagen as $v) {
             $offen = $bearbeite && (int)$bearbeite['id'] === (int)$v['id'];
@@ -234,6 +253,13 @@ final class Ansicht {
         return $o . '</div></details>';
     }
 
+    /** Knöpfe, die einen Platzhalter an der Cursorstelle des Textfelds einfügen (app.js, data-platzhalter). */
+    private static function platzhalterKnoepfe(string $ziel): string {
+        $h = 'sg_h'; $o = '';
+        foreach (Seite::PLATZHALTER as $k => $beschreibung) $o .= '<button type="button" class="small" data-platzhalter="{{' . $h($k) . '}}" data-ziel="' . $h($ziel) . '" title="' . $h($beschreibung) . '">' . $h($k) . '</button>';
+        return $o;
+    }
+
     private static function vorlagenForm(string $csrfFeld, array $v): string {
         $h = 'sg_h';
         $id = (int)$v['id'];
@@ -243,6 +269,7 @@ final class Ansicht {
             . '<label for="v' . $id . '-art">Art</label><select id="v' . $id . '-art" name="art">' . $art . '</select>'
             . '<label for="v' . $id . '-titel">Titel</label><input id="v' . $id . '-titel" name="titel" maxlength="80" required value="' . $h((string)$v['titel']) . '">'
             . '<label for="v' . $id . '-text">Text</label><textarea id="v' . $id . '-text" name="text" rows="12" maxlength="' . Seite::MAX_TEXT . '" required>' . $h((string)$v['text']) . '</textarea>'
+            . '<div class="us-platz" role="group" aria-label="Platzhalter einfügen"><span class="muted">Platzhalter einfügen:</span>' . self::platzhalterKnoepfe('v' . $id . '-text') . '</div>'
             . '<label class="check"><input type="checkbox" name="aktiv" value="1"' . ((int)$v['aktiv'] ? ' checked' : '') . '> Aktiv (in „Neuer Vorgang“ wählbar)</label>'
             . '<div class="aktionen"><button class="primary" type="submit">Speichern</button></div></form>';
         if ($id > 0) $o .= '<form method="post" class="inline us-loeschen">' . $csrfFeld . '<input type="hidden" name="aktion" value="vorlage-loeschen"><input type="hidden" name="id" value="' . $id . '"><button class="danger small" type="submit" data-bestaetigen="Vorlage endgültig löschen? Bestehende Vorgänge behalten ihren Text.">Vorlage löschen</button></form>';

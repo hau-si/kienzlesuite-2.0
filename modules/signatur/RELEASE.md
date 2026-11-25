@@ -1,5 +1,21 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.22
+
+- **Vorgewählter Patient oben:** Beim Start aus T2med (und bei der Übergabe aus der Kasse) erscheint oben ein Kasten mit Name und Geburtsdatum des Patienten. Das Patientenfeld in „Neuer Vorgang“ ist dann ausgeblendet; „Anderen Patienten wählen“ im Kasten setzt alles zurück. Nicht auf dem Server geprüft.
+
+## 0.1.0-beta.21
+
+- **Name und Anrede als Platzhalter:** `{{vorname}}`, `{{nachname}}`, `{{anrede}}` (Herr oder Frau) und `{{briefanrede}}` („Sehr geehrter Herr Mustermann“, „Sehr geehrte Frau Musterfrau“, bei divers, unbestimmt oder unbekannt „Guten Tag Vorname Nachname“). Vor- und Nachname sowie das Geschlecht kommen aus T2med und lassen sich in „Neuer Vorgang“ ändern. Einen Titel (Dr., Prof.) kennt die T2med-Schnittstelle nicht.
+- **Telefon und E-Mail in T2med übernehmen:** Bei einem Start aus T2med gibt es in „Neuer Vorgang“ das Häkchen „… nach der Unterschrift in T2med übernehmen“. Sind Telefon oder E-Mail geändert, steht der Vorgang mit „Für T2med vorgemerkt“ in der Liste; nach der Unterschrift schreibt der Knopf „Kontaktdaten in T2med übernehmen“ nur diese Angaben (Patient frisch lesen, nur Telefon und E-Mail ersetzen, mit Versionsprüfung zurückschreiben). Es wird nie automatisch geschrieben und nichts gelöscht. Das Zugriffstoken liegt dafür verschlüsselt höchstens 4 Stunden auf dem Server. Bei der Übergabe aus der Kasse gibt es das noch nicht (kommt mit der Rückgabe an die Kasse). Nicht auf dem Server und nicht gegen echtes T2med geprüft: bitte zuerst mit einem Testpatienten.
+- **Keine blauen Punkte mehr** im Menü: Auch „Pad-Software hochladen“ ist nur noch ein Hinweis.
+
+## 0.1.0-beta.20
+
+- **Platzhalter für Telefon, E-Mail, Geburtsdatum und Anschrift:** `{{telefon}}`, `{{email}}`, `{{geburtsdatum}}`, `{{adresse}}` stehen in Vorlagen zur Verfügung. Die Daten kommen aus T2med (Start aus T2med und Übergabe aus der Kasse) und lassen sich in „Neuer Vorgang“ unter „Weitere Patientendaten“ noch ändern.
+- **Platzhalter per Klick einfügen:** Unter dem Textfeld jeder Vorlage stehen Knöpfe für alle Platzhalter; ein Klick fügt den Platzhalter an der Cursorstelle ein.
+- **Übergabe aus der Kasse** öffnet „Neuer Vorgang“ mit Patient, Kontaktdaten und Leistungsliste; Dokument (und Pad) wählt man dort selbst. Nicht auf dem Server geprüft.
+
 ## 0.1.0-beta.18
 
 - **Leistungsliste aus der Kasse:** „Neuer Vorgang“ nimmt eine Liste von Leistungen samt Patient entgegen (Übergabe über die Adresse, `#uebergabe=…`). Summe und Leistungen kommen aus der Liste ins Dokument, neuer Platzhalter `{{leistungen}}` (ohne Liste die eingegebene Leistung). Der Vorgang merkt sich Herkunft („kasse“), Verweis auf den Kassenvorgang und die Liste (Schema 4). Das Muster „IGeL-Vertrag“ nutzt `{{leistungen}}`; bereits gespeicherte Vorlagen bleiben unverändert und können den Platzhalter selbst einbauen. PDF, Rückgabe an die Kasse und Speichern in T2med folgen. Nicht auf der VM geprüft.

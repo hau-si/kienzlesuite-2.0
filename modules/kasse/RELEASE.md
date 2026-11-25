@@ -1,5 +1,13 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.43
+
+- „Zur Unterschrift“ übergibt auch Vor- und Nachname und das Geschlecht des Patienten (für `{{anrede}}` und `{{briefanrede}}` in Signatur). Nicht auf dem Server geprüft.
+
+## 2.3.4-beta.42
+
+- **„Zur Unterschrift“ übergibt auch Telefon, E-Mail, Geburtsdatum und Anschrift des Patienten** (frisch aus T2med) an Signatur, für die Platzhalter in den Dokumenten. Ist T2med nicht erreichbar, öffnet Signatur trotzdem, die Felder bleiben leer. Nicht auf dem Server geprüft.
+
 ## 2.3.4-beta.41
 
 - **Knopf „Zur Unterschrift (Signatur)“ vor dem Kassieren:** Ist das Modul Signatur installiert und für den Benutzer sichtbar, übergibt der Knopf Patient und die gewählten Positionen (mit GOÄ-Ziffer und Preis, einschließlich „Sonstiger Betrag“) an Signatur, in einem neuen Tab. Dort Dokument wählen und den Vorgang anlegen, danach hier wie gewohnt kassieren. Nicht auf der VM geprüft.

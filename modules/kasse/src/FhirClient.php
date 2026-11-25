@@ -51,6 +51,10 @@ final class FhirClient {
             is_array($contact) && ($contact['system'] ?? '') === 'email' && ($contact['use'] ?? '') !== 'old' &&
             is_string($contact['value'] ?? null) && strlen($contact['value']) <= 254 && filter_var($contact['value'], FILTER_VALIDATE_EMAIL));
         usort($emails, static fn($a, $b) => ($a['rank'] ?? PHP_INT_MAX) <=> ($b['rank'] ?? PHP_INT_MAX));
+        $phones = array_filter(is_array($p['telecom'] ?? null) ? $p['telecom'] : [], static fn($contact) =>
+            is_array($contact) && in_array($contact['system'] ?? '', ['phone', 'sms'], true) && ($contact['use'] ?? '') !== 'old' &&
+            is_string($contact['value'] ?? null) && preg_match('/^[0-9 +()\/.-]{3,40}$/D', trim($contact['value'])));
+        usort($phones, static fn($a, $b) => ($a['rank'] ?? PHP_INT_MAX) <=> ($b['rank'] ?? PHP_INT_MAX));
         $address = [];
         foreach (is_array($p['address'] ?? null) ? $p['address'] : [] as $a) {
             if (!is_array($a) || ($a['use'] ?? '') === 'old') continue;
@@ -61,7 +65,7 @@ final class FhirClient {
             $address = array_values(array_filter(array_map(static fn($line) => mb_substr(preg_replace('/[\x00-\x1f\x7f]/u', ' ', $line), 0, 200), array_slice($lines, 0, 5))));
             if ($address) break;
         }
-        return ['id' => (string)$p['id'], 'name' => $label ?: 'Patient ' . $p['id'], 'birthdate' => $p['birthDate'] ?? '', 'email' => $emails[0]['value'] ?? '', 'address' => $address];
+        return ['id' => (string)$p['id'], 'name' => $label ?: 'Patient ' . $p['id'], 'birthdate' => $p['birthDate'] ?? '', 'email' => $emails[0]['value'] ?? '', 'given' => mb_substr(trim(implode(' ', array_filter((array)($name['given'] ?? []), 'is_string'))), 0, 80), 'family' => mb_substr(is_string($name['family'] ?? null) ? trim($name['family']) : '', 0, 80), 'gender' => in_array($p['gender'] ?? '', ['male', 'female', 'other', 'unknown'], true) ? $p['gender'] : 'unknown', 'phone' => isset($phones[0]) ? trim($phones[0]['value']) : '', 'address' => $address];
     }
     public function resource(array $visit, array $payment): array {
         $zone = new \DateTimeZone($this->config->get('app', 'timezone'));

@@ -889,6 +889,17 @@ final class App {
             default => 'Druckübergabe nicht bestätigt. Drucker und Warteschlange prüfen, bevor erneut gedruckt wird.',
         }];
     }
+    /** Kontaktdaten des Patienten (Telefon, E-Mail, Anschrift) für die Übergabe an Signatur, frisch aus T2med; ohne T2med leer. */
+    public function patientKontakt(array $visit): array {
+        $leer = ['vorname' => '', 'nachname' => '', 'geschlecht' => 'unknown', 'telefon' => '', 'email' => '', 'adresse' => '', 'geburtsdatum' => (string)$visit['patient_birthdate'], 'hinweis' => ''];
+        if ($visit['oauth_cipher'] === '') return $leer;
+        try {
+            $patient = $this->fhir->patient($visit['context_id'], $this->decrypt($visit['oauth_cipher']));
+            if ($patient['id'] !== $visit['patient_id']) return ['hinweis' => 'Die Kontaktdaten konnten nicht eindeutig dem Patienten zugeordnet werden.'] + $leer;
+            return ['vorname' => (string)($patient['given'] ?? ''), 'nachname' => (string)($patient['family'] ?? ''), 'geschlecht' => (string)($patient['gender'] ?? 'unknown'), 'telefon' => (string)($patient['phone'] ?? ''), 'email' => (string)($patient['email'] ?? ''), 'adresse' => implode(', ', array_map('strval', $patient['address'] ?? [])),
+                'geburtsdatum' => (string)($patient['birthdate'] ?? $visit['patient_birthdate']), 'hinweis' => ''];
+        } catch (Problem) { return ['hinweis' => 'Telefon und E-Mail konnten nicht aus T2med geladen werden.'] + $leer; }
+    }
     public function receiptRecipient(array $visit, string $id): array {
         $payment = $this->payment($visit, $id);
         if ($payment['payment_status'] !== 'successful') throw new Problem('E-Mail-Adresse erst nach erfolgreicher Zahlung verfügbar.', 409);

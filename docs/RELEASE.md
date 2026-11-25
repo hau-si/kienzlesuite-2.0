@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.67
+
+- **Starter unter Windows ohne schwarzes Fenster:** Das Starterprogramm wird für Windows ohne Konsole gebaut (`-H=windowsgui`), beim Aufruf aus T2med öffnet sich nur noch der Browser. Fehler stehen weiter in `starter.log` neben dem Programm. Das Paket auf den Arbeitsplätzen einmal neu ausführen (aktualisiert nur das Programm). Nicht unter Windows geprüft.
+
 ## 0.21.4-beta.66
 
 - **Paket-Download „Serverzertifikat der Suite nicht lesbar“ behoben:** Die PHP-Einstellung `open_basedir` erlaubte nur `ca.crt`, nicht `server.crt`; der Starter braucht das Serverzertifikat für Fingerabdruck und Paket. Jetzt ist `server.crt` lesend freigegeben (`installer/vorlagen/php-fpm-core.conf`). **Nach dem Update einmal `sudo bash installer/install.sh`**, das schreibt die PHP-Einstellung neu. Nicht auf dem Server geprüft.
