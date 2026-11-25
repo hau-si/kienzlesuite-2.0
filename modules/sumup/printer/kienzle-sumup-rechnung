@@ -25,8 +25,9 @@ try {
     if (!str_starts_with($data, '%PDF-')) throw new Problem('Unbekanntes Druckformat. Bitte die Rechnung als PDF drucken.');
     $app = ks_app();
     if (!$app->config->get('invoice_inbox', 'enabled', false)) throw new Problem('Rechnungseingang ist in der Kasse ausgeschaltet (Einstellungen → T2med-Rechnungen übernehmen).');
-    $app->inboxReceive($data);
-    fwrite(STDERR, 'INFO: Rechnung übernommen.' . "\n");
+    $result = $app->inboxReceive($data);
+    // Meldung ohne Patientendaten; schlägt nur die Ablage im Netzwerkordner fehl, steht das im Protokoll des Druckers.
+    fwrite(STDERR, (($result['export'] ?? 'done') === 'failed' ? 'WARNUNG: Rechnung übernommen, aber die PDF wurde NICHT im Netzwerkordner abgelegt (Kasse → Einstellungen → Ablage prüfen; die Zahlung holt es nach).' : 'INFO: Rechnung übernommen.') . "\n");
     $rc = 0;
 } catch (Problem $e) {
     // Problem-Texte sind feste Programmtexte ohne Patientendaten; abgelehnte Drucke stehen im Rechnungseingang.

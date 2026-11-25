@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.37
+
+- **Ablage der T2med-Rechnung beim Drucken auf „vKasse“:** Bei „jede gedruckte“ blieb die Ablage im Netzwerkordner leer, obwohl die Rechnung ankam. Ursache war der Drucker selbst (Basis beta.60). Zusätzlich: Schlägt die Ablage beim Drucken fehl, steht im Protokoll des Druckers jetzt eine Warnung statt „übernommen“, und **das Bezahlen der Rechnung holt die Ablage nach**. Bereits Abgelegtes wird nie doppelt abgelegt. Mit Prüfablage getestet, nicht auf der VM.
+
 ## 2.3.4-beta.36
 
 - **Drucker „vBriefversand“ einklappbar:** Die Karte hing bisher unter jedem Reiter der Einstellungen (z. B. unten bei „Leistungen“). Sie steht jetzt unter Einrichtung → „Praxis & Rechnungen“ nach Letterxpress, als Ausklappzeile mit Schild: **erledigt** (zugeklappt), sobald der Drucker in der Suite bereit ist, sonst **fehlt** (aufgeklappt). Ob der Drucker am Windows-PC eingerichtet ist, kann der Server nicht erkennen. Der Punkt im Einrichtungs-Überblick führt direkt dorthin. Im Browser (Vorschau mit erfundenen Daten) geprüft, nicht auf der VM.

@@ -568,6 +568,7 @@ final class App {
         });
         if ($keep !== null && $this->export->enabled() && $this->export->when() === 'received') {
             $status = $this->exportRow($result['id']);
+            $result['export'] = $status['status'];
             $result['message'] .= $status['status'] === 'done' ? ' PDF im Netzwerkordner abgelegt.' : ' PDF NICHT im Netzwerkordner abgelegt: ' . $status['error'];
         }
         if (!$viaLetter) unset($result['id']);
@@ -645,8 +646,8 @@ final class App {
     private function exportPayment(array $payment, bool $manual = false): bool {
         if (!$this->export->enabled() || $payment['payment_status'] !== 'successful') return false;
         if (!empty($payment['inbox_id'])) {
-            // Im Modus received wird beim Eingang abgelegt; danach nur noch auf ausdrücklichen Wunsch wiederholen.
-            if ($this->export->when() !== 'paid' && !$manual) return false;
+            // Im Modus received wird beim Eingang abgelegt. Hat das nicht geklappt (NAS nicht erreichbar, Auftrag nicht abgegeben),
+            // holt die Zahlung es nach; bereits Abgelegtes legt exportRow nie ein zweites Mal ab.
             $this->exportRow($payment['inbox_id']); return true;
         }
         if (empty($payment['invoice_json']) || !$this->export->appInvoices()) return false;

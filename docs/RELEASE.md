@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.60
+
+- **Virtuelle Drucker dürfen Aufträge an die Ablage abgeben:** Die Einheit eines Druckers (z. B. „vKasse“) lief mit `ProtectSystem=strict` und durfte nur in den Datenordner des Moduls schreiben. Der Auftragsordner der Ablage (`/var/spool/kienzle/ablage/<modul>`) war schreibgeschützt. Die Rechnung kam an, die PDF wurde aber nie zum Netzwerkspeicher übergeben. Jetzt steht der Ordner in `ReadWritePaths` (mit `-`, falls er fehlt). Die Drucker-Einheit wird beim nächsten Abgleich (Verwaltung → Drucker oder automatisch) neu geschrieben und der Drucker neu gestartet. Nicht auf der VM geprüft.
+
 ## 0.21.4-beta.59
 
 - **Klicksperre bei Update-Abfragen:** „Jetzt nach Updates suchen“ (Basis und Module) geht höchstens alle 30 Sekunden. Davor erscheint „Bitte kurz warten …“ mit der Restzeit. Grund: GitHub erlaubt ohne Anmeldung nur 60 Abfragen pro Stunde und IP-Adresse (Fehler „HTTP 403 rate limit exceeded“). Nicht auf der VM geprüft.
