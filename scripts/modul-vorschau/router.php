@@ -10,7 +10,7 @@ if (str_starts_with($path, '/assets/')) {
 }
 if (!preg_match('#^/(terminzettel|signatur)(/|$)#', $path, $m)) { http_response_code(404); echo 'nur /terminzettel und /signatur'; return true; }
 $modul = $m[1];
-$menu = rawurlencode(json_encode(['apps' => ['/kasse/' => 'Kasse', '/terminzettel/' => 'Terminzettel', '/signatur/' => 'Signatur'], 'ids' => ['/kasse/' => 'sumup', '/terminzettel/' => 'terminzettel', '/signatur/' => 'signatur'], 'admin' => true, 'login' => 'anna']));
+$menu = rawurlencode(json_encode(['apps' => ['/kasse/' => 'Kasse', '/terminzettel/' => 'Terminzettel', '/signatur/' => 'Signatur'], 'ids' => ['/kasse/' => 'kasse', '/terminzettel/' => 'terminzettel', '/signatur/' => 'signatur'], 'admin' => true, 'login' => 'anna']));
 $_SERVER += ['KIENZLE_BENUTZER' => 'anna', 'KIENZLE_NAME' => 'Anna Beispiel', 'KIENZLE_ROLLE' => 'admin', 'KIENZLE_RECHTE' => '', 'KIENZLE_CSRF' => 'x', 'KIENZLE_PFAD' => '/' . $modul,
     'KIENZLE_MENUE' => $menu, 'KIENZLE_PRAXIS' => rawurlencode(json_encode(['name' => 'Praxis Dr. Beispiel', 'street' => 'Musterweg 1', 'city' => '12345 Musterstadt']))];
 putenv('KIENZLE_DATEN=' . $daten . '/' . $modul);

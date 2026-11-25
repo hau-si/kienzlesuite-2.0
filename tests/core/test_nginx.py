@@ -23,7 +23,7 @@ def registry():
     reg = manifest.check_list([ROOT / 'modules' / 'beispiel'])
     php = copy.deepcopy(reg['modules'][0])
     php['module']['id'] = 'kasse'
-    php['web'] = {'path': '/kasse', 'upstream': 'unix:/run/kienzle/kasse/web.sock', 'protocol': 'fastcgi', 'entry': 'public/index.php', 'starter': True}
+    php['web'] = {'path': '/kasse', 'upstream': 'unix:/run/kienzle/kasse/web.sock', 'protocol': 'fastcgi', 'entry': 'public/index.php'}
     reg['modules'].append(php)
     return reg
 
@@ -72,18 +72,8 @@ class Vorlage(unittest.TestCase):
         self.assertIn('fastcgi_param SCRIPT_FILENAME /opt/kienzle/kasse/current/public/index.php;', b)
         self.assertNotIn('HTTP_X_KIENZLE', self.conf)
 
-    def test_starter_ohne_anmeldung_nur_api_php(self):
-        b = block(self.conf, 'location = /api.php {')
-        self.assertNotIn('auth_request', b)
-        self.assertIn('limit_except POST { deny all; }', b)
-        self.assertIn('fastcgi_param KIENZLE_OEFFENTLICH starter;', b)
-        self.assertIn('fastcgi_param SCRIPT_FILENAME /opt/kienzle/kasse/current/public/index.php;', b)
-        self.assertNotIn('KIENZLE_BENUTZER', b)
-        self.assertEqual(self.conf.count('location = /api.php'), 1)
-        reg = registry()
-        reg['modules'][0]['web']['starter'] = True                   # HTTP-Modul: kein Starter
-        with self.assertRaises(nginx.Fehler):
-            nginx.render(HOSTS, reg)
+    def test_kein_alter_starter_zugang(self):
+        self.assertNotIn('location = /api.php', self.conf)
 
     def test_startkontexte_pruefung_durch_die_basis(self):
         reg = registry()
@@ -154,7 +144,7 @@ class Befehl(unittest.TestCase):
             r = self.run_cli(tmp, 'schreiben', str(ROOT / 'modules'))
             self.assertEqual(r.returncode, 0, r.stderr)
             reg = json.loads((Path(tmp) / 'modules.json').read_text())
-            self.assertEqual([m['module']['id'] for m in reg['modules']], ['beispiel', 'signatur', 'sumup', 'terminzettel'])
+            self.assertEqual([m['module']['id'] for m in reg['modules']], ['beispiel', 'kasse', 'signatur', 'terminzettel'])
             self.assertIn('/_auth/beispiel', (Path(tmp) / 'kienzle.conf').read_text())
             self.assertEqual(oct((Path(tmp) / 'modules.json').stat().st_mode & 0o777), '0o640')
 
@@ -163,8 +153,8 @@ class Befehl(unittest.TestCase):
         import shutil
         with tempfile.TemporaryDirectory() as tmp:
             opt = Path(tmp) / 'opt'
-            shutil.copytree(ROOT / 'modules' / 'sumup', opt / 'sumup' / 'releases' / '2.0.0' / 'sumup')
-            os.symlink('releases/2.0.0/sumup', opt / 'sumup' / 'current')
+            shutil.copytree(ROOT / 'modules' / 'kasse', opt / 'kasse' / 'releases' / '2.0.0' / 'kasse')
+            os.symlink('releases/2.0.0/kasse', opt / 'kasse' / 'current')
             (opt / 'core' / 'current').mkdir(parents=True)
             (opt / 'leer').mkdir()
             os.environ['KIENZLE_MODULE_PROGRAMME'] = str(opt)
@@ -174,9 +164,9 @@ class Befehl(unittest.TestCase):
                 del os.environ['KIENZLE_MODULE_PROGRAMME']
             self.assertEqual(r.returncode, 0, r.stderr)
             reg = json.loads((Path(tmp) / 'modules.json').read_text())
-            self.assertEqual([m['module']['id'] for m in reg['modules']], ['sumup'])
+            self.assertEqual([m['module']['id'] for m in reg['modules']], ['kasse'])
             conf = (Path(tmp) / 'kienzle.conf').read_text()
-            self.assertIn('location = /api.php {', conf)
+            self.assertNotIn('location = /api.php', conf)
             self.assertIn('location ^~ /kasse/ {', conf)
 
     def test_abgelehnte_konfiguration_bleibt_alt(self):

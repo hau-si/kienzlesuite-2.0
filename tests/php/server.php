@@ -44,7 +44,7 @@ function test_server(): void {
     $starter = $env->modules->starterPath();
     check(($starter !== '') === str_contains($h->body, 'id="starter"') && ($starter === '' || str_contains($h->body, 'href="/verwaltung/arbeitsplaetze"')), 'Hilfe Arbeitsplätze: Starter-Hinweis');
     $json = json_decode((string)shell_exec(escapeshellarg(dirname(__DIR__, 2) . '/core/bin/kienzle-modul-pruefen') . ' --alle --json ' . escapeshellarg(dirname(__DIR__, 2) . '/modules')), true);
-    $kasse = array_values(array_filter($json['modules'], fn($x) => $x['module']['id'] === 'sumup'))[0];
+    $kasse = array_values(array_filter($json['modules'], fn($x) => $x['module']['id'] === 'kasse'))[0];
     $env->modules = \Kienzle\Core\Modules::fromArray([$kasse]);
     $mitKasse = (new Browser($env))->get('/hilfe/arbeitsplatz')->body;
     check(str_contains($mitKasse, 'id="starter"') && str_contains($mitKasse, 'href="/verwaltung/arbeitsplaetze"'), 'Hilfe Arbeitsplätze: Starter der Kasse fehlt');

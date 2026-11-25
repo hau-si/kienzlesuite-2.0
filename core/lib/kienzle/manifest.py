@@ -56,9 +56,9 @@ LIMITS = {'starters': 5, 'packages': 50, 'services': 20, 'firewall': 20, 'rights
           'connections': len(CONNECTIONS)}
 
 SCHEMA_SECTIONS = {
-    'module': {'id', 'name', 'version', 'core_api', 'description'},
+    'module': {'id', 'name', 'version', 'core_api', 'description', 'replaces'},
     'system': {'packages', 'services', 'user', 'data'},
-    'web': {'path', 'upstream', 'protocol', 'entry', 'starter', 'einstellungen', 'uploads'},
+    'web': {'path', 'upstream', 'protocol', 'entry', 'einstellungen', 'uploads'},
     'firewall': {'name', 'port', 'proto', 'scope'},
     'rights': {'id', 'label'},
     'backup': {'paths', 'snapshot', 'settings'},
@@ -217,6 +217,12 @@ class _Checker:
                                           f'(unterstützt: {", ".join(sorted(supported_api()))}).')
         out['core_api'] = api
         out['description'] = self.text(t, 'description', 'module', required=False, limit=300)
+        # Früherer Name dieses Moduls: Bei der Installation werden Daten und Rechte des alten Moduls übernommen und das alte Modul entfernt.
+        old = self.pattern(t, 'replaces', 'module', ID, 'sumup', required=False) if 'replaces' in t else None
+        if old is not None and old == out.get('id'):
+            self.error('module.replaces', 'darf nicht die eigene ID sein.')
+            old = None
+        out['replaces'] = old
         return out
 
     def system(self, t: dict, mid: str | None) -> dict:
@@ -256,10 +262,6 @@ class _Checker:
                 entry = self.rel_path(t['entry'], 'web.entry')
         elif 'entry' in t:
             self.error('web.entry', 'nur mit protocol = "fastcgi".')
-        starter = t.get('starter', False)
-        if not isinstance(starter, bool):
-            self.error('web.starter', 'muss true oder false sein.')
-            starter = False
         uploads = t.get('uploads', False)
         if not isinstance(uploads, bool):
             self.error('web.uploads', 'muss true oder false sein.')
@@ -268,7 +270,7 @@ class _Checker:
         if settings is not None and (not isinstance(settings, str) or not re.fullmatch(r'/|/[A-Za-z0-9][A-Za-z0-9._-]{0,60}(/[A-Za-z0-9][A-Za-z0-9._-]{0,60}){0,3}', settings)):
             self.error('web.einstellungen', 'muss ein Pfad unter dem Webpfad sein, z. B. „/settings.php“.')
             settings = None
-        return {'path': path, 'upstream': upstream, 'protocol': protocol, 'entry': entry, 'starter': starter, 'einstellungen': settings, 'uploads': uploads}
+        return {'path': path, 'upstream': upstream, 'protocol': protocol, 'entry': entry, 'einstellungen': settings, 'uploads': uploads}
 
     def firewall(self, items: list) -> list:
         if len(items) > LIMITS['firewall']:
@@ -575,8 +577,6 @@ def check_list(folders: list) -> dict:
         claim(('id', mid), mid, 'doppelte Modul-ID')
         if m['web']:
             claim(('path', m['web']['path']), mid, f'Webpfad {m["web"]["path"]}')
-            if m['web']['starter']:
-                claim(('starter',), mid, 'Arbeitsplatz-Starter (/api.php)')
         for st in m.get('starters', []):
             claim(('schema', st['schema']), mid, f'Startschema {st["schema"]}')
         for p in m['printers']:

@@ -43,6 +43,7 @@ mit dem Archiv `modules/<id>/…` (`scripts/release-bauen <id>`). Das Programm l
 | `version` | ja | `X.Y.Z`, optional mit Vorabkennung: `2.1.0-beta.3` |
 | `core_api` | ja | Text, z. B. `"1"`; muss in `core/API` stehen |
 | `description` | nein | kurze Beschreibung (höchstens 300 Zeichen) |
+| `replaces` | nein | frühere ID des Moduls (z. B. `"sumup"` bei der Kasse). Bei der Installation übernimmt die Basis Datenordner, Ablage-Spool und Rechte des alten Moduls, startet das neue und entfernt danach das alte samt Dienst-Benutzer. Schlägt etwas fehl, läuft das alte Modul unverändert weiter |
 
 ### `[system]` – Pflicht
 
@@ -65,7 +66,6 @@ Ohne `[web]` erscheint das Modul nicht im Menü (z. B. ein reines Druckmodul).
 | `upstream` | ja | genau `unix:/run/kienzle/<id>/web.sock`. Der Ordner gehört `ks-<id>`, Gruppe `www-data`, Rechte 0750: nur das Modul und nginx kommen hinein, andere Module nicht |
 | `protocol` | nein | `"http"` (Vorgabe: das Modul spricht HTTP über den Socket) oder `"fastcgi"` (PHP über php-fpm) |
 | `entry` | bei `fastcgi` | Einstiegsdatei im Modulordner, z. B. `public/index.php`; alle Anfragen unter `path` gehen an sie |
-| `starter` | nein | `true`: das Modul bedient den Arbeitsplatz-Starter (`POST https://<server>/api.php` ohne Anmeldung, siehe `docs/MODUL-SCHNITTSTELLE.md`). Nur mit `fastcgi`, höchstens ein Modul. Vorgabe `false` |
 | `uploads` | nein | `true`: Formular-Uploads (`multipart/form-data`, `$_FILES`) sind erlaubt, bis 3 MB je Datei. Sonst ist `file_uploads` im Modul-Dienst aus. Nur mit `fastcgi`. Vorgabe `false` |
 
 ### `[[firewall]]` – optional, höchstens 20

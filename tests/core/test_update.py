@@ -153,7 +153,7 @@ class Release(Umgebung):
         self.assertEqual((self.t / 'aus' / 'core' / 'VERSION').read_text(), '0.4.0\n')
         self.assertEqual(oct((self.t / 'aus' / 'installer' / 'install.sh').stat().st_mode & 0o777), '0o755')
         with self.assertRaisesRegex(release.Fehler, 'gehört zu'):
-            release.parse_manifest(manifest, 'sumup')
+            release.parse_manifest(manifest, 'kasse')
         with self.assertRaises(release.Fehler):
             release.check_archive(archive + b'x', m)
         for change in ({'format': 'x'}, {'channel': 'nacht'}, {'version': '1.0'}, {'files': {}}, {'files': {'../x': {'sha256': '0' * 64, 'size': 1, 'mode': '0o644'}}},
@@ -282,7 +282,7 @@ class Updater(Umgebung):
         self.assert_unchanged('nicht neuer')
         self.request({'action': 'installieren', 'version': '0.9.0'})
         self.assert_unchanged('nicht verfügbar')
-        self.publish('0.4.0', part='sumup')
+        self.publish('0.4.0', part='kasse')
         self.request({'action': 'installieren', 'version': '0.4.0'})
         self.assert_unchanged('gehört zu')
 
@@ -446,7 +446,7 @@ class Skripte(unittest.TestCase):
             m = release.parse_manifest((Path(tmp) / n['manifest']).read_bytes(), 'core')
             self.assertIn('installer/install.sh', m['files'])
             self.assertIn('core/php/Web.php', m['files'])
-            self.assertIn('modules/sumup/module.toml', m['files'])                          # mitgelieferte Module
+            self.assertIn('modules/kasse/module.toml', m['files'])                          # mitgelieferte Module
             self.assertFalse([f for f in m['files'] if f.startswith('modules/beispiel/')])   # Beispielmodul nicht
             release.check_archive((Path(tmp) / n['archive']).read_bytes(), m)
             subprocess.run(['openssl', 'genpkey', '-algorithm', 'ed25519', '-out', f'{tmp}/k.pem'], check=True)
@@ -459,12 +459,12 @@ class Skripte(unittest.TestCase):
             again = subprocess.run([sys.executable, str(ROOT / 'scripts' / 'release-bauen'), 'core', '--ziel', f'{tmp}/2'], capture_output=True, text=True)
             self.assertEqual(again.returncode, 0)
             # Modul-Release: nur modules/<id>/, Version aus module.toml.
-            r = subprocess.run([sys.executable, str(ROOT / 'scripts' / 'release-bauen'), 'sumup', '--ziel', f'{tmp}/m'], capture_output=True, text=True)
+            r = subprocess.run([sys.executable, str(ROOT / 'scripts' / 'release-bauen'), 'kasse', '--ziel', f'{tmp}/m'], capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stderr)
-            mv = (ROOT / 'modules' / 'sumup' / 'VERSION').read_text().strip()
-            mm = release.parse_manifest((Path(tmp) / 'm' / release.names('sumup', mv)['manifest']).read_bytes(), 'sumup')
-            self.assertTrue(all(f.startswith('modules/sumup/') for f in mm['files']))
-            self.assertIn('modules/sumup/module.toml', mm['files'])
+            mv = (ROOT / 'modules' / 'kasse' / 'VERSION').read_text().strip()
+            mm = release.parse_manifest((Path(tmp) / 'm' / release.names('kasse', mv)['manifest']).read_bytes(), 'kasse')
+            self.assertTrue(all(f.startswith('modules/kasse/') for f in mm['files']))
+            self.assertIn('modules/kasse/module.toml', mm['files'])
             self.assertEqual(subprocess.run([sys.executable, str(ROOT / 'scripts' / 'release-bauen'), 'beispiel', '--ziel', f'{tmp}/b'], capture_output=True).returncode, 2)
             self.assertEqual((Path(tmp) / '2' / n['archive']).read_bytes(), (Path(tmp) / n['archive']).read_bytes(), 'Archiv nicht reproduzierbar')
 

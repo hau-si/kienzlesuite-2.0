@@ -166,7 +166,7 @@ final class Overview {
         if (array_filter($this->modules->all(), fn($m) => !empty($m['printers']))) {
             $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['drucker'], isset($manual['drucker']) ? 'done' : 'open', 'Auf jedem PC, von dem T2med druckt, die virtuellen Drucker (z. B. Terminzettel, vKasse) hinzufügen – Anleitung unter „Arbeitsplatz einrichten“', '/hilfe/arbeitsplatz#drucker', 'drucker');
         }
-        $starterId = array_key_first(array_filter($this->modules->all(), fn($m) => !empty($m['web']['starter'])));
+        $starterId = array_key_first(array_filter($this->modules->all(), fn($m) => !empty($m['starters'])));
         if ($starterId !== null) {
             $starterLink = '/verwaltung/arbeitsplaetze';
             $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['starter'], isset($manual['starter']) ? 'done' : 'open', 'Unter Verwaltung → Starter das Paket neu laden und auf jedem Arbeitsplatz ausführen', $starterLink, 'starter');

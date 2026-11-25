@@ -1,0 +1,111 @@
+# Kasse: Kartenzahlung am SumUp Solo aus T2med, T2med-Rechnungseingang, GOÄ-Leistungen, Barzahlung, Belege,
+# Rechnung per Post (Letterxpress), Ablage für die Steuerberatung. Auf Grundlage von kienzle-sumup (Branch
+# rechnungseingang, 1.4.1-rechnung.57) von Dr. Thomas Kienzle, für die Kienzle-Suite 2.0 umgebaut.
+
+[module]
+id = "kasse"
+replaces = "sumup"
+name = "Kasse"
+version = "2.3.4-beta.38"
+core_api = "1"
+description = "Kartenzahlung am SumUp Solo aus T2med, T2med-Rechnungseingang über den Drucker „vKasse“, GOÄ-Leistungen, Barzahlung, Belege per E-Mail, Druck und Post."
+
+[system]
+packages = ["php-fpm", "php-cli", "php-curl", "php-sqlite3", "php-mbstring", "php-gd", "librsvg2-bin", "qpdf", "fonts-dejavu-core", "poppler-utils", "tesseract-ocr", "tesseract-ocr-deu", "ghostscript", "cups-client"]
+user = "ks-kasse"
+data = "/var/lib/kienzle/kasse"
+
+[web]
+path = "/kasse"
+upstream = "unix:/run/kienzle/kasse/web.sock"
+protocol = "fastcgi"
+entry = "public/index.php"
+einstellungen = "/settings.php"
+
+# Startkontext für den zentralen Arbeitsplatz-Starter der Basis (Verwaltung → Starter): POST https://<server>/starter/kasse
+[[starters]]
+schema = "kienzle-kasse"
+label = "Kasse"
+
+[[rights]]
+id = "kassieren"
+label = "Kasse: Kartenzahlung und Barzahlung aus T2med"
+
+[[rights]]
+id = "paid"
+label = "Kasse: T2med-Rechnungen in den Vorgängen abhaken"
+
+[[rights]]
+id = "inbox"
+label = "Kasse: Rechnungseingang, Nachbearbeitung und Löschen von Rechnungen"
+
+[[rights]]
+id = "letter"
+label = "Kasse: Rechnungen per Post (Letterxpress) senden"
+
+[[rights]]
+id = "catalog"
+label = "Kasse: Leistungen und GOÄ-Positionen bearbeiten"
+
+[[rights]]
+id = "export"
+label = "Kasse: Excel-Export der Vorgänge"
+
+[[rights]]
+id = "storno"
+label = "Kasse: Rechnungen stornieren"
+
+[[rights]]
+id = "periods"
+label = "Kasse: Monats- und Jahresansicht der Vorgänge"
+
+[backup]
+paths = ["/var/lib/kienzle/kasse"]
+snapshot = "bin/backup-snapshot"
+settings = ["/var/lib/kienzle/kasse/grundwerte.json", "/var/lib/kienzle/kasse/sicherung"]
+
+[[printers]]
+name = "vKasse"
+label = "Nimmt Rechnungen aus T2med an und legt sie in der Kasse ab."
+command = "printer/kienzle-kasse-rechnung"
+formats = ["application/pdf", "application/postscript"]
+paper = "A4"
+share = ["ipp"]
+
+[[printers]]
+name = "vBriefversand"
+label = "Schickt Rechnungen aus T2med sofort per Post an Letterxpress."
+command = "printer/kienzle-letterxpress"
+formats = ["application/pdf", "application/postscript"]
+paper = "A4"
+share = ["ipp"]
+
+[[connections]]
+id = "t2med"
+purpose = "Patient lesen und Zahlung in die Akte schreiben (FHIR)"
+
+[[connections]]
+id = "mail"
+purpose = "Zahlungsbelege per E-Mail an Patienten senden"
+required = false
+
+[[connections]]
+id = "letterxpress"
+purpose = "Rechnungen per Post versenden"
+required = false
+
+[[connections]]
+id = "ablage"
+purpose = "Rechnungen als PDF für die Steuerberatung ablegen"
+required = false
+
+[setup]
+overview = "bin/setup-overview"
+
+[hooks]
+install = "bin/install"
+update = "bin/update"
+remove = "bin/remove"
+busy = "bin/busy"
+health = "bin/health"
+apparmor = ["gs", "qpdf"]

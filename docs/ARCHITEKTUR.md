@@ -34,7 +34,7 @@ Code dafür entsteht.
 kienzlesuite-2.0/
   core/                 Basis: Webinterface, Benutzer, Firewall, Updates, Backup, Netzwerkspeicher, Zertifikate
   modules/
-    sumup/              Kasse (Kartenzahlung, Rechnungseingang); ab Basis 0.16.0 mitgeliefert, Webpfad /kasse
+    kasse/              Kasse (Kartenzahlung, Rechnungseingang); ab Basis 0.16.0 mitgeliefert, Webpfad /kasse
     terminzettel/
     fax/
     telefon/
@@ -69,20 +69,20 @@ Jedes Modul bringt eine Datei mit, die die Basis liest. Beispiel:
 
 ```toml
 [module]
-id = "sumup"
+id = "kasse"
 name = "Kartenzahlung und Rechnungen"
 version = "2.0.0"
 core_api = "1"
 
 [system]
 packages = ["php-fpm", "php-sqlite3", "qpdf", "poppler-utils"]
-services = ["kienzle-sumup-worker.service"]
-user = "ks-sumup"                 # eigener Systembenutzer
-data = "/var/lib/kienzle/sumup"   # eigener Datenordner, 0700
+services = ["kienzle-kasse-worker.service"]
+user = "ks-kasse"                 # eigener Systembenutzer
+data = "/var/lib/kienzle/kasse"   # eigener Datenordner, 0700
 
 [web]
 path = "/kasse"
-upstream = "unix:/run/kienzle/sumup/web.sock"
+upstream = "unix:/run/kienzle/kasse/web.sock"
 protocol = "fastcgi"                # PHP-Modul über php-fpm
 entry = "public/index.php"
 
@@ -94,14 +94,14 @@ id = "paid"
 label = "Bezahlt-Liste abhaken"
 
 [backup]
-paths = ["/var/lib/kienzle/sumup"]
+paths = ["/var/lib/kienzle/kasse"]
 snapshot = "bin/backup-snapshot"  # erzeugt eine konsistente Kopie der Datenbank
 
 [[printers]]
 name = "vKasse"
 label = "T2med-Rechnung an SumUp-Terminal"
-ppd = "printer/sumup-rechnung.ppd"
-backend = "printer/kienzle-sumup-backend"
+ppd = "printer/kasse-rechnung.ppd"
+backend = "printer/kienzle-kasse-backend"
 share = ["samba", "ipp"]
 
 [[connections]]                   # zentrale Verbindung der Basis, die das Modul nutzt

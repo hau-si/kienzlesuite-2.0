@@ -95,7 +95,7 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 - Installation: [docs/INSTALLATION.md](docs/INSTALLATION.md)
 - Umsetzungsplan Schritt 1: [docs/PLAN.md](docs/PLAN.md)
 - Schnittstelle für Module: [docs/MODUL-SCHNITTSTELLE.md](docs/MODUL-SCHNITTSTELLE.md), Format [docs/MODULE-TOML.md](docs/MODULE-TOML.md)
-- Arbeitsregeln und Stand für Agenten (auch Claude Code): [AGENTS.md](AGENTS.md); Beispielrechnung aus T2med (erfunden): [modules/sumup/tests/fixtures](modules/sumup/tests/fixtures/README.md)
+- Arbeitsregeln und Stand für Agenten (auch Claude Code): [AGENTS.md](AGENTS.md); Beispielrechnung aus T2med (erfunden): [modules/kasse/tests/fixtures](modules/kasse/tests/fixtures/README.md)
 - Grundlage: [hau-si/kienzle-suite-beta](https://github.com/hau-si/kienzle-suite-beta), Fork von
   [thomaskien/t2med-sumup](https://github.com/thomaskien/t2med-sumup)
 

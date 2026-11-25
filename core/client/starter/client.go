@@ -19,8 +19,7 @@ import (
 	"time"
 )
 
-// Config entspricht client.json. Contexts ordnet jedem URL-Schema die Adresse des Moduls zu (Pfad auf dem Server);
-// fehlt es (alte Pakete der Kasse), gilt nur kienzle-sumup → /api.php.
+// Config entspricht client.json. Contexts ordnet jedem URL-Schema die Adresse des Moduls zu (Pfad auf dem Server).
 type Config struct {
 	ServerURL   string            `json:"server_url"`
 	LauncherKey string            `json:"launcher_key"`
@@ -46,7 +45,7 @@ func loadConfig(file string) (*Config, error) {
 		return nil, fmt.Errorf("client.json ungültig: %w", err)
 	}
 	if len(c.Contexts) == 0 {
-		c.Contexts = map[string]string{"kienzle-sumup": "/api.php"}
+		return nil, errors.New("client.json: keine Startkontexte (Paket neu laden)")
 	}
 	for s, p := range c.Contexts {
 		if !schemeRe.MatchString(s) || !pathRe.MatchString(p) || strings.Contains(p, "..") {
