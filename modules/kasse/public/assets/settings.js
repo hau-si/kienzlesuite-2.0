@@ -308,7 +308,7 @@ function t2medSetupHelp() {
   const li = el('li', 'Als Adresse eintragen (genau so, mit den Platzhaltern) und eine Bezeichnung vergeben, z. B. „Kartenzahlung“:'); li.append(el('br'), el('code', 'kienzle-kasse://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}', 'code-copy')); ol.append(li);
   ol.append(el('li', 'Auf Plus klicken, oben rechts mit dem Häkchen speichern und in der Liste davor auf „aktualisieren“ (Pfeile) klicken.'));
   ol.append(el('li', 'Dann „Funktionsleisten verwalten“: Konfiguration anlegen oder bearbeiten (Name, Benutzer, Benutzergruppe, Station), „Aktion hinzufügen“, die Aktion unter der vergebenen Bezeichnung suchen, Farbe und Kürzel oder Icon wählen und bestätigen.'));
-  ol.append(el('li', 'Der Starter-Aufruf funktioniert erst, wenn auf dem Arbeitsplatz das Starter-Paket installiert ist (Suite: Verwaltung → Starter).'));
+  ol.append(el('li', 'Der Starter-Aufruf funktioniert erst, wenn auf dem Arbeitsplatz das Starter-Paket installiert ist (Suite: Verwaltung → Arbeitsplätze).'));
   ol.append(el('li', 'Die FHIR-Adresse, die T2med beim Aufruf mitgibt, muss in der Suite unter Verwaltung → Verbindungen → T2med bei „Erlaubte fhirBasisUrl aus T2med“ stehen (die Adresse des FHIR-Servers gilt immer als erlaubt). Bei einer Fehlermeldung zeigt die Seite die tatsächlichen Werte.'));
   const guide = el('li'); guide.append('Mit Bildern: ', el('a', 'Anleitung „T2med einrichten“', null, {href: GUIDE_URL, target: '_blank', rel: 'noopener'})); ol.append(guide);
   d.append(ol); return d;
@@ -325,7 +325,7 @@ function renderChecklist(data) {
   const items = [
     ...web,
     {ort: 'pc', info: true, label: 'Zertifikat der Suite einrichten (einmal je PC, siehe Arbeitsplatz einrichten der Suite)', card: 's-clients', href: '/hilfe/arbeitsplatz', hrefLabel: 'Anleitung'},
-    {ort: 'pc', info: true, label: 'Starter auf den Kassen-PCs installieren (ein Paket für alle Module)', card: 's-clients', href: '/verwaltung/arbeitsplaetze', hrefLabel: 'Seite „Starter“ der Suite'},
+    {ort: 'pc', info: true, label: 'Starter auf den Kassen-PCs installieren (ein Paket für alle Module)', card: 's-clients', href: '/hilfe/arbeitsplatz#paket', hrefLabel: 'Seite „Arbeitsplätze“ der Suite'},
     ...pc,
     ...(invoiceQueue ? [{ort: 'pc', info: true, label: 'Drucker „vKasse“ am Arbeitsplatz installieren (Windows: IPP-Drucker hinzufügen, Papier A4)', card: 'invoice-printer-help', detail: (data.invoice_printer && data.invoice_printer.url) || ''}] : []),
     ...(letterQueue ? [{ort: 'pc', info: true, label: 'Drucker „vBriefversand“ am Arbeitsplatz installieren (für den Sammelversand per Post; wie „vKasse“, Papier A4)', card: 'letter-printer-help', detail: (data.letter_printer && data.letter_printer.url) || ''}] : []),

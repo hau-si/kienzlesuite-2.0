@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Zentraler Arbeitsplatz-Starter: Schlüssel, Prüfpfad für nginx, Seite „Starter“, Paket. Nur erfundene Testdaten.
+// Zentraler Arbeitsplatz-Starter: Schlüssel, Prüfpfad für nginx, Seite „Arbeitsplätze“, Paket. Nur erfundene Testdaten.
 require __DIR__ . '/lib.php';
 require __DIR__ . '/browser.php';
 
@@ -51,8 +51,9 @@ function test_pruefpfad(): void {
 function test_seite_und_paket(): void {
     [$env, $st] = st_env();
     [$b] = admin_browser($env); st_web($env, $st, $b);
-    $page = $b->get('/verwaltung/arbeitsplaetze');
-    check($page->status === 200 && str_contains($page->body, 'kienzle-kasse://?kontextId=') && str_contains($page->body, 'kienzle-igel://'), 'Startkontexte fehlen');
+    check($b->get('/verwaltung/arbeitsplaetze')->status === 303, 'alte Starter-Seite leitet zu den Arbeitsplätzen');
+    $page = $b->get('/hilfe/arbeitsplatz');
+    check($page->status === 200 && str_contains($page->body, 'id="paket"') && str_contains($page->body, 'kienzle-kasse://?kontextId=') && str_contains($page->body, 'kienzle-igel://'), 'Startkontexte fehlen');
     check(!str_contains($page->body, 'IGeL <b>') && str_contains($page->body, 'IGeL &lt;b&gt;'), 'nicht maskiert');
     check(str_contains($page->body, '/verwaltung/arbeitsplaetze/windows.zip'), 'Paket-Link fehlt');
     $zip = $b->get('/verwaltung/arbeitsplaetze/linux.zip');
@@ -60,10 +61,13 @@ function test_seite_und_paket(): void {
     check(str_contains($zip->body, 'install-linux.sh') && str_contains($zip->body, 'schemas.txt') && str_contains($zip->body, 'kienzle-igel') && str_contains($zip->body, '"/starter/kasse"'), 'Paketinhalt');
     check(str_contains($zip->body, $st->key()) && str_contains($zip->body, '"server_url": "https://kienzle.example.org"'), 'client.json');
     check($b->get('/verwaltung/arbeitsplaetze/amiga.zip')->status === 404, 'unbekanntes System');
+    $mitDrucker = $st->files('windows', ['kienzle-kasse' => '/starter/kasse'], 'https://kienzle.example.org', [['name' => 'vKasse', 'url' => 'http://kienzle.example.org:631/printers/vKasse', 'papier' => 'A4']]);
+    check(($mitDrucker['drucker.txt']['data'] ?? '') === "vKasse|http://kienzle.example.org:631/printers/vKasse|A4\n" && isset($mitDrucker['install-drucker.ps1']), 'Paket ohne Druckerliste');
+    check(!isset($st->files('windows', ['kienzle-kasse' => '/starter/kasse'], 'https://kienzle.example.org')['drucker.txt']), 'drucker.txt ohne Drucker');
     $alt = $st->key();
     $vorher = $st->key();
     check($b->post('/verwaltung/arbeitsplaetze', ['aktion' => 'erneuern'])->status >= 400 && $st->key() === $vorher, 'Erneuern ohne Bestätigung darf nichts ändern');
-    check($b->post('/verwaltung/arbeitsplaetze', ['aktion' => 'erneuern', 'bestaetigt' => '1'])->status === 200 && $st->key() !== $alt, 'Erneuern über die Seite');
+    check($b->post('/verwaltung/arbeitsplaetze', ['aktion' => 'erneuern', 'bestaetigt' => '1'])->status === 303 && $st->key() !== $alt, 'Erneuern über die Seite');
     check($b->post('/verwaltung/arbeitsplaetze', ['aktion' => 'boese'])->status === 400, 'unbekannte Aktion');
     $map = $env->modules->starterMap();
     check($map === ['kasse' => '/kasse'], 'starterMap');
@@ -73,8 +77,8 @@ function test_ohne_startkontexte(): void {
     $env = new Env();
     $st = new Starter($env->db, $env->secrets, $env->config, dirname(__DIR__, 2) . '/core');
     [$b] = admin_browser($env); st_web($env, $st, $b);
-    $page = $b->get('/verwaltung/arbeitsplaetze');
-    check($page->status === 200 && str_contains($page->body, 'Kein installiertes Modul'), 'leere Seite');
+    $page = $b->get('/hilfe/arbeitsplatz');
+    check($page->status === 200 && !str_contains($page->body, 'id="paket"'), 'Paketabschnitt ohne Startkontexte');
     problem(fn() => $st->files('linux', [], 'https://kienzle.example.org'), 404, 'Paket ohne Kontexte');
 }
 

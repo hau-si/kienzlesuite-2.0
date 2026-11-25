@@ -134,7 +134,7 @@ final class Web {
     public static string $caFile = '/etc/kienzle/ca/ca.crt';
 
     /** Anleitung für die Arbeitsplätze: Zertifizierungsstelle und Servername. Ohne Anmeldung erreichbar (vorher vertraut der Browser der Suite noch nicht). */
-    private function workstationHelp(): Response {
+    private function workstationHelp(?string $error = null, ?string $notice = null): Response {
         $pem = @file_get_contents(self::$caFile);
         $fp = '';
         if (is_string($pem) && preg_match('/-----BEGIN CERTIFICATE-----(.+?)-----END CERTIFICATE-----/s', $pem, $m)) {
@@ -186,12 +186,13 @@ final class Web {
             $body .= '<h2 id="drucker">' . $nr++ . '. Virtuelle Drucker einrichten</h2>'
                 . '<p>Nur für PCs, von denen aus T2med auf die virtuellen Drucker der Module druckt. Zuerst Schritt 1 und 2 erledigen: Die Drucker-Adresse enthält den Namen der Suite.</p>' . $drucker;
         }
-        // Ist die Kasse installiert, braucht jeder PC, an dem aus T2med kassiert wird, zusätzlich den Starter (zentrales Paket unter Verwaltung → Starter).
-        if (($starter = $this->modules->starterPath()) !== '') {
-            $body .= '<h2 id="starter">' . $nr . '. Starter für T2med installieren</h2>'
-                . '<p>Damit der Knopf in T2med die Kasse öffnet, braucht jeder Kassen-PC einmal den <strong>Starter</strong>. Das Paket (ein Starter für alle Module) lädt ein Admin unter Verwaltung → Starter und führt es auf dem PC einmal aus.</p>'
-                . '<p class="row-buttons"><a class="button" href="/verwaltung/arbeitsplaetze">Zur Seite „Starter“</a></p>'
-                . '<p class="muted">Zuerst Schritt 1 und 2 erledigen: Der Starter prüft das Zertifikat der Suite und braucht ihren Namen.</p>';
+        // Starter, Pakete und Schlüssel: gehören zu den Arbeitsplätzen (Admins sehen die Pakete direkt hier).
+        if ($this->modules->starterPath() !== '' || $this->modules->starters()) {
+            $body .= '<h2 id="paket">' . $nr . '. Paket für einen Arbeitsplatz (Starter, Zertifikat, Drucker)</h2>';
+            $admin = ($this->session['stage'] ?? '') === 'full' && (int)($this->session['user_admin'] ?? 0) === 1 && $this->starter !== null;
+            $body .= $admin ? $this->starterAbschnitt($error, $notice)
+                : '<p>Ein Paket pro PC richtet Starter (für T2med), Zertifikat und die virtuellen Drucker auf einmal ein. Es enthält den Starter-Schlüssel der Praxis und ist deshalb nur für angemeldete Admins abrufbar: '
+                . '<a href="/anmelden?weiter=/hilfe/arbeitsplatz">Als Admin anmelden</a>.</p>';
         }
         return Response::html(V::page('Arbeitsplätze einrichten', $body, $this->nav(), $this->config->practice, 'Einrichten'));
     }
@@ -1148,7 +1149,7 @@ final class Web {
         if ($r->path === '/verwaltung/praxis') return $get ? $this->practicePage() : $this->practiceSave($r, $admin);
         if ($r->path === '/verwaltung/server') return $get ? $this->serverPage() : $this->serverSave($r, $admin);
         if ($r->path === '/verwaltung/sso') return $get ? $this->ssoPage() : $this->ssoAction($r, $admin);
-        if ($r->path === '/verwaltung/arbeitsplaetze') return $get ? $this->starterPage() : $this->starterAction($r, $admin);
+        if ($r->path === '/verwaltung/arbeitsplaetze') return $get ? Response::redirect('/hilfe/arbeitsplatz#paket') : $this->starterAction($r, $admin);
         if ($get && preg_match('#^/verwaltung/arbeitsplaetze/(windows|macos|linux)\.zip$#D', $r->path, $m)) return $this->starterPaket($m[1], $admin);
         if ($r->path === '/verwaltung/drucker') return $get ? $this->printersPage() : $this->printersAction($r, $admin);
         if ($r->path === '/verwaltung/einrichtung') return $get ? $this->overviewPage() : $this->overviewAction($r, $admin);
@@ -2085,30 +2086,47 @@ final class Web {
         return $out;
     }
 
-    private function starterPage(?string $error = null, ?string $notice = null): Response {
+    /** Abschnitt „Paket“ der Seite Arbeitsplätze (nur Admins): Startkontexte, Pakete je System, Schlüssel. */
+    /** @return list<array{name:string,url:string,papier:string}> virtuelle Drucker der Module für das Arbeitsplatz-Paket */
+    private function starterDrucker(): array {
+        $host = $this->printerHost();
+        $out = [];
+        foreach ($this->printers ? $this->printers->status()['queues'] : [] as $q) {
+            if (($q['modul'] ?? '') === '') continue;
+            $name = (string)$q['name'];
+            $out[] = ['name' => $name, 'url' => 'http://' . $host . ':631/printers/' . rawurlencode($name), 'papier' => preg_match('/terminzettel/i', $name) ? 'A6' : 'A4'];
+        }
+        return $out;
+    }
+
+    private function starterAbschnitt(?string $error = null, ?string $notice = null): string {
         $st = $this->st();
         $list = $this->modules->starters();
         $body = V::error($error) . ($notice ? '<p class="notice">' . V::h($notice) . '</p>' : '')
-            . '<p>Ein Starterprogramm pro Arbeitsplatz öffnet Module direkt aus T2med (aktueller Patient wird mitgegeben). Es wird einmal je PC eingerichtet und bedient alle '
+            . '<p>Ein Paket pro Arbeitsplatz richtet Starterprogramm, Zertifikat und virtuelle Drucker auf einmal ein; erneutes Ausführen aktualisiert nur, was sich geändert hat. Das Starterprogramm öffnet Module direkt aus T2med (aktueller Patient wird mitgegeben). Es wird einmal je PC eingerichtet und bedient alle '
             . 'installierten Module; neue Module erscheinen hier von selbst, danach das Paket auf den PCs einmal erneut einrichten.</p>';
-        if (!$list) return Response::html(V::page('Starter', $body . '<p class="muted">Kein installiertes Modul bietet einen Startkontext an.</p>', $this->nav(), $this->config->practice, 'Einrichten'));
+        if (!$list) return $body . '<p class="muted">Kein installiertes Modul bietet einen Startkontext an.</p>';
         $rows = '';
         foreach ($list as $s) $rows .= '<tr><td>' . V::h($this->modules->name($s['modul'])) . '</td><td>' . V::h($s['label']) . '</td><td><code>' . V::h($s['schema'] . '://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}') . '</code></td></tr>';
-        $body .= '<h2>Startkontexte</h2><p class="muted">Diese Adresse in T2med als Eintrag „Programm/URL“ je Kontext anlegen.</p>'
+        $body .= '<h3>Startkontexte</h3><p class="muted">Diese Adresse in T2med als Eintrag „Programm/URL“ je Kontext anlegen.</p>'
             . '<table><thead><tr><th>Modul</th><th>Kontext</th><th>Adresse in T2med</th></tr></thead><tbody>' . $rows . '</tbody></table>';
-        $body .= '<h2>Paket für einen Arbeitsplatz</h2><p>Das Paket enthält Starterprogramm, Zertifikat, Starter-Schlüssel und Einrichtungsskript. Nur für Admins, nach der Einrichtung löschen.</p><p class="row-buttons">';
+        $body .= '<h3>Paket laden</h3><p>Das Paket enthält Starterprogramm, Zertifikat, Starter-Schlüssel, die virtuellen Drucker der Module und das Einrichtungsskript. Schlägt die Druckereinrichtung fehl, gilt die Anleitung oben (Abschnitt „Virtuelle Drucker“). Nur für Admins, nach der Einrichtung löschen.</p><p class="row-buttons">';
         foreach (Starter::SYSTEMS as $key => $spec) {
             $body .= '<a class="button" href="/verwaltung/arbeitsplaetze/' . $key . '.zip">' . V::h($spec['label']) . '</a> ';
             if (!$st->hasPrograms($key)) $missing[] = $spec['label'];
         }
         $body .= '</p>' . (!empty($missing) ? '<p class="muted">Für ' . V::h(implode(', ', $missing)) . ' liegen auf dem Server noch keine Starterprogramme; das Paket enthält dann nur die Skripte.</p>' : '');
-        $body .= '<h2>Starter-Schlüssel</h2><p class="muted">Ein Schlüssel für alle Module. Er muss nur im Fehlerfall erneuert werden, zum Beispiel wenn ein Paket in falsche Hände geraten ist.</p>'
+        $body .= '<h3>Starter-Schlüssel</h3><p class="muted">Ein Schlüssel für alle Module. Er muss nur im Fehlerfall erneuert werden, zum Beispiel wenn ein Paket in falsche Hände geraten ist.</p>'
             . '<details class="box"><summary><strong>Schlüssel erneuern (nur im Fehlerfall)</strong></summary>'
             . '<p class="error">Achtung: Nach dem Erneuern funktionieren alle bisher eingerichteten Arbeitsplätze nicht mehr. Auf jedem Arbeitsplatz muss danach ein neues Paket ausgeführt werden.</p>'
             . '<form method="post" action="/verwaltung/arbeitsplaetze">' . $this->hidden('erneuern')
             . '<p><label><input type="checkbox" name="bestaetigt" value="1" required> Ja, ich will den Schlüssel erneuern und alle Arbeitsplätze neu einrichten.</label></p>'
             . '<button class="danger">Schlüssel jetzt erneuern</button></form></details>';
-        return Response::html(V::page('Starter', $body, $this->nav(), $this->config->practice, 'Einrichten'), $error ? 422 : 200);
+        return $body;
+    }
+
+    private function starterPage(?string $error = null, ?string $notice = null): Response {
+        return $this->workstationHelp($error, $notice);
     }
 
     private function starterAction(Request $r, string $admin): Response {
@@ -2116,11 +2134,12 @@ final class Web {
         if ($r->field('bestaetigt', 1) !== '1') throw new Problem('Bitte das Erneuern des Schlüssels ausdrücklich bestätigen.', 422);
         $this->st()->renew();
         $this->audit->write($admin, 'starter-schluessel-erneuert', '');
-        return $this->starterPage(null, 'Neuer Starter-Schlüssel erzeugt. Die Pakete bitte neu laden und die Arbeitsplätze neu einrichten.');
+        $this->flash('Neuer Starter-Schlüssel erzeugt. Die Pakete bitte neu laden und die Arbeitsplätze neu einrichten.');
+        return Response::redirect('/hilfe/arbeitsplatz#paket');
     }
 
     private function starterPaket(string $system, string $admin): Response {
-        $files = $this->st()->files($system, $this->starterKontexte(), $this->serverUrl());
+        $files = $this->st()->files($system, $this->starterKontexte(), $this->serverUrl(), $this->starterDrucker());
         $out = '';
         Starter::zip($files, function (string $b) use (&$out) { $out .= $b; });
         $this->audit->write($admin, 'starter-paket-geladen', $system);

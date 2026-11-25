@@ -101,6 +101,11 @@ function test_seite_menue_und_rechte(): void {
     check($u->get('/verwaltung/module')->status === 403, 'Mitarbeiter sieht Module');
 }
 
+function test_modulsymbole_vorhanden(): void {
+    $fallback = Kienzle\Core\View::icon('modul:gibt-es-nicht', 'app');
+    foreach (['kasse', 'terminzettel', 'signatur'] as $id) check(Kienzle\Core\View::icon('modul:' . $id, 'app') !== $fallback, 'Symbol für Modul fehlt: ' . $id);
+}
+
 function test_starter_weiterleitung_im_seitenkopf(): void {
     [$env, $m] = mod_env();
     $b = module_browser($env, $m);

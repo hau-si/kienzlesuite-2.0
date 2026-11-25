@@ -12,9 +12,16 @@ umask 077
 target="$HOME/Library/Application Support/Kienzle-Starter"
 app="$HOME/Applications/Kienzle-Starter.app"
 mkdir -p "$target" "$HOME/Applications"
-install -m 700 "$asset" "$target/kienzle-starter"
-install -m 600 client.json "$target/client.json"
-install -m 644 server.crt "$target/server.crt"
+# Idempotent: jede Zeile sagt „neu“, „aktualisiert“ oder „unverändert“.
+place() { # Quelle Ziel Modus Beschriftung
+  if [ -f "$2" ] && cmp -s "$1" "$2"; then printf '%-13s %s\n' unverändert "$4"; return; fi
+  had=no; [ -f "$2" ] && had=yes
+  install -m "$3" "$1" "$2"
+  printf '%-13s %s\n' "$([ $had = yes ] && echo aktualisiert || echo neu)" "$4"
+}
+place "$asset" "$target/kienzle-starter" 700 Starterprogramm
+place client.json "$target/client.json" 600 'Einstellungen und Schlüssel'
+place server.crt "$target/server.crt" 644 'Zertifikat (Datei)'
 source_file=$(mktemp -t kienzle-starter)
 trap 'rm -f "$source_file"' EXIT
 cat > "$source_file" <<'APPLESCRIPT'
@@ -42,4 +49,14 @@ test "$i" -gt 0 || { echo 'schemas.txt enthält keine Einträge.'; exit 1; }
 codesign --force --deep --sign - "$app"
 '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister' -f "$app"
 security add-trusted-cert -r trustRoot -k "$HOME/Library/Keychains/login.keychain-db" "$target/server.crt"
-echo 'Kienzle-Starter eingerichtet.'
+# Virtuelle Drucker (drucker.txt: Name|Adresse|Papier je Zeile) über CUPS einrichten
+if [ -f drucker.txt ] && grep -q '|' drucker.txt; then
+  while IFS='|' read -r name url _; do
+    [ -n "$name" ] || continue
+    cups="ipp://${url#http://}"
+    if lpstat -v "$name" 2>/dev/null | grep -qF "$cups"; then printf '%-13s %s\n' unverändert "Drucker $name"; continue; fi
+    if sudo lpadmin -p "$name" -E -v "$cups" -m everywhere; then printf '%-13s %s\n' neu "Drucker $name"
+    else echo "Drucker $name nicht eingerichtet (Anleitung: Seite „Arbeitsplätze“ der Suite)."; fi
+  done < drucker.txt
+fi
+echo 'Arbeitsplatz eingerichtet. Das Paket kann gelöscht werden.'

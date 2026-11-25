@@ -38,7 +38,7 @@ Oberfläche, Hilfetexte, Dokumentation und Commit-Nachrichten auf Deutsch.
 
 ## Hinweise für neue Sitzungen (Stand 25.11.2026)
 
-**Stand:** Basis 0.21.4-beta.63, Kasse (`sumup`) 2.3.4-beta.38, Terminzettel 1.3.0-beta.14, Signatur 0.1.0-beta.16; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
+**Stand:** Basis 0.21.4-beta.64, Kasse (`kasse`) 2.3.4-beta.39, Terminzettel 1.3.0-beta.14, Signatur 0.1.0-beta.16; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
 (Basis 0.19.1). Der Nutzer testet auf einer echten Ubuntu-26.04-VM (Aktualisierung dort: `cd ~/kienzlesuite-2.0 && git pull && sudo bash installer/install.sh`,
 oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nicht ins Repository.
 
@@ -84,7 +84,7 @@ oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nich
 
 ### Nicht auf echter Hardware geprüft (der Nutzer testet auf der VM)
 
-- Zentraler Starter (Seite „Starter“, Paket, Installationsskripte, Go-Starter, nginx `/starter/<modul>`, Weiterleitung `&m=`), Signatur-Start aus T2med und alle Signatur-Pad-Dienste/-Seiten: nur mit Tests, nicht mit T2med, Pad oder im Browser geprüft.
+- Zentraler Starter (Seite „Arbeitsplätze“, Paket, Installationsskripte, Go-Starter, nginx `/starter/<modul>`, Weiterleitung `&m=`), Signatur-Start aus T2med und alle Signatur-Pad-Dienste/-Seiten: nur mit Tests, nicht mit T2med, Pad oder im Browser geprüft.
 
 - Kasse: Nachbearbeitung abgelehnter Rechnungen (`InvoiceReview`, `InboxLog`): abgelehnte PDF höchstens 7 Tage in `state_dir/rejected/` (0700/0600), Bildausschnitte per `pdftoppm -x -y -W -H` nach Zeilenpositionen aus `pdftotext -bbox-layout` bzw. Tesseract-TSV, Übernahme über `App::storeInvoice` nach Prüfung; nur für vKasse, nicht für vBriefversand - nicht im Browser geprüft.
 - Kasse: Seite `/kasse/vorgaenge` (Klasse `Vorgaenge`, Tag/Woche/Monat/Jahr, Abhaken, Excel `vorgaenge-export.php`; ersetzt Rechnungseingangsliste, Steuer-Excel und Abhakliste der Einstellungen; Rechte `kassieren` = Tag/Woche, `periods` = Monat/Jahr, `export`, `paid`; `TaxExport` ist nur noch Datenschicht), Storno auch für offene Überweisungen, Filter T2med/IGeL - noch nicht auf der VM geprüft.

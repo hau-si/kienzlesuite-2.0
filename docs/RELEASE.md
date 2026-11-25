@@ -1,5 +1,12 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.64
+
+- **Starter gehört zu „Arbeitsplätze“:** Die eigene Seite „Starter“ im Menü entfällt. Auf der Seite „Arbeitsplätze“ steht unten der Abschnitt „Paket für einen Arbeitsplatz“ (Startkontexte, Download je System, Schlüssel erneuern, nur für angemeldete Admins). Die alte Adresse leitet dorthin weiter.
+- **Ein Paket richtet den ganzen Arbeitsplatz ein:** Starterprogramm, Zertifikat, Aufruf aus T2med und die virtuellen Drucker der Module (vKasse, vTermine, vBriefversand) in einem Durchgang. Windows fragt für die Drucker einmal nach Administratorrechten (`install-drucker.ps1`), macOS und Linux nutzen `lpadmin` über sudo. Die Texte zur Druckereinrichtung bleiben als Rückfall auf der Seite.
+- **Erneutes Ausführen aktualisiert nur Änderungen:** Jede Zeile meldet „neu“, „aktualisiert“ oder „unverändert“ (Starterprogramm, Einstellungen, Zertifikat, Aufruf je Kontext, Drucker). Nicht auf der VM geprüft.
+- Modul „sumup“ heißt „kasse“; die einmalige Migration (`replaces`, Umzug der Daten, Datenbank-Schritt) ist wieder aus dem Code entfernt. Die Datenbank-Versionsnummer bleibt bei 4.
+
 ## 0.21.4-beta.63
 
 - **Starter nur noch an einer Stelle:** Die Hilfeseite „Arbeitsplätze“ und der Einrichtungs-Überblick verweisen auf die Seite „Starter“ (Verwaltung → Starter) statt auf das Paket der Kasse.

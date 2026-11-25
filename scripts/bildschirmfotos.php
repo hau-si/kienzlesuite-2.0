@@ -57,7 +57,7 @@ exec('openssl req -x509 -newkey rsa:2048 -nodes -keyout ' . escapeshellarg($env-
 $st = new Starter($env->db, $env->secrets, $env->config, dirname(__DIR__) . '/core', $crt);
 $admin->web = fn() => new Web($env->config, $env->db, $env->users, new Kienzle\Core\Auth($env->db, $env->users, $env->audit, $admin->ip), $env->passkeys, $env->modules, $env->audit,
     static fn(string $uri) => '<svg/>', null, null, null, null, null, null, null, null, null, $st);
-$r = $admin->get('/verwaltung/arbeitsplaetze'); echo str_pad('starter', 14) . $r->status . "\n"; if ($r->status === 200) seite('starter', $r->body, $out, $css);
+$r = $admin->get('/hilfe/arbeitsplatz'); echo str_pad('starter', 14) . $r->status . "\n"; if ($r->status === 200) seite('starter', $r->body, $out, $css);
 $anon = new Browser($env);
 seite('anmelden', $anon->get('/anmelden')->body, $out, $css);
 echo "Seiten in $out\n";

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Baut den Arbeitsplatz-Starter (core/client/starter, Go) für Windows, macOS und Linux nach core/client-dist
-# und schreibt SHA256SUMS. release-bauen legt diese Dateien in das Basis-Archiv; das Paket der Seite „Starter“ enthält sie.
+# und schreibt SHA256SUMS. release-bauen legt diese Dateien in das Basis-Archiv; das Paket der Seite „Arbeitsplätze“ enthält sie.
 #   scripts/starter-bauen
 set -euo pipefail
 cd -- "$(dirname -- "$0")/../core/client/starter"

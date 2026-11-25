@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.39
+
+- Verweise auf die neue Seite „Arbeitsplätze“ (Paket für den Arbeitsplatz) statt auf „Starter“. Die Migration von „sumup“ ist entfernt. Nicht auf der VM geprüft.
+
 ## 2.3.4-beta.38
 
 - **Startkontext heißt `kienzle-kasse`** statt `kienzle-sumup`. In T2med unter „Drittanbieter-Zugriffe verwalten“ die Adresse auf `kienzle-kasse://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}` ändern, danach auf den Arbeitsplätzen das Paket von Verwaltung → Starter neu ausführen.

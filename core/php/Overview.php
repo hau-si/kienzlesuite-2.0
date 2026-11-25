@@ -168,8 +168,8 @@ final class Overview {
         }
         $starterId = array_key_first(array_filter($this->modules->all(), fn($m) => !empty($m['starters'])));
         if ($starterId !== null) {
-            $starterLink = '/verwaltung/arbeitsplaetze';
-            $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['starter'], isset($manual['starter']) ? 'done' : 'open', 'Unter Verwaltung → Starter das Paket neu laden und auf jedem Arbeitsplatz ausführen', $starterLink, 'starter');
+            $starterLink = '/hilfe/arbeitsplatz#paket';
+            $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['starter'], isset($manual['starter']) ? 'done' : 'open', 'Unter Verwaltung → Arbeitsplätze das Paket neu laden und auf jedem Arbeitsplatz ausführen', $starterLink, 'starter');
         }
         if ((int)($this->db->one('SELECT COUNT(*) AS n FROM oidc_clients')['n'] ?? 0) > 0) {
             $out[] = self::item(self::MANUAL['dienste'], isset($manual['dienste']) ? 'done' : 'open', 'Die Anmelde-Adresse (Issuer) heißt jetzt https://' . ($this->config?->hostnames[0] ?? '') . '; in den angebundenen Diensten (Modulen) ändern', '/verwaltung/module', 'dienste');

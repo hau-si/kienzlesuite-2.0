@@ -146,25 +146,6 @@ function test_migration_alte_rechte_werden_einzelrechte(): void {
     check($env->users->access($id) === ['kasse' => ['admin' => true, 'rights' => ['paid']]], 'Alte Rechte nicht übernommen: ' . json_encode($env->users->access($id)));
 }
 
-function test_migration_modul_sumup_wird_kasse(): void {
-    $env = new Env();
-    [$id] = $env->user('alt');
-    $env->db->query('INSERT INTO user_overrides(user_id,perm,allow) VALUES(?,?,1)', [$id, 'sumup:paid']);
-    $env->db->query('INSERT INTO user_overrides(user_id,perm,allow) VALUES(?,?,0)', [$id, 'sumup:storno']);
-    $env->db->store('erstadmin:sumup', '1');
-    $env->db->store('benutzer.gruppen', json_encode(['MFA' => ['admin' => ['sumup'], 'rechte' => ['sumup:kassieren', 'andere:x']]]));
-    $env->db->query('PRAGMA user_version=3');
-    $env->db->migrate();
-    $rows = array_column($env->db->query('SELECT perm,allow FROM user_overrides WHERE user_id=?', [$id])->fetchAll(), 'allow', 'perm');
-    check(($rows['kasse:paid'] ?? null) == 1 && ($rows['kasse:storno'] ?? null) == 0 && ($rows['sumup:paid'] ?? null) == 1, 'Einzelrechte nicht kopiert: ' . json_encode($rows));
-    check($env->db->setting('erstadmin:kasse') === '1', 'Erstadmin nicht kopiert');
-    $g = json_decode((string)$env->db->setting('benutzer.gruppen'), true);
-    check($g['MFA']['admin'] === ['sumup', 'kasse'] && $g['MFA']['rechte'] === ['sumup:kassieren', 'andere:x', 'kasse:kassieren'], 'Gruppe nicht kopiert: ' . json_encode($g));
-    $env->db->query('PRAGMA user_version=3');
-    $env->db->migrate();   // zweiter Lauf ändert nichts
-    check(json_decode((string)$env->db->setting('benutzer.gruppen'), true) === $g, 'zweiter Lauf verändert die Gruppen');
-}
-
 function test_konfiguration(): void {
     $c = Config::fromArray(['hostnames' => ['kienzle.example.org', '192.0.2.5', '2001:db8::5']]);
     foreach (['kienzle.example.org', 'KIENZLE.example.org', 'kienzle.example.org:443', '192.0.2.5', '[2001:db8::5]', '[2001:db8::5]:443'] as $ok) check($c->ownHost($ok), "eigener Name „{$ok}“ abgelehnt");

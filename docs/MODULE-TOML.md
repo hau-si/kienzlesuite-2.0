@@ -43,7 +43,6 @@ mit dem Archiv `modules/<id>/…` (`scripts/release-bauen <id>`). Das Programm l
 | `version` | ja | `X.Y.Z`, optional mit Vorabkennung: `2.1.0-beta.3` |
 | `core_api` | ja | Text, z. B. `"1"`; muss in `core/API` stehen |
 | `description` | nein | kurze Beschreibung (höchstens 300 Zeichen) |
-| `replaces` | nein | frühere ID des Moduls (z. B. `"sumup"` bei der Kasse). Bei der Installation übernimmt die Basis Datenordner, Ablage-Spool und Rechte des alten Moduls, startet das neue und entfernt danach das alte samt Dienst-Benutzer. Schlägt etwas fehl, läuft das alte Modul unverändert weiter |
 
 ### `[system]` – Pflicht
 
@@ -117,12 +116,12 @@ Virtuelle Drucker des Moduls. Die Druckerverwaltung der Basis legt sie an und en
 
 ### `[[starters]]` – optional
 
-Startkontexte für den zentralen Arbeitsplatz-Starter der Basis (Verwaltung → Starter). Nur mit `[web] protocol = "fastcgi"`. Höchstens 5 Einträge je Modul.
+Startkontexte für den zentralen Arbeitsplatz-Starter der Basis (Verwaltung → Arbeitsplätze). Nur mit `[web] protocol = "fastcgi"`. Höchstens 5 Einträge je Modul.
 
 | Feld | Pflicht | Bedeutung |
 |---|---|---|
 | `schema` | ja | URL-Schema, das T2med aufruft, `kienzle-<name>` (Kleinbuchstaben, Ziffern, Bindestrich); über alle Module eindeutig |
-| `label` | ja | Name des Kontexts für die Anzeige auf der Seite „Starter“ |
+| `label` | ja | Name des Kontexts für die Anzeige auf der Seite „Arbeitsplätze“ |
 
 Das Starterprogramm sendet `POST https://<server>/starter/<modul-id>` (JSON mit `context_id`, `fhir_base_url`, `oauth_token`, `action = "launch"`).
 Die Basis prüft vorher den Starter-Schlüssel; das Modul sieht `KIENZLE_OEFFENTLICH=starter` und `KIENZLE_STARTER_GEPRUEFT=1` und antwortet mit
