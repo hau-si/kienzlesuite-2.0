@@ -1,5 +1,10 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.23
+
+- **Neues Layout der Startseite wie in der Kasse:** Links die offenen Vorgänge (am Pad zuerst, mit den Knöpfen zum Vorgang), rechts groß der Patient und darunter die Dokumentauswahl als Liste mit Auswahlpunkten (statt Auswahlfeld) und dem Knopf „Vorgang anlegen“. Auf schmalen Bildschirmen stehen die Spalten untereinander.
+- Symbole vor „Start“, „Alle Vorgänge“ und „Einstellungen“ im Seitenkopf. Nicht auf dem Server geprüft.
+
 ## 0.1.0-beta.22
 
 - **Vorgewählter Patient oben:** Beim Start aus T2med (und bei der Übergabe aus der Kasse) erscheint oben ein Kasten mit Name und Geburtsdatum des Patienten. Das Patientenfeld in „Neuer Vorgang“ ist dann ausgeblendet; „Anderen Patienten wählen“ im Kasten setzt alles zurück. Nicht auf dem Server geprüft.

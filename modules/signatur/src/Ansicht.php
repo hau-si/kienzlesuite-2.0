@@ -14,10 +14,10 @@ final class Ansicht {
 
     /** Seitenkopf mit Unterseiten wie in der Kasse: Start, Vorgänge, Einstellungen. */
     private static function kopfzeile(string $route, bool $darfVorlage, bool $admin): string {
-        $link = static fn(string $ziel, string $text, string $r): string => '<a class="button ' . ($route === $r ? 'primary' : 'secondary') . '" href="' . sg_h(sg_basis()) . $ziel . '"' . ($route === $r ? ' aria-current="page"' : '') . '>' . $text . '</a>';
+        $link = static fn(string $ziel, string $text, string $r, string $icon = ''): string => '<a class="button ' . ($route === $r ? 'primary' : 'secondary') . ' mit-icon" href="' . sg_h(sg_basis()) . $ziel . '"' . ($route === $r ? ' aria-current="page"' : '') . '>' . $icon . $text . '</a>';
         return '<header class="seitenkopf"><div><p class="eyebrow">Signatur</p><h1>' . ['/' => 'Unterschriften', '/vorgaenge' => 'Vorgänge', '/einstellungen' => 'Einstellungen'][$route] . '</h1></div>'
-            . '<span class="start-tools">' . ($route === '/' ? '' : $link('/', '← Start', '')) . ($route !== '/vorgaenge' ? $link('/vorgaenge', 'Alle Vorgänge', '/vorgaenge') : '')
-            . ($route !== '/einstellungen' && ($darfVorlage || $admin) ? $link('/einstellungen', 'Einstellungen', '/einstellungen') : '') . '</span></header>';
+            . '<span class="start-tools">' . ($route === '/' ? '' : $link('/', 'Start', '', self::HAUS)) . ($route !== '/vorgaenge' ? $link('/vorgaenge', 'Alle Vorgänge', '/vorgaenge', self::LISTE) : '')
+            . ($route !== '/einstellungen' && ($darfVorlage || $admin) ? $link('/einstellungen', 'Einstellungen', '/einstellungen', self::ZAHNRAD) : '') . '</span></header>';
     }
 
     /** Eine Zeile der Vorgangsliste mit Daten für die Filter (Art, Status, Suchtext). */
@@ -67,26 +67,27 @@ final class Ansicht {
             return $o . '</div>';
         }
 
-        // Patient aus T2med oder der Kasse: Kasten oben (JS blendet ihn ein und das Patientenfeld unten aus).
-        if ($darfVorgang) $o .= '<section class="card us-gewaehlt" id="n-gewaehlt" hidden><div class="us-patient"><div><div class="eyebrow muted" id="n-gewaehlt-quelle">AUSGEWÄHLTER PATIENT</div><strong class="us-name" id="n-gewaehlt-name"></strong><div class="muted" id="n-gewaehlt-info"></div></div>'
-            . '<button type="button" class="small" id="n-gewaehlt-weg">Anderen Patienten wählen</button></div></section>';
-        // Start: der Vorgang, der gerade am Pad ist (sonst der zuletzt angelegte offene), dann „Neuer Vorgang“.
-        $o .= '<section class="card us-aktuell"><h2>' . ($aktuell && $aktuell['status'] === 'am_pad' ? 'Gerade am Pad' : 'Zuletzt angelegter Vorgang') . '</h2>';
-        if (!$aktuell) {
-            $o .= '<p class="muted">Kein offener Vorgang. Unten einen neuen anlegen.</p>';
-        } else {
-            $stat = '<span class="us-status s-' . $h($aktuell['status']) . '">' . $h(Seite::STATI[$aktuell['status']] ?? $aktuell['status']) . '</span>';
-            $o .= '<div class="us-patient"><div><strong class="us-name">' . $h($aktuell['patient']) . '</strong><div class="muted">' . $h($aktuell['titel']) . ' · angelegt ' . $h(self::datum((int)$aktuell['erstellt'])) . '</div>'
-                . '<div class="muted">Pad: ' . $h($padNamen[(int)($aktuell['pad_id'] ?? 0)] ?? 'nicht zugeordnet') . '</div></div><div>' . $stat
-                . ($aktuell['meldung'] !== '' ? '<div class="muted klein-text">' . $h($aktuell['meldung']) . '</div>' : '') . '</div></div>'
-                . '<div class="aktionen">' . self::aktionen($aktuell, $csrfFeld, $darfVorgang) . '</div>';
+        // Linke Spalte: offene Vorgänge (wie die Liste der Kasse), rechts groß Patient und Dokumentauswahl.
+        $offene = array_values(array_filter($vorgaenge, fn($v) => !in_array($v['status'], ['uebertragen', 'abgebrochen'], true)));
+        usort($offene, fn($x, $y) => ($y['status'] === 'am_pad') <=> ($x['status'] === 'am_pad') ?: ((int)$y['erstellt'] <=> (int)$x['erstellt']));
+        $links = '<aside class="card us-links"><div class="us-kopf"><h2>Vorgänge</h2><a class="muted klein-text" href="' . $h(sg_basis()) . '/vorgaenge">Alle</a></div>';
+        if (!$offene) $links .= '<p class="muted">Kein offener Vorgang. Rechts einen neuen anlegen.</p>';
+        foreach (array_slice($offene, 0, 8) as $v) {
+            $links .= '<div class="us-vz' . ($v['status'] === 'am_pad' ? ' am-pad' : '') . '"><div class="us-vz-kopf"><div><strong>' . $h($v['patient']) . '</strong><div class="muted klein-text">' . $h($v['titel']) . ' · ' . $h(self::datum((int)$v['erstellt'])) . '</div></div>'
+                . '<span class="us-status s-' . $h($v['status']) . '">' . $h(Seite::STATI[$v['status']] ?? $v['status']) . '</span></div>'
+                . ($v['meldung'] !== '' ? '<div class="muted klein-text">' . $h($v['meldung']) . '</div>' : '')
+                . '<div class="aktionen">' . self::aktionen($v, $csrfFeld, $darfVorgang) . '</div></div>';
         }
-        $o .= '</section>';
+        $links .= '</aside>';
+        // Patient aus T2med oder der Kasse: Kasten oben rechts (JS blendet ihn ein und das Patientenfeld im Formular aus).
+        $rechts = '';
+        if ($darfVorgang) $rechts .= '<section class="card us-gewaehlt" id="n-gewaehlt" hidden><div class="us-patient"><div><div class="eyebrow muted" id="n-gewaehlt-quelle">AUSGEWÄHLTER PATIENT</div><strong class="us-name" id="n-gewaehlt-name"></strong><div class="muted" id="n-gewaehlt-info"></div></div>'
+            . '<button type="button" class="small" id="n-gewaehlt-weg">Anderen Patienten wählen</button></div></section>';
 
         $aktive = array_values(array_filter($vorlagen, fn($v) => (int)$v['aktiv']));
         if ($darfVorgang) {
             $opt = '';
-            foreach ($aktive as $v) $opt .= '<option value="' . (int)$v['id'] . '">' . $h(Seite::ARTEN[$v['art']] ?? $v['art']) . ': ' . $h($v['titel']) . '</option>';
+            foreach ($aktive as $i => $v) $opt .= '<label class="us-dok"><input type="radio" name="vorlage_id" value="' . (int)$v['id'] . '"' . ($i === 0 ? ' checked' : '') . '><span><strong>' . $h($v['titel']) . '</strong><span class="muted klein-text">' . $h(Seite::ARTEN[$v['art']] ?? $v['art']) . '</span></span></label>';
             $padOpt = '';
             $aktivePads = array_values(array_filter($pads, fn($p) => (int)$p['aktiv']));
             if (count($aktivePads) > 1) {
@@ -94,12 +95,12 @@ final class Ansicht {
                 foreach ($aktivePads as $p) $padOpt .= '<option value="' . (int)$p['id'] . '">' . $h($p['name'] . ($p['arbeitsplatz'] !== '' ? ' (' . $p['arbeitsplatz'] . ')' : '')) . '</option>';
                 $padOpt .= '</select>';
             }
-            $o .= '<section class="card"><h2>Neuer Vorgang</h2>';
+            $rechts .= '<section class="card"><h2>Dokument wählen</h2>';
             if (!$aktive) {
-                $o .= '<p class="muted">Es gibt keine aktive Vorlage. Bitte unter Einstellungen eine Vorlage anlegen oder aktivieren.</p>';
+                $rechts .= '<p class="muted">Es gibt keine aktive Vorlage. Bitte unter Einstellungen eine Vorlage anlegen oder aktivieren.</p>';
             } else {
-                $o .= '<form method="post" class="us-form" autocomplete="off">' . $csrfFeld . '<input type="hidden" name="aktion" value="neu"><input type="hidden" name="kontext" id="n-kontext" value=""><input type="hidden" name="leistungen_json" id="n-leistungen" value=""><input type="hidden" name="quelle" id="n-quelle" value=""><input type="hidden" name="quelle_ref" id="n-quelle-ref" value="">'
-                    . '<label for="n-vorlage">Dokument</label><select id="n-vorlage" name="vorlage_id">' . $opt . '</select>'
+                $rechts .= '<form method="post" class="us-form" autocomplete="off">' . $csrfFeld . '<input type="hidden" name="aktion" value="neu"><input type="hidden" name="kontext" id="n-kontext" value=""><input type="hidden" name="leistungen_json" id="n-leistungen" value=""><input type="hidden" name="quelle" id="n-quelle" value=""><input type="hidden" name="quelle_ref" id="n-quelle-ref" value="">'
+                    . '<div class="us-dokliste" role="radiogroup" aria-label="Dokument">' . $opt . '</div>'
                     . $padOpt
                     . '<div id="n-patient-feld"><label for="n-patient">Patient</label><input id="n-patient" name="patient" maxlength="80" required placeholder="z. B. Max Mustermann"></div>'
                     . '<div id="n-liste" class="us-liste" hidden><strong>Leistungen aus der Kasse</strong><ul id="n-liste-eintraege"></ul><p class="muted" id="n-liste-summe"></p></div>'
@@ -120,9 +121,9 @@ final class Ansicht {
                     . '<label class="check"><input type="checkbox" name="druck_nachher" value="1"> Unterschriebenes Dokument danach drucken</label>'
                     . '<button class="primary" type="submit">Vorgang anlegen</button></form>';
             }
-            $o .= '</section>';
+            $rechts .= '</section>';
         }
-        return $o . '</div>';
+        return $o . '<div class="us-grid">' . $links . '<div class="us-rechts">' . $rechts . '</div></div></div>';
     }
 
     /** Vorgangsliste mit Suche (Patient, Vorgang, Dokumentart) und Filtern nach Dokumentart und Status; die Filter wirken im Browser (app.js). */
@@ -149,6 +150,9 @@ final class Ansicht {
     public static ?array $padSuche = null;
     public static int $padBearbeiten = 0;
 
+    private const HAUS = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10"/></svg>';
+    private const LISTE = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>';
+    private const ZAHNRAD = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>';
     private const STIFT = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>';
     private const MUELL = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>';
 
