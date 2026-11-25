@@ -1,5 +1,19 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.17
+
+- **Abgebrochene Vorgänge wieder aufnehmen:** In der Vorgangsliste hat ein abgebrochener Vorgang jetzt den Knopf „Wieder aufnehmen“. Er kehrt zu „Wartet auf Unterschrift“ zurück, war er schon unterschrieben, zu „Unterschrieben“; am Vorgang steht „Wieder aufgenommen.“ Eine abgelaufene T2med-Verbindung wird wie bisher angezeigt. Nicht im Browser geprüft.
+
+## 0.1.0-beta.16
+
+- **Unterschrift am Pad: Fehlersuche und Umbau beim „OK“.** Das Protokoll aus beta.15 zeigte „0 Punkte erfasst“ bei sichtbarer Unterschrift und keine Stift-Ereignisse der Pad-Bibliothek. Ob die Zahl von `STSignatureStop` überhaupt die Punktzahl ist, ist unklar; deshalb entscheidet jetzt die Größe der Unterschriftsdaten (`STSignatureGetSignData` nach dem Anhalten). Sind Daten da, werden sie gespeichert (ohne `Confirm`, das nur das Display leert).
+- Das Protokoll nennt beim Start der Aufnahme das Unterschriftsfeld, die Rückgabe und ob sie läuft, und bei „OK“ Zustand, Stopp-Rückgabe, Datengröße und die Zahl der Ereignisse je Art (4 = Stiftpunkte). Stiftpunkte füllen die Ereignisliste nicht mehr.
+- Nicht am echten Pad geprüft. Bitte nach einem Versuch `sudo journalctl -u kienzle-signatur-pad -n 30 --no-pager` ausgeben.
+
+## 0.1.0-beta.15
+
+- Meldungen („Vorgang angelegt“, Fehler) erscheinen direkt beim angeklickten Knopf statt oben auf der Seite (Skript der Basis, Basis ab beta.58). Nicht im Browser geprüft.
+
 ## 0.1.0-beta.14
 
 - **Pads: feste Zeilen statt Eingabefelder.** Eingerichtete Pads erscheinen als Zeile mit Name, Arbeitsplatz, Adresse:Port und Status; am Ende ein **Stift** (Bearbeiten, nur dann erscheinen die Felder) und ein **Mülleimer** (Löschen mit Rückfrage). Neu anlegen bleibt darunter.

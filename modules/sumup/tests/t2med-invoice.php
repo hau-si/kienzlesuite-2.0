@@ -278,6 +278,21 @@ try {
     $app = new App($cfg, null, null, null, $export); $app->db->migrate();
     $result = $app->storeInvoice($parsed, $pdf);
     check(str_contains($result['message'], 'im Netzwerkordner abgelegt') && isset($export->files['TEST_2026-03-15_RE2026-0042_42,50EUR.pdf']), 'Eingang nicht sofort abgelegt');
+    // b2) Jede gedruckte Rechnung: scheitert die Ablage beim Drucken, meldet es der Drucker und die Zahlung holt sie nach.
+    $cfg = exportConfig('received'); $dirs[] = $cfg->get('app', 'state_dir'); $export = new FakeExport($cfg);
+    $app = new App($cfg, null, null, null, $export); $app->db->migrate();
+    $export->failures = 1;
+    $result = $app->storeInvoice($parsed, $pdf);
+    check(($result['export'] ?? '') === 'failed' && str_contains($result['message'], 'NICHT im Netzwerkordner abgelegt') && $export->files === [], 'Fehlgeschlagene Ablage beim Drucken nicht gemeldet');
+    check($app->db->one('SELECT pdf FROM invoice_inbox')['pdf'] === $pdf, 'PDF nach fehlgeschlagener Ablage verworfen');
+    [$vr, $br] = visit($app, 'test-received');
+    $pr = $app->startInvoice($vr, ['request_id' => App::id(), 'invoice_id' => $app->state($vr, $br)['invoices'][0]['id']]);
+    $app->mock($vr, ['payment_id' => $pr['id'], 'status' => 'successful']);
+    $paidState = $app->document($vr, $pr['id']);
+    check($paidState['invoice_export']['status'] === 'done' && isset($export->files['TEST_2026-03-15_RE2026-0042_42,50EUR.pdf']), 'Zahlung holt die Ablage im Modus „jede gedruckte“ nicht nach');
+    $puts = count($export->commands);
+    $app->invoiceExport($vr, $pr['id']);
+    check(count($export->commands) === $puts, 'Rechnung im Modus „jede gedruckte“ doppelt abgelegt');
     // c) Ablage aus: keine PDF aufbewahren.
     $cfg = configuration(); $dirs[] = $cfg->get('app', 'state_dir'); $app = new App($cfg); $app->db->migrate();
     $app->storeInvoice($parsed, $pdf);

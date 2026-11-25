@@ -33,6 +33,8 @@ SAMBA_NET = Path(E('KIENZLE_DRUCKER_SAMBA_NETZ', '/etc/samba/kienzle-netz.conf')
 UNITS = Path(E('KIENZLE_DRUCKER_UNITS', '/etc/systemd/system'))
 SYSTEMCTL = E('KIENZLE_DRUCKER_SYSTEMCTL', '/usr/bin/systemctl')
 DATA = Path(E('KIENZLE_DRUCKER_DATA', '/var/lib/kienzle'))
+# Auftragsordner der Ablage (Netzwerkspeicher): Druckprogramme von Modulen müssen dort ihre Aufträge abgeben dürfen (z. B. PDF der Kasse).
+ABLAGE_SPOOL = Path(E('KIENZLE_ABLAGE_SPOOL', '/var/spool/kienzle/ablage'))
 PORTS = range(47100, 47200)
 SYSTEMD_RUN = Path(E('KIENZLE_SYSTEMD_RUN', '/run/systemd/system'))   # gibt es nur, wenn systemd läuft (wie sd_booted)
 
@@ -484,7 +486,8 @@ def unit_text(p: dict, port: int) -> str:
             f'ExecStartPre=/usr/bin/mkdir -p {spool}\n'
             f'ExecStart={BIN["ippeveprinter"]} -p {port} -n localhost -r off -c {cmd} -f {",".join(p["formats"])} -d {spool} {p["scheme"]}\n'
             'Restart=on-failure\nNoNewPrivileges=yes\nProtectSystem=strict\nProtectHome=yes\nPrivateTmp=yes\n'
-            f'ReadWritePaths={DATA / mid}\nRestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX\nCapabilityBoundingSet=\n\n[Install]\nWantedBy=multi-user.target\n')
+            f'ReadWritePaths={DATA / mid} -{ABLAGE_SPOOL / mid}\n'
+            'RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX\nCapabilityBoundingSet=\n\n[Install]\nWantedBy=multi-user.target\n')
 
 
 def _port_open(port: int) -> bool:

@@ -4,7 +4,7 @@ Praxis-Appliance für Hausarztpraxen mit T2med: **eine Basis**, einmal auf einer
 einzeln dazukommen – Kasse (SumUp), Terminzettel, Signatur, später Fax, Telefon und Kienzlezeit. Verwaltung komplett im
 Webinterface; Firewall, Benutzer, Admin-Zugang mit OTP, Updates und verschlüsselte Sicherung gibt es nur einmal, in der Basis.
 
-Stand (24.11.2026): **Basis 0.21.4-beta.57** mit den Modulen
+Stand (24.11.2026): **Basis 0.21.4-beta.58** mit den Modulen
 - **Kasse** 2.3.4-beta.30: SumUp-Kartenzahlung, Rechnungseingang aus T2med (jetzt mit Nachbearbeitung nicht erkannter Rechnungen anhand von Bildausschnitten), Überweisung mit QR-Code, Startseite mit freier Eingabe, Vorgänge mit Excel-Export, Post per Letterxpress.
 - **Terminzettel** 1.3.0-beta.10: T2med-Termine auf dem Bondrucker, mit Praxislogo (links, Mitte oder rechts), Kalender-QR und neu einem Absage-QR (vorbereitete E-Mail).
 - **Signatur** 0.1.0-beta.4: Vorlagen und Vorgänge für Unterschriften am signotec-Pad (Pad-Dienst und Rückschreiben nach T2med noch nicht gebaut).
@@ -14,6 +14,8 @@ Installierbar nur auf einer Test-VM ([docs/VM-TEST.md](docs/VM-TEST.md)); Fax, T
 ![Basis und Module](docs/architektur-whiteboard.png)
 
 ## So sieht es aus
+
+**Erklärvideo (2:38 Minuten, ohne Ton):** [docs/video/Kienzle-Suite-Ueberblick.mp4](docs/video/Kienzle-Suite-Ueberblick.mp4) – alle Module im Überblick, mit erfundenen Beispieldaten.
 
 Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu erzeugen mit `bash scripts/bildschirmfotos.sh` ([Hinweise](docs/screenshots/README.md)).
 
@@ -39,6 +41,10 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 
 ![Einrichtung](docs/screenshots/einrichtung.png)
 
+**Arbeitsplatz-Starter:** Ein Programm je PC und ein Schlüssel für alle Module; T2med startet damit Kasse und Signatur mit dem aktuellen Patienten.
+
+![Starter](docs/screenshots/starter.png)
+
 **Verbindungen:** Zugänge, die mehrere Module brauchen (T2med, E-Mail, SMS, Letterxpress, Ablage per SFTP oder SMB), werden einmal eingetragen; ein Modul bekommt nur die, die es anmeldet.
 
 ![Verbindungen](docs/screenshots/verbindungen.png)
@@ -50,6 +56,36 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 **Kasse – Einstellungen:** Die Einrichtung steht als Ausklappzeilen im Stil der Suite, Rotes zuerst; am Zahnrad der Startseite zeigt eine rote Zahl, wie viel noch offen ist.
 
 ![Kasse-Einstellungen](docs/screenshots/kasse-einstellungen.png)
+
+**Kasse – Vorgänge:** Tag, Woche, Monat und Jahr mit Filtern, Abhaken in T2med und Excel-Liste für die Steuerberatung.
+
+![Kasse-Vorgänge](docs/screenshots/kasse-vorgaenge.png)
+
+**Der Weg einer Rechnung:** Verbindungsklick und Rechnung drucken aus T2med oder das IGeL-Modul der Kasse enden im Kassieren und, wenn gewünscht, als PDF im Netzwerkordner.
+
+![Weg der Rechnung](docs/screenshots/weg-der-rechnung.png)
+
+**Kasse – IGeL und GOÄ:** Leistungen ohne T2med-Rechnung kassieren; beim Anlegen einer Leistung genügt der Endpreis, der Faktor wird nach § 5 GOÄ errechnet.
+
+![IGeL](docs/screenshots/kasse-igel.png)
+
+![GOÄ-Rechner](docs/screenshots/kasse-goae.png)
+
+**Kasse – Ablage im Netzwerkordner:** Rechnungen als PDF (bezahlte oder jede gedruckte) in einen Ordner auf dem Netzwerkspeicher, Unterordner wie `Rechnungen/{jahr}/{monat}` werden bei Bedarf angelegt.
+
+![Kasse-Ablage](docs/screenshots/kasse-ablage.png)
+
+**Terminzettel:** Großer, lesbarer Zettel für den Bondrucker mit Kalender-QR-Code je Termin.
+
+![Terminzettel](docs/screenshots/terminzettel.png)
+
+**Signatur:** Vorgänge für Unterschriften am Pad, Pads je Arbeitsplatz und die Pad-Software von signotec (wird nicht mitgeliefert, Upload als ZIP).
+
+![Signatur-Vorgänge](docs/screenshots/signatur-vorgaenge.png)
+
+![Signatur-Pads](docs/screenshots/signatur-pads.png)
+
+![Signatur-Software](docs/screenshots/signatur-software.png)
 
 **Updater:** Updates je Modul und Basis aus signierten Releases (Kanal stabil oder beta), Sicherung vor dem Update, automatischer Rücksprung bei einem Fehler. Kein Update, solange z. B. eine Kartenzahlung läuft.
 

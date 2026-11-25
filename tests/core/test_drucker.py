@@ -207,7 +207,7 @@ class IppEverywhere(Umgebung):
         self.assertIn('Beispiel-PDF: angelegt bzw. aktualisiert.', notes)
         unit = (self.t / 'units' / 'kienzle-drucker-beispiel-beispiel-pdf.service').read_text()
         for part in ('User=ks-beispiel', '-p 47100 -n localhost -r off', f'-c {self.t}/opt/beispiel/current/printer/druck', '-f application/pdf',
-                     'NoNewPrivileges=yes', f'ReadWritePaths={self.t}/data/beispiel'):
+                     'NoNewPrivileges=yes', f'ReadWritePaths={self.t}/data/beispiel -{self.d.ABLAGE_SPOOL}/beispiel'):
             self.assertIn(part, unit)
         q = self.cups()['queues']['Beispiel-PDF']
         self.assertEqual(q['uri'], 'ipp://localhost:47100/ipp/print')

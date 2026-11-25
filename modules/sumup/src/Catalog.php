@@ -34,7 +34,9 @@ final class Catalog {
         $baseInput = $code !== '' ? App::string($input, 'base', 16, false) : '';
         $base = $baseInput !== '' ? Money::cents($baseInput, $this->config->get('app', 'max_amount_cents')) : 0;
         if ($base > 0) {
-            $expected = ServiceCatalog::feeUnits($base, ServiceCatalog::units($factor));
+            // Passt der Einfachsatz zur Ziffer im GOÄ-Verzeichnis, wird genau nach § 5 GOÄ gerechnet (Punktzahl × Punktwert × Faktor).
+            $points = GoaeVerzeichnis::punkte($code, $base);
+            $expected = $points > 0 ? GoaeVerzeichnis::gebuehr($points, ServiceCatalog::units($factor)) : ServiceCatalog::feeUnits($base, ServiceCatalog::units($factor));
             if (abs($expected - $cents) > 1) throw new Problem('Einfachsatz × Faktor ergibt ' . Money::format($expected) . ', eingetragen sind ' . Money::format($cents) . '. Bitte den Preis anpassen oder den GOÄ-Rechner verwenden.');
         }
         if ($id === '') {

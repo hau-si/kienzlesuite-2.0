@@ -229,6 +229,15 @@ final class Seite {
         self::pdo()->prepare('UPDATE vorgaenge SET status="abgebrochen" WHERE id=?')->execute([$id]);
     }
 
+    /** Nimmt einen abgebrochenen Vorgang wieder auf: zurück auf „Unterschrieben“, wenn schon unterschrieben war, sonst „Wartet“. */
+    public static function wiederaufnehmen(int $id): void {
+        $v = self::vorgang($id);
+        if (!$v) throw new \InvalidArgumentException('Vorgang nicht gefunden.');
+        if ($v['status'] !== 'abgebrochen') throw new \InvalidArgumentException('Nur abgebrochene Vorgänge lassen sich wieder aufnehmen.');
+        $neu = (int)$v['unterschrieben'] > 0 ? 'unterschrieben' : 'wartet';
+        self::pdo()->prepare('UPDATE vorgaenge SET status=?, meldung="Wieder aufgenommen." WHERE id=? AND status="abgebrochen"')->execute([$neu, $id]);
+    }
+
     /** Entfernt abgeschlossene Vorgänge nach der Aufbewahrungszeit; Patientendaten sollen nicht länger als nötig liegen. */
     public static function aufraeumen(?int $jetzt = null): int {
         $grenze = ($jetzt ?? time()) - self::AUFBEWAHRUNG_TAGE * 86400;

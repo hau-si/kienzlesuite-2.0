@@ -190,6 +190,19 @@ Seite::abbrechen($vp);
 check(Seite::vorgang($vp)['status'] === 'abgebrochen', 'am Pad abbrechbar');
 check(in_array((int)$vp, array_map(fn($v) => (int)$v['id'], Seite::vorgaenge(true)), true) === false, 'abgebrochen nicht in offenen');
 
+// Wieder aufnehmen abgebrochener Vorgänge
+check(str_contains(Ansicht::seite('/vorgaenge', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null), 'value="wiederaufnehmen"'), 'Knopf Wieder aufnehmen in der Liste');
+Seite::wiederaufnehmen($vp);
+check(Seite::vorgang($vp)['status'] === 'wartet' && Seite::vorgang($vp)['meldung'] === 'Wieder aufgenommen.', 'wieder aufgenommen: wartet');
+check(in_array((int)$vp, array_map(fn($v) => (int)$v['id'], Seite::vorgaenge(true)), true), 'wieder in offenen');
+wirft(fn() => Seite::wiederaufnehmen($vp), 'nur abgebrochene wieder aufnehmbar');
+wirft(fn() => Seite::wiederaufnehmen(9999), 'unbekannter Vorgang nicht aufnehmbar');
+\KienzleSignatur\Speicher::pdo()->prepare('UPDATE vorgaenge SET unterschrieben=? WHERE id=?')->execute([time(), $vp]);
+Seite::abbrechen($vp);
+Seite::wiederaufnehmen($vp);
+check(Seite::vorgang($vp)['status'] === 'unterschrieben', 'schon unterschrieben: zurück auf unterschrieben');
+Seite::abbrechen($vp);
+
 // Löschen abgebrochener Vorgänge
 $lv = Seite::vorgangAnlegen($neu + ['pad_id' => $pa], 'x');
 wirft(fn() => Seite::vorgangLoeschen($lv), 'nur abgebrochene löschbar');

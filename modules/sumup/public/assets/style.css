@@ -75,3 +75,4 @@ progress.progress{display:block;width:100%;height:8px;margin:6px 0 10px}
 .review-page { display: block; max-width: 100%; margin: .5rem 0; border: 1px solid #c8c6bc; }
 .review-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: .75rem; }
 @media (max-width: 640px) { .review-row { grid-template-columns: 1fr; } }
+.goae-hint{margin:6px 0 10px;padding:10px 12px;border-radius:9px;background:#f4f7f6;font-size:13px;line-height:1.45}.goae-hint p{margin:0 0 6px}.goae-hint-text{font-weight:600}.goae-hint-item{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid #e2e8e5;padding:6px 2px;font:inherit;color:inherit;cursor:pointer}.goae-hint-item:hover,.goae-hint-item:focus{background:#e5f3ed}.goae-hint-source{margin:8px 0 0!important}

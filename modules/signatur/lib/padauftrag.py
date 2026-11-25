@@ -16,7 +16,7 @@ import padseiten  # noqa: E402
 
 DATEN = os.environ.get('KIENZLE_SIGNATUR_DATEN', '/var/lib/kienzle/signatur')
 LEERLAUF = 600  # Sekunden ohne Bedienung am Pad, dann geht der Vorgang zurück auf „wartet“
-EV_DISCONNECT, EV_HOTSPOT = 0, 1
+EV_DISCONNECT, EV_HOTSPOT, EV_SIGNATUR = 0, 1, 4
 
 
 def log(text: str) -> None:
@@ -122,7 +122,7 @@ class PadGeraet:
         for name, args in {
             'STDisplaySetTarget': [I], 'STControlSetCallback': [cb_typ, ctypes.c_void_p], 'STDisplaySetImageFromFile': [I, I, W],
             'STSensorSetSignRect': [I, I, I, I], 'STSensorAddHotSpot': [I, I, I, I], 'STSensorClearHotSpots': [], 'STSignatureStart': [],
-            'STSignatureRetry': [], 'STSignatureConfirm': [], 'STSignatureStop': [], 'STSignatureCancel': [I], 'STSignatureGetSignData': [ctypes.c_void_p, ctypes.POINTER(I)],
+            'STSignatureRetry': [], 'STSignatureConfirm': [], 'STSignatureStop': [], 'STSignatureGetState': [], 'STSignatureCancel': [I], 'STSignatureGetSignData': [ctypes.c_void_p, ctypes.POINTER(I)],
             'STSignatureSaveAsFileEx': [W, I, I, I, I, I, ctypes.c_uint, I],
         }.items():
             f = getattr(L, name)
@@ -133,7 +133,12 @@ class PadGeraet:
         import threading
         self.signal = threading.Event()
 
+        self.zaehler: dict[int, int] = {}
+
         def rueckruf(art, daten, groesse, _):
+            self.zaehler[art] = self.zaehler.get(art, 0) + 1
+            if art == EV_SIGNATUR:
+                return   # Stiftpunkte nicht in die Ereignisliste (sonst ein Eintrag je Punkt)
             wert = ctypes.cast(daten, ctypes.POINTER(ctypes.c_int))[0] if daten and groesse > 0 else 0
             self.queue.append((art, wert))
             self.signal.set()
@@ -162,7 +167,9 @@ class PadGeraet:
 
     def unterschrift_starten(self, feld) -> None:
         self.pruefen('Unterschriftsfeld', self.lib.STSensorSetSignRect(*feld))
-        self.pruefen('Aufnahme', self.lib.STSignatureStart())
+        rc = self.pruefen('Aufnahme', self.lib.STSignatureStart())
+        self.zaehler.pop(EV_SIGNATUR, None)
+        log(f'Aufnahme gestartet (Feld {tuple(feld)}, Rückgabe {rc}, läuft: {self.lib.STSignatureGetState()})')
 
     def unterschrift_neu(self) -> None:
         self.pruefen('Löschen', self.lib.STSignatureRetry())
@@ -180,30 +187,18 @@ class PadGeraet:
         """Bestätigt die Unterschrift und speichert sie. Bei Misserfolg steht der Grund in self.hinweis (für Seite und Protokoll)."""
         L = self.lib
         self.hinweis = ''
-        # Erst anhalten (löscht das Display nicht): Ohne erfasste Punkte bleibt das Feld stehen und die Aufnahme läuft weiter.
+        # Erst anhalten (löscht das Display nicht): Ohne Unterschriftsdaten bleibt das Feld stehen und die Aufnahme läuft weiter.
         # STSignatureConfirm würde das Display leeren, auch wenn nichts erfasst wurde.
-        punkte = L.STSignatureStop()
-        log(f'Vorgang {vid}: {punkte} Punkte erfasst')
-        if punkte == 0:
+        laeuft = L.STSignatureGetState()
+        stopp = L.STSignatureStop()
+        groesse = ctypes.c_int(0)
+        rc = L.STSignatureGetSignData(None, ctypes.byref(groesse))
+        log(f'Vorgang {vid}: Aufnahme lief: {laeuft}, Stopp {stopp}, Daten {rc}/{groesse.value} Bytes, Stiftereignisse {self.zaehler.get(EV_SIGNATUR, 0)}, alle Ereignisse {self.zaehler}')
+        if rc < 0 or groesse.value < 1:
             self.hinweis = 'Noch keine Unterschrift erkannt. Bitte im Feld unterschreiben, dann „OK“.'
             L.STSignatureStart()
             return None
-        if punkte < 0:
-            self.hinweis = f'Anhalten nicht möglich: {self.pt.fehlertext(L, punkte)}'
-            log(self.hinweis)
-            return None
-        rc = L.STSignatureConfirm()
-        if rc < 0:
-            self.hinweis = f'Bestätigen nicht möglich: {self.pt.fehlertext(L, rc)}'
-            log(self.hinweis)
-            return None
-        groesse = ctypes.c_int(0)
-        rc = L.STSignatureGetSignData(None, ctypes.byref(groesse))
-        if rc < 0 or groesse.value < 1:
-            self.hinweis = f'Keine Unterschriftsdaten (Rückgabe {rc}, Größe {groesse.value}): {self.pt.fehlertext(L, rc) if rc < 0 else "leer"}'
-            log(self.hinweis)
-            L.STSignatureRetry()
-            return None
+        # Die Daten sind seit dem Anhalten zwischengespeichert; Confirm würde nur das Display leeren (das geschieht danach in danke()).
         puffer = (ctypes.c_ubyte * groesse.value)()
         self.pruefen('Rohdaten', L.STSignatureGetSignData(puffer, ctypes.byref(groesse)))
         os.makedirs(ausgabe, mode=0o700, exist_ok=True)

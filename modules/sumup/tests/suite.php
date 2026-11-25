@@ -68,6 +68,10 @@ try {
     check(str_contains($js, 'const CLIENT_STEPS') && str_contains($js, 'CLIENT_STEPS[id]'), 'settings.js definiert CLIENT_STEPS (sonst bricht die Einstellungsseite ab)');
     [$code, $html] = page($root, staff_server(['inbox']) + ['REQUEST_URI' => '/kasse/settings.php']);
     check($code === 200 && str_contains($html, 'settings.js') && str_contains($html, 'id="letter-printer-help"'), 'Einstellungen für Mitarbeiter mit Recht nicht erreichbar');
+    // Drucker „vBriefversand“ als Ausklappzeile mit Schild (erledigt/fehlt), eingeordnet bei „Praxis & Rechnungen“ statt unter jedem Reiter.
+    check(str_contains($html, 'id="letter-printer-fold"') && str_contains($html, 'id="letter-printer-tag"'), 'vBriefversand nicht einklappbar');
+    $js = (string) file_get_contents(dirname(__DIR__) . '/public/assets/settings.js');
+    check(str_contains($js, "'s-letterxpress', 'letter-printer-help'") && str_contains($js, "done ? 'erledigt' : 'fehlt'"), 'vBriefversand nicht in der Einrichtung eingeordnet');
     [$code] = page($root, staff_server(['paid', 'export', 'periods']) + ['REQUEST_URI' => '/kasse/settings.php']);
     check($code === 403, 'Rechte der Vorgänge öffnen die Einstellungen');
     [$code] = page($root, staff_server([]) + ['REQUEST_URI' => '/kasse/settings.php']);

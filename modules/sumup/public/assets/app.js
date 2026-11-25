@@ -261,20 +261,21 @@ function goaeResult(text, level) { const r=$('goae-result'); r.hidden=!text; r.t
 function goaeCalc(source) {
   const base=parseCents($('service-base').value), limits=state.fee_types[$('service-fee-type').value];
   if(!base) { goaeResult(''); return; }
+  const punkte=goaePunkte($('service-goae').value, base);
   let h, price;
   if(source==='factor') {
     const f=String($('service-factor').value).replace(',','.'); if(!/^\d(\.\d{1,4})?$/.test(f)) { goaeResult('Bitte einen Faktor wie 2,3 oder 2,332 eingeben (höchstens 4 Nachkommastellen).','warn'); return; }
-    h=factorUnits(f); price=fee(base,h); $('service-target').value=(price/100).toFixed(2).replace('.',',');
+    h=factorUnits(f); price=fee(base,h,punkte); $('service-target').value=(price/100).toFixed(2).replace('.',',');
   } else {
     const target=parseCents($('service-target').value); if(!target) { goaeResult('Gewünschten Endbetrag eintragen, dann wird der Faktor berechnet.'); return; }
-    [h,price]=bestFactor(base,target);
-    if(h>limits.max*100) { goaeResult('Über dem Höchstsatz ('+commaFactor(limits.max*100)+'-fach): höchstens '+euro(fee(base,limits.max*100))+' möglich. Bitte anderen Endbetrag oder Gebührenrahmen wählen.','error'); return; }
+    [h,price]=bestFactor(base,target,punkte);
+    if(h>limits.max*100) { goaeResult('Über dem Höchstsatz ('+commaFactor(limits.max*100)+'-fach): höchstens '+euro(fee(base,limits.max*100,punkte))+' möglich. Bitte anderen Endbetrag oder Gebührenrahmen wählen.','error'); return; }
     $('service-factor').value=commaFactor(h);
   }
   if(h>limits.max*100) { goaeResult('Faktor über dem Höchstsatz ('+commaFactor(limits.max*100)+').','error'); return; }
   $('service-price').value=(price/100).toFixed(2).replace('.',',');
   const target=parseCents($('service-target').value);
-  const parts=['Faktor '+commaFactor(h)+' × '+euro(base)+' = '+euro(price)+' → als Preis übernommen.'];
+  const parts=[(punkte?'Faktor '+commaFactor(h)+' × '+punkte+' Punkte × 5,82873 Cent':'Faktor '+commaFactor(h)+' × '+euro(base))+' = '+euro(price)+' → als Preis übernommen.'];
   if(source!=='factor' && target && price!==target) parts.push('Genau '+euro(target)+' ist auch mit vier Nachkommastellen beim Faktor nicht möglich.');
   else if(source!=='factor' && h%100!==0) parts.push('Der Faktor hat '+(h%10===0?'3':'4')+' Nachkommastellen, damit der Betrag genau '+euro(price)+' ergibt.');
   if(h>limits.threshold*100) parts.push('Über dem Schwellenwert '+commaFactor(limits.threshold*100)+': Bei der Abrechnung ist eine Begründung nötig.');
@@ -282,10 +283,17 @@ function goaeCalc(source) {
 }
 for(const [id,source] of [['service-base','target'],['service-target','target'],['service-factor','factor'],['service-fee-type','target']]) $(id).addEventListener('input',()=>goaeCalc(source));
 $('service-fee-type').addEventListener('change',()=>goaeCalc('target'));
+// GOÄ-Verzeichnis: Ziffer oder Stichwort im Ziffernfeld → Vorschlag; „Übernehmen“ füllt Einfachsatz, Rahmen, Faktor (und leere Bezeichnung).
+const goaeVorschlag=goaeHelfer($('service-goae'), e=>{
+  $('service-base').value=(e.cent/100).toFixed(2).replace('.',','); $('service-fee-type').value=e.rahmen; $('service-factor').value=goaeStartfaktor(e,state.fee_types);
+  if(!$('service-label').value.trim()) $('service-label').value=goaeKurz(e.text,160);
+  $('goae-fields').open=true; goaeCalc('factor');
+});
+$('service-goae').addEventListener('input',()=>{ if(parseCents($('service-base').value)) goaeCalc('factor'); });
 
-function resetForm() { goaeResult(''); $('service-form').reset(); $('service-id').value=''; $('goae-fields').open=false; $('service-save').textContent='Leistung hinzufügen'; $('edit-reset').hidden=true; }
+function resetForm() { goaeResult(''); goaeVorschlag.hide(); $('service-form').reset(); $('service-id').value=''; $('goae-fields').open=false; $('service-save').textContent='Leistung hinzufügen'; $('edit-reset').hidden=true; }
 function resetGroup() { $('group-form').reset(); $('group-id').value=''; $('group-save').textContent='Kombination hinzufügen'; $('group-reset').hidden=true; }
-function manage(show) { $('manager').hidden=!show; $('manage-toggle').setAttribute('aria-expanded',String(show)); if(show) $('manager').scrollIntoView({behavior:'smooth',block:'nearest'}); }
+function manage(show) { if(show) goaeVerzeichnis().catch(()=>{}); $('manager').hidden=!show; $('manage-toggle').setAttribute('aria-expanded',String(show)); if(show) $('manager').scrollIntoView({behavior:'smooth',block:'nearest'}); }
 function renderReader() {
   clearTimeout(readerTimer);
   const p=state.reader_payment;
@@ -458,7 +466,7 @@ $('service-fee-type').onchange=()=>{
   const fee=state.fee_types[$('service-fee-type').value];
   if(Number($('service-factor').value.replace(',','.'))*100>fee.max) $('service-factor').value=String(fee.threshold/100).replace('.',',');
 };
-$('service-form').onsubmit=e=>{ e.preventDefault(); run(async()=>{ await api('service_save',{id:$('service-id').value,label:$('service-label').value,category:$('service-category').value,price:$('service-price').value,goae_code:$('service-goae').value,factor:$('service-factor').value,fee_type:$('service-fee-type').value,on_request:$('service-on-request').checked,default_reason:$('service-reason').value,vat:$('service-vat').checked,base:$('service-goae').value?$('service-base').value:''}); resetForm(); await load(); }); };
+$('service-form').onsubmit=e=>{ e.preventDefault(); run(async()=>{ goaePruefen($('service-goae').value); await api('service_save',{id:$('service-id').value,label:$('service-label').value,category:$('service-category').value,price:$('service-price').value,goae_code:$('service-goae').value,factor:$('service-factor').value,fee_type:$('service-fee-type').value,on_request:$('service-on-request').checked,default_reason:$('service-reason').value,vat:$('service-vat').checked,base:$('service-goae').value?$('service-base').value:''}); resetForm(); await load(); }); };
 $('group-reset').onclick=resetGroup;
 $('group-form').onsubmit=e=>{e.preventDefault();run(async()=>{
   await api('group_save',{id:$('group-id').value,label:$('group-label').value,services:[...$('group-members').querySelectorAll('input:checked')].map(el=>el.value)});

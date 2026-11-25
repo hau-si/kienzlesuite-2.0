@@ -35,7 +35,7 @@ jobs:
       - name: Tests
         run: |
           [ -s teile.txt ] || exit 0
-          sudo apt-get update && sudo apt-get install -y php-cli php-sqlite3 php-mbstring php-gd php-curl php-xml openssl librsvg2-bin poppler-utils qpdf fonts-dejavu-core ghostscript python3-openpyxl python3-pil python3-qrcode tesseract-ocr tesseract-ocr-deu
+          sudo apt-get update && sudo apt-get install -y php-cli php-sqlite3 php-mbstring php-gd php-curl php-xml php-zip openssl librsvg2-bin poppler-utils qpdf fonts-dejavu-core ghostscript python3-openpyxl python3-pil python3-qrcode tesseract-ocr tesseract-ocr-deu
           bash tests/run-all.sh
       - name: Starterprogramme bauen
         run: scripts/starter-bauen

@@ -1,5 +1,25 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.62
+
+- **Erklärvideo im Repository:** `docs/video/Kienzle-Suite-Ueberblick.mp4` (2:38 Minuten, ohne Ton, erfundene Daten), in der README verlinkt. Keine Änderung am Programm.
+
+## 0.21.4-beta.61
+
+- **Neue Bildschirmfotos und Erklärvideo-Werkzeug:** Alle Bilder in `docs/screenshots` neu mit erfundenen Daten, dazu Starter, Kasse (Vorgänge, Ablage, IGeL, GOÄ-Rechner), Terminzettel, Signatur und ein Schaubild „Weg der Rechnung“. Neue Skripte: `scripts/bildschirmfotos-seiten.py`, `scripts/modul-vorschau/`, `scripts/video-bauen.py`. README und `AGENTS.md` angepasst. Keine Änderung am Programm.
+
+## 0.21.4-beta.60
+
+- **Virtuelle Drucker dürfen Aufträge an die Ablage abgeben:** Die Einheit eines Druckers (z. B. „vKasse“) lief mit `ProtectSystem=strict` und durfte nur in den Datenordner des Moduls schreiben. Der Auftragsordner der Ablage (`/var/spool/kienzle/ablage/<modul>`) war schreibgeschützt. Die Rechnung kam an, die PDF wurde aber nie zum Netzwerkspeicher übergeben. Jetzt steht der Ordner in `ReadWritePaths` (mit `-`, falls er fehlt). Die Drucker-Einheit wird beim nächsten Abgleich (Verwaltung → Drucker oder automatisch) neu geschrieben und der Drucker neu gestartet. Nicht auf der VM geprüft.
+
+## 0.21.4-beta.59
+
+- **Klicksperre bei Update-Abfragen:** „Jetzt nach Updates suchen“ (Basis und Module) geht höchstens alle 30 Sekunden. Davor erscheint „Bitte kurz warten …“ mit der Restzeit. Grund: GitHub erlaubt ohne Anmeldung nur 60 Abfragen pro Stunde und IP-Adresse (Fehler „HTTP 403 rate limit exceeded“). Nicht auf der VM geprüft.
+
+## 0.21.4-beta.58
+
+- **Rückmeldung nach Knopfdruck überall:** Viele Aktionen leiteten nach dem Absenden ohne Meldung weiter, besonders **Updates** („Jetzt nach Updates suchen“, „Jetzt installieren“, Kanal speichern, Zurück auf frühere Version), aber auch Server, Dienste, Gruppen, Firewall, Module, Verbindungen, Drucker, Einrichtung und Sicherung. Jetzt merkt sich der Server einen kurzen Text zur Sitzung und zeigt ihn einmalig auf der nächsten Seite; `core.js` (v7) setzt ihn direkt hinter den angeklickten Knopf. Das gilt auch für die Meldungen der Signatur-Seiten. Nicht im Browser geprüft.
+
 ## 0.21.4-beta.57
 
 - **Logo im Browser-Tab:** Kleines Herz mit Puls-Linie (eigene Zeichnung, `assets/favicon.svg`) als Tab-Symbol aller Seiten der Basis und der Module im Rahmen der Suite. Falls der Tab noch kein Herz zeigt: Strg+F5. Nicht im Browser geprüft.
