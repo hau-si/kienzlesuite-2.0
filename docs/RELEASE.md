@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.21.4-beta.58
+
+- **Rückmeldung nach Knopfdruck überall:** Viele Aktionen leiteten nach dem Absenden ohne Meldung weiter, besonders **Updates** („Jetzt nach Updates suchen“, „Jetzt installieren“, Kanal speichern, Zurück auf frühere Version), aber auch Server, Dienste, Gruppen, Firewall, Module, Verbindungen, Drucker, Einrichtung und Sicherung. Jetzt merkt sich der Server einen kurzen Text zur Sitzung und zeigt ihn einmalig auf der nächsten Seite; `core.js` (v7) setzt ihn direkt hinter den angeklickten Knopf. Das gilt auch für die Meldungen der Signatur-Seiten. Nicht im Browser geprüft.
+
 ## 0.21.4-beta.57
 
 - **Logo im Browser-Tab:** Kleines Herz mit Puls-Linie (eigene Zeichnung, `assets/favicon.svg`) als Tab-Symbol aller Seiten der Basis und der Module im Rahmen der Suite. Falls der Tab noch kein Herz zeigt: Strg+F5. Nicht im Browser geprüft.

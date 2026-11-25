@@ -1,5 +1,9 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.15
+
+- Meldungen („Vorgang angelegt“, Fehler) erscheinen direkt beim angeklickten Knopf statt oben auf der Seite (Skript der Basis, Basis ab beta.58). Nicht im Browser geprüft.
+
 ## 0.1.0-beta.14
 
 - **Pads: feste Zeilen statt Eingabefelder.** Eingerichtete Pads erscheinen als Zeile mit Name, Arbeitsplatz, Adresse:Port und Status; am Ende ein **Stift** (Bearbeiten, nur dann erscheinen die Felder) und ein **Mülleimer** (Löschen mit Rückfrage). Neu anlegen bleibt darunter.
