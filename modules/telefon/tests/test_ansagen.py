@@ -97,5 +97,41 @@ class Kokoro(unittest.TestCase):
         self.assertEqual(json.loads((t / 'kienzlefon' / 'auftrag-status.json').read_text())['stand'], 'fertig')
         self.assertFalse((t / 'kokoro').exists() or (t / 'kienzlefon' / 'kokoro').exists() or (t / 'kienzlefon' / 'kokoro-thorsten').exists())
 
+
+class Whisper(unittest.TestCase):
+    """Whisper wird nur auf Knopfdruck geladen (Internet); hier: Paketliste, Entfernen und das Startskript des Workers."""
+
+    def test_paketliste(self):
+        zeilen = [z for z in (MODUL / 'lib/whisper/requirements-cp314.lock').read_text().splitlines() if z and not z.startswith('#')]
+        namen = {z.split('==')[0].lower() for z in zeilen}
+        self.assertTrue({'faster-whisper', 'ctranslate2', 'av', 'tokenizers', 'huggingface_hub'} <= namen)
+        for z in zeilen:
+            self.assertRegex(z, r'^[A-Za-z0-9_.-]+==[0-9][A-Za-z0-9.]* --hash=sha256:[0-9a-f]{64}$')
+
+    def test_entfernen(self):
+        t = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, t, True)
+        for d in ('whisper/venv', 'kienzlefon/modelle/x'):
+            (t / d).mkdir(parents=True)
+        (t / 'whisper' / 'bereit.json').write_text('{}')
+        (t / 'kienzlefon' / 'auftrag.json').write_text('{"aktion": "whisper-entfernen"}')
+        subprocess.run([sys.executable, '-B', str(MODUL / 'lib/ansagen-auftrag')], env={'PATH': '/usr/bin:/bin', 'KIENZLE_DATEN': str(t)})
+        st = json.loads((t / 'kienzlefon' / 'auftrag-status.json').read_text())
+        self.assertEqual(st['stand'], 'fertig', st)
+        self.assertFalse((t / 'whisper').exists() or (t / 'kienzlefon' / 'modelle').exists())
+
+    def test_worker_startet_mit_whisper_umgebung(self):
+        """Ist <daten>/whisper/venv da, startet das Startskript den Worker mit deren Python (hier ein Ersatz, der nur seine Argumente meldet)."""
+        t = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, t, True)
+        py = t / 'whisper' / 'venv' / 'bin' / 'python'
+        py.parent.mkdir(parents=True)
+        py.write_text('#!/bin/sh\necho "ersatz $KIENZLE_WHISPER_UMGEBUNG $*"\n')
+        py.chmod(0o755)
+        r = subprocess.run([sys.executable, '-B', str(MODUL / 'lib/kzf-bin/kienzlefon-worker'), '--config', 'x.toml'],
+                           env={'PATH': '/usr/bin:/bin', 'KIENZLE_DATEN': str(t)}, capture_output=True, text=True)
+        self.assertEqual(r.stdout.strip(), f'ersatz 1 -B {MODUL}/lib/kzf-bin/kienzlefon-worker --config x.toml')
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -1,8 +1,14 @@
 #!/usr/bin/python3 -B
 # Startskript des Moduls telefon für „kienzlefon-worker“ aus Kienzlefon 2.7 (kienzlefon.cli:worker_main); ersetzt /opt/kienzlefon/venv/bin/kienzlefon-worker.
+import os
 import sys
 from pathlib import Path
 
+# faster-whisper liegt (optional nachgeladen) in einer eigenen Umgebung im Datenordner; ist sie da, mit deren Python neu starten.
+_venv = Path(os.environ.get('KIENZLE_DATEN', '/var/lib/kienzle/telefon')) / 'whisper' / 'venv' / 'bin' / 'python'
+if _venv.is_file() and not os.environ.get('KIENZLE_WHISPER_UMGEBUNG'):
+    os.environ['KIENZLE_WHISPER_UMGEBUNG'] = '1'
+    os.execv(str(_venv), [str(_venv), '-B', *sys.argv])
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'kienzlefon'))
 from kienzlefon.cli import worker_main  # noqa: E402
 

@@ -5,7 +5,7 @@ declare(strict_types=1);
  * (auth_request) und Benutzer, Rolle und Rechte als KIENZLE_* übergeben.
  */
 require_once dirname(__DIR__) . '/src/bootstrap.php';
-use KienzleTelefon\{Anlage, Ansicht};
+use KienzleTelefon\{Anlage, Ansicht, Vorgaenge};
 
 header('X-Frame-Options: DENY');
 header('X-Content-Type-Options: nosniff');
@@ -21,7 +21,8 @@ try {
     $darfStatus = $k->recht('status');
     $darfNebenstellen = $k->recht('nebenstellen');
     $darfSprachmenue = $k->recht('sprachmenue');
-    if (!$darfStatus && !$darfNebenstellen && !$darfSprachmenue) $k->verweigern();
+    $darfVorgaenge = $k->recht('vorgaenge');
+    if (!$darfStatus && !$darfNebenstellen && !$darfSprachmenue && !$darfVorgaenge) $k->verweigern();
     if (preg_match('#^/assets/([A-Za-z0-9][A-Za-z0-9_.-]{0,80})$#D', $rel, $m)) {
         $types = ['css' => 'text/css; charset=utf-8', 'js' => 'text/javascript; charset=utf-8'];
         $ext = strtolower(pathinfo($m[1], PATHINFO_EXTENSION));
@@ -69,10 +70,11 @@ try {
         exit;
     }
     if ($rel === '') $rel = '/';
-    if (!in_array($rel, ['/', '/einstellungen', '/sprachmenue'], true)) { http_response_code(404); echo 'Nicht gefunden.'; exit; }
+    if (!in_array($rel, ['/', '/einstellungen', '/sprachmenue', '/vorgaenge'], true)) { http_response_code(404); echo 'Nicht gefunden.'; exit; }
+    if ($rel === '/vorgaenge' && !$darfVorgaenge) $k->verweigern();
     if ($rel === '/einstellungen' && !$darfNebenstellen) $k->verweigern();
     if ($rel === '/sprachmenue' && !$darfSprachmenue) $k->verweigern();
-    if ($rel === '/' && !$darfStatus && !$darfNebenstellen && !$darfSprachmenue) $k->verweigern();
+    if ($rel === '/' && !$darfStatus && !$darfNebenstellen && !$darfSprachmenue && !$darfVorgaenge) $k->verweigern();
     header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
 
     $meldung = $fehler = null;
@@ -82,18 +84,25 @@ try {
         if (!$k->csrfGueltig($_POST['kienzle-csrf'] ?? null)) { http_response_code(403); echo 'Sitzung abgelaufen. Bitte die Seite neu laden.'; exit; }
         try {
             $aktion = (string)($_POST['aktion'] ?? '');
-            $nur = ['nebenstelle-speichern', 'sprachmenue-texte', 'wartemusik'];
+            $vorgang = in_array($aktion, ['vorgang-erledigt', 'vorgang-offen', 'vorgang-loeschen'], true);
+            $nur = ['nebenstelle-speichern', 'sprachmenue-texte', 'wartemusik', 'vorgang-erledigt', 'vorgang-offen', 'vorgang-loeschen'];
             if (!$admin && !in_array($aktion, $nur, true)) throw new InvalidArgumentException('Das dürfen nur Admins.');
-            if (in_array($aktion, ['sprachmenue-texte', 'wartemusik'], true) ? !$darfSprachmenue || $rel !== '/sprachmenue' : !$darfNebenstellen) throw new InvalidArgumentException('Dafür fehlt das Recht.');
+            $erlaubt = match (true) {
+                $vorgang => $darfVorgaenge && $rel === '/vorgaenge',
+                in_array($aktion, ['sprachmenue-texte', 'wartemusik'], true) => $darfSprachmenue && $rel === '/sprachmenue',
+                default => $darfNebenstellen,
+            };
+            if (!$erlaubt) throw new InvalidArgumentException('Dafür fehlt das Recht.');
             $neu = match ($aktion) {
-                'sprachmenue-texte', 'wartemusik' => null,
+                'sprachmenue-texte', 'wartemusik', 'vorgang-erledigt', 'vorgang-offen', 'vorgang-loeschen' => null,
+                'whisper-einrichten' => Anlage::whisperWahl($cfg, $_POST),
                 'leitung-speichern' => Anlage::leitungSpeichern($cfg, $_POST, $k),
                 'leitung-loeschen' => Anlage::leitungLoeschen($cfg, (string)($_POST['id'] ?? '')),
                 'zwecke-speichern' => Anlage::zweckeSpeichern($cfg, $_POST),
                 'kanaele-speichern' => Anlage::kanaeleSpeichern($cfg, $_POST),
                 'netz-speichern' => Anlage::netzSpeichern($cfg, $_POST),
                 'sprachmenue-speichern' => Anlage::sprachmenueSpeichern($cfg, $_POST, $k),
-                'piper-einrichten', 'piper-entfernen', 'kokoro-einrichten', 'kokoro-entfernen', 'ansagen-erzeugen' => null,
+                'piper-einrichten', 'piper-entfernen', 'kokoro-einrichten', 'kokoro-entfernen', 'ansagen-erzeugen', 'whisper-entfernen' => null,
                 'nebenstellen-anlegen' => Anlage::nebenstellenAnlegen($cfg, (int)($_POST['anzahl'] ?? 0), $k),
                 'nebenstelle-speichern' => Anlage::nebenstelleSpeichern($cfg, $_POST),
                 'nebenstelle-loeschen' => Anlage::nebenstelleLoeschen($cfg, (string)($_POST['nummer'] ?? '')),
@@ -101,7 +110,20 @@ try {
                 'zugang-zeigen' => null,
                 default => throw new InvalidArgumentException('Unbekannte Aktion.'),
             };
-            if ($aktion === 'sprachmenue-texte') {
+            if ($vorgang) {
+                $id = (string)($_POST['id'] ?? '');
+                match ($aktion) { 'vorgang-erledigt' => Vorgaenge::verschieben($id), 'vorgang-offen' => Vorgaenge::verschieben($id, true), default => Vorgaenge::loeschen($id) };
+                $meldung = ['vorgang-erledigt' => 'Als erledigt markiert. Erledigte Vorgänge werden nach 7 Tagen gelöscht.', 'vorgang-offen' => 'Wieder offen.',
+                    'vorgang-loeschen' => 'Vorgang gelöscht.'][$aktion];
+            } elseif ($aktion === 'whisper-einrichten') {
+                Anlage::speichern($neu, $k);
+                $cfg = $neu;
+                Anlage::auftrag('whisper-einrichten');
+                $meldung = 'Whisper wird geladen (' . (($neu['kienzlefon']['whisper_genau'] ?? false) ? 'etwa 5 GB' : 'etwa 2 GB') . ', je nach Leitung 10 bis 60 Minuten). Der Stand steht unter „Sprachmenü“.';
+            } elseif ($aktion === 'whisper-entfernen') {
+                Anlage::auftrag('whisper-entfernen');
+                $meldung = 'Whisper wird entfernt.';
+            } elseif ($aktion === 'sprachmenue-texte') {
                 $meldung = Anlage::sprachmenueSchreiben($_POST, $k);
             } elseif ($aktion === 'wartemusik') {
                 $meldung = Anlage::wartemusikWaehlen($cfg, (string)($_POST['wahl'] ?? ''), $k);
@@ -135,7 +157,16 @@ try {
     header('Cache-Control: no-store');
     if ($rel === '/einstellungen' && in_array(Anlage::auftragStatus()['stand'] ?? '', ['laeuft', 'wartet'], true)) header('Refresh: 5');
     Ansicht::$sprachmenue = $darfSprachmenue && (bool)($cfg['kienzlefon']['aktiv'] ?? false);
-    if ($rel === '/sprachmenue') {
+    if ($rel === '/vorgaenge') {
+        $bereich = ($_GET['bereich'] ?? '') === 'erledigt' ? 'erledigt' : 'offen';
+        try {
+            $liste = Vorgaenge::liste($k, $bereich);
+        } catch (RuntimeException $e) {
+            $liste = [];
+            $fehler ??= $e->getMessage();
+        }
+        $inhalt = Ansicht::vorgaenge($liste, $bereich, Vorgaenge::anzahlOffen(), $k->csrf(), $meldung, $fehler);
+    } elseif ($rel === '/sprachmenue') {
         try {
             $daten = Anlage::sprachmenueLesen();
         } catch (RuntimeException $e) {
@@ -149,6 +180,7 @@ try {
         $server = preg_replace('/:\d+$/', '', (string)($_SERVER['HTTP_HOST'] ?? '')) ?: 'Adresse des Servers';
         $inhalt = Ansicht::einstellungen($cfg, $status, $k->csrf(), $admin, $leitung, $zugang, (string)$server, $meldung, $fehler);
     } else {
+        Ansicht::$vorgaenge = $darfVorgaenge && (bool)($cfg['kienzlefon']['aktiv'] ?? false) ? Vorgaenge::anzahlOffen() : null;
         $inhalt = Ansicht::uebersicht($cfg, $status, $darfNebenstellen, tf_fax_bereit(), $meldung, $fehler);
     }
     echo $k->rahmen('Telefon', $inhalt, ['roh' => true, 'kopf' => Ansicht::kopf($base) . '<script src="' . tf_h($base) . '/assets/app.js" defer></script>']);

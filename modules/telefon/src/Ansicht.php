@@ -11,14 +11,18 @@ final class Ansicht {
 
     /** Link „Sprachmenü“ im Seitenkopf zeigen (Recht vorhanden und Sprachmenü eingeschaltet). */
     public static bool $sprachmenue = false;
+    /** Anzahl offener Vorgänge für den Knopf im Seitenkopf (null = Knopf nicht zeigen). */
+    public static ?int $vorgaenge = null;
 
     private static function tag(string $art, string $text): string { return '<span class="tag ' . $art . '">' . tf_h($text) . '</span>'; }
 
     private static function kopfzeile(string $route, bool $einstellungen): string {
         $b = tf_h(tf_basis());
-        $titel = ['/einstellungen' => 'Einstellungen', '/sprachmenue' => 'Sprachmenü'][$route] ?? 'Telefonanlage';
+        $titel = ['/einstellungen' => 'Einstellungen', '/sprachmenue' => 'Sprachmenü', '/vorgaenge' => 'Vorgänge'][$route] ?? 'Telefonanlage';
         $link = $route !== '/' ? '<a class="button secondary" href="' . $b . '/">← Übersicht</a>'
-            : (self::$sprachmenue ? '<a class="button secondary" href="' . $b . '/sprachmenue">Sprachmenü</a>' : '')
+            : (self::$vorgaenge !== null ? '<a class="button' . (self::$vorgaenge ? '' : ' secondary') . '" href="' . $b . '/vorgaenge">Vorgänge'
+                . (self::$vorgaenge ? ' (' . self::$vorgaenge . ')' : '') . '</a>' : '')
+              . (self::$sprachmenue ? '<a class="button secondary" href="' . $b . '/sprachmenue">Sprachmenü</a>' : '')
               . ($einstellungen ? '<a class="button secondary" href="' . $b . '/einstellungen">Einstellungen</a>' : '');
         return '<header class="seitenkopf"><div><p class="eyebrow">Telefon</p><h1>' . $titel . '</h1></div><span class="start-tools">' . $link . '</span></header>';
     }
@@ -108,11 +112,28 @@ final class Ansicht {
         return '<details class="fold" id="' . $id . '"' . ($offen ? ' open' : '') . '><summary><h2>' . tf_h($titel) . '</h2> ' . $zustand . '</summary><div class="tf-body">' . $inhalt . '</div></details>';
     }
 
+    /** Whisper (optional nachgeladen): Anrufer sprechen Rezept-, Überweisungs-, Termin- und Rückrufwünsche auf; ohne Whisper geht es in die Warteschlange. */
+    private static function whisper(string $csrf, callable $knopf): string {
+        $o = '<h3>Aufnahme von Anliegen (Whisper)</h3><p>' . (Anlage::whisperBereit() ? self::tag('ok', 'Whisper eingerichtet') . ' '
+            . (Anlage::whisperLaeuft() ? self::tag('ok', 'Verarbeitung läuft') : self::tag('warn', 'Verarbeitung startet …')) : self::tag('opt', 'nicht eingerichtet')) . '</p>'
+            . '<p class="muted">Mit Whisper können Anrufer Rezept, Überweisung, Termin oder Rückruf aufsprechen; das Modul wandelt die Aufnahme auf diesem Server in Text um '
+            . '(nichts geht ins Internet) und zeigt sie unter „Vorgänge“. Ohne Whisper landen diese Anrufer in der Warteschlange. Braucht einen schnellen Prozessor und '
+            . 'mindestens 8 GB Arbeitsspeicher; Whisper wird nur bei Bedarf geladen.</p><div class="tf-knoepfe tf-links">';
+        if (!Anlage::whisperBereit()) {
+            $o .= '<form method="post" data-confirm="Whisper jetzt aus dem Internet laden? Das sind mehrere GB und kann lange dauern."><input type="hidden" name="kienzle-csrf" value="' . tf_h($csrf)
+                . '"><input type="hidden" name="aktion" value="whisper-einrichten"><label class="check"><input type="checkbox" name="genau" value="1"> Namen genauer erkennen (zusätzlich etwa 3 GB, langsamer)</label> '
+                . '<button class="primary" type="submit">Whisper einrichten</button></form>';
+        } else {
+            $o .= $knopf('whisper-entfernen', 'Whisper entfernen', 'danger', 'Whisper und die Modelle löschen? Anrufer werden dann wieder direkt mit der Praxis verbunden.');
+        }
+        return $o . '</div>';
+    }
+
     /** Ansagen: Piper (optional nachgeladen) einrichten/entfernen, Ansagen erzeugen, Stand des letzten Auftrags. */
     private static function ansagen(string $csrf, string $tts): string {
         $st = Anlage::auftragStatus();
         $namen = ['piper-einrichten' => 'Piper einrichten', 'piper-entfernen' => 'Piper entfernen', 'kokoro-einrichten' => 'Kokoro einrichten', 'kokoro-entfernen' => 'Kokoro entfernen',
-            'erzeugen' => 'Ansagen erzeugen', '' => 'Auftrag'];
+            'erzeugen' => 'Ansagen erzeugen', 'whisper-einrichten' => 'Whisper einrichten', 'whisper-entfernen' => 'Whisper entfernen', '' => 'Auftrag'];
         $stand = match ($st['stand'] ?? '') {
             'laeuft', 'wartet' => self::tag('warn', 'läuft'), 'fertig' => self::tag('ok', 'fertig'), 'fehler' => self::tag('err', 'Fehler'), default => '',
         };
@@ -131,6 +152,7 @@ final class Ansicht {
             : $knopf('kokoro-einrichten', 'Kokoro einrichten', 'primary', 'Kokoro-Thorsten jetzt laden? Das sind mehrere GB (PyTorch, Modell) und dauert lange.');
         if (Anlage::ttsBereit()) $o .= $knopf('ansagen-erzeugen', 'Geänderte Ansagen erzeugen', 'primary') . $knopf('ansagen-erzeugen', 'Alle neu erzeugen', 'secondary', 'Alle Ansagen neu erzeugen? Das dauert einige Minuten.', ['alle' => '1']);
         $o .= '</div>';
+        $o .= self::whisper($csrf, $knopf);
         if ($stand !== '') $o .= '<p>' . tf_h($namen[$st['aktion'] ?? ''] ?? 'Auftrag') . ': ' . $stand . ' <span class="muted">' . tf_h((string)($st['meldung'] ?? '')) . '</span></p>';
         return $o;
     }
@@ -270,6 +292,61 @@ final class Ansicht {
         return $o . $nachWarteschlange . '</div>';
     }
 
+    private static function wert(mixed $v): string { return is_scalar($v) ? trim((string)$v) : ''; }
+
+    /** Felder eines Vorgangs (oder eines Anliegens) als Liste; leere Felder fallen weg. */
+    private static function felder(array $d): string {
+        $o = '';
+        foreach (Vorgaenge::FELDER as $k => $label) {
+            $v = self::wert($d[$k] ?? '');
+            if ($v === '' || $v === 'unbekannt') continue;
+            $o .= '<dt>' . tf_h($label) . '</dt><dd>' . nl2br(tf_h($v)) . '</dd>';
+        }
+        return $o;
+    }
+
+    /** Seite „Vorgänge“: aufgesprochene Anliegen als Karten, Reiter Offen/Erledigt. */
+    public static function vorgaenge(array $liste, string $bereich, int $offen, string $csrf, ?string $meldung, ?string $fehler): string {
+        $h = 'tf_h';
+        $b = $h(tf_basis());
+        $o = '<div class="tf">' . self::kopfzeile('/vorgaenge', true) . self::meldungen($meldung, $fehler)
+            . '<nav class="tf-reiter"><a href="' . $b . '/vorgaenge"' . ($bereich === 'offen' ? ' aria-current="page"' : '') . '>Offen (' . $offen . ')</a>'
+            . '<a href="' . $b . '/vorgaenge?bereich=erledigt"' . ($bereich === 'erledigt' ? ' aria-current="page"' : '') . '>Erledigt</a></nav>';
+        if ($bereich === 'erledigt') $o .= '<p class="muted">Erledigte Vorgänge werden 7 Tage nach dem Erledigen gelöscht.</p>';
+        if (!$liste) return $o . '<section class="card"><p class="muted">' . ($bereich === 'offen' ? 'Keine offenen Vorgänge.' : 'Keine erledigten Vorgänge.') . '</p></section></div>';
+        $knopf = static fn(string $aktion, string $id, string $text, string $klasse, string $frage = '') => '<form method="post" action="' . $b . '/vorgaenge' . ($bereich === 'erledigt' ? '?bereich=erledigt' : '') . '"'
+            . ($frage !== '' ? ' data-confirm="' . $h($frage) . '"' : '') . '><input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"><input type="hidden" name="aktion" value="' . $aktion
+            . '"><input type="hidden" name="id" value="' . $h($id) . '"><button class="small ' . $klasse . '" type="submit">' . $h($text) . '</button></form>';
+        foreach ($liste as $v) {
+            $d = $v['daten'];
+            $typ = Vorgaenge::TYPEN[$v['typ']] ?? ($v['typ'] !== '' ? $v['typ'] : 'Vorgang');
+            try {
+                $zeit = $v['zeit'] !== '' ? (new \DateTimeImmutable((string)$v['zeit']))->setTimezone(new \DateTimeZone('Europe/Berlin'))->format('d.m.Y, H:i') . ' Uhr' : '';
+            } catch (\Exception) {
+                $zeit = '';
+            }
+            $name = trim(self::wert($d['vorname'] ?? '') . ' ' . self::wert($d['nachname'] ?? ''));
+            $o .= '<section class="card tf-vorgang"><header><div><span class="tag ' . ($v['typ'] === 'kienzlefon_error' || isset($v['fehler']) ? 'err' : 'ok') . '">' . $h($typ) . '</span> <strong>'
+                . $h($name !== '' ? $name : 'Name nicht verstanden') . '</strong><div class="muted">' . $h($zeit)
+                . (self::wert($d['id'] ?? '') !== '' && self::wert($d['id']) !== 'unbekannt' ? ' · Anruf von ' . $h(self::wert($d['id'])) : '') . '</div></div><div class="tf-knoepfe">'
+                . ($bereich === 'offen' ? $knopf('vorgang-erledigt', $v['id'], 'Erledigt', 'primary') : $knopf('vorgang-offen', $v['id'], 'Wieder öffnen', 'secondary'))
+                . $knopf('vorgang-loeschen', $v['id'], 'Löschen', 'danger', 'Diesen Vorgang endgültig löschen?') . '</div></header>';
+            if (isset($v['fehler'])) {
+                $o .= '<p class="fehler">' . $h($v['fehler']) . '</p>';
+            } else {
+                $felder = self::felder($d);
+                foreach ((array)($d['anliegen_liste'] ?? []) as $i => $a) {
+                    if (!is_array($a)) continue;
+                    $felder .= '<dt>' . $h((string)($i + 1) . '. ' . (Vorgaenge::TYPEN[(string)($a['typ'] ?? '')] ?? 'Anliegen')) . '</dt><dd><dl class="tf-dl">' . self::felder($a) . '</dl></dd>';
+                }
+                if ($v['typ'] === 'kienzlefon_error') $felder .= '<dt>Hinweis</dt><dd>Die Aufnahme ließ sich nicht vollständig verarbeiten. Bitte zurückrufen.</dd>';
+                $o .= $felder !== '' ? '<dl class="tf-dl">' . $felder . '</dl>' : '<p class="muted">Nichts verstanden. Bitte zurückrufen.</p>';
+            }
+            $o .= '</section>';
+        }
+        return $o . '</div>';
+    }
+
     public static function einstellungen(array $cfg, array $status, string $csrf, bool $admin, ?string $leitung, ?array $zugang, string $server, ?string $meldung, ?string $fehler): string {
         $h = 'tf_h';
         $o = '<div class="tf">' . self::kopfzeile('/einstellungen', true) . self::meldungen($meldung, $fehler);
@@ -350,7 +427,7 @@ final class Ansicht {
                 . self::feld('google_tempo', 'Sprechtempo', (string)($kz['google']['tempo'] ?? ''), 'Leer = 0,93 (0,25 bis 2).') . '</details>';
             $o .= self::fold('sprachmenue', 'Sprachmenü', $kz['aktiv'] ? self::tag('ok', 'an') : self::tag('opt', 'aus'),
                 '<p class="muted">Sprachmenü aus Kienzlefon: Öffnungs- und Telefonzeiten, Begrüßung, Menü (Praxis, Rezept, Überweisung, Termin), Apotheken- und Fachstellenweg. '
-                . 'Erst einschalten, wenn die Ansagen erzeugt sind. Noch in Arbeit: Aufnahme von Anliegen (Whisper).</p>'
+                . 'Erst einschalten, wenn die Ansagen erzeugt sind.</p>'
                 . ($kz['aktiv'] ? '<p><a class="button secondary" href="' . $h(tf_basis()) . '/sprachmenue">Zeiten, Ansagetexte, Menütasten und Wartemusik bearbeiten →</a></p>' : '')
                 . self::formular($csrf, 'sprachmenue-speichern', $form, 'Speichern') . self::ansagen($csrf, (string)$kz['tts']));
         }

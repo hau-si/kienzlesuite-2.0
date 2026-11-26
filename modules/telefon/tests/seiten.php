@@ -95,4 +95,29 @@ $o = aufruf($dir, '/telefon/sprachmenue', 'sprachmenue', 'benutzer', ['aktion' =
 check(str_contains($o, 'wieder das Klingelzeichen') && str_contains((string)file_get_contents("$dir/daten/kienzlefon/kienzlefon.toml"), 'modus = "klingelzeichen"'), 'Zurück zum Klingelzeichen');
 $o = aufruf($dir, '/telefon/sprachmenue', 'sprachmenue', 'benutzer', ['aktion' => 'wartemusik', 'kienzle-csrf' => $csrf, 'wahl' => 'entfernen']);
 check(str_contains($o, 'Wartemusik gelöscht') && !is_dir("$dir/daten/kienzlefon/wartemusik"), 'Wartemusik gelöscht');
+// Vorgänge: eigenes Recht; Schlüsselpaar entsteht beim Anwenden mit Sprachmenü.
+check(is_file("$dir/daten/vorgaenge-schluessel") && is_file("$dir/daten/kienzlefon/telepraxis-public.pem"), 'Schlüsselpaar beim Anwenden angelegt');
+check(str_contains(aufruf($dir, '/telefon/vorgaenge', 'sprachmenue'), '#CODE=403'), 'Vorgänge ohne Recht');
+check(str_contains(aufruf($dir, '/telefon/vorgaenge', 'vorgaenge'), 'Keine offenen Vorgänge'), 'Vorgänge leer');
+check(str_contains(aufruf($dir, '/telefon/', 'vorgaenge'), '/telefon/vorgaenge">Vorgänge</a>'), 'Knopf Vorgänge in der Übersicht');
+$py = 'import sys; from pathlib import Path; from zoneinfo import ZoneInfo; sys.path.insert(0, sys.argv[1]); from kienzlefon.crypto import TelepraxisEncryptor;'
+    . ' TelepraxisEncryptor(Path(sys.argv[2]), Path(sys.argv[3]), ZoneInfo("Europe/Berlin")).write_payload({"typ": "termin", "id": "+4930123456", "telefon": "+4930123456",'
+    . ' "vorname": "Max", "nachname": "Mustermann", "grund": "Impfung", "_kienzlefon": {"erstellt_am": "2026-11-26T09:14:00+01:00"}}, "20261126_091400_000001")';
+exec(implode(' ', array_map('escapeshellarg', ['python3', '-c', $py, dirname(__DIR__) . '/kienzlefon', "$dir/daten/kienzlefon/telepraxis-public.pem", "$dir/daten/kienzlefon/vorgaenge"])), $aus, $rc);
+$o = aufruf($dir, '/telefon/vorgaenge', 'vorgaenge');
+check($rc === 0 && str_contains($o, 'Max Mustermann') && str_contains($o, 'Impfung') && str_contains($o, 'Offen (1)'), 'Vorgang auf der Seite');
+check(str_contains(aufruf($dir, '/telefon/', 'vorgaenge'), 'Vorgänge (1)'), 'Zähler in der Übersicht');
+check(str_contains(aufruf($dir, '/telefon/vorgaenge', 'sprachmenue', 'benutzer', ['aktion' => 'vorgang-erledigt', 'kienzle-csrf' => $csrf, 'id' => '20261126_091400_000001']), '#CODE=403'), 'Erledigen ohne Recht');
+$o = aufruf($dir, '/telefon/vorgaenge', 'vorgaenge', 'benutzer', ['aktion' => 'vorgang-erledigt', 'kienzle-csrf' => $csrf, 'id' => '20261126_091400_000001']);
+check(str_contains($o, 'Als erledigt markiert') && str_contains($o, 'Offen (0)'), 'Erledigt');
+check(str_contains(aufruf($dir, '/telefon/vorgaenge?bereich=erledigt', 'vorgaenge'), 'Max Mustermann'), 'Reiter Erledigt');
+check(str_contains(aufruf($dir, '/telefon/sprachmenue', 'vorgaenge', 'benutzer', ['aktion' => 'vorgang-loeschen', 'kienzle-csrf' => $csrf, 'id' => '20261126_091400_000001']), 'fehlt das Recht'), 'Löschen nur auf der Vorgangsseite');
+$o = aufruf($dir, '/telefon/vorgaenge?bereich=erledigt', 'vorgaenge', 'benutzer', ['aktion' => 'vorgang-loeschen', 'kienzle-csrf' => $csrf, 'id' => '20261126_091400_000001']);
+check(str_contains($o, 'Vorgang gelöscht') && !glob("$dir/daten/kienzlefon/vorgaenge/erledigt/*.enc"), 'Gelöscht');
+// Whisper einrichten (nur Admin): Wahl merken, Auftrag ablegen.
+check(str_contains(aufruf($dir, '/telefon/einstellungen', 'nebenstellen', 'benutzer', ['aktion' => 'whisper-einrichten', 'kienzle-csrf' => $csrf]), 'nur Admins'), 'Whisper nur Admin');
+$o = aufruf($dir, '/telefon/einstellungen', '', 'admin', ['aktion' => 'whisper-einrichten', 'kienzle-csrf' => $csrf, 'genau' => '1']);
+check(str_contains($o, 'Whisper wird geladen (etwa 5 GB') && json_decode((string)file_get_contents("$dir/daten/kienzlefon/auftrag.json"), true)['aktion'] === 'whisper-einrichten', 'Whisper-Auftrag');
+check(str_contains((string)file_get_contents("$dir/daten/kienzlefon/kienzlefon.toml"), 'modell_namen = "large-v3"'), 'Genaueres Modell für Namen');
+unlink("$dir/daten/kienzlefon/auftrag.json");
 echo "seiten.php (telefon): alles in Ordnung\n";

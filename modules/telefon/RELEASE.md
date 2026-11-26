@@ -1,5 +1,12 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.10
+
+- **Aufnahme von Anliegen mit Whisper** (Einstellungen → Sprachmenü → „Whisper einrichten“, nur Admins): Anrufer sprechen Rezept, Überweisung, Termin, Rückruf oder Sonstiges auf; der Worker von Kienzlefon wandelt die Aufnahmen **auf dem Server** in Text um (faster-whisper, CPU). Whisper wird wie Piper nur auf Knopfdruck geladen: eigene Python-Umgebung aus `lib/whisper/requirements-cp314.lock` (23 Pakete mit Prüfsummen) und das Modell large-v3-turbo (etwa 1,6 GB); wahlweise „Namen genauer erkennen“ mit large-v3 (zusätzlich etwa 3 GB). Neuer Dienst `kienzle-telefon-whisper` (startet, sobald Whisper bereit ist, über `kienzle-telefon-whisper.path`; offline, ohne Telemetrie). Ohne Whisper landen diese Anrufer wie bisher in der Warteschlange.
+- **Neue Seite „Vorgänge“** (`/telefon/vorgaenge`, Knopf mit Zähler in der Übersicht, neues Recht `vorgaenge`): je Anliegen eine Karte mit Art, Zeit, Anrufernummer, Name, Geburtsdatum, Rückrufnummer, Medikamenten, Fachrichtung bzw. Grund; mehrere Anliegen eines Anrufs untereinander. Knöpfe „Erledigt“, „Wieder öffnen“, „Löschen“.
+- **Datenschutz:** Vorgänge liegen verschlüsselt im Datenordner (Format von Kienzlefon, RSA 3072 + AES-256). Das Schlüsselpaar erzeugt das Modul; der geheime Teil liegt nur verschlüsselt mit dem Modulschlüssel der Basis vor, der Worker kann Vorgänge also schreiben, aber nicht lesen. Tonaufnahmen löscht der Worker nach dem Umwandeln. Die Pflege löscht erledigte Vorgänge nach 7 Tagen und verarbeitete Anrufe im Spool nach 2 Tagen (fehlgeschlagene nach 7). Inhalte stehen nie im Protokoll.
+- Geprüft mit Tests (Worker von Kienzlefon mit Ersatz-Whisper vom Spool bis zur Ablage, Entschlüsseln in PHP, Rechte, Pflege, Paketliste). **Nicht geprüft:** echtes Laden von Whisper und den Modellen, Erkennungsgüte und Dauer auf dem Prozessor der VM, echte Anrufe.
+
 ## 0.1.0-beta.9
 
 - **Wartemusik** (Telefon → Sprachmenü → „Wartemusik“, unter der Warteschlange): Klingelzeichen, die Wartemelodie von Johannes Plachetka (41 s, MIT-Lizenz mit seiner Freigabe, als MP3 im Modul unter `medien/`, 1,6 MB) oder **eigene Musik zum Hochladen** (MP3, WAV, OGG, FLAC, M4A; höchstens 7 MB und 30 Minuten). Umgewandelt wird mit `hold_music.install_media` aus Kienzlefon (Lautheit angeglichen, alle Asterisk-Formate) in den Datenordner (`kienzlefon/wartemusik`); die hochgeladene Datei wird danach gelöscht. Abspielfeld auf der Seite, am Telefon über Nebenstelle 8805; „Wartemusik löschen“ stellt auf Klingelzeichen zurück.

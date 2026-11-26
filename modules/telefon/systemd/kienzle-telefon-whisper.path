@@ -1,0 +1,10 @@
+# Kienzle-Suite, Modul telefon: Whisper-Worker starten, sobald Whisper eingerichtet ist.
+[Unit]
+Description=Kienzle-Suite Modul telefon (Whisper bereit)
+
+[Path]
+PathExists=/var/lib/kienzle/telefon/whisper/bereit.json
+Unit=kienzle-telefon-whisper.service
+
+[Install]
+WantedBy=multi-user.target

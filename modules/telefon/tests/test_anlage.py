@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -283,7 +284,7 @@ class KienzlefonBruecke(unittest.TestCase):
             self.a.check(b)
         with self.assertRaises(self.a.Fehler):
             self.a.check(self.cfg(tts='espeak'))
-        self.assertEqual(self.a.check(beispiel())['kienzlefon'], {'aktiv': False, 'tts': 'piper', 'wartemusik': 'klingelzeichen',
+        self.assertEqual(self.a.check(beispiel())['kienzlefon'], {'aktiv': False, 'tts': 'piper', 'wartemusik': 'klingelzeichen', 'whisper_genau': False,
                          'google': {'schluessel': '', 'stimme': 'de-DE-Chirp3-HD-Enceladus', 'tempo': 0.93}})
         b = self.cfg()
         b['kienzlefon']['wartemusik'] = 'radio'
@@ -398,6 +399,65 @@ class KienzlefonBruecke(unittest.TestCase):
         self.assertFalse(self.a.wartemusik_entfernen()['bereit'])
         self.a.anwenden(b)
         self.assertIn('modus = "klingelzeichen"', (self.tmp / 'kienzlefon' / 'kienzlefon.toml').read_text())
+
+    def test_vorgang_vom_spool_bis_zur_ablage(self):
+        """Worker von Kienzlefon mit Ersatz-Whisper: Aufnahme im Spool → Vorgang verschlüsselt mit dem Schlüssel des Moduls, Ton gelöscht;
+        die Pflege löscht später verarbeitete Anrufe und erledigte Vorgänge."""
+        import base64
+        import sys
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import padding, rsa
+        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+        self.a.anwenden(self.cfg())
+        toml = (self.tmp / 'kienzlefon' / 'kienzlefon.toml').read_text()
+        for zeile in ('demo = false', 'audio_beilegen = false', 'modell_namen = "large-v3-turbo"', f'ausgabeverzeichnis = "{self.tmp}/kienzlefon/vorgaenge"'):
+            self.assertIn(zeile, toml)
+        geheim = rsa.generate_private_key(public_exponent=65537, key_size=3072)
+        (self.tmp / 'kienzlefon' / 'telepraxis-public.pem').write_bytes(geheim.public_key().public_bytes(
+            serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo))
+        sys.path.insert(0, str(HERE.parent / 'kienzlefon'))
+        from kienzlefon.config import load_config
+        from kienzlefon.models import CallType, FieldName
+        from kienzlefon.spool import Spool, WorkingCall
+        from kienzlefon.worker import Worker
+        config = load_config(self.tmp / 'kienzlefon' / 'kienzlefon.toml')
+        spool = Spool(config.paths.spool, config.practice.timezone)
+        call = spool.create_call(CallType.PRESCRIPTION, '+4930123456', 'rezept')
+        for field, name, index in ((FieldName.FIRST_NAME, 'vorname.wav', None), (FieldName.LAST_NAME, 'nachname.wav', None),
+                                   (FieldName.MEDICATION, 'medikament-01.wav', 1)):
+            call.begin_audio(field, name, index).write_bytes(b'RIFF' + b'0' * 100)
+        queued = spool.finish_recording(call, 'abgeschlossen')
+        claimed = spool.claim_next()
+
+        class Ersatz:
+            def transcribe(self, path, _field):
+                return {'vorname.wav': 'Max.', 'nachname.wav': 'Mustermann.', 'medikament-01.wav': 'Ibuprofen 400.'}[path.name]
+        Worker(config, transcriber=Ersatz()).process(WorkingCall(claimed.path, config.practice.timezone))
+        ziel = self.tmp / 'kienzlefon' / 'vorgaenge' / f'{queued.call_id}.json.enc'
+        w = json.loads(ziel.read_text())
+        self.assertNotIn('Mustermann', ziel.read_text())
+        key = geheim.decrypt(base64.b64decode(w['ek']), padding.PKCS1v15())
+        d = Cipher(algorithms.AES(key), modes.CBC(base64.b64decode(w['iv']))).decryptor()
+        roh = d.update(base64.b64decode(w['ct'])) + d.finalize()
+        payload = json.loads(roh[:-roh[-1]])['payload']
+        self.assertEqual((payload['vorname'], payload['nachname'], payload['medikamente']), ('Max', 'Mustermann', 'Ibuprofen 400'))
+        bereit = next((self.tmp / 'kienzlefon' / 'spool' / 'ready').iterdir())
+        self.assertEqual(list((bereit / 'audio').glob('*.wav')), [])          # Ton nach dem Umwandeln gelöscht
+        # Pflege: verarbeitete Anrufe nach 2 Tagen, erledigte Vorgänge nach 7 Tagen.
+        erledigt = self.tmp / 'kienzlefon' / 'vorgaenge' / 'erledigt'
+        erledigt.mkdir()
+        alt = erledigt / 'x.json.enc'
+        alt.write_text('{}')
+        neu = erledigt / 'y.json.enc'
+        neu.write_text('{}')
+        vor = time.time() - 8 * 86400
+        os.utime(alt, (vor, vor))
+        os.utime(bereit, (time.time() - 3 * 86400,) * 2)
+        self.a.pflege()
+        self.assertFalse(alt.exists())
+        self.assertTrue(neu.exists())
+        self.assertFalse(bereit.exists())
+        self.assertTrue(ziel.exists())
 
     def test_sprachmenue_seite_lesen_und_schreiben(self):
         self.assertEqual(self.a.sprachmenue_lesen(), {'ok': True, 'bereit': False})

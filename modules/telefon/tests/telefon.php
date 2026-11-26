@@ -3,7 +3,7 @@ declare(strict_types=1);
 // Modul telefon: Einstellungen, Verschlüsselung der Passwörter, Generator-Aufruf, Seiten. Nur erfundene Daten.
 require dirname(__DIR__, 3) . '/core/php/modul/Kienzle.php';
 require dirname(__DIR__) . '/src/bootstrap.php';
-use KienzleTelefon\{Anlage, Ansicht};
+use KienzleTelefon\{Anlage, Ansicht, Vorgaenge};
 
 set_error_handler(static function (int $no, string $msg, string $file, int $line): bool { if (!(error_reporting() & $no)) return false; throw new ErrorException($msg, 0, $no, $file, $line); });
 function check(bool $ok, string $msg): void { if (!$ok) { fwrite(STDERR, "FEHLER: $msg\n"); exit(1); } }
@@ -94,4 +94,40 @@ wirft(fn() => Anlage::wartemusikHochladen(Anlage::laden(), str_repeat('a', Anlag
 wirft(fn() => Anlage::wartemusikHochladen(Anlage::laden(), "%PDF-1.7\n" . str_repeat('x', 100), $k), 'Wartemusik kein Audio', 'Musikdatei');
 check(!file_exists("$dir/daten/kienzlefon/wartemusik-upload"), 'Abgelehnte Datei nicht abgelegt');
 check(Anlage::wartemusik() === ['bereit' => false, 'quelle' => '', 'dauer' => 0], 'Keine Wartemusik');
+// Vorgänge: Schlüsselpaar des Moduls; Kienzlefon (crypto.py) verschlüsselt mit dem öffentlichen Teil, PHP entschlüsselt.
+Vorgaenge::schluesselSicherstellen($k);
+$pub = "$dir/daten/kienzlefon/telepraxis-public.pem";
+check(str_contains((string)file_get_contents($pub), 'BEGIN PUBLIC KEY') && str_starts_with((string)file_get_contents("$dir/daten/vorgaenge-schluessel"), 'v1:'), 'Schlüsselpaar, geheimer Teil verschlüsselt');
+check(decoct(fileperms("$dir/daten/vorgaenge-schluessel") & 0777) === '600', 'Geheimer Schlüssel 0600');
+$alt = (string)file_get_contents($pub);
+Vorgaenge::schluesselSicherstellen($k);
+check((string)file_get_contents($pub) === $alt, 'Schlüssel bleibt');
+check(Vorgaenge::liste($k) === [] && Vorgaenge::anzahlOffen() === 0, 'Noch keine Vorgänge');
+$py = 'import sys, json; from pathlib import Path; from zoneinfo import ZoneInfo; sys.path.insert(0, sys.argv[1]);'
+    . ' from kienzlefon.crypto import TelepraxisEncryptor;'
+    . ' e = TelepraxisEncryptor(Path(sys.argv[2]), Path(sys.argv[3]), ZoneInfo("Europe/Berlin"));'
+    . ' e.write_payload({"typ": "rezeptbestellung", "id": "+4930123456", "telefon": "+4930123456", "vorname": "Max", "nachname": "Mustermann", "geburtsdatum": "1. April 1970",'
+    . ' "medikamente": "Ibuprofen 400\nPantoprazol 20", "_kienzlefon": {"vorgang_id": "20261126_091400_000001", "erstellt_am": "2026-11-26T09:14:00+01:00"}}, "20261126_091400_000001");'
+    . ' e.write_payload({"typ": "mehrere_anliegen", "id": "unbekannt", "telefon": "unbekannt", "anliegen_liste": [{"typ": "termin", "vorname": "Erika", "grund": "Kontrolle"}],'
+    . ' "_kienzlefon": {"vorgang_id": "20261126_101500_000002", "erstellt_am": "2026-11-26T10:15:00+01:00"}}, "20261126_101500_000002")';
+exec(implode(' ', array_map('escapeshellarg', ['python3', '-c', $py, dirname(__DIR__) . '/kienzlefon', $pub, "$dir/daten/kienzlefon/vorgaenge"])) . ' 2>&1', $aus, $rc);
+check($rc === 0, 'Kienzlefon verschlüsselt: ' . implode("\n", $aus));
+check(!str_contains((string)file_get_contents("$dir/daten/kienzlefon/vorgaenge/20261126_091400_000001.json.enc"), 'Mustermann'), 'Vorgang verschlüsselt abgelegt');
+$l = Vorgaenge::liste($k);
+check(count($l) === 2 && $l[0]['id'] === '20261126_101500_000002' && $l[1]['daten']['nachname'] === 'Mustermann' && $l[1]['typ'] === 'rezeptbestellung', 'Vorgänge entschlüsselt');
+$html = Ansicht::vorgaenge($l, 'offen', 2, $k->csrf(), null, null);
+check(str_contains($html, 'Max Mustermann') && str_contains($html, 'Ibuprofen 400<br />') && str_contains($html, 'Rezept') && str_contains($html, '26.11.2026, 09:14 Uhr')
+    && str_contains($html, 'Anruf von +4930123456') && str_contains($html, '1. Termin') && str_contains($html, 'Kontrolle') && str_contains($html, 'Name nicht verstanden'), 'Vorgänge-Seite');
+Vorgaenge::verschieben('20261126_091400_000001');
+check(Vorgaenge::anzahlOffen() === 1 && count(Vorgaenge::liste($k, 'erledigt')) === 1, 'Erledigt');
+Vorgaenge::verschieben('20261126_091400_000001', true);
+check(Vorgaenge::anzahlOffen() === 2, 'Wieder offen');
+Vorgaenge::loeschen('20261126_101500_000002');
+check(Vorgaenge::anzahlOffen() === 1, 'Gelöscht');
+wirft(fn() => Vorgaenge::verschieben('../anlage'), 'Pfad im Vorgang');
+wirft(fn() => Vorgaenge::loeschen('gibtsnicht'), 'Unbekannter Vorgang');
+// Fremd verschlüsselter Vorgang (anderer Schlüssel): wird als Fehler gezeigt, nichts bricht.
+file_put_contents("$dir/daten/kienzlefon/vorgaenge/20261126_120000_000003.json.enc", json_encode(['v' => 1, 'cipher' => 'AES-256-CBC', 'ek' => base64_encode(random_bytes(384)), 'iv' => base64_encode(random_bytes(16)), 'ct' => base64_encode(random_bytes(32)), 'sha256' => '']));
+$l = Vorgaenge::liste($k);
+check(count($l) === 2 && ($l[0]['fehler'] ?? '') !== '', 'Unlesbarer Vorgang als Fehler');
 echo "telefon.php: alles in Ordnung\n";

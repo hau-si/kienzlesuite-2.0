@@ -5,9 +5,14 @@ Piper ist **optional nachgeladen**, damit das Modul klein bleibt: Erst „Piper 
 Datenordner an (Pakete mit festen Versionen und Prüfsummen aus lib/piper/requirements-cp314.lock) und lädt die Stimme
 de_DE-thorsten-high von einer festen Fassung (v1.0.0) der Piper-Stimmen. „Piper entfernen“ löscht beides wieder.
 
+Whisper (Aufnahme von Anliegen, optional): „whisper-einrichten“ legt <daten>/whisper/venv aus lib/whisper/requirements-cp314.lock an
+und lädt die Modelle aus kienzlefon.toml ([whisper]) mit kienzlefon-modell-laden nach <daten>/kienzlefon/modelle; danach startet
+kienzle-telefon-whisper.path den Dienst (Datei <daten>/whisper/bereit.json). „whisper-entfernen“ löscht beides.
+
 Kokoro (wahlweise, groß) lädt „kokoro-einrichten“ über lib/kokoro-einrichten mit dem Installer von Kienzlefon; Google braucht keine Pakete.
 
-Auftrag <daten>/kienzlefon/auftrag.json: {"aktion": "piper-einrichten" | "piper-entfernen" | "kokoro-einrichten" | "kokoro-entfernen" | "erzeugen", "alle": bool}
+Auftrag <daten>/kienzlefon/auftrag.json: {"aktion": "piper-einrichten" | "piper-entfernen" | "kokoro-einrichten" | "kokoro-entfernen" | "erzeugen"
+                                          | "whisper-einrichten" | "whisper-entfernen", "alle": bool}
 Stand   <daten>/kienzlefon/auftrag-status.json: {"aktion", "stand": "laeuft" | "fertig" | "fehler", "meldung", "zeit"}
 """
 import hashlib
@@ -33,6 +38,11 @@ LOCK = HERE / 'piper' / 'requirements-cp314.lock'
 STIMME = 'de_DE-thorsten-high'
 STIMME_URL = os.environ.get('KIENZLE_PIPER_STIMME_URL', 'https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/de/de_DE/thorsten/high/')
 MAX_STIMME = 300 * 1024 * 1024
+WHISPER = DATA / 'whisper'
+WHISPER_VENV = WHISPER / 'venv'
+WHISPER_BEREIT = WHISPER / 'bereit.json'
+WHISPER_LOCK = HERE / 'whisper' / 'requirements-cp314.lock'
+MODELLE = KZF / 'modelle'
 
 
 def melden(aktion: str, stand: str, meldung: str) -> None:
@@ -86,6 +96,31 @@ def piper_entfernen() -> str:
     return 'Piper entfernt. Erzeugte Ansagen bleiben erhalten.'
 
 
+def whisper_einrichten() -> str:
+    if sys.version_info[:2] != (3, 14):
+        raise RuntimeError(f'Die Paketliste ist für Python 3.14 (Ubuntu 26.04); hier läuft {sys.version_info[0]}.{sys.version_info[1]}.')
+    WHISPER_BEREIT.unlink(missing_ok=True)
+    shutil.rmtree(WHISPER_VENV, ignore_errors=True)
+    WHISPER.mkdir(mode=0o700, exist_ok=True)
+    laufen([sys.executable, '-m', 'venv', '--system-site-packages', str(WHISPER_VENV)], 300)
+    laufen([str(WHISPER_VENV / 'bin' / 'python'), '-m', 'pip', 'install', '--no-input', '--disable-pip-version-check', '--require-hashes', '--no-deps',
+            '--only-binary=:all:', '-r', str(WHISPER_LOCK)], 1800)
+    MODELLE.mkdir(mode=0o700, parents=True, exist_ok=True)
+    # Modelle von Hugging Face; Zwischenspeicher und Sperren im Datenordner, ohne Telemetrie.
+    env = {**os.environ, 'KIENZLE_DATEN': str(DATA), 'HF_HOME': str(WHISPER / 'hf'), 'HF_HUB_DISABLE_TELEMETRY': '1'}
+    out = laufen([str(HERE / 'kzf-bin' / 'kienzlefon-modell-laden'), '--config', str(KZF / 'kienzlefon.toml')], 3 * 3600, env)
+    modelle = [z.split(':', 1)[1].strip() for z in out.splitlines() if z.startswith('Whisper-Modell bereit:')]
+    WHISPER_BEREIT.write_text(json.dumps({'modelle': modelle, 'pakete': WHISPER_LOCK.read_text(encoding='utf-8').count('--hash='), 'zeit': int(time.time())}) + '\n')
+    return 'Whisper eingerichtet (' + ', '.join(modelle) + '). Anrufer können jetzt Anliegen aufsprechen.'
+
+
+def whisper_entfernen() -> str:
+    WHISPER_BEREIT.unlink(missing_ok=True)
+    shutil.rmtree(WHISPER, ignore_errors=True)
+    shutil.rmtree(MODELLE, ignore_errors=True)
+    return 'Whisper entfernt. Anrufer werden wieder direkt mit der Praxis verbunden.'
+
+
 def kokoro_einrichten() -> str:
     laufen([sys.executable, '-B', str(HERE / 'kokoro-einrichten')], 3600, {**os.environ, 'KIENZLE_DATEN': str(DATA)})
     return 'Kokoro-Thorsten eingerichtet (Modell geprüft, Testansage erzeugt).'
@@ -113,7 +148,7 @@ def main() -> int:
         AUFTRAG.unlink(missing_ok=True)
     aktion = str(auftrag.get('aktion') or '')
     arbeit = {'piper-einrichten': piper_einrichten, 'piper-entfernen': piper_entfernen, 'kokoro-einrichten': kokoro_einrichten,
-              'kokoro-entfernen': kokoro_entfernen, 'erzeugen': lambda: erzeugen(auftrag.get('alle') is True)}.get(aktion)
+              'kokoro-entfernen': kokoro_entfernen, 'whisper-einrichten': whisper_einrichten, 'whisper-entfernen': whisper_entfernen, 'erzeugen': lambda: erzeugen(auftrag.get('alle') is True)}.get(aktion)
     if arbeit is None:
         melden(aktion[:30], 'fehler', 'Unbekannter Auftrag.')
         return 1

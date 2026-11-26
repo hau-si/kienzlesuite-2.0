@@ -22,7 +22,7 @@ final class Anlage {
             'telefon' => ['leitung_ein' => '', 'nummer_ein' => '', 'leitung_aus' => '', 'kennung_aus' => '', 'aus_zaehlt' => true, 'ausland' => false, 'sonderrufnummern' => false],
             'ueberlauf' => ['leitung' => '', 'nummer' => ''], 'kanaele' => ['gesamt' => 4, 'telefon' => 3, 'fax' => 3, 'ueberlauf' => 2],
             'warteschlange' => ['max_wartend' => 5], 'nebenstellen' => [], 'netz' => ['lokal' => '', 'erlaubt' => '', 'extern' => ''],
-            'kienzlefon' => ['aktiv' => false, 'tts' => 'piper', 'google' => ['schluessel' => '', 'stimme' => '', 'tempo' => ''], 'wartemusik' => 'klingelzeichen']];
+            'kienzlefon' => ['aktiv' => false, 'tts' => 'piper', 'google' => ['schluessel' => '', 'stimme' => '', 'tempo' => ''], 'wartemusik' => 'klingelzeichen', 'whisper_genau' => false]];
     }
 
     public static function laden(): array {
@@ -53,7 +53,10 @@ final class Anlage {
 
     /** Gespeicherte Einstellungen an Asterisk geben (nach dem Speichern und nach einem Update). */
     public static function anwenden(\KienzleModul $k, ?array $cfg = null): array {
-        $r = self::python('anwenden', self::klartext($cfg ?? self::laden(), $k));
+        $cfg ??= self::laden();
+        // Schlüsselpaar für die Vorgänge vor dem ersten Start des Whisper-Workers (der braucht den öffentlichen Teil).
+        if ($cfg['kienzlefon']['aktiv'] ?? false) Vorgaenge::schluesselSicherstellen($k);
+        $r = self::python('anwenden', self::klartext($cfg, $k));
         if (($r['ok'] ?? false) !== true) throw new \RuntimeException((string)($r['fehler'] ?? 'Die Anlage ließ sich nicht neu laden.'));
         return $r;
     }
@@ -234,8 +237,15 @@ final class Anlage {
         return 'Eigene Wartemusik eingerichtet und eingeschaltet.';
     }
 
+    /** „Whisper einrichten“: Wahl der Modelle merken (genauer = large-v3 für Namen); der Auftrag lädt danach. */
+    public static function whisperWahl(array $cfg, array $p): array {
+        if (!($cfg['kienzlefon']['aktiv'] ?? false)) throw new \InvalidArgumentException('Erst das Sprachmenü einschalten.');
+        $cfg['kienzlefon']['whisper_genau'] = !empty($p['genau']);
+        return $cfg;
+    }
+
     // ---- Ansagen und Piper (optional nachgeladen, lib/ansagen-auftrag über kienzle-telefon-ansagen.path) ------------
-    public const AUFTRAEGE = ['piper-einrichten', 'piper-entfernen', 'kokoro-einrichten', 'kokoro-entfernen', 'erzeugen'];
+    public const AUFTRAEGE = ['piper-einrichten', 'piper-entfernen', 'kokoro-einrichten', 'kokoro-entfernen', 'erzeugen', 'whisper-einrichten', 'whisper-entfernen'];
 
     /** Auftrag für den Ansagen-Dienst ablegen (einer zur Zeit). */
     public static function auftrag(string $aktion, bool $alle = false): void {
@@ -257,6 +267,14 @@ final class Anlage {
         $d = is_array($d) ? $d : [];
         if (is_file(self::$data . '/kienzlefon/auftrag.json')) $d = ['aktion' => '', 'stand' => 'wartet', 'meldung' => 'Auftrag wartet auf den Dienst …', 'zeit' => time()];
         return $d;
+    }
+
+    public static function whisperBereit(): bool { return is_file(self::$data . '/whisper/bereit.json'); }
+
+    /** Läuft der Whisper-Worker (Herzschlag von Kienzlefon höchstens 30 s alt)? */
+    public static function whisperLaeuft(): bool {
+        $f = self::$data . '/kienzlefon/run/whisper-health.json';
+        return is_file($f) && (int)@filemtime($f) > time() - 30;
     }
 
     public static function piperBereit(): bool { return is_file(self::$data . '/piper/bereit.json'); }

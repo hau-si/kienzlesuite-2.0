@@ -25,6 +25,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import subprocess
 import sys
 import time
@@ -305,7 +306,8 @@ def check(cfg: dict) -> dict:
     wartemusik = str(kz.get('wartemusik') or 'klingelzeichen')
     if wartemusik not in ('klingelzeichen', 'musik'):
         raise Fehler('Wartemusik: Klingelzeichen oder Musik wählen.')
-    out['kienzlefon'] = {'aktiv': kz.get('aktiv') is True, 'tts': tts, 'google': google, 'wartemusik': wartemusik}
+    out['kienzlefon'] = {'aktiv': kz.get('aktiv') is True, 'tts': tts, 'google': google, 'wartemusik': wartemusik,
+                         'whisper_genau': kz.get('whisper_genau') is True}
     if out['kienzlefon']['aktiv'] and not tel.get('leitung_ein'):
         raise Fehler('Sprachmenü: zuerst die eingehende Telefonleitung unter „Rufnummern“ wählen.')
     if out['kienzlefon']['aktiv']:
@@ -815,6 +817,7 @@ def render(c: dict) -> dict[str, str]:
 # ---- Kienzlefon (Sprachmenü, Zeiten, Ansagen) ------------------------------------------------------------------
 KZF_SOURCE = PROGRAM / 'kienzlefon'          # unverändert übernommenes Kienzlefon 2.7 (kienzlefon/HERKUNFT.md)
 KZF_DATA = DATA / 'kienzlefon'
+ERLEDIGT_TAGE = 7                             # erledigte Vorgänge werden danach gelöscht
 MOH = KZF_DATA / 'wartemusik'                 # Wiedergabeformate der Wartemusik (statt /var/lib/asterisk/moh/kienzlefon-wartemusik)
 PLACHETKA = PROGRAM / 'medien' / 'johannes-plachetka-warteschlange.mp3'
 KZF_CONFIG = KZF_DATA / 'kienzlefon.toml'
@@ -853,6 +856,13 @@ def kienzlefon_toml(c: dict) -> str:
         ('pfade', 'spool', str(d / 'spool')), ('pfade', 'runtime', str(d / 'run')), ('pfade', 'ansagen', str(d / 'ansagen')),
         ('pfade', 'ansagen_master', str(d / 'ansagen-master')), ('whisper', 'modellverzeichnis', str(d / 'modelle')),
         ('telepraxis', 'ausgabeverzeichnis', str(d / 'vorgaenge')), ('telepraxis', 'public_key', str(d / 'telepraxis-public.pem')),
+        # Vorgänge verschlüsselt für die Seite „Vorgänge“ (Schlüsselpaar des Moduls, geheimer Teil nur mit dem Modulschlüssel lesbar),
+        # ohne Tonaufnahmen (die löscht der Worker nach dem Umwandeln).
+        ('telepraxis', 'demo', False), ('telepraxis', 'audio_beilegen', False), ('telepraxis', 'anrufernummern_anonymisieren', False),
+        # Whisper: large-v3-turbo für alles; „genauer“ nimmt für Vor- und Nachnamen large-v3 (zusätzlich etwa 3 GB).
+        ('whisper', 'modell_standard', 'large-v3-turbo'), ('whisper', 'modell_medikamente', 'large-v3-turbo'),
+        ('whisper', 'modell_namen', 'large-v3' if c['kienzlefon'].get('whisper_genau') else 'large-v3-turbo'),
+        ('whisper', 'geraet', 'cpu'), ('whisper', 'compute_type', 'int8'),
         ('tts', 'engine', c['kienzlefon']['tts']), ('tts', 'kokoro_generator', str(d / 'kokoro' / 'kienzlefon-kokoro-tts-generate')),
         ('tts', 'kokoro_modellverzeichnis', str(d / 'kokoro-thorsten')), ('tts', 'qwen_generator', str(KZF_BIN / 'kienzlefon-qwen3-tts-generate')),
         ('tts', 'google_generator', str(KZF_BIN / 'kienzlefon-google-tts-generate')), ('tts', 'google_konfig', str(d / 'google-tts.conf')),
@@ -1051,7 +1061,17 @@ def pflege(now: float | None = None) -> int:
     """Protokolle älter als 7 Tage und liegengebliebene Empfangsdateien löschen."""
     now = now or time.time()
     removed = 0
-    for folder, days in ((AST / 'log', LOG_KEEP_DAYS), (AST / 'spool' / 'fax-empfang', 2)):
+    # Datensparsamkeit: erledigte Vorgänge nach 7 Tagen; fertig verarbeitete Anrufe im Spool von Kienzlefon (Klartext der Anliegen)
+    # nach 2 Tagen, fehlgeschlagene nach 7 Tagen.
+    for folder in (KZF_DATA / 'spool' / 'ready', KZF_DATA / 'spool' / 'error'):
+        for p in folder.glob('*') if folder.is_dir() else []:
+            try:
+                if p.is_dir() and not p.is_symlink() and p.stat().st_mtime < now - (2 if folder.name == 'ready' else 7) * 86400:
+                    shutil.rmtree(p)
+                    removed += 1
+            except OSError:
+                pass
+    for folder, days in ((AST / 'log', LOG_KEEP_DAYS), (AST / 'spool' / 'fax-empfang', 2), (KZF_DATA / 'vorgaenge' / 'erledigt', ERLEDIGT_TAGE)):
         for p in folder.glob('*') if folder.is_dir() else []:
             try:
                 if p.is_file() and not p.is_symlink() and p.stat().st_mtime < now - days * 86400:
