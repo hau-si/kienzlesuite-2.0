@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.7
+
+- **Windows-Druckerskript** (`install-drucker.ps1` im Starter-Paket und Anleitung unter „Arbeitsplätze“): Bei „Drucker … nicht angelegt“ nennt die Meldung jetzt getrennt den Fehler beim Anlegen des Anschlusses und beim Anlegen des Druckers (vorher verdeckte der zweite den ersten) und prüft, ob die Druckeradresse vom Arbeitsplatz aus antwortet. Häufigste Ursache: Der Drucker fehlt auf dem Server (Verwaltung → Drucker → „Virtuelle Drucker der Module abgleichen“) oder Port 631 ist blockiert.
+- **Umlaute in der PowerShell-Ausgabe** („unverändert“ statt „unverÃ¤ndert“): Die Skripte werden mit UTF-8-Kennung (BOM) ausgeliefert.
+- Nicht auf Windows geprüft.
+
 ## 0.22.0-beta.6
 
 - **Fehler behoben: Modul-Update scheiterte mit „Vorgang fehlgeschlagen (Error)“**, wenn das Modul im Datenordner Sockets oder Pipes hat. Betroffen war das Telefonmodul (laufendes Asterisk legt `asterisk.ctl` an): Der Schnappschuss vor dem Update brach beim Kopieren ab. Sockets, Pipes und Gerätedateien werden jetzt übersprungen (sie gehören nicht in einen Schnappschuss). Das Protokoll (`/var/lib/kienzle/module/module.log`) nennt bei unbekannten Fehlern jetzt die Ursache. Mit Test nachgestellt (Socket und Pipe im Datenordner). Nach dem Update der Basis das Telefonmodul erneut aktualisieren; es wurde beim Abbruch nichts verändert.
