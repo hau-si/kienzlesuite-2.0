@@ -86,55 +86,95 @@ final class Ansicht {
         return $o . '</ul>';
     }
 
+    /** Anzeigename einer Quelle (Faxdrucker mit Bezeichnung, Upload, NAS, Sendefehler). */
+    private static function quellName(string $q, array $drucker): string {
+        return match (true) { $q === 'sendefehler' => 'Sendefehler', $q === Fax::UPLOAD => 'Hochgeladen', $q === Fax::NAS => 'NAS-Ordner',
+            default => $q . (($drucker[$q]['bezeichnung'] ?? '') !== '' ? ' · ' . $drucker[$q]['bezeichnung'] : '') };
+    }
+
+    private static function wann(int $t): string {
+        if ($t <= 0) return '–';
+        $tage = (int)((strtotime('today') - strtotime(date('Y-m-d', $t))) / 86400);
+        return match (true) { $tage <= 0 => 'heute ' . date('H:i', $t), $tage === 1 => 'gestern ' . date('H:i', $t), default => date('d.m. H:i', $t) };
+    }
+
+    /**
+     * „Fax senden“ (Entwurf A): oben alle Dokumente aller Quellen in einer Liste mit Häkchen (neueste vorgewählt, Reihenfolge wie
+     * angehakt, Vorschau rechts), darunter „An“ mit Favoriten, „Zuletzt“, Suchfeld je Empfänger und „+ weiterer Empfänger“.
+     */
     private static function senden(array $d): string {
         $b = fx_h(fx_basis());
-        $q = $d['quelle'];
-        $tabs = '';
-        $druckerInfo = [];
-        foreach ($d['drucker'] as $x) $druckerInfo[$x['name']] = $x;
-        foreach (array_keys($d['zaehler']) as $name) {
-            $z = $d['zaehler'][$name] ?? 0;
-            if ($name === Fax::UPLOAD && $z === 0 && $q !== $name) continue;      // „Hochgeladen“ nur, wenn etwas drin liegt
-            $titel = match (true) { $name === 'sendefehler' => 'Sendefehler', $name === Fax::UPLOAD => 'Hochgeladen', $name === Fax::NAS => 'NAS-Ordner',
-                default => $name . (($druckerInfo[$name]['bezeichnung'] ?? '') !== '' ? ' · ' . $druckerInfo[$name]['bezeichnung'] : '') };
-            $tabs .= '<a class="button small ' . ($name === $q ? 'primary' : 'secondary') . '" href="' . $b . '/?quelle=' . fx_h($name) . '">' . fx_h($titel)
-                . ($z ? ' <span class="fx-zahl">' . $z . '</span>' : '') . '</a>';
-        }
-        $fest = $druckerInfo[$q] ?? null;
-        $fest = $fest && $fest['nummer'] !== '' ? $fest : null;
+        $drucker = [];
+        foreach ($d['drucker'] as $x) $drucker[$x['name']] = $x;
+        $doks = $d['dokumente'];
+        $vor = $d['auswahl'] ?: array_map(fn($x) => Fax::UPLOAD . '/' . $x, $d['vorgewaehlt']);
+        $vor = array_values(array_intersect($vor, array_column($doks, 'schluessel')));
+        if (!$vor && $doks) $vor = [$doks[0]['schluessel']];
         $liste = '';
-        foreach ($d['dateien'] as $f) {
+        foreach ($doks as $f) {
+            $nr = array_search($f['schluessel'], $vor, true);
+            $fest = isset($drucker[$f['quelle']]) && $drucker[$f['quelle']]['nummer'] !== '' ? $drucker[$f['quelle']] : null;
             $titel = $f['titel'] !== '' ? $f['titel'] : $f['datei'];
-            $liste .= '<li><label class="check"><input type="checkbox" name="dateien[]" value="' . fx_h($f['datei']) . '"' . (count($d['dateien']) === 1 || in_array($f['datei'], $d['vorgewaehlt'], true) ? ' checked' : '') . '> <span><strong>'
-                . fx_h($titel) . '</strong><span class="muted klein"> · ' . self::zeit($f['zeit']) . ' · ' . self::groesse($f['groesse']) . '</span></span></label>'
-                . ' <a class="klein" href="' . $b . '/pdf?art=quelle&amp;quelle=' . fx_h($q) . '&amp;datei=' . fx_h($f['datei']) . '" target="_blank" rel="noopener">ansehen</a></li>';
+            $liste .= '<li data-vorschau="' . $b . '/vorschau?dok=' . fx_h(rawurlencode($f['schluessel'])) . '" data-seiten="' . (int)$f['seiten'] . '"'
+                . ($fest ? ' data-fest-name="' . fx_h($fest['bezeichnung'] !== '' ? $fest['bezeichnung'] : $fest['name']) . '" data-fest-nummer="' . fx_h(Fax::anzeige($fest['nummer'])) . '"' : '') . '>'
+                . '<label class="fx-dok"><input type="checkbox" name="auswahl[]" value="' . fx_h($f['schluessel']) . '"' . ($nr !== false ? ' checked' : '') . '>'
+                . '<span class="fx-nr" aria-hidden="true">' . ($nr !== false ? $nr + 1 : '') . '</span><span class="fx-dok-text"><strong>' . fx_h($titel) . '</strong>'
+                . '<span class="muted klein">' . fx_h(self::quellName($f['quelle'], $drucker)) . ' · ' . self::wann($f['zeit']) . ($f['seiten'] ? ' · ' . (int)$f['seiten'] . ' S.' : '') . '</span></span></label>'
+                . '<a class="klein" href="' . $b . '/pdf?art=quelle&amp;quelle=' . fx_h($f['quelle']) . '&amp;datei=' . fx_h($f['datei']) . '" target="_blank" rel="noopener">ansehen</a></li>';
         }
-        $kontakte = '<option value="0">– aus dem Telefonbuch wählen –</option>';
-        foreach ($d['kontakte'] as $k) $kontakte .= '<option value="' . (int)$k['id'] . '">' . fx_h($k['name'] . ' · ' . Fax::anzeige($k['nummer'])) . '</option>';
+        $erstes = $vor ? $vor[0] : '';
+        $o = '<form method="post" id="fx-senden" class="fx-senden" data-telefonbuch="' . fx_h((string)json_encode(array_map(fn($k) => ['id' => (int)$k['id'], 'name' => $k['name'],
+                'nummer' => Fax::anzeige($k['nummer']), 'n' => $k['nummer']], $d['kontakte']), JSON_UNESCAPED_UNICODE)) . '">' . self::csrf($d['csrf'])
+            . '<input type="hidden" name="reihenfolge" value="' . fx_h(implode("\n", $vor)) . '">'
+            . '<section class="card fx-doks"><div class="fx-titel"><h2>Dokumente</h2><span class="muted klein">Neueste oben · mehrere werden in der Reihenfolge des Anhakens zu einem Fax</span></div>'
+            . '<div class="fx-doks-raster"><div>';
+        $o .= $liste !== '' ? '<ul class="fx-dateien" id="fx-dateien">' . $liste . '</ul>'
+            : '<p class="muted">Noch keine Dokumente. Am PC auf einen Faxdrucker drucken (' . fx_h(implode(', ', array_column($d['drucker'], 'name'))) . '), eine Datei hierher ziehen'
+                . ($d['lauschordner'] ? ' oder in den NAS-Ordner legen' : '') . '.</p>';
+        $o .= '<div id="fx-drop" class="fx-drop" data-csrf="' . fx_h($d['csrf']) . '" data-ziel="' . $b . '/" data-hochladen="' . $b . '/hochladen" tabindex="0">'
+            . '<span><strong>+ Datei hierher ziehen</strong> <span class="muted klein">oder</span> <label class="fx-datei">wählen<input type="file" id="fx-datei" multiple accept=".pdf,.ps,.jpg,.jpeg,.png,.gif,.bmp,.webp,application/pdf,image/*" hidden></label></span>'
+            . '<span class="muted klein">PDF, Bilder oder PostScript bis 7 MB. Word-Dokumente bitte auf den Faxdrucker drucken.</span></div>'
+            . ($liste !== '' ? '<button class="small secondary" type="submit" name="aktion" value="quelle-loeschen" formnovalidate data-frage="Die angehakten Dokumente löschen?">Angehakte löschen</button>' : '')
+            . '</div><figure class="fx-vorschau" id="fx-vorschau">' . ($erstes !== '' ? '<img src="' . $b . '/vorschau?dok=' . fx_h(rawurlencode($erstes)) . '" alt="Vorschau: oberer Teil der ersten Seite">' : '<div class="fx-leer muted klein">Vorschau</div>')
+            . '<figcaption class="muted klein">Oberer Teil der ersten Seite</figcaption></figure></div>'
+            . '<p class="fx-summe" id="fx-summe" aria-live="polite"></p></section>';
+
+        // Empfänger
+        $chips = '';
+        $favoriten = array_values(array_filter($d['kontakte'], fn($k) => !empty($k['favorit'])));
+        foreach ($favoriten as $k) $chips .= '<button type="button" class="fx-chip fx-fav" data-wahl data-kontakt="' . (int)$k['id'] . '" data-name="' . fx_h($k['name']) . '" data-nummer="' . fx_h(Fax::anzeige($k['nummer'])) . '" title="' . fx_h(Fax::anzeige($k['nummer'])) . '">★ ' . fx_h($k['name']) . '</button>';
+        $favNummern = array_column($favoriten, 'nummer');
+        $zuletzt = '';
+        foreach (array_slice(array_filter($d['zuletzt'], fn($z) => !in_array($z['nummer'], $favNummern, true)), 0, 5) as $z) {
+            $zuletzt .= '<button type="button" class="fx-chip" data-wahl data-name="' . fx_h($z['name']) . '" data-nummer="' . fx_h(Fax::anzeige($z['nummer'])) . '" title="Zuletzt gefaxt an ' . fx_h(Fax::anzeige($z['nummer'])) . '">⟲ ' . fx_h($z['name']) . '</button>';
+        }
+        $post = (array)($d['post']['empfaenger'] ?? []);
+        if (!$post && $erstes !== '') {          // Dokument von einem Faxdrucker mit fester Nummer: Empfänger vorbelegen
+            $q = substr($erstes, 0, (int)strpos($erstes, '/'));
+            if (($drucker[$q]['nummer'] ?? '') !== '') $post = [['name' => $drucker[$q]['bezeichnung'] !== '' ? $drucker[$q]['bezeichnung'] : $q, 'nummer' => Fax::anzeige($drucker[$q]['nummer'])]];
+        }
         $empf = '';
         for ($i = 0; $i < Fax::MAX_EMPFAENGER; $i++) {
-            $vorName = $i === 0 && $fest ? ($fest['bezeichnung'] !== '' ? $fest['bezeichnung'] : $fest['name']) : '';
-            $vorNr = $i === 0 && $fest ? Fax::anzeige($fest['nummer']) : '';
-            $empf .= '<fieldset class="fx-empfaenger"' . ($i > 0 ? ' data-weitere hidden' : '') . '><legend>Empfänger ' . ($i + 1) . '</legend>'
-                . ($i === 0 && $fest ? '<p class="muted klein">Feste Faxnummer des Druckers ' . fx_h($fest['name']) . ' (änderbar).</p>' : '')
-                . '<label>Telefonbuch<select name="empfaenger[' . $i . '][kontakt]">' . $kontakte . '</select></label>'
-                . '<div class="fx-zwei"><label>Name<input name="empfaenger[' . $i . '][name]" maxlength="80" autocomplete="off" value="' . fx_h($vorName) . '"></label>'
-                . '<label>Faxnummer<input name="empfaenger[' . $i . '][nummer]" maxlength="30" inputmode="tel" autocomplete="off" placeholder="030 1234567" value="' . fx_h($vorNr) . '"></label></div>'
-                . '<label class="check"><input type="checkbox" name="empfaenger[' . $i . '][merken]" value="1"> Im Telefonbuch speichern</label></fieldset>';
+            $p = is_array($post[$i] ?? null) ? $post[$i] : [];
+            $sichtbar = $i === 0 || trim((string)($p['name'] ?? '') . (string)($p['nummer'] ?? '')) !== '';
+            $empf .= '<div class="fx-empfaenger"' . ($sichtbar ? '' : ' hidden') . ($i > 0 ? ' data-weitere' : '') . '>'
+                . '<div class="fx-suchfeld"><input name="empfaenger[' . $i . '][name]" maxlength="80" autocomplete="off" aria-label="Empfänger ' . ($i + 1) . ': Name oder Faxnummer" placeholder="Name, Teil des Namens oder Faxnummer …" value="' . fx_h((string)($p['name'] ?? '')) . '">'
+                . '<ul class="fx-vorschlaege" hidden></ul></div>'
+                . '<input name="empfaenger[' . $i . '][nummer]" maxlength="30" inputmode="tel" autocomplete="off" aria-label="Empfänger ' . ($i + 1) . ': Faxnummer" placeholder="Faxnummer" value="' . fx_h((string)($p['nummer'] ?? '')) . '">'
+                . '<input type="hidden" name="empfaenger[' . $i . '][kontakt]" value="' . (int)($p['kontakt'] ?? 0) . '">'
+                . ($i > 0 ? '<button type="button" class="small secondary fx-weg" data-entfernen title="Empfänger entfernen" aria-label="Empfänger entfernen">×</button>' : '<span></span>')
+                . '<label class="check klein fx-merken"><input type="checkbox" name="empfaenger[' . $i . '][merken]" value="1"' . (!empty($p['merken']) ? ' checked' : '') . '> Im Telefonbuch speichern</label></div>';
         }
-        $o = '<form method="post" id="fx-senden" class="fx-raster">' . self::csrf($d['csrf']) . '<input type="hidden" name="quelle" value="' . fx_h($q) . '">'
-            . '<section class="card"><h2>1. Dokument wählen</h2><p class="muted">Am PC auf einen Faxdrucker drucken (' . fx_h(implode(', ', array_column($d['drucker'], 'name'))) . '), eine Datei hierher ziehen'
-            . ($d['lauschordner'] ? ' oder in den NAS-Ordner legen' : '') . '. Das Dokument erscheint dann hier.</p>'
-            . '<div id="fx-drop" class="fx-drop" data-csrf="' . fx_h($d['csrf']) . '" data-ziel="' . $b . '/" data-hochladen="' . $b . '/hochladen" tabindex="0"><strong>Dateien hier ablegen</strong><span class="muted klein">PDF, Bilder (JPEG, PNG, GIF, BMP, WebP) oder PostScript, bis 7 MB je Datei. '
-            . 'Word- und LibreOffice-Dokumente bitte zuerst als PDF speichern oder auf den Faxdrucker drucken.</span>'
-            . '<label class="button small secondary fx-datei">Dateien wählen<input type="file" id="fx-datei" multiple accept=".pdf,.ps,.jpg,.jpeg,.png,.gif,.bmp,.webp,application/pdf,image/*" hidden></label></div>'
-            . '<div class="fx-tabs">' . $tabs . '</div>';
-        $o .= $liste !== '' ? '<ul class="fx-dateien">' . $liste . '</ul><button class="small secondary" type="submit" name="aktion" value="quelle-loeschen" formnovalidate data-frage="Ausgewählte Dokumente löschen?">Ausgewählte löschen</button>'
-            : '<p class="muted">' . ($q === 'sendefehler' ? 'Keine fehlgeschlagenen Dokumente.' : ($q === Fax::NAS ? 'Der NAS-Ordner ist leer.' : ($q === Fax::UPLOAD ? 'Noch nichts hochgeladen.' : 'Noch nichts auf ' . fx_h($q) . ' gedruckt.'))) . '</p>';
-        $o .= '</section><section class="card"><h2>2. Empfänger</h2>' . $empf . '<button class="small secondary" type="button" data-mehr>Weiteren Empfänger hinzufügen</button>'
-            . '<h2>3. Senden</h2><div class="fx-zwei"><label>Auflösung<select name="aufloesung"><option value="fine">fein (empfohlen)</option><option value="standard">normal</option></select></label>'
-            . '<label class="check"><input type="checkbox" name="ecm" value="1" checked> Fehlerkorrektur (ECM)</label></div>'
-            . '<button class="primary" type="submit" name="aktion" value="senden"' . ($d['telefon'] ? '' : ' disabled') . '>Fax senden</button></section></form>';
+        $ecm = !$d['post'] || !empty($d['post']['ecm']);
+        $o .= '<section class="card fx-an"><h2>An</h2>'
+            . ($chips . $zuletzt !== '' ? '<div class="fx-chips">' . $chips . $zuletzt . '</div>' : '<p class="muted klein">Tipp: Im Telefonbuch mit ★ Favoriten markieren, sie stehen dann hier zur Auswahl.</p>')
+            . $empf . '<button class="small secondary fx-plus" type="button" data-mehr>+ weiterer Empfänger</button>'
+            . '<details class="fold fx-erweitert"><summary>Erweitert</summary><div class="fx-zwei"><label>Auflösung<select name="aufloesung"><option value="fine">fein (empfohlen)</option><option value="standard"'
+            . (($d['post']['aufloesung'] ?? '') === 'standard' ? ' selected' : '') . '>normal</option></select></label>'
+            . '<label class="check"><input type="checkbox" name="ecm" value="1"' . ($ecm ? ' checked' : '') . '> Fehlerkorrektur (ECM)</label></div>'
+            . '<label class="check"><input type="checkbox" name="einzeln" value="1" id="fx-einzeln"' . (!empty($d['post']['einzeln']) ? ' checked' : '') . '> Jedes Dokument als eigenes Fax</label></details>'
+            . '<p class="fx-hinweis klein" id="fx-viele" hidden>Mehr als 15 Seiten: Als einzelne Faxe ist das Senden oft zuverlässiger – bricht die Leitung ab, wird nur ein Dokument wiederholt (Erweitert → „Jedes Dokument als eigenes Fax“).</p>'
+            . '<button class="primary fx-los" id="fx-los" type="submit" name="aktion" value="senden"' . ($d['telefon'] ? '' : ' disabled') . '>Fax senden</button></section></form>';
         $o .= '<section class="card"><h2>Laufende Aufträge</h2><div id="fx-aktiv" data-status="' . $b . '/status">' . self::aktiveListe($d['aktive'], $d['csrf']) . '</div></section>';
         return $o;
     }
@@ -143,7 +183,7 @@ final class Ansicht {
         $b = fx_h(fx_basis());
         $liste = $d['berichte'];
         if (!$liste) return '<section class="card"><p class="muted">' . ($art === 'fehler' ? 'Keine Fehlerberichte.' : 'Noch keine gesendeten Faxe.') . '</p></section>';
-        $o = '<section class="card">' . ($art === 'fehler' ? '<p class="muted">Das Original eines fehlgeschlagenen Faxes liegt unter „Fax senden“ → Sendefehler und lässt sich dort erneut senden.</p>' : '')
+        $o = '<section class="card">' . ($art === 'fehler' ? '<p class="muted">Das Original eines fehlgeschlagenen Faxes steht unter „Fax senden“ in der Dokumentliste (Quelle „Sendefehler“) und lässt sich dort erneut senden.</p>' : '')
             . '<table class="fx-tabelle"><tr><th>Zeit</th><th>Empfänger</th><th>Dokument</th><th>Seiten</th><th>' . ($art === 'fehler' ? 'Grund' : '') . '</th><th></th></tr>';
         foreach ($liste as $r) {
             $grund = $r['abgebrochen'] ? self::tag('warn', 'abgebrochen') : ($art === 'fehler' ? fx_h(self::grund($r['grund'])) : self::tag('ok', 'gesendet'));
@@ -172,7 +212,7 @@ final class Ansicht {
         foreach ($d['eingang'] as $e) {
             $abs = $e['kontakt'] !== '' ? fx_h($e['kontakt']) . '<div class="muted klein">' . fx_h(Fax::anzeige(Fax::nummer($e['absender']))) . '</div>'
                 : ($e['absender'] !== '' ? fx_h(Fax::anzeige(Fax::nummer($e['absender']) ?: $e['absender'])) : '<span class="muted">unbekannt</span>');
-            $o .= '<tr class="' . ($e['gelesen'] ? '' : 'fx-neu') . '"><td>' . self::zeit($e['zeit']) . ($e['gelesen'] ? '' : ' ' . self::tag('ok', 'neu')) . '</td><td>' . $abs . '</td><td>'
+            $o .= '<tr class="' . ($e['gelesen'] ? '' : 'fx-neu') . '" data-vorschau="' . $b . '/vorschau?art=eingang&amp;datei=' . fx_h($e['name']) . '.pdf"><td>' . self::zeit($e['zeit']) . ($e['gelesen'] ? '' : ' ' . self::tag('ok', 'neu')) . '</td><td>' . $abs . '</td><td>'
                 . fx_h((string)($e['seiten'] ?? '')) . ($e['status'] !== '' && $e['status'] !== 'SUCCESS' ? ' ' . self::tag('warn', 'unvollständig') : '') . '</td><td class="fx-knoepfe">'
                 . '<a class="button small primary" href="' . $b . '/pdf?art=eingang&amp;datei=' . fx_h($e['name']) . '.pdf" target="_blank" rel="noopener">Öffnen</a>'
                 . '<form method="post" data-confirm="Dieses Fax endgültig löschen?">' . self::csrf($d['csrf']) . '<input type="hidden" name="aktion" value="eingang-loeschen"><input type="hidden" name="name" value="' . fx_h($e['name']) . '"><button class="small danger" type="submit">Löschen</button></form></td></tr>';
@@ -183,18 +223,23 @@ final class Ansicht {
 
     private static function telefonbuch(array $d): string {
         $edit = $d['rechte']['telefonbuch'];
-        $e = $d['kontaktBearbeiten'] ?? ['id' => 0, 'name' => '', 'nummer' => '', 'notiz' => ''];
+        $e = $d['kontaktBearbeiten'] ?? ['id' => 0, 'name' => '', 'nummer' => '', 'notiz' => '', 'favorit' => 0];
         $o = '';
         if ($edit) {
             $o .= '<section class="card"><h2>' . ((int)$e['id'] > 0 ? 'Eintrag bearbeiten' : 'Neuer Eintrag') . '</h2><form method="post" class="fx-form">' . self::csrf($d['csrf'])
                 . '<input type="hidden" name="aktion" value="kontakt-speichern"><input type="hidden" name="id" value="' . (int)$e['id'] . '">'
                 . '<div class="fx-zwei"><label>Name<input name="name" maxlength="80" required value="' . fx_h((string)$e['name']) . '"></label><label>Faxnummer<input name="nummer" maxlength="30" required inputmode="tel" value="' . fx_h((string)($e['nummer'] !== '' ? Fax::anzeige((string)$e['nummer']) : '')) . '"></label></div>'
-                . '<label>Notiz<input name="notiz" maxlength="200" value="' . fx_h((string)$e['notiz']) . '"></label><button class="primary" type="submit">Speichern</button></form></section>';
+                . '<label>Notiz<input name="notiz" maxlength="200" value="' . fx_h((string)$e['notiz']) . '"></label>'
+                . '<label class="check"><input type="checkbox" name="favorit" value="1"' . (!empty($e['favorit']) ? ' checked' : '') . '> ★ Favorit (steht bei „Fax senden“ direkt zur Auswahl)</label><button class="primary" type="submit">Speichern</button></form></section>';
         }
         if (!$d['kontakte']) return $o . '<section class="card"><p class="muted">Das Telefonbuch ist leer.</p></section>';
-        $o .= '<section class="card"><label class="fx-suche">Suchen <input type="search" data-filter="#fx-kontakte" autocomplete="off"></label><table class="fx-tabelle" id="fx-kontakte"><tr><th>Name</th><th>Faxnummer</th><th>Notiz</th><th></th></tr>';
+        $o .= '<section class="card"><label class="fx-suche">Suchen <input type="search" data-filter="#fx-kontakte" autocomplete="off"></label><table class="fx-tabelle" id="fx-kontakte"><tr><th class="fx-stern-spalte" title="Favorit">★</th><th>Name</th><th>Faxnummer</th><th>Notiz</th><th></th></tr>';
         foreach ($d['kontakte'] as $k) {
-            $o .= '<tr data-text="' . fx_h(mb_strtolower($k['name'] . ' ' . $k['nummer'] . ' ' . $k['notiz'])) . '"><td>' . fx_h($k['name']) . '</td><td>' . fx_h(Fax::anzeige($k['nummer'])) . '</td><td>' . fx_h($k['notiz']) . '</td><td class="fx-knoepfe">'
+            $fav = !empty($k['favorit']);
+            $stern = $edit ? '<form method="post">' . self::csrf($d['csrf']) . '<input type="hidden" name="aktion" value="kontakt-favorit"><input type="hidden" name="id" value="' . (int)$k['id'] . '">'
+                . '<input type="hidden" name="an" value="' . ($fav ? '0' : '1') . '"><button type="submit" class="fx-stern' . ($fav ? ' an' : '') . '" title="' . ($fav ? 'Favorit entfernen' : 'Als Favorit markieren') . '" aria-pressed="' . ($fav ? 'true' : 'false') . '">' . ($fav ? '★' : '☆') . '</button></form>'
+                : ($fav ? '<span class="fx-stern an">★</span>' : '');
+            $o .= '<tr data-text="' . fx_h(mb_strtolower($k['name'] . ' ' . $k['nummer'] . ' ' . $k['notiz'])) . '"><td>' . $stern . '</td><td>' . fx_h($k['name']) . '</td><td>' . fx_h(Fax::anzeige($k['nummer'])) . '</td><td>' . fx_h($k['notiz']) . '</td><td class="fx-knoepfe">'
                 . ($edit ? '<a class="button small secondary" href="' . fx_h(fx_basis()) . '/telefonbuch?kontakt=' . (int)$k['id'] . '">Bearbeiten</a><form method="post" data-confirm="Eintrag löschen?">' . self::csrf($d['csrf'])
                     . '<input type="hidden" name="aktion" value="kontakt-loeschen"><input type="hidden" name="id" value="' . (int)$k['id'] . '"><button class="small danger" type="submit">Löschen</button></form>' : '') . '</td></tr>';
         }

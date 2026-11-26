@@ -85,8 +85,10 @@ final class Fax {
                 if ($name === '') $name = $k['name'];
                 if ($num === '') $num = $k['nummer'];
             }
+            if ($num === '' && preg_match('/^[\d\s+\/().-]{6,30}$/D', $name)) { $num = $name; $name = ''; }   // Nummer direkt ins Suchfeld getippt
             $norm = self::nummer($num);
             if ($norm === '') throw new \InvalidArgumentException("Empfänger $i: Faxnummer fehlt oder ist ungültig.");
+            if ($name === '') $name = self::anzeige($norm);
             $out[] = ['name' => self::zeile($name, "Empfänger $i: Name", 80), 'nummer' => $norm, 'merken' => !empty($e['merken']) && $kontakt === 0];
         }
         if (!$out) throw new \InvalidArgumentException('Bitte mindestens einen Empfänger angeben.');
@@ -151,30 +153,59 @@ final class Fax {
     }
 
     // ---- Aufträge ----------------------------------------------------------------------------------------------
-    /** Für jede Datei und jeden Empfänger einen Auftrag anlegen (erst staging/, dann atomar nach queue/). Liefert die Anzahl. */
+    /** Alte Form (sofort senden der Faxdrucker, Tests): jede Datei als eigenes Fax. */
     public static function senden(string $quelle, array $dateien, array $empfaenger, string $aufloesung, bool $ecm, string $benutzer): int {
-        if (!self::austauschBereit()) throw new \RuntimeException('Das Modul Telefon fehlt oder ist noch nicht verbunden (Verwaltung → Module).');
         $dateien = array_values(array_unique(array_map('strval', $dateien)));
         if (!$dateien) throw new \InvalidArgumentException('Bitte mindestens ein Dokument auswählen.');
+        return self::sendenAuswahl(array_map(fn($d) => $quelle . '/' . $d, $dateien), $empfaenger, $aufloesung, $ecm, true, $benutzer);
+    }
+
+    /** Schlüssel „quelle/datei“ eines Dokuments in Pfad, Quelle und Titel auflösen (streng geprüft). */
+    public static function dokument(string $schluessel): array {
+        $p = strpos($schluessel, '/');
+        if ($p === false) throw new \InvalidArgumentException('Dokument ungültig.');
+        $quelle = substr($schluessel, 0, $p);
+        $datei = substr($schluessel, $p + 1);
+        [$pfad] = self::quellPfad($quelle, $datei);
+        $titel = $quelle === 'sendefehler' ? (string)preg_replace('/(__JOB-.*)?\.pdf$/', '', $datei) : (self::metaTitel($pfad) ?: 'Dokument');
+        return ['pfad' => $pfad, 'quelle' => $quelle, 'datei' => $datei, 'titel' => $titel];
+    }
+
+    /**
+     * Ausgewählte Dokumente (Schlüssel „quelle/datei“ in der gewünschten Reihenfolge) an alle Empfänger senden. Mehrere Dokumente
+     * werden zu EINEM Fax zusammengefügt (ein Anruf, ein Sendebericht), mit $einzeln geht jedes als eigenes Fax. Aufträge entstehen
+     * erst in staging/ und gehen dann atomar nach queue/. Danach werden die Quelldateien gelöscht. Liefert die Anzahl der Aufträge.
+     */
+    public static function sendenAuswahl(array $schluessel, array $empfaenger, string $aufloesung, bool $ecm, bool $einzeln, string $benutzer): int {
+        if (!self::austauschBereit()) throw new \RuntimeException('Das Modul Telefon fehlt oder ist noch nicht verbunden (Verwaltung → Module).');
+        $schluessel = array_values(array_unique(array_filter(array_map('strval', $schluessel), fn($x) => $x !== '')));
+        if (!$schluessel) throw new \InvalidArgumentException('Bitte mindestens ein Dokument auswählen.');
+        if (count($schluessel) > self::MAX_DOKUMENTE) throw new \InvalidArgumentException('Höchstens ' . self::MAX_DOKUMENTE . ' Dokumente auf einmal.');
         if (!in_array($aufloesung, ['fine', 'standard'], true)) $aufloesung = 'fine';
-        $pfade = [];
-        foreach ($dateien as $d) $pfade[$d] = self::quellPfad($quelle, $d)[0];
+        $doks = array_map(fn($x) => self::dokument($x), $schluessel);
+        $tmp = null;
+        if ($einzeln || count($doks) === 1) {
+            $faxe = array_map(fn($d) => ['pfad' => $d['pfad'], 'quelle' => $d['quelle'], 'titel' => $d['titel']], $doks);
+        } else {
+            $tmp = self::zusammenfuegen(array_column($doks, 'pfad'));
+            $faxe = [['pfad' => $tmp, 'quelle' => implode('+', array_values(array_unique(array_column($doks, 'quelle')))),
+                'titel' => preg_replace('/\.(pdf|ps|jpe?g|png|gif|bmp|webp)$/i', '', $doks[0]['titel']) . ' + ' . (count($doks) - 1) . ' weitere']];
+        }
         $staging = self::axOrdner('staging');
         $queue = self::axOrdner('queue');
         $neu = [];
         try {
-            foreach ($pfade as $datei => $pfad) {
-                $titel = $quelle === 'sendefehler' ? preg_replace('/(__JOB-.*)?\.pdf$/', '', $datei) : (self::metaTitel($pfad) ?: 'Dokument');
+            foreach ($faxe as $fax) {
                 foreach ($empfaenger as $e) {
                     $id = 'JOB-' . date('Ymd-His') . '-' . self::zufall(6);
                     $dir = $staging . '/' . $id;
                     if (!mkdir($dir, 0770)) throw new \RuntimeException('Auftrag ließ sich nicht anlegen.');
                     chmod($dir, 0770);
                     foreach (['doc.pdf', 'source.pdf'] as $f) {
-                        if (!copy($pfad, "$dir/$f")) throw new \RuntimeException('Dokument ließ sich nicht kopieren.');
+                        if (!copy($fax['pfad'], "$dir/$f")) throw new \RuntimeException('Dokument ließ sich nicht kopieren.');
                         chmod("$dir/$f", 0660);
                     }
-                    $job = ['job_id' => $id, 'created_at' => date('c'), 'source' => ['src' => $quelle, 'filename_original' => self::dateiTitel($titel) . '.pdf'],
+                    $job = ['job_id' => $id, 'created_at' => date('c'), 'source' => ['src' => $fax['quelle'], 'filename_original' => self::dateiTitel($fax['titel']) . '.pdf'],
                         'recipient' => ['name' => $e['name'], 'number' => $e['nummer']], 'options' => ['ecm' => $ecm, 'resolution' => $aufloesung],
                         'status' => 'queued', 'kienzle' => ['benutzer' => $benutzer]];
                     self::jsonSchreiben("$dir/job.json", $job);
@@ -187,10 +218,130 @@ final class Fax {
         } catch (\Throwable $e) {
             foreach ($neu as $id) self::ordnerLoeschen("$staging/$id");
             throw $e;
+        } finally {
+            if ($tmp !== null) @unlink($tmp);
         }
-        foreach ($pfade as $pfad) { @unlink($pfad); @unlink(substr($pfad, 0, -4) . '.json'); }
+        foreach ($doks as $d) { @unlink($d['pfad']); @unlink(substr($d['pfad'], 0, -4) . '.json'); }
         foreach ($empfaenger as $e) if ($e['merken']) self::kontaktSpeichern(0, $e['name'], $e['nummer'], '');
+        self::zuletztMerken($empfaenger);
         return count($neu);
+    }
+
+    /** Mehrere PDFs in dieser Reihenfolge zu einer Datei zusammenfügen (Ghostscript pdfwrite). Liefert den Pfad. */
+    private static function zusammenfuegen(array $pfade): string {
+        $ziel = self::$data . '/.zusammen-' . bin2hex(random_bytes(4)) . '.pdf';
+        [$code] = self::gs(['-dNOPAUSE', '-dBATCH', '-dSAFER', '-sDEVICE=pdfwrite', '-o', $ziel, ...$pfade]);
+        if ($code !== 0 || !is_file($ziel) || (string)file_get_contents($ziel, false, null, 0, 5) !== '%PDF-') {
+            @unlink($ziel);
+            throw new \RuntimeException('Die Dokumente ließen sich nicht zusammenfügen. Bitte „Jedes Dokument als eigenes Fax“ wählen.');
+        }
+        return $ziel;
+    }
+
+    /** Ghostscript ohne Shell starten; liefert [Rückgabewert, Ausgabe]. */
+    private static function gs(array $args): array {
+        $p = @proc_open(['/usr/bin/gs', '-q', ...$args], [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        if (!is_resource($p)) return [127, ''];
+        $out = (string)stream_get_contents($pipes[1]);
+        stream_get_contents($pipes[2]);
+        fclose($pipes[1]); fclose($pipes[2]);
+        return [proc_close($p), $out];
+    }
+
+    // ---- Dokumente für „Fax senden“: alle Quellen in einer Liste, Seitenzahl, Vorschau -----------------------------
+    public const MAX_DOKUMENTE = 20;
+
+    /** Alle Dokumente aller Quellen (Faxdrucker, Upload, NAS, Sendefehler), neueste zuerst, mit Seitenzahl. */
+    public static function dokumente(): array {
+        $out = [];
+        foreach ([...self::quellen(), 'sendefehler'] as $q) {
+            if ($q === 'sendefehler') {
+                $liste = [];
+                foreach (glob(self::ordner('fehler-original') . '/*.pdf') ?: [] as $f) {
+                    $n = basename($f);
+                    if (!self::dateiname($n) || is_link($f)) continue;
+                    $liste[] = ['datei' => $n, 'groesse' => (int)filesize($f), 'zeit' => (int)filemtime($f), 'titel' => (string)preg_replace('/(__JOB-.*)?\.pdf$/', '', $n)];
+                }
+                $dir = self::ordner('fehler-original');
+            } else {
+                $liste = self::quelle($q);
+                $dir = self::ordner('drucker') . '/' . $q;
+            }
+            foreach ($liste as $f) {
+                $out[] = $f + ['quelle' => $q, 'schluessel' => $q . '/' . $f['datei'], 'seiten' => self::seitenZahl($dir . '/' . $f['datei'])];
+            }
+        }
+        usort($out, fn($a, $b) => [$b['zeit'], $b['datei']] <=> [$a['zeit'], $a['datei']]);
+        self::seitenCacheSchreiben();
+        return $out;
+    }
+
+    private static ?array $seitenCache = null;
+    private static bool $seitenGeaendert = false;
+
+    private static function cacheSchluessel(string $pfad): string { return sha1($pfad . '|' . (int)@filemtime($pfad) . '|' . (int)@filesize($pfad)); }
+
+    /** Seitenzahl einer PDF (Ghostscript, zwischengespeichert); null, wenn sie sich nicht bestimmen lässt. */
+    public static function seitenZahl(string $pfad): ?int {
+        self::$seitenCache ??= (array)(json_decode((string)@file_get_contents(self::$data . '/.seiten.json'), true) ?: []);
+        $k = self::cacheSchluessel($pfad);
+        if (isset(self::$seitenCache[$k])) return (int)self::$seitenCache[$k] ?: null;
+        [$code, $out] = self::gs(['-dNODISPLAY', '-dSAFER', '--permit-file-read=' . $pfad, '-sDatei=' . $pfad, '-c', 'Datei (r) file runpdfbegin pdfpagecount = quit']);
+        $n = $code === 0 && preg_match('/^\s*(\d{1,5})\s*$/', $out, $m) ? (int)$m[1] : 0;
+        if ($n === 0) $n = preg_match_all('#/Type\s*/Page(?![a-zA-Z])#', (string)@file_get_contents($pfad, false, null, 0, self::MAX_PDF));
+        self::$seitenCache[$k] = $n;
+        self::$seitenGeaendert = true;
+        return $n ?: null;
+    }
+
+    private static function seitenCacheSchreiben(): void {
+        if (!self::$seitenGeaendert) return;
+        $c = array_slice(self::$seitenCache ?? [], -500, null, true);
+        file_put_contents(self::$data . '/.seiten.json', (string)json_encode($c));
+        @chmod(self::$data . '/.seiten.json', 0600);
+        self::$seitenGeaendert = false;
+    }
+
+    /**
+     * Vorschau: oberer Teil der ersten Seite als PNG in Graustufen (so ungefähr sieht es auch das Faxgerät). Zwischengespeichert in
+     * <daten>/vorschau (0700), nach einem Tag gelöscht (aufraeumen), weil die Bilder Gesundheitsdaten zeigen können.
+     */
+    public static function vorschau(string $pfad): string {
+        $dir = self::$data . '/vorschau';
+        if (!is_dir($dir)) @mkdir($dir, 0700, true);
+        $cache = $dir . '/' . self::cacheSchluessel($pfad) . '.png';
+        if (is_file($cache)) return (string)file_get_contents($cache);
+        $tmp = $dir . '/.neu-' . bin2hex(random_bytes(4)) . '.png';
+        [$code] = self::gs(['-dSAFER', '-dBATCH', '-dNOPAUSE', '-sDEVICE=pnggray', '-r72', '-dTextAlphaBits=4', '-dGraphicsAlphaBits=4',
+            '-dFirstPage=1', '-dLastPage=1', '-o', $tmp, $pfad]);
+        $png = $code === 0 && is_file($tmp) ? (string)file_get_contents($tmp) : '';
+        @unlink($tmp);
+        if (!str_starts_with($png, "\x89PNG")) throw new \RuntimeException('Keine Vorschau möglich.');
+        if (function_exists('imagecreatefromstring') && ($bild = @imagecreatefromstring($png))) {
+            $w = imagesx($bild);
+            $h = imagesy($bild);
+            $oben = @imagecrop($bild, ['x' => 0, 'y' => 0, 'width' => $w, 'height' => max(1, min($h, (int)round($w * 0.62)))]);
+            if ($oben) { ob_start(); imagepng($oben, null, 9); $png = (string)ob_get_clean(); }
+        }
+        file_put_contents($cache, $png);
+        @chmod($cache, 0600);
+        return $png;
+    }
+
+    // ---- Zuletzt gefaxt an ---------------------------------------------------------------------------------------
+    public static function zuletzt(): array {
+        $d = json_decode((string)@file_get_contents(self::$data . '/zuletzt.json'), true);
+        return is_array($d) ? array_values(array_filter($d, fn($e) => is_array($e) && is_string($e['name'] ?? null) && is_string($e['nummer'] ?? null))) : [];
+    }
+
+    private static function zuletztMerken(array $empfaenger): void {
+        $liste = self::zuletzt();
+        foreach ($empfaenger as $e) {
+            $liste = array_values(array_filter($liste, fn($x) => $x['nummer'] !== $e['nummer']));
+            array_unshift($liste, ['name' => $e['name'], 'nummer' => $e['nummer']]);
+        }
+        file_put_contents(self::$data . '/zuletzt.json', (string)json_encode(array_slice($liste, 0, 8), JSON_UNESCAPED_UNICODE));
+        @chmod(self::$data . '/zuletzt.json', 0600);
     }
 
     private static function metaTitel(string $pfad): string {
@@ -445,6 +596,8 @@ final class Fax {
         $pdo = new \PDO('sqlite:' . self::$data . '/telefonbuch.sqlite', null, null, [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION, \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC]);
         $pdo->exec('CREATE TABLE IF NOT EXISTS kontakte (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, nummer TEXT NOT NULL, notiz TEXT NOT NULL DEFAULT \'\', erstellt TEXT NOT NULL, geaendert TEXT NOT NULL)');
         $pdo->exec('CREATE INDEX IF NOT EXISTS kontakte_name ON kontakte(name)');
+        $spalten = array_column($pdo->query('PRAGMA table_info(kontakte)')->fetchAll(), 'name');
+        if (!in_array('favorit', $spalten, true)) $pdo->exec('ALTER TABLE kontakte ADD COLUMN favorit INTEGER NOT NULL DEFAULT 0');
         @chmod(self::$data . '/telefonbuch.sqlite', 0600);
         return self::$pdo = $pdo;
     }
@@ -459,7 +612,7 @@ final class Fax {
         return $st->fetch() ?: null;
     }
 
-    public static function kontaktSpeichern(int $id, string $name, string $nummer, string $notiz): int {
+    public static function kontaktSpeichern(int $id, string $name, string $nummer, string $notiz, ?bool $favorit = null): int {
         $name = self::zeile($name, 'Name', 80);
         $norm = self::nummer($nummer);
         if ($norm === '') throw new \InvalidArgumentException('Faxnummer fehlt oder ist ungültig.');
@@ -469,11 +622,19 @@ final class Fax {
             $st = self::db()->prepare('UPDATE kontakte SET name = ?, nummer = ?, notiz = ?, geaendert = ? WHERE id = ?');
             $st->execute([$name, $norm, $notiz, $jetzt, $id]);
             if ($st->rowCount() === 0) throw new \InvalidArgumentException('Eintrag nicht gefunden.');
+            if ($favorit !== null) self::kontaktFavorit($id, $favorit);
             return $id;
         }
         if ((int)self::db()->query('SELECT COUNT(*) FROM kontakte')->fetchColumn() >= 5000) throw new \InvalidArgumentException('Telefonbuch ist voll (5000 Einträge).');
-        self::db()->prepare('INSERT INTO kontakte (name, nummer, notiz, erstellt, geaendert) VALUES (?, ?, ?, ?, ?)')->execute([$name, $norm, $notiz, $jetzt, $jetzt]);
+        self::db()->prepare('INSERT INTO kontakte (name, nummer, notiz, erstellt, geaendert, favorit) VALUES (?, ?, ?, ?, ?, ?)')->execute([$name, $norm, $notiz, $jetzt, $jetzt, $favorit ? 1 : 0]);
         return (int)self::db()->lastInsertId();
+    }
+
+    /** Favorit an/aus (Favoriten stehen bei „Fax senden“ direkt zur Auswahl). */
+    public static function kontaktFavorit(int $id, bool $an): void {
+        $st = self::db()->prepare('UPDATE kontakte SET favorit = ? WHERE id = ?');
+        $st->execute([$an ? 1 : 0, $id]);
+        if ($st->rowCount() === 0) throw new \InvalidArgumentException('Eintrag nicht gefunden.');
     }
 
     public static function kontaktLoeschen(int $id): void { self::db()->prepare('DELETE FROM kontakte WHERE id = ?')->execute([$id]); }
@@ -835,6 +996,8 @@ final class Fax {
         $ordner = [[self::ordner('eingang'), $e['eingang_tage']], [self::ordner('protokoll'), $e['protokoll_tage']], [self::ordner('fehler'), $e['protokoll_tage']],
             [self::ordner('fehler-original'), $e['protokoll_tage']]];
         foreach (glob(self::ordner('drucker') . '/*', GLOB_ONLYDIR) ?: [] as $d) $ordner[] = [$d, $e['drucker_tage']];   // auch Ordner entfernter Drucker
+        foreach (glob(self::$data . '/vorschau/*.png') ?: [] as $f) if (filemtime($f) < $jetzt - 86400 && @unlink($f)) $n++;
+        foreach (glob(self::$data . '/.zusammen-*.pdf') ?: [] as $f) if (filemtime($f) < $jetzt - 3600) @unlink($f);
         foreach ($ordner as [$dir, $tage]) {
             if ($tage <= 0) continue;
             foreach (glob($dir . '/*.{pdf,json}', GLOB_BRACE) ?: [] as $f) {

@@ -1,5 +1,16 @@
 # Release-Notizen Fax
 
+## 0.1.0-beta.7
+
+- **„Fax senden“ neu (Entwurf A „Liste mit Häkchen“):** Alle Dokumente aus allen Quellen (Faxdrucker, NAS-Ordner, hochgeladen, Sendefehler) stehen in **einer** Liste, neueste oben, mit Quelle, Zeit und **Seitenzahl**. Das **neueste ist vorgewählt**. Rechts die **Vorschau** (oberer Teil der ersten Seite, in Graustufen wie beim Faxgerät); sie folgt der Maus über der Liste.
+- **Mehrere Dokumente an eine Nummer:** Angehakte Dokumente werden in der **Reihenfolge des Anhakens** (Zahl im Kästchen) zu **einem Fax** zusammengefügt (ein Anruf, ein Sendebericht, Titel „Erstes + N weitere“). Unter „Erweitert“: „Jedes Dokument als eigenes Fax“, Auflösung, Fehlerkorrektur. Bei mehr als 15 Seiten erscheint der Hinweis, dass einzelne Faxe zuverlässiger sein können.
+- **Empfänger:** Standard ist **ein** Empfänger, weitere über „+ weiterer Empfänger“ (mit × wieder entfernen). Darüber die **Favoriten** (★) und die zuletzt angefaxten Empfänger (⟲) zum Anklicken. Das Namensfeld sucht im Telefonbuch nach **Namensteilen** (Pfeiltasten und Enter) oder nimmt direkt eine **Faxnummer** an; der Name ist dann nicht nötig. „Im Telefonbuch speichern“ erscheint nur bei einer neuen Nummer.
+- Der Knopf nennt, was passiert, z. B. „2 Dokumente (3 Seiten) an Labor Beispiel faxen“. Bei einem Fehler bleiben Auswahl und Eingaben erhalten.
+- **Telefonbuch:** Stern ★ je Eintrag (und Haken im Bearbeiten-Formular) markiert Favoriten.
+- **Faxeingang:** Fährt man mit der Maus über ein Fax, zeigt sich die Vorschau des oberen Seitenteils (öffnet das Fax nicht, es bleibt „neu“).
+- Vorschaubilder liegen im Datenordner des Moduls (0700) und werden nach einem Tag gelöscht. Faxdrucker mit fester Nummer belegen den Empfänger weiterhin vor.
+- Geprüft mit Tests und im Browser (Chromium) gegen den PHP-Testserver mit erfundenen Daten. **Nicht auf der VM geprüft** (Ghostscript von Ubuntu 26.04 für Seitenzahl, Vorschau und Zusammenfügen, nginx/php-fpm), kein echtes Fax gesendet.
+
 ## 0.1.0-beta.6
 
 - **Fehler behoben: Dateien hochladen hing** („Dateien wählen“ bzw. Ziehen auf die Fläche: die Fläche wurde grau, nach langer Zeit kam „Hochladen nicht möglich“). Ursache war der Formular-Upload (`multipart`), der auf dem Server ohne Meldung hängen bleibt (gleiche Falle wie früher beim Logo im Terminzettel). Jetzt geht jede Datei einzeln roh an `/fax/hochladen` (wie Logo und Pad-Software), mit **Fortschrittsbalken** („Datei 2 von 3: … – 45 %“), Zeitgrenze von 60 Sekunden je Datei und klarer Fehlermeldung. Bis 7 MB je Datei (vorher 3 MB).

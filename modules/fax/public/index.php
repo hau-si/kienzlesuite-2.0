@@ -67,6 +67,18 @@ try {
         readfile($pfad);
         exit;
     }
+    if ($rel === '/vorschau') {
+        // Oberer Teil der ersten Seite als Bild (Fax senden: ?dok=quelle/datei; Faxeingang beim Überfahren: ?art=eingang&datei=…).
+        $art = (string)($_GET['art'] ?? '');
+        if (!($art === 'eingang' ? $rechte['eingang'] : $rechte['senden'])) $k->verweigern();
+        $pfad = $art === 'eingang' ? Fax::pdfPfad('eingang', (string)($_GET['datei'] ?? '')) : Fax::dokument((string)($_GET['dok'] ?? ''))['pfad'];
+        try { $png = Fax::vorschau($pfad); } catch (RuntimeException) { http_response_code(404); exit; }
+        header('Content-Type: image/png');
+        header('Cache-Control: private, max-age=600');
+        header("Content-Security-Policy: default-src 'none'");
+        echo $png;
+        exit;
+    }
     if (!isset(Ansicht::SEITEN[$rel])) { http_response_code(404); echo 'Nicht gefunden.'; exit; }
     if (!Ansicht::darf($rel, $rechte)) $k->verweigern();
     header('X-Frame-Options: DENY');
@@ -79,23 +91,33 @@ try {
             $aktion = (string)($_POST['aktion'] ?? '');
             $braucht = match ($aktion) {
                 'senden', 'hochladen', 'quelle-loeschen', 'abbrechen', 'bericht-loeschen', 'fehler-uebernehmen' => 'senden',
-                'eingang-loeschen' => 'eingang', 'kontakt-speichern', 'kontakt-loeschen' => 'telefonbuch',
+                'eingang-loeschen' => 'eingang', 'kontakt-speichern', 'kontakt-loeschen', 'kontakt-favorit' => 'telefonbuch',
                 'einstellungen-speichern', 'aufbewahrung-speichern', 'drucker-speichern', 'nas-speichern', 'benachrichtigung-speichern' => 'admin',
                 default => throw new InvalidArgumentException('Unbekannte Aktion.'),
             };
             if (!$rechte[$braucht]) throw new InvalidArgumentException('Dafür fehlt das Recht.');
             $dateien = array_values(array_filter((array)($_POST['dateien'] ?? []), 'is_string'));
+            // Auswahl „quelle/datei“; die Reihenfolge des Anhakens kommt aus „reihenfolge“ (JavaScript), sonst gilt die Liste.
+            $auswahl = array_values(array_filter((array)($_POST['auswahl'] ?? []), 'is_string'));
+            $folge = array_values(array_filter(explode("\n", (string)($_POST['reihenfolge'] ?? '')), fn($x) => $x !== ''));
+            if ($folge && count($folge) === count($auswahl) && !array_diff($folge, $auswahl)) $auswahl = $folge;
+            if (!$auswahl && $dateien) $auswahl = array_map(fn($x) => (string)($_POST['quelle'] ?? '') . '/' . $x, $dateien);
             $meldung = match ($aktion) {
-                'senden' => (function () use ($dateien, $k) {
-                    $n = Fax::senden((string)($_POST['quelle'] ?? ''), $dateien, Fax::empfaenger((array)($_POST['empfaenger'] ?? [])), (string)($_POST['aufloesung'] ?? 'fine'), !empty($_POST['ecm']), $k->benutzer());
-                    return $n === 1 ? 'Fax beauftragt. Der Stand steht unten bei „Laufende Aufträge“.' : "$n Faxe beauftragt.";
+                'senden' => (function () use ($auswahl, $k) {
+                    $n = Fax::sendenAuswahl($auswahl, Fax::empfaenger((array)($_POST['empfaenger'] ?? [])), (string)($_POST['aufloesung'] ?? 'fine'), !empty($_POST['ecm']), !empty($_POST['einzeln']), $k->benutzer());
+                    return $n === 1 ? 'Fax beauftragt. Der Stand steht unten bei „Laufende Aufträge“.' : "$n Faxe beauftragt. Der Stand steht unten bei „Laufende Aufträge“.";
                 })(),
-                'quelle-loeschen' => Fax::quelleLoeschen((string)($_POST['quelle'] ?? ''), $dateien) . ' Dokument(e) gelöscht.',
+                'quelle-loeschen' => (function () use ($auswahl) {
+                    $n = 0;
+                    foreach ($auswahl as $s) { $d = Fax::dokument($s); $n += Fax::quelleLoeschen($d['quelle'], [$d['datei']]); }
+                    return $n === 1 ? 'Dokument gelöscht.' : "$n Dokumente gelöscht.";
+                })(),
                 'abbrechen' => (function () { Fax::abbrechen((string)($_POST['id'] ?? '')); return 'Abbruch angefordert.'; })(),
                 'bericht-loeschen' => (function () { Fax::berichtLoeschen((string)($_POST['art'] ?? ''), (string)($_POST['json'] ?? '')); return 'Bericht gelöscht.'; })(),
                 'fehler-uebernehmen' => (function () { Fax::fehlerUebernehmen((string)($_POST['json'] ?? '')); return 'Ins Sendeprotokoll übernommen.'; })(),
                 'eingang-loeschen' => (function () { Fax::eingangLoeschen((string)($_POST['name'] ?? '')); return 'Fax gelöscht.'; })(),
-                'kontakt-speichern' => (function () { Fax::kontaktSpeichern((int)($_POST['id'] ?? 0), (string)($_POST['name'] ?? ''), (string)($_POST['nummer'] ?? ''), (string)($_POST['notiz'] ?? '')); return 'Eintrag gespeichert.'; })(),
+                'kontakt-speichern' => (function () { Fax::kontaktSpeichern((int)($_POST['id'] ?? 0), (string)($_POST['name'] ?? ''), (string)($_POST['nummer'] ?? ''), (string)($_POST['notiz'] ?? ''), !empty($_POST['favorit'])); return 'Eintrag gespeichert.'; })(),
+                'kontakt-favorit' => (function () { $an = !empty($_POST['an']); Fax::kontaktFavorit((int)($_POST['id'] ?? 0), $an); return $an ? 'Als Favorit markiert.' : 'Kein Favorit mehr.'; })(),
                 'kontakt-loeschen' => (function () { Fax::kontaktLoeschen((int)($_POST['id'] ?? 0)); return 'Eintrag gelöscht.'; })(),
                 'einstellungen-speichern', 'aufbewahrung-speichern' => (function () { Fax::aufbewahrungSpeichern($_POST); return 'Aufbewahrung gespeichert.'; })(),
                 'drucker-speichern' => (function () { Fax::druckerSpeichern((array)($_POST['drucker'] ?? [])); return 'Druckerliste gespeichert. Jetzt unter Verwaltung → Drucker „Virtuelle Drucker der Module abgleichen“ wählen (oder das Modul Fax neu installieren), damit neue Drucker erscheinen und entfernte verschwinden.'; })(),
@@ -127,8 +149,8 @@ try {
         'einstellungen' => Fax::einstellungen(), 'quelle' => $quelle, 'drucker' => Fax::drucker(), 'lauschordner' => Fax::einstellungen()['lausch']['ziel'] !== '', 'nachrichten' => $k->nachrichtenBereit(),
         'vorgewaehlt' => array_values(array_filter((array)($_POST['vorgewaehlt'] ?? []), 'is_string'))];
     if ($rel === '/') {
-        $d += ['zaehler' => Fax::quellenZaehler(), 'kontakte' => Fax::kontakte(), 'aktive' => Fax::aktive(),
-            'dateien' => $quelle === 'sendefehler' ? array_map(fn($f) => ['datei' => basename($f), 'groesse' => (int)filesize($f), 'zeit' => (int)filemtime($f), 'titel' => ''], glob(Fax::ordner('fehler-original') . '/*.pdf') ?: []) : Fax::quelle($quelle)];
+        $d += ['kontakte' => Fax::kontakte(), 'aktive' => Fax::aktive(), 'dokumente' => Fax::dokumente(), 'zuletzt' => Fax::zuletzt(),
+            'auswahl' => $fehler !== null && ($_POST['aktion'] ?? '') === 'senden' ? $auswahl ?? [] : [], 'post' => $fehler !== null && ($_POST['aktion'] ?? '') === 'senden' ? $_POST : []];
     } elseif ($rel === '/protokoll' || $rel === '/fehler') {
         $d['berichte'] = Fax::berichte($rel === '/fehler' ? 'fehler' : 'protokoll');
     } elseif ($rel === '/einstellungen') {

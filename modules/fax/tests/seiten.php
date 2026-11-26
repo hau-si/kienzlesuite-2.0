@@ -39,10 +39,21 @@ check(str_contains($o, 'Druckerliste gespeichert') && str_contains($o, 'vFaxPrax
 $o = aufruf($dir, '/fax/einstellungen', '', 'admin', ['aktion' => 'aufbewahrung-speichern', 'kienzle-csrf' => $csrf, 'eingang_tage' => '30', 'protokoll_tage' => '90', 'drucker_tage' => '14', 'eingang_tage_unbegrenzt' => '1']);
 check(str_contains($o, 'Aufbewahrung gespeichert') && str_contains($o, 'name="eingang_tage_unbegrenzt" value="1" data-schalter="eingang_tage" checked'), 'unbegrenzt über das Formular');
 check(str_contains(aufruf($dir, '/fax/einstellungen', 'senden', 'benutzer', ['aktion' => 'drucker-speichern', 'kienzle-csrf' => $csrf, 'drucker' => [['name' => 'vFaxX']]]), '#CODE=403'), 'Druckerliste nur Admin');
-$o = aufruf($dir, '/fax/?quelle=vFaxLabor', 'senden');
-check(str_contains($o, 'Feste Faxnummer des Druckers vFaxLabor') && str_contains($o, 'value="0309876543"') && str_contains($o, 'value="Labor"') && str_contains($o, 'id="fx-drop"') && str_contains($o, 'vFax1, vFaxLabor'), 'feste Nummer vorbelegt, Ablagefläche');
+mkdir("$dir/daten/drucker/vFaxLabor", 0700);
+file_put_contents("$dir/daten/drucker/vFaxLabor/20260102-090000-aaaaaa.pdf", "%PDF-1.4\n%%EOF\n");
+touch("$dir/daten/drucker/vFaxLabor/20260102-090000-aaaaaa.pdf", time() + 5);
+$o = aufruf($dir, '/fax/', 'senden');
+check(str_contains($o, 'value="vFaxLabor/20260102-090000-aaaaaa.pdf" checked') && str_contains($o, 'value="0309876543"') && str_contains($o, 'value="Labor"') && str_contains($o, 'id="fx-drop"'), 'neuestes Dokument vorgewählt, feste Nummer vorbelegt');
+$o = aufruf($dir, '/fax/', 'senden', 'benutzer', ['aktion' => 'senden', 'kienzle-csrf' => $csrf, 'auswahl' => ['vFaxLabor/20260102-090000-aaaaaa.pdf'], 'empfaenger' => [['name' => 'Labor', 'nummer' => '12']], 'einzeln' => '1']);
+check(str_contains($o, 'Faxnummer fehlt oder ist ungültig') && str_contains($o, 'value="12"') && str_contains($o, 'name="einzeln" value="1" id="fx-einzeln" checked'), 'Fehler: Eingaben bleiben erhalten');
+check(str_contains(aufruf($dir, '/fax/', 'senden', 'benutzer', ['aktion' => 'quelle-loeschen', 'kienzle-csrf' => $csrf, 'auswahl' => ['vFaxLabor/20260102-090000-aaaaaa.pdf']]), 'Dokument gelöscht.')
+    && !is_file("$dir/daten/drucker/vFaxLabor/20260102-090000-aaaaaa.pdf"), 'angehakte Dokumente löschen');
+$o = aufruf($dir, '/fax/vorschau?dok=' . rawurlencode('vFax1/../x.pdf'), 'senden');
+check(str_contains($o, '#CODE=404'), 'Vorschau: Pfad geprüft');
+check(str_contains(aufruf($dir, '/fax/vorschau?art=eingang&datei=x.pdf', 'senden'), '#CODE=403'), 'Vorschau des Eingangs braucht Recht');
+$o = aufruf($dir, '/fax/', 'senden');
 check(str_contains($o, 'mit-icon') && str_contains($o, '<svg'), 'Symbole im Kopf');
-check(str_contains(aufruf($dir, '/fax/?quelle=vFaxGibtsNicht', 'senden'), 'name="quelle" value="vFax1"'), 'unbekannte Quelle fällt auf den ersten Drucker zurück');
+check(str_contains(aufruf($dir, '/fax/?quelle=vFaxGibtsNicht', 'senden'), '#CODE=200'), 'alter Verweis mit unbekannter Quelle');
 check(str_contains(aufruf($dir, '/fax/gibtsnicht', 'senden'), '#CODE=404'), 'unbekannte Seite');
 check(str_contains(aufruf($dir, '/fax/pdf?art=quelle&quelle=vFax1&datei=20260101-120000-abcdef.pdf', 'senden'), '%PDF-1.4'), 'PDF anzeigen');
 check(str_contains(aufruf($dir, '/fax/pdf?art=quelle&quelle=vFax1&datei=../../x.pdf', 'senden'), '#CODE=404'), 'PDF-Pfad geprüft');
@@ -54,6 +65,13 @@ check(str_contains($o, 'Fax beauftragt') && count(glob("$dir/austausch/queue/JOB
 check(str_contains(aufruf($dir, '/fax/status', 'senden'), 'Labor Beispiel'), 'Status der laufenden Aufträge');
 $o = aufruf($dir, '/fax/telefonbuch', 'senden', 'benutzer', ['aktion' => 'kontakt-speichern', 'kienzle-csrf' => $csrf, 'name' => 'X', 'nummer' => '030 1']);
 check(str_contains($o, 'Dafür fehlt das Recht'), 'Telefonbuch bearbeiten braucht Recht');
+$o = aufruf($dir, '/fax/telefonbuch', 'telefonbuch,senden', 'benutzer', ['aktion' => 'kontakt-speichern', 'kienzle-csrf' => $csrf, 'name' => 'Klinik Beispiel', 'nummer' => '030 1112223', 'favorit' => '1']);
+check(str_contains($o, 'Eintrag gespeichert') && str_contains($o, 'class="fx-stern an"'), 'Favorit beim Speichern');
+$o = aufruf($dir, '/fax/telefonbuch', 'telefonbuch', 'benutzer', ['aktion' => 'kontakt-favorit', 'kienzle-csrf' => $csrf, 'id' => '1', 'an' => '0']);
+check(str_contains($o, 'Kein Favorit mehr') && !str_contains($o, 'class="fx-stern an"'), 'Favorit per Stern entfernen');
+check(str_contains(aufruf($dir, '/fax/telefonbuch', 'senden', 'benutzer', ['aktion' => 'kontakt-favorit', 'kienzle-csrf' => $csrf, 'id' => '1', 'an' => '1']), 'Dafür fehlt das Recht'), 'Stern braucht Recht Telefonbuch');
+$o = aufruf($dir, '/fax/', 'senden');
+check(str_contains($o, '⟲ Labor Beispiel') && str_contains($o, '&quot;name&quot;:&quot;Klinik Beispiel&quot;'), 'Zuletzt und Telefonbuch für die Suche');
 // Roher Upload über einen echten HTTP-Server (PHP-Testserver mit nachgestellten Kopfzeilen der Basis).
 $port = 18000 + random_int(0, 999);
 file_put_contents("$dir/router.php", '<?php $_SERVER += ["KIENZLE_PFAD" => "/fax", "KIENZLE_BENUTZER" => "mfa1", "KIENZLE_ROLLE" => "benutzer", "KIENZLE_RECHTE" => $_SERVER["HTTP_X_TEST_RECHTE"] ?? "senden", "KIENZLE_CSRF" => str_repeat("a", 32)]; require ' . var_export(dirname(__DIR__) . '/public/index.php', true) . ';');
@@ -72,5 +90,9 @@ check($code === 200 && ($j['ok'] ?? false) && str_ends_with((string)$j['datei'],
 check($code === 403 && str_contains((string)$j['fehler'], 'Sitzung'), 'Upload ohne gültige CSRF-Marke');
 [$code, $j] = $post($pdfTest, ['Content-Type: application/octet-stream', 'X-Kienzle-CSRF: ' . str_repeat('a', 32), 'X-Test-Rechte: eingang']);
 check($code === 403, 'Upload ohne Recht „senden“');
-check(str_contains(aufruf($dir, '/fax/?quelle=Upload', 'senden'), 'Befund für Labor.pdf') && str_contains(aufruf($dir, '/fax/', 'senden'), 'data-hochladen="/fax/hochladen"'), 'Datei in der Quelle „Upload“');
+check(str_contains(aufruf($dir, '/fax/', 'senden'), 'Befund für Labor.pdf') && str_contains(aufruf($dir, '/fax/', 'senden'), 'data-hochladen="/fax/hochladen"'), 'Datei in der Quelle „Upload“');
+$ctx = stream_context_create(['http' => ['ignore_errors' => true, 'timeout' => 20]]);
+$hoch = array_values(array_filter(glob("$dir/daten/drucker/Upload/*.pdf") ?: [], fn($f) => true));
+$bild = (string)file_get_contents("http://127.0.0.1:$port/fax/vorschau?dok=" . rawurlencode('Upload/' . basename($hoch[0])), false, $ctx);
+check(str_starts_with($bild, "\x89PNG") && str_contains(implode("\n", $http_response_header), 'Content-Type: image/png'), 'Vorschau als Bild über HTTP');
 echo "seiten.php (fax): alles in Ordnung\n";
