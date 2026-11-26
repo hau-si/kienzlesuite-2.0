@@ -1031,6 +1031,100 @@ def pflege(now: float | None = None) -> int:
     return removed
 
 
+# ---- Sprachmenü: Zeiten, Ansagetexte, Menütasten (Seite /telefon/sprachmenue) ---------------------------------------
+ZEITEN = {'oeffnungszeiten': 'Öffnungszeiten', 'telefonzeiten': 'Telefonzeiten', 'apothekenzeiten': 'Apotheken und Pflege',
+          'fachstellenzeiten': 'Krankenhaus, Notarzt und Kollegen'}
+
+
+def _kienzlefon():
+    import sys
+    if str(KZF_SOURCE) not in sys.path:
+        sys.path.insert(0, str(KZF_SOURCE))
+    from kienzlefon import ivr_keys, webadmin
+    from kienzlefon.config import CONFIGURABLE_PROMPT_MODES, WEEKDAYS, load_config
+    from kienzlefon.prompts import rendered_prompts
+    return webadmin, ivr_keys, load_config, rendered_prompts, CONFIGURABLE_PROMPT_MODES, WEEKDAYS
+
+
+def _zeitliste(text: str) -> list[str]:
+    return [t.strip().replace(' ', '') for t in re.split(r'[,;\n]+', str(text)) if t.strip()]
+
+
+def sprachmenue_lesen() -> dict:
+    """Werte der Seite aus kienzlefon.toml (Vorgaben aus der Vorlage von Kienzlefon). Liefert bereit=false ohne Sprachmenü."""
+    import hashlib
+    import tomllib
+    if not KZF_CONFIG.is_file():
+        return {'ok': True, 'bereit': False}
+    webadmin, ivr_keys, load_config, rendered_prompts, modes, days = _kienzlefon()
+    try:
+        config = load_config(KZF_CONFIG)
+    except Exception as e:  # noqa: BLE001
+        raise Fehler(f'Kienzlefon: {str(e)[:200]}') from None
+    raw = tomllib.loads(KZF_CONFIG.read_text(encoding='utf-8'))
+    vorgabe = tomllib.loads((KZF_SOURCE / 'config' / 'kienzlefon.toml.example').read_text(encoding='utf-8'))
+    rendered = set(rendered_prompts(config))
+    erzeugt = set(ivr_keys.GENERATED_PROMPTS) if config.ivr_keys != ivr_keys.DEFAULTS else set()
+    ansagen = []
+    for name, text in raw.get('ansagen', {}).items():
+        if name not in vorgabe.get('ansagen', {}):
+            continue
+        modus_name = 'opening_hours' if name == 'opening_hours_prefix' else name
+        ansagen.append({'name': name, 'label': webadmin._prompt_label(name), 'gruppe': webadmin._prompt_group(name), 'text': str(text),
+                        'standard': str(vorgabe['ansagen'][name]), 'erzeugt': name in erzeugt,
+                        'modus': config.prompt_mode(modus_name) if modus_name in modes and modus_name in rendered else None,
+                        'modus_name': modus_name})
+    menues = [('Hauptmenü', ivr_keys.MAIN), ('Untermenü Rückruf/Sonstiges', ivr_keys.SUBMENU),
+              ('Nach einem Medikament', ivr_keys.MEDICATION), ('Nach einem Anliegen', ivr_keys.AFTER_CONCERN)]
+    return {'ok': True, 'bereit': True, 'stand': hashlib.sha256(KZF_CONFIG.read_bytes()).hexdigest(),
+            'zeiten': {s: {'titel': t, 'tage': {d: ', '.join(raw.get(s, {}).get(d, [])) for d in days}} for s, t in ZEITEN.items()},
+            'ansagen': ansagen,
+            'tasten': [{'titel': t, 'tasten': [{'id': i, 'label': lab, 'taste': config.ivr_keys.get(i, ''), 'standard': std}
+                                                for i, (std, lab) in m.items()]} for t, m in menues]}
+
+
+def sprachmenue_schreiben(job: dict) -> dict:
+    """Geänderte Werte prüfen (Prüfung der Weboberfläche von Kienzlefon) und in kienzlefon.toml schreiben."""
+    import hashlib
+    import tomllib
+    if not isinstance(job, dict) or set(job) - {'stand', 'zeiten', 'ansagen', 'modi', 'tasten'}:
+        raise Fehler('Ungültige Angaben.')
+    if not KZF_CONFIG.is_file():
+        raise Fehler('Das Sprachmenü ist noch nicht eingeschaltet.')
+    webadmin, _, load_config, _, _, days = _kienzlefon()
+    text = KZF_CONFIG.read_text(encoding='utf-8')
+    stand = hashlib.sha256(text.encode('utf-8')).hexdigest()
+    if job.get('stand') != stand:
+        raise Fehler('Die Einstellungen wurden inzwischen geändert. Bitte die Seite neu laden.')
+    config = load_config(KZF_CONFIG)
+    zeiten = job.get('zeiten') or {}
+    alt = tomllib.loads(text)
+    if not isinstance(zeiten, dict) or any(not isinstance(v, dict) for v in zeiten.values()):
+        raise Fehler('Ungültige Zeiten.')
+    auftrag = {'config_hash': stand,
+               'schedules': {s: {d: _zeitliste(tage[d]) if d in tage else list(alt.get(s, {}).get(d, [])) for d in days} for s, tage in zeiten.items()},
+               'prompts': {str(k): str(v) for k, v in (job.get('ansagen') or {}).items()},
+               'prompt_modes': {str(k): str(v) for k, v in (job.get('modi') or {}).items()}}
+    if job.get('tasten'):
+        auftrag['ivr_keys'] = {str(k): str(v).strip() for k, v in job['tasten'].items()}
+    try:
+        values = webadmin._validate_save_request(auftrag, config)
+    except (webadmin.WebAdminError, ValueError, TypeError) as e:
+        raise Fehler(str(e)[:300]) from None
+    neu = webadmin._render_updated_config(text, values)
+    if neu == text:
+        return {'ok': True, 'geaendert': False}
+    tmp = KZF_DATA / '.kienzlefon.toml.neu'
+    write(tmp, neu, 0o600)
+    try:
+        load_config(tmp)
+    except Exception as e:  # noqa: BLE001 - Konfigurationsfehler von Kienzlefon
+        tmp.unlink(missing_ok=True)
+        raise Fehler(f'Kienzlefon: {str(e)[:200]}') from None
+    os.replace(tmp, KZF_CONFIG)
+    return {'ok': True, 'geaendert': True}
+
+
 def main(argv: list[str]) -> int:
     action = argv[1] if len(argv) > 1 else ''
     try:
@@ -1046,6 +1140,13 @@ def main(argv: list[str]) -> int:
             else:
                 print(json.dumps(anwenden(cfg), ensure_ascii=False))
             return 0
+        if action == 'sprachmenue-lesen':
+            print(json.dumps(sprachmenue_lesen(), ensure_ascii=False))
+            return 0
+        if action == 'sprachmenue-schreiben':
+            raw = sys.stdin.read(1_000_000)
+            print(json.dumps(sprachmenue_schreiben(json.loads(raw) if raw.strip() else {}), ensure_ascii=False))
+            return 0
         if action == 'status':
             print(json.dumps(status(), ensure_ascii=False))
             return 0
@@ -1058,7 +1159,7 @@ def main(argv: list[str]) -> int:
     except ValueError:
         print(json.dumps({'ok': False, 'fehler': 'Einstellungen ungültig.'}))
         return 1
-    print('Aufruf: anlage.py grundgeruest|pruefen|anwenden|status|pflege', file=sys.stderr)
+    print('Aufruf: anlage.py grundgeruest|pruefen|anwenden|status|pflege|sprachmenue-lesen|sprachmenue-schreiben', file=sys.stderr)
     return 2
 
 

@@ -9,13 +9,17 @@ final class Ansicht {
         return '<link rel="stylesheet" href="' . tf_h($base) . '/assets/style.css?v=' . $v . '">';
     }
 
+    /** Link „Sprachmenü“ im Seitenkopf zeigen (Recht vorhanden und Sprachmenü eingeschaltet). */
+    public static bool $sprachmenue = false;
+
     private static function tag(string $art, string $text): string { return '<span class="tag ' . $art . '">' . tf_h($text) . '</span>'; }
 
     private static function kopfzeile(string $route, bool $einstellungen): string {
         $b = tf_h(tf_basis());
-        $titel = $route === '/einstellungen' ? 'Einstellungen' : 'Telefonanlage';
-        $link = $route === '/einstellungen' ? '<a class="button secondary" href="' . $b . '/">← Übersicht</a>'
-            : ($einstellungen ? '<a class="button secondary" href="' . $b . '/einstellungen">Einstellungen</a>' : '');
+        $titel = ['/einstellungen' => 'Einstellungen', '/sprachmenue' => 'Sprachmenü'][$route] ?? 'Telefonanlage';
+        $link = $route !== '/' ? '<a class="button secondary" href="' . $b . '/">← Übersicht</a>'
+            : (self::$sprachmenue ? '<a class="button secondary" href="' . $b . '/sprachmenue">Sprachmenü</a>' : '')
+              . ($einstellungen ? '<a class="button secondary" href="' . $b . '/einstellungen">Einstellungen</a>' : '');
         return '<header class="seitenkopf"><div><p class="eyebrow">Telefon</p><h1>' . $titel . '</h1></div><span class="start-tools">' . $link . '</span></header>';
     }
 
@@ -131,6 +135,116 @@ final class Ansicht {
         return $o;
     }
 
+    private const TAGE = ['montag' => 'Mo', 'dienstag' => 'Di', 'mittwoch' => 'Mi', 'donnerstag' => 'Do', 'freitag' => 'Fr', 'samstag' => 'Sa', 'sonntag' => 'So'];
+    private const ZEIT_HILFE = [
+        'oeffnungszeiten' => 'Wann die Praxis geöffnet ist. Danach richten sich Begrüßung und Ansage der Öffnungszeiten.',
+        'telefonzeiten' => 'Wann Anrufer zur Praxis durchgestellt werden. Außerhalb nimmt das Sprachmenü nur Anliegen auf.',
+        'apothekenzeiten' => 'Wann Apotheken und Pflegedienste die eigene Taste nutzen können.',
+        'fachstellenzeiten' => 'Wann Krankenhäuser, Rettungsdienst, Notärzte und Kollegen das rote Telefon erreichen.',
+    ];
+    /** Abschnitte der Seite: Titel und die Gruppen bzw. Namen der Ansagen von Kienzlefon. */
+    private const TEXTE = [
+        'begruessung' => ['Begrüßung und Notfall', ['greeting_open', 'greeting_closed', 'emergency', 'urgent_help']],
+        'menue' => ['Menü und Tasten', ['menu_open', 'menu_closed', 'opening_hours_choice', 'zeiten_und_menue']],
+        'anliegen' => ['Aufnahme von Anliegen', ['datenerfassung', 'abschluss_und_fehler']],
+        'warteschlange' => ['Warteschlange', ['warteschlange']],
+        'verwaltung' => ['Ansagen-Telefon (777)', ['interne_verwaltung']],
+        'weitere' => ['Weitere Texte', ['weitere_ansagen']],
+    ];
+
+    private static function verborgen(string $csrf, string $stand): string {
+        return '<input type="hidden" name="kienzle-csrf" value="' . tf_h($csrf) . '"><input type="hidden" name="aktion" value="sprachmenue-texte"><input type="hidden" name="stand" value="' . tf_h($stand) . '">';
+    }
+
+    private static function ansageFeld(array $a, bool $anhoeren): string {
+        $h = 'tf_h';
+        $n = (string)$a['name'];
+        $o = '<div class="tf-ansage"><label for="a-' . $h($n) . '">' . $h((string)$a['label']) . '</label>';
+        if ($a['erzeugt']) {
+            $o .= '<textarea id="a-' . $h($n) . '" rows="2" disabled>' . $h((string)$a['text']) . '</textarea><small class="muted">Wird aus den Menütasten erzeugt, weil die Tasten geändert sind.</small>';
+        } else {
+            $zeilen = max(1, min(6, (int)ceil(mb_strlen((string)$a['text']) / 90)));
+            $o .= '<textarea id="a-' . $h($n) . '" name="ansage[' . $h($n) . ']" rows="' . $zeilen . '" maxlength="5000">' . $h((string)$a['text']) . '</textarea>';
+            if ((string)$a['text'] !== (string)$a['standard']) $o .= '<small class="muted">Vorgabe: ' . $h((string)$a['standard']) . '</small>';
+        }
+        $o .= '<div class="tf-ansage-zeile">';
+        if ($a['modus'] !== null) {
+            $o .= '<label class="tf-inline">Spielen: <select name="modus[' . $h((string)$a['modus_name']) . ']">';
+            foreach (Anlage::MODI as $k => $v) $o .= '<option value="' . $k . '"' . ($k === $a['modus'] ? ' selected' : '') . '>' . $h($v) . '</option>';
+            $o .= '</select></label>';
+        }
+        $hoer = preg_replace('/^(opening_hours|phone_hours)_.*$/', '$1', $n);
+        if ($anhoeren && Anlage::ansageDatei((string)$hoer) !== null) $o .= '<audio controls preload="none" src="' . $h(tf_basis()) . '/ansage/' . $h((string)$hoer) . '.wav"></audio>';
+        return $o . '</div></div>';
+    }
+
+    /** Seite „Sprachmenü“: Zeiten, Ansagetexte und Menütasten als Ausklappzeilen. */
+    public static function sprachmenue(array $d, string $csrf, ?string $meldung, ?string $fehler): string {
+        $h = 'tf_h';
+        $o = '<div class="tf">' . self::kopfzeile('/sprachmenue', true) . self::meldungen($meldung, $fehler);
+        if (!($d['bereit'] ?? false)) {
+            return $o . '<section class="card"><p>Das Sprachmenü ist noch nicht eingeschaltet.</p><p class="muted">Ein Admin schaltet es unter Einstellungen → Sprachmenü ein.</p></section></div>';
+        }
+        $st = Anlage::auftragStatus();
+        $tts = Anlage::ttsBereit();
+        $o .= '<p class="muted">Änderungen gelten sofort. Geänderte Texte werden danach mit der Sprachausgabe neu erzeugt'
+            . ($tts ? '' : ' – dafür muss sie zuerst unter Einstellungen → Sprachmenü eingerichtet sein') . '. Platzhalter: {praxisname}.</p>';
+        if (in_array($st['stand'] ?? '', ['laeuft', 'wartet'], true)) $o .= '<p>' . self::tag('warn', 'Ansagen werden erzeugt') . ' <span class="muted">' . $h((string)($st['meldung'] ?? '')) . '</span></p>';
+        elseif (($st['stand'] ?? '') === 'fehler') $o .= '<p>' . self::tag('err', 'Fehler beim Erzeugen') . ' <span class="muted">' . $h((string)($st['meldung'] ?? '')) . '</span></p>';
+        $stand = (string)$d['stand'];
+        foreach ($d['zeiten'] as $s => $z) {
+            $tage = array_keys(array_filter($z['tage'], fn($v) => trim((string)$v) !== ''));
+            $pflicht = in_array($s, ['oeffnungszeiten', 'telefonzeiten'], true);
+            $marke = $tage ? self::tag('ok', implode(', ', array_map(fn($t) => self::TAGE[$t] ?? $t, $tage))) : ($pflicht ? self::tag('warn', 'keine Zeiten') : self::tag('opt', 'aus'));
+            $f = '<p class="muted">' . $h(self::ZEIT_HILFE[$s] ?? '') . ' Mehrere Zeiträume mit Komma trennen, z. B. 08:00-12:00, 14:00-18:00; leer = geschlossen.</p><div class="tf-zeiten">';
+            foreach ($z['tage'] as $tag => $v) {
+                $f .= '<label for="z-' . $h($s . '-' . $tag) . '">' . $h(ucfirst((string)$tag)) . '</label><input id="z-' . $h($s . '-' . $tag) . '" name="zeit[' . $h($s) . '][' . $h((string)$tag) . ']" value="' . $h((string)$v)
+                    . '" maxlength="200" placeholder="geschlossen" pattern="[0-9:\-, ;]*" inputmode="numeric">';
+            }
+            $f .= '</div>';
+            $o .= self::fold('z-' . $s, (string)$z['titel'], $marke, '<form method="post" class="tf-form tf-breit">' . self::verborgen($csrf, $stand) . $f . '<button class="primary" type="submit">Speichern</button></form>');
+        }
+        $gruppen = [];
+        foreach ($d['ansagen'] as $a) $gruppen[$a['gruppe']][] = $a;
+        $nachName = array_column($d['ansagen'], null, 'name');
+        $vergeben = [];
+        foreach (self::TEXTE as $id => [$titel, $teile]) {
+            $liste = [];
+            foreach ($teile as $t) {
+                foreach (isset($nachName[$t]) ? [$nachName[$t]] : ($gruppen[$t] ?? []) as $a) {
+                    if (isset($vergeben[$a['name']])) continue;
+                    $vergeben[$a['name']] = true;
+                    $liste[] = $a;
+                }
+            }
+            if (!$liste && $id !== 'menue') continue;
+            $f = '';
+            if ($id === 'menue') {
+                $f .= '<p class="muted">Tasten der Auswahlmenüs. Leer = Auswahl aus. Ändert man Tasten, werden die Menütexte daraus erzeugt.</p><div class="tf-tasten">';
+                foreach ($d['tasten'] as $m) {
+                    $f .= '<fieldset><legend>' . $h((string)$m['titel']) . '</legend>';
+                    foreach ($m['tasten'] as $t) {
+                        $f .= '<label>' . $h((string)$t['label']) . '<input name="taste[' . $h((string)$t['id']) . ']" value="' . $h((string)$t['taste']) . '" maxlength="1" pattern="[0-9*#]?" class="tf-taste" title="Vorgabe: '
+                            . $h((string)$t['standard'] ?: 'keine') . '"></label>';
+                    }
+                    $f .= '</fieldset>';
+                }
+                $f .= '</div>';
+            }
+            $zahlen = array_filter($liste, fn($a) => str_starts_with((string)$a['name'], 'queue_digit_'));
+            $haupt = array_filter($liste, fn($a) => !str_starts_with((string)$a['name'], 'queue_digit_'));
+            foreach ($haupt as $a) $f .= self::ansageFeld($a, true);
+            if ($zahlen) {
+                $f .= '<details class="how"><summary>Zahlwörter für die Warteposition (' . count($zahlen) . ')</summary><div class="tf-zahlen">';
+                foreach ($zahlen as $a) $f .= '<label>' . $h((string)$a['label']) . '<input name="ansage[' . $h((string)$a['name']) . ']" value="' . $h((string)$a['text']) . '" maxlength="200"></label>';
+                $f .= '</div></details>';
+            }
+            $marke = self::tag('ok', count($liste) . ' ' . (count($liste) === 1 ? 'Text' : 'Texte'));
+            $o .= self::fold('t-' . $id, $titel, $marke, '<form method="post" class="tf-form tf-breit">' . self::verborgen($csrf, $stand) . $f . '<button class="primary" type="submit">Speichern</button></form>');
+        }
+        return $o . '</div>';
+    }
+
     public static function einstellungen(array $cfg, array $status, string $csrf, bool $admin, ?string $leitung, ?array $zugang, string $server, ?string $meldung, ?string $fehler): string {
         $h = 'tf_h';
         $o = '<div class="tf">' . self::kopfzeile('/einstellungen', true) . self::meldungen($meldung, $fehler);
@@ -211,7 +325,8 @@ final class Ansicht {
                 . self::feld('google_tempo', 'Sprechtempo', (string)($kz['google']['tempo'] ?? ''), 'Leer = 0,93 (0,25 bis 2).') . '</details>';
             $o .= self::fold('sprachmenue', 'Sprachmenü', $kz['aktiv'] ? self::tag('ok', 'an') : self::tag('opt', 'aus'),
                 '<p class="muted">Sprachmenü aus Kienzlefon: Öffnungs- und Telefonzeiten, Begrüßung, Menü (Praxis, Rezept, Überweisung, Termin), Apotheken- und Fachstellenweg. '
-                . 'Noch in Arbeit: Google und Kokoro, Seiten für Zeiten und Texte, Aufnahme von Anliegen. Erst einschalten, wenn die Ansagen erzeugt sind.</p>'
+                . 'Erst einschalten, wenn die Ansagen erzeugt sind. Noch in Arbeit: Wartemusik, Aufnahme von Anliegen (Whisper).</p>'
+                . ($kz['aktiv'] ? '<p><a class="button secondary" href="' . $h(tf_basis()) . '/sprachmenue">Zeiten, Ansagetexte und Menütasten bearbeiten →</a></p>' : '')
                 . self::formular($csrf, 'sprachmenue-speichern', $form, 'Speichern') . self::ansagen($csrf, (string)$kz['tts']));
         }
 

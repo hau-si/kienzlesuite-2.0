@@ -355,6 +355,40 @@ class KienzlefonBruecke(unittest.TestCase):
         self.assertIn('same => n(accepted),Goto(kfx-phone-queue,s,1)', (etc / 'extensions-kfx-telefonie.conf').read_text())
 
 
+    def test_sprachmenue_seite_lesen_und_schreiben(self):
+        self.assertEqual(self.a.sprachmenue_lesen(), {'ok': True, 'bereit': False})
+        self.a.anwenden(self.cfg())
+        d = self.a.sprachmenue_lesen()
+        self.assertTrue(d['bereit'])
+        self.assertEqual(set(d['zeiten']), {'oeffnungszeiten', 'telefonzeiten', 'apothekenzeiten', 'fachstellenzeiten'})
+        namen = {x['name']: x for x in d['ansagen']}
+        self.assertEqual(namen['greeting_open']['modus'], 'offen')
+        self.assertEqual(namen['opening_hours_prefix']['modus_name'], 'opening_hours')
+        self.assertEqual(d['tasten'][0]['tasten'][1], {'id': 'praxis', 'label': 'Praxiswarteschlange', 'taste': '1', 'standard': '1'})
+        r = self.a.sprachmenue_schreiben({'stand': d['stand'], 'zeiten': {'oeffnungszeiten': {'montag': '08:00-12:00; 14:00 - 18:00'}},
+                                          'ansagen': {'greeting_open': 'Guten Tag, hier ist die Praxis Beispiel.'},
+                                          'modi': {'emergency': 'zu'}, 'tasten': {'rezept': '7'}})
+        self.assertEqual(r, {'ok': True, 'geaendert': True})
+        toml = (self.tmp / 'kienzlefon' / 'kienzlefon.toml').read_text()
+        self.assertIn('montag = ["08:00-12:00", "14:00-18:00"]', toml)
+        self.assertIn('greeting_open = "Guten Tag, hier ist die Praxis Beispiel."', toml)
+        self.assertIn('emergency = "zu"', toml)
+        self.assertIn('rezept = "7"', toml)
+        # Neu Erzeugen der Anlage behält die Werte der Seite.
+        self.a.anwenden(self.cfg())
+        d2 = self.a.sprachmenue_lesen()
+        self.assertEqual(d2['zeiten']['oeffnungszeiten']['tage']['montag'], '08:00-12:00, 14:00-18:00')
+        self.assertTrue({x['name']: x for x in d2['ansagen']}['menu_open']['erzeugt'])   # Tasten geändert → Menütext wird erzeugt
+        # Veralteter Stand, ungültige Zeit, doppelte Taste, leerer Pflichttext, fremder Schlüssel → Fehler, Datei unverändert.
+        for job in ({'stand': d['stand']}, {'stand': d2['stand'], 'zeiten': {'telefonzeiten': {'montag': '25:00-26:00'}}},
+                    {'stand': d2['stand'], 'tasten': {'termin': '7'}}, {'stand': d2['stand'], 'ansagen': {'greeting_open': ' '}},
+                    {'stand': d2['stand'], 'ansagen': {'gibtsnicht': 'x'}}, {'stand': d2['stand'], 'pfade': {}},
+                    {'stand': d2['stand'], 'modi': {'emergency': 'manchmal'}}):
+            with self.assertRaises(self.a.Fehler, msg=str(job)):
+                self.a.sprachmenue_schreiben(job)
+        self.assertEqual(self.a.sprachmenue_lesen()['stand'], d2['stand'])
+        self.assertFalse((self.tmp / 'kienzlefon' / '.kienzlefon.toml.neu').exists())
+
 class FaxEmpfang(unittest.TestCase):
     """lib/kfx/fax-empfangen: TIFF → PDF im Austauschordner (tiff2pdf nachgestellt)."""
 

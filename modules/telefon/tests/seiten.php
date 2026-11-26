@@ -54,4 +54,29 @@ $lid = json_decode((string)file_get_contents("$dir/daten/anlage.json"), true)['l
 aufruf($dir, '/telefon/einstellungen', '', 'admin', ['aktion' => 'zwecke-speichern', 'kienzle-csrf' => $csrf, 'tel_leitung_ein' => $lid, 'tel_nummer_ein' => '4930123456', 'tel_aus_zaehlt' => '1']);
 $o = aufruf($dir, '/telefon/einstellungen', '', 'admin', ['aktion' => 'sprachmenue-speichern', 'kienzle-csrf' => $csrf, 'aktiv' => '1', 'tts' => 'piper']);
 check(str_contains($o, 'Gespeichert.') && str_contains((string)file_get_contents("$dir/daten/asterisk/etc/extensions-kfx-telefonie.conf"), 'Goto(kienzlefon-entry,s,1)'), 'Sprachmenü über die Seite eingeschaltet');
+// Seite „Sprachmenü“: Zeiten, Texte, Tasten (Recht sprachmenue, echte Prüfung durch Kienzlefon über lib/anlage.py).
+check(str_contains(aufruf($dir, '/telefon/sprachmenue', 'nebenstellen'), '#CODE=403'), 'Sprachmenü ohne Recht');
+$o = aufruf($dir, '/telefon/sprachmenue', 'sprachmenue');
+check(str_contains($o, '#CODE=200') && str_contains($o, 'Öffnungszeiten') && str_contains($o, 'name="zeit[oeffnungszeiten][montag]"')
+    && str_contains($o, 'name="ansage[greeting_open]"') && str_contains($o, 'name="taste[rezept]"') && str_contains($o, 'Zahlwörter'), 'Sprachmenü-Seite');
+check(str_contains(aufruf($dir, '/telefon/', 'sprachmenue'), '/telefon/sprachmenue'), 'Link zum Sprachmenü in der Übersicht');
+preg_match('/name="stand" value="([a-f0-9]{64})"/', $o, $m);
+$o = aufruf($dir, '/telefon/sprachmenue', 'sprachmenue', 'benutzer', ['aktion' => 'sprachmenue-texte', 'kienzle-csrf' => $csrf, 'stand' => $m[1],
+    'zeit' => ['telefonzeiten' => ['montag' => '08:00-12:00, 14:00-17:00', 'dienstag' => '08:00-12:00']], 'ansage' => ['emergency' => 'Bei Notfällen wählen Sie bitte die eins eins zwei.'], 'modus' => ['emergency' => 'immer']]);
+check(str_contains($o, 'Gespeichert.') && str_contains($o, 'value="08:00-12:00, 14:00-17:00"') && str_contains($o, 'Bei Notfällen wählen Sie bitte die eins eins zwei.'), 'Zeiten und Text gespeichert');
+check(str_contains($o, 'Sprachausgabe eingerichtet ist'), 'Hinweis ohne Sprachausgabe');
+$o = aufruf($dir, '/telefon/sprachmenue', 'sprachmenue', 'benutzer', ['aktion' => 'sprachmenue-texte', 'kienzle-csrf' => $csrf, 'stand' => $m[1], 'zeit' => ['telefonzeiten' => ['montag' => '8-12']]]);
+check(str_contains($o, 'inzwischen geändert'), 'Veralteter Stand');
+preg_match('/name="stand" value="([a-f0-9]{64})"/', $o, $m);
+$o = aufruf($dir, '/telefon/sprachmenue', 'sprachmenue', 'benutzer', ['aktion' => 'sprachmenue-texte', 'kienzle-csrf' => $csrf, 'stand' => $m[1], 'taste' => ['rezept' => '1']]);
+check(str_contains($o, 'doppelt'), 'Doppelte Taste abgelehnt');
+check(str_contains(aufruf($dir, '/telefon/sprachmenue', 'sprachmenue', 'benutzer', ['aktion' => 'netz-speichern', 'kienzle-csrf' => $csrf]), 'nur Admins'), 'Andere Aktionen nur Admin');
+check(str_contains(aufruf($dir, '/telefon/einstellungen', 'nebenstellen', 'benutzer', ['aktion' => 'sprachmenue-texte', 'kienzle-csrf' => $csrf]), 'fehlt das Recht'), 'Texte nur mit Recht');
+if (!is_dir("$dir/daten/kienzlefon/ansagen-master")) mkdir("$dir/daten/kienzlefon/ansagen-master", 0700, true);
+file_put_contents("$dir/daten/kienzlefon/ansagen-master/emergency.wav", 'RIFF0000WAVE');
+$o = aufruf($dir, '/telefon/ansage/emergency.wav', 'sprachmenue');
+check(str_starts_with($o, 'RIFF0000WAVE'), 'Ansage anhören');
+check(str_contains(aufruf($dir, '/telefon/ansage/emergency.wav', 'nebenstellen'), '#CODE=403'), 'Anhören nur mit Recht');
+check(str_contains(aufruf($dir, '/telefon/ansage/fehlt.wav', 'sprachmenue'), '#CODE=404'), 'Fehlende Ansage');
+check(str_contains(aufruf($dir, '/telefon/sprachmenue', 'sprachmenue'), '/telefon/ansage/emergency.wav'), 'Abspielknopf auf der Seite');
 echo "seiten.php (telefon): alles in Ordnung\n";

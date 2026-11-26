@@ -1,5 +1,12 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.7
+
+- **Neue Seite „Sprachmenü“** (`/telefon/sprachmenue`, Knopf in der Übersicht und unter Einstellungen → Sprachmenü): Ausklappzeilen für Öffnungszeiten, Telefonzeiten, Apotheken und Pflege, Krankenhaus/Notarzt/Kollegen (je Wochentag, mehrere Zeiträume mit Komma), Begrüßung und Notfall, Menü und Tasten (alle vier Auswahlmenüs), Aufnahme von Anliegen, Warteschlange (Zahlwörter eingeklappt), Ansagen-Telefon 777 und weitere Texte. Je Text „Spielen: immer / nur wenn geöffnet / nur wenn geschlossen / nie“, wo Kienzlefon das vorsieht, die Vorgabe als Hinweis und ein Abspielfeld, sobald die Ansage erzeugt ist.
+- Gespeichert wird in `kienzlefon.toml`; geprüft wird mit der Prüfung der Weboberfläche von Kienzlefon 2.7 (unverändert übernommen) und danach mit dem Laden der ganzen Konfiguration. Ein zweiter Bearbeiter, der inzwischen gespeichert hat, wird erkannt („bitte neu laden“). Danach wendet das Modul die Anlage neu an (die KI-Taste steht im Wählplan) und erzeugt die geänderten Ansagen, wenn die Sprachausgabe bereit ist. Die Werte bleiben beim Neu-Erzeugen der Anlage erhalten.
+- Neues Recht `sprachmenue` („Zeiten, Ansagetexte und Menütasten des Sprachmenüs ändern“), z. B. für die Praxisleitung; die übrigen Einstellungen bleiben bei Admins.
+- Geprüft mit Tests (Lesen/Schreiben mit echter Prüfung von Kienzlefon, Rechte, Abspielen). **Nicht geprüft:** VM, echte Anrufe mit den geänderten Zeiten und Tasten.
+
 ## 0.1.0-beta.6
 
 - **Google wahlweise zuschaltbar** (Einstellungen → Sprachmenü → „Google (wahlweise)“): API-Schlüssel (verschlüsselt gespeichert, nie wieder angezeigt, leer lassen = behalten, eigener Haken zum Löschen), Stimme und Sprechtempo. Für den Generator von Kienzlefon steht der Schlüssel nur in `kienzlefon/google-tts.conf` (0600), nicht in `kienzlefon.toml`. Es gehen nur die festen Ansagetexte an Google.

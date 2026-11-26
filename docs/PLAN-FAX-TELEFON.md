@@ -45,7 +45,7 @@ Modul telefon (ks-telefon)                         Modul fax (ks-fax)
 | Stufe | Inhalt | Stand |
 |---|---|---|
 | 1 | Basis: `[[exchange]]`, `[system] disables`, `core_api` 2. Telefon: Anlage (Leitungen, Nebenstellen, Warteschlange, Kanalgrenzen, Faxkanal). Fax: Drucker, Senden, Telefonbuch, Aufträge, Berichte, Eingang | fertig (Basis 0.22.0-beta.1, Telefon/Fax 0.1.0-beta.1) |
-| 2 | Kienzlefon: Sprachmenü (AGI), Zeiten, Ansagen (Piper; Google und Kokoro wahlweise), Anrufsbaum, Sonderqueue, rotes Telefon, Ansagen-IVR 777 | Code übernommen (beta.2), Sprachmenü angeschlossen (beta.3), Piper optional nachladen und Ansagen erzeugen (beta.5), Google und Kokoro wahlweise (beta.6); offen: Seiten für Zeiten/Texte, Wartemusik |
+| 2 | Kienzlefon: Sprachmenü (AGI), Zeiten, Ansagen (Piper; Google und Kokoro wahlweise), Anrufsbaum, Sonderqueue, rotes Telefon, Ansagen-IVR 777 | Code übernommen (beta.2), Sprachmenü angeschlossen (beta.3), Piper optional nachladen und Ansagen erzeugen (beta.5), Google und Kokoro wahlweise (beta.6), Seite „Sprachmenü“ für Zeiten, Texte und Tasten (beta.7); offen: Wartemusik |
 | 3 | Kienzlefon: Whisper-Worker, Vorgänge (Rezept, Überweisung …) mit Ablage im Modul und kurzer Löschfrist; Basis: Nachrichten-Ausgang für Module (SMS und Mail über die Verbindungen der Basis, ohne Zugangsdaten im Modul); SMS an Anrufer; Mail bei Faxeingang | offen |
 | 4 | Kienzlefon: Rufgruppen-Steuerung (Port 8767), AMI für die T2med-Middleware, KI-Übergabe (WireGuard), App-Schnittstelle; Firewall-Einträge | offen |
 | 5 | Kienzlefax: Scan-/Fax-Texterkennung (OCR), Samba-Freigaben über die Basis; Umzug bestehender Installationen (`kienzlefax-installer.env`, `kienzlefon.toml`) | offen |

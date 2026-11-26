@@ -20,7 +20,8 @@ try {
     $admin = $k->istAdmin();
     $darfStatus = $k->recht('status');
     $darfNebenstellen = $k->recht('nebenstellen');
-    if (!$darfStatus && !$darfNebenstellen) $k->verweigern();
+    $darfSprachmenue = $k->recht('sprachmenue');
+    if (!$darfStatus && !$darfNebenstellen && !$darfSprachmenue) $k->verweigern();
     if (preg_match('#^/assets/([A-Za-z0-9][A-Za-z0-9_.-]{0,80})$#D', $rel, $m)) {
         $types = ['css' => 'text/css; charset=utf-8', 'js' => 'text/javascript; charset=utf-8'];
         $ext = strtolower(pathinfo($m[1], PATHINFO_EXTENSION));
@@ -31,10 +32,22 @@ try {
         readfile($file);
         exit;
     }
+    if (preg_match('#^/ansage/([a-z][a-z0-9_]{0,63})\.wav$#D', $rel, $m)) {
+        // Erzeugte Ansage zum Anhören auf der Seite „Sprachmenü“ (feste Praxistexte, keine Anruferdaten).
+        if (!$darfSprachmenue) $k->verweigern();
+        $file = Anlage::ansageDatei($m[1]);
+        if ($file === null) { http_response_code(404); exit; }
+        header('Content-Type: audio/wav');
+        header('Cache-Control: private, no-cache');
+        header('Content-Length: ' . filesize($file));
+        readfile($file);
+        exit;
+    }
     if ($rel === '') $rel = '/';
-    if (!in_array($rel, ['/', '/einstellungen'], true)) { http_response_code(404); echo 'Nicht gefunden.'; exit; }
+    if (!in_array($rel, ['/', '/einstellungen', '/sprachmenue'], true)) { http_response_code(404); echo 'Nicht gefunden.'; exit; }
     if ($rel === '/einstellungen' && !$darfNebenstellen) $k->verweigern();
-    if ($rel === '/' && !$darfStatus && !$darfNebenstellen) $k->verweigern();
+    if ($rel === '/sprachmenue' && !$darfSprachmenue) $k->verweigern();
+    if ($rel === '/' && !$darfStatus && !$darfNebenstellen && !$darfSprachmenue) $k->verweigern();
     header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
 
     $meldung = $fehler = null;
@@ -44,10 +57,11 @@ try {
         if (!$k->csrfGueltig($_POST['kienzle-csrf'] ?? null)) { http_response_code(403); echo 'Sitzung abgelaufen. Bitte die Seite neu laden.'; exit; }
         try {
             $aktion = (string)($_POST['aktion'] ?? '');
-            $nur = ['nebenstelle-speichern'];
+            $nur = ['nebenstelle-speichern', 'sprachmenue-texte'];
             if (!$admin && !in_array($aktion, $nur, true)) throw new InvalidArgumentException('Das dürfen nur Admins.');
-            if (!$darfNebenstellen) throw new InvalidArgumentException('Dafür fehlt das Recht.');
+            if ($aktion === 'sprachmenue-texte' ? !$darfSprachmenue || $rel !== '/sprachmenue' : !$darfNebenstellen) throw new InvalidArgumentException('Dafür fehlt das Recht.');
             $neu = match ($aktion) {
+                'sprachmenue-texte' => null,
                 'leitung-speichern' => Anlage::leitungSpeichern($cfg, $_POST, $k),
                 'leitung-loeschen' => Anlage::leitungLoeschen($cfg, (string)($_POST['id'] ?? '')),
                 'zwecke-speichern' => Anlage::zweckeSpeichern($cfg, $_POST),
@@ -62,7 +76,9 @@ try {
                 'zugang-zeigen' => null,
                 default => throw new InvalidArgumentException('Unbekannte Aktion.'),
             };
-            if (in_array($aktion, ['piper-einrichten', 'piper-entfernen', 'kokoro-einrichten', 'kokoro-entfernen', 'ansagen-erzeugen'], true)) {
+            if ($aktion === 'sprachmenue-texte') {
+                $meldung = Anlage::sprachmenueSchreiben($_POST, $k);
+            } elseif (in_array($aktion, ['piper-einrichten', 'piper-entfernen', 'kokoro-einrichten', 'kokoro-entfernen', 'ansagen-erzeugen'], true)) {
                 Anlage::auftrag($aktion === 'ansagen-erzeugen' ? 'erzeugen' : $aktion, !empty($_POST['alle']));
                 $meldung = ['piper-einrichten' => 'Piper wird geladen (etwa 200 MB, einige Minuten). Der Stand steht unter „Sprachmenü“.',
                     'piper-entfernen' => 'Piper wird entfernt.', 'kokoro-einrichten' => 'Kokoro wird geladen (mehrere GB, kann lange dauern). Der Stand steht unter „Sprachmenü“.',
@@ -90,7 +106,16 @@ try {
     header('Content-Type: text/html; charset=utf-8');
     header('Cache-Control: no-store');
     if ($rel === '/einstellungen' && in_array(Anlage::auftragStatus()['stand'] ?? '', ['laeuft', 'wartet'], true)) header('Refresh: 5');
-    if ($rel === '/einstellungen') {
+    Ansicht::$sprachmenue = $darfSprachmenue && (bool)($cfg['kienzlefon']['aktiv'] ?? false);
+    if ($rel === '/sprachmenue') {
+        try {
+            $daten = Anlage::sprachmenueLesen();
+        } catch (RuntimeException $e) {
+            $daten = ['bereit' => false];
+            $fehler ??= $e->getMessage();
+        }
+        $inhalt = Ansicht::sprachmenue($daten, $k->csrf(), $meldung, $fehler);
+    } elseif ($rel === '/einstellungen') {
         $leitung = $admin && preg_match('/^[a-z0-9]{1,12}$/D', (string)($_GET['leitung'] ?? '')) ? (string)$_GET['leitung'] : null;
         $server = preg_replace('/:\d+$/', '', (string)($_SERVER['HTTP_HOST'] ?? '')) ?: 'Adresse des Servers';
         $inhalt = Ansicht::einstellungen($cfg, $status, $k->csrf(), $admin, $leitung, $zugang, (string)$server, $meldung, $fehler);

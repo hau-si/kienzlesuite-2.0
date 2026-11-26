@@ -137,6 +137,51 @@ final class Anlage {
         return $cfg;
     }
 
+    // ---- Seite „Sprachmenü“: Zeiten, Ansagetexte, Menütasten (in kienzlefon.toml, Prüfung durch Kienzlefon) -------
+    public const MODI = ['immer' => 'immer', 'offen' => 'nur wenn geöffnet', 'zu' => 'nur wenn geschlossen', 'deaktiviert' => 'nie'];
+
+    public static function sprachmenueLesen(): array {
+        $r = self::python('sprachmenue-lesen', null);
+        if (($r['ok'] ?? false) !== true) throw new \RuntimeException((string)($r['fehler'] ?? 'Das Sprachmenü ließ sich nicht lesen.'));
+        return $r;
+    }
+
+    /** Formular der Seite in Angaben für lib/anlage.py umsetzen (nur Zeichenketten, Längen begrenzt; Inhalt prüft Kienzlefon). */
+    public static function sprachmenueAuftrag(array $p): array {
+        $kurz = static fn($v, int $max) => mb_substr(trim(is_scalar($v) ? (string)$v : ''), 0, $max);
+        $job = ['stand' => $kurz($p['stand'] ?? '', 64)];
+        foreach ((array)($p['zeit'] ?? []) as $s => $tage) {
+            if (!is_string($s) || !preg_match('/^[a-z]{1,30}$/D', $s) || !is_array($tage)) continue;
+            foreach ($tage as $tag => $v) if (is_string($tag) && preg_match('/^[a-z]{1,12}$/D', $tag)) $job['zeiten'][$s][$tag] = $kurz($v, 200);
+        }
+        foreach (['ansage' => ['ansagen', 5000], 'modus' => ['modi', 20], 'taste' => ['tasten', 1]] as $feld => [$ziel, $max]) {
+            foreach ((array)($p[$feld] ?? []) as $name => $v) if (is_string($name) && preg_match('/^[a-z][a-z0-9_]{0,63}$/D', $name)) $job[$ziel][$name] = $kurz($v, $max);
+        }
+        return $job;
+    }
+
+    /** Speichern; danach Anlage neu anwenden (Tasten stehen auch im Wählplan) und Ansagen erzeugen, wenn eine Sprachausgabe bereitsteht. */
+    public static function sprachmenueSchreiben(array $p, \KienzleModul $k): string {
+        $r = self::python('sprachmenue-schreiben', self::sprachmenueAuftrag($p));
+        if (($r['ok'] ?? false) !== true) throw new \InvalidArgumentException((string)($r['fehler'] ?? 'Die Angaben sind ungültig.'));
+        if (!($r['geaendert'] ?? false)) return 'Keine Änderung.';
+        self::anwenden($k);
+        if (!self::ttsBereit()) return 'Gespeichert. Die Ansagen werden erzeugt, sobald die Sprachausgabe eingerichtet ist (Einstellungen → Sprachmenü).';
+        try {
+            self::auftrag('erzeugen');
+            return 'Gespeichert. Die geänderten Ansagen werden jetzt erzeugt.';
+        } catch (\InvalidArgumentException) {
+            return 'Gespeichert. Ein anderer Auftrag läuft noch; danach bitte „Geänderte Ansagen erzeugen“ wählen.';
+        }
+    }
+
+    /** Pfad einer erzeugten Ansage zum Anhören (WAV aus ansagen-master), sonst null. */
+    public static function ansageDatei(string $name): ?string {
+        if (!preg_match('/^[a-z][a-z0-9_]{0,63}$/D', $name)) return null;
+        $f = self::$data . '/kienzlefon/ansagen-master/' . $name . '.wav';
+        return is_file($f) && !is_link($f) ? $f : null;
+    }
+
     // ---- Ansagen und Piper (optional nachgeladen, lib/ansagen-auftrag über kienzle-telefon-ansagen.path) ------------
     public const AUFTRAEGE = ['piper-einrichten', 'piper-entfernen', 'kokoro-einrichten', 'kokoro-entfernen', 'erzeugen'];
 
