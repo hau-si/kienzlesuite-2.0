@@ -1,0 +1,17 @@
+#!/usr/bin/python3 -IB
+"""Nachrichten-Ausgang der Kienzle-Suite (als ks-nachrichten, gestartet von systemd).
+
+  kienzle-nachrichten abarbeiten    SMS und E-Mails der Module verschicken (kienzle-nachrichten.timer, alle 20 Sekunden)
+"""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'lib'))
+from kienzle import nachrichten  # noqa: E402
+
+if __name__ == '__main__':
+    if sys.argv[1:] == ['abarbeiten']:
+        nachrichten.abarbeiten()
+        sys.exit(0)
+    print(__doc__.strip(), file=sys.stderr)
+    sys.exit(2)

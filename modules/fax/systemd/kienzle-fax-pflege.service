@@ -27,4 +27,4 @@ RestrictSUIDSGID=yes
 LockPersonality=yes
 SystemCallArchitectures=native
 CapabilityBoundingSet=
-ReadWritePaths=/var/lib/kienzle/fax -/var/spool/kienzle/austausch/fax_telefon -/var/spool/kienzle/ablage/fax
+ReadWritePaths=/var/lib/kienzle/fax -/var/spool/kienzle/austausch/fax_telefon -/var/spool/kienzle/ablage/fax -/var/spool/kienzle/nachrichten/fax

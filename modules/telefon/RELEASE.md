@@ -1,5 +1,10 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.11
+
+- **SMS an Anrufer** (Seite „Vorgänge“, aufklappbar an jeder Karte „SMS an den Anrufer“): Handynummer aus der Anrufernummer vorbelegt (sonst aus der Akte eintragen), Textvorschlag je Art ohne Gesundheitsangaben (z. B. „Ihr Rezept liegt zur Abholung bereit. Ihre Praxis …“), vor dem Senden änderbar, wahlweise danach als erledigt markieren. Der Stand („wird verschickt“, „verschickt“, „nicht verschickt“ mit Grund) steht an der Karte. Verschickt wird über den Nachrichten-Ausgang der Basis (Verbindung `nachrichten`, braucht Basis 0.22.0-beta.7 und eine SMS-Verbindung unter Verwaltung → Verbindungen); das Modul kennt den SMS-Zugang nicht und merkt sich je Vorgang nur die Auftragskennung.
+- Geprüft mit Tests (Nummer, Vorlage, Auftrag, Rechte, Anzeige). **Nicht geprüft:** echter SMS-Versand, VM.
+
 ## 0.1.0-beta.10
 
 - **Aufnahme von Anliegen mit Whisper** (Einstellungen → Sprachmenü → „Whisper einrichten“, nur Admins): Anrufer sprechen Rezept, Überweisung, Termin, Rückruf oder Sonstiges auf; der Worker von Kienzlefon wandelt die Aufnahmen **auf dem Server** in Text um (faster-whisper, CPU). Whisper wird wie Piper nur auf Knopfdruck geladen: eigene Python-Umgebung aus `lib/whisper/requirements-cp314.lock` (23 Pakete mit Prüfsummen) und das Modell large-v3-turbo (etwa 1,6 GB); wahlweise „Namen genauer erkennen“ mit large-v3 (zusätzlich etwa 3 GB). Neuer Dienst `kienzle-telefon-whisper` (startet, sobald Whisper bereit ist, über `kienzle-telefon-whisper.path`; offline, ohne Telemetrie). Ohne Whisper landen diese Anrufer wie bisher in der Warteschlange.

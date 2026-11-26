@@ -130,6 +130,56 @@ final class KienzleModul {
     }
 
     /**
+     * Nachrichten-Ausgang (Verbindung „nachrichten“): SMS bzw. E-Mail über die Zugänge der Basis verschicken lassen, ohne dass
+     * das Modul sie kennt. Der Dienst ks-nachrichten arbeitet den Ausgang alle 20 Sekunden ab. Liefert die Auftragskennung für
+     * nachricht(). Keine Patientendaten in den Text, die nicht unbedingt nötig sind (z. B. „Ihr Rezept liegt bereit“).
+     * @return array{sms: bool, mail: bool} welche Arten die Basis eingerichtet hat (leer, wenn die Verbindung fehlt)
+     */
+    public function nachrichtenBereit(): array {
+        $n = $this->verbindung('nachrichten');
+        return ['sms' => (bool)($n['sms'] ?? false), 'mail' => (bool)($n['mail'] ?? false)];
+    }
+
+    public function smsSenden(string $an, string $text): string {
+        if (!preg_match('/^\+[1-9][0-9]{7,14}$/D', $an)) throw new InvalidArgumentException('Handynummer bitte im Format +491701234567.');
+        if (trim($text) === '' || mb_strlen($text) > 320) throw new InvalidArgumentException('SMS-Text fehlt oder ist länger als 320 Zeichen.');
+        return $this->nachrichtAblegen(['art' => 'sms', 'an' => $an, 'text' => $text]);
+    }
+
+    /** @param string|list<string> $an */
+    public function mailSenden(string|array $an, string $betreff, string $text): string {
+        $an = array_values(array_filter((array)$an, fn($a) => is_string($a) && filter_var($a, FILTER_VALIDATE_EMAIL)));
+        if (!$an || count($an) > 5) throw new InvalidArgumentException('Ein bis fünf gültige E-Mail-Adressen.');
+        if (trim($betreff) === '' || mb_strlen($betreff) > 150 || trim($text) === '' || mb_strlen($text) > 20000) throw new InvalidArgumentException('Betreff oder Text fehlt oder ist zu lang.');
+        return $this->nachrichtAblegen(['art' => 'mail', 'an' => $an, 'betreff' => $betreff, 'text' => $text]);
+    }
+
+    private function nachrichtAblegen(array $auftrag): string {
+        $n = $this->verbindung('nachrichten');
+        if (!$n || !is_dir((string)($n['ausgang'] ?? ''))) throw new RuntimeException('Der Nachrichten-Ausgang der Basis ist für dieses Modul nicht eingerichtet.');
+        if (!($n[$auftrag['art']] ?? false)) throw new RuntimeException($auftrag['art'] === 'sms' ? 'SMS ist in der Basis nicht eingerichtet (Verwaltung → Verbindungen).'
+            : 'E-Mail ist in der Basis nicht eingerichtet (Verwaltung → Verbindungen).');
+        $job = date('Ymd-His') . '-' . bin2hex(random_bytes(6));
+        $dir = (string)$n['ausgang'];
+        $json = (string)json_encode($auftrag, JSON_UNESCAPED_UNICODE);
+        if (file_put_contents("$dir/.$job.neu", $json) !== strlen($json)) throw new RuntimeException('Nachricht konnte nicht abgelegt werden.');
+        chmod("$dir/.$job.neu", 0640);
+        rename("$dir/.$job.neu", "$dir/$job.json");   // erst vollständig sichtbar machen
+        return $job;
+    }
+
+    /** Stand eines Auftrags: ['stand' => 'wartet'|'gesendet'|'fehler'|'unbekannt', 'meldung' => …]. */
+    public function nachricht(string $job): array {
+        $n = $this->verbindung('nachrichten');
+        if (!$n || !preg_match('/^[A-Za-z0-9_-]{8,64}$/D', $job)) return ['stand' => 'unbekannt', 'meldung' => ''];
+        $dir = (string)$n['ausgang'];
+        if (is_file("$dir/$job.json")) return ['stand' => 'wartet', 'meldung' => 'Wird verschickt …'];
+        $e = json_decode((string)@file_get_contents("$dir/$job.ergebnis"), true);
+        return is_array($e) && in_array($e['stand'] ?? '', ['gesendet', 'fehler'], true) ? ['stand' => $e['stand'], 'meldung' => (string)($e['meldung'] ?? '')]
+            : ['stand' => 'unbekannt', 'meldung' => ''];
+    }
+
+    /**
      * Datei auf dem Netzwerkspeicher ablegen lassen (Verbindung „ablage“). Die Basis überträgt sie, ohne dass das Modul
      * die Zugangsdaten kennt. $unterordner z. B. „Rechnungen/{jahr}/{monat}“. Liefert die Auftragskennung.
      */

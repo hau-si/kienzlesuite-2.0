@@ -266,6 +266,7 @@ final class Fax {
     public static function abholen(): int {
         if (!self::austauschBereit()) return 0;
         $n = 0;
+        $neu = [];
         foreach (['sendeberichte' => 'protokoll', 'sendefehler/berichte' => 'fehler', 'sendefehler/eingang' => 'fehler-original', 'empfang' => 'eingang'] as $von => $nach) {
             $dir = self::ax($von);
             // Beim Eingang ist ein Fax erst mit seiner JSON-Datei vollständig (fax-empfangen schreibt sie zuletzt): PDF und JSON als Paar holen.
@@ -275,10 +276,65 @@ final class Fax {
                 $b = basename($f);
                 if (!self::dateiname($b) || is_link($f)) continue;
                 $ziel = self::ordner($nach) . '/' . $b;
-                if (@copy($f, $ziel)) { @chmod($ziel, 0600); @unlink($f); $n++; }
+                if (@copy($f, $ziel)) {
+                    @chmod($ziel, 0600); @unlink($f); $n++;
+                    if ($von === 'empfang' && str_ends_with($b, '.json')) $neu[] = substr($b, 0, -5);
+                }
             }
         }
+        if ($neu) self::meldenVormerken($neu);
         return $n;
+    }
+
+    // ---- Benachrichtigung bei Faxeingang (Nachrichten-Ausgang der Basis) ----------------------------------------
+    /** Neu eingegangene Faxe für die E-Mail-Benachrichtigung merken (verschickt die Pflege). */
+    private static function meldenVormerken(array $namen): void {
+        $f = self::$data . '/eingang-melden.json';
+        $alt = json_decode((string)@file_get_contents($f), true);
+        $liste = array_slice(array_values(array_unique([...(is_array($alt) ? $alt : []), ...$namen])), -200);
+        file_put_contents($f, (string)json_encode($liste));
+        @chmod($f, 0600);
+    }
+
+    /**
+     * E-Mail „Neues Fax“ an die eingestellten Adressen über den Nachrichten-Ausgang der Basis. Bewusst ohne Absender, Inhalt
+     * und Anhang (Faxe enthalten Gesundheitsdaten): nur Anzahl, Seiten und der Hinweis, wo das Fax liegt. Liefert die Anzahl.
+     */
+    public static function eingangMelden(\KienzleModul $k): int {
+        $f = self::$data . '/eingang-melden.json';
+        $namen = json_decode((string)@file_get_contents($f), true);
+        if (!is_array($namen) || !$namen) return 0;
+        @unlink($f);
+        $an = self::einstellungen()['mail_eingang'];
+        if (!$an) return 0;
+        if (!$k->nachrichtenBereit()['mail']) { error_log('fax: Benachrichtigung bei Faxeingang eingestellt, aber E-Mail ist in der Basis nicht eingerichtet.'); return 0; }
+        $seiten = 0;
+        foreach ($namen as $n) {
+            $j = is_string($n) && self::dateiname($n . '.json') ? json_decode((string)@file_get_contents(self::ordner('eingang') . '/' . $n . '.json'), true) : null;
+            $seiten += is_array($j) ? (int)($j['seiten'] ?? $j['pages'] ?? 0) : 0;
+        }
+        $anzahl = count($namen);
+        $praxis = trim((string)($k->praxis()['name'] ?? ''));
+        $text = ($anzahl === 1 ? 'Ein neues Fax ist eingegangen' : "$anzahl neue Faxe sind eingegangen") . ($seiten > 0 ? " ($seiten " . ($seiten === 1 ? 'Seite' : 'Seiten') . ')' : '') . ".\n\n"
+            . "Öffnen: Kienzle-Suite → Fax → Eingang.\n\nDiese Nachricht enthält aus Datenschutzgründen weder Absender noch Inhalt.\n"
+            . ($praxis !== '' ? "\n$praxis\n" : '');
+        try {
+            $k->mailSenden($an, $anzahl === 1 ? 'Neues Fax eingegangen' : "$anzahl neue Faxe eingegangen", $text);
+        } catch (\Throwable $e) {
+            error_log('fax: Benachrichtigung nicht abgelegt: ' . $e->getMessage());
+            return 0;
+        }
+        return $anzahl;
+    }
+
+    /** Adressen für die Benachrichtigung (höchstens 5, Komma oder Zeilen getrennt; leer = aus). */
+    public static function benachrichtigungSpeichern(array $p): void {
+        $an = array_values(array_unique(array_filter(array_map('trim', preg_split('/[\s,;]+/', (string)($p['mail_eingang'] ?? '')) ?: []))));
+        if (count($an) > 5) throw new \InvalidArgumentException('Höchstens fünf Adressen.');
+        foreach ($an as $a) if (!filter_var($a, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Keine gültige E-Mail-Adresse: ' . $a);
+        $d = self::roh();
+        $d['mail_eingang'] = $an;
+        self::rohSchreiben($d);
     }
 
     /** Berichte (Protokoll oder Fehler): je JSON des Workers ein Eintrag, neueste zuerst. */
@@ -441,7 +497,8 @@ final class Fax {
         $la = is_array($d['lausch'] ?? null) ? $d['lausch'] : [];
         return ['eingang_tage' => $tage('eingang_tage', 90), 'protokoll_tage' => $tage('protokoll_tage', 90), 'drucker_tage' => $tage('drucker_tage', 14),
             'export' => ['ziel' => (string)($ex['ziel'] ?? ''), 'ordner' => (string)($ex['ordner'] ?? 'Fax-Eingang'), 'jahresordner' => (bool)($ex['jahresordner'] ?? true)],
-            'lausch' => ['ziel' => (string)($la['ziel'] ?? ''), 'ordner' => (string)($la['ordner'] ?? 'Fax-Ausgang')]];
+            'lausch' => ['ziel' => (string)($la['ziel'] ?? ''), 'ordner' => (string)($la['ordner'] ?? 'Fax-Ausgang')],
+            'mail_eingang' => array_values(array_filter((array)($d['mail_eingang'] ?? []), fn($a) => is_string($a) && filter_var($a, FILTER_VALIDATE_EMAIL)))];
     }
 
     public static function aufbewahrungSpeichern(array $p): void {
@@ -749,6 +806,7 @@ final class Fax {
             $r = ['abgeholt' => self::abholen(), 'sofort' => self::sofortSenden(), 'lausch' => 0, 'export' => 0];
             if ($k) {
                 try { $r['lausch'] = self::lauschHolen($k); $r['export'] = self::exportieren($k); } catch (\Throwable $e) { error_log('fax: ' . $e->getMessage()); }
+                $r['gemeldet'] = self::eingangMelden($k);
             }
             $r['aufgeraeumt'] = self::aufraeumen();
             return $r;

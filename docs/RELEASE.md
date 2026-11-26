@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.7
+
+- **Nachrichten-Ausgang für Module:** Module, die die Verbindung `nachrichten` anmelden, können SMS und E-Mail über die Zugänge der Basis verschicken, **ohne die Zugangsdaten zu kennen** (bisher bekam ein Modul für E-Mail das SMTP-Passwort; SMS gab es für Module gar nicht). Das Modul legt einen Auftrag in `/var/spool/kienzle/nachrichten/<modul>/` ab (PHP: `$k->smsSenden()`, `$k->mailSenden()`, Stand mit `$k->nachricht()`), der neue Dienst `kienzle-nachrichten` (eigener Benutzer `ks-nachrichten`, alle 20 Sekunden) verschickt ihn und meldet das Ergebnis zurück. Fehlschläge werden 30 Minuten lang wiederholt; je Modul höchstens 60 SMS und 120 E-Mails pro Stunde; ins Protokoll kommen nie Empfänger oder Inhalte. Die Zugänge liest nur `ks-nachrichten` (`/etc/kienzle/verbindungen/nachrichten.json`, 0640).
+- Verwaltung → Verbindungen → „Wer nutzt was“ zeigt die Verbindungen mit Namen statt Kennung.
+- Geprüft mit Tests (Verteilung, Dienst mit Ersatz-Versand, Wiederholung, Grenze, PHP-Hilfe). **Nicht geprüft:** echter Versand über seven.io und SMTP/Gmail aus dem Dienst, Anlegen des Benutzers und des Zeitgebers durch `install.sh` auf Ubuntu 26.04.
+
 ## 0.22.0-beta.6
 
 - **Fehler behoben: Modul-Update scheiterte mit „Vorgang fehlgeschlagen (Error)“**, wenn das Modul im Datenordner Sockets oder Pipes hat. Betroffen war das Telefonmodul (laufendes Asterisk legt `asterisk.ctl` an): Der Schnappschuss vor dem Update brach beim Kopieren ab. Sockets, Pipes und Gerätedateien werden jetzt übersprungen (sie gehören nicht in einen Schnappschuss). Das Protokoll (`/var/lib/kienzle/module/module.log`) nennt bei unbekannten Fehlern jetzt die Ursache. Mit Test nachgestellt (Socket und Pipe im Datenordner). Nach dem Update der Basis das Telefonmodul erneut aktualisieren; es wurde beim Abbruch nichts verändert.

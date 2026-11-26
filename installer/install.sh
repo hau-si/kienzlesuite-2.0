@@ -116,12 +116,15 @@ fi
 echo '== Benutzer und Ordner'
 id ks-core >/dev/null 2>&1 || useradd --system --home-dir /var/lib/kienzle/core --no-create-home --shell /usr/sbin/nologin ks-core
 id ks-ablage >/dev/null 2>&1 || useradd --system --home-dir /var/lib/kienzle/ablage --no-create-home --shell /usr/sbin/nologin ks-ablage
+id ks-nachrichten >/dev/null 2>&1 || useradd --system --home-dir /var/lib/kienzle/nachrichten --no-create-home --shell /usr/sbin/nologin ks-nachrichten
 install -d -m 0755 -o root -g root /etc/kienzle /var/lib/kienzle /opt/kienzle /opt/kienzle/core /opt/kienzle/core/releases
 install -d -m 0750 -o root -g ks-core /etc/kienzle/core
 install -d -m 0700 -o ks-core -g ks-core /var/lib/kienzle/core /var/lib/kienzle/core/anfragen
 install -d -m 0755 -o root -g root /var/lib/kienzle/firewall /var/lib/kienzle/update /var/lib/kienzle/verbindungen
 install -d -m 0755 -o root -g root /etc/kienzle/verbindungen /etc/kienzle/verbindungen/module /etc/kienzle/schluessel /var/spool/kienzle /var/spool/kienzle/ablage
 install -d -m 0755 -o ks-ablage -g ks-ablage /var/lib/kienzle/ablage
+install -d -m 0755 -o root -g root /var/spool/kienzle/nachrichten
+install -d -m 0700 -o ks-nachrichten -g ks-nachrichten /var/lib/kienzle/nachrichten
 install -d -m 0700 -o root -g root /etc/kienzle/sicherung /var/cache/kienzle-sicherung
 install -d -m 0755 -o root -g root /var/lib/kienzle/sicherung /var/lib/kienzle/ueberblick /var/lib/kienzle/servername /var/lib/kienzle/module /etc/kienzle/module
 install -d -m 0700 -o ks-ablage -g ks-ablage /var/lib/kienzle/ablage/.ssh
@@ -264,6 +267,7 @@ install -m 0644 "$vorlagen/kienzle-zertifikat.service" "$vorlagen/kienzle-zertif
   "$vorlagen/kienzle-update.path" "$vorlagen/kienzle-update-anwenden.service" "$vorlagen/kienzle-update-pruefen.service" \
   "$vorlagen/kienzle-update-pruefen.timer" "$vorlagen/kienzle-update-start.service" \
   "$vorlagen/kienzle-verbindungen.path" "$vorlagen/kienzle-verbindungen-anwenden.service" "$vorlagen/kienzle-ablage.service" "$vorlagen/kienzle-ablage.timer" \
+  "$vorlagen/kienzle-nachrichten.service" "$vorlagen/kienzle-nachrichten.timer" \
   "$vorlagen/kienzle-sicherung.path" "$vorlagen/kienzle-sicherung-anwenden.service" "$vorlagen/kienzle-sicherung.service" "$vorlagen/kienzle-sicherung.timer" \
   "$vorlagen/kienzle-ueberblick.path" "$vorlagen/kienzle-ueberblick.service" "$vorlagen/kienzle-ueberblick.timer" \
   "$vorlagen/kienzle-drucker.path" "$vorlagen/kienzle-drucker-anwenden.service" "$vorlagen/kienzle-drucker.timer" \
@@ -285,7 +289,7 @@ if [ -z "$nosystemd" ]; then
   systemctl disable --now "php$phpv-fpm.service" >/dev/null 2>&1 || true
   systemctl enable --now kienzle-core-php.service kienzle-zertifikat.timer kienzle-firewall.path
   systemctl enable kienzle-firewall.service kienzle-update-start.service
-  systemctl enable --now kienzle-update.path kienzle-update-pruefen.timer kienzle-verbindungen.path kienzle-ablage.timer kienzle-sicherung.path kienzle-sicherung.timer kienzle-ueberblick.path kienzle-ueberblick.timer kienzle-drucker.path kienzle-drucker.timer kienzle-servername.path kienzle-neustart.path kienzle-module.path kienzle-module-pruefen.timer
+  systemctl enable --now kienzle-update.path kienzle-update-pruefen.timer kienzle-verbindungen.path kienzle-ablage.timer kienzle-nachrichten.timer kienzle-sicherung.path kienzle-sicherung.timer kienzle-ueberblick.path kienzle-ueberblick.timer kienzle-drucker.path kienzle-drucker.timer kienzle-servername.path kienzle-neustart.path kienzle-module.path kienzle-module-pruefen.timer
   # Druckserver: CUPS und smbd; nmbd (NetBIOS) und der AD-Dienst werden nicht gebraucht.
   systemctl disable --now nmbd.service samba-ad-dc.service >/dev/null 2>&1 || true
   systemctl enable avahi-daemon.service cups.service smbd.service >/dev/null 2>&1 || true

@@ -220,6 +220,27 @@ $nas = Fax::quelle('NAS');
 check(count($nas) === 2 && !glob("$dir/lauscheingang/*") && count(glob("$dir/daten/lausch-fehler/*") ?: []) === 1, 'Quelle NAS gefüllt, kaputte Datei beiseite');
 check(in_array('Brief vom Labor.pdf', array_column($nas, 'titel'), true), 'Dateiname als Titel');
 check(Fax::quellenZaehler()['NAS'] === 2, 'Zähler NAS');
+// Benachrichtigung bei Faxeingang über den Nachrichten-Ausgang der Basis (nachgestellt): nur Anzahl und Seiten, kein Absender.
+mkdir("$dir/nachrichten", 0770);
+file_put_contents("$verb/fax.json", json_encode(['ablage' => ['ausgang' => "$dir/ausgang", 'eingang' => "$dir/lauscheingang", 'ziele' => [['id' => 'steuerbuero', 'name' => 'NAS Praxis']]],
+    'nachrichten' => ['ausgang' => "$dir/nachrichten", 'sms' => false, 'mail' => true]]));
+wirft(fn() => Fax::benachrichtigungSpeichern(['mail_eingang' => 'keine-adresse']), 'ungültige Adresse', 'Keine gültige');
+wirft(fn() => Fax::benachrichtigungSpeichern(['mail_eingang' => 'a@example.org,b@example.org,c@example.org,d@example.org,e@example.org,f@example.org']), 'zu viele Adressen', 'fünf');
+Fax::benachrichtigungSpeichern(['mail_eingang' => "empfang@example.org; mfa@example.org\n"]);
+check(Fax::einstellungen()['mail_eingang'] === ['empfang@example.org', 'mfa@example.org'], 'Adressen gespeichert');
+Fax::eingangMelden($km);                                          // ältere Vormerkungen aus dem Test oben verbrauchen
+array_map('unlink', glob("$dir/nachrichten/*.json") ?: []);
+file_put_contents("$dir/austausch/empfang/20260401-090000_49301234500_1775026800123.pdf", $pdf);
+file_put_contents("$dir/austausch/empfang/20260401-090000_49301234500_1775026800123.json", json_encode(['empfangen' => '2026-04-01T09:00:00+00:00', 'absender' => '49301234500', 'seiten' => 2, 'status' => 'SUCCESS']));
+Fax::abholen();
+check(Fax::eingangMelden($km) === 1, 'ein Fax gemeldet');
+$mails = glob("$dir/nachrichten/*.json");
+$mail = json_decode((string)file_get_contents($mails[0]), true);
+check(count($mails) === 1 && $mail['art'] === 'mail' && $mail['an'] === ['empfang@example.org', 'mfa@example.org'] && $mail['betreff'] === 'Neues Fax eingegangen'
+    && str_contains($mail['text'], 'Ein neues Fax ist eingegangen (2 Seiten).') && !str_contains($mail['text'], '1234500'), 'Benachrichtigung ohne Absender');
+check(Fax::eingangMelden($km) === 0, 'nur einmal gemeldet');
+Fax::benachrichtigungSpeichern(['mail_eingang' => '']);
+check(Fax::einstellungen()['mail_eingang'] === [], 'Benachrichtigung aus');
 $r = Fax::pflege($km);
 check(isset($r['abgeholt'], $r['sofort'], $r['lausch'], $r['export'], $r['aufgeraeumt']), 'Pflege läuft durch');
 

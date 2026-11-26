@@ -46,6 +46,7 @@ UNITS = Path(E('KIENZLE_MODULE_UNITS', '/etc/systemd/system'))
 TMPFILES = Path(E('KIENZLE_MODULE_TMPFILES', '/etc/tmpfiles.d'))
 RUN = Path(E('KIENZLE_MODULE_RUN', '/run/kienzle'))
 SPOOL = Path(E('KIENZLE_MODULE_SPOOL', '/var/spool/kienzle/ablage'))
+NACHRICHTEN_SPOOL = Path(E('KIENZLE_MODULE_NACHRICHTEN', '/var/spool/kienzle/nachrichten'))
 EXCHANGE = Path(E('KIENZLE_MODULE_AUSTAUSCH', manifest.EXCHANGE_BASE))
 SETFACL = E('KIENZLE_MODULE_SETFACL', '/usr/bin/setfacl')
 WEB = E('KIENZLE_MODULE_WEB', str(Path(__file__).resolve().parents[2] / 'bin' / 'kienzle-web'))
@@ -398,6 +399,7 @@ def fpm_conf(m: dict) -> str:
     readable = [*(x['path'] + '/' for x in m.get('exchange', [])),
                 f'/opt/kienzle/{mid}/', f'/var/lib/kienzle/{mid}/', '/opt/kienzle/core/', f'/etc/kienzle/verbindungen/module/{mid}.json',
                 f'/etc/kienzle/schluessel/{mid}.key', '/var/lib/kienzle/drucker/status.json', f'/var/spool/kienzle/ablage/{mid}/',
+                f'/var/spool/kienzle/nachrichten/{mid}/',
                 '/etc/kienzle/ca/ca.crt', '/etc/kienzle/ca/server.crt', '/tmp/', '/usr/bin/', '/usr/share/fonts/', '/usr/share/fonts-dejavu-core/']
     return '\n'.join([
         f'; Kienzle-Suite, Modul {mid}: eigene php-fpm-Instanz als ks-{mid}. Von der Modulverwaltung geschrieben; Änderungen gehen verloren.',
@@ -429,7 +431,8 @@ def fpm_unit(m: dict, binary: str) -> str:
         'ProtectKernelModules=yes', 'ProtectKernelLogs=yes', 'ProtectControlGroups=yes', 'ProtectClock=yes', 'ProtectHostname=yes',
         'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6', 'RestrictNamespaces=yes', 'RestrictRealtime=yes', 'RestrictSUIDSGID=yes',
         'LockPersonality=yes', 'SystemCallArchitectures=native', 'CapabilityBoundingSet=',
-        f'ReadWritePaths=/var/lib/kienzle/{mid} /run/kienzle/{mid} -/var/spool/kienzle/ablage/{mid}' + ''.join(f' -{x["path"]}' for x in m.get('exchange', [])),
+        f'ReadWritePaths=/var/lib/kienzle/{mid} /run/kienzle/{mid} -/var/spool/kienzle/ablage/{mid} -/var/spool/kienzle/nachrichten/{mid}'
+        + ''.join(f' -{x["path"]}' for x in m.get('exchange', [])),
         '', '[Install]', 'WantedBy=multi-user.target', ''])
 
 
@@ -751,6 +754,7 @@ def _remove(mid: str, m: dict | None, delete_data: bool, run_hook: bool = True) 
         shutil.rmtree(DATA / mid, ignore_errors=True)
         shutil.rmtree(STATE / 'schnappschuesse' / mid, ignore_errors=True)
         shutil.rmtree(SPOOL / mid, ignore_errors=True)
+        shutil.rmtree(NACHRICHTEN_SPOOL / mid, ignore_errors=True)
         if not OWNER:
             _run(['/usr/sbin/userdel', f'ks-{mid}'], timeout=60)
 

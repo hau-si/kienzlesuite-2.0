@@ -65,7 +65,7 @@ try {
             $braucht = match ($aktion) {
                 'senden', 'hochladen', 'quelle-loeschen', 'abbrechen', 'bericht-loeschen', 'fehler-uebernehmen' => 'senden',
                 'eingang-loeschen' => 'eingang', 'kontakt-speichern', 'kontakt-loeschen' => 'telefonbuch',
-                'einstellungen-speichern', 'aufbewahrung-speichern', 'drucker-speichern', 'nas-speichern' => 'admin',
+                'einstellungen-speichern', 'aufbewahrung-speichern', 'drucker-speichern', 'nas-speichern', 'benachrichtigung-speichern' => 'admin',
                 default => throw new InvalidArgumentException('Unbekannte Aktion.'),
             };
             if (!$rechte[$braucht]) throw new InvalidArgumentException('Dafür fehlt das Recht.');
@@ -84,6 +84,7 @@ try {
                 'kontakt-loeschen' => (function () { Fax::kontaktLoeschen((int)($_POST['id'] ?? 0)); return 'Eintrag gelöscht.'; })(),
                 'einstellungen-speichern', 'aufbewahrung-speichern' => (function () { Fax::aufbewahrungSpeichern($_POST); return 'Aufbewahrung gespeichert.'; })(),
                 'drucker-speichern' => (function () { Fax::druckerSpeichern((array)($_POST['drucker'] ?? [])); return 'Druckerliste gespeichert. Jetzt unter Verwaltung → Drucker „Virtuelle Drucker der Module abgleichen“ wählen (oder das Modul Fax neu installieren), damit neue Drucker erscheinen und entfernte verschwinden.'; })(),
+                'benachrichtigung-speichern' => (function () { Fax::benachrichtigungSpeichern($_POST); return 'Benachrichtigung gespeichert.'; })(),
                 'nas-speichern' => (function () use ($k) { Fax::nasSpeichern($k, $_POST); return 'NAS-Einstellungen gespeichert.'; })(),
                 'hochladen' => (function () {
                     $r = Fax::hochladen((array)($_FILES['dateien'] ?? []));
@@ -108,7 +109,7 @@ try {
     if (!in_array($quelle, [...Fax::quellen(), 'sendefehler'], true)) $quelle = $erste;
     $d = ['rechte' => $rechte, 'csrf' => $k->csrf(), 'meldung' => $meldung, 'fehler' => $fehler, 'telefon' => Fax::austauschBereit(),
         'ungelesen' => $rechte['eingang'] ? Fax::ungelesen() : 0, 'fehlerzahl' => $rechte['senden'] ? count(Fax::berichte('fehler')) : 0,
-        'einstellungen' => Fax::einstellungen(), 'quelle' => $quelle, 'drucker' => Fax::drucker(), 'lauschordner' => Fax::einstellungen()['lausch']['ziel'] !== '',
+        'einstellungen' => Fax::einstellungen(), 'quelle' => $quelle, 'drucker' => Fax::drucker(), 'lauschordner' => Fax::einstellungen()['lausch']['ziel'] !== '', 'nachrichten' => $k->nachrichtenBereit(),
         'vorgewaehlt' => array_values(array_filter((array)($_POST['vorgewaehlt'] ?? []), 'is_string'))];
     if ($rel === '/') {
         $d += ['zaehler' => Fax::quellenZaehler(), 'kontakte' => Fax::kontakte(), 'aktive' => Fax::aktive(),

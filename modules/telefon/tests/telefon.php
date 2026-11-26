@@ -130,4 +130,24 @@ wirft(fn() => Vorgaenge::loeschen('gibtsnicht'), 'Unbekannter Vorgang');
 file_put_contents("$dir/daten/kienzlefon/vorgaenge/20261126_120000_000003.json.enc", json_encode(['v' => 1, 'cipher' => 'AES-256-CBC', 'ek' => base64_encode(random_bytes(384)), 'iv' => base64_encode(random_bytes(16)), 'ct' => base64_encode(random_bytes(32)), 'sha256' => '']));
 $l = Vorgaenge::liste($k);
 check(count($l) === 2 && ($l[0]['fehler'] ?? '') !== '', 'Unlesbarer Vorgang als Fehler');
+// SMS an Anrufer: Handynummer erkennen, Vorlage ohne Gesundheitsangaben, Auftrag im Nachrichten-Ausgang (nachgestellt).
+check(Vorgaenge::handynummer('01701234567') === '+491701234567' && Vorgaenge::handynummer('004915112345678') === '+4915112345678'
+    && Vorgaenge::handynummer('49 170 1234567') === '+491701234567' && Vorgaenge::handynummer('+4930123456') === '' && Vorgaenge::handynummer('unbekannt') === '', 'Handynummer');
+check(Vorgaenge::smsVorlage('rezeptbestellung', 'Praxis Dr. med. Erika Beispiel') === 'Ihr Rezept liegt zur Abholung bereit. Ihre Praxis Dr. med. Erika Beispiel'
+    && Vorgaenge::smsVorlage('termin', 'Dr. Beispiel') === 'Bitte rufen Sie uns wegen Ihres Terminwunsches zurück. Ihre Praxis Dr. Beispiel', 'SMS-Vorlage');
+mkdir("$dir/verbindungen", 0700);
+mkdir("$dir/nachrichten", 0770);
+file_put_contents("$dir/verbindungen/telefon.json", json_encode(['nachrichten' => ['ausgang' => "$dir/nachrichten", 'sms' => true, 'mail' => false]]));
+$ks = new KienzleModul('telefon', $server, "$dir/verbindungen", "$dir/schluessel");
+Vorgaenge::smsSenden($ks, '20261126_091400_000001', '0170 1234567', 'Ihr Rezept liegt zur Abholung bereit.');
+$smsJobs = glob("$dir/nachrichten/*.json");
+check(count($smsJobs) === 1 && json_decode((string)file_get_contents($smsJobs[0]), true)['an'] === '+491701234567', 'SMS-Auftrag abgelegt');
+$liste = Vorgaenge::smsListe();
+check(count($liste['20261126_091400_000001']) === 1 && !str_contains((string)file_get_contents("$dir/daten/kienzlefon/vorgaenge/sms.json"), '1701234567'), 'SMS gemerkt ohne Nummer');
+wirft(fn() => Vorgaenge::smsSenden($ks, 'gibtsnicht', '+491701234567', 'x'), 'SMS zu unbekanntem Vorgang');
+$sms = ['bereit' => true, 'praxis' => 'Praxis Beispiel', 'stand' => ['20261126_091400_000001' => ['stand' => 'gesendet', 'meldung' => '', 'zeit' => time()]]];
+$v = Vorgaenge::liste($k);
+$html = Ansicht::vorgaenge($v, 'offen', 2, $k->csrf(), null, null, $sms);
+check(str_contains($html, 'SMS verschickt') && str_contains($html, 'value="+4930123456"') === false && str_contains($html, 'name="aktion" value="vorgang-sms"'), 'SMS-Formular und Stand');
+check(!str_contains(Ansicht::vorgaenge($v, 'offen', 2, $k->csrf(), null, null, ['bereit' => false]), 'vorgang-sms'), 'ohne SMS-Zugang kein Formular');
 echo "telefon.php: alles in Ordnung\n";

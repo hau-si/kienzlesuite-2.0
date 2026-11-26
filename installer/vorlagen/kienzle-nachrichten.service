@@ -1,0 +1,31 @@
+# Kienzle-Suite: SMS und E-Mails der Module verschicken (als ks-nachrichten; nur dieser Dienst kennt die Zugänge).
+[Unit]
+Description=Kienzle-Suite Nachrichten-Ausgang
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ks-nachrichten
+Group=ks-nachrichten
+ExecStart=/opt/kienzle/core/current/bin/kienzle-nachrichten abarbeiten
+TimeoutStartSec=600
+UMask=0022
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+ReadWritePaths=/var/spool/kienzle/nachrichten /var/lib/kienzle/nachrichten

@@ -305,8 +305,36 @@ final class Ansicht {
         return $o;
     }
 
+    /** SMS an den Anrufer (Nachrichten-Ausgang der Basis): Stand der letzten SMS und ein aufklappbares Formular mit Textvorschlag. */
+    private static function smsTeil(array $v, string $bereich, string $csrf, array $sms): string {
+        $h = 'tf_h';
+        $st = $sms['stand'][$v['id']] ?? null;
+        $o = '';
+        if ($st) {
+            $zeit = date('d.m., H:i', (int)$st['zeit']);
+            $o .= '<p class="tf-sms-stand">' . match ($st['stand']) {
+                'gesendet' => self::tag('ok', 'SMS verschickt') . ' <span class="muted">' . $h($zeit) . ' Uhr</span>',
+                'fehler' => self::tag('err', 'SMS nicht verschickt') . ' <span class="muted">' . $h((string)$st['meldung']) . '</span>',
+                'wartet' => self::tag('warn', 'SMS wird verschickt …'),
+                default => '',
+            } . '</p>';
+        }
+        if (!($sms['bereit'] ?? false)) return $o;
+        $d = $v['daten'];
+        $nr = Vorgaenge::handynummer(self::wert($d['telefon'] ?? '')) ?: Vorgaenge::handynummer(self::wert($d['id'] ?? ''));
+        $b = $h(tf_basis());
+        return $o . '<details class="how tf-sms"><summary>SMS an den Anrufer</summary><form method="post" action="' . $b . '/vorgaenge' . ($bereich === 'erledigt' ? '?bereich=erledigt' : '') . '" class="tf-form">'
+            . '<input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"><input type="hidden" name="aktion" value="vorgang-sms"><input type="hidden" name="id" value="' . $h((string)$v['id']) . '">'
+            . '<label>Handynummer<input name="an" value="' . $h($nr) . '" inputmode="tel" maxlength="20" required placeholder="+491701234567"></label>'
+            . ($nr === '' ? '<small class="muted">Die Anrufernummer ist keine Handynummer oder unbekannt; bitte die Nummer aus der Akte eintragen.</small>' : '')
+            . '<label>Text<textarea name="text" rows="2" maxlength="320" required>' . $h(Vorgaenge::smsVorlage((string)$v['typ'], (string)($sms['praxis'] ?? ''))) . '</textarea></label>'
+            . '<small class="muted">Keine Befunde oder Diagnosen in SMS schreiben. Höchstens 320 Zeichen.</small>'
+            . ($bereich === 'offen' ? self::haken('erledigt', 'Danach als erledigt markieren', true) : '')
+            . '<button class="primary" type="submit">SMS senden</button></form></details>';
+    }
+
     /** Seite „Vorgänge“: aufgesprochene Anliegen als Karten, Reiter Offen/Erledigt. */
-    public static function vorgaenge(array $liste, string $bereich, int $offen, string $csrf, ?string $meldung, ?string $fehler): string {
+    public static function vorgaenge(array $liste, string $bereich, int $offen, string $csrf, ?string $meldung, ?string $fehler, array $sms = []): string {
         $h = 'tf_h';
         $b = $h(tf_basis());
         $o = '<div class="tf">' . self::kopfzeile('/vorgaenge', true) . self::meldungen($meldung, $fehler)
@@ -341,6 +369,7 @@ final class Ansicht {
                 }
                 if ($v['typ'] === 'kienzlefon_error') $felder .= '<dt>Hinweis</dt><dd>Die Aufnahme ließ sich nicht vollständig verarbeiten. Bitte zurückrufen.</dd>';
                 $o .= $felder !== '' ? '<dl class="tf-dl">' . $felder . '</dl>' : '<p class="muted">Nichts verstanden. Bitte zurückrufen.</p>';
+                $o .= self::smsTeil($v, $bereich, $csrf, $sms);
             }
             $o .= '</section>';
         }

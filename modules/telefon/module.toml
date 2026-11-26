@@ -5,7 +5,7 @@
 [module]
 id = "telefon"
 name = "Telefon"
-version = "0.1.0-beta.10"
+version = "0.1.0-beta.11"
 core_api = "2"
 description = "Telefonanlage: Leitungen der Anbieter, Telefone, Warteschlange, Sprachmenü (Kienzlefon) und Kanalgrenze. Stellt auch die Faxleitung für das Modul Fax bereit; Fax lässt sich erst danach installieren."
 
@@ -55,6 +55,11 @@ label = "Telefon: aufgesprochene Anliegen (Rezept, Termin, Rückruf …) lesen u
 [[rights]]
 id = "sprachmenue"
 label = "Telefon: Zeiten, Ansagetexte und Menütasten des Sprachmenüs ändern"
+
+[[connections]]
+id = "nachrichten"
+purpose = "SMS an Anrufer aus den Vorgängen (z. B. „Ihr Rezept liegt bereit“)"
+required = false
 
 [[exchange]]
 module = "fax"

@@ -105,6 +105,44 @@ final class Vorgaenge {
         touch($nach);   // Löschfrist der erledigten Vorgänge zählt ab jetzt
     }
 
+    // ---- SMS an Anrufer (Nachrichten-Ausgang der Basis) ---------------------------------------------------------------
+    /** Anrufernummer als internationale Nummer (+49…), wenn sie wie eine Handynummer aussieht; sonst ''. */
+    public static function handynummer(string $nr): string {
+        $nr = preg_replace('/[\s\/()-]/', '', $nr) ?? '';
+        if (str_starts_with($nr, '00')) $nr = '+' . substr($nr, 2);
+        elseif (str_starts_with($nr, '0')) $nr = '+49' . substr($nr, 1);
+        elseif (preg_match('/^49\d{9,}$/D', $nr)) $nr = '+' . $nr;
+        return preg_match('/^\+491[5-7]\d{7,10}$/D', $nr) ? $nr : '';
+    }
+
+    /** Vorschlag für den SMS-Text je Art (ohne Gesundheitsangaben; vor dem Senden änderbar). */
+    public static function smsVorlage(string $typ, string $praxis): string {
+        $gruss = $praxis !== '' ? ' Ihre ' . (preg_match('/^praxis\b/i', $praxis) ? '' : 'Praxis ') . $praxis : ' Ihre Praxis';
+        return match ($typ) {
+            'rezeptbestellung' => 'Ihr Rezept liegt zur Abholung bereit.',
+            'ueb_req' => 'Ihre Überweisung liegt zur Abholung bereit.',
+            'termin' => 'Bitte rufen Sie uns wegen Ihres Terminwunsches zurück.',
+            default => 'Wir haben Ihr Anliegen erhalten und bearbeitet.',
+        } . $gruss;
+    }
+
+    /** SMS-Aufträge je Vorgang (nur Auftragskennung und Zeit, keine Nummer, kein Text). */
+    public static function smsListe(): array {
+        $d = json_decode((string)@file_get_contents(self::ordner() . '/sms.json'), true);
+        return is_array($d) ? $d : [];
+    }
+
+    public static function smsSenden(\KienzleModul $k, string $id, string $an, string $text): void {
+        if (!preg_match(self::ID, $id) || (!is_file(self::ordner() . "/$id.json.enc") && !is_file(self::ordner() . "/erledigt/$id.json.enc"))) throw new \InvalidArgumentException('Unbekannter Vorgang.');
+        $an = preg_replace('/[\s\/()-]/', '', $an) ?? '';
+        if (str_starts_with($an, '0') && !str_starts_with($an, '00')) $an = '+49' . substr($an, 1);
+        $job = $k->smsSenden($an, trim($text));
+        $liste = self::smsListe();
+        $liste[$id][] = ['job' => $job, 'zeit' => time()];
+        $liste = array_filter($liste, fn($x, $vid) => is_file(self::ordner() . "/$vid.json.enc") || is_file(self::ordner() . "/erledigt/$vid.json.enc") || $vid === $id, ARRAY_FILTER_USE_BOTH);
+        self::schreiben(self::ordner() . '/sms.json', (string)json_encode($liste), 0600);
+    }
+
     public static function loeschen(string $id): void {
         if (!preg_match(self::ID, $id)) throw new \InvalidArgumentException('Unbekannter Vorgang.');
         foreach ([self::ordner() . "/$id.json.enc", self::ordner() . "/erledigt/$id.json.enc"] as $f) {

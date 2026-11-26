@@ -5,6 +5,9 @@ HTTPS-Server auf localhost mit eigenem Testzertifikat. Nur erfundene Zugangsdate
 """
 import http.server
 import importlib
+import io
+import contextlib
+import time
 import json
 import os
 import shutil
@@ -100,7 +103,8 @@ class Umgebung(unittest.TestCase):
                'KIENZLE_ABLAGE_SCHLUESSEL': self.t / 'ssh/id_ed25519', 'FAKE_NAS': self.t / 'nas', 'FAKE_PW': 'Nas-Passwort-1', 'FAKE_HOSTKEY': HOSTKEY.split(' ', 1)[1],
                'KIENZLE_VERB_ETC': self.t / 'etc', 'KIENZLE_VERB_SCHLUESSEL': self.t / 'schluessel', 'KIENZLE_VERB_STATE': self.t / 'state-verb',
                'KIENZLE_VERB_REQUEST': self.t / 'anfragen/verbindungen.json', 'KIENZLE_VERB_MODULES': self.t / 'modules.json', 'KIENZLE_VERB_CHOWN': '0',
-               'KIENZLE_VERB_UID': os.getuid()}
+               'KIENZLE_VERB_UID': os.getuid(), 'KIENZLE_NACHRICHTEN_SPOOL': self.t / 'nachrichten', 'KIENZLE_NACHRICHTEN_KONFIG': self.t / 'etc/nachrichten.json',
+               'KIENZLE_NACHRICHTEN_STATE': self.t / 'state-nachrichten'}
         patcher = mock.patch.dict(os.environ, {k: str(v) for k, v in env.items()})
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -481,6 +485,84 @@ class Verbindungen(Umgebung):
         os.environ['KIENZLE_VERB_UID'] = str(os.getuid())
         s = self.request({'action': 'verteilen'})
         self.assertIn('nicht vertrauenswürdig', s['letzte']['meldung'])
+
+
+class Nachrichten(Verbindungen):
+    """Nachrichten-Ausgang: nur angemeldete Module bekommen einen Ausgang, die Zugänge nur ks-nachrichten; der Dienst verschickt
+    (hier mit Ersatz-Versand), schreibt Ergebnisse, wiederholt Fehlschläge 30 Minuten und begrenzt je Stunde."""
+
+    def setUp(self):
+        super().setUp()
+        import kienzle.nachrichten
+        self.na = importlib.reload(kienzle.nachrichten)
+        self.registry(extra_connections=[{'id': 'nachrichten', 'purpose': 'SMS an Anrufer', 'required': False}])
+        self.request({'action': 'sms', 'daten': {'api_key': 'SMS-Schluessel-1', 'absender': 'Praxis'}})
+        self.request({'action': 'mail', 'daten': self.MAIL})
+        self.aus = self.t / 'nachrichten' / 'zeit'
+
+    def auftrag(self, name, daten):
+        (self.aus / f'{name}.json').write_text(json.dumps(daten))
+
+    def ergebnis(self, name):
+        return json.loads((self.aus / f'{name}.ergebnis').read_text())
+
+    def test_verteilen(self):
+        zeit = json.loads((self.t / 'etc/module/zeit.json').read_text())
+        self.assertEqual(zeit['nachrichten'], {'ausgang': str(self.aus), 'sms': True, 'mail': True})
+        self.assertNotIn('SMS-Schluessel-1', json.dumps(zeit))
+        self.assertNotIn('nachrichten', json.loads((self.t / 'etc/module/beispiel.json').read_text()))
+        self.assertEqual(oct(self.aus.stat().st_mode & 0o7777), '0o2770')
+        k = json.loads((self.t / 'etc/nachrichten.json').read_text())
+        self.assertEqual((k['sms']['api_key'], k['mail']['passwort']), ('SMS-Schluessel-1', 'Mail-Passwort-1'))
+        self.assertIn('zeit', k['module'])
+        self.assertNotIn('beispiel', k['module'])                        # meldet „nachrichten“ nicht an
+        self.assertEqual(oct((self.t / 'etc/nachrichten.json').stat().st_mode & 0o777), '0o640')
+        self.assertFalse((self.t / 'nachrichten' / 'beispiel').exists())
+
+    def test_abarbeiten(self):
+        gesendet = []
+        self.auftrag('20261126-0900-sms1', {'art': 'sms', 'an': '+491701234567', 'text': 'Ihr Rezept liegt bereit.'})
+        self.auftrag('20261126-0900-mail', {'art': 'mail', 'an': 'fax@example.org', 'betreff': 'Neues Fax', 'text': 'Ein Fax ist eingegangen.'})
+        self.auftrag('20261126-0900-falsch', {'art': 'sms', 'an': '0170 123', 'text': 'x'})
+        self.auftrag('20261126-0900-steuer', {'art': 'mail', 'an': ['fax@example.org'], 'betreff': 'a\nBcc: x@example.org', 'text': 'x'})
+        (self.aus / 'x.json').write_text('{}')                         # zu kurzer Name: kein Auftrag
+        (self.t / 'nachrichten' / 'fremd').mkdir()
+        (self.t / 'nachrichten' / 'fremd' / '20261126-0900-fremd.json').write_text(json.dumps({'art': 'sms', 'an': '+491701234567', 'text': 'x'}))
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            r = self.na.abarbeiten(send=lambda cfg, job: gesendet.append((job['art'], job['an'], cfg[job['art']]['absender'])))
+        self.assertEqual(r, {'gesendet': 2, 'fehler': 2, 'wartet': 0})
+        self.assertEqual(gesendet, [('mail', ['fax@example.org'], 'praxis@example.org'), ('sms', '+491701234567', 'Praxis')])
+        self.assertEqual(self.ergebnis('20261126-0900-sms1')['stand'], 'gesendet')
+        self.assertEqual(self.ergebnis('20261126-0900-falsch')['stand'], 'fehler')
+        self.assertIn('Betreff', self.ergebnis('20261126-0900-steuer')['meldung'])
+        self.assertEqual(sorted(p.name for p in self.aus.glob('*.json')), ['x.json'])              # ungültiger Name bleibt liegen
+        self.assertTrue((self.t / 'nachrichten' / 'fremd' / '20261126-0900-fremd.json').exists())   # nicht angemeldetes Modul
+        for geheim in ('+491701234567', 'fax@example.org', 'Rezept'):
+            self.assertNotIn(geheim, buf.getvalue())
+
+    def test_wiederholen_und_grenze(self):
+        def kaputt(cfg, job):
+            raise self.na.Fehler('seven.io nicht erreichbar')
+        self.auftrag('20261126-0900-sms1', {'art': 'sms', 'an': '+491701234567', 'text': 'Test'})
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(self.na.abarbeiten(send=kaputt)['wartet'], 1)
+            self.assertTrue((self.aus / '20261126-0900-sms1.json').exists())
+            self.assertEqual(self.na.abarbeiten(now=time.time() + 31 * 60, send=kaputt)['fehler'], 1)
+        self.assertEqual(self.ergebnis('20261126-0900-sms1'), {**self.ergebnis('20261126-0900-sms1'), 'stand': 'fehler', 'meldung': 'seven.io nicht erreichbar'})
+        for i in range(self.na.GRENZE['sms'] + 1):
+            self.auftrag(f'20261126-1000-{i:04d}', {'art': 'sms', 'an': '+491701234567', 'text': 'Test'})
+        with contextlib.redirect_stdout(io.StringIO()):
+            r = self.na.abarbeiten(send=lambda cfg, job: None)
+        self.assertEqual((r['gesendet'], r['wartet']), (self.na.GRENZE['sms'], 1))
+
+    def test_ohne_sms_zugang(self):
+        self.request({'action': 'sms', 'loeschen': True})
+        self.assertFalse(json.loads((self.t / 'etc/module/zeit.json').read_text())['nachrichten']['sms'])
+        self.auftrag('20261126-0900-sms1', {'art': 'sms', 'an': '+491701234567', 'text': 'Test'})
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.na.abarbeiten(send=lambda cfg, job: self.fail('darf nicht senden'))
+        self.assertIn('nicht eingerichtet', self.ergebnis('20261126-0900-sms1')['meldung'])
 
 
 if __name__ == '__main__':

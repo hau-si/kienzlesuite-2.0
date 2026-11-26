@@ -1,0 +1,10 @@
+[Unit]
+Description=Kienzle-Suite Nachrichten-Ausgang alle 20 Sekunden
+
+[Timer]
+OnBootSec=1min
+OnUnitInactiveSec=20s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

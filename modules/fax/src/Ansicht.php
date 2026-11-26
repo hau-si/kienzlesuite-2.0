@@ -244,6 +244,14 @@ final class Ansicht {
                 . '<button class="primary" type="submit">Speichern</button></form></section>';
         }
 
+        $bereit = (bool)($d['nachrichten']['mail'] ?? false);
+        $o .= '<section class="card"><h2>Benachrichtigung bei Faxeingang</h2><p class="muted">Bei neuen Faxen eine kurze E-Mail an diese Adressen schicken (höchstens fünf, durch Komma getrennt; leer = aus). '
+            . 'Die E-Mail nennt nur Anzahl und Seiten, nie Absender oder Inhalt, und geht über die E-Mail-Verbindung der Basis.</p>'
+            . ($bereit ? '' : '<p class="fx-hinweis">Dafür muss unter Verwaltung → Verbindungen → E-Mail-Versand eingerichtet sein.</p>')
+            . '<form method="post" class="fx-form fx-schmal">' . self::csrf($d['csrf']) . '<input type="hidden" name="aktion" value="benachrichtigung-speichern">'
+            . '<label>E-Mail-Adressen<input name="mail_eingang" maxlength="400" value="' . fx_h(implode(', ', $e['mail_eingang'])) . '" placeholder="empfang@example.org"></label>'
+            . '<button class="primary" type="submit">Speichern</button></form></section>';
+
         $o .= '<section class="card"><h2>Aufbewahrung</h2><p class="muted">Faxe enthalten Gesundheitsdaten. Ältere Dateien löscht das Modul selbst, es sei denn, „unbegrenzt“ ist gewählt (dann bleibt alles, bis es von Hand gelöscht wird).</p>'
             . '<form method="post" class="fx-form fx-schmal">' . self::csrf($d['csrf']) . '<input type="hidden" name="aktion" value="aufbewahrung-speichern">'
             . $tage('eingang_tage', 'Faxeingang (Tage)', $e['eingang_tage']) . $tage('protokoll_tage', 'Sendeprotokoll und Fehlerberichte (Tage)', $e['protokoll_tage'])

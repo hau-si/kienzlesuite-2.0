@@ -92,6 +92,23 @@ Verbindungen. Ändert der Admin etwas, wird die Datei neu geschrieben; Module le
 $fhir = $k->verbindung('t2med');      // null, wenn nicht eingerichtet
 ```
 
+## Nachrichten-Ausgang (SMS und E-Mail)
+
+Angemeldet mit `[[connections]] id = "nachrichten"`. Das Modul kennt weder den SMS- noch den E-Mail-Zugang. Es legt einen Auftrag
+in seinem Ausgang ab (`/var/spool/kienzle/nachrichten/<id>/`); der Dienst `ks-nachrichten` verschickt ihn innerhalb von etwa
+20 Sekunden mit den Verbindungen der Basis (SMS über seven.io, E-Mail über SMTP oder Gmail) und schreibt das Ergebnis zurück.
+Fehlschläge werden 30 Minuten lang wiederholt. Je Modul höchstens 60 SMS und 120 E-Mails pro Stunde.
+
+```php
+$bereit = $k->nachrichtenBereit();                     // ['sms' => bool, 'mail' => bool]
+$job = $k->smsSenden('+491701234567', 'Ihr Rezept liegt zur Abholung bereit.');      // höchstens 320 Zeichen
+$job = $k->mailSenden(['empfang@example.org'], 'Neues Fax eingegangen', $text);       // 1–5 Adressen, nur Text
+$k->nachricht($job);                                    // ['stand' => 'wartet'|'gesendet'|'fehler'|'unbekannt', 'meldung' => …]
+```
+
+Texte so knapp wie möglich und **ohne Befunde, Diagnosen oder Anhänge**; SMS und E-Mail sind nicht Ende-zu-Ende verschlüsselt.
+Eigene Dienste des Moduls, die Nachrichten ablegen, tragen `-/var/spool/kienzle/nachrichten/<id>` in `ReadWritePaths` ein.
+
 ## Netzwerkspeicher
 
 Das Modul kennt die Zugangsdaten zum NAS nicht. Es legt einen Auftrag ab; der Dienst `ks-ablage` überträgt ihn per SMB oder

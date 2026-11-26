@@ -120,4 +120,16 @@ $o = aufruf($dir, '/telefon/einstellungen', '', 'admin', ['aktion' => 'whisper-e
 check(str_contains($o, 'Whisper wird geladen (etwa 5 GB') && json_decode((string)file_get_contents("$dir/daten/kienzlefon/auftrag.json"), true)['aktion'] === 'whisper-einrichten', 'Whisper-Auftrag');
 check(str_contains((string)file_get_contents("$dir/daten/kienzlefon/kienzlefon.toml"), 'modell_namen = "large-v3"'), 'Genaueres Modell für Namen');
 unlink("$dir/daten/kienzlefon/auftrag.json");
+// SMS an Anrufer über den Nachrichten-Ausgang (nachgestellt).
+@mkdir("$dir/verbindungen", 0700);
+@mkdir("$dir/nachrichten", 0770);
+file_put_contents("$dir/verbindungen/telefon.json", json_encode(['nachrichten' => ['ausgang' => "$dir/nachrichten", 'sms' => true, 'mail' => true]]));
+exec(implode(' ', array_map('escapeshellarg', ['python3', '-c', $py, dirname(__DIR__) . '/kienzlefon', "$dir/daten/kienzlefon/telepraxis-public.pem", "$dir/daten/kienzlefon/vorgaenge"])), $aus, $rc);
+$o = aufruf($dir, '/telefon/vorgaenge', 'vorgaenge');
+check(str_contains($o, 'SMS an den Anrufer') && str_contains($o, 'Bitte rufen Sie uns wegen Ihres Terminwunsches zurück.'), 'SMS-Formular mit Vorlage');
+$o = aufruf($dir, '/telefon/vorgaenge', 'vorgaenge', 'benutzer', ['aktion' => 'vorgang-sms', 'kienzle-csrf' => $csrf, 'id' => '20261126_091400_000001', 'an' => '0170 1234567', 'text' => 'Bitte rufen Sie uns zurück.', 'erledigt' => '1']);
+check(str_contains($o, 'SMS wird verschickt') && str_contains($o, 'als erledigt markiert') && count(glob("$dir/nachrichten/*.json") ?: []) === 1, 'SMS beauftragt und erledigt');
+check(str_contains(aufruf($dir, '/telefon/vorgaenge?bereich=erledigt', 'vorgaenge'), 'SMS wird verschickt …'), 'Stand an der Karte');
+$o = aufruf($dir, '/telefon/vorgaenge?bereich=erledigt', 'vorgaenge', 'benutzer', ['aktion' => 'vorgang-sms', 'kienzle-csrf' => $csrf, 'id' => '20261126_091400_000001', 'an' => '12345', 'text' => 'x']);
+check(str_contains($o, 'Handynummer bitte im Format'), 'Ungültige Nummer');
 echo "seiten.php (telefon): alles in Ordnung\n";
