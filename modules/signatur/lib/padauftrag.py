@@ -134,11 +134,20 @@ class PadGeraet:
         self.signal = threading.Event()
 
         self.zaehler: dict[int, int] = {}
+        self.stift: dict = {}
 
         def rueckruf(art, daten, groesse, _):
             self.zaehler[art] = self.zaehler.get(art, 0) + 1
             if art == EV_SIGNATUR:
-                return   # Stiftpunkte nicht in die Ereignisliste (sonst ein Eintrag je Punkt)
+                # Stiftpunkte nicht in die Ereignisliste (sonst ein Eintrag je Punkt); nur Bereich merken (x, y, Druck) für das Protokoll.
+                if daten and groesse >= 12:
+                    x, y, druck = ctypes.cast(daten, ctypes.POINTER(ctypes.c_int))[0:3]
+                    k = self.stift
+                    k['n'] = k.get('n', 0) + 1
+                    k['x'] = (min(k.get('x', (x, x))[0], x), max(k.get('x', (x, x))[1], x))
+                    k['y'] = (min(k.get('y', (y, y))[0], y), max(k.get('y', (y, y))[1], y))
+                    k['druck'] = max(k.get('druck', 0), druck)
+                return
             wert = ctypes.cast(daten, ctypes.POINTER(ctypes.c_int))[0] if daten and groesse > 0 else 0
             self.queue.append((art, wert))
             self.signal.set()
@@ -169,6 +178,7 @@ class PadGeraet:
         self.pruefen('Unterschriftsfeld', self.lib.STSensorSetSignRect(*feld))
         rc = self.pruefen('Aufnahme', self.lib.STSignatureStart())
         self.zaehler.pop(EV_SIGNATUR, None)
+        self.stift = {}
         log(f'Aufnahme gestartet (Feld {tuple(feld)}, Rückgabe {rc}, läuft: {self.lib.STSignatureGetState()})')
 
     def unterschrift_neu(self) -> None:
@@ -193,7 +203,7 @@ class PadGeraet:
         stopp = L.STSignatureStop()
         groesse = ctypes.c_int(0)
         rc = L.STSignatureGetSignData(None, ctypes.byref(groesse))
-        log(f'Vorgang {vid}: Aufnahme lief: {laeuft}, Stopp {stopp}, Daten {rc}/{groesse.value} Bytes, Stiftereignisse {self.zaehler.get(EV_SIGNATUR, 0)}, alle Ereignisse {self.zaehler}')
+        log(f'Vorgang {vid}: Aufnahme lief: {laeuft}, Stopp {stopp}, Daten {rc}/{groesse.value} Bytes, Stiftereignisse {self.zaehler.get(EV_SIGNATUR, 0)} (Bereich {self.stift or "keine"}), alle Ereignisse {self.zaehler}')
         if rc < 0 or groesse.value < 1:
             self.hinweis = 'Noch keine Unterschrift erkannt. Bitte im Feld unterschreiben, dann „OK“.'
             L.STSignatureStart()

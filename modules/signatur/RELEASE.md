@@ -1,5 +1,9 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.26
+
+- **Fehlersuche Pad: Bereich der Stiftpunkte im Protokoll.** Bei „OK“ nennt die Protokollzeile jetzt zusätzlich, in welchem Bereich (x, y) und mit welchem größten Druck Stiftpunkte ankamen („Bereich keine“, wenn das Pad nichts meldet). Daran sieht man, ob die Punkte außerhalb des Unterschriftsfelds liegen oder gar nicht ankommen. Nicht am echten Pad geprüft.
+
 ## 0.1.0-beta.25
 
 - **Patient immer oben rechts wie in der Kasse:** Der Kasten ist stets sichtbar; ohne Vorwahl steht darin das Namensfeld (manuelle Eingabe), nach Übernahme aus T2med oder Kasse der Name mit „Anderen Patienten wählen“. Darunter die Dokumentauswahl.
