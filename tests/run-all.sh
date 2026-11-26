@@ -16,6 +16,10 @@ for m in modules/*/; do
   grep -Eq "^## ${v//./\\.}\$" "$m/RELEASE.md" || { echo "$m: RELEASE.md ohne Abschnitt für $v"; exit 1; }
 done
 
+step 'Installations-ISO (iso/)'
+for t in iso/tests/test_*.py; do python3 -B "$t"; done
+bash -n iso/bauen.sh
+
 step 'Python: Syntax und Stil'
 python_bins=(core/bin/kienzle-module core/bin/kienzle-modul-pruefen core/bin/kienzle-zertifikat core/bin/kienzle-web core/bin/kienzle-firewall core/bin/kienzle-update core/bin/kienzle-verbindungen core/bin/kienzle-ablage core/bin/kienzle-sicherung core/bin/kienzle-ueberblick core/bin/kienzle-drucker core/bin/kienzle-servername scripts/release-bauen scripts/release-signieren)
 python3 -B -m py_compile core/lib/kienzle/*.py "${python_bins[@]}" tests/core/*.py tests/integration/*.py
