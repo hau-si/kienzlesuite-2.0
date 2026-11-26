@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.5
+
+- **Klicksperre bei Update-Abfragen von 30 auf 10 Sekunden** („Jetzt nach Updates suchen“, Basis und Module). Bei vielen Klicks hintereinander gilt weiter der Schutz vor dem GitHub-Limit (60 Abfragen pro Stunde und IP-Adresse ohne Anmeldung).
+
 ## 0.22.0-beta.4
 
 - **Veränderbare Druckerliste für Module** (`[printer_list]` in `module.toml`, siehe `docs/MODULE-TOML.md`): Ein Modul pflegt die Namen virtueller Drucker selbst (Datei im Datenordner), die Basis legt sie beim Abgleichen an (Verwaltung → Drucker → „Virtuelle Drucker der Module abgleichen“, auch bei Installieren und Aktualisieren). Namen müssen mit einem festen Vorsatz beginnen (schützt Namen anderer Module); fehlt die Datei oder ist sie kaputt, gilt die Vorgabe. Der Druckername kommt als `KIENZLE_DRUCKER` im Umfeld des Druckprogramms an. Die Einheiten der IPP-Drucker bekommen diese Zeile, deshalb startet der erste Abgleich nach dem Update alle virtuellen Drucker einmal neu.
@@ -66,7 +70,7 @@
 
 ## 0.21.4-beta.59
 
-- **Klicksperre bei Update-Abfragen:** „Jetzt nach Updates suchen“ (Basis und Module) geht höchstens alle 30 Sekunden. Davor erscheint „Bitte kurz warten …“ mit der Restzeit. Grund: GitHub erlaubt ohne Anmeldung nur 60 Abfragen pro Stunde und IP-Adresse (Fehler „HTTP 403 rate limit exceeded“). Nicht auf der VM geprüft.
+- **Klicksperre bei Update-Abfragen:** „Jetzt nach Updates suchen“ (Basis und Module) geht höchstens alle 30 Sekunden (ab 0.22.0-beta.5: 10 Sekunden). Davor erscheint „Bitte kurz warten …“ mit der Restzeit. Grund: GitHub erlaubt ohne Anmeldung nur 60 Abfragen pro Stunde und IP-Adresse (Fehler „HTTP 403 rate limit exceeded“). Nicht auf der VM geprüft.
 
 ## 0.21.4-beta.58
 

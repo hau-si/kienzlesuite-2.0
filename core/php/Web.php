@@ -1749,10 +1749,10 @@ final class Web {
         return $busy ? $response->with('Refresh', '5') : $response;
     }
 
-    /** Klicksperre: Update-Abfragen (Basis und Module) höchstens alle 30 Sekunden, damit das GitHub-Limit nicht aufgebraucht wird. */
+    /** Klicksperre: Update-Abfragen (Basis und Module) höchstens alle 10 Sekunden, damit das GitHub-Limit nicht aufgebraucht wird. */
     private function pruefSperre(): void {
         $last = (int)$this->db->setting('sperre:update-pruefen');
-        $rest = $last + 30 - time();
+        $rest = $last + 10 - time();
         if ($rest > 0) throw new Problem('Bitte kurz warten: Die nächste Abfrage ist in ' . $rest . ' Sekunden möglich (Schutz vor dem GitHub-Limit).', 429);
         $this->db->store('sperre:update-pruefen', (string)time());
     }
