@@ -150,4 +150,10 @@ $k = new KienzleModul('terminzettel', ['KIENZLE_MENUE' => rawurlencode('{"apps":
 $seite = $k->rahmen('Terminzettel', $html, ['roh' => true, 'kopf' => $kopf]);
 check(str_contains($seite, '<aside class="side">') && str_contains($seite, 'href="/terminzettel/"') && str_contains($seite, 'assets/app.js?v=') && str_contains($seite, 'Bon-1'), 'Seite im Rahmen der Suite mit Seitenleiste');
 check(preg_match('#assets/style\.css\?v=[0-9a-f]{8}"#', $kopf) === 1 && preg_match('#assets/app\.js\?v=[0-9a-f]{8}"#', $kopf) === 1, 'Skript und Stil ohne Versionsanhang: Zwischenspeicher zeigt nach einem Update alte Dateien');
+// Neuer Standardtext der Absage-Mail; alte Standardtexte werden ersetzt.
+$alt = ['cancel_body' => "Guten Tag,\n\nich kann meinen Termin leider nicht wahrnehmen und sage ihn hiermit ab:\n{{termine}}\n\nMit freundlichen Grüßen\n{{patient}}", 'cancel_subject' => 'Terminabsage'];
+file_put_contents(Seite::$data . '/werte.json', json_encode($alt));
+$neu = Seite::werte();
+check(str_contains($neu['cancel_body'], "leider muss ich meinen Termin am\n\n{{termine}}\n\nabsagen.") && str_ends_with($neu['cancel_body'], "Viele Grüße,\n{{patient}}") && $neu['cancel_subject'] === 'Terminabsage {{patient}}', 'Neuer Standardtext der Absage-Mail');
+
 echo "OK: Terminzettel-Einstellungen, Layout, Ablage und Vorschau.\n";
