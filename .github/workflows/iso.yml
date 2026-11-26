@@ -1,0 +1,39 @@
+name: Start-ISO
+# Baut die kleine Start-ISO (iso/bauen.sh) und legt sie als Release „start-iso“ ab (immer die neueste, wird ersetzt).
+# Der Updater der Suite ignoriert dieses Release (Tag passt nicht zu core-v… / <modul>-v…).
+# Gestartet von Hand (Actions → Start-ISO → Run workflow) und bei Änderungen an iso/ oder den Release-Schlüsseln auf beta und main.
+on:
+  workflow_dispatch:
+  push:
+    branches: [beta, main]
+    paths: ['iso/**', 'installer/release-keys/**', '.github/workflows/iso.yml']
+permissions:
+  contents: write
+concurrency:
+  group: start-iso
+  cancel-in-progress: false
+jobs:
+  iso:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Werkzeuge
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq xorriso gpgv gnupg dirmngr
+      - name: Tests der ISO-Teile
+        run: for t in iso/tests/test_*.py; do python3 -B "$t"; done
+      - name: ISO bauen
+        run: bash iso/bauen.sh kienzle-suite-start.iso
+      - name: Größe und Aufbau prüfen
+        run: |
+          size=$(stat -c %s kienzle-suite-start.iso); echo "Größe: $size"
+          [ "$size" -lt 400000000 ] || { echo 'ISO ist zu groß: das große Dateisystem wurde nicht entfernt.'; exit 1; }
+          xorriso -indev kienzle-suite-start.iso -find / -maxdepth 2 2>&1 | head -40
+          xorriso -indev kienzle-suite-start.iso -report_el_torito plain 2>&1 | head -20
+      - name: Veröffentlichen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha=$(sha256sum kienzle-suite-start.iso | cut -d' ' -f1)
+          printf 'Kleine Start-ISO der Kienzle-Suite (Ubuntu Server 26.04.1 wird beim Start geladen, Internet per DHCP und ca. 6 GB RAM nötig).\n\nBauzweig: %s, Stand: %s\nSHA-256: %s\n' "$GITHUB_REF_NAME" "$GITHUB_SHA" "$sha" > notizen.md
+          gh release delete start-iso --yes --cleanup-tag >/dev/null 2>&1 || true
+          gh release create start-iso kienzle-suite-start.iso --target "$GITHUB_SHA" --prerelease --title 'Start-ISO (neueste)' --notes-file notizen.md

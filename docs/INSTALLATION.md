@@ -51,23 +51,25 @@ Prüfliste für die Test-VM: `docs/VM-TEST.md`.
 4. Beim ersten Start läuft der Installer der Suite von selbst. Den Einrichtungslink zeigt danach
    `sudo journalctl -u kienzle-erstinstallation` bzw. `sudo kienzle-admin einrichtungslink`.
 
-## Installations-ISO (iso/)
+## Start-ISO (iso/): einfachster Weg
 
-Für eine Installation fast ohne Eingaben: `bash iso/bauen.sh UBUNTU-26.04.x-live-server-amd64.iso` erzeugt aus der offiziellen
-Ubuntu-ISO (vorher gegen `SHA256SUMS` von releases.ubuntu.com prüfen) die Datei `kienzle-suite-installer.iso`. Gebaut wird nur ergänzend
-(`xorriso`): Autoinstall, Startmenü, `holen.py` und die Release-Schlüssel.
+Die kleine Start-ISO (rund 100–150 MB) liegt als Download im GitHub-Release **„start-iso“** (GitHub → Releases → „Start-ISO (neueste)“); sie wird
+von `.github/workflows/iso.yml` gebaut. Auf Windows reicht: Datei laden, mit Rufus oder balenaEtcher auf einen USB-Stick schreiben (oder an die VM hängen),
+davon starten.
 
-- Interaktiv bleiben nur drei Ubuntu-Bildschirme: **Netzwerk** (DHCP oder feste Adresse), **Datenträger** (Platte und Größe, Rest bleibt frei)
-  und **Benutzer/Passwort** (Servername ist mit `suite` vorbelegt). Sprache, Tastatur (de), Zeitzone, SSH-Server, Sicherheitsupdates laufen ohne Rückfrage.
-- Das Startmenü wählt Kanal und Herkunft: *stabil (signiert)*, *Beta (unsignierte Vorabversionen erlaubt)*, *Zweig main* oder *Zweig beta*
-  (nur wenn es kein Release gibt). Unsignierte Stände werden nur durch ausdrückliche Menüwahl zugelassen und mit der Prüfsumme des Manifests
-  (Releases) bzw. gar nicht (Zweig) abgesichert.
-- Beim ersten Start holt `kienzle-holen` das neueste Release des Kanals, prüft die Ed25519-Signatur mit den Schlüsseln der ISO
-  (`installer/release-keys`), packt es nach `/opt/kienzle-installer` und startet `install.sh`. Schlägt etwas fehl, bleibt das System bestehen und
-  der Dienst versucht es nach 2 Minuten erneut (`sudo journalctl -u kienzle-erstinstallation`).
-- Stand: Logik (Download, Signatur, Auspacken, Menü, Autoinstall-Aufbau) ist mit `iso/tests` getestet; **der Start von der ISO ist noch nicht auf einer
-  VM geprüft**. Die „kleine ISO, die Ubuntu nachlädt“ (Netzstart) ist noch nicht gebaut: Sie braucht zusätzlich viel Arbeitsspeicher und einen
-  Weg, die ISO-Dateien im Live-System bereitzustellen.
+- **Voraussetzungen:** Internet per DHCP beim Start und rund **6 GB Arbeitsspeicher** oder mehr: Ubuntu Server 26.04.1 wird beim Start geladen
+  (2,7 GB) und im Arbeitsspeicher gehalten. Eine feste Adresse für den Download: Menüeintrag mit „e“ bearbeiten (Hinweis steht in der Menüdatei).
+- **Eingaben:** Nur drei Ubuntu-Bildschirme bleiben: **Netzwerk** (DHCP oder feste Adresse), **Datenträger** (Platte und Größe, Rest bleibt frei)
+  und **Benutzer/Passwort** (Servername mit `suite` vorbelegt). Sprache, Tastatur (de), Zeitzone, SSH-Server und Sicherheitsupdates laufen ohne Rückfrage.
+- **Startmenü:** *stabil (signiert)*, *Beta (unsignierte Vorabversionen erlaubt)*, *Zweig main* oder *Zweig beta* (nur wenn es kein Release gibt).
+  Unsignierte Stände gibt es nur durch ausdrückliche Menüwahl; bei Releases schützt dann noch die Prüfsumme des Manifests, beim Zweig nichts.
+- **Danach** holt `kienzle-holen` beim ersten Start das neueste Release des Kanals, prüft die Ed25519-Signatur mit den Schlüsseln aus
+  `installer/release-keys` (in der ISO eingebettet), packt es nach `/opt/kienzle-installer` und startet `install.sh`. Schlägt etwas fehl, bleibt das
+  System bestehen und der Dienst versucht es nach 2 Minuten erneut (`sudo journalctl -u kienzle-erstinstallation`).
+- **Bauen:** `bash iso/bauen.sh` (Linux, braucht `xorriso`, `gpgv`): lädt die Ubuntu-ISO, prüft sie gegen `SHA256SUMS` mit GPG-Signatur (fester
+  Fingerabdruck der Ubuntu-CD-Schlüssel), entfernt das große Dateisystem und ergänzt Menü und Autoinstall (Bezeichnung `CIDATA`).
+- **Stand:** Download, Signaturprüfung, Seed und Menü sind mit `iso/tests` getestet. **Der Start von der ISO ist noch nicht auf einer VM geprüft**
+  (offene Punkte: ob cloud-init den Seed über die Bezeichnung `CIDATA` findet, ob Secure Boot mit dem verkleinerten Abbild startet).
 
 ## Was der Installer einrichtet
 
