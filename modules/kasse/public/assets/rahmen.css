@@ -9,7 +9,11 @@ main.modul footer { text-align: left; padding: 8px 0 0; color: #7e918a; font-siz
 main.modul ul.checklist small, main.modul ol.checklist small, main.modul .checklist small { font-family: inherit; font-size: 12.5px; }
 /* Startseite: links Rechnungen (Filter, Suche, Marken), rechts die eingebettete Kassenansicht */
 main.modul { max-width: 1400px; }
-.start-tools { display: flex; align-items: center; gap: 14px; }
+.start-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.button.mit-icon { display: inline-flex; align-items: center; gap: 8px; }
+.start-left-kopf { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.start-refresh { border: 1px solid #d9e3df; background: #fff; border-radius: 8px; width: 28px; height: 28px; line-height: 1; font-size: 16px; cursor: pointer; color: inherit; padding: 0; }
+.start-refresh:hover { background: #eaf4f0; }
 .start-grid { display: grid; grid-template-columns: minmax(290px, 350px) minmax(0, 1fr); gap: 14px; align-items: start; }
 .start-left { background: #fff; border: 1px solid #d9e3df; border-radius: 12px; padding: 10px 12px; height: calc(100vh - 190px); min-height: 520px; display: flex; flex-direction: column; box-sizing: border-box; }
 .start-right { min-width: 0; }

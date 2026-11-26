@@ -195,6 +195,10 @@ try {
     check($http->posts('api.sumup.com')===$postsBefore && $http->posts('t2med.test')===$fhirBefore,'Belegabruf erzeugt Zahlung oder Dokumentation');
     echo "OK: Belegzuordnung, Wiederholung, Beleglink und E-Mail-Vorschlag ohne Schreibvorgänge.\n";
     // Migration einer bestehenden Datenbank erhält Zahlung und ergänzt Versandstatus.
+    // Bestehende Datenbank (Version 21, services ohne Spalte signature) wird beim Start ergänzt.
+    $old = $app->db->pdo;
+    $old->exec('ALTER TABLE services DROP COLUMN signature'); $old->exec('PRAGMA user_version=21'); $app->db->migrate();
+    check(in_array('signature', array_column($old->query('PRAGMA table_info(services)')->fetchAll(), 'name'), true), 'Spalte signature nach Migration von Version 21 fehlt');
     $app->db->query('DROP TABLE receipt_emails');$app->db->query('PRAGMA user_version=1');$app->db->migrate();
     check($app->db->one('SELECT * FROM payments WHERE id=?',[$p['id']])===$paymentBefore,'Migration verändert Zahlung');
     $values=$cfg->values;$values['mail']=['enabled'=>true,'host'=>'smtp.example.invalid','port'=>587,'encryption'=>'starttls','username'=>'user','password'=>'secret','from_address'=>'praxis@example.invalid','from_name'=>'Musterpraxis'];

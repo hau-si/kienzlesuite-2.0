@@ -1,5 +1,17 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.47
+
+- **Einheitlicher Seitenkopf:** Alle Seiten der Kasse haben oben dieselben Knöpfe mit denselben Symbolen wie das Modul Signatur: Start, Vorgänge, IGeL, Einstellungen (die aktuelle Seite ist hervorgehoben).
+- **Neue Seite „IGeL“** (neben den Einstellungen): Die Leistungs- und IGeL-Liste (GOÄ, Preise, „Unterschrift erforderlich“) ist aus den Einstellungen dorthin umgezogen. Der Zahnrad-Link in der Kassenansicht führt dorthin.
+- **Einstellungen ohne Reiter:** Die drei Reiter entfallen. Es bleibt die Einrichtung; der „Einrichtung – Überblick“ lässt sich zuklappen (zeigt „n offen“ oder „fertig“). Der Rechnungseingang steht darunter.
+- **Aktualisieren** der Rechnungsliste: kleiner Knopf (↻) oben an der Liste der Startseite.
+- **Kürzere Zahlungsknöpfe:** „Karte“, „Bar“ und „Überweisung“, mit Betrag davor (z. B. „15,00 € · Karte“). Nicht auf dem Server geprüft.
+
+## 2.3.4-beta.46
+
+- **Fehler behoben (beta.45):** Auf Servern mit bestehender Datenbank zeigte die Kasse nur „Der Vorgang konnte nicht verarbeitet werden“, weil die neue Spalte „Unterschrift erforderlich“ nicht angelegt wurde (Datenbankversion nicht erhöht). Die Datenbank wird jetzt beim Start auf Version 22 gebracht; ein Test deckt die Migration von Version 21 ab. Bitte beta.45 überspringen.
+
 ## 2.3.4-beta.45
 
 - **Haken „Unterschrift erforderlich“ je Leistung** (Einstellungen → Leistungskatalog, in der Liste als Spalte „Unterschrift“). Der Knopf „Zur Unterschrift“ erscheint in der Kasse nur noch, wenn mindestens eine gewählte Leistung diesen Haken hat.

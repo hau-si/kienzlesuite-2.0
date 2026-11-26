@@ -54,7 +54,7 @@ if ($rahmen) {
 <p class="muted small">T2med-Rechnungen werden immer auf dem Praxisdrucker gedruckt.</p>
 <button type="button" id="print-settings-save" class="secondary">Speichern</button></div></div>
 <div id="invoices-section" class="invoices" hidden><h2>Offene T2med-Rechnung</h2><div id="invoices"></div><p class="muted">Rechnungsnummer und Betrag stammen aus der in T2med auf „vKasse“ gedruckten Rechnung. Nur Betrag und Rechnungsnummer gehen an SumUp.</p></div>
-<div class="col-left"><div class="section-heading"><h2>Leistungen</h2><a id="catalog-gear" class="gear" href="<?= $base ?>einstellungen#leistungen" target="_top" title="Leistungsliste bearbeiten" aria-label="Leistungsliste bearbeiten">⚙</a><button type="button" id="manage-toggle" class="text-button" aria-expanded="false">Leistungen verwalten</button></div>
+<div class="col-left"><div class="section-heading"><h2>Leistungen</h2><a id="catalog-gear" class="gear" href="<?= $base ?>igel" target="_top" title="Leistungsliste bearbeiten" aria-label="Leistungsliste bearbeiten">⚙</a><button type="button" id="manage-toggle" class="text-button" aria-expanded="false">Leistungen verwalten</button></div>
 <input id="service-search" class="service-search" type="search" placeholder="Suchen: Ziffer oder Name" autocomplete="off" aria-label="Leistungen suchen">
 <p id="practice-hint" class="muted" hidden>Für eigene Leistungsbelege und GOÄ-Rechnungen bitte Praxisname und Anschrift in den Einstellungen eintragen.</p>
 <div id="groups-section" hidden><h3>Kombinationen</h3><div id="groups"></div><p class="muted">Gemeinsame Einzelleistungen werden nur einmal berechnet.</p><h3>Einzelleistungen</h3></div>
@@ -71,8 +71,8 @@ if ($rahmen) {
 <button id="reader-cancel" class="secondary wide">Anderen Vorgang abbrechen</button>
 <button id="reader-status" class="text-button">Status prüfen</button>
 </div>
-<div id="pay-method" class="pay-method" role="radiogroup" aria-label="Zahlungsart"><label><input type="radio" name="pay-method" value="card" checked><span>💳 Karte (SumUp)</span></label><label><input type="radio" name="pay-method" value="cash"><span>💶 Bar</span></label><label id="pay-transfer-label" hidden><input type="radio" name="pay-method" value="transfer"><span>🏦 Überweisung</span></label></div><p id="pay-method-note" class="muted small" hidden></p>
-<button id="pay" class="primary wide" disabled>Mit Karte kassieren</button></div></section>
+<div id="pay-method" class="pay-method" role="radiogroup" aria-label="Zahlungsart"><label><input type="radio" name="pay-method" value="card" checked><span>Karte</span></label><label><input type="radio" name="pay-method" value="cash"><span>Bar</span></label><label id="pay-transfer-label" hidden><input type="radio" name="pay-method" value="transfer"><span>Überweisung</span></label></div><p id="pay-method-note" class="muted small" hidden></p>
+<button id="pay" class="primary wide" disabled>Karte</button></div></section>
 <section id="manager" class="card" hidden><div class="section-heading"><h2>Leistungen verwalten</h2><button id="manage-close" class="text-button">Fertig</button></div><div id="manage-list"></div>
 <form id="service-form"><input id="service-id" type="hidden"><label for="service-label">Bezeichnung</label><input id="service-label" required maxlength="160" placeholder="z. B. Attest"><label for="service-category">Gruppe <span class="muted">optional</span></label><input id="service-category" list="category-list" maxlength="40" placeholder="z. B. Blutwerte, Sonographie, Bescheinigungen" autocomplete="off"><datalist id="category-list"></datalist><label for="service-price">Preis in Euro</label><input id="service-price" required inputmode="decimal" placeholder="10,00" maxlength="12">
 <label class="check-label" id="service-vat-row"><input id="service-vat" type="checkbox"> <span id="service-vat-label">mit MwSt. (im Preis enthalten)</span></label><p id="service-vat-note" class="muted small" hidden></p>

@@ -17,7 +17,7 @@ $base = ks_h(Suite::base() . '/');
 $csrf = ks_h($k->csrf());
 ob_start();
 ?>
-<header class="seitenkopf"><div><p class="eyebrow">Kasse</p><h1>Vorgänge</h1></div><span class="start-tools"><a class="button secondary" href="<?= $base ?>">← Zur Kasse</a></span></header>
+<header class="seitenkopf"><div><p class="eyebrow">Kasse</p><h1>Vorgänge</h1></div><?= \KienzleKasse\Kopf::knoepfe('vorgaenge', $base, in_array('catalog', Suite::settingsRights(), true), Suite::settingsRights() !== []) ?></header>
 <section class="card vorgaenge">
 <div class="vg-bar">
 <div class="start-tabs" id="vg-art" role="tablist"></div>

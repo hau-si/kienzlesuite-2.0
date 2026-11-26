@@ -219,9 +219,8 @@ const GROUPS = [
   {id: 'netz', label: 'Arbeitsplätze', cards: ['s-clients']},
   {id: 'sicherheit', label: 'Protokoll', cards: ['s-audit']},
 ];
+// Die Einstellungsseite hat nur noch einen Bereich (keine Reiter mehr); die Leistungsliste liegt auf der eigenen Seite „IGeL“.
 const TABS = [
-  {id: 'abrechnung', label: 'Abrechnung', hint: 'laufend', cards: ['s-inbox-list']},
-  {id: 'leistungen', label: 'Leistungen', hint: 'GOÄ', cards: ['s-catalog']},
   {id: 'einrichtung', label: 'Einrichtung', hint: 'einmalig', cards: ['s-checklist', ...GROUPS.flatMap(g => g.cards)], groups: GROUPS},
 ];
 let lastOpenCards = [];
@@ -250,6 +249,7 @@ function layoutTabs(data) {
       panel.append(box);
       for (const id of group.cards) { const card = $(id); if (card) box.append(card); }
     }
+    const eingang = $('s-inbox-list'); if (eingang) panel.append(eingang);
   }
   const open = renderChecklist(data);
   rankGroups();
@@ -257,7 +257,7 @@ function layoutTabs(data) {
     for (const id of lastOpenCards) openGroupOf(id);
     openGroupOf(location.hash.slice(1));
     const hash = location.hash.slice(1);
-    activate(TABS.some(t => t.id === hash) ? hash : tabOf(hash) || (open ? 'einrichtung' : 'abrechnung'));
+    activate('einrichtung');
     if (tabOf(hash)) setTimeout(() => $(hash)?.scrollIntoView({block: 'start'}), 50);
   } else activate(activeTab);
 }
@@ -354,6 +354,9 @@ function renderChecklist(data) {
   lastOpenCards = required.filter(i => !i.done).map(i => i.card);
   lastItems = items;
   badge('einrichtung', open);
+  const fold = $('checklist-fold'), tag = $('checklist-tag');
+  if (tag) { tag.textContent = open ? open + ' offen' : 'fertig'; tag.className = 'tag ' + (open ? 'warn' : 'ok'); }
+  if (fold && !fold.dataset.touched) { fold.open = open > 0; fold.dataset.auto = String(open > 0); fold.ontoggle = () => { if (String(fold.open) !== fold.dataset.auto) fold.dataset.touched = '1'; }; }
   return open;
 }
 async function busy(button, action) {
@@ -362,9 +365,10 @@ async function busy(button, action) {
 }
 async function loadSettings() {
   const data = await api('get');
+  if (document.body.dataset.seite === 'igel') { show('settings'); loadCatalog(); return; }
   if (data.role === 'staff') { staffMode(data); return; }
   document.body.classList.remove('staff');
-  render(data); show('settings'); loadInbox(); loadCatalog();
+  render(data); show('settings'); loadInbox();
 }
 
 // Mitarbeiter-Zugang: nur die freigegebenen Bereiche, keine Einstellungen oder Schlüssel.
@@ -377,6 +381,7 @@ function staffMode(data) {
   const take = id => { const card = $(id); if (card) { card.hidden = false; panel.append(card); } };
   if (can('inbox') || can('letter')) { take('s-inbox-list'); loadInbox(); }
   if (can('catalog')) { take('s-catalog'); loadCatalog(); }
+  if (!panel.children.length && can('catalog')) { location.replace(BASE + 'igel'); return; }
   if (!panel.children.length) panel.append(el('p', 'Für diesen Zugang sind keine Bereiche freigegeben. Bitte beim Administrator melden.', 'muted'));
   show('settings');
 }
@@ -404,7 +409,7 @@ function ippIpNote(url, ips) {
 })();
 
 // Sicherheitsprotokoll: letzte Vorgänge der Einstellungsseite anzeigen.
-$('audit-load').onclick = async () => {
+if ($('audit-load')) $('audit-load').onclick = async () => {
   try {
     const result = await api('audit');
     const box = $('audit-list');
@@ -645,4 +650,4 @@ async function loadInbox() {
   try { renderInbox(await api('inbox_overview')); }
   catch (error) { $('inbox-box').replaceChildren(el('p', error.message, 'muted')); }
 }
-$('inbox-load').onclick = loadInbox;
+if ($('inbox-load')) $('inbox-load').onclick = loadInbox;
