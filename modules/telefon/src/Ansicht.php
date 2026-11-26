@@ -407,6 +407,12 @@ final class Ansicht {
                 if ($v['typ'] === 'kienzlefon_error') $felder .= '<dt>Hinweis</dt><dd>Die Aufnahme ließ sich nicht vollständig verarbeiten. Bitte zurückrufen.</dd>';
                 $o .= $felder !== '' ? '<dl class="tf-dl">' . $felder . '</dl>' : '<p class="muted">Nichts verstanden. Bitte zurückrufen.</p>';
                 $o .= self::smsTeil($v, $bereich, $csrf, $sms);
+                $ton = Vorgaenge::aufnahmen($v);
+                if ($ton) {
+                    $o .= '<details class="how tf-ton"><summary>Aufnahmen anhören (' . count($ton) . ')</summary><ul>';
+                    foreach ($ton as $t) $o .= '<li><span>' . $h($t['label']) . '</span><audio controls preload="none" src="' . $b . '/vorgaenge/ton/' . $h((string)$v['id']) . '/' . $h($t['datei']) . '"></audio></li>';
+                    $o .= '</ul><small class="muted">Aufnahmen werden 14 Tage nach dem Anruf gelöscht.</small></details>';
+                }
             }
             // Kommentare (verschlüsselt gespeichert)
             $kom = $v['kommentare'] ?? [];

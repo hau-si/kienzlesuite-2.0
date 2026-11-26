@@ -821,6 +821,7 @@ def render(c: dict) -> dict[str, str]:
 KZF_SOURCE = PROGRAM / 'kienzlefon'          # unverändert übernommenes Kienzlefon 2.7 (kienzlefon/HERKUNFT.md)
 KZF_DATA = DATA / 'kienzlefon'
 ERLEDIGT_TAGE = 7                             # erledigte Vorgänge werden danach gelöscht
+TON_TAGE = 14                                 # Tonaufnahmen der Anliegen (Spool von Kienzlefon) werden danach gelöscht
 MOH = KZF_DATA / 'wartemusik'                 # Wiedergabeformate der Wartemusik (statt /var/lib/asterisk/moh/kienzlefon-wartemusik)
 PLACHETKA = PROGRAM / 'medien' / 'johannes-plachetka-warteschlange.mp3'
 KZF_CONFIG = KZF_DATA / 'kienzlefon.toml'
@@ -834,6 +835,17 @@ CONTROL_USER = 'kienzlefon-control'
 CONTROL_DIR = DATA / 'kienzlefon' / 'control'
 CONTROL_AMI = DATA / 'kienzlefon' / 'control-ami.json'
 PBX_ID = 'kienzle-praxis'
+
+
+def toml_entfernen(text: str, section: str, key: str) -> str:
+    """Einen Schlüssel aus einem Abschnitt einer TOML-Datei entfernen (Kommentare bleiben)."""
+    header = re.search(rf'^\[{re.escape(section)}\]\s*$', text, re.M)
+    if header is None:
+        return text
+    nxt = re.search(r'^\[[^]]+\]\s*$', text[header.end():], re.M)
+    end = header.end() + (nxt.start() if nxt else len(text) - header.end())
+    body = re.sub(rf'^{re.escape(key)}\s*=.*\n?', '', text[header.end():end], count=1, flags=re.M)
+    return text[:header.end()] + body + text[end:]
 
 
 def toml_set(text: str, section: str, key: str, value) -> str:
@@ -867,7 +879,7 @@ def kienzlefon_toml(c: dict) -> str:
         ('telepraxis', 'ausgabeverzeichnis', str(d / 'vorgaenge')), ('telepraxis', 'public_key', str(d / 'telepraxis-public.pem')),
         # Vorgänge verschlüsselt für die Seite „Vorgänge“ (Schlüsselpaar des Moduls, geheimer Teil nur mit dem Modulschlüssel lesbar),
         # ohne Tonaufnahmen (die löscht der Worker nach dem Umwandeln).
-        ('telepraxis', 'demo', False), ('telepraxis', 'audio_beilegen', False), ('telepraxis', 'anrufernummern_anonymisieren', False),
+        ('telepraxis', 'demo', False), ('telepraxis', 'anrufernummern_anonymisieren', False),
         # Whisper: large-v3-turbo für alles; „genauer“ nimmt für Vor- und Nachnamen large-v3 (zusätzlich etwa 3 GB).
         ('whisper', 'modell_standard', 'large-v3-turbo'), ('whisper', 'modell_medikamente', 'large-v3-turbo'),
         ('whisper', 'modell_namen', 'large-v3' if c['kienzlefon'].get('whisper_genau') else 'large-v3-turbo'),
@@ -894,6 +906,9 @@ def kienzlefon_toml(c: dict) -> str:
         werte.append(('praxis', 'name', c['praxis']))
     for section, key, value in werte:
         text = toml_set(text, section, key, value)
+    # Ohne „audio_beilegen“ behält Kienzlefon die Tonaufnahmen im Spool (spool/ready/<id>/audio); die Seite „Vorgänge“ spielt sie ab,
+    # die Pflege löscht sie nach TON_TAGE Tagen. Mit true/false würde der Worker sie sofort löschen bzw. in ein Paket für die App legen.
+    text = toml_entfernen(text, 'telepraxis', 'audio_beilegen')
     if 'CHANGE_ME_RED_PHONE_SECRET' in text:
         text = toml_set(text, 'asterisk', 'rotes_telefon_passwort', secrets.token_hex(16))
     return text
@@ -1127,13 +1142,24 @@ def pflege(now: float | None = None) -> int:
     removed = 0
     # Datensparsamkeit: erledigte Vorgänge nach 7 Tagen; fertig verarbeitete Anrufe im Spool von Kienzlefon (Klartext der Anliegen)
     # nach 2 Tagen, fehlgeschlagene nach 7 Tagen.
+    # Spool von Kienzlefon: Tonaufnahmen (zum Anhören auf der Seite „Vorgänge“) nach TON_TAGE Tagen; die Klartext-Abschrift
+    # (call.json, steht verschlüsselt im Vorgang) fertig verarbeiteter Anrufe schon nach 2 Tagen. Alter aus der Vorgangs-ID (Anrufzeit).
     for folder in (KZF_DATA / 'spool' / 'ready', KZF_DATA / 'spool' / 'error'):
         for p in folder.glob('*') if folder.is_dir() else []:
             try:
-                if p.is_dir() and not p.is_symlink() and p.stat().st_mtime < now - (2 if folder.name == 'ready' else 7) * 86400:
+                if not p.is_dir() or p.is_symlink():
+                    continue
+                m = re.match(r'^(\d{8}_\d{6})_', p.name)
+                beginn = time.mktime(time.strptime(m.group(1), '%Y%m%d_%H%M%S')) if m else p.stat().st_mtime
+                if beginn < now - TON_TAGE * 86400:
                     shutil.rmtree(p)
                     removed += 1
-            except OSError:
+                elif folder.name == 'ready' and beginn < now - 2 * 86400:
+                    for f in p.iterdir():
+                        if f.is_file() and not f.is_symlink():
+                            f.unlink()
+                            removed += 1
+            except (OSError, ValueError):
                 pass
     for folder, days in ((AST / 'log', LOG_KEEP_DAYS), (AST / 'spool' / 'fax-empfang', 2), (KZF_DATA / 'vorgaenge' / 'erledigt', ERLEDIGT_TAGE),
                          (KZF_DATA / 'vorgaenge' / 'papierkorb', ERLEDIGT_TAGE)):

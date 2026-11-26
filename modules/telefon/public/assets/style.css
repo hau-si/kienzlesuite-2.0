@@ -78,3 +78,7 @@ main.modul { max-width: 980px; margin: 0; padding: 32px 40px 48px; }
 .tf-kommentare ul { margin: 6px 0; padding-left: 18px; }
 .tf-kommentare li { margin: 4px 0; }
 .tf-neu-hinweis { padding: 10px 14px; border-radius: 9px; background: #fff3d6; }
+.tf-ton ul { list-style: none; padding: 0; margin: 6px 0; display: grid; gap: 6px; }
+.tf-ton li { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.tf-ton li span { min-width: 9em; font-weight: 600; }
+.tf-ton audio { height: 32px; }

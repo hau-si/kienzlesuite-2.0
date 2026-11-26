@@ -137,11 +137,52 @@ final class Vorgaenge {
         }
     }
 
-    /** „Löschen“: erst in den Papierkorb (7 Tage, wiederherstellbar), aus dem Papierkorb endgültig. */
+    // ---- Tonaufnahmen (Spool von Kienzlefon, 14 Tage; lib/anlage.py pflege) --------------------------------------------
+    private static function spool(string $id): ?string {
+        foreach (['ready', 'error'] as $st) {
+            $d = Anlage::$data . "/kienzlefon/spool/$st/$id";
+            if (is_dir("$d/audio") && !is_link($d) && !is_link("$d/audio")) return $d;
+        }
+        return null;
+    }
+
+    /** Aufnahmen eines Vorgangs, die noch da sind: [{datei, feld, label}] in Aufnahmereihenfolge. */
+    public static function aufnahmen(array $v): array {
+        if (!preg_match(self::ID, (string)($v['id'] ?? '')) || !($d = self::spool((string)$v['id']))) return [];
+        $out = [];
+        foreach ((array)($v['daten']['_kienzlefon']['audio'] ?? []) as $a) {
+            $datei = basename((string)($a['datei'] ?? ''));
+            if (!preg_match('/^[A-Za-z0-9_-]{1,80}\.wav$/D', $datei) || !is_file("$d/audio/$datei") || is_link("$d/audio/$datei")) continue;
+            $feld = (string)($a['feld'] ?? '');
+            $label = $feld === 'medikamente' && isset($a['index']) ? 'Medikament ' . (int)$a['index'] : (self::FELDER[$feld] ?? ucfirst($feld));
+            $out[] = ['datei' => $datei, 'feld' => $feld, 'label' => $label];
+        }
+        return $out;
+    }
+
+    /** Pfad einer Aufnahme zum Abspielen (nur Dateinamen aus dem Aufnahmeordner des Vorgangs). */
+    public static function tonDatei(string $id, string $datei): ?string {
+        if (!preg_match(self::ID, $id) || !preg_match('/^[A-Za-z0-9_-]{1,80}\.wav$/D', $datei) || !($d = self::spool($id))) return null;
+        $f = "$d/audio/$datei";
+        return is_file($f) && !is_link($f) ? $f : null;
+    }
+
+    private static function aufnahmenLoeschen(string $id): void {
+        foreach (['ready', 'error'] as $st) {
+            $d = Anlage::$data . "/kienzlefon/spool/$st/$id";
+            if (!preg_match(self::ID, $id) || !is_dir($d) || is_link($d)) continue;
+            foreach ([...(glob("$d/audio/*") ?: []), ...(glob("$d/*") ?: [])] as $f) if (is_file($f) || is_link($f)) unlink($f);
+            @rmdir("$d/audio");
+            @rmdir($d);
+        }
+    }
+
+    /** „Löschen“: erst in den Papierkorb (7 Tage, wiederherstellbar), aus dem Papierkorb endgültig (samt Tonaufnahmen). */
     public static function loeschen(string $id): bool {
         $ort = self::ortOderFehler($id);
         if ($ort !== 'papierkorb') { self::verschieben($id, 'papierkorb'); return false; }
         foreach (['.json.enc', '.stand.json', '.kommentare'] as $e) if (is_file(self::pfad($id, $ort, $e))) unlink(self::pfad($id, $ort, $e));
+        self::aufnahmenLoeschen($id);
         return true;
     }
 

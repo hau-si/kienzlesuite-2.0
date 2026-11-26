@@ -71,6 +71,17 @@ try {
         exit;
     }
     if ($rel === '') $rel = '/';
+    if (preg_match('#^/vorgaenge/ton/([A-Za-z0-9_-]{1,80})/([A-Za-z0-9_-]{1,80}\.wav)$#D', $rel, $m)) {
+        // Tonaufnahme eines Anliegens (Patientendaten): nur mit Recht, nicht zwischenspeichern.
+        if (!$darfVorgaenge) $k->verweigern();
+        $file = Vorgaenge::tonDatei($m[1], $m[2]);
+        if ($file === null) { http_response_code(404); exit; }
+        header('Content-Type: audio/wav');
+        header('Cache-Control: no-store');
+        header('Content-Length: ' . filesize($file));
+        readfile($file);
+        exit;
+    }
     if ($rel === '/vorgaenge/anzahl') {
         // Für den Hinweis „neuer Vorgang“ auf der Seite (nur Zahlen, keine Inhalte).
         if (!$darfVorgaenge) $k->verweigern();

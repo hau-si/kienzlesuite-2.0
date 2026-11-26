@@ -165,4 +165,24 @@ check(str_contains($o, 'class="fehler"'), 'Schalten ohne Anlage meldet Fehler');
 check(str_contains(aufruf($dir, '/telefon/rufgruppen', 'rufgruppen', 'benutzer', ['aktion' => 'rufgruppen-speichern', 'kienzle-csrf' => $csrf]), 'nur Admins'), 'Standards nur Admin');
 $o = aufruf($dir, '/telefon/einstellungen', '', 'admin', ['aktion' => 'sprachmenue-speichern', 'kienzle-csrf' => $csrf, 'aktiv' => '1', 'tts' => 'piper']);
 check(str_contains((string)file_get_contents("$dir/daten/asterisk/etc/manager_kienzlefon_control.conf"), 'ausgeschaltet') && !is_file("$dir/daten/kienzlefon/control-ami.json"), 'Rufgruppen wieder aus');
+// Tonaufnahmen anhören (Spool von Kienzlefon nachgestellt), endgültiges Löschen entfernt sie.
+$pyTon = 'import sys; from pathlib import Path; from zoneinfo import ZoneInfo; sys.path.insert(0, sys.argv[1]); from kienzlefon.crypto import TelepraxisEncryptor;'
+    . ' TelepraxisEncryptor(Path(sys.argv[2]), Path(sys.argv[3]), ZoneInfo("Europe/Berlin")).write_payload({"typ": "rezeptbestellung", "id": "+491701234567", "telefon": "+491701234567",'
+    . ' "vorname": "Max", "medikamente": "Ibuprofen 400", "_kienzlefon": {"erstellt_am": "2026-11-26T11:15:00+01:00", "audio": [{"feld": "vorname", "datei": "audio/vorname.wav"},'
+    . ' {"feld": "medikamente", "index": 1, "datei": "audio/medikament-01.wav"}, {"feld": "nachname", "datei": "audio/fehlt.wav"}]}}, "20261126_111500_000004")';
+exec(implode(' ', array_map('escapeshellarg', ['python3', '-c', $pyTon, dirname(__DIR__) . '/kienzlefon', "$dir/daten/kienzlefon/telepraxis-public.pem", "$dir/daten/kienzlefon/vorgaenge"])), $aus, $rc);
+mkdir("$dir/daten/kienzlefon/spool/ready/20261126_111500_000004/audio", 0750, true);
+file_put_contents("$dir/daten/kienzlefon/spool/ready/20261126_111500_000004/audio/vorname.wav", 'RIFF0000WAVEvorname');
+file_put_contents("$dir/daten/kienzlefon/spool/ready/20261126_111500_000004/audio/medikament-01.wav", 'RIFF0000WAVEmedikament');
+$o = aufruf($dir, '/telefon/vorgaenge?bereich=neu', 'vorgaenge');
+check($rc === 0 && str_contains($o, 'Aufnahmen anhören (2)') && str_contains($o, '/telefon/vorgaenge/ton/20261126_111500_000004/medikament-01.wav') && str_contains($o, 'Medikament 1'), 'Aufnahmen auf der Karte');
+check(str_starts_with(aufruf($dir, '/telefon/vorgaenge/ton/20261126_111500_000004/vorname.wav', 'vorgaenge'), 'RIFF0000WAVEvorname'), 'Aufnahme abspielen');
+check(str_contains(aufruf($dir, '/telefon/vorgaenge/ton/20261126_111500_000004/vorname.wav', 'rufgruppen'), '#CODE=403'), 'Abspielen nur mit Recht');
+check(str_contains(aufruf($dir, '/telefon/vorgaenge/ton/20261126_111500_000004/fehlt.wav', 'vorgaenge'), '#CODE=404'), 'Fehlende Aufnahme');
+check(str_contains(aufruf($dir, '/telefon/vorgaenge/ton/..%2F..%2Fanlage/x.wav', 'vorgaenge'), '#CODE=404'), 'Kein Pfad nach außen');
+aufruf($dir, '/telefon/vorgaenge?bereich=neu', 'vorgaenge', 'benutzer', ['aktion' => 'vorgang-loeschen', 'kienzle-csrf' => $csrf, 'id' => '20261126_111500_000004']);
+check(is_dir("$dir/daten/kienzlefon/spool/ready/20261126_111500_000004"), 'Papierkorb behält die Aufnahmen');
+aufruf($dir, '/telefon/vorgaenge?bereich=papierkorb', 'vorgaenge', 'benutzer', ['aktion' => 'vorgang-loeschen', 'kienzle-csrf' => $csrf, 'id' => '20261126_111500_000004']);
+clearstatcache();
+check(!is_dir("$dir/daten/kienzlefon/spool/ready/20261126_111500_000004"), 'Endgültig gelöscht samt Aufnahmen');
 echo "seiten.php (telefon): alles in Ordnung\n";

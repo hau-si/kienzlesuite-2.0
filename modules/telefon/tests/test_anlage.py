@@ -411,7 +411,8 @@ class KienzlefonBruecke(unittest.TestCase):
         from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
         self.a.anwenden(self.cfg())
         toml = (self.tmp / 'kienzlefon' / 'kienzlefon.toml').read_text()
-        for zeile in ('demo = false', 'audio_beilegen = false', 'modell_namen = "large-v3-turbo"', f'ausgabeverzeichnis = "{self.tmp}/kienzlefon/vorgaenge"'):
+        self.assertNotIn('audio_beilegen', toml)                            # ohne Eintrag behält Kienzlefon die Tonaufnahmen
+        for zeile in ('demo = false', 'modell_namen = "large-v3-turbo"', f'ausgabeverzeichnis = "{self.tmp}/kienzlefon/vorgaenge"'):
             self.assertIn(zeile, toml)
         geheim = rsa.generate_private_key(public_exponent=65537, key_size=3072)
         (self.tmp / 'kienzlefon' / 'telepraxis-public.pem').write_bytes(geheim.public_key().public_bytes(
@@ -443,7 +444,7 @@ class KienzlefonBruecke(unittest.TestCase):
         payload = json.loads(roh[:-roh[-1]])['payload']
         self.assertEqual((payload['vorname'], payload['nachname'], payload['medikamente']), ('Max', 'Mustermann', 'Ibuprofen 400'))
         bereit = next((self.tmp / 'kienzlefon' / 'spool' / 'ready').iterdir())
-        self.assertEqual(list((bereit / 'audio').glob('*.wav')), [])          # Ton nach dem Umwandeln gelöscht
+        self.assertEqual(len(list((bereit / 'audio').glob('*.wav'))), 3)      # Tonaufnahmen bleiben zum Anhören
         # Pflege: verarbeitete Anrufe nach 2 Tagen, erledigte Vorgänge nach 7 Tagen.
         erledigt = self.tmp / 'kienzlefon' / 'vorgaenge' / 'erledigt'
         erledigt.mkdir()
@@ -453,10 +454,12 @@ class KienzlefonBruecke(unittest.TestCase):
         neu.write_text('{}')
         vor = time.time() - 8 * 86400
         os.utime(alt, (vor, vor))
-        os.utime(bereit, (time.time() - 3 * 86400,) * 2)
-        self.a.pflege()
+        self.a.pflege(now=time.time() + 3 * 86400)                            # nach 3 Tagen: Abschrift weg, Ton bleibt
         self.assertFalse(alt.exists())
         self.assertTrue(neu.exists())
+        self.assertFalse((bereit / 'call.json').exists())
+        self.assertEqual(len(list((bereit / 'audio').glob('*.wav'))), 3)
+        self.a.pflege(now=time.time() + 15 * 86400)                           # nach 14 Tagen: Ton weg
         self.assertFalse(bereit.exists())
         self.assertTrue(ziel.exists())
 

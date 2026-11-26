@@ -1,5 +1,12 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.15
+
+- **Tonaufnahmen anhören** (Seite „Vorgänge“, an jeder Karte „Aufnahmen anhören“): je aufgesprochenem Feld (Vorname, Nachname, Geburtsdatum, Rückrufnummer, Medikament 1, 2 …, Grund) ein Abspielfeld. Gilt für alle Vorgänge aus der Spracherkennung ab diesem Stand; ältere Aufnahmen wurden bisher sofort gelöscht.
+- **Löschfrist der Aufnahmen 14 Tage** nach dem Anruf (Pflege, `TON_TAGE`). Die Klartext-Abschrift im Arbeitsordner von Kienzlefon wird weiterhin nach 2 Tagen gelöscht (sie steht verschlüsselt im Vorgang). „Endgültig löschen“ im Papierkorb löscht die Aufnahmen sofort mit.
+- Technik: `audio_beilegen` wird aus `kienzlefon.toml` entfernt; dann behält Kienzlefon die Aufnahmen in `spool/ready/<id>/audio`. Abspielen nur mit dem Recht `vorgaenge`, ohne Zwischenspeichern im Browser.
+- Geprüft mit Tests (Worker behält die Aufnahmen, Fristen der Pflege, Abspielen, Rechte, Löschen). **Nicht geprüft:** VM, echte Anrufe, Wiedergabe im Browser.
+
 ## 0.1.0-beta.14
 
 - **Seite „Vorgänge“ ausgebaut** (Funktionen aus der Praxis-App kienzlefon-app, ohne eigenes Modul):
