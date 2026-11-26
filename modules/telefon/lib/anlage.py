@@ -47,6 +47,7 @@ RTP_START, RTP_END = 12000, 12999
 AMI_PORT = 5038
 AMI_USER = 'kienzle-fax'
 AMI_WEB_USER = 'kienzle-web'
+AMI_EREIGNISSE_USER = 'kienzle-ereignisse'   # Anrufstatistik (lib/telefon-ereignisse): nur lesen
 CA_LIST = '/etc/ssl/certs/ca-certificates.crt'
 
 # Anbietervorlagen (pjsip-provider.sh und telefonie-queue.sh von Kienzlefax).
@@ -637,6 +638,7 @@ PHONE = r"""
 ; =============================================================================
 [kfx-phone-in]
 exten => s,1,NoOp(Telefonieeingang Hauptanschluss)
+ same => n,AGI(@NAMEN@)
  same => n,Gosub(kfx_external_capacity,primary-phone,1)
  same => n,GotoIf($["${KFX_CAPACITY_OK}"="1"]?accepted)
  same => n,NoOp(KFX PHONE rejected before answer: primary provider capacity full)
@@ -645,6 +647,7 @@ exten => s,1,NoOp(Telefonieeingang Hauptanschluss)
 
 [kfx-phone-overflow-in]
 exten => s,1,NoOp(Telefonieeingang Sipgate-Ueberlauf)
+ same => n,AGI(@NAMEN@)
  same => n,Gosub(kfx_external_capacity,sipgate-phone,1)
  same => n,GotoIf($["${KFX_CAPACITY_OK}"="1"]?accepted)
  same => n,NoOp(KFX PHONE rejected before answer: sipgate overflow capacity full)
@@ -695,7 +698,8 @@ def render_extensions(c: dict) -> tuple[str, str]:
         out += FAX_IN.replace('@SPOOL@', str(AST / 'spool' / 'fax-empfang')).replace('@EMPFANG@', str(PROGRAM / 'lib' / 'kfx' / 'fax-empfangen'))
     out += '\n#tryinclude "/etc/asterisk/extensions-kfx-telefonie.conf"\n'
     main, out = out, '; Erzeugt vom Modul telefon (Telefonie wie Kienzlefax telefonie-queue.sh). Änderungen gehen verloren.\n'
-    out += PHONE.replace('@MAX_WARTEND@', str(c['warteschlange']['max_wartend']))
+    # Anrufername aus dem T2med-Telefonverzeichnis (lib/anrufername.agi; ohne Verzeichnis ändert es nichts).
+    out += PHONE.replace('@MAX_WARTEND@', str(c['warteschlange']['max_wartend'])).replace('@NAMEN@', f"{PROGRAM / 'lib' / 'anrufername.agi'},{DATA}")
     # Interne Nebenstellen: klingeln nur, wenn frei (kein Anklopfen).
     out += '\n[kfx-phone-local]\n'
     for x in c['nebenstellen']:
@@ -775,9 +779,9 @@ MODULES = (
     'format_gsm', 'format_wav', 'format_wav_gsm', 'format_pcm', 'format_sln',
     'bridge_simple', 'bridge_native_rtp', 'bridge_holding', 'bridge_builtin_features', 'bridge_builtin_interval_features',
     'pbx_config', 'app_dial', 'app_queue', 'app_playback', 'app_stack', 'app_system', 'app_exec', 'app_senddtmf', 'app_read',
-    'app_record', 'app_echo', 'app_transfer', 'app_verbose', 'res_speech', 'res_agi', 'res_fax', 'res_fax_spandsp', 'res_musiconhold', 'res_clioriginate',
+    'app_record', 'app_echo', 'app_userevent', 'app_transfer', 'app_verbose', 'res_speech', 'res_agi', 'res_fax', 'res_fax_spandsp', 'res_musiconhold', 'res_clioriginate',
     'func_groupcount', 'func_lock', 'func_callerid', 'func_channel', 'func_strings', 'func_logic', 'func_math', 'func_devstate',
-    'func_jitterbuffer', 'func_global', 'func_env', 'func_timeout', 'func_pjsip_endpoint', 'func_pjsip_contact', 'func_pjsip_aor',
+    'func_jitterbuffer', 'func_global', 'func_env', 'func_sha1', 'func_rand', 'func_timeout', 'func_pjsip_endpoint', 'func_pjsip_contact', 'func_pjsip_aor',
 )
 
 INDICATIONS = """[general]
@@ -816,12 +820,15 @@ def base_files() -> dict[str, str]:
         'http.conf': '[general]\nenabled=no\n',
         'rtp.conf': f'[general]\nrtpstart={RTP_START}\nrtpend={RTP_END}\nicesupport=no\n',
         'manager.conf': ('; AMI nur auf localhost, nur für den Fax-Dienst des Moduls.\n[general]\nenabled=yes\nwebenabled=no\n'
-                         f'port={AMI_PORT}\nbindaddr=127.0.0.1\ndisplayconnects=no\nauthtimeout=10\nauthlimit=20\n\n'
+                         f'port={AMI_PORT}\nbindaddr=127.0.0.1\ndisplayconnects=no\nauthtimeout=10\nauthlimit=20\nchannelvars=KF_STATS_CALL_ID\n\n'
                          f'[{AMI_USER}]\nsecret={ami_secret()}\ndeny=0.0.0.0/0.0.0.0\npermit=127.0.0.1/255.255.255.255\n'
                          'read=system,call,reporting\nwrite=system,call,originate\n\n'
                          f'; Seite „Anrufe“ der Weboberfläche: Zustand lesen und per Klick wählen (keine Systembefehle).\n'
                          f'[{AMI_WEB_USER}]\nsecret={ami_secret("ami-web.json", AMI_WEB_USER)}\ndeny=0.0.0.0/0.0.0.0\npermit=127.0.0.1/255.255.255.255\n'
                          'read=call,reporting\nwrite=call,originate,reporting\n\n'
+                         '; Anrufstatistik (lib/telefon-ereignisse): nur Ereignisse lesen, nichts ändern.\n'
+                         f'[{AMI_EREIGNISSE_USER}]\nsecret={ami_secret("ami-ereignisse.json", AMI_EREIGNISSE_USER)}\ndeny=0.0.0.0/0.0.0.0\npermit=127.0.0.1/255.255.255.255\n'
+                         'read=user,agent\nwrite=\n\n'
                          f'; Zugang des Steuerungsdienstes für die Rufgruppen (nur wenn eingeschaltet, sonst leer)\n#tryinclude "{CONTROL_CONF}"\n'),
         'musiconhold.conf': '; Wartemusik folgt mit Kienzlefon (Stufe 2); die Warteschlange klingelt.\n[general]\n',
         'indications.conf': INDICATIONS,
@@ -927,6 +934,8 @@ def kienzlefon_toml(c: dict) -> str:
         ('control_api', 'enabled', bool(c['kienzlefon'].get('rufgruppen'))), ('control_api', 'bind', '127.0.0.1'), ('control_api', 'port', 8767),
         ('control_api', 'allowed_networks', ['127.0.0.1/32']), ('control_api', 'credentials_file', str(d / 'control-identities.json')),
         ('control_api', 'pbx_id', PBX_ID), ('routing_policy', 'remote_enabled', False),
+        # Anrufstatistik: Haken von Kienzlefon im Wählplan (Ereignisse liest lib/telefon-ereignisse, ohne Nummern).
+        ('anrufstatistik', 'pbx_id', PBX_ID),
         ('asterisk', 'hauptausgang_endpoint', endpoint(tel['leitung_aus']) if tel.get('leitung_aus') in by_id else 'kfx-phone-in-endpoint'),
         ('asterisk', 'hauptausgang_nummer', tel.get('kennung_aus') or '0'), ('asterisk', 'ausgehend_zaehlt_kanalgrenze', bool(tel.get('aus_zaehlt', True))),
         ('asterisk', 'erste_queue_nebenstelle', int(members[0]) if members else 201), ('asterisk', 'queue_nebenstellen_anzahl', max(1, len(members))),
@@ -1038,11 +1047,15 @@ def pfade_ersetzen(files: dict[str, str]) -> dict[str, str]:
     """Feste Pfade von Kienzlefax/Kienzlefon (Einbindungen, Programmaufrufe) durch die Ordner des Moduls ersetzen."""
     replace = {'/var/lib/asterisk/moh/kienzlefon-wartemusik': str(MOH),
                '/opt/kienzlefon/venv/bin/': f'{KZF_BIN}/', '/etc/kienzlefon/kienzlefon.toml': str(KZF_CONFIG), '/etc/asterisk/': f'{ETC}/'}
+    # Statistik-Haken: UUID() gibt es im Asterisk-Paket von Ubuntu nicht (func_uuid fehlt); gleich aufgebaute Kennung aus SHA1.
+    uuid_alt = 'Set(__KF_STATS_CALL_ID=${UUID()})'
+    uuid_neu = ('Set(KF_STATS_H=${SHA1(${UNIQUEID}-${EPOCH}-${RAND()})})\n same => n,Set(__KF_STATS_CALL_ID='
+                '${KF_STATS_H:0:8}-${KF_STATS_H:8:4}-4${KF_STATS_H:13:3}-8${KF_STATS_H:17:3}-${KF_STATS_H:20:12})')
     out = {}
     for name, text in files.items():
         for old, new in replace.items():
             text = text.replace(old, new)
-        out[name] = text
+        out[name] = text.replace(uuid_alt, uuid_neu)
     return out
 
 # ---- Dateien und Asterisk ------------------------------------------------------------------------------------------

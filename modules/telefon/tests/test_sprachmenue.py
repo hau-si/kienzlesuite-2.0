@@ -182,5 +182,73 @@ class Anrufe(unittest.TestCase):
         rx('core stop now')
 
 
+@unittest.skipUnless(ok(), 'Asterisk oder python3-cryptography fehlt (oder Port 5038 belegt)')
+class T2med(unittest.TestCase):
+    """Anrufername aus dem Telefonverzeichnis (lib/anrufername.agi) und Anrufstatistik (lib/telefon-ereignisse) mit echtem Asterisk.
+    Erfundener Patient Max Mustermann, 030 1234567."""
+
+    def test_anrufername_und_statistik(self):
+        t = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, t, True)
+        env = {'PATH': '/usr/bin:/bin', 'KIENZLE_DATEN': str(t), 'KIENZLE_PROGRAMM': str(MODUL), 'KIENZLE_ASTERISK': '/bin/false', 'LANG': 'C.UTF-8'}
+        cfg = {'leitungen': [{'id': 'l1', 'name': 'Test', 'anbieter': 'andere', 'benutzer': '4930123456', 'passwort': 'nurtest', 'domain': 'sip.example.invalid'}],
+               'telefon': {'leitung_ein': 'l1', 'nummer_ein': '4930123456'}, 'netz': {'lokal': '192.0.2.0/24'},
+               'nebenstellen': [{'nummer': '201', 'name': 'Empfang', 'passwort': 'A' * 24}], 'kienzlefon': {'aktiv': True, 'tts': 'piper'}}
+        r = subprocess.run(['/usr/bin/python3', '-B', str(MODUL / 'lib/anlage.py'), 'anwenden'], input=json.dumps(cfg), capture_output=True, text=True, env=env)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        php = ('require $argv[1] . "/src/bootstrap.php"; use KienzleTelefon\\{Anlage, Verzeichnis};'
+               ' $f = Verzeichnis::datei(); $pdo = new PDO("sqlite:" . $f); $r = new ReflectionMethod(Verzeichnis::class, "neueDb"); $pdo = $r->invoke(null, $f);'
+               ' Verzeichnis::einfuegen($pdo, [["id" => "p1", "nummer" => "4711", "vorname" => "Max", "nachname" => "Mustermann", '
+               '"geburt" => "1970-01-01", "telefone" => ["030 1234567"]]]);'
+               ' echo "ok";')
+        r = subprocess.run(['php', '-r', php, str(MODUL)], capture_output=True, text=True, env=env, timeout=30)
+        self.assertEqual(r.stdout, 'ok', r.stderr)
+        conf = str(t / 'asterisk/etc/asterisk.conf')
+        p = subprocess.Popen([ASTERISK, '-f', '-n', '-C', conf], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.addCleanup(lambda: (p.poll() is None and p.send_signal(signal.SIGTERM), p.wait(10)))
+
+        def rx(cmd):
+            return subprocess.run([ASTERISK, '-C', conf, '-rx', cmd], capture_output=True, text=True, timeout=20).stdout
+        for _ in range(40):
+            time.sleep(0.5)
+            if 'Asterisk' in rx('core show version'):
+                break
+        ev = subprocess.Popen(['/usr/bin/python3', '-B', str(MODUL / 'lib/telefon-ereignisse')], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        self.addCleanup(lambda: (ev.poll() is None and ev.terminate(), ev.wait(10)))
+        time.sleep(1.5)
+        # Anruf von 030 1234567 in den Praxiseingang (AMI Originate mit Absendernummer)
+        php = ('require $argv[1] . "/src/bootstrap.php"; use KienzleTelefon\\Ami;'
+               ' $o = Ami::verbinden()->aktion("Originate", ["Channel" => "Local/s@kfx-phone-in", "Application" => "Wait", "Data" => "20", '
+               '"CallerID" => "<0301234567>", "Async" => "true"]);'
+               ' echo $o[0]["response"] ?? "";')
+        r = subprocess.run(['php', '-r', php, str(MODUL)], capture_output=True, text=True, env=env, timeout=30)
+        self.assertEqual(r.stdout, 'Success', r.stderr)
+        name = ''
+        for _ in range(30):
+            time.sleep(0.5)
+            kanaele = [z.split('!')[0] for z in rx('core show channels concise').splitlines() if z.startswith('Local/s@kfx-phone-in') and z.split('!')[0].endswith(';2')]
+            if kanaele:
+                name = rx(f'core show channel {kanaele[0]}')
+                if 'Mustermann, Max' in name:
+                    break
+        self.assertIn('Mustermann, Max', name, 'Anrufername nicht gesetzt')
+        db = t / 'statistik' / 'statistik.sqlite'
+        zeilen = []
+        for _ in range(20):
+            time.sleep(0.5)
+            if db.exists():
+                import sqlite3
+                con = sqlite3.connect(db)
+                zeilen = con.execute('SELECT id, tag FROM anrufe').fetchall()
+                con.close()
+                if zeilen:
+                    break
+        self.assertEqual(len(zeilen), 1, 'Statistik hat den Anruf nicht erfasst')
+        self.assertRegex(zeilen[0][0], r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-8[0-9a-f]{3}-[0-9a-f]{12}$')
+        roh = db.read_bytes()
+        self.assertNotIn(b'1234567', roh, 'Nummer in der Statistik gespeichert')
+        rx('core stop now')
+
+
 if __name__ == '__main__':
     unittest.main()

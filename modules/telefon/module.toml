@@ -5,13 +5,13 @@
 [module]
 id = "telefon"
 name = "Telefon"
-version = "0.1.0-beta.19"
+version = "0.1.0-beta.20"
 core_api = "2"
 description = "Telefonanlage: Leitungen der Anbieter, Telefone, Warteschlange, Sprachmenü (Kienzlefon) und Kanalgrenze. Stellt auch die Faxleitung für das Modul Fax bereit; Fax lässt sich erst danach installieren."
 
 [system]
-packages = ["asterisk", "asterisk-modules", "asterisk-prompt-de", "php-fpm", "php-cli", "php-mbstring", "python3", "python3-reportlab", "python3-pypdf", "python3-cryptography", "ghostscript", "qpdf", "libtiff-tools", "acl", "ffmpeg", "python3-venv", "espeak-ng", "libsndfile1", "libgomp1", "git"]
-services = ["kienzle-telefon-asterisk.service", "kienzle-telefon-fax.service", "kienzle-telefon-pflege.service", "kienzle-telefon-pflege.timer", "kienzle-telefon-ansagen.service", "kienzle-telefon-ansagen.path", "kienzle-telefon-whisper.service", "kienzle-telefon-whisper.path", "kienzle-telefon-steuerung.service", "kienzle-telefon-steuerung.path", "kienzle-telefon-prov.service"]
+packages = ["asterisk", "asterisk-modules", "asterisk-prompt-de", "php-fpm", "php-cli", "php-mbstring", "php-curl", "php-sqlite3", "python3", "python3-reportlab", "python3-pypdf", "python3-cryptography", "ghostscript", "qpdf", "libtiff-tools", "acl", "ffmpeg", "python3-venv", "espeak-ng", "libsndfile1", "libgomp1", "git"]
+services = ["kienzle-telefon-asterisk.service", "kienzle-telefon-fax.service", "kienzle-telefon-pflege.service", "kienzle-telefon-pflege.timer", "kienzle-telefon-ansagen.service", "kienzle-telefon-ansagen.path", "kienzle-telefon-whisper.service", "kienzle-telefon-whisper.path", "kienzle-telefon-steuerung.service", "kienzle-telefon-steuerung.path", "kienzle-telefon-prov.service", "kienzle-telefon-ereignisse.service"]
 disables = ["asterisk.service"]
 user = "ks-telefon"
 data = "/var/lib/kienzle/telefon"
@@ -72,6 +72,23 @@ label = "Telefon: Telefone in den Rufgruppen Normal und ROT an- und abmelden"
 [[rights]]
 id = "sprachmenue"
 label = "Telefon: Zeiten, Ansagetexte und Menütasten des Sprachmenüs ändern"
+
+[[rights]]
+id = "patienten"
+label = "Telefon: Patienten im T2med-Telefonverzeichnis suchen und Akte in T2med öffnen"
+
+[[rights]]
+id = "statistik"
+label = "Telefon: Anrufstatistik sehen (ohne Nummern und Namen)"
+
+[[starters]]
+schema = "kienzle-telefonverzeichnis"
+label = "Telefonverzeichnis aus T2med laden"
+
+[[connections]]
+id = "t2med"
+purpose = "Telefonverzeichnis (Patienten mit Telefonnummern) aus T2med laden"
+required = false
 
 [[connections]]
 id = "nachrichten"

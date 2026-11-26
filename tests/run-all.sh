@@ -79,11 +79,12 @@ grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/signatur/module.toml 
 for h in modules/signatur/bin/*; do sh -n "$h"; done
 
 step 'Modul Telefon (modules/telefon/tests)'
-python3 -B -m py_compile modules/telefon/lib/anlage.py modules/telefon/lib/kfx/fax-dienst modules/telefon/lib/kfx/fax-empfangen \
+python3 -B -m py_compile modules/telefon/lib/anlage.py modules/telefon/lib/anrufername.agi modules/telefon/lib/telefon-ereignisse modules/telefon/lib/kfx/fax-dienst modules/telefon/lib/kfx/fax-empfangen \
   modules/telefon/lib/kfx/kienzlefax-worker.py modules/telefon/lib/kfx/kfx_update_status.agi
-if command -v ruff >/dev/null; then ruff check --no-cache --select E,F,W,B --line-length 180 modules/telefon/lib/anlage.py modules/telefon/tests; fi
+if command -v ruff >/dev/null; then ruff check --no-cache --select E,F,W,B --line-length 180 modules/telefon/lib/anlage.py modules/telefon/lib/anrufername.agi modules/telefon/lib/telefon-ereignisse modules/telefon/tests; fi
 php modules/telefon/tests/telefon.php
 php modules/telefon/tests/seiten.php
+php modules/telefon/tests/t2med.php
 # Enthält einen durchgehenden Faxtest mit echtem Asterisk; ohne Asterisk wird er übersprungen.
 (cd modules/telefon/tests && python3 -B -m unittest discover -s . -p 'test_*.py')
 grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/telefon/module.toml | head -1)" modules/telefon/VERSION || { echo 'modules/telefon/VERSION passt nicht zu module.toml'; exit 1; }
