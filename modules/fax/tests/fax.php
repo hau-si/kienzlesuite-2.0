@@ -252,6 +252,7 @@ Fax::druckAblegen('vFax2', $pdf, 'Überweisung Max Mustermann');
 $html = Ansicht::seite('/', $basis + ['zaehler' => Fax::quellenZaehler(), 'kontakte' => Fax::kontakte(), 'aktive' => Fax::aktive(), 'dateien' => Fax::quelle('vFax2')]);
 check(str_contains($html, 'Überweisung Max Mustermann') && str_contains($html, 'Fehler &lt;i&gt;') && str_contains($html, 'empfaenger[4][nummer]') && !str_contains($html, 'href="/fax/einstellungen"'), 'Senden-Seite');
 check(substr_count($html, '<form') === substr_count($html, '</form>'), 'Formulare geschlossen');
+check(substr_count($html, 'quelle=sendefehler') <= 1, 'Reiter Sendefehler nur einmal');
 $html = Ansicht::seite('/protokoll', $basis + ['berichte' => Fax::berichte('protokoll')]);
 check(str_contains($html, 'Labor Beispiel') && str_contains($html, '030 9876543') === false && str_contains($html, '0309876543'), 'Protokoll-Seite');
 $html = Ansicht::seite('/telefonbuch', $basis + ['kontakte' => Fax::kontakte(), 'kontaktBearbeiten' => null]);

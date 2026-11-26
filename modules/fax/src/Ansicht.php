@@ -92,7 +92,7 @@ final class Ansicht {
         $tabs = '';
         $druckerInfo = [];
         foreach ($d['drucker'] as $x) $druckerInfo[$x['name']] = $x;
-        foreach ([...array_keys($d['zaehler']), 'sendefehler'] as $name) {
+        foreach (array_keys($d['zaehler']) as $name) {
             $z = $d['zaehler'][$name] ?? 0;
             if ($name === Fax::UPLOAD && $z === 0 && $q !== $name) continue;      // „Hochgeladen“ nur, wenn etwas drin liegt
             $titel = match (true) { $name === 'sendefehler' => 'Sendefehler', $name === Fax::UPLOAD => 'Hochgeladen', $name === Fax::NAS => 'NAS-Ordner',

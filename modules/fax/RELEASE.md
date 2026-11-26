@@ -1,5 +1,9 @@
 # Release-Notizen Fax
 
+## 0.1.0-beta.5
+
+- Fehler behoben: Bei „Fax senden“ stand der Reiter „Sendefehler“ doppelt (der Zähler enthielt ihn schon, die Seite hängte ihn nochmals an). Test ergänzt.
+
 ## 0.1.0-beta.4
 
 - **E-Mail bei Faxeingang** (Einstellungen → „Benachrichtigung bei Faxeingang“, bis zu fünf Adressen): Bei neuen Faxen geht eine kurze E-Mail hinaus, nur mit Anzahl und Seiten, **ohne Absender, Inhalt oder Anhang** (Faxe enthalten Gesundheitsdaten). Mehrere Faxe innerhalb einer Minute ergeben eine E-Mail. Verschickt wird über den Nachrichten-Ausgang der Basis (Verbindung `nachrichten`, braucht Basis 0.22.0-beta.8 und eine E-Mail-Verbindung unter Verwaltung → Verbindungen).
