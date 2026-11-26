@@ -27,7 +27,7 @@ fi
 
 step 'PHP: Syntax'
 for f in core/php/*.php core/php/modul/*.php core/public/*.php core/bin/kienzle-admin core/bin/kienzle-tresor tests/php/*.php \
-         modules/*/src/*.php modules/*/seiten/*.php modules/*/public/*.php modules/*/tests/*.php; do
+         modules/*/src/*.php modules/*/seiten/*.php modules/*/public/*.php modules/*/tests/*.php modules/*/lib/*.php; do
   [ -f "$f" ] || continue
   php -l "$f" >/dev/null || { php -l "$f"; exit 1; }
 done
@@ -73,6 +73,24 @@ php modules/signatur/tests/signatur.php
 (cd modules/signatur/tests && python3 -B -m unittest discover -s . -p 'test_*.py')
 grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/signatur/module.toml | head -1)" modules/signatur/VERSION || { echo 'modules/signatur/VERSION passt nicht zu module.toml'; exit 1; }
 for h in modules/signatur/bin/*; do sh -n "$h"; done
+
+step 'Modul Telefon (modules/telefon/tests)'
+python3 -B -m py_compile modules/telefon/lib/anlage.py modules/telefon/lib/kfx/fax-dienst modules/telefon/lib/kfx/fax-empfangen \
+  modules/telefon/lib/kfx/kienzlefax-worker.py modules/telefon/lib/kfx/kfx_update_status.agi
+if command -v ruff >/dev/null; then ruff check --no-cache --select E,F,W,B --line-length 180 modules/telefon/lib/anlage.py modules/telefon/tests; fi
+php modules/telefon/tests/telefon.php
+php modules/telefon/tests/seiten.php
+# Enthält einen durchgehenden Faxtest mit echtem Asterisk; ohne Asterisk wird er übersprungen.
+(cd modules/telefon/tests && python3 -B -m unittest discover -s . -p 'test_*.py')
+grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/telefon/module.toml | head -1)" modules/telefon/VERSION || { echo 'modules/telefon/VERSION passt nicht zu module.toml'; exit 1; }
+for h in modules/telefon/bin/* modules/telefon/lib/kfx/asterisk-rx; do sh -n "$h"; done
+bash -n modules/telefon/lib/kfx/pdf_with_header.sh
+
+step 'Modul Fax (modules/fax/tests)'
+php modules/fax/tests/fax.php
+php modules/fax/tests/seiten.php
+grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/fax/module.toml | head -1)" modules/fax/VERSION || { echo 'modules/fax/VERSION passt nicht zu module.toml'; exit 1; }
+for h in modules/fax/bin/* modules/fax/printer/*; do sh -n "$h"; done
 
 step 'Arbeitsplatz-Starter (core/client/starter)'
 if command -v go >/dev/null; then (cd core/client/starter && go vet ./... && go test ./...); else echo 'go nicht installiert – Starter-Tests übersprungen.'; fi

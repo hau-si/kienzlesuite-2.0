@@ -1,0 +1,88 @@
+# Fax: Faxe senden über virtuelle Faxdrucker, Telefonbuch, Sendeprotokoll, Fehlerberichte und Faxeingang.
+# Auf Grundlage von Kienzlefax 3.5.0 (kienzlefax.php) von Dr. Thomas Kienzle, für die Kienzle-Suite 2.0 als Modul umgebaut.
+# Gesendet und empfangen wird über die Telefonanlage des Moduls telefon (gemeinsamer Austauschordner).
+
+[module]
+id = "fax"
+name = "Fax"
+version = "0.1.0-beta.1"
+core_api = "2"
+description = "Papierloses Fax für die Praxis: am PC auf einen Faxdrucker drucken, Empfänger wählen, senden; Sendeprotokoll, Fehlerberichte mit erneutem Senden und Faxeingang."
+
+[system]
+packages = ["php-fpm", "php-cli", "php-sqlite3", "php-mbstring", "ghostscript"]
+user = "ks-fax"
+data = "/var/lib/kienzle/fax"
+
+[web]
+path = "/fax"
+upstream = "unix:/run/kienzle/fax/web.sock"
+protocol = "fastcgi"
+entry = "public/index.php"
+einstellungen = "/einstellungen"
+
+[[rights]]
+id = "senden"
+label = "Fax: Faxe senden, Sendeprotokoll und Fehlerberichte"
+
+[[rights]]
+id = "eingang"
+label = "Fax: Faxeingang lesen und löschen"
+
+[[rights]]
+id = "telefonbuch"
+label = "Fax: Telefonbuch bearbeiten"
+
+[[printers]]
+name = "vFax1"
+label = "Fax senden: Dokument erscheint im Modul Fax unter vFax1."
+command = "printer/vfax1"
+formats = ["application/pdf", "application/postscript"]
+share = ["ipp", "samba"]
+
+[[printers]]
+name = "vFax2"
+label = "Fax senden: Dokument erscheint im Modul Fax unter vFax2."
+command = "printer/vfax2"
+formats = ["application/pdf", "application/postscript"]
+share = ["ipp", "samba"]
+
+[[printers]]
+name = "vFax3"
+label = "Fax senden: Dokument erscheint im Modul Fax unter vFax3."
+command = "printer/vfax3"
+formats = ["application/pdf", "application/postscript"]
+share = ["ipp", "samba"]
+
+[[printers]]
+name = "vFax4"
+label = "Fax senden: Dokument erscheint im Modul Fax unter vFax4."
+command = "printer/vfax4"
+formats = ["application/pdf", "application/postscript"]
+share = ["ipp", "samba"]
+
+[[printers]]
+name = "vFax5"
+label = "Fax senden: Dokument erscheint im Modul Fax unter vFax5."
+command = "printer/vfax5"
+formats = ["application/pdf", "application/postscript"]
+share = ["ipp", "samba"]
+
+[[exchange]]
+module = "telefon"
+purpose = "Faxaufträge an die Telefonanlage geben und empfangene Faxe abholen (Format aus Kienzlefax)"
+
+[backup]
+paths = ["/var/lib/kienzle/fax"]
+settings = ["/var/lib/kienzle/fax/einstellungen.json"]
+
+[setup]
+overview = "bin/setup-overview"
+
+[hooks]
+install = "bin/install"
+update = "bin/update"
+remove = "bin/remove"
+busy = "bin/busy"
+health = "bin/health"
+apparmor = ["gs"]

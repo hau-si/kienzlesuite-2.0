@@ -1,0 +1,3 @@
+#!/bin/sh
+# Asterisk-Befehl an die Instanz des Moduls telefon (für den Fax-Worker: KFX_ASTERISK_BIN).
+exec /usr/sbin/asterisk -C "${KIENZLE_DATEN:-/var/lib/kienzle/telefon}/asterisk/etc/asterisk.conf" "$@"

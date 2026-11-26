@@ -1,0 +1,33 @@
+/* Modul Telefon im Rahmen der Suite: Karten, Knöpfe und Marken kommen aus core.css; hier nur die Teile dieser Seiten. */
+main.modul { max-width: 980px; margin: 0; padding: 32px 40px 48px; }
+.seitenkopf { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.seitenkopf h1 { margin: 6px 0 0; }
+.start-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.tf .ok, .tf .fehler { padding: 10px 14px; border-radius: 9px; font-weight: 600; }
+.tf .ok { background: #e5f3ed; }
+.tf .fehler { color: var(--error); background: #fbeeea; }
+.tf-tabelle { width: 100%; border-collapse: collapse; }
+.tf-tabelle td, .tf-tabelle th { vertical-align: middle; text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+.tf details.fold { border: 1px solid var(--line); border-radius: 12px; background: #fff; margin: 0 0 8px; padding: 0 14px; }
+.tf details.fold > summary { padding: 11px 0; cursor: pointer; }
+.tf details.fold > summary h2 { display: inline; font-size: 16px; }
+.tf details.fold[open] > summary { border-bottom: 1px solid #edf0ee; margin-bottom: 8px; }
+.tf-body { padding: 4px 0 12px; }
+.tf-form { display: grid; gap: 8px; max-width: 620px; margin: 10px 0; }
+.tf-form label { display: grid; gap: 3px; font-weight: 600; }
+.tf-form label.check { display: flex; gap: 8px; align-items: center; font-weight: 400; }
+.tf-form small { font-weight: 400; }
+.tf-form fieldset { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px 12px; display: grid; gap: 8px; }
+.tf-form legend { font-weight: 700; padding: 0 4px; }
+.tf-form > button { justify-self: start; margin-top: 4px; }
+.tf-schmal { max-width: 360px; }
+.tf-liste { display: grid; gap: 6px; margin-bottom: 8px; }
+.tf-zeile { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.tf-knoepfe { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.tf-knoepfe form, .tf-inline { display: inline-flex; gap: 6px; align-items: center; margin: 0; }
+.tf-inline input[name="name"] { width: 14em; }
+.tf-inline label.check { display: inline-flex; gap: 4px; align-items: center; font-weight: 400; }
+.tf-zugang dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; }
+.tf-zugang dt { font-weight: 600; }
+.tf code { background: var(--soft); padding: 1px 5px; border-radius: 5px; font-size: 13px; }
+@media (max-width: 900px) { main.modul { padding: 20px 16px 40px; } .tf-zeile { flex-direction: column; align-items: flex-start; } }

@@ -1,6 +1,6 @@
 # Modul-Beschreibung `module.toml`
 
-Gilt für `core_api = "1"` (Basis ab 0.2.0). Jedes Modul liegt in `modules/<id>/` und bringt dort eine `module.toml` mit.
+Gilt für `core_api = "1"` (Basis ab 0.2.0) und `core_api = "2"` (Basis ab 0.22.0: zusätzlich `[system] disables` und `[[exchange]]`). Jedes Modul liegt in `modules/<id>/` und bringt dort eine `module.toml` mit.
 Geprüft wird sie mit
 
 ```
@@ -51,6 +51,7 @@ mit dem Archiv `modules/<id>/…` (`scripts/release-bauen <id>`). Das Programm l
 | `user` | ja | genau `ks-<id>`; der Systembenutzer, unter dem alle Dienste und Haken des Moduls laufen |
 | `data` | ja | genau `/var/lib/kienzle/<id>`; eigener Datenordner (0700) |
 | `packages` | nein | Ubuntu-Pakete, höchstens 50, Muster `[a-z0-9][a-z0-9+.-]+`. Die Basis installiert sie. |
+| `disables` | nein | nur `core_api = "2"`: Dienste aus Ubuntu-Paketen, die das Modul selbst betreibt; die Basis stoppt und maskiert sie bei der Installation und hebt die Maskierung beim Entfernen auf. Erlaubt: `asterisk.service` (Modul Telefon betreibt eine eigene Asterisk-Instanz) |
 | `services` | nein | systemd-Einheiten des Moduls, höchstens 20, nur `kienzle-<id>[-…].service/.timer/.path/.socket`. Die Dateien liegen im Modul unter `systemd/<name>`; jeder Dienst muss genau `User=ks-<id>` enthalten (keine Gruppen, keine Befehle mit Vorrechten) |
 
 ### `[web]` – optional
@@ -140,6 +141,22 @@ bekommen deren Zugangsdaten; sie sind dann nur für `ks-<id>` lesbar. Zugänge, 
 | `id` | ja | `"t2med"` (FHIR-Zugang zu T2med), `"mail"` (E-Mail-Versand: `art` = `smtp` mit Server und Zugang oder `gmail` mit `client_id`, `client_secret`, `refresh_token` für die Gmail-API, Umfang gmail.send; ein Modul muss beide Arten unterstützen oder `art` prüfen), `"letterxpress"` (Briefversand: `username`, `api_key`, `modus` = `test`/`live`) oder `"ablage"` (Netzwerkspeicher); je einmal |
 | `purpose` | ja | wofür das Modul die Verbindung nutzt, höchstens 120 Zeichen; wird dem Admin angezeigt |
 | `required` | nein | `true` (Vorgabe): ohne die Verbindung arbeitet das Modul nicht; `false`: nur einzelne Funktionen fehlen |
+
+### `[[exchange]]` – optional, höchstens 5, nur `core_api = "2"`
+
+Gemeinsamer Austauschordner mit einem anderen Modul (z. B. Fax ↔ Telefon). Die Basis legt ihn erst an, wenn **beide** Module
+installiert sind und einander anmelden: `/var/spool/kienzle/austausch/<a>_<b>` (IDs alphabetisch), root, 0770, ACL nur für
+`ks-<a>` und `ks-<b>` (auch als Vorgabe für neue Dateien). Danach starten die Dienste beider Module neu.
+
+| Schlüssel | Pflicht | Regel |
+|---|---|---|
+| `module` | ja | ID des anderen Moduls |
+| `purpose` | ja | wofür der Ordner dient, höchstens 120 Zeichen |
+
+- Die Weboberfläche (php-fpm) des Moduls darf den Ordner lesen und schreiben (`open_basedir`, `ReadWritePaths`).
+- Eigene Dienste des Moduls tragen ihn selbst ein: `ReadWritePaths=… -/var/spool/kienzle/austausch/<a>_<b>` (mit `-`, falls er noch fehlt).
+- Neue Dateien bekommen die Rechte über die Vorgabe-ACL nur, wenn sie mit Gruppenrechten angelegt werden (Modus 0660 bzw. 0770,
+  z. B. `chmod` nach `tempnam`). Inhalt und Format des Ordners legen die beiden Module fest.
 
 ### `[setup]` – optional
 

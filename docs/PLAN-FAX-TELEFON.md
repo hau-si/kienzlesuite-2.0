@@ -1,0 +1,61 @@
+# Fax und Telefon als Module (Übernahme von Kienzlefax und Kienzlefon)
+
+Stand: 26.11.2026. Quellen: [thomaskien/kienzlefax-fuer-linux](https://github.com/thomaskien/kienzlefax-fuer-linux) 3.5.0
+(Faxserver und Telefonanlage) und [thomaskien/kienzlefon](https://github.com/thomaskien/kienzlefon) 2.7 (Sprachmenü,
+Transkription, Ansagen, KI). Beide MIT-Lizenz, von Dr. Thomas Kienzle.
+
+## Entscheidungen des Nutzers (26.11.2026)
+
+- Zwei Module: **`fax`** (Pfad `/fax`) und **`telefon`** (Pfad `/telefon`).
+- Die **Telefonanlage (Asterisk) gehört zum Modul Telefon**. Fax braucht Telefon.
+- Der Code wird **übernommen**; danach kann Thomas die Module hier weiterentwickeln.
+- **Alles** wird übernommen (Fax, Warteschlange, Sprachmenü, Whisper, Ansagen, KI, Middleware, App-Schnittstellen).
+- **SMS an Anrufer** soll möglich sein (über die SMS-Verbindung der Basis).
+- Benutzer, Rechte und Schnittstellen (Mail, SMS, T2med) kommen aus der Basis. Die eigenen Passwörter der alten
+  Weboberflächen entfallen.
+
+## Aufbau
+
+```
+Modul telefon (ks-telefon)                         Modul fax (ks-fax)
+  Asterisk 22 aus Ubuntu 26.04 (eigene Instanz,      Weboberfläche: Senden, Telefonbuch, Aufträge,
+  Konfiguration im Datenordner, kein root)           Sendeprotokoll, Fehlerberichte, Faxeingang
+  Leitungen, Nebenstellen, Warteschlange,            virtuelle Drucker vFax1 … vFax5
+  Kanalgrenzen (aus Kienzlefax)                      Eingangsdienst (empfangene Faxe übernehmen)
+  Faxkanal: Worker, AGI-Status, SendFAX/ReceiveFAX
+            \                                        /
+             `--- /var/spool/kienzle/austausch/fax_telefon ---'
+                  (Austauschordner der Basis, nur diese beiden Module)
+```
+
+- **Asterisk** kommt als Paket (`asterisk`, `asterisk-modules` mit `res_fax_spandsp`, `asterisk-prompt-de`). Der Bau aus
+  dem Quellcode wie bei Kienzlefax entfällt. Der Paketdienst `asterisk.service` wird von der Basis abgeschaltet
+  (`[system] disables`), das Modul startet eine eigene Instanz als `ks-telefon` (`kienzle-telefon-asterisk.service`).
+- **Austauschordner** (`[[exchange]]`, Basis 0.22.0): Melden zwei Module einander an, legt die Basis
+  `/var/spool/kienzle/austausch/<a>_<b>` an (root, 0770, ACL nur für `ks-<a>` und `ks-<b>`). Kein anderes Modul kommt hinein.
+- **Vertrag Fax ↔ Telefon** im Austauschordner: das Auftragsformat von Kienzlefax (`queue/<job>/job.json` + `doc.pdf`,
+  `processing/`, `sendeberichte/`, `sendefehler/eingang|berichte/`) und `empfang/` für eingegangene Faxe (PDF + JSON).
+  Einzelheiten: `modules/telefon/docs/AUSTAUSCH-FAX.md`.
+
+## Stufen
+
+| Stufe | Inhalt | Stand |
+|---|---|---|
+| 1 | Basis: `[[exchange]]`, `[system] disables`, `core_api` 2. Telefon: Anlage (Leitungen, Nebenstellen, Warteschlange, Kanalgrenzen, Faxkanal). Fax: Drucker, Senden, Telefonbuch, Aufträge, Berichte, Eingang | diese Version |
+| 2 | Kienzlefon: Sprachmenü (AGI), Zeiten, Ansagen (Kokoro/Piper/Google), Anrufsbaum, Sonderqueue, rotes Telefon, Ansagen-IVR 777 | offen |
+| 3 | Kienzlefon: Whisper-Worker, Vorgänge (Rezept, Überweisung …) mit Ablage im Modul und kurzer Löschfrist; Basis: Nachrichten-Ausgang für Module (SMS und Mail über die Verbindungen der Basis, ohne Zugangsdaten im Modul); SMS an Anrufer; Mail bei Faxeingang | offen |
+| 4 | Kienzlefon: Rufgruppen-Steuerung (Port 8767), AMI für die T2med-Middleware, KI-Übergabe (WireGuard), App-Schnittstelle; Firewall-Einträge | offen |
+| 5 | Kienzlefax: Scan-/Fax-Texterkennung (OCR), Samba-Freigaben über die Basis; Umzug bestehender Installationen (`kienzlefax-installer.env`, `kienzlefon.toml`) | offen |
+
+## Was bei der Übernahme anders ist
+
+- Kein Bash-Installer: Einstellungen in der Weboberfläche, Prüfung in PHP und Python, Asterisk-Dateien erzeugt das Modul.
+- Keine Weboberfläche ohne Anmeldung (Kienzlefax) und kein eigenes Passwort (Kienzlefon): Rechte der Suite.
+- Keine Dateien unter `/etc/asterisk`, `/srv/kienzlefax`, `/srv/scan`: alles im Datenordner bzw. Austauschordner.
+- Asterisk-Protokolle nur Warnungen und Fehler, sieben Tage (Rufnummern sind personenbezogen).
+- Firewall: Ports kommen als Einträge des Moduls und sind zunächst geschlossen.
+
+## Nicht auf echter Hardware geprüft
+
+Alles in Stufe 1: keine echte SIP-Leitung, kein Telefon, kein Faxgerät, keine VM. Geprüft sind die erzeugten
+Asterisk-Dateien, der Auftragsablauf mit nachgestelltem Asterisk und die Weboberflächen mit Tests.

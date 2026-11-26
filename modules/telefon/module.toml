@@ -1,0 +1,67 @@
+# Telefon: Telefonanlage (Asterisk) mit Leitungen, Nebenstellen, Warteschlange und Faxkanal für das Modul fax.
+# Auf Grundlage von Kienzlefax 3.5.0 und Kienzlefon 2.7 von Dr. Thomas Kienzle, für die Kienzle-Suite 2.0 als Modul umgebaut.
+# Stufe 1: Anlage aus Kienzlefax. Sprachmenü, Transkription, Ansagen und KI aus Kienzlefon folgen (docs/PLAN-FAX-TELEFON.md).
+
+[module]
+id = "telefon"
+name = "Telefon"
+version = "0.1.0-beta.1"
+core_api = "2"
+description = "Telefonanlage für die Praxis: Leitungen der Anbieter, Telefone, Warteschlange mit wachsender Rufgruppe, gemeinsame Kanalgrenze und Faxkanal für das Modul Fax."
+
+[system]
+packages = ["asterisk", "asterisk-modules", "asterisk-prompt-de", "php-fpm", "php-cli", "php-mbstring", "python3", "python3-reportlab", "python3-pypdf", "ghostscript", "qpdf", "libtiff-tools", "acl"]
+services = ["kienzle-telefon-asterisk.service", "kienzle-telefon-fax.service", "kienzle-telefon-pflege.service", "kienzle-telefon-pflege.timer"]
+disables = ["asterisk.service"]
+user = "ks-telefon"
+data = "/var/lib/kienzle/telefon"
+
+[web]
+path = "/telefon"
+upstream = "unix:/run/kienzle/telefon/web.sock"
+protocol = "fastcgi"
+entry = "public/index.php"
+einstellungen = "/einstellungen"
+
+[[firewall]]
+name = "Telefon: Telefone der Praxis (SIP)"
+port = 5060
+proto = "udp"
+
+[[firewall]]
+name = "Telefon: Anbieter (SIP)"
+port = 5070
+proto = "udp"
+scope = "any"
+
+[[firewall]]
+name = "Telefon: Sprache und Fax (RTP)"
+port = "12000-12999"
+proto = "udp"
+scope = "any"
+
+[[rights]]
+id = "status"
+label = "Telefon: Zustand der Anlage ansehen"
+
+[[rights]]
+id = "nebenstellen"
+label = "Telefon: Namen der Telefone und Warteschlange ändern"
+
+[[exchange]]
+module = "fax"
+purpose = "Faxaufträge senden und empfangene Faxe übergeben (Format aus Kienzlefax)"
+
+[backup]
+paths = ["/var/lib/kienzle/telefon/anlage.json", "/var/lib/kienzle/telefon/ami.json"]
+settings = ["/var/lib/kienzle/telefon/anlage.json"]
+
+[setup]
+overview = "bin/setup-overview"
+
+[hooks]
+install = "bin/install"
+update = "bin/update"
+remove = "bin/remove"
+busy = "bin/busy"
+health = "bin/health"

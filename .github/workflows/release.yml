@@ -26,7 +26,7 @@ jobs:
           [ "$version" = "$expected" ] || { echo "Tag $GITHUB_REF_NAME passt nicht zur Version $expected"; exit 1; }
           { echo "PART=$part"; echo "VERSION=$version"; echo "NOTES=$notes"; echo "TITLE=$title"; } >> "$GITHUB_ENV"
       - name: Tests
-        run: sudo apt-get update && sudo apt-get install -y php-cli php-sqlite3 php-mbstring php-gd php-curl php-xml php-zip openssl librsvg2-bin poppler-utils qpdf fonts-dejavu-core ghostscript python3-openpyxl && bash tests/run-all.sh
+        run: sudo apt-get update && sudo apt-get install -y php-cli php-sqlite3 php-mbstring php-gd php-curl php-xml php-zip openssl librsvg2-bin poppler-utils qpdf fonts-dejavu-core ghostscript python3-openpyxl asterisk asterisk-modules asterisk-prompt-de libtiff-tools python3-reportlab python3-pypdf && (sudo systemctl stop asterisk || true) && bash tests/run-all.sh
       - name: Starterprogramme bauen
         run: scripts/starter-bauen
       - name: Bauen

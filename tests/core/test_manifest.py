@@ -65,7 +65,7 @@ class Gueltig(unittest.TestCase):
 
     def test_alle_module_im_repository_gueltig(self):
         result = manifest.check_all(ROOT / 'modules')
-        self.assertEqual(result['core_api'], ['1'])
+        self.assertEqual(result['core_api'], ['1', '2'])
         self.assertIn('beispiel', [m['module']['id'] for m in result['modules']])
 
     def test_beispiel_in_der_dokumentation_entspricht_dem_beispielmodul(self):
@@ -103,7 +103,7 @@ class Gueltig(unittest.TestCase):
         self.assertEqual(m['firewall'][0]['scope'], 'any')
 
     def test_api_aus_core_api(self):
-        self.assertEqual(manifest.supported_api(), frozenset({'1'}))
+        self.assertEqual(manifest.supported_api(), frozenset({'1', '2'}))
         self.assertRegex((ROOT / 'core' / 'VERSION').read_text().strip(), manifest.VERSION)
 
 
@@ -170,7 +170,7 @@ class Modul(Fehler):
 
     def test_core_api(self):
         self.invalid(replace('core_api = "1"', 'core_api = 1'), 'module.core_api', 'ungültig')
-        self.invalid(replace('core_api = "1"', 'core_api = "2"'), 'module.core_api', 'nicht unterstützt')
+        self.invalid(replace('core_api = "1"', 'core_api = "3"'), 'module.core_api', 'nicht unterstützt')
         self.invalid(replace('core_api = "1"\n', ''), 'module', '„core_api“ fehlt')
 
 
@@ -197,6 +197,34 @@ class System(Fehler):
                 self.invalid(replace('"kienzle-beispiel-worker.service"', f'"{bad}"'), 'system.services')
         units = '"kienzle-beispiel.service", "kienzle-beispiel-sync.timer"'
         manifest.check_text(replace('"kienzle-beispiel-worker.service"', units))
+
+
+class Austausch(Fehler):
+    """[[exchange]] und [system] disables (core_api 2)."""
+    API2 = replace('core_api = "1"', 'core_api = "2"')
+
+    def test_austausch(self):
+        m = manifest.check_text(self.API2 + '\n[[exchange]]\nmodule = "telefon"\npurpose = "Faxaufträge"\n')
+        self.assertEqual(m['exchange'], [{'module': 'telefon', 'purpose': 'Faxaufträge', 'path': '/var/spool/kienzle/austausch/beispiel_telefon'}])
+        self.assertEqual(manifest.exchange_dir('telefon', 'fax'), '/var/spool/kienzle/austausch/fax_telefon')
+
+    def test_austausch_regeln(self):
+        self.invalid(BEISPIEL + '\n[[exchange]]\nmodule = "telefon"\npurpose = "x"\n', 'module.core_api', 'core_api = "2"')
+        self.invalid(self.API2 + '\n[[exchange]]\nmodule = "beispiel"\npurpose = "x"\n', 'exchange[1].module', 'anderes Modul')
+        self.invalid(self.API2 + '\n[[exchange]]\nmodule = "../core"\npurpose = "x"\n', 'exchange[1].module', 'ungültig')
+        self.invalid(self.API2 + '\n[[exchange]]\nmodule = "fax"\n', 'exchange[1]', '„purpose“ fehlt')
+        two = '\n[[exchange]]\nmodule = "fax"\npurpose = "x"\n'
+        self.invalid(self.API2 + two + two, 'exchange[2].module', 'doppelt')
+        self.invalid(self.API2 + '\n[[exchange]]\nmodule = "fax"\npurpose = "x"\nweg = 1\n', 'exchange', 'unbekannter Schlüssel')
+
+    def test_paketdienste_abschalten(self):
+        text = replace('user = "ks-beispiel"', 'user = "ks-beispiel"\ndisables = ["asterisk.service"]', self.API2)
+        self.assertEqual(manifest.check_text(text)['system']['disables'], ['asterisk.service'])
+        self.assertEqual(manifest.check_text(BEISPIEL)['system']['disables'], [])
+        for bad in ('ssh.service', 'nginx.service', 'kienzle-core-php.service'):
+            with self.subTest(bad):
+                self.invalid(text.replace('asterisk.service', bad), 'system.disables', 'darf nicht')
+        self.invalid(replace('user = "ks-beispiel"', 'user = "ks-beispiel"\ndisables = ["asterisk.service"]'), 'module.core_api', 'core_api = "2"')
 
 
 class Web(Fehler):
@@ -480,7 +508,7 @@ class Befehl(Ordner):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(json.loads(r.stdout), manifest.check_folder(BEISPIEL_DIR))
         r = self.run_cli('--alle', '--json', str(ROOT / 'modules'))
-        self.assertEqual(json.loads(r.stdout)['core_api'], ['1'])
+        self.assertEqual(json.loads(r.stdout)['core_api'], ['1', '2'])
 
     def test_ungueltig(self):
         folder = self.module(text=replace(VERSION_LINE, 'version = "1"'))

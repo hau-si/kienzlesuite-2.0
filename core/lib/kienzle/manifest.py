@@ -50,14 +50,20 @@ HOOKS = ('install', 'update', 'remove', 'busy', 'health')
 CONNECTIONS = ('t2med', 'mail', 'ablage', 'letterxpress')
 SHARES = ('samba', 'ipp')
 STARTER_SCHEMA = re.compile(r'^kienzle-[a-z0-9-]{1,30}$')
+# Dienste aus Ubuntu-Paketen, die die Basis abschalten darf, weil das Modul sie selbst betreibt ([system] disables).
+DISABLES = frozenset({'asterisk.service'})
+# Gemeinsame Austauschordner zweier Module ([[exchange]]): /var/spool/kienzle/austausch/<a>_<b> (IDs sortiert).
+EXCHANGE_BASE = '/var/spool/kienzle/austausch'
+# Abschnitte und Schlüssel, die erst ab dieser API-Version gelten.
+API_2 = '2'
 FORMAT = re.compile(r'^[a-z]+/[a-z0-9.+-]{1,60}$')
 
-LIMITS = {'starters': 5, 'packages': 50, 'services': 20, 'firewall': 20, 'rights': 30, 'printers': 10, 'paths': 20,
+LIMITS = {'exchange': 5, 'starters': 5, 'packages': 50, 'services': 20, 'firewall': 20, 'rights': 30, 'printers': 10, 'paths': 20,
           'connections': len(CONNECTIONS)}
 
 SCHEMA_SECTIONS = {
     'module': {'id', 'name', 'version', 'core_api', 'description'},
-    'system': {'packages', 'services', 'user', 'data'},
+    'system': {'packages', 'services', 'user', 'data', 'disables'},
     'web': {'path', 'upstream', 'protocol', 'entry', 'starter', 'einstellungen', 'uploads'},
     'firewall': {'name', 'port', 'proto', 'scope'},
     'rights': {'id', 'label'},
@@ -65,11 +71,12 @@ SCHEMA_SECTIONS = {
     'printers': {'name', 'label', 'ppd', 'backend', 'command', 'formats', 'paper', 'share'},
     'connections': {'id', 'purpose', 'required'},
     'starters': {'schema', 'label'},
+    'exchange': {'module', 'purpose'},
     'setup': {'overview'},
     'hooks': {*HOOKS, 'apparmor'},
 }
 TABLES = {'module', 'system', 'web', 'backup', 'setup', 'hooks'}
-ARRAYS = {'firewall', 'rights', 'printers', 'connections', 'starters'}
+ARRAYS = {'firewall', 'rights', 'printers', 'connections', 'starters', 'exchange'}
 REQUIRED_TABLES = ('module', 'system')
 
 
@@ -195,6 +202,9 @@ class _Checker:
         out['printers'] = self.printers(data.get('printers', []))
         out['connections'] = self.connections(data.get('connections', []))
         out['starters'] = self.starters(data.get('starters', []), out['web'])
+        out['exchange'] = self.exchange(data.get('exchange', []), mid)
+        if (out['exchange'] or out['system']['disables']) and module.get('core_api') == '1':
+            self.error('module.core_api', '[[exchange]] und [system] disables gibt es erst mit core_api = "2".')
         out['setup'] = self.setup(data.get('setup', {}))
         out['hooks'] = self.hooks(data.get('hooks', {}))
         return None if self.errors else out
@@ -236,7 +246,11 @@ class _Checker:
         data = self.text(t, 'data', 'system', limit=100)
         if data is not None and mid and data != f'{BASE_DATA}/{mid}':
             self.error('system.data', f'muss „{BASE_DATA}/{mid}“ sein.')
-        return {'packages': packages, 'services': services, 'user': user, 'data': data}
+        disables = self.string_list(t, 'disables', 'system', len(DISABLES))
+        for d in disables:
+            if d not in DISABLES:
+                self.error('system.disables', f'„{shown(d)}“ darf nicht abgeschaltet werden. Erlaubt: {", ".join(sorted(DISABLES))}.')
+        return {'packages': packages, 'services': services, 'user': user, 'data': data, 'disables': [d for d in disables if d in DISABLES]}
 
     def web(self, t: dict, mid: str | None) -> dict:
         path = self.pattern(t, 'path', 'web', WEB_PATH, '/kasse')
@@ -433,6 +447,28 @@ class _Checker:
             out.append({'schema': schema, 'label': self.text(t, 'label', where, limit=60)})
         return out
 
+    def exchange(self, items: list, mid: str | None) -> list:
+        """Austauschordner mit einem anderen Modul. Die Basis legt ihn nur an, wenn beide Module einander anmelden."""
+        if len(items) > LIMITS['exchange']:
+            self.error('exchange', f'höchstens {LIMITS["exchange"]} Einträge.')
+            return []
+        out, seen = [], set()
+        for n, t in enumerate(items, 1):
+            where = f'exchange[{n}]'
+            other = self.pattern(t, 'module', where, ID, 'telefon')
+            if other is not None:
+                if other == mid:
+                    self.error(f'{where}.module', 'muss ein anderes Modul sein.')
+                    other = None
+                elif other in seen:
+                    self.error(f'{where}.module', f'„{other}“ ist doppelt.')
+                    other = None
+            purpose = self.text(t, 'purpose', where, limit=120)
+            if other is not None and mid:
+                seen.add(other)
+                out.append({'module': other, 'purpose': purpose, 'path': exchange_dir(mid, other)})
+        return out
+
     def setup(self, t: dict) -> dict:
         return {'overview': self.rel_path(t['overview'], 'setup.overview') if 'overview' in t else None}
 
@@ -444,6 +480,11 @@ class _Checker:
                 self.error('hooks.apparmor', f'„{shown(prog)}“ ist nicht freigegeben. Erlaubt: {", ".join(sorted(APPARMOR))}.')
         out['apparmor'] = apparmor
         return out
+
+
+def exchange_dir(a: str, b: str) -> str:
+    """Pfad des Austauschordners zweier Module (IDs enthalten kein „_“, daher eindeutig)."""
+    return f'{EXCHANGE_BASE}/{"_".join(sorted((a, b)))}'
 
 
 def check_text(text: str) -> dict:

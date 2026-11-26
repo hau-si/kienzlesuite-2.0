@@ -12,6 +12,8 @@ Installieren bzw. Aktualisieren:
  5. FastCGI-Module: eigene php-fpm-Instanz als ks-<id> (Dienst kienzle-<id>-php.service, gehärtet wie die Basis).
     Eigene Dienste des Moduls aus <modul>/systemd/<name> (nur mit User=ks-<id>).
  6. Modulverzeichnis, nginx, AppArmor, Verbindungen und virtuelle Drucker neu schreiben (kienzle-web module).
+    Paketdienste aus [system] disables abschalten (maskieren); Austauschordner ([[exchange]]) anlegen, sobald beide Module
+    einander anmelden (root, 0770, ACL nur für die beiden Modulbenutzer), und die Dienste beider Module neu starten.
  7. Haken install bzw. update als ks-<id>, Dienste starten, hooks.health binnen 60 Sekunden.
  8. Bei Fehler: alter Verweis und Daten-Schnappschuss zurück (Aktualisieren) bzw. Modul wieder entfernen (Erstinstallation).
 Entfernen: hooks.remove, Dienste und Einheiten entfernen, Programm löschen; Daten und Benutzer nur auf ausdrücklichen Wunsch.
@@ -44,6 +46,8 @@ UNITS = Path(E('KIENZLE_MODULE_UNITS', '/etc/systemd/system'))
 TMPFILES = Path(E('KIENZLE_MODULE_TMPFILES', '/etc/tmpfiles.d'))
 RUN = Path(E('KIENZLE_MODULE_RUN', '/run/kienzle'))
 SPOOL = Path(E('KIENZLE_MODULE_SPOOL', '/var/spool/kienzle/ablage'))
+EXCHANGE = Path(E('KIENZLE_MODULE_AUSTAUSCH', manifest.EXCHANGE_BASE))
+SETFACL = E('KIENZLE_MODULE_SETFACL', '/usr/bin/setfacl')
 WEB = E('KIENZLE_MODULE_WEB', str(Path(__file__).resolve().parents[2] / 'bin' / 'kienzle-web'))
 SYSTEMCTL = E('KIENZLE_MODULE_SYSTEMCTL', '/usr/bin/systemctl')
 APT = E('KIENZLE_MODULE_APT', '/usr/bin/apt-get')
@@ -391,7 +395,8 @@ def phpfpm_binary() -> str:
 
 def fpm_conf(m: dict) -> str:
     mid = m['module']['id']
-    readable = [f'/opt/kienzle/{mid}/', f'/var/lib/kienzle/{mid}/', '/opt/kienzle/core/', f'/etc/kienzle/verbindungen/module/{mid}.json',
+    readable = [*(x['path'] + '/' for x in m.get('exchange', [])),
+                f'/opt/kienzle/{mid}/', f'/var/lib/kienzle/{mid}/', '/opt/kienzle/core/', f'/etc/kienzle/verbindungen/module/{mid}.json',
                 f'/etc/kienzle/schluessel/{mid}.key', '/var/lib/kienzle/drucker/status.json', f'/var/spool/kienzle/ablage/{mid}/',
                 '/etc/kienzle/ca/ca.crt', '/etc/kienzle/ca/server.crt', '/tmp/', '/usr/bin/', '/usr/share/fonts/', '/usr/share/fonts-dejavu-core/']
     return '\n'.join([
@@ -424,7 +429,8 @@ def fpm_unit(m: dict, binary: str) -> str:
         'ProtectKernelModules=yes', 'ProtectKernelLogs=yes', 'ProtectControlGroups=yes', 'ProtectClock=yes', 'ProtectHostname=yes',
         'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6', 'RestrictNamespaces=yes', 'RestrictRealtime=yes', 'RestrictSUIDSGID=yes',
         'LockPersonality=yes', 'SystemCallArchitectures=native', 'CapabilityBoundingSet=',
-        f'ReadWritePaths=/var/lib/kienzle/{mid} /run/kienzle/{mid} -/var/spool/kienzle/ablage/{mid}', '', '[Install]', 'WantedBy=multi-user.target', ''])
+        f'ReadWritePaths=/var/lib/kienzle/{mid} /run/kienzle/{mid} -/var/spool/kienzle/ablage/{mid}' + ''.join(f' -{x["path"]}' for x in m.get('exchange', [])),
+        '', '[Install]', 'WantedBy=multi-user.target', ''])
 
 
 def units(folder: Path, m: dict) -> list[str]:
@@ -449,6 +455,58 @@ def units(folder: Path, m: dict) -> list[str]:
     if not without_systemd():
         _run(['/usr/bin/systemd-tmpfiles', '--create', str(TMPFILES / f'kienzle-{mid}.conf')], timeout=60)
     return names
+
+
+def disable_package_services(m: dict) -> None:
+    """Dienste aus Ubuntu-Paketen abschalten, die das Modul selbst betreibt (z. B. asterisk.service): stoppen und maskieren,
+    damit auch ein Paket-Update sie nicht wieder startet."""
+    for name in m['system'].get('disables', []):
+        if name in manifest.DISABLES:
+            _systemctl('disable', '--now', name)
+            _systemctl('mask', name)
+            log(f'{m["module"]["id"]}: Paketdienst {name} abgeschaltet.')
+
+
+def release_package_services(mid: str, m: dict | None) -> None:
+    """Beim Entfernen: Maskierung aufheben, wenn kein anderes installiertes Modul den Dienst abschaltet (nicht starten)."""
+    if not m:
+        return
+    others = {d for oid, om in installed().items() if oid != mid for d in om['system'].get('disables', [])}
+    for name in m['system'].get('disables', []):
+        if name in manifest.DISABLES and name not in others:
+            _systemctl('unmask', name)
+
+
+def exchanges() -> set[str]:
+    """Austauschordner aller Modulpaare, die einander anmelden. Liefert die Module, deren Ordner neu angelegt wurde
+    (deren Dienste müssen neu starten, damit der Ordner in ReadWritePaths greift)."""
+    have = installed()
+    fresh: set[str] = set()
+    for mid, m in have.items():
+        for x in m.get('exchange', []):
+            other = have.get(x['module'])
+            if not other or mid not in [y['module'] for y in other.get('exchange', [])] or mid > x['module']:
+                continue
+            path = Path(manifest.exchange_dir(mid, x['module']).replace(manifest.EXCHANGE_BASE, str(EXCHANGE), 1))
+            if path.is_symlink():
+                raise Fehler(f'Austauschordner {path.name} ist ein Verweis.')
+            new = not path.is_dir()
+            path.mkdir(mode=0o770, parents=True, exist_ok=True)
+            os.chmod(path, 0o770)
+            if not OWNER:
+                shutil.chown(path, 'root', 'root')
+                if not Path(SETFACL).is_file() and APT:
+                    _run([APT, 'install', '-y', '-q', '--no-install-recommends', 'acl'], timeout=600,
+                         env={**os.environ, 'DEBIAN_FRONTEND': 'noninteractive'})
+                users = [f'ks-{mid}', f'ks-{x["module"]}']
+                spec = ','.join([f'u:{u}:rwx' for u in users] + [f'd:u:{u}:rwx' for u in users] + ['m::rwx', 'd:m::rwx', 'o::---', 'd:o::---'])
+                r = _run([SETFACL, '-m', spec, str(path)], timeout=60)
+                if r.returncode != 0:
+                    raise Fehler(f'Austauschordner {path.name}: Rechte ließen sich nicht setzen: ' + (r.stderr or '').strip()[:200])
+            if new:
+                log(f'Austauschordner {path.name} angelegt ({mid} und {x["module"]}).')
+                fresh |= {mid, x['module']}
+    return fresh
 
 
 def unit_names(mid: str) -> list[str]:
@@ -614,6 +672,7 @@ def install(mid: str, version: str | None = None) -> str:
     set_status(running={'action': 'aktualisieren' if have else 'installieren', 'id': mid, 'step': 'installieren', 'since': int(time.time())})
     snap = snapshot(mid, current) if have else None
     packages(m)
+    disable_package_services(m)
     account(mid)
     if have:
         stop(mid)
@@ -621,10 +680,13 @@ def install(mid: str, version: str | None = None) -> str:
     try:
         names = units(PROGRAMS / mid / 'current', m)
         register()
+        partners = exchanges() - {mid}
         r = hook(m, 'update' if have else 'install', {'KIENZLE_VORHER': current or ''})
         if r is not None and r.returncode != 0:
             raise Fehler(f'Haken {"update" if have else "install"} fehlgeschlagen: ' + (r.stderr or r.stdout).strip()[-300:])
         start(names)
+        for other in sorted(partners):
+            start(unit_names(other))
         if not healthy(m):
             raise Fehler('Das Modul antwortet nach dem Start nicht (hooks.health).')
     except Fehler as e:
@@ -652,6 +714,7 @@ def install(mid: str, version: str | None = None) -> str:
 
 
 def _remove(mid: str, m: dict | None, delete_data: bool, run_hook: bool = True) -> None:
+    release_package_services(mid, m)
     if m and run_hook:
         r = hook(m, 'remove')
         if r is not None and r.returncode != 0:

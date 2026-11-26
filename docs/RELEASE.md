@@ -1,5 +1,13 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.1
+
+- **Schnittstelle für Module, Version 2 (`core_api = "2"`)**, für die neuen Module Fax und Telefon (`docs/PLAN-FAX-TELEFON.md`). Version 1 bleibt gültig; die bisherigen Module ändern sich nicht.
+  - `[[exchange]]`: gemeinsamer Austauschordner zweier Module. Melden beide einander an, legt die Basis `/var/spool/kienzle/austausch/<a>_<b>` an (root, 0770, ACL nur für die beiden Modulbenutzer), trägt ihn in die Weboberfläche beider Module ein (`open_basedir`, `ReadWritePaths`) und startet deren Dienste neu. Kein anderes Modul kommt hinein.
+  - `[system] disables`: Dienste aus Ubuntu-Paketen, die ein Modul selbst betreibt, werden gestoppt und maskiert (zugelassen nur `asterisk.service`); beim Entfernen wird die Maskierung aufgehoben.
+- Der Installer installiert zusätzlich `acl` (für die Rechte des Austauschordners).
+- Beschreibung in `docs/MODULE-TOML.md`. Geprüft mit Tests; **nicht auf der VM geprüft** (ACL und Maskierung brauchen root und systemd).
+
 ## 0.21.4-beta.60
 
 - **Virtuelle Drucker dürfen Aufträge an die Ablage abgeben:** Die Einheit eines Druckers (z. B. „vKasse“) lief mit `ProtectSystem=strict` und durfte nur in den Datenordner des Moduls schreiben. Der Auftragsordner der Ablage (`/var/spool/kienzle/ablage/<modul>`) war schreibgeschützt. Die Rechnung kam an, die PDF wurde aber nie zum Netzwerkspeicher übergeben. Jetzt steht der Ordner in `ReadWritePaths` (mit `-`, falls er fehlt). Die Drucker-Einheit wird beim nächsten Abgleich (Verwaltung → Drucker oder automatisch) neu geschrieben und der Drucker neu gestartet. Nicht auf der VM geprüft.

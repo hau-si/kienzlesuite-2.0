@@ -1,0 +1,3 @@
+#!/bin/sh
+# Einrichtungs-Überblick des Moduls telefon als JSON.
+exec /usr/bin/php "$(dirname "$0")/../lib/ueberblick.php"
