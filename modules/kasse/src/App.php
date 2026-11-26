@@ -764,6 +764,10 @@ final class App {
             return $result;
         });
     }
+    /** Aus der Vorgänge-Liste: eine Rechnung des Rechnungseingangs einmalig per Post senden. */
+    public function vorgangPost(string $inboxId): array {
+        return (new Vorgaenge($this->db, $this->config))->post($inboxId, $this->letter, $this->export, fn(string $id): array => $this->exportRow($id, 'Post'));
+    }
     /** Offene T2med-Rechnung dieses Patienten per Post über Letterxpress versenden (nach Bestätigung an der Kasse). */
     public function invoiceLetter(array $visit, array $input): array {
         if (!$this->letter->enabled()) throw new Problem('Der Versand per Post ist nicht eingeschaltet (Einstellungen → Letterxpress).', 409);

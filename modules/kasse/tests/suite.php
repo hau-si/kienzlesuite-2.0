@@ -146,6 +146,10 @@ try {
     check($code === 403, 'Storno ohne Recht „storno“');
     [$code] = $vg(['kassieren', 'storno'], ['action' => 'storno', 'payment_id' => str_repeat('0', 32)]);
     check($code !== 403, 'Storno mit Recht „storno“ abgelehnt');
+    [$code] = $vg(['kassieren'], ['action' => 'vorgaenge_post', 'invoice_id' => str_repeat('0', 32)]);
+    check($code === 403, 'Postversand aus den Vorgängen ohne Recht „letter“');
+    [$code] = $vg(['kassieren', 'letter'], ['action' => 'vorgaenge_post', 'invoice_id' => str_repeat('0', 32)]);
+    check($code === 404 || $code === 409, 'Postversand unbekannter Rechnung abgelehnt: ' . $code);
     [$code] = $vg(['kassieren'], ['action' => 'vorgaenge_done', 'ids' => [], 'done' => true]);
     check($code === 403, 'Abhaken ohne Recht „paid“');
     [$code] = $vg(['paid'], ['action' => 'vorgaenge_done', 'ids' => [], 'done' => true]);

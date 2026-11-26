@@ -75,6 +75,23 @@ try {
     $state = $app->state($vi, $br)['invoices'][0]['letter'];
     check($state['status'] === 'sent' && $state['mode'] === 'test' && $state['job_id'] === '4711' && $state['sent_at'] > 0, 'Versandstatus nicht gespeichert');
 
+    // 2b. Vorgänge-Liste: Knopf nur bei noch nicht versandten Rechnungen, Versand nur einmal.
+    $vg = new KienzleKasse\Vorgaenge($app->db, $app->config);
+    $rows = array_column($vg->list('tag', date('Y-m-d'))['items'], null, 'id');
+    check(isset($rows[$id]) && $rows[$id]['can_post'] === false && $rows[$id]['post'] === true, 'Versandte Rechnung bietet „Per Post“ an');
+    $app->storeInvoice(['number' => 'RE2026-0043'] + $parsed, $pdf);
+    $new = $app->db->one("SELECT id FROM invoice_inbox WHERE invoice_number='RE2026-0043'")['id'];
+    $rows = array_column($vg->list('tag', date('Y-m-d'))['items'], null, 'id');
+    check(($rows[$new]['can_post'] ?? false) === true, 'Offene Rechnung bietet „Per Post“ nicht an');
+    $before = count($http->calls);
+    check($app->vorgangPost($new)['status'] === 'sent' && count($http->calls) === $before + 1, 'Versand aus den Vorgängen');
+    rejects(fn() => $app->vorgangPost($new), 'Zweiter Versand aus den Vorgängen', 409);
+    check(count($http->calls) === $before + 1, 'Zweiter Versand ging an Letterxpress');
+    $rows = array_column($vg->list('tag', date('Y-m-d'))['items'], null, 'id');
+    check($rows[$new]['can_post'] === false, 'Knopf nach dem Versand noch da');
+    $app->db->query('DELETE FROM invoice_inbox WHERE id=?', [$new]);
+    $http->calls = array_slice($http->calls, 0, 1);   // die folgenden Prüfungen zählen ab dem ersten Auftrag
+
     // 3. Testbriefe sperren nicht; live gesendete Rechnungen nie ein zweites Mal.
     check($app->invoiceLetter($vi, ['invoice_id' => $id])['status'] === 'sent' && count($http->calls) === 2, 'Zweiter Testbrief nicht möglich');
     $app->db->query("UPDATE invoice_inbox SET lxp_mode='live' WHERE id=?", [$id]);
