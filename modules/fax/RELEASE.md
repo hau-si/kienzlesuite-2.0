@@ -1,5 +1,11 @@
 # Release-Notizen Fax
 
+## 0.1.0-beta.8
+
+- **Fehler behoben: Vorschau blieb leer** (bei „Fax senden“ und im Faxeingang). Ghostscript wurde mit `/dev/null` als Eingabe gestartet; `/dev/null` liegt außerhalb der Ordner, die das Modul-PHP öffnen darf (`open_basedir`), deshalb startete Ghostscript auf dem Server gar nicht. Seitenzahl (Ersatzweg) und Zusammenfügen mehrerer Dokumente waren ebenso betroffen. Jetzt nur noch Pipes; Fehler von Ghostscript stehen im Protokoll des Moduls.
+- Die Seitentests laufen jetzt mit derselben `open_basedir`-Sperre wie auf dem Server (der Test schlug mit dem alten Stand fehl).
+- **Nicht auf der VM geprüft.**
+
 ## 0.1.0-beta.7
 
 - **„Fax senden“ neu (Entwurf A „Liste mit Häkchen“):** Alle Dokumente aus allen Quellen (Faxdrucker, NAS-Ordner, hochgeladen, Sendefehler) stehen in **einer** Liste, neueste oben, mit Quelle, Zeit und **Seitenzahl**. Das **neueste ist vorgewählt**. Rechts die **Vorschau** (oberer Teil der ersten Seite, in Graustufen wie beim Faxgerät); sie folgt der Maus über der Liste.

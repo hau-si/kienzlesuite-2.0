@@ -240,12 +240,16 @@ final class Fax {
 
     /** Ghostscript ohne Shell starten; liefert [Rückgabewert, Ausgabe]. */
     private static function gs(array $args): array {
-        $p = @proc_open(['/usr/bin/gs', '-q', ...$args], [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
-        if (!is_resource($p)) return [127, ''];
+        // Nur Pipes: /dev/null liegt außerhalb von open_basedir des Moduls (daran scheiterte die Vorschau auf dem Server).
+        $p = @proc_open(['/usr/bin/gs', '-q', ...$args], [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        if (!is_resource($p)) { error_log('fax: Ghostscript ließ sich nicht starten.'); return [127, '']; }
+        fclose($pipes[0]);
         $out = (string)stream_get_contents($pipes[1]);
-        stream_get_contents($pipes[2]);
+        $err = (string)stream_get_contents($pipes[2]);
         fclose($pipes[1]); fclose($pipes[2]);
-        return [proc_close($p), $out];
+        $code = proc_close($p);
+        if ($code !== 0) error_log('fax: Ghostscript meldet Fehler ' . $code . ': ' . mb_substr(trim(preg_replace('/\s+/', ' ', $err) ?? ''), 0, 300));
+        return [$code, $out];
     }
 
     // ---- Dokumente für „Fax senden“: alle Quellen in einer Liste, Seitenzahl, Vorschau -----------------------------

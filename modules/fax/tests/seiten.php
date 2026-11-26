@@ -9,6 +9,8 @@ register_shutdown_function(static function () use ($dir) { exec('rm -r ' . escap
 file_put_contents("$dir/daten/einstellungen.json", json_encode(['drucker' => [['name' => 'vFax1'], ['name' => 'vFaxLabor', 'bezeichnung' => 'Labor', 'nummer' => '49309876543']]]));
 file_put_contents("$dir/daten/drucker/vFax1/20260101-120000-abcdef.pdf", "%PDF-1.4\n%%EOF\n");
 $csrf = str_repeat('a', 32);
+// Wie auf dem Server (core/lib/kienzle/module.py fpm_conf): open_basedir ohne /dev, /proc und Co., damit Zugriffe außerhalb auffallen.
+define('BASEDIR', implode(':', [realpath($dir) . '/', dirname(__DIR__, 3) . '/', '/usr/bin/', '/tmp/']));
 
 function aufruf(string $dir, string $uri, string $rechte, string $rolle = 'benutzer', array $post = []): string {
     $server = ['REQUEST_URI' => $uri, 'REQUEST_METHOD' => $post ? 'POST' : 'GET', 'KIENZLE_PFAD' => '/fax', 'KIENZLE_BENUTZER' => 'mfa1', 'KIENZLE_ROLLE' => $rolle,
@@ -18,7 +20,7 @@ function aufruf(string $dir, string $uri, string $rechte, string $rolle = 'benut
     $code = '$_SERVER = ' . var_export($server, true) . ' + $_SERVER; $_GET = ' . var_export($get, true) . '; $_POST = ' . var_export($post, true) . ';'
         . ' register_shutdown_function(function () { echo "\n#CODE=" . (http_response_code() ?: 200); }); require ' . var_export(dirname(__DIR__) . '/public/index.php', true) . ';';
     $env = ['KIENZLE_DATEN' => "$dir/daten", 'KIENZLE_AUSTAUSCH' => "$dir/austausch", 'KIENZLE_SUITE_HILFE' => dirname(__DIR__, 3) . '/core/php/modul/Kienzle.php', 'PATH' => '/usr/bin:/bin'];
-    $p = proc_open([PHP_BINARY, '-d', 'display_errors=stderr', '-r', $code], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $env);
+    $p = proc_open([PHP_BINARY, '-d', 'display_errors=stderr', '-d', 'open_basedir=' . BASEDIR, '-r', $code], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $env);
     $out = (string)stream_get_contents($pipes[1]);
     $err = (string)stream_get_contents($pipes[2]);
     proc_close($p);
@@ -75,7 +77,7 @@ check(str_contains($o, '⟲ Labor Beispiel') && str_contains($o, '&quot;name&quo
 // Roher Upload über einen echten HTTP-Server (PHP-Testserver mit nachgestellten Kopfzeilen der Basis).
 $port = 18000 + random_int(0, 999);
 file_put_contents("$dir/router.php", '<?php $_SERVER += ["KIENZLE_PFAD" => "/fax", "KIENZLE_BENUTZER" => "mfa1", "KIENZLE_ROLLE" => "benutzer", "KIENZLE_RECHTE" => $_SERVER["HTTP_X_TEST_RECHTE"] ?? "senden", "KIENZLE_CSRF" => str_repeat("a", 32)]; require ' . var_export(dirname(__DIR__) . '/public/index.php', true) . ';');
-$srv = proc_open([PHP_BINARY, '-S', "127.0.0.1:$port", "$dir/router.php"], [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pp, null,
+$srv = proc_open([PHP_BINARY, '-d', 'open_basedir=' . BASEDIR, '-S', "127.0.0.1:$port", "$dir/router.php"], [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pp, null,
     ['KIENZLE_DATEN' => "$dir/daten", 'KIENZLE_AUSTAUSCH' => "$dir/austausch", 'KIENZLE_SUITE_HILFE' => dirname(__DIR__, 3) . '/core/php/modul/Kienzle.php', 'PATH' => '/usr/bin:/bin']);
 register_shutdown_function(static function () use ($srv) { proc_terminate($srv); });
 $post = static function (string $body, array $kopf) use ($port): array {
