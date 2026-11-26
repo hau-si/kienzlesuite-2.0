@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.2
+
+- **Passwortregeln einstellbar** (Verwaltung → Sicherheit → „Passwörter“): Mindestlänge (6–64), Zahl der Zeichenarten (1–4), Mindeststärke (0–4), Sperre häufiger Muster und Sperre des Anmeldenamens im Passwort. Standard wie bisher (10 Zeichen, Muster- und Namensprüfung); die Regeln gelten für neue und geänderte Passwörter, bestehende bleiben gültig.
+- **Warnung bei zu lockeren Regeln** (rot: Länge unter 8 oder Mustersperre aus; gelb: Länge unter 10, Namensprüfung aus oder weder Stärke noch Zeichenarten bei unter 12 Zeichen). Der Abschnitt öffnet sich dann von selbst und trägt das Schild „Warnung“.
+- **Stärkebalken** beim Festlegen und Ändern eines Passworts (Einrichtungslink, erster Admin, Konto → Passwort ändern): zeigt Stärke von „sehr schwach“ bis „sehr gut“ und was noch fehlt. Die Rechnung steht in `Passwords::score` und `passwort.js` (gleiche Ergebnisse). Nicht auf der VM geprüft.
+
 ## 0.22.0-beta.1
 
 - **Schnittstelle für Module, Version 2 (`core_api = "2"`)**, für die neuen Module Fax und Telefon (`docs/PLAN-FAX-TELEFON.md`). Version 1 bleibt gültig; die bisherigen Module ändern sich nicht.
