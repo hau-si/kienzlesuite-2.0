@@ -43,6 +43,25 @@ $o = aufruf($dir, '/telefon/einstellungen', 'nebenstellen', 'benutzer', ['aktion
 check(str_contains($o, 'Gespeichert.') && str_contains($o, 'value="Empfang"'), 'Mitarbeiter benennt Telefon');
 $o = aufruf($dir, '/telefon/einstellungen', 'nebenstellen', 'benutzer', ['aktion' => 'nebenstelle-loeschen', 'kienzle-csrf' => $csrf, 'nummer' => '201']);
 check(str_contains($o, 'nur Admins'), 'Löschen nur Admin');
+// Einrichtung der Telefone (Snom): MAC-Adresse und Schlüssel nur durch Admins.
+$o = aufruf($dir, '/telefon/einstellungen', 'nebenstellen', 'benutzer', ['aktion' => 'nebenstelle-mac', 'kienzle-csrf' => $csrf, 'nummer' => '201', 'mac' => '00:04:13:a1:b2:c3']);
+check(str_contains($o, 'nur Admins') && !str_contains($o, '000413a1b2c3'), 'MAC-Adresse nur Admin');
+$o = aufruf($dir, '/telefon/einstellungen', 'nebenstellen', 'benutzer', ['aktion' => 'prov-speichern', 'kienzle-csrf' => $csrf, 'aktiv' => '1']);
+check(str_contains($o, 'nur Admins'), 'Einrichtung einschalten nur Admin');
+$o = aufruf($dir, '/telefon/einstellungen', '', 'admin', ['aktion' => 'nebenstelle-mac', 'kienzle-csrf' => $csrf, 'nummer' => '201', 'mac' => 'kaputt']);
+check(str_contains($o, 'MAC-Adresse ungültig'), 'Ungültige MAC-Adresse abgelehnt');
+$o = aufruf($dir, '/telefon/einstellungen', '', 'admin', ['aktion' => 'nebenstelle-mac', 'kienzle-csrf' => $csrf, 'nummer' => '201', 'mac' => '00:04:13:A1:B2:C3']);
+check(str_contains($o, 'value="00:04:13:a1:b2:c3"'), 'MAC-Adresse gespeichert und angezeigt');
+$o = aufruf($dir, '/telefon/einstellungen', '', 'admin', ['aktion' => 'prov-speichern', 'kienzle-csrf' => $csrf, 'aktiv' => '1']);
+check(preg_match('#http://kienzle\.praxis\.example\.org:8780/[0-9a-f]{32}/\{mac\}\.xml#', $o) === 1 && str_contains($o, '1 Telefon'), 'Adresse für die Telefone mit Schlüssel');
+preg_match('#8780/([0-9a-f]{32})/#', $o, $m1);
+$datei = glob($dir . '/daten/prov/*/000413a1b2c3.xml');
+check(count($datei) === 1 && str_contains((string)file_get_contents($datei[0]), '<user_name idx="1" perm="R">201</user_name>'), 'Einstellungsdatei erzeugt');
+$o = aufruf($dir, '/telefon/einstellungen', '', 'admin', ['aktion' => 'prov-schluessel-neu', 'kienzle-csrf' => $csrf]);
+preg_match('#8780/([0-9a-f]{32})/#', $o, $m2);
+check(($m1[1] ?? '') !== '' && ($m2[1] ?? '') !== '' && $m1[1] !== $m2[1] && !is_dir($dir . '/daten/prov/' . $m1[1]) && is_file($dir . '/daten/prov/' . $m2[1] . '/000413a1b2c3.xml'), 'Neuer Schlüssel ersetzt den alten');
+$o = aufruf($dir, '/telefon/einstellungen', '', 'admin', ['aktion' => 'prov-speichern', 'kienzle-csrf' => $csrf]);
+check(glob($dir . '/daten/prov/*/*') === [], 'Ausgeschaltet: keine Dateien');
 $o = aufruf($dir, '/telefon/einstellungen', '', 'admin', ['aktion' => 'zugang-zeigen', 'kienzle-csrf' => $csrf, 'nummer' => '201']);
 check(!str_contains($o, 'Zugang für Telefon'), 'Zugang nur nach frischer Bestätigung');
 $o = aufruf($dir, '/telefon/einstellungen', '', 'admin', ['aktion' => 'zugang-zeigen', 'kienzle-csrf' => $csrf, 'nummer' => '201'], time());

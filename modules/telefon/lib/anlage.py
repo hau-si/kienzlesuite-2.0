@@ -67,6 +67,9 @@ TTS = ('piper', 'google', 'kokoro')
 ID = re.compile(r'^[a-z0-9]{1,12}$')
 NUMMER = re.compile(r'^\+?[0-9]{3,20}$')
 NEBENSTELLE = re.compile(r'^[1-8][0-9]{2,3}$')
+MAC = re.compile(r'^[0-9a-f]{12}$')
+PROV_SCHLUESSEL = re.compile(r'^[0-9a-f]{32}$')
+PROV_PORT = 8780   # Einrichtung der Telefone (lib/prov-dienst), nur aus den Praxisnetzen (Firewall)
 HOST = re.compile(r'^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*(?::[0-9]{1,5})?$')
 SIP_USER = re.compile(r'^[A-Za-z0-9_.+@-]{1,80}$')
 URI = re.compile(r'^sip:[A-Za-z0-9_.+@:-]{1,150}$')
@@ -268,6 +271,7 @@ def check(cfg: dict) -> dict:
     out['warteschlange'] = {'max_wartend': _int((cfg.get('warteschlange') or {}).get('max_wartend'), 'Wartende Anrufer', 1, 50, 5)}
 
     seen = set()
+    macs: dict[str, str] = {}
     for n, raw in enumerate(cfg.get('nebenstellen') or [], 1):
         if not isinstance(raw, dict):
             raise Fehler('Nebenstelle ungültig.')
@@ -280,10 +284,24 @@ def check(cfg: dict) -> dict:
         pw = _text(raw.get('passwort'), f'Nebenstelle {num}: Passwort', 128, required=True)
         if len(pw) < 16 or not re.fullmatch(r'[A-Za-z0-9]+', pw):
             raise Fehler(f'Nebenstelle {num}: Passwort zu schwach (mindestens 16 Buchstaben und Ziffern).')
+        mac = re.sub(r'[\s:.-]', '', str(raw.get('mac') or '')).lower()
+        if mac and not MAC.match(mac):
+            raise Fehler(f'Nebenstelle {num}: MAC-Adresse ungültig (12 Zeichen 0–9 und a–f, z. B. 00:04:13:A1:B2:C3).')
+        if mac and mac in macs:
+            raise Fehler(f'Nebenstelle {num}: Die MAC-Adresse gehört schon zu Telefon {macs[mac]}.')
+        if mac:
+            macs[mac] = num
         out['nebenstellen'].append({'nummer': num, 'name': _name(raw.get('name'), f'Nebenstelle {num}: Name', 30) or f'Telefon {num}',
-                                    'passwort': pw, 'warteschlange': raw.get('warteschlange', True) is not False})
+                                    'passwort': pw, 'warteschlange': raw.get('warteschlange', True) is not False, 'mac': mac})
     if len(out['nebenstellen']) > 100:
         raise Fehler('Höchstens 100 Nebenstellen.')
+    pv = cfg.get('provisionierung') if isinstance(cfg.get('provisionierung'), dict) else {}
+    schluessel = str(pv.get('schluessel') or '')
+    if schluessel and not PROV_SCHLUESSEL.match(schluessel):
+        raise Fehler('Einrichtung der Telefone: Schlüssel ungültig.')
+    if pv.get('aktiv') is True and not schluessel:
+        raise Fehler('Einrichtung der Telefone: Schlüssel fehlt.')
+    out['provisionierung'] = {'aktiv': pv.get('aktiv') is True, 'schluessel': schluessel}
 
     kz = cfg.get('kienzlefon') or {}
     tts = str(kz.get('tts') or 'piper')
@@ -1063,6 +1081,54 @@ def transports(text: str) -> str:
     return '\n'.join(re.findall(r'^\[transport-[^\]]+\][^\[]*', text, flags=re.M))
 
 
+SNOM_VORLAGE = '''<?xml version="1.0" encoding="utf-8"?>
+<settings>
+  <phone-settings e="2">
+    <user_active idx="1" perm="R">on</user_active>
+    <user_realname idx="1" perm="R">{name}</user_realname>
+    <user_name idx="1" perm="R">{nummer}</user_name>
+    <user_host idx="1" perm="R">{{{{HOST}}}}</user_host>
+    <user_pname idx="1" perm="R">{nummer}</user_pname>
+    <user_pass idx="1" perm="R">{passwort}</user_pass>
+    <language perm="">Deutsch</language>
+    <timezone perm="">GER+1</timezone>
+    <tone_scheme perm="">GER</tone_scheme>
+  </phone-settings>
+</settings>
+'''
+
+
+def snom_datei(x: dict) -> str:
+    """Einstellungsdatei eines Snom-Telefons (D7xx). Der Platzhalter {{HOST}} setzt der Dienst aus der Adresse ein, unter der das Telefon ihn erreicht."""
+    from xml.sax.saxutils import escape
+    return SNOM_VORLAGE.format(name=escape(x['name']), nummer=escape(x['nummer']), passwort=escape(x['passwort']))
+
+
+def provisionierung_schreiben(c: dict) -> list[str]:
+    """Einstellungsdateien je Telefon mit eingetragener MAC-Adresse nach <Daten>/prov/<Schlüssel>/<mac>.xml; alles andere dort verschwindet."""
+    root = DATA / 'prov'
+    pv = c['provisionierung']
+    wanted: dict[Path, str] = {}
+    if pv['aktiv']:
+        for x in c['nebenstellen']:
+            if x['mac']:
+                wanted[root / pv['schluessel'] / f'{x["mac"]}.xml'] = snom_datei(x)
+    written = []
+    if root.is_dir():
+        for folder in root.iterdir():
+            if folder.is_dir() and not folder.is_symlink():
+                for f in folder.iterdir():
+                    if f not in wanted:
+                        f.unlink(missing_ok=True)
+                if folder.name != pv['schluessel'] or not pv['aktiv']:
+                    shutil.rmtree(folder, ignore_errors=True)
+    for path, text in wanted.items():
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if write(path, text, 0o600):
+            written.append(path.name)
+    return written
+
+
 def anwenden(cfg: dict) -> dict:
     c = check(cfg)
     grundgeruest()
@@ -1080,6 +1146,7 @@ def anwenden(cfg: dict) -> dict:
         except OSError:
             pass
     changed = [name for name, text in files.items() if write(ETC / name, text)]
+    provisionierung_schreiben(c)
     if c['praxis'] or not (DATA / 'praxis.txt').exists():
         write(DATA / 'praxis.txt', (c['praxis'] or 'Praxis') + '\n', 0o600)
     write(DATA / 'fax.json', json.dumps({'aktiv': bool(c['fax'].get('leitung')), 'nummer': c['fax'].get('nummer', ''),

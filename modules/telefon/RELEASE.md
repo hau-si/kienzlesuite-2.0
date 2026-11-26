@@ -1,5 +1,11 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.17
+
+- **Automatische Einrichtung der Snom-Telefone (D785 u. a.) über die MAC-Adresse:** Admins tragen bei jedem Telefon die MAC-Adresse ein und schalten unter „Einrichtung der Telefone (Snom)“ den Dienst ein. Die Seite zeigt die Adresse `http://<Server>:8780/<Schlüssel>/{mac}.xml`; sie wird einmal im Telefon (Einstellungs-URL) oder im DHCP-Server (Option 66) eingetragen. Das Telefon holt sich Benutzer, Passwort, Server und Anzeigename selbst.
+- **Sicherheit:** Eigener Dienst `kienzle-telefon-prov` (Port 8780/TCP, nur Praxisnetze in der Firewall, nie Internet). Ohne den geheimen 128-Bit-Schlüssel in der Adresse und die richtige MAC-Adresse gibt es 404; mehr als 20 Fehlversuche pro Minute und Adresse werden gebremst. Dateien 0600, Schlüssel jederzeit mit „Neuen Schlüssel vergeben“ ersetzbar. MAC-Adressen und der Schalter sind nur für Admins (sonst könnten Mitarbeiter mit dem Recht „Telefone“ fremde Zugangsdaten abrufen). Das Telefon-Passwort wird im Klartext in die Datei geschrieben (Snom lädt sie unverschlüsselt per HTTP); das Netz muss daher vertrauenswürdig sein.
+- Geprüft mit Tests (MAC-Prüfung, Dateien, Schlüsselwechsel, Dienst-Abruf, Seiten und Rechte). **Nicht geprüft:** echtes Snom D785. Namen der Einstellungen in der XML-Datei und der Platzhalter `{mac}` stammen aus der Snom-Dokumentation von Hand und müssen am Gerät bestätigt werden; ggf. in `SNOM_VORLAGE` (`lib/anlage.py`) anpassen.
+
 ## 0.1.0-beta.16
 
 - **Neue Seite „Anrufe“** (`/telefon/anrufe`, Entwurf B, Knopf in der Übersicht; Entscheidung des Nutzers: im Modul Telefon statt eigenem Modul): links die Warteschlange mit Nummer und Wartezeit (ROT markiert), Anzahl im Sprachmenü; rechts alle Telefone mit Zustand (frei, klingelt, im Gespräch mit Nummer und Dauer, nicht angemeldet). Aktualisiert sich alle 3 Sekunden, frisch aus Asterisk; gespeichert wird dabei nichts.

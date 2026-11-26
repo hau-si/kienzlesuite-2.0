@@ -22,6 +22,7 @@ final class Anlage {
             'telefon' => ['leitung_ein' => '', 'nummer_ein' => '', 'leitung_aus' => '', 'kennung_aus' => '', 'aus_zaehlt' => true, 'ausland' => false, 'sonderrufnummern' => false],
             'ueberlauf' => ['leitung' => '', 'nummer' => ''], 'kanaele' => ['gesamt' => 4, 'telefon' => 3, 'fax' => 3, 'ueberlauf' => 2],
             'warteschlange' => ['max_wartend' => 5], 'nebenstellen' => [], 'netz' => ['lokal' => '', 'erlaubt' => '', 'extern' => ''],
+            'provisionierung' => ['aktiv' => false, 'schluessel' => ''],
             'kienzlefon' => ['aktiv' => false, 'tts' => 'piper', 'google' => ['schluessel' => '', 'stimme' => '', 'tempo' => ''], 'wartemusik' => 'klingelzeichen', 'whisper_genau' => false, 'rufgruppen' => false]];
     }
 
@@ -356,6 +357,34 @@ final class Anlage {
             return $cfg;
         }
         throw new \InvalidArgumentException('Nebenstelle unbekannt.');
+    }
+
+    /** MAC-Adresse eines Telefons eintragen (nur Admins: wer sie kennt, bekommt die Zugangsdaten des Telefons). Leer = keine automatische Einrichtung. */
+    public static function nebenstelleMac(array $cfg, array $p): array {
+        $nr = (string)($p['nummer'] ?? '');
+        foreach ($cfg['nebenstellen'] as $i => $n) {
+            if ($n['nummer'] !== $nr) continue;
+            $mac = trim((string)($p['mac'] ?? ''));
+            $roh = strtolower(preg_replace('/[\s:.\-]/', '', $mac) ?? '');
+            $cfg['nebenstellen'][$i]['mac'] = preg_match('/^[0-9a-f]{12}$/D', $roh) ? $roh : $mac;
+            return $cfg;
+        }
+        throw new \InvalidArgumentException('Nebenstelle unbekannt.');
+    }
+
+    /** Einrichtung der Telefone ein- oder ausschalten; beim ersten Einschalten entsteht der Schlüssel für die Adresse. */
+    public static function provisionierungSpeichern(array $cfg, array $p): array {
+        $aktiv = !empty($p['aktiv']);
+        $schluessel = (string)($cfg['provisionierung']['schluessel'] ?? '');
+        if ($aktiv && !preg_match('/^[0-9a-f]{32}$/D', $schluessel)) $schluessel = bin2hex(random_bytes(16));
+        $cfg['provisionierung'] = ['aktiv' => $aktiv, 'schluessel' => $schluessel];
+        return $cfg;
+    }
+
+    /** Neuer Schlüssel: die bisherige Adresse gilt nicht mehr, die Telefone müssen die neue Adresse bekommen. */
+    public static function provisionierungSchluesselNeu(array $cfg): array {
+        $cfg['provisionierung'] = ['aktiv' => (bool)($cfg['provisionierung']['aktiv'] ?? false), 'schluessel' => bin2hex(random_bytes(16))];
+        return $cfg;
     }
 
     public static function nebenstelleLoeschen(array $cfg, string $nr): array {

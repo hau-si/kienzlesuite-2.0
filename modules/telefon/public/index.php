@@ -140,6 +140,9 @@ try {
                 'piper-einrichten', 'piper-entfernen', 'kokoro-einrichten', 'kokoro-entfernen', 'ansagen-erzeugen', 'whisper-entfernen' => null,
                 'nebenstellen-anlegen' => Anlage::nebenstellenAnlegen($cfg, (int)($_POST['anzahl'] ?? 0), $k),
                 'nebenstelle-speichern' => Anlage::nebenstelleSpeichern($cfg, $_POST),
+                'nebenstelle-mac' => Anlage::nebenstelleMac($cfg, $_POST),
+                'prov-speichern' => Anlage::provisionierungSpeichern($cfg, $_POST),
+                'prov-schluessel-neu' => Anlage::provisionierungSchluesselNeu($cfg),
                 'nebenstelle-loeschen' => Anlage::nebenstelleLoeschen($cfg, (string)($_POST['nummer'] ?? '')),
                 'passwort-neu' => Anlage::nebenstellePasswortNeu($cfg, (string)($_POST['nummer'] ?? ''), $k),
                 'zugang-zeigen' => null,
@@ -196,7 +199,7 @@ try {
                 $cfg = $neu;
                 $meldung = match ($aktion) {
                     'leitung-loeschen' => 'Leitung gelöscht.', 'nebenstellen-anlegen' => 'Telefone angelegt. Die Zugangsdaten stehen unter „Zugang“.',
-                    'nebenstelle-loeschen' => 'Nebenstelle gelöscht.', 'passwort-neu' => 'Neues Passwort vergeben. Das Telefon bitte neu einrichten.',
+                    'nebenstelle-loeschen' => 'Nebenstelle gelöscht.', 'prov-schluessel-neu' => 'Neuer Schlüssel vergeben. Die Adresse für die Telefone hat sich geändert.', 'passwort-neu' => 'Neues Passwort vergeben. Das Telefon bitte neu einrichten.',
                     default => 'Gespeichert.',
                 } . (($r['neustart'] ?? false) ? ' Die Anlage startet neu, sobald kein Gespräch mehr läuft.' : '')
                   . (!($r['laeuft'] ?? false) ? ' Hinweis: Die Telefonanlage läuft gerade nicht; die Einstellungen gelten beim nächsten Start.' : '');

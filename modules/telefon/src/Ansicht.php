@@ -105,6 +105,11 @@ final class Ansicht {
         return $o . '</select></label>';
     }
 
+    /** 12 Zeichen als 00:04:13:a1:b2:c3 anzeigen (gespeichert wird ohne Trennzeichen). */
+    private static function macAnzeige(string $mac): string {
+        return preg_match('/^[0-9a-f]{12}$/D', $mac) ? implode(':', str_split($mac, 2)) : $mac;
+    }
+
     private static function haken(string $name, string $label, bool $an): string {
         return '<label class="check"><input type="checkbox" name="' . $name . '" value="1"' . ($an ? ' checked' : '') . '> ' . tf_h($label) . '</label>';
     }
@@ -609,12 +614,16 @@ final class Ansicht {
         }
 
         // Telefone
-        $liste = '<table class="tf-tabelle"><tr><th>Nr.</th><th>Name</th><th>Warteschlange</th><th>Angemeldet</th><th></th></tr>';
+        $liste = '<table class="tf-tabelle"><tr><th>Nr.</th><th>Name</th><th>Warteschlange</th><th>MAC-Adresse</th><th>Angemeldet</th><th></th></tr>';
         foreach ($cfg['nebenstellen'] as $n) {
             $s = $status['telefone'][$n['nummer']] ?? '';
             $liste .= '<tr><td>' . $h($n['nummer']) . '</td><td colspan="2"><form method="post" class="tf-inline"><input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"><input type="hidden" name="aktion" value="nebenstelle-speichern">'
                 . '<input type="hidden" name="nummer" value="' . $h($n['nummer']) . '"><input name="name" value="' . $h($n['name']) . '" maxlength="30" aria-label="Name">'
                 . '<label class="check"><input type="checkbox" name="warteschlange" value="1"' . ($n['warteschlange'] ? ' checked' : '') . '> ja</label><button class="small" type="submit">Speichern</button></form></td>'
+                . '<td>' . ($admin
+                    ? '<form method="post" class="tf-inline"><input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"><input type="hidden" name="aktion" value="nebenstelle-mac"><input type="hidden" name="nummer" value="' . $h($n['nummer']) . '">'
+                        . '<input name="mac" value="' . $h(self::macAnzeige((string)($n['mac'] ?? ''))) . '" maxlength="17" placeholder="00:04:13:…" aria-label="MAC-Adresse von Telefon ' . $h($n['nummer']) . '" size="17"><button class="small" type="submit">Speichern</button></form>'
+                    : $h(self::macAnzeige((string)($n['mac'] ?? '')))) . '</td>'
                 . '<td>' . ($s === 'Avail' ? self::tag('ok', 'ja') : self::tag('warn', 'nein')) . '</td><td class="tf-knoepfe">';
             if ($admin) {
                 foreach ([['zugang-zeigen', 'Zugang', 'small secondary', ''], ['passwort-neu', 'Neues Passwort', 'small', 'Neues Passwort für ' . $n['nummer'] . '? Das Telefon muss danach neu eingerichtet werden.'],
@@ -636,6 +645,26 @@ final class Ansicht {
             $inhalt .= self::formular($csrf, 'nebenstellen-anlegen', self::feld('anzahl', 'Neue Telefone anlegen (Anzahl)', '1', 'Nummern ab 201; jedes bekommt ein eigenes Passwort.', 'number', ' min="1" max="20"'), 'Anlegen', 'tf-form tf-schmal');
         }
         $o .= self::fold('telefone', 'Telefone', $cfg['nebenstellen'] ? self::tag('ok', count($cfg['nebenstellen']) . ' angelegt') : self::tag('err', 'fehlt'), $inhalt, !$admin || $zugang !== null);
+
+        if ($admin) {
+            // Automatische Einrichtung der Telefone (Snom) über die MAC-Adresse
+            $pv = $cfg['provisionierung'];
+            $mitMac = count(array_filter($cfg['nebenstellen'], fn($n) => ($n['mac'] ?? '') !== ''));
+            $adresse = 'http://' . $server . ':8780/' . $pv['schluessel'] . '/{mac}.xml';
+            $form = self::haken('aktiv', 'Telefone mit eingetragener MAC-Adresse automatisch einrichten (Snom)', (bool)$pv['aktiv']);
+            $inhalt = '<p class="muted">Ein Snom-Telefon holt sich beim Start seine Zugangsdaten (Benutzer, Passwort, Server, Anzeigename) selbst. Dazu trägst du oben bei jedem Telefon die MAC-Adresse ein '
+                . '(steht auf dem Gerät und im Webmenü des Telefons) und gibst dem Telefon einmal die Adresse unten. Der Dienst ist nur aus den Praxisnetzen erreichbar: '
+                . 'Dazu den Port <code>8780</code> (TCP) unter Verwaltung → Firewall für das Praxisnetz freigeben, nie für das Internet.</p>'
+                . self::formular($csrf, 'prov-speichern', $form, 'Speichern', 'tf-form tf-schmal');
+            if ($pv['aktiv']) {
+                $inhalt .= '<div class="card"><h3>Adresse für die Telefone</h3><p><code>' . $h($adresse) . '</code></p>'
+                    . '<p class="muted">Im Webmenü des Telefons als Adresse der Einstellungsdatei eintragen (Snom: Setup → Erweitert → Update → „Einstellungs-URL“, je nach Firmware leicht anders), '
+                    . 'oder im DHCP-Server als Option 66. <code>{mac}</code> ersetzt das Telefon selbst. Die Adresse enthält einen geheimen Schlüssel: nicht weitergeben. '
+                    . ($mitMac === 0 ? 'Noch bei keinem Telefon ist eine MAC-Adresse eingetragen.' : $mitMac . ' Telefon(e) mit MAC-Adresse.') . '</p>'
+                    . '<form method="post" data-confirm="Neuen Schlüssel vergeben? Die bisherige Adresse gilt dann nicht mehr; alle Telefone brauchen die neue Adresse."><input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"><input type="hidden" name="aktion" value="prov-schluessel-neu"><button class="small secondary" type="submit">Neuen Schlüssel vergeben</button></form></div>';
+            }
+            $o .= self::fold('einrichtung', 'Einrichtung der Telefone (Snom)', $pv['aktiv'] ? self::tag('ok', $mitMac . ' mit MAC') : self::tag('opt', 'aus'), $inhalt);
+        }
 
         if ($admin) {
             $nz = $cfg['netz'];

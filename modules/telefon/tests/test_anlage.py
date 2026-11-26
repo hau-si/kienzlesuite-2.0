@@ -550,5 +550,110 @@ class FaxkennungVorgabe(unittest.TestCase):
             cfg['praxis'] = ''
             self.assertEqual(a.check(cfg)['fax']['name'], 'Fax')
 
+
+class EinrichtungTelefone(unittest.TestCase):
+    """MAC-Adressen der Telefone und Einstellungsdateien für die automatische Einrichtung (Snom)."""
+
+    def test_mac_und_schluessel_pruefen(self):
+        with tempfile.TemporaryDirectory() as d:
+            a = load(Path(d))
+            cfg = beispiel()
+            cfg['nebenstellen'][0]['mac'] = '00:04:13:A1:B2:C3'
+            cfg['nebenstellen'][1]['mac'] = '000413-a1b2c4'
+            c = a.check(cfg)
+            self.assertEqual([x['mac'] for x in c['nebenstellen']], ['000413a1b2c3', '000413a1b2c4', ''])
+            self.assertEqual(c['provisionierung'], {'aktiv': False, 'schluessel': ''})
+            for schlecht, text in (('00:04:13', 'MAC-Adresse ungültig'), ('zz0413a1b2c3', 'MAC-Adresse ungültig')):
+                cfg = beispiel()
+                cfg['nebenstellen'][0]['mac'] = schlecht
+                with self.assertRaises(a.Fehler) as ctx:
+                    a.check(cfg)
+                self.assertIn(text, str(ctx.exception))
+            cfg = beispiel()
+            cfg['nebenstellen'][0]['mac'] = cfg['nebenstellen'][1]['mac'] = '000413a1b2c3'
+            with self.assertRaises(a.Fehler) as ctx:
+                a.check(cfg)
+            self.assertIn('gehört schon zu Telefon 201', str(ctx.exception))
+            cfg = beispiel()
+            cfg['provisionierung'] = {'aktiv': True, 'schluessel': ''}
+            with self.assertRaises(a.Fehler):
+                a.check(cfg)
+            cfg['provisionierung'] = {'aktiv': True, 'schluessel': 'nicht-gueltig'}
+            with self.assertRaises(a.Fehler):
+                a.check(cfg)
+
+    def test_dateien_schreiben_und_aufraeumen(self):
+        with tempfile.TemporaryDirectory() as d:
+            a = load(Path(d))
+            cfg = beispiel()
+            cfg['nebenstellen'][0]['mac'] = '00:04:13:a1:b2:c3'
+            cfg['nebenstellen'][0]['name'] = 'Empfang 1 & Co'
+            schluessel = 'ab' * 16
+            cfg['provisionierung'] = {'aktiv': True, 'schluessel': schluessel}
+            c = a.check(cfg)
+            self.assertEqual(a.provisionierung_schreiben(c), ['000413a1b2c3.xml'])
+            datei = Path(d) / 'prov' / schluessel / '000413a1b2c3.xml'
+            text = datei.read_text(encoding='utf-8')
+            self.assertIn('<user_name idx="1" perm="R">201</user_name>', text)
+            self.assertIn('<user_pass idx="1" perm="R">' + 'A' * 24 + '</user_pass>', text)
+            self.assertIn('Empfang 1 &amp; Co', text)
+            self.assertIn('{{HOST}}', text)
+            self.assertEqual(oct(datei.stat().st_mode & 0o777), '0o600')
+            self.assertEqual(a.provisionierung_schreiben(c), [])   # unverändert
+            # Neuer Schlüssel: der alte Ordner verschwindet.
+            cfg['provisionierung']['schluessel'] = 'cd' * 16
+            a.provisionierung_schreiben(a.check(cfg))
+            self.assertFalse((Path(d) / 'prov' / schluessel).exists())
+            self.assertTrue((Path(d) / 'prov' / ('cd' * 16) / '000413a1b2c3.xml').is_file())
+            # MAC entfernt: Datei weg.
+            cfg['nebenstellen'][0]['mac'] = ''
+            a.provisionierung_schreiben(a.check(cfg))
+            self.assertEqual(list((Path(d) / 'prov').rglob('*.xml')), [])
+            # Abgeschaltet: alles weg.
+            cfg['nebenstellen'][0]['mac'] = '000413a1b2c3'
+            a.provisionierung_schreiben(a.check(cfg))
+            cfg['provisionierung']['aktiv'] = False
+            a.provisionierung_schreiben(a.check(cfg))
+            self.assertEqual(list((Path(d) / 'prov').rglob('*')), [])
+
+
+class ProvDienst(unittest.TestCase):
+    """lib/prov-dienst: liefert nur Dateien zu Schlüssel und MAC, setzt den Servernamen ein, bremst Fehlversuche."""
+
+    def test_abruf(self):
+        import http.client
+        import threading
+        from http.server import ThreadingHTTPServer
+        from importlib.machinery import SourceFileLoader
+        with tempfile.TemporaryDirectory() as d:
+            os.environ['KIENZLE_DATEN'] = d
+            dienst = SourceFileLoader('prov_dienst', str(HERE.parent / 'lib' / 'prov-dienst')).load_module()
+            schluessel = 'ef' * 16
+            (Path(d) / 'prov' / schluessel).mkdir(parents=True)
+            (Path(d) / 'prov' / schluessel / '000413a1b2c3.xml').write_text('<h>{{HOST}}</h>', encoding='utf-8')
+            server = ThreadingHTTPServer(('127.0.0.1', 0), dienst.Handler)
+            threading.Thread(target=server.serve_forever, daemon=True).start()
+            port = server.server_address[1]
+
+            def hole(pfad: str, host: str = 'praxis.example.org:8780'):
+                c = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+                c.request('GET', pfad, headers={'Host': host})
+                r = c.getresponse()
+                return r.status, r.read().decode()
+            try:
+                self.assertEqual(hole(f'/{schluessel}/000413A1B2C3.xml'), (200, '<h>praxis.example.org</h>'))   # Telefone schicken Großbuchstaben
+                self.assertEqual(hole(f'/{schluessel}/000413a1b2c3.xml', '192.0.2.5:8780')[1], '<h>192.0.2.5</h>')
+                self.assertEqual(hole(f'/{"00" * 16}/000413a1b2c3.xml')[0], 404)      # falscher Schlüssel
+                self.assertEqual(hole(f'/{schluessel}/000413a1b2c4.xml')[0], 404)    # unbekannte MAC
+                self.assertEqual(hole('/../../etc/passwd')[0], 404)
+                self.assertEqual(hole(f'/{schluessel}/000413a1b2c3.xml', 'böse host')[0], 400)
+                dienst.fehler.clear()
+                for _ in range(dienst.FEHLER_MAX):
+                    hole(f'/{schluessel}/000413a1b2c4.xml')
+                self.assertEqual(hole(f'/{schluessel}/000413a1b2c3.xml')[0], 429)    # gebremst, auch der richtige Abruf
+            finally:
+                server.shutdown()
+
+
 if __name__ == '__main__':
     unittest.main()
