@@ -351,6 +351,19 @@ class Drucker(Fehler):
         m = manifest.check_text(replace('formats = ["application/pdf"]\n', '', BEISPIEL))
         self.assertEqual(m['printers'][1]['formats'], ['application/pdf'])
 
+    LISTE = ('\n[printer_list]\nprefix = "vBsp"\nlabel = "Beispiel"\ncommand = "printer/kienzle-beispiel-druck"\nfile = "drucker.json"\nmax = 3\n')
+
+    def test_druckerliste(self):
+        m = manifest.check_text(BEISPIEL + self.LISTE)
+        pl = m['printer_list']
+        self.assertEqual((pl['prefix'], pl['default'], pl['max'], pl['paper'], pl['formats']), ('vBsp', ['vBsp'], 3, 'A4', ['application/pdf']))
+        self.assertIsNone(manifest.check_text(BEISPIEL)['printer_list'])
+        self.invalid(BEISPIEL + self.LISTE.replace('max = 3', 'max = 9'), 'printer_list.max')
+        self.invalid(BEISPIEL + self.LISTE.replace('"vBsp"', '"v Bsp"'), 'printer_list.prefix')
+        self.invalid(BEISPIEL + self.LISTE + 'default = ["vXyz"]\n', 'printer_list.default', 'beginnt nicht')
+        self.invalid(BEISPIEL + self.LISTE.replace('printer/kienzle-beispiel-druck', '../x'), 'printer_list.command')
+        self.invalid(BEISPIEL + self.LISTE.replace('drucker.json', '../drucker.json'), 'printer_list.file')
+
     def test_pflichtfelder_und_freigabe(self):
         self.invalid(replace('ppd = "printer/beispiel.ppd"\n', ''), 'printers[1]', '„command“ oder „ppd“ fehlt')
         self.invalid(replace('share = ["samba", "ipp"]', 'share = ["ftp"]'), 'printers[1].share', 'unbekannt')

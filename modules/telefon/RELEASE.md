@@ -1,11 +1,15 @@
 # Release-Notizen Telefon
 
-## 0.1.0-beta.8
+## 0.1.0-beta.9
 
 - **Wartemusik** (Telefon → Sprachmenü → „Wartemusik“, unter der Warteschlange): Klingelzeichen, die Wartemelodie von Johannes Plachetka (41 s, MIT-Lizenz mit seiner Freigabe, als MP3 im Modul unter `medien/`, 1,6 MB) oder **eigene Musik zum Hochladen** (MP3, WAV, OGG, FLAC, M4A; höchstens 7 MB und 30 Minuten). Umgewandelt wird mit `hold_music.install_media` aus Kienzlefon (Lautheit angeglichen, alle Asterisk-Formate) in den Datenordner (`kienzlefon/wartemusik`); die hochgeladene Datei wird danach gelöscht. Abspielfeld auf der Seite, am Telefon über Nebenstelle 8805; „Wartemusik löschen“ stellt auf Klingelzeichen zurück.
 - Hochgeladen wird roh per `fetch` (Module haben keine Formular-Uploads); Prüfung am Dateikopf und mit `ffprobe`. Hinweis auf der Seite: nur Musik mit Nutzungsrecht (GEMA).
 - Bedienbar mit dem Recht `sprachmenue`.
 - Geprüft mit Tests (echtes ffmpeg: Umwandlung der Plachetka-Musik und einer erzeugten WAV, Ablehnung fremder Dateien, Warteschlange mit `musicclass`). **Nicht geprüft:** Hochladen im Browser, Wiedergabe in einem echten Gespräch, VM.
+
+## 0.1.0-beta.8
+
+- **Faxkennung (Name im Faxkopf) leer = Praxisname:** Bleibt das Feld unter Einstellungen → Rufnummern → Fax → „Faxkennung“ leer, nimmt die Anlage den Praxisnamen aus Verwaltung → Praxis (ohne Sonderzeichen, Umlaute als ae/oe/ue), sonst „Fax“. **Bis 60 statt 20 Zeichen:** Der volle Name steht als Kopfzeile (`FAXOPT(headerinfo)`) auf jeder Seite; die Stationskennung im Faxprotokoll erlaubt technisch nur 20 Zeichen und bekommt die an Wortgrenze gekürzte Form. Das Feld ist deutlicher beschriftet; das Modul Fax verweist darauf. Nicht an einem echten Faxgerät geprüft (ob der Kopf beim Empfänger vollständig erscheint, hängt auch vom Gerät ab).
 
 ## 0.1.0-beta.7
 

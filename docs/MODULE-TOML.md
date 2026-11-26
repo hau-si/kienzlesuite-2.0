@@ -116,6 +116,24 @@ Virtuelle Drucker des Moduls. Die Druckerverwaltung der Basis legt sie an und en
 | `backend` | nein | nur mit `ppd`: CUPS-Backend im Modulordner (ausführbar, läuft als Benutzer `lp`). Ohne Backend verwirft die Warteschlange die Ausgabe der Filter (Backend `kienzle-leer` der Basis) |
 | `share` | nein | Liste aus `"samba"` und `"ipp"`: wie die Arbeitsplätze den Drucker erreichen. IPP ist bei virtuellen Druckern immer an (Standardweg für alle Betriebssysteme), auch wenn es hier fehlt; Samba (alte Windows-Freigabe) ist nur eine Vorgabe für neue Drucker, der Admin schaltet es unter Verwaltung → Drucker ein oder aus |
 
+### `[printer_list]` – optional
+
+Veränderbare Druckerliste (z. B. Faxdrucker, die der Admin in den Einstellungen des Moduls erweitert). Das Modul schreibt die Namen
+nach `/var/lib/kienzle/<id>/<file>` (`{"drucker": [{"name": "vFax"}, …]}`); die Basis legt beim Abgleichen (Verwaltung → Drucker →
+„Virtuelle Drucker der Module abgleichen“, auch bei Installieren und Aktualisieren des Moduls) für jeden Namen einen virtuellen Drucker an.
+Alle Drucker der Liste teilen sich Programm, Beschreibung und Papier. Das Programm bekommt den Druckernamen in der Umgebungsvariablen
+`KIENZLE_DRUCKER`. Zusammen mit `[[printers]]` höchstens 10 Drucker.
+
+| Schlüssel | Pflicht | Regel |
+|---|---|---|
+| `prefix` | ja | Jeder Name muss so beginnen (z. B. `vFax`); schützt Namen anderer Module |
+| `label` | ja | Beschreibung |
+| `command` | ja | Programm im Modulordner wie bei `[[printers]]` |
+| `file` | ja | Dateiname im Datenordner, `*.json`, höchstens 64 KB |
+| `default` | nein | Namen, solange die Datei fehlt oder kaputt ist (Vorgabe: nur `prefix`) |
+| `max` | nein | höchstens so viele Drucker aus der Liste (Vorgabe 10) |
+| `paper`, `formats`, `share` | nein | wie bei `[[printers]]` |
+
 ### `[[starters]]` – optional
 
 Startkontexte für den zentralen Arbeitsplatz-Starter der Basis (Verwaltung → Arbeitsplätze). Nur mit `[web] protocol = "fastcgi"`. Höchstens 5 Einträge je Modul.

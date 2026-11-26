@@ -254,6 +254,35 @@ class IppEverywhere(Umgebung):
         call = [c for c in self.cups()['calls'] if c[0] == 'lpadmin' and 'Beispiel-PDF' in c][-1]
         self.assertIn('printer-is-shared=true', call)
 
+    def test_druckerliste_des_moduls(self):
+        m = self.printer()
+        m['printers'] = []
+        m['printer_list'] = {'prefix': 'vFax', 'default': ['vFax'], 'file': 'drucker.json', 'label': 'Fax senden', 'command': 'printer/druck',
+                             'paper': 'A4', 'formats': ['application/pdf'], 'share': ['ipp'], 'max': 3}
+        self.registry(m)
+
+        def sync():
+            with mock.patch.object(self.d, '_port_open', return_value=False), mock.patch.object(self.d, '_start_unit'):
+                return self.d.sync()
+        sync()
+        self.assertEqual(sorted(self.cups()['queues']), ['vFax'], 'ohne Datei: Vorgabe')
+        unit = (self.t / 'units' / 'kienzle-drucker-beispiel-vfax.service').read_text()
+        self.assertIn('Environment=KIENZLE_DRUCKER=vFax', unit)
+        datei = self.t / 'data' / 'beispiel' / 'drucker.json'
+        datei.parent.mkdir(parents=True)
+        # fremde Namen, doppelte und zu viele werden ignoriert
+        datei.write_text(json.dumps({'drucker': [{'name': 'vFax'}, {'name': 'vFax Labor'}, {'name': 'vFaxLabor'}, {'name': 'vfaxlabor'}, {'name': 'vKasse'},
+                                                 {'name': 'vFax3'}, {'name': 'vFax4'}]}))
+        sync()
+        self.assertEqual(sorted(self.cups()['queues']), ['vFax', 'vFax3', 'vFaxLabor'])
+        datei.write_text(json.dumps({'drucker': [{'name': 'vFax2'}]}))
+        sync()
+        self.assertEqual(sorted(self.cups()['queues']), ['vFax2'])
+        self.assertFalse((self.t / 'units' / 'kienzle-drucker-beispiel-vfax.service').exists())
+        datei.write_text('kaputt')
+        sync()
+        self.assertEqual(sorted(self.cups()['queues']), ['vFax'], 'kaputte Datei: Vorgabe')
+
     def test_antwortet_nicht(self):
         self.registry(self.printer())
         with mock.patch.object(self.d, '_port_open', return_value=False):

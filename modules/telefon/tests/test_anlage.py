@@ -459,5 +459,32 @@ class FaxEmpfang(unittest.TestCase):
         self.assertEqual(r.returncode, 2)
 
 
+
+class FaxkennungVorgabe(unittest.TestCase):
+    def test_praxisname_als_vorgabe(self):
+        with tempfile.TemporaryDirectory() as d:
+            a = load(Path(d))
+            self.assertEqual(a.kennung_aus_praxis('Praxis Dr. Müller & Partner Hausärzte'), 'Praxis Dr. Mueller & Partner Hausaerzte')
+            self.assertEqual(a.kennung_kurz('Praxis Dr. Müller & Partner Hausärzte'), 'Praxis Dr. Mueller')
+            cfg0 = beispiel()
+            cfg0['fax']['name'] = 'Gemeinschaftspraxis Dr. Mueller und Partner'
+            c0 = a.check(cfg0)
+            self.assertEqual(c0['fax']['name'], 'Gemeinschaftspraxis Dr. Mueller und Partner')
+            ext = a.render_extensions(c0)
+            text = ext[0] + ext[1]
+            self.assertIn('Set(CALLERID(name)=Gemeinschaftspraxis Dr. Mueller und Partner)', text)
+            self.assertIn('Set(FAXOPT(headerinfo)=Gemeinschaftspraxis Dr. Mueller und Partner)', text)
+            self.assertIn('Set(FAXOPT(localstationid)=Gemeinschaftspraxis)', text)
+            self.assertEqual(a.kennung_aus_praxis(''), 'Fax')
+            cfg = beispiel()
+            cfg['fax']['name'] = ''
+            cfg['praxis'] = 'Praxis Beispiel'
+            self.assertEqual(a.check(cfg)['fax']['name'], 'Praxis Beispiel')
+            cfg['fax']['name'] = 'Eigener Name'
+            self.assertEqual(a.check(cfg)['fax']['name'], 'Eigener Name')
+            cfg['fax']['name'] = ''
+            cfg['praxis'] = ''
+            self.assertEqual(a.check(cfg)['fax']['name'], 'Fax')
+
 if __name__ == '__main__':
     unittest.main()

@@ -62,6 +62,11 @@ for line in script:
             Path(rest[1]).write_bytes(data)
         elif cmd == 'rename': os.replace(cwd / rest[0].replace('\\', '/'), cwd / rest[1].replace('\\', '/'))
         elif cmd in ('del', 'rm'): (cwd / rest[0].replace('\\', '/')).unlink()
+        elif cmd == 'ls':
+            if not cwd.is_dir(): raise OSError('kein Ordner')
+            for f in sorted(cwd.iterdir()):
+                if prog == 'smbclient': print('  %-30s %s %9d  Mon Jan  1 00:00:00 2024' % (f.name, 'D' if f.is_dir() else 'A', 0 if f.is_dir() else f.stat().st_size))
+                else: print(f.name)
     except OSError as e:
         print('NT_STATUS_OBJECT_PATH_NOT_FOUND' if prog == 'smbclient' else str(e)); sys.exit(1)
 '''
@@ -159,6 +164,49 @@ class Ablage(Umgebung):
         self.assertFalse(list((self.t / 'nas').rglob('*.part')))
         self.job(job='auftrag-0002', name='zweite.pdf')
         self.assertEqual(self.ab.process()['kasse/auftrag-0002']['zustand'], 'abgelegt')      # Ordner gibt es schon
+
+    def lauschen(self, ziel='steuerbuero', ordner='Fax-Ausgang', module='fax', **extra):
+        d = self.t / 'spool' / module
+        d.mkdir(parents=True, exist_ok=True)
+        (d / 'lauschen.anfrage').write_text(json.dumps({'ziel': ziel, 'ordner': ordner, **extra}))
+        return d
+
+    def test_lauschordner_smb(self):
+        self.targets(self.SMB)
+        nas = self.t / 'nas/praxis/Kienzle/Ablage/Fax-Ausgang'
+        nas.mkdir(parents=True)
+        (nas / 'brief.pdf').write_bytes(b'%PDF-1.4 brief')
+        (nas / 'notiz.txt').write_bytes(b'nicht gewollt')
+        (nas / 'unter').mkdir()
+        (nas / 'halb.pdf.part').write_bytes(b'x')
+        d = self.lauschen()
+        jobs = self.ab.process()
+        self.assertEqual(jobs['fax/lauschen']['zustand'], 'ok', jobs)
+        self.assertEqual(jobs['fax/lauschen']['anzahl'], 1)
+        self.assertEqual((d / 'eingang/brief.pdf').read_bytes(), b'%PDF-1.4 brief')
+        self.assertEqual(oct((d / 'eingang/brief.pdf').stat().st_mode & 0o777), '0o660')
+        self.assertFalse((nas / 'brief.pdf').exists(), 'auf dem NAS gelöscht')
+        self.assertTrue((nas / 'notiz.txt').exists() and (nas / 'halb.pdf.part').exists())
+        (nas / 'brief.pdf').write_bytes(b'%PDF-1.4 zweiter')                      # gleicher Name: nichts überschreiben
+        self.ab.process()
+        self.assertEqual(sorted(p.name for p in (d / 'eingang').iterdir()), ['1-brief.pdf', 'brief.pdf'])
+        self.assertEqual((d / 'eingang/brief.pdf').read_bytes(), b'%PDF-1.4 brief')
+
+    def test_lauschordner_sftp_endungen_und_fehler(self):
+        self.targets(self.SFTP)
+        nas = self.t / 'nas/sftp/kienzle/Fax-Ausgang'
+        nas.mkdir(parents=True)
+        (nas / 'a.pdf').write_bytes(b'%PDF-1.4 a')
+        (nas / 'b.png').write_bytes(b'png')
+        d = self.lauschen(ziel='sicherung', endungen=['pdf', 'png', 'x y'])
+        self.assertEqual(self.ab.process()['fax/lauschen']['anzahl'], 2)
+        self.assertEqual(sorted(p.name for p in (d / 'eingang').iterdir()), ['a.pdf', 'b.png'])
+        self.lauschen(ziel='gibtsnicht')
+        self.assertEqual(self.ab.process()['fax/lauschen']['zustand'], 'fehler')
+        self.lauschen(ordner='../draussen')
+        self.assertEqual(self.ab.process()['fax/lauschen']['zustand'], 'fehler')
+        self.lauschen(ordner='nicht-vorhanden')
+        self.assertEqual(self.ab.process()['fax/lauschen']['anzahl'], 0)          # fehlender Ordner ist kein Fehler
 
     def test_sftp_ablegen_und_serverschluessel(self):
         self.targets(self.SFTP)

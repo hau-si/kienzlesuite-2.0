@@ -1,0 +1,4 @@
+#!/bin/sh
+# Virtueller Faxdrucker (alle Namen aus [printer_list]): Dokument für das Fax ablegen (ippeveprinter der Basis, als ks-fax).
+# Den Druckernamen setzt die Basis in der Umgebungsvariablen KIENZLE_DRUCKER.
+exec /usr/bin/php "$(dirname "$0")/../lib/druckauftrag.php" "${KIENZLE_DRUCKER:-vFax}" "$@"

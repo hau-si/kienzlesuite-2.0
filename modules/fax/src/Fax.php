@@ -14,7 +14,11 @@ namespace KienzleFax;
 final class Fax {
     public static string $data = '/var/lib/kienzle/fax';
     public static string $austausch = '/var/spool/kienzle/austausch/fax_telefon';
-    public const DRUCKER = ['vFax1', 'vFax2', 'vFax3', 'vFax4', 'vFax5'];
+    public const VORSATZ = 'vFax';            // Faxdrucker heißen vFax, vFax2, vFaxLabor … (Vorsatz in module.toml [printer_list])
+    public const MAX_DRUCKER = 10;
+    public const UPLOAD = 'Upload';            // Quelle für hochgezogene Dateien (Drag and Drop)
+    public const NAS = 'NAS';                  // Quelle für Dateien aus dem Lauschordner auf dem NAS
+    public const ENDUNGEN = ['pdf', 'ps', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
     public const MAX_EMPFAENGER = 5;
     public const MAX_PDF = 30 * 1024 * 1024;
     private static ?\PDO $pdo = null;
@@ -92,7 +96,7 @@ final class Fax {
     // ---- Quellen (Faxdrucker) ----------------------------------------------------------------------------------
     /** PDFs eines Faxdruckers (neueste zuerst) mit Name, Größe, Zeit und Titel des Druckauftrags. */
     public static function quelle(string $drucker): array {
-        if (!in_array($drucker, self::DRUCKER, true)) throw new \InvalidArgumentException('Quelle unbekannt.');
+        if (!in_array($drucker, self::quellen(), true)) throw new \InvalidArgumentException('Quelle unbekannt.');
         $dir = self::ordner('drucker') . '/' . $drucker;
         $out = [];
         foreach (glob($dir . '/*.pdf') ?: [] as $f) {
@@ -107,14 +111,14 @@ final class Fax {
 
     public static function quellenZaehler(): array {
         $z = [];
-        foreach (self::DRUCKER as $d) $z[$d] = count(glob(self::ordner('drucker') . '/' . $d . '/*.pdf') ?: []);
+        foreach (self::quellen() as $d) $z[$d] = count(glob(self::ordner('drucker') . '/' . $d . '/*.pdf') ?: []);
         $z['sendefehler'] = count(glob(self::ordner('fehler-original') . '/*.pdf') ?: []);
         return $z;
     }
 
     /** Druckauftrag ablegen (vom virtuellen Drucker, als ks-fax). Liefert den Dateinamen. */
     public static function druckAblegen(string $drucker, string $pdf, string $titel, ?int $jetzt = null): string {
-        if (!in_array($drucker, self::DRUCKER, true)) throw new \InvalidArgumentException('Drucker unbekannt.');
+        if (!in_array($drucker, self::quellen(), true)) throw new \InvalidArgumentException('Drucker unbekannt.');
         if (!str_starts_with($pdf, '%PDF-') || strlen($pdf) > self::MAX_PDF) throw new \InvalidArgumentException('Kein PDF oder zu groß.');
         $dir = self::ordner('drucker') . '/' . $drucker;
         if (!is_dir($dir)) mkdir($dir, 0700, true);
@@ -139,7 +143,7 @@ final class Fax {
     /** Pfad einer Quelldatei (Faxdrucker oder Original eines Sendefehlers), streng geprüft. */
     public static function quellPfad(string $quelle, string $datei): array {
         if (!self::dateiname($datei) || !str_ends_with($datei, '.pdf')) throw new \InvalidArgumentException('Datei ungültig.');
-        $dir = $quelle === 'sendefehler' ? self::ordner('fehler-original') : (in_array($quelle, self::DRUCKER, true) ? self::ordner('drucker') . '/' . $quelle : null);
+        $dir = $quelle === 'sendefehler' ? self::ordner('fehler-original') : (in_array($quelle, self::quellen(), true) ? self::ordner('drucker') . '/' . $quelle : null);
         if ($dir === null) throw new \InvalidArgumentException('Quelle unbekannt.');
         $pfad = $dir . '/' . $datei;
         if (!is_file($pfad) || is_link($pfad)) throw new \InvalidArgumentException('Datei nicht gefunden: ' . $datei);
@@ -418,33 +422,349 @@ final class Fax {
 
     public static function kontaktLoeschen(int $id): void { self::db()->prepare('DELETE FROM kontakte WHERE id = ?')->execute([$id]); }
 
-    // ---- Einstellungen und Aufräumen -----------------------------------------------------------------------------
-    public static function einstellungen(): array {
+    // ---- Einstellungen -------------------------------------------------------------------------------------------
+    private static function roh(): array {
         $d = json_decode((string)@file_get_contents(self::$data . '/einstellungen.json'), true);
-        $d = is_array($d) ? $d : [];
-        return ['eingang_tage' => (int)($d['eingang_tage'] ?? 90), 'protokoll_tage' => (int)($d['protokoll_tage'] ?? 90), 'drucker_tage' => (int)($d['drucker_tage'] ?? 14)];
+        return is_array($d) ? $d : [];
     }
 
-    public static function einstellungenSpeichern(array $p): void {
-        $e = [];
-        foreach (['eingang_tage' => 'Faxeingang', 'protokoll_tage' => 'Sendeprotokoll und Fehler', 'drucker_tage' => 'Gedruckte Dokumente'] as $k => $name) {
-            $v = (int)($p[$k] ?? -1);
-            if ($v < 1 || $v > 3650) throw new \InvalidArgumentException($name . ': 1 bis 3650 Tage.');
-            $e[$k] = $v;
-        }
-        file_put_contents(self::$data . '/einstellungen.json', (string)json_encode($e));
+    private static function rohSchreiben(array $d): void {
+        file_put_contents(self::$data . '/einstellungen.json', (string)json_encode($d, JSON_UNESCAPED_UNICODE));
         @chmod(self::$data . '/einstellungen.json', 0600);
     }
 
-    /** Ältere Dateien löschen (Fristen aus den Einstellungen). Liefert die Anzahl. */
+    /** Alle Einstellungen mit Vorgaben. Aufbewahrung in Tagen, 0 = unbegrenzt. */
+    public static function einstellungen(): array {
+        $d = self::roh();
+        $tage = static fn(string $k, int $vorgabe): int => isset($d[$k]) && (int)$d[$k] >= 0 && (int)$d[$k] <= 3650 ? (int)$d[$k] : $vorgabe;
+        $ex = is_array($d['export'] ?? null) ? $d['export'] : [];
+        $la = is_array($d['lausch'] ?? null) ? $d['lausch'] : [];
+        return ['eingang_tage' => $tage('eingang_tage', 90), 'protokoll_tage' => $tage('protokoll_tage', 90), 'drucker_tage' => $tage('drucker_tage', 14),
+            'export' => ['ziel' => (string)($ex['ziel'] ?? ''), 'ordner' => (string)($ex['ordner'] ?? 'Fax-Eingang'), 'jahresordner' => (bool)($ex['jahresordner'] ?? true)],
+            'lausch' => ['ziel' => (string)($la['ziel'] ?? ''), 'ordner' => (string)($la['ordner'] ?? 'Fax-Ausgang')]];
+    }
+
+    public static function aufbewahrungSpeichern(array $p): void {
+        $d = self::roh();
+        foreach (['eingang_tage' => 'Faxeingang', 'protokoll_tage' => 'Sendeprotokoll und Fehler', 'drucker_tage' => 'Gedruckte Dokumente'] as $k => $name) {
+            if (!empty($p[$k . '_unbegrenzt'])) { $d[$k] = 0; continue; }
+            $v = (int)($p[$k] ?? -1);
+            if ($v < 1 || $v > 3650) throw new \InvalidArgumentException($name . ': 1 bis 3650 Tage oder „unbegrenzt“.');
+            $d[$k] = $v;
+        }
+        self::rohSchreiben($d);
+    }
+
+    /** Alte Aufrufe (Tests, Formular ohne „unbegrenzt“): wie aufbewahrungSpeichern. */
+    public static function einstellungenSpeichern(array $p): void { self::aufbewahrungSpeichern($p); }
+
+    // ---- Faxdrucker ----------------------------------------------------------------------------------------------
+    public static function druckerName(string $n): bool {
+        return (bool)preg_match('/^' . self::VORSATZ . '[A-Za-z0-9_-]{0,' . (39 - strlen(self::VORSATZ)) . '}$/D', $n);
+    }
+
+    /**
+     * Faxdrucker mit Bezeichnung und fester Faxnummer. Ohne gespeicherte Liste: ein Drucker „vFax“; auf einem Server, auf dem das
+     * Modul schon benutzt wurde (Telefonbuch vorhanden), bleiben die fünf Drucker vFax1 bis vFax5 der ersten Beta erhalten.
+     */
+    public static function drucker(): array {
+        $d = self::roh();
+        $liste = [];
+        if (isset($d['drucker']) && is_array($d['drucker'])) {
+            foreach ($d['drucker'] as $x) {
+                if (!is_array($x) || !self::druckerName((string)($x['name'] ?? '')) || isset($liste[strtolower((string)$x['name'])])) continue;
+                $nummer = self::nummer((string)($x['nummer'] ?? ''));
+                $liste[strtolower($x['name'])] = ['name' => $x['name'], 'bezeichnung' => mb_substr(trim((string)($x['bezeichnung'] ?? '')), 0, 60),
+                    'nummer' => $nummer, 'sofort' => $nummer !== '' && !empty($x['sofort'])];
+            }
+        }
+        if (!$liste) {
+            $namen = is_file(self::$data . '/telefonbuch.sqlite') ? ['vFax1', 'vFax2', 'vFax3', 'vFax4', 'vFax5'] : [self::VORSATZ];
+            foreach ($namen as $n) $liste[strtolower($n)] = ['name' => $n, 'bezeichnung' => '', 'nummer' => '', 'sofort' => false];
+            $d['drucker'] = array_values($liste);
+            self::rohSchreiben($d);
+        }
+        return array_slice(array_values($liste), 0, self::MAX_DRUCKER);
+    }
+
+    public static function druckerNamen(): array { return array_column(self::drucker(), 'name'); }
+
+    public static function druckerEintrag(string $name): ?array {
+        foreach (self::drucker() as $x) if ($x['name'] === $name) return $x;
+        return null;
+    }
+
+    /** Alle Quellen für „Fax senden“: Faxdrucker, hochgeladene Dateien und (mit Lauschordner) der NAS-Ordner. */
+    public static function quellen(): array {
+        $q = [...self::druckerNamen(), self::UPLOAD];
+        if (self::einstellungen()['lausch']['ziel'] !== '' || is_dir(self::$data . '/drucker/' . self::NAS)) $q[] = self::NAS;
+        return $q;
+    }
+
+    /** Liste der Faxdrucker aus dem Formular speichern (drucker[i][name|bezeichnung|nummer|sofort]); schreibt auch drucker.json für die Basis. */
+    public static function druckerSpeichern(array $roh): void {
+        $liste = [];
+        foreach (array_slice($roh, 0, 30) as $x) {
+            if (!is_array($x)) continue;
+            $name = trim((string)($x['name'] ?? ''));
+            if ($name === '') continue;
+            if (!self::druckerName($name)) throw new \InvalidArgumentException('Druckername „' . mb_substr($name, 0, 40) . '“: muss mit „' . self::VORSATZ . '“ beginnen, danach nur Buchstaben, Ziffern, _ und -.');
+            if (isset($liste[strtolower($name)])) throw new \InvalidArgumentException('Druckername „' . $name . '“ ist doppelt.');
+            $nummer = trim((string)($x['nummer'] ?? ''));
+            $norm = $nummer === '' ? '' : self::nummer($nummer);
+            if ($nummer !== '' && $norm === '') throw new \InvalidArgumentException($name . ': Faxnummer ungültig.');
+            $liste[strtolower($name)] = ['name' => $name, 'bezeichnung' => self::zeile((string)($x['bezeichnung'] ?? ''), $name . ': Bezeichnung', 60, false),
+                'nummer' => $norm, 'sofort' => $norm !== '' && !empty($x['sofort'])];
+        }
+        if (!$liste) throw new \InvalidArgumentException('Mindestens ein Faxdrucker ist nötig.');
+        if (count($liste) > self::MAX_DRUCKER) throw new \InvalidArgumentException('Höchstens ' . self::MAX_DRUCKER . ' Faxdrucker.');
+        $d = self::roh();
+        $d['drucker'] = array_values($liste);
+        self::rohSchreiben($d);
+        self::druckerDateiSchreiben();
+    }
+
+    /** Namen der Faxdrucker für die Basis (lib/kienzle/drucker.py liest sie beim Abgleichen). */
+    public static function druckerDateiSchreiben(): void {
+        $json = (string)json_encode(['drucker' => array_map(fn($x) => ['name' => $x['name']], self::drucker())]);
+        $pfad = self::$data . '/drucker.json';
+        if (@file_get_contents($pfad) !== $json) {
+            file_put_contents($pfad . '.neu', $json);
+            @chmod($pfad . '.neu', 0644);
+            rename($pfad . '.neu', $pfad);
+        }
+    }
+
+    // ---- NAS: Export des Faxeingangs und Lauschordner -------------------------------------------------------------
+    /** Ziele des Netzwerkspeichers (id → Name) aus der Verbindung „ablage“ (leer, wenn nicht eingerichtet). */
+    public static function nasZiele(\KienzleModul $k): array {
+        try { $a = $k->verbindung('ablage'); } catch (\Throwable) { return []; }
+        $out = [];
+        foreach ((array)($a['ziele'] ?? []) as $t) if (is_array($t) && preg_match('/^[a-z][a-z0-9-]{1,30}$/D', (string)($t['id'] ?? ''))) $out[(string)$t['id']] = (string)($t['name'] ?? $t['id']);
+        return $out;
+    }
+
+    private static function ordnerName(string $o, string $feld): string {
+        $o = trim(str_replace('\\', '/', trim($o)), '/');
+        if ($o === '') return '';
+        if (mb_strlen($o) > 120 || !preg_match('#^[A-Za-z0-9_ äöüÄÖÜß.-]+(/[A-Za-z0-9_ äöüÄÖÜß.-]+)*$#Du', $o) || str_contains($o, '..')) {
+            throw new \InvalidArgumentException($feld . ': nur Buchstaben, Ziffern, Leerzeichen, _ . - und / (Unterordner), keine „..“.');
+        }
+        return $o;
+    }
+
+    public static function nasSpeichern(\KienzleModul $k, array $p): void {
+        $ziele = self::nasZiele($k);
+        $d = self::roh();
+        $ziel = (string)($p['export_ziel'] ?? '');
+        if ($ziel !== '' && !isset($ziele[$ziel])) throw new \InvalidArgumentException('Export: unbekanntes Ziel.');
+        $d['export'] = ['ziel' => $ziel, 'ordner' => self::ordnerName((string)($p['export_ordner'] ?? ''), 'Exportordner') ?: 'Fax-Eingang', 'jahresordner' => !empty($p['export_jahresordner'])];
+        $lziel = (string)($p['lausch_ziel'] ?? '');
+        if ($lziel !== '' && !isset($ziele[$lziel])) throw new \InvalidArgumentException('Lauschordner: unbekanntes Ziel.');
+        $lordner = self::ordnerName((string)($p['lausch_ordner'] ?? ''), 'Lauschordner') ?: 'Fax-Ausgang';
+        if ($lziel !== '' && $lziel === $ziel && strcasecmp($lordner, $d['export']['ordner']) === 0) {
+            throw new \InvalidArgumentException('Export- und Lauschordner dürfen nicht derselbe Ordner sein (sonst würde jedes empfangene Fax wieder zum Senden angeboten).');
+        }
+        $d['lausch'] = ['ziel' => $lziel, 'ordner' => $lordner];
+        self::rohSchreiben($d);
+        $k->lauschen($lziel === '' ? null : $lziel, $lordner, self::ENDUNGEN);
+    }
+
+    private static function exportiert(): array {
+        $d = json_decode((string)@file_get_contents(self::$data . '/exportiert.json'), true);
+        return is_array($d) ? $d : [];
+    }
+
+    /** Neue Faxe des Eingangs auf das NAS legen lassen (ks-ablage überträgt und wiederholt bei Fehlern). Liefert die Anzahl. */
+    public static function exportieren(\KienzleModul $k): int {
+        $e = self::einstellungen()['export'];
+        if ($e['ziel'] === '' || !isset(self::nasZiele($k)[$e['ziel']])) return 0;
+        $schon = self::exportiert();
+        $n = 0;
+        foreach (array_reverse(self::eingang()) as $f) {
+            if (isset($schon[$f['name']])) continue;
+            $pdf = (string)@file_get_contents(self::ordner('eingang') . '/' . $f['name'] . '.pdf');
+            if ($pdf === '') continue;
+            $von = self::dateiTitel($f['kontakt'] !== '' ? $f['kontakt'] : ($f['absender'] !== '' ? self::nummer($f['absender']) ?: $f['absender'] : 'unbekannt'));
+            $name = date('Y-m-d_H-i', $f['zeit']) . '_' . $von . '_' . ($f['seiten'] !== null && $f['seiten'] !== '' ? (int)$f['seiten'] . 'S_' : '') . substr(preg_replace('/\D/', '', $f['name']), -6) . '.pdf';
+            try {
+                $k->ablegen($e['ziel'], $pdf, $name, $e['ordner'] . ($e['jahresordner'] ? '/{jahr}/{monat}' : ''), (new \DateTimeImmutable())->setTimestamp($f['zeit']));
+                $schon[$f['name']] = time();
+                $n++;
+            } catch (\Throwable $ex) {
+                error_log('fax: Export: ' . $ex->getMessage());
+                break;
+            }
+        }
+        if ($n > 0) {
+            $schon = array_filter($schon, fn($z, $name) => is_file(self::ordner('eingang') . '/' . $name . '.pdf') || $z > time() - 30 * 86400, ARRAY_FILTER_USE_BOTH);
+            file_put_contents(self::$data . '/exportiert.json', (string)json_encode($schon));
+            @chmod(self::$data . '/exportiert.json', 0600);
+        }
+        return $n;
+    }
+
+    /** Dateien aus dem Lauschordner (von ks-ablage geholt) in die Quelle „NAS“ übernehmen; nicht lesbare in lausch-fehler/. */
+    public static function lauschHolen(\KienzleModul $k): int {
+        $dir = $k->lauschenEingang();
+        if ($dir === '' || !is_dir($dir)) return 0;
+        $n = 0;
+        foreach (glob($dir . '/*') ?: [] as $f) {
+            $name = basename($f);
+            if (!is_file($f) || is_link($f) || str_starts_with($name, '.')) continue;
+            try {
+                $pdf = self::alsPdf((string)file_get_contents($f), $name);
+                $ziel = self::ordner('drucker') . '/' . self::NAS;
+                if (!is_dir($ziel)) mkdir($ziel, 0700, true);
+                self::druckAblegen(self::NAS, $pdf, $name);
+                @unlink($f);
+                $n++;
+            } catch (\Throwable $e) {
+                error_log('fax: Lauschordner: ' . $name . ': ' . $e->getMessage());
+                $fehler = self::$data . '/lausch-fehler';
+                if (!is_dir($fehler)) @mkdir($fehler, 0700, true);
+                @rename($f, $fehler . '/' . date('Ymd-His') . '-' . preg_replace('/[^A-Za-z0-9._-]/', '_', $name));
+            }
+        }
+        return $n;
+    }
+
+    // ---- Umwandlung in PDF (Faxdrucker, Hochladen, Lauschordner) --------------------------------------------------
+    /**
+     * Inhalt als PDF: PDF bleibt, PostScript wandelt Ghostscript, JPEG wird (ohne Umweg) in eine A4-Seite gesetzt, andere Bilder
+     * (PNG, GIF, BMP, WebP) wandelt zuerst GD in JPEG. Alles andere (Word, LibreOffice …) lehnt das Modul ab.
+     */
+    public static function alsPdf(string $inhalt, string $name = ''): string {
+        if ($inhalt === '' || strlen($inhalt) > self::MAX_PDF) throw new \InvalidArgumentException('Datei leer oder zu groß (höchstens 30 MB).');
+        if (str_starts_with($inhalt, '%PDF-')) return $inhalt;
+        if (str_starts_with($inhalt, '%!')) return self::postscript($inhalt);
+        $info = @getimagesizefromstring($inhalt);
+        if ($info !== false && in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_GIF, IMAGETYPE_BMP, IMAGETYPE_WEBP], true)) return self::bildAlsPdf($inhalt, $info);
+        throw new \InvalidArgumentException(($name !== '' ? '„' . mb_substr($name, 0, 50) . '“: ' : '') . 'Nur PDF, PostScript oder Bilder (JPEG, PNG, GIF, BMP, WebP). Word- und LibreOffice-Dokumente bitte als PDF speichern oder auf den Faxdrucker drucken.');
+    }
+
+    private static function postscript(string $inhalt): string {
+        $tmp = self::$data . '/.druck-' . bin2hex(random_bytes(4));
+        file_put_contents($tmp . '.ps', $inhalt);
+        $p = proc_open(['/usr/bin/gs', '-q', '-dNOPAUSE', '-dBATCH', '-dSAFER', '-sDEVICE=pdfwrite', '-sPAPERSIZE=a4', '-o', $tmp . '.pdf', $tmp . '.ps'], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        if (!is_resource($p)) { @unlink($tmp . '.ps'); throw new \RuntimeException('Ghostscript fehlt.'); }
+        stream_get_contents($pipes[1]); stream_get_contents($pipes[2]); fclose($pipes[1]); fclose($pipes[2]);
+        $code = proc_close($p);
+        $pdf = $code === 0 && is_file($tmp . '.pdf') ? (string)file_get_contents($tmp . '.pdf') : '';
+        @unlink($tmp . '.ps'); @unlink($tmp . '.pdf');
+        if (!str_starts_with($pdf, '%PDF-')) throw new \RuntimeException('Umwandlung in PDF fehlgeschlagen.');
+        return $pdf;
+    }
+
+    /** Bild als eine A4-Seite (Hoch- oder Querformat, mit Rand, Seitenverhältnis bleibt). */
+    private static function bildAlsPdf(string $inhalt, array $info): string {
+        if ($info[2] !== IMAGETYPE_JPEG) {
+            if (!function_exists('imagecreatefromstring')) throw new \RuntimeException('Dieses Bildformat braucht die PHP-Erweiterung GD.');
+            $bild = @imagecreatefromstring($inhalt);
+            if (!$bild) throw new \InvalidArgumentException('Bild nicht lesbar.');
+            $weiss = imagecreatetruecolor(imagesx($bild), imagesy($bild));
+            imagefill($weiss, 0, 0, (int)imagecolorallocate($weiss, 255, 255, 255));
+            imagecopy($weiss, $bild, 0, 0, 0, 0, imagesx($bild), imagesy($bild));      // Transparenz wird weiß
+            ob_start();
+            imagejpeg($weiss, null, 90);
+            $inhalt = (string)ob_get_clean();
+            $info = @getimagesizefromstring($inhalt) ?: throw new \RuntimeException('Bild ließ sich nicht umwandeln.');
+        }
+        [$w, $h] = $info;
+        $kanaele = (int)($info['channels'] ?? 3);
+        if ($w < 1 || $h < 1 || !in_array($kanaele, [1, 3], true)) throw new \InvalidArgumentException('JPEG im CMYK-Format wird nicht unterstützt. Bitte als PDF speichern.');
+        $quer = $w > $h;
+        [$sw, $sh] = $quer ? [842, 595] : [595, 842];
+        $f = min(($sw - 40) / $w, ($sh - 40) / $h);
+        $bw = $w * $f; $bh = $h * $f;
+        $x = ($sw - $bw) / 2; $y = ($sh - $bh) / 2;
+        $inhaltsstrom = sprintf("q %.2F 0 0 %.2F %.2F %.2F cm /Im0 Do Q", $bw, $bh, $x, $y);
+        $obj = [
+            1 => '<< /Type /Catalog /Pages 2 0 R >>',
+            2 => '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+            3 => "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 $sw $sh] /Resources << /XObject << /Im0 5 0 R >> >> /Contents 4 0 R >>",
+            4 => "<< /Length " . strlen($inhaltsstrom) . " >>\nstream\n$inhaltsstrom\nendstream",
+            5 => "<< /Type /XObject /Subtype /Image /Width $w /Height $h /ColorSpace /" . ($kanaele === 1 ? 'DeviceGray' : 'DeviceRGB') . " /BitsPerComponent 8 /Filter /DCTDecode /Length " . strlen($inhalt) . " >>\nstream\n$inhalt\nendstream",
+        ];
+        $pdf = "%PDF-1.4\n";
+        $pos = [];
+        foreach ($obj as $nr => $inh) { $pos[$nr] = strlen($pdf); $pdf .= "$nr 0 obj\n$inh\nendobj\n"; }
+        $xref = strlen($pdf);
+        $pdf .= "xref\n0 " . (count($obj) + 1) . "\n0000000000 65535 f \n";
+        foreach ($pos as $p) $pdf .= sprintf("%010d 00000 n \n", $p);
+        return $pdf . "trailer\n<< /Size " . (count($obj) + 1) . " /Root 1 0 R >>\nstartxref\n$xref\n%%EOF\n";
+    }
+
+    /** Hochgeladene Dateien ($_FILES['dateien']) als Dokumente der Quelle „Upload“ ablegen. Liefert die Dateinamen. */
+    public static function hochladen(array $files): array {
+        $namen = (array)($files['name'] ?? []);
+        $out = [];
+        $fehler = [];
+        if (count($namen) > 20) throw new \InvalidArgumentException('Höchstens 20 Dateien auf einmal.');
+        foreach ($namen as $i => $orig) {
+            $err = (int)($files['error'][$i] ?? UPLOAD_ERR_NO_FILE);
+            if ($err === UPLOAD_ERR_NO_FILE) continue;
+            $tmp = (string)($files['tmp_name'][$i] ?? '');
+            $orig = mb_substr((string)$orig, 0, 120);
+            if ($err === UPLOAD_ERR_INI_SIZE || $err === UPLOAD_ERR_FORM_SIZE) { $fehler[] = "„{$orig}“ ist zu groß (höchstens 3 MB)."; continue; }
+            if ($err !== UPLOAD_ERR_OK || !is_uploaded_file($tmp) && !self::$testUpload) { $fehler[] = "„{$orig}“ ließ sich nicht hochladen."; continue; }
+            try {
+                $out[] = self::druckAblegen(self::UPLOAD, self::alsPdf((string)file_get_contents($tmp), $orig), $orig);
+            } catch (\InvalidArgumentException | \RuntimeException $e) {
+                $fehler[] = $e->getMessage();
+            }
+        }
+        if (!$out && !$fehler) throw new \InvalidArgumentException('Keine Datei gewählt.');
+        if ($fehler && !$out) throw new \InvalidArgumentException(implode(' ', $fehler));
+        return ['dateien' => $out, 'fehler' => $fehler];
+    }
+
+    public static bool $testUpload = false;
+
+    // ---- Pflege (Zeitgeber jede Minute und beim Laden der Seiten) ---------------------------------------------------
+    /** Drucker mit fester Nummer und „sofort senden“: neue Dokumente gehen ohne Rückfrage hinaus. Liefert die Anzahl. */
+    public static function sofortSenden(): int {
+        if (!self::austauschBereit()) return 0;
+        $n = 0;
+        foreach (self::drucker() as $x) {
+            if (!$x['sofort'] || $x['nummer'] === '') continue;
+            foreach (self::quelle($x['name']) as $f) {
+                if ($f['zeit'] > time() - 5) continue;     // Auftrag noch nicht ganz geschrieben
+                try {
+                    $n += self::senden($x['name'], [$f['datei']], [['name' => $x['bezeichnung'] !== '' ? $x['bezeichnung'] : $x['name'], 'nummer' => $x['nummer'], 'merken' => false]], 'fine', true, 'Faxdrucker ' . $x['name']);
+                } catch (\Throwable $e) {
+                    error_log('fax: sofort senden: ' . $e->getMessage());
+                    break;
+                }
+            }
+        }
+        return $n;
+    }
+
+    /** Alles, was ohne geöffnete Seite passieren soll: Ergebnisse abholen, sofort senden, Lauschordner, Export, Aufräumen. */
+    public static function pflege(?\KienzleModul $k = null): array {
+        $lock = fopen(self::$data . '/.pflege.lock', 'c');
+        if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) return ['uebersprungen' => true];
+        try {
+            $r = ['abgeholt' => self::abholen(), 'sofort' => self::sofortSenden(), 'lausch' => 0, 'export' => 0];
+            if ($k) {
+                try { $r['lausch'] = self::lauschHolen($k); $r['export'] = self::exportieren($k); } catch (\Throwable $e) { error_log('fax: ' . $e->getMessage()); }
+            }
+            $r['aufgeraeumt'] = self::aufraeumen();
+            return $r;
+        } finally { flock($lock, LOCK_UN); fclose($lock); }
+    }
+
+    /** Ältere Dateien löschen (Fristen aus den Einstellungen; 0 = unbegrenzt). Liefert die Anzahl. */
     public static function aufraeumen(?int $jetzt = null): int {
         $jetzt ??= time();
         $e = self::einstellungen();
         $n = 0;
         $ordner = [[self::ordner('eingang'), $e['eingang_tage']], [self::ordner('protokoll'), $e['protokoll_tage']], [self::ordner('fehler'), $e['protokoll_tage']],
             [self::ordner('fehler-original'), $e['protokoll_tage']]];
-        foreach (self::DRUCKER as $d) $ordner[] = [self::ordner('drucker') . '/' . $d, $e['drucker_tage']];
+        foreach (glob(self::ordner('drucker') . '/*', GLOB_ONLYDIR) ?: [] as $d) $ordner[] = [$d, $e['drucker_tage']];   // auch Ordner entfernter Drucker
         foreach ($ordner as [$dir, $tage]) {
+            if ($tage <= 0) continue;
             foreach (glob($dir . '/*.{pdf,json}', GLOB_BRACE) ?: [] as $f) {
                 if (is_file($f) && filemtime($f) < $jetzt - $tage * 86400 && @unlink($f)) $n++;
             }
@@ -457,7 +777,7 @@ final class Fax {
             ['title' => 'Modul Telefon verbunden (Faxleitung)', 'state' => $telefonDa ? 'done' : 'error',
                 'hint' => $telefonDa ? '' : 'Das Modul Telefon installieren und dort unter Einstellungen → Rufnummern die Faxleitung wählen.', 'link' => '/fax/'],
             ['title' => 'Faxdrucker an den Arbeitsplätzen eingerichtet', 'state' => is_file(self::$data . '/.drucker-genutzt') ? 'done' : 'open',
-                'hint' => 'Verwaltung → Drucker: vFax1 bis vFax5 an den PCs einrichten und einmal etwas darauf drucken.', 'link' => '/fax/'],
+                'hint' => 'Verwaltung → Drucker: den Faxdrucker (Name vFax) an den PCs einrichten und einmal etwas darauf drucken.', 'link' => '/fax/'],
         ];
     }
 }

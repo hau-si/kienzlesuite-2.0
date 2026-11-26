@@ -7,9 +7,15 @@ use KienzleFax\Fax;
 $haken = (string)($argv[1] ?? '');
 try {
     if ($haken === 'install' || $haken === 'update') {
+        Fax::druckerDateiSchreiben();                         // vor der Datenbank: ohne Telefonbuch gilt ein Drucker, mit Telefonbuch bleiben vFax1 bis vFax5
         foreach (['drucker', 'protokoll', 'fehler', 'fehler-original', 'eingang'] as $o) Fax::ordner($o);
         Fax::db();
         echo "Fax bereit.\n";
+        exit(0);
+    }
+    if ($haken === 'pflege') {                            // Zeitgeber jede Minute (systemd/kienzle-fax-pflege.timer)
+        $r = Fax::pflege(fx_modul());
+        if (array_sum(array_filter($r, 'is_int')) > 0) echo json_encode($r), "\n";
         exit(0);
     }
     if ($haken === 'remove' || $haken === 'busy') exit(0);   // laufende Aufträge sendet das Modul telefon weiter

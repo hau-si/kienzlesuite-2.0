@@ -149,6 +149,30 @@ final class KienzleModul {
         return $job;
     }
 
+    /**
+     * Lauschordner auf dem Netzwerkspeicher (Verbindung „ablage“) ein- oder ausschalten: ks-ablage holt neue Dateien mit den
+     * Endungen aus dem Ordner (relativ zum Ziel) nach lauschenEingang() und löscht sie erst danach auf dem NAS.
+     * Ziel null oder leer schaltet aus.
+     */
+    public function lauschen(?string $ziel, string $ordner = '', array $endungen = ['pdf']): void {
+        $a = $this->verbindung('ablage');
+        if (!$a) throw new RuntimeException('Verbindung „ablage“ ist für dieses Modul nicht eingerichtet.');
+        $datei = (string)$a['ausgang'] . '/lauschen.anfrage';
+        if ($ziel === null || $ziel === '' || trim($ordner, '/') === '') { @unlink($datei); return; }
+        if (!in_array($ziel, array_column($a['ziele'], 'id'), true)) throw new RuntimeException('Unbekanntes Ziel.');
+        $json = json_encode(['ziel' => $ziel, 'ordner' => trim($ordner, '/'), 'endungen' => array_values($endungen)], JSON_UNESCAPED_UNICODE);
+        $tmp = $datei . '.neu';
+        if (file_put_contents($tmp, $json) !== strlen($json)) throw new RuntimeException('Lauschordner konnte nicht eingerichtet werden.');
+        chmod($tmp, 0660);
+        rename($tmp, $datei);
+    }
+
+    /** Ordner, in den ks-ablage Dateien aus dem Lauschordner legt (leer, wenn keine Verbindung „ablage“). */
+    public function lauschenEingang(): string {
+        $a = $this->verbindung('ablage');
+        return $a && isset($a['eingang']) ? (string)$a['eingang'] : '';
+    }
+
     private function key(string $zweck): string {
         $hex = trim((string)@file_get_contents($this->schluessel . '/' . $this->id . '.key'));
         if (strlen($hex) !== 64) throw new RuntimeException('Schlüssel des Moduls fehlt.');
