@@ -1,5 +1,10 @@
 # Release-Notizen Fax
 
+## 0.1.0-beta.6
+
+- **Fehler behoben: Dateien hochladen hing** („Dateien wählen“ bzw. Ziehen auf die Fläche: die Fläche wurde grau, nach langer Zeit kam „Hochladen nicht möglich“). Ursache war der Formular-Upload (`multipart`), der auf dem Server ohne Meldung hängen bleibt (gleiche Falle wie früher beim Logo im Terminzettel). Jetzt geht jede Datei einzeln roh an `/fax/hochladen` (wie Logo und Pad-Software), mit **Fortschrittsbalken** („Datei 2 von 3: … – 45 %“), Zeitgrenze von 60 Sekunden je Datei und klarer Fehlermeldung. Bis 7 MB je Datei (vorher 3 MB).
+- Geprüft mit Tests (auch über einen echten HTTP-Server) und im Browser (Chromium) gegen den PHP-Testserver. **Nicht auf der VM geprüft** (nginx und php-fpm des Moduls).
+
 ## 0.1.0-beta.5
 
 - Fehler behoben: Bei „Fax senden“ stand der Reiter „Sendefehler“ doppelt (der Zähler enthielt ihn schon, die Seite hängte ihn nochmals an). Test ergänzt.

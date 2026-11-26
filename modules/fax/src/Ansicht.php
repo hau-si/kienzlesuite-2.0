@@ -125,7 +125,7 @@ final class Ansicht {
         $o = '<form method="post" id="fx-senden" class="fx-raster">' . self::csrf($d['csrf']) . '<input type="hidden" name="quelle" value="' . fx_h($q) . '">'
             . '<section class="card"><h2>1. Dokument wählen</h2><p class="muted">Am PC auf einen Faxdrucker drucken (' . fx_h(implode(', ', array_column($d['drucker'], 'name'))) . '), eine Datei hierher ziehen'
             . ($d['lauschordner'] ? ' oder in den NAS-Ordner legen' : '') . '. Das Dokument erscheint dann hier.</p>'
-            . '<div id="fx-drop" class="fx-drop" data-csrf="' . fx_h($d['csrf']) . '" data-ziel="' . $b . '/" tabindex="0"><strong>Dateien hier ablegen</strong><span class="muted klein">PDF, Bilder (JPEG, PNG, GIF, BMP, WebP) oder PostScript, bis 3 MB je Datei. '
+            . '<div id="fx-drop" class="fx-drop" data-csrf="' . fx_h($d['csrf']) . '" data-ziel="' . $b . '/" data-hochladen="' . $b . '/hochladen" tabindex="0"><strong>Dateien hier ablegen</strong><span class="muted klein">PDF, Bilder (JPEG, PNG, GIF, BMP, WebP) oder PostScript, bis 7 MB je Datei. '
             . 'Word- und LibreOffice-Dokumente bitte zuerst als PDF speichern oder auf den Faxdrucker drucken.</span>'
             . '<label class="button small secondary fx-datei">Dateien wählen<input type="file" id="fx-datei" multiple accept=".pdf,.ps,.jpg,.jpeg,.png,.gif,.bmp,.webp,application/pdf,image/*" hidden></label></div>'
             . '<div class="fx-tabs">' . $tabs . '</div>';

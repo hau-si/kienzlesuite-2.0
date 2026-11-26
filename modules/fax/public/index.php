@@ -29,6 +29,21 @@ try {
         readfile($file);
         exit;
     }
+    if ($rel === '/hochladen' && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+        // Eine Datei roh im Anfragekörper (assets/app.js), Name in X-Dateiname (URL-kodiert); Antwort als JSON.
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        if (!$rechte['senden']) { http_response_code(403); echo json_encode(['ok' => false, 'fehler' => 'Dafür fehlt das Recht.']); exit; }
+        if (!$k->csrfGueltig($_SERVER['HTTP_X_KIENZLE_CSRF'] ?? null)) { http_response_code(403); echo json_encode(['ok' => false, 'fehler' => 'Sitzung abgelaufen. Bitte die Seite neu laden.']); exit; }
+        try {
+            $datei = Fax::hochladenRoh((string)file_get_contents('php://input', false, null, 0, Fax::UPLOAD_MAX + 1), rawurldecode((string)($_SERVER['HTTP_X_DATEINAME'] ?? '')));
+            echo json_encode(['ok' => true, 'datei' => $datei], JSON_UNESCAPED_UNICODE);
+        } catch (InvalidArgumentException | RuntimeException $e) {
+            http_response_code(422);
+            echo json_encode(['ok' => false, 'fehler' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        }
+        exit;
+    }
     Fax::abholen();
     if ($rel === '/status') {
         if (!$rechte['senden']) $k->verweigern();

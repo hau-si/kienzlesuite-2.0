@@ -175,6 +175,13 @@ wirft(fn() => Fax::hochladen(['name' => [''], 'tmp_name' => [''], 'error' => [UP
 wirft(fn() => Fax::hochladen(['name' => ['g.pdf'], 'tmp_name' => ['x'], 'error' => [UPLOAD_ERR_INI_SIZE]]), 'zu groß', '3 MB');
 Fax::$testUpload = false;
 Fax::quelleLoeschen('Upload', [Fax::quelle('Upload')[0]['datei']]);
+// Roh hochladen (assets/app.js sendet jede Datei einzeln im Anfragekörper)
+$roh = Fax::hochladenRoh($jpg, '../Scan vom Labor.jpg');
+check(Fax::quelle('Upload')[0]['titel'] === '..Scan vom Labor.jpg' && Fax::quelle('Upload')[0]['datei'] === $roh, 'Roh hochgeladen, Pfad aus dem Namen entfernt');
+wirft(fn() => Fax::hochladenRoh('', 'leer.pdf'), 'leere Datei', 'leer');
+wirft(fn() => Fax::hochladenRoh(str_repeat('a', Fax::UPLOAD_MAX + 1), 'gross.pdf'), 'zu groß', '7 MB');
+wirft(fn() => Fax::hochladenRoh('Text', 'Notiz.txt'), 'kein PDF/Bild', 'Nur PDF');
+Fax::quelleLoeschen('Upload', [$roh]);
 
 // Feste Nummer mit „sofort senden“ (Zeitgeber): nur Drucker mit Nummer und Haken
 $labor = Fax::druckAblegen('vFaxLabor', $pdf, 'Befund Labor');

@@ -39,27 +39,64 @@ document.querySelectorAll('input[data-schalter]').forEach((haken) => {
 // Fax senden: Dateien auf die Fläche ziehen (oder wählen); sie werden hochgeladen und unten ausgewählt.
 const flaeche = document.getElementById('fx-drop');
 if (flaeche) {
+  // Jede Datei einzeln roh senden (kein Formular-Upload: der hing auf dem Server ohne Meldung), mit Fortschrittsbalken und
+  // höchstens 60 Sekunden je Datei. XMLHttpRequest, weil fetch beim Hochladen keinen Fortschritt meldet.
+  const fehlerZeigen = (text) => {
+    let m = document.getElementById('fx-drop-fehler');
+    if (!m) { m = document.createElement('p'); m.id = 'fx-drop-fehler'; m.className = 'fehler'; m.setAttribute('role', 'alert'); flaeche.after(m); }
+    m.textContent = text;
+  };
+  const anzeige = () => {
+    let a = document.getElementById('fx-fortschritt');
+    if (!a) {
+      a = document.createElement('div'); a.id = 'fx-fortschritt'; a.className = 'fx-fortschritt'; a.setAttribute('role', 'status');
+      a.innerHTML = '<span class="fx-fortschritt-text"></span><progress max="100" value="0"></progress>';
+      flaeche.appendChild(a);
+    }
+    a.hidden = false;
+    return a;
+  };
+  const senden = (d, schritt) => new Promise((fertig) => {
+    const x = new XMLHttpRequest();
+    x.open('POST', flaeche.getAttribute('data-hochladen'));
+    x.timeout = 60000;
+    x.setRequestHeader('Content-Type', 'application/octet-stream');
+    x.setRequestHeader('X-Kienzle-CSRF', flaeche.getAttribute('data-csrf'));
+    x.setRequestHeader('X-Dateiname', encodeURIComponent(d.name));
+    x.upload.onprogress = (e) => { if (e.lengthComputable) schritt(Math.round(e.loaded / e.total * 100)); };
+    x.onload = () => {
+      let j = null; try { j = JSON.parse(x.responseText); } catch (_) { j = null; }
+      fertig(x.status >= 200 && x.status < 300 && j && j.ok ? { datei: j.datei } : { fehler: (j && j.fehler) || ('„' + d.name + '“ ließ sich nicht hochladen (HTTP ' + x.status + ').') });
+    };
+    x.onerror = () => fertig({ fehler: '„' + d.name + '“: keine Verbindung zum Server.' });
+    x.ontimeout = () => fertig({ fehler: '„' + d.name + '“: keine Antwort vom Server (Zeit überschritten).' });
+    x.send(d);
+  });
   const hochladen = async (dateien) => {
     if (!dateien || !dateien.length) return;
-    const daten = new FormData();
-    daten.append('kienzle-csrf', flaeche.getAttribute('data-csrf'));
-    daten.append('aktion', 'hochladen');
-    for (const d of dateien) daten.append('dateien[]', d, d.name);
+    const liste = Array.from(dateien);
+    if (liste.length > 20) { fehlerZeigen('Höchstens 20 Dateien auf einmal.'); return; }
+    const alt = document.getElementById('fx-drop-fehler'); if (alt) alt.remove();
     flaeche.classList.add('fx-laedt');
-    let antwort = null;
-    try {
-      const r = await fetch(flaeche.getAttribute('data-ziel'), { method: 'POST', body: daten, credentials: 'same-origin', headers: { 'X-Requested-With': 'fx' } });
-      antwort = await r.json();
-    } catch (_) { antwort = { ok: false, fehler: 'Hochladen nicht möglich. Bitte die Seite neu laden.' }; }
+    const a = anzeige(); const text = a.querySelector('.fx-fortschritt-text'); const balken = a.querySelector('progress');
+    const neu = []; const fehler = [];
+    for (let i = 0; i < liste.length; i++) {
+      const d = liste[i];
+      const kopf = (liste.length > 1 ? 'Datei ' + (i + 1) + ' von ' + liste.length + ': ' : '') + d.name;
+      const schritt = (p) => { balken.value = p; text.textContent = kopf + ' – ' + (p < 100 ? p + ' %' : 'wird umgewandelt …'); };
+      schritt(0);
+      if (d.size > 7 * 1024 * 1024) { fehler.push('„' + d.name + '“ ist zu groß (höchstens 7 MB).'); continue; }
+      const r = await senden(d, schritt);
+      if (r.datei) neu.push(r.datei); else fehler.push(r.fehler);
+    }
     flaeche.classList.remove('fx-laedt');
-    if (antwort && antwort.ok) {
-      sessionStorage.setItem('fx-meldung', antwort.meldung || '');
-      sessionStorage.setItem('fx-vor', JSON.stringify(antwort.dateien || []));
+    a.hidden = true;
+    if (neu.length) {
+      sessionStorage.setItem('fx-meldung', neu.length + ' Datei(en) übernommen und unten ausgewählt.' + (fehler.length ? ' Nicht übernommen: ' + fehler.join(' ') : ''));
+      sessionStorage.setItem('fx-vor', JSON.stringify(neu));
       window.location.href = flaeche.getAttribute('data-ziel') + '?quelle=Upload';
     } else {
-      let m = document.getElementById('fx-drop-fehler');
-      if (!m) { m = document.createElement('p'); m.id = 'fx-drop-fehler'; m.className = 'fehler'; m.setAttribute('role', 'alert'); flaeche.after(m); }
-      m.textContent = (antwort && antwort.fehler) || 'Hochladen fehlgeschlagen.';
+      fehlerZeigen(fehler.join(' ') || 'Hochladen fehlgeschlagen.');
     }
   };
   ['dragenter', 'dragover'].forEach((n) => flaeche.addEventListener(n, (e) => { e.preventDefault(); flaeche.classList.add('fx-ueber'); }));

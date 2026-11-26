@@ -778,6 +778,20 @@ final class Fax {
 
     public static bool $testUpload = false;
 
+    /** Höchstgröße einer roh hochgeladenen Datei (PHP der Module: post_max_size 8M). */
+    public const UPLOAD_MAX = 7 * 1024 * 1024;
+
+    /**
+     * Eine Datei roh aus dem Anfragekörper übernehmen (Module haben keine verlässlichen Formular-Uploads: ein multipart-Upload
+     * hing auf der VM ohne Meldung, siehe AGENTS.md „Fallen“). Liefert den Dateinamen im Ordner „Upload“.
+     */
+    public static function hochladenRoh(string $bytes, string $name): string {
+        $name = trim(mb_substr(str_replace(["\0", '/', '\\'], '', $name), 0, 120));
+        if ($bytes === '') throw new \InvalidArgumentException('Die Datei ist leer.');
+        if (strlen($bytes) > self::UPLOAD_MAX) throw new \InvalidArgumentException("„{$name}“ ist zu groß (höchstens 7 MB).");
+        return self::druckAblegen(self::UPLOAD, self::alsPdf($bytes, $name !== '' ? $name : 'Dokument'), $name !== '' ? $name : 'Dokument');
+    }
+
     // ---- Pflege (Zeitgeber jede Minute und beim Laden der Seiten) ---------------------------------------------------
     /** Drucker mit fester Nummer und „sofort senden“: neue Dokumente gehen ohne Rückfrage hinaus. Liefert die Anzahl. */
     public static function sofortSenden(): int {

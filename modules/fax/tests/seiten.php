@@ -54,4 +54,23 @@ check(str_contains($o, 'Fax beauftragt') && count(glob("$dir/austausch/queue/JOB
 check(str_contains(aufruf($dir, '/fax/status', 'senden'), 'Labor Beispiel'), 'Status der laufenden Aufträge');
 $o = aufruf($dir, '/fax/telefonbuch', 'senden', 'benutzer', ['aktion' => 'kontakt-speichern', 'kienzle-csrf' => $csrf, 'name' => 'X', 'nummer' => '030 1']);
 check(str_contains($o, 'Dafür fehlt das Recht'), 'Telefonbuch bearbeiten braucht Recht');
+// Roher Upload über einen echten HTTP-Server (PHP-Testserver mit nachgestellten Kopfzeilen der Basis).
+$port = 18000 + random_int(0, 999);
+file_put_contents("$dir/router.php", '<?php $_SERVER += ["KIENZLE_PFAD" => "/fax", "KIENZLE_BENUTZER" => "mfa1", "KIENZLE_ROLLE" => "benutzer", "KIENZLE_RECHTE" => $_SERVER["HTTP_X_TEST_RECHTE"] ?? "senden", "KIENZLE_CSRF" => str_repeat("a", 32)]; require ' . var_export(dirname(__DIR__) . '/public/index.php', true) . ';');
+$srv = proc_open([PHP_BINARY, '-S', "127.0.0.1:$port", "$dir/router.php"], [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pp, null,
+    ['KIENZLE_DATEN' => "$dir/daten", 'KIENZLE_AUSTAUSCH' => "$dir/austausch", 'KIENZLE_SUITE_HILFE' => dirname(__DIR__, 3) . '/core/php/modul/Kienzle.php', 'PATH' => '/usr/bin:/bin']);
+register_shutdown_function(static function () use ($srv) { proc_terminate($srv); });
+$post = static function (string $body, array $kopf) use ($port): array {
+    $ctx = stream_context_create(['http' => ['method' => 'POST', 'header' => implode("\r\n", $kopf), 'content' => $body, 'ignore_errors' => true, 'timeout' => 20]]);
+    for ($i = 0; $i < 50; $i++) { $r = @file_get_contents("http://127.0.0.1:$port/fax/hochladen", false, $ctx); if ($r !== false) break; usleep(100000); }
+    return [(int)explode(' ', $http_response_header[0] ?? 'x 0')[1], json_decode((string)$r, true)];
+};
+$pdfTest = (string)file_get_contents(dirname(__DIR__, 3) . '/modules/kasse/tests/fixtures/t2med-beispielrechnung.pdf');
+[$code, $j] = $post($pdfTest, ['Content-Type: application/octet-stream', 'X-Kienzle-CSRF: ' . str_repeat('a', 32), 'X-Dateiname: ' . rawurlencode('Befund für Labor.pdf')]);
+check($code === 200 && ($j['ok'] ?? false) && str_ends_with((string)$j['datei'], '.pdf'), 'Roher Upload über HTTP');
+[$code, $j] = $post($pdfTest, ['Content-Type: application/octet-stream', 'X-Kienzle-CSRF: falsch', 'X-Dateiname: a.pdf']);
+check($code === 403 && str_contains((string)$j['fehler'], 'Sitzung'), 'Upload ohne gültige CSRF-Marke');
+[$code, $j] = $post($pdfTest, ['Content-Type: application/octet-stream', 'X-Kienzle-CSRF: ' . str_repeat('a', 32), 'X-Test-Rechte: eingang']);
+check($code === 403, 'Upload ohne Recht „senden“');
+check(str_contains(aufruf($dir, '/fax/?quelle=Upload', 'senden'), 'Befund für Labor.pdf') && str_contains(aufruf($dir, '/fax/', 'senden'), 'data-hochladen="/fax/hochladen"'), 'Datei in der Quelle „Upload“');
 echo "seiten.php (fax): alles in Ordnung\n";
