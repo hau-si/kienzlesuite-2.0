@@ -94,8 +94,8 @@ final class Ansicht {
         return $o . '</div>';
     }
 
-    private static function feld(string $name, string $label, string $wert, string $hilfe = '', string $typ = 'text', string $extra = ''): string {
-        return '<label>' . tf_h($label) . '<input type="' . $typ . '" name="' . $name . '" value="' . tf_h($wert) . '"' . $extra . '>'
+    private static function feld(string $name, string $label, string $wert, string $hilfe = '', string $typ = 'text', string $extra = '', string $tipp = ''): string {
+        return '<label' . ($tipp !== '' ? ' title="' . tf_h($tipp) . '"' : '') . '>' . tf_h($label) . '<input type="' . $typ . '" name="' . $name . '" value="' . tf_h($wert) . '"' . $extra . '>'
             . ($hilfe !== '' ? '<small class="muted">' . tf_h($hilfe) . '</small>' : '') . '</label>';
     }
 
@@ -110,8 +110,8 @@ final class Ansicht {
         return preg_match('/^[0-9a-f]{12}$/D', $mac) ? implode(':', str_split($mac, 2)) : $mac;
     }
 
-    private static function haken(string $name, string $label, bool $an): string {
-        return '<label class="check"><input type="checkbox" name="' . $name . '" value="1"' . ($an ? ' checked' : '') . '> ' . tf_h($label) . '</label>';
+    private static function haken(string $name, string $label, bool $an, string $tipp = ''): string {
+        return '<label class="check"' . ($tipp !== '' ? ' title="' . tf_h($tipp) . '"' : '') . '><input type="checkbox" name="' . $name . '" value="1"' . ($an ? ' checked' : '') . '> ' . tf_h($label) . '</label>';
     }
 
     private static function formular(string $csrf, string $aktion, string $inhalt, string $knopf, string $klasse = 'tf-form'): string {
@@ -622,7 +622,7 @@ final class Ansicht {
                 . '<label class="check"><input type="checkbox" name="warteschlange" value="1"' . ($n['warteschlange'] ? ' checked' : '') . '> ja</label><button class="small" type="submit">Speichern</button></form></td>'
                 . '<td>' . ($admin
                     ? '<form method="post" class="tf-inline"><input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"><input type="hidden" name="aktion" value="nebenstelle-mac"><input type="hidden" name="nummer" value="' . $h($n['nummer']) . '">'
-                        . '<input name="mac" value="' . $h(self::macAnzeige((string)($n['mac'] ?? ''))) . '" maxlength="17" placeholder="00:04:13:…" aria-label="MAC-Adresse von Telefon ' . $h($n['nummer']) . '" size="17"><button class="small" type="submit">Speichern</button></form>'
+                        . '<input name="mac" value="' . $h(self::macAnzeige((string)($n['mac'] ?? ''))) . '" maxlength="17" placeholder="00:04:13:…" title="Hardware-Adresse (MAC) des Telefons: steht auf dem Aufkleber und im Webmenü des Telefons. Damit erkennt der Einrichtungsdienst, welche Einstellungen das Telefon bekommt. Leer = nicht automatisch einrichten." aria-label="MAC-Adresse von Telefon ' . $h($n['nummer']) . '" size="17"><button class="small" type="submit">Speichern</button></form>'
                     : $h(self::macAnzeige((string)($n['mac'] ?? '')))) . '</td>'
                 . '<td>' . ($s === 'Avail' ? self::tag('ok', 'ja') : self::tag('warn', 'nein')) . '</td><td class="tf-knoepfe">';
             if ($admin) {
@@ -651,7 +651,7 @@ final class Ansicht {
             $pv = $cfg['provisionierung'];
             $mitMac = count(array_filter($cfg['nebenstellen'], fn($n) => ($n['mac'] ?? '') !== ''));
             $adresse = 'http://' . $server . ':8780/' . $pv['schluessel'] . '/{mac}.xml';
-            $form = self::haken('aktiv', 'Telefone mit eingetragener MAC-Adresse automatisch einrichten (Snom)', (bool)$pv['aktiv']);
+            $form = self::haken('aktiv', 'Telefone mit eingetragener MAC-Adresse automatisch einrichten (Snom)', (bool)$pv['aktiv'], 'Schaltet den Einrichtungsdienst (Port 8780) ein: Telefone mit eingetragener MAC-Adresse und der richtigen Adresse holen sich Benutzer, Passwort, Server und Namen selbst. Aus = Dienst liefert nichts und alle Einstellungsdateien werden gelöscht.');
             $inhalt = '<p class="muted">Ein Snom-Telefon holt sich beim Start seine Zugangsdaten (Benutzer, Passwort, Server, Anzeigename) selbst. Dazu trägst du oben bei jedem Telefon die MAC-Adresse ein '
                 . '(steht auf dem Gerät und im Webmenü des Telefons) und gibst dem Telefon einmal die Adresse unten. Der Dienst ist nur aus den Praxisnetzen erreichbar: '
                 . 'Dazu den Port <code>8780</code> (TCP) unter Verwaltung → Firewall für das Praxisnetz freigeben, nie für das Internet.</p>'
@@ -668,9 +668,15 @@ final class Ansicht {
 
         if ($admin) {
             $nz = $cfg['netz'];
-            $form = self::feld('lokal', 'Netz der Telefone', (string)$nz['lokal'], 'Netz, in dem die Telefone stehen, z. B. 192.0.2.0/24.')
-                . self::feld('erlaubt', 'Anmelden erlaubt aus', (string)$nz['erlaubt'], 'Leer = nur aus dem Netz der Telefone. 0.0.0.0/0 nur mit VPN oder zusätzlichem Schutz.')
-                . self::feld('extern', 'Öffentliche Adresse (nur bei Bedarf)', (string)$nz['extern'], 'Für Anbieter, die ohne sie keinen Ton haben (z. B. praxis.example.org).');
+            $form = self::feld('lokal', 'Netz der Telefone', (string)$nz['lokal'], 'Netz, in dem die Telefone stehen, z. B. 192.0.2.0/24. Mehrere (z. B. Praxisnetz und VPN) mit Komma trennen.', 'text', '',
+                'Die Adressbereiche, in denen die Telefone stehen (Schreibweise 192.168.111.0/24). Asterisk weiß damit, welche Telefone im eigenen Netz sind und keine Adressumsetzung (NAT) brauchen. '
+                . 'Ohne diese Angabe kann sich kein Telefon anmelden. Mehrere Netze, z. B. Praxisnetz und VPN, mit Komma trennen.')
+                . self::feld('erlaubt', 'Anmelden erlaubt aus', (string)$nz['erlaubt'], 'Leer = nur aus dem Netz der Telefone. Mehrere mit Komma trennen. Bei Telefonen über VPN auch das Netz eintragen, aus dem sich das Telefon meldet (steht in dessen Anmeldung als Adresse). 0.0.0.0/0 nur mit VPN oder zusätzlichem Schutz.', 'text', '',
+                'Aus welchen Adressbereichen sich Telefone anmelden dürfen. Geprüft werden die Absenderadresse der Anmeldung und die Adresse, die das Telefon als Kontakt angibt; beide müssen in einem dieser Netze liegen. '
+                . 'Leer = nur das Netz der Telefone. Läuft ein Telefon über VPN, nennt es oft die Adresse seines eigenen Heimnetzes (z. B. 192.168.1.x) als Kontakt: Dieses Netz muss dann hier mit eingetragen werden. '
+                . '0.0.0.0/0 erlaubt jeden und ist nur mit VPN oder anderem Schutz sinnvoll. Mehrere Netze mit Komma trennen.')
+                . self::feld('extern', 'Öffentliche Adresse (nur bei Bedarf)', (string)$nz['extern'], 'Für Anbieter, die ohne sie keinen Ton haben (z. B. praxis.example.org).', 'text', '',
+                'Name oder Adresse, unter der die Anlage aus dem Internet erreichbar ist. Nur nötig, wenn der Anbieter sonst keinen Ton liefert (Telefonanlage hinter einem Router mit Adressumsetzung). Im Praxisnetz allein leer lassen.');
             $o .= self::fold('netz', 'Netz', $nz['lokal'] !== '' ? self::tag('ok', $nz['lokal']) : self::tag('warn', 'offen'), self::formular($csrf, 'netz-speichern', $form, 'Netz speichern')
                 . '<p class="muted">Firewall: Unter Verwaltung → Firewall die Einträge „Telefon: …“ freischalten (Telefone 5060/UDP aus dem Praxisnetz, Anbieter 5070/UDP und Sprache 12000–12999/UDP von überall).</p>');
         }
