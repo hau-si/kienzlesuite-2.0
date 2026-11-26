@@ -296,6 +296,38 @@ Fax::aufraeumen();
 check(!is_file("$dir/daten/vorschau/alt.png"), 'alte Vorschaubilder gelöscht');
 exec('rm -r ' . escapeshellarg(Fax::$austausch . '/queue'));
 rename(Fax::$austausch . '/queue-vorher', Fax::$austausch . '/queue');
+// Texterkennung empfangener Faxe (echtes Ghostscript und Tesseract; erfundener Text)
+if (is_executable('/usr/bin/tesseract')) {
+    $ein = Fax::ordner('eingang');
+    $nameOcr = '20261126-101500_ab12_0301112223';
+    file_put_contents("$ein/$nameOcr.pdf", Fax::alsPdf("%!PS\n/Helvetica findfont 28 scalefont setfont 72 700 moveto (Befund Mustermann) show 72 650 moveto (Laborwerte unauffaellig) show showpage\n"));
+    file_put_contents("$ein/$nameOcr.json", json_encode(['empfangen' => '2026-11-26T10:15:00+01:00', 'absender' => '0301112223', 'seiten' => 1, 'status' => 'SUCCESS']));
+    $x = array_values(array_filter(Fax::eingang(), fn($f) => $f['name'] === $nameOcr))[0];
+    check(!$x['erkannt'], 'vor der Texterkennung');
+    check(Fax::ocrLauf() >= 1, 'Texterkennung läuft');
+    check(str_contains(Fax::text($nameOcr), 'Mustermann') && (fileperms(Fax::textPfad($nameOcr)) & 0777) === 0600, 'Text erkannt, Datei privat');
+    check(Fax::ocrLauf() === 0, 'nicht doppelt');
+    $t = Fax::eingangSuchen(Fax::eingang(), 'mustermann LABORWERTE');
+    check(count($t) === 1 && $t[0]['name'] === $nameOcr && str_contains($t[0]['treffer'], 'Mustermann'), 'Suche im Text mit Ausschnitt');
+    check(Fax::eingangSuchen(Fax::eingang(), 'Mustermann Gibtsnicht') === [], 'alle Wörter müssen vorkommen');
+    check(count(Fax::eingangSuchen(Fax::eingang(), '030 1112223')) >= 1, 'Suche nach Absendernummer');
+    check(count(Fax::eingangSuchen(Fax::eingang(), '')) === count(Fax::eingang()), 'leere Suche zeigt alles');
+    $html = Ansicht::seite('/eingang', ['rechte' => ['admin' => false, 'senden' => true, 'eingang' => true, 'telefonbuch' => false], 'csrf' => 'x', 'meldung' => null, 'fehler' => null, 'telefon' => true,
+        'ungelesen' => 0, 'fehlerzahl' => 0, 'einstellungen' => Fax::einstellungen(), 'eingang' => $t, 'suche' => 'mustermann']);
+    check(str_contains($html, 'fx-treffer') && str_contains($html, '1 Treffer') && str_contains($html, 'value="mustermann"'), 'Trefferliste');
+    // Kaputtes Fax: leere Textdatei, kein endloses Wiederholen
+    $kaputt = '20261126-101600_ab13_0301112224';
+    file_put_contents("$ein/$kaputt.pdf", "%PDF-1.4\nkaputt");
+    file_put_contents("$ein/$kaputt.json", json_encode(['empfangen' => '2026-11-26T10:16:00+01:00', 'absender' => '', 'status' => 'SUCCESS']));
+    Fax::ocrLauf();
+    check(is_file(Fax::textPfad($kaputt)) && Fax::text($kaputt) === '', 'unlesbares Fax: leerer Text');
+    Fax::eingangLoeschen($kaputt);
+    check(!is_file(Fax::textPfad($kaputt)), 'Text wird mit dem Fax gelöscht');
+    Fax::ocrSpeichern(false);
+    check(!Fax::einstellungen()['ocr'] && !is_file(Fax::textPfad($nameOcr)) && Fax::ocrLauf() === 0, 'aus: Texte gelöscht, nichts erkannt');
+    Fax::ocrSpeichern(true);
+    Fax::eingangLoeschen($nameOcr);
+}
 
 // Seiten
 $r = ['admin' => false, 'senden' => true, 'eingang' => true, 'telefonbuch' => false];

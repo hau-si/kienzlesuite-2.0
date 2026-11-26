@@ -97,4 +97,9 @@ $ctx = stream_context_create(['http' => ['ignore_errors' => true, 'timeout' => 2
 $hoch = array_values(array_filter(glob("$dir/daten/drucker/Upload/*.pdf") ?: [], fn($f) => true));
 $bild = (string)file_get_contents("http://127.0.0.1:$port/fax/vorschau?dok=" . rawurlencode('Upload/' . basename($hoch[0])), false, $ctx);
 check(str_starts_with($bild, "\x89PNG") && str_contains(implode("\n", $http_response_header), 'Content-Type: image/png'), 'Vorschau als Bild über HTTP');
+$o = aufruf($dir, '/fax/eingang?suche=Mustermann', 'eingang');
+check(str_contains($o, 'value="Mustermann"') && str_contains($o, 'Kein Fax gefunden'), 'Suche im Faxeingang');
+check(str_contains(aufruf($dir, '/fax/einstellungen', '', 'admin', ['aktion' => 'ocr-speichern', 'kienzle-csrf' => $csrf]), 'Texterkennung ist aus'), 'Texterkennung abschalten');
+check(str_contains(aufruf($dir, '/fax/einstellungen', '', 'admin'), 'name="ocr" value="1">'), 'Schalter aus gespeichert');
+check(str_contains(aufruf($dir, '/fax/einstellungen', 'senden', 'benutzer', ['aktion' => 'ocr-speichern', 'kienzle-csrf' => $csrf, 'ocr' => '1']), '#CODE=403'), 'Texterkennung nur Admin');
 echo "seiten.php (fax): alles in Ordnung\n";

@@ -94,3 +94,7 @@ tr[data-vorschau] { cursor: default; }
 .fx-schwebe img { display: block; width: 100%; height: auto; min-height: 60px; }
 @media (max-width: 960px) { .fx-doks-raster { grid-template-columns: 1fr; } .fx-vorschau { position: static; } .fx-empfaenger { grid-template-columns: 1fr 36px; } .fx-empfaenger .fx-suchfeld, .fx-empfaenger > input[name$="[nummer]"] { grid-column: 1 / 2; } }
 @media (hover: none) { .fx-schwebe { display: none; } }
+/* Faxeingang: Suche (auch im erkannten Text) */
+.fx-suchzeile { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.fx-suchzeile input[type=search] { flex: 1 1 280px; max-width: 480px; }
+.fx-treffer { margin-top: 4px; padding: 4px 8px; border-radius: 6px; background: var(--soft); color: #315f53; max-width: 520px; }

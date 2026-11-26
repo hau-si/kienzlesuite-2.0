@@ -482,6 +482,14 @@ final class Fax {
         return $anzahl;
     }
 
+    /** Texterkennung empfangener Faxe ein/aus; aus löscht die erkannten Texte. */
+    public static function ocrSpeichern(bool $an): void {
+        $d = self::roh();
+        $d['ocr'] = $an;
+        self::rohSchreiben($d);
+        if (!$an) foreach (glob(self::ordner('eingang') . '/*.txt') ?: [] as $f) @unlink($f);
+    }
+
     /** Adressen für die Benachrichtigung (höchstens 5, Komma oder Zeilen getrennt; leer = aus). */
     public static function benachrichtigungSpeichern(array $p): void {
         $an = array_values(array_unique(array_filter(array_map('trim', preg_split('/[\s,;]+/', (string)($p['mail_eingang'] ?? '')) ?: []))));
@@ -554,7 +562,7 @@ final class Fax {
             $norm = self::nummer($abs);
             $out[] = ['name' => $b, 'zeit' => strtotime((string)($m['empfangen'] ?? '')) ?: (int)filemtime($f), 'absender' => $abs,
                 'kontakt' => $namen[$norm] ?? ($namen[$abs] ?? ''), 'seiten' => $m['seiten'] ?? null, 'status' => (string)($m['status'] ?? ''),
-                'gelesen' => isset($gelesen[$b])];
+                'gelesen' => isset($gelesen[$b]), 'erkannt' => is_file("$dir/$b.txt")];
         }
         usort($out, fn($a, $b) => $b['zeit'] <=> $a['zeit']);
         return $out;
@@ -577,6 +585,7 @@ final class Fax {
         $dir = self::ordner('eingang');
         @unlink("$dir/$name.pdf");
         @unlink("$dir/$name.json");
+        @unlink("$dir/$name.txt");
         $g = self::gelesen();
         unset($g[$name]);
         file_put_contents(self::$data . '/gelesen.json', (string)json_encode($g));
@@ -663,7 +672,8 @@ final class Fax {
         return ['eingang_tage' => $tage('eingang_tage', 90), 'protokoll_tage' => $tage('protokoll_tage', 90), 'drucker_tage' => $tage('drucker_tage', 14),
             'export' => ['ziel' => (string)($ex['ziel'] ?? ''), 'ordner' => (string)($ex['ordner'] ?? 'Fax-Eingang'), 'jahresordner' => (bool)($ex['jahresordner'] ?? true)],
             'lausch' => ['ziel' => (string)($la['ziel'] ?? ''), 'ordner' => (string)($la['ordner'] ?? 'Fax-Ausgang')],
-            'mail_eingang' => array_values(array_filter((array)($d['mail_eingang'] ?? []), fn($a) => is_string($a) && filter_var($a, FILTER_VALIDATE_EMAIL)))];
+            'mail_eingang' => array_values(array_filter((array)($d['mail_eingang'] ?? []), fn($a) => is_string($a) && filter_var($a, FILTER_VALIDATE_EMAIL))),
+            'ocr' => (bool)($d['ocr'] ?? true)];
     }
 
     public static function aufbewahrungSpeichern(array $p): void {
@@ -959,6 +969,107 @@ final class Fax {
         return self::druckAblegen(self::UPLOAD, self::alsPdf($bytes, $name !== '' ? $name : 'Dokument'), $name !== '' ? $name : 'Dokument');
     }
 
+    // ---- Texterkennung empfangener Faxe (eigener Dienst kienzle-fax-ocr, niedrige Priorität) -----------------------
+    public const OCR_MAX_SEITEN = 30;
+
+    /** Pfad der erkannten Textdatei eines Faxes im Eingang (<name>.txt, 0600). */
+    public static function textPfad(string $name): string { return self::ordner('eingang') . '/' . $name . '.txt'; }
+
+    /** Erkannter Text eines Faxes ('' = noch nicht erkannt oder nichts lesbar). */
+    public static function text(string $name): string {
+        if (!preg_match('/^[0-9]{8}-[0-9]{6}_[0-9a-z]{1,32}_[0-9]{1,40}$/D', $name)) return '';
+        return (string)@file_get_contents(self::textPfad($name));
+    }
+
+    /** Programm ohne Shell starten (nur Pipes, siehe gs()); liefert [Rückgabewert, Ausgabe]. */
+    private static function programm(array $befehl, int $zeit = 120): array {
+        $p = @proc_open($befehl, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        if (!is_resource($p)) return [127, ''];
+        fclose($pipes[0]);
+        stream_set_timeout($pipes[1], $zeit);
+        $out = (string)stream_get_contents($pipes[1]);
+        stream_get_contents($pipes[2]);
+        fclose($pipes[1]); fclose($pipes[2]);
+        return [proc_close($p), $out];
+    }
+
+    /** Text einer PDF erkennen: Seiten mit Ghostscript als Bild (300 dpi, Graustufen), dann Tesseract (Deutsch). */
+    public static function erkennen(string $pdf): string {
+        $tmp = self::$data . '/.ocr-' . bin2hex(random_bytes(4));
+        mkdir($tmp, 0700);
+        try {
+            [$code] = self::gs(['-dSAFER', '-dBATCH', '-dNOPAUSE', '-sDEVICE=pnggray', '-r300', '-dFirstPage=1', '-dLastPage=' . self::OCR_MAX_SEITEN, '-o', $tmp . '/s%03d.png', $pdf]);
+            $seiten = glob($tmp . '/s*.png') ?: [];
+            if ($code !== 0 || !$seiten) throw new \RuntimeException('Fax ließ sich nicht in Bilder umwandeln.');
+            sort($seiten);
+            $text = [];
+            foreach ($seiten as $bild) {
+                [$c, $out] = self::programm(['/usr/bin/tesseract', $bild, 'stdout', '-l', 'deu', '--psm', '3']);
+                if ($c !== 0) throw new \RuntimeException('Tesseract meldet Fehler ' . $c . '.');
+                $text[] = trim(str_replace("\f", '', $out));
+            }
+            return implode("\n\f\n", $text);
+        } finally {
+            foreach (glob($tmp . '/*') ?: [] as $f) @unlink($f);
+            @rmdir($tmp);
+        }
+    }
+
+    /**
+     * Neue Faxe im Eingang erkennen (neueste zuerst), höchstens $max je Lauf oder bis $sekunden vorbei sind. Ein Fax, das sich nicht
+     * lesen lässt, bekommt eine leere Textdatei (kein endloses Wiederholen). Liefert die Anzahl.
+     */
+    public static function ocrLauf(int $max = 5, int $sekunden = 240): int {
+        if (!self::einstellungen()['ocr'] || !is_executable('/usr/bin/tesseract')) return 0;
+        $lock = fopen(self::$data . '/.ocr.lock', 'c');
+        if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) return 0;
+        $start = time();
+        $n = 0;
+        try {
+            foreach (self::eingang() as $f) {
+                if ($n >= $max || time() - $start > $sekunden) break;
+                $ziel = self::textPfad($f['name']);
+                if (is_file($ziel)) continue;
+                try {
+                    $text = self::erkennen(self::ordner('eingang') . '/' . $f['name'] . '.pdf');
+                } catch (\Throwable $e) {
+                    error_log('fax: Texterkennung ' . $f['name'] . ': ' . $e->getMessage());
+                    $text = '';
+                }
+                file_put_contents($ziel . '.neu', $text);
+                chmod($ziel . '.neu', 0600);
+                rename($ziel . '.neu', $ziel);
+                $n++;
+            }
+        } finally { flock($lock, LOCK_UN); fclose($lock); }
+        return $n;
+    }
+
+    /** Wortweise suchen (alle Wörter müssen vorkommen, Groß-/Kleinschreibung egal) in Absender, Kontakt und erkanntem Text. */
+    public static function eingangSuchen(array $liste, string $suche): array {
+        $woerter = array_filter(preg_split('/\s+/u', mb_strtolower(trim(mb_substr($suche, 0, 100)))) ?: [], fn($w) => $w !== '');
+        if (!$woerter) return $liste;
+        $out = [];
+        foreach ($liste as $f) {
+            $text = mb_strtolower($f['kontakt'] . ' ' . $f['absender'] . ' ' . self::anzeige(self::nummer($f['absender'])) . ' ' . self::text($f['name']));
+            $ok = true;
+            foreach ($woerter as $w) if (!str_contains($text, $w)) { $ok = false; break; }
+            if (!$ok) continue;
+            $f['treffer'] = self::ausschnitt(self::text($f['name']), $woerter[array_key_first($woerter)]);
+            $out[] = $f;
+        }
+        return $out;
+    }
+
+    /** Kurzer Textausschnitt um den ersten Treffer (für die Trefferliste). */
+    public static function ausschnitt(string $text, string $wort): string {
+        $text = trim((string)preg_replace('/\s+/u', ' ', $text));
+        $pos = mb_stripos($text, $wort);
+        if ($pos === false) return '';
+        $von = max(0, $pos - 50);
+        return ($von > 0 ? '… ' : '') . mb_substr($text, $von, 140) . (mb_strlen($text) > $von + 140 ? ' …' : '');
+    }
+
     // ---- Pflege (Zeitgeber jede Minute und beim Laden der Seiten) ---------------------------------------------------
     /** Drucker mit fester Nummer und „sofort senden“: neue Dokumente gehen ohne Rückfrage hinaus. Liefert die Anzahl. */
     public static function sofortSenden(): int {
@@ -1004,9 +1115,14 @@ final class Fax {
         foreach (glob(self::ordner('drucker') . '/*', GLOB_ONLYDIR) ?: [] as $d) $ordner[] = [$d, $e['drucker_tage']];   // auch Ordner entfernter Drucker
         foreach (glob(self::$data . '/vorschau/*.png') ?: [] as $f) if (filemtime($f) < $jetzt - 86400 && @unlink($f)) $n++;
         foreach (glob(self::$data . '/.zusammen-*.pdf') ?: [] as $f) if (filemtime($f) < $jetzt - 3600) @unlink($f);
+        foreach (glob(self::$data . '/.ocr-*', GLOB_ONLYDIR) ?: [] as $d) {      // Reste eines abgebrochenen Texterkennungslaufs
+            if (filemtime($d) >= $jetzt - 3600) continue;
+            foreach (glob($d . '/*') ?: [] as $f) @unlink($f);
+            @rmdir($d);
+        }
         foreach ($ordner as [$dir, $tage]) {
             if ($tage <= 0) continue;
-            foreach (glob($dir . '/*.{pdf,json}', GLOB_BRACE) ?: [] as $f) {
+            foreach (glob($dir . '/*.{pdf,json,txt}', GLOB_BRACE) ?: [] as $f) {
                 if (is_file($f) && filemtime($f) < $jetzt - $tage * 86400 && @unlink($f)) $n++;
             }
         }

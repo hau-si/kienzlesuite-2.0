@@ -5,14 +5,14 @@
 [module]
 id = "fax"
 name = "Fax"
-version = "0.1.0-beta.9"
+version = "0.1.0-beta.10"
 core_api = "2"
 description = "Papierloses Fax: am PC auf einen Faxdrucker drucken, Empfänger wählen, senden; Sendeprotokoll, Fehlerberichte, Faxeingang. Braucht das Modul Telefon (Telefonanlage); eine Praxis nur mit Fax richtet dort nur die Faxleitung ein."
 requires = ["telefon"]
 
 [system]
-packages = ["php-fpm", "php-cli", "php-sqlite3", "php-mbstring", "php-gd", "ghostscript"]
-services = ["kienzle-fax-pflege.service", "kienzle-fax-pflege.timer"]
+packages = ["php-fpm", "php-cli", "php-sqlite3", "php-mbstring", "php-gd", "ghostscript", "tesseract-ocr", "tesseract-ocr-deu"]
+services = ["kienzle-fax-pflege.service", "kienzle-fax-pflege.timer", "kienzle-fax-ocr.service", "kienzle-fax-ocr.timer"]
 user = "ks-fax"
 data = "/var/lib/kienzle/fax"
 

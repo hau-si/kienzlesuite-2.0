@@ -18,6 +18,11 @@ try {
         if (array_sum(array_filter($r, 'is_int')) > 0) echo json_encode($r), "\n";
         exit(0);
     }
+    if ($haken === 'ocr') {                               // Texterkennung neuer Faxe (systemd/kienzle-fax-ocr.timer, niedrige Priorität)
+        $n = Fax::ocrLauf();
+        if ($n > 0) echo "Texterkennung: $n Fax(e).\n";
+        exit(0);
+    }
     if ($haken === 'remove' || $haken === 'busy') exit(0);   // laufende Aufträge sendet das Modul telefon weiter
     if ($haken === 'health') {
         foreach (['pdo_sqlite', 'mbstring'] as $ext) if (!extension_loaded($ext)) { echo "PHP-Erweiterung fehlt: $ext\n"; exit(1); }

@@ -1,5 +1,13 @@
 # Release-Notizen Fax
 
+## 0.1.0-beta.10
+
+- **Texterkennung empfangener Faxe:** Ein eigener Dienst (`kienzle-fax-ocr`, jede Minute, niedrige Priorität, höchstens 5 Faxe je Lauf) liest neue Faxe mit Tesseract (Deutsch, 300 dpi, höchstens 30 Seiten). Alles bleibt auf dem Server; der Text liegt als `<fax>.txt` (0600) neben dem Fax und wird mit ihm gelöscht. Neue Pakete: `tesseract-ocr`, `tesseract-ocr-deu`.
+- **Suche im Faxeingang:** Suchfeld oben; alle Wörter müssen vorkommen (Absender, Name aus dem Telefonbuch, Nummer und erkannter Text). Treffer zeigen einen kurzen Textausschnitt; noch nicht gelesene Faxe zeigen „Text wird erkannt …“.
+- Einstellungen → „Texterkennung“: an (Standard) oder aus; aus löscht alle erkannten Texte.
+- Ein Fax, das sich nicht lesen lässt, bekommt einen leeren Text (kein endloses Wiederholen); der Grund steht im Protokoll des Moduls.
+- Geprüft mit Tests (echtes Ghostscript und Tesseract). **Nicht auf der VM geprüft** (neue Pakete, Dienst mit systemd-Härtung, Dauer bei echten Faxen).
+
 ## 0.1.0-beta.9
 
 - **Fehler behoben: Vorschau blieb leer** (bei „Fax senden“ und im Faxeingang). Ghostscript wurde mit `/dev/null` als Eingabe gestartet; `/dev/null` liegt außerhalb der Ordner, die das Modul-PHP öffnen darf (`open_basedir`), deshalb startete Ghostscript auf dem Server gar nicht. Seitenzahl (Ersatzweg) und Zusammenfügen mehrerer Dokumente waren ebenso betroffen. Jetzt nur noch Pipes; Fehler von Ghostscript stehen im Protokoll des Moduls.

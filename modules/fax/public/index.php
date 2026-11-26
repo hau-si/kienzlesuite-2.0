@@ -92,7 +92,7 @@ try {
             $braucht = match ($aktion) {
                 'senden', 'hochladen', 'quelle-loeschen', 'abbrechen', 'bericht-loeschen', 'fehler-uebernehmen' => 'senden',
                 'eingang-loeschen' => 'eingang', 'kontakt-speichern', 'kontakt-loeschen', 'kontakt-favorit' => 'telefonbuch',
-                'einstellungen-speichern', 'aufbewahrung-speichern', 'drucker-speichern', 'nas-speichern', 'benachrichtigung-speichern' => 'admin',
+                'einstellungen-speichern', 'aufbewahrung-speichern', 'drucker-speichern', 'nas-speichern', 'benachrichtigung-speichern', 'ocr-speichern' => 'admin',
                 default => throw new InvalidArgumentException('Unbekannte Aktion.'),
             };
             if (!$rechte[$braucht]) throw new InvalidArgumentException('Dafür fehlt das Recht.');
@@ -122,6 +122,7 @@ try {
                 'einstellungen-speichern', 'aufbewahrung-speichern' => (function () { Fax::aufbewahrungSpeichern($_POST); return 'Aufbewahrung gespeichert.'; })(),
                 'drucker-speichern' => (function () { Fax::druckerSpeichern((array)($_POST['drucker'] ?? [])); return 'Druckerliste gespeichert. Jetzt unter Verwaltung → Drucker „Virtuelle Drucker der Module abgleichen“ wählen (oder das Modul Fax neu installieren), damit neue Drucker erscheinen und entfernte verschwinden.'; })(),
                 'benachrichtigung-speichern' => (function () { Fax::benachrichtigungSpeichern($_POST); return 'Benachrichtigung gespeichert.'; })(),
+                'ocr-speichern' => (function () { Fax::ocrSpeichern(!empty($_POST['ocr'])); return !empty($_POST['ocr']) ? 'Texterkennung ist an. Neue Faxe werden in den nächsten Minuten gelesen.' : 'Texterkennung ist aus; erkannte Texte wurden gelöscht.'; })(),
                 'nas-speichern' => (function () use ($k) { Fax::nasSpeichern($k, $_POST); return 'NAS-Einstellungen gespeichert.'; })(),
                 'hochladen' => (function () {
                     $r = Fax::hochladen((array)($_FILES['dateien'] ?? []));
@@ -156,7 +157,8 @@ try {
     } elseif ($rel === '/einstellungen') {
         $d += ['nasZiele' => Fax::nasZiele($k), 'praxisname' => $k->praxis()['name']];
     } elseif ($rel === '/eingang') {
-        $d['eingang'] = Fax::eingang();
+        $d['suche'] = mb_substr(trim((string)($_GET['suche'] ?? '')), 0, 100);
+        $d['eingang'] = Fax::eingangSuchen(Fax::eingang(), $d['suche']);
     } elseif ($rel === '/telefonbuch') {
         $d['kontakte'] = Fax::kontakte();
         $d['kontaktBearbeiten'] = $rechte['telefonbuch'] && (int)($_GET['kontakt'] ?? 0) > 0 ? Fax::kontakt((int)$_GET['kontakt']) : null;

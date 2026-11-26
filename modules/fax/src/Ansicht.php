@@ -207,11 +207,19 @@ final class Ansicht {
 
     private static function eingang(array $d): string {
         $b = fx_h(fx_basis());
-        if (!$d['eingang']) return '<section class="card"><p class="muted">Noch keine Faxe empfangen.</p></section>';
-        $o = '<section class="card"><table class="fx-tabelle"><tr><th>Empfangen</th><th>Absender</th><th>Seiten</th><th></th></tr>';
+        $suche = (string)($d['suche'] ?? '');
+        $ocr = (bool)($d['einstellungen']['ocr'] ?? false);
+        $kopf = '<form method="get" class="fx-suchzeile" role="search"><input type="search" name="suche" value="' . fx_h($suche) . '" maxlength="100" placeholder="'
+            . ($ocr ? 'Suchen in Absender und Faxtext …' : 'Suchen nach Absender …') . '" aria-label="Faxe durchsuchen"><button class="secondary" type="submit">Suchen</button>'
+            . ($suche !== '' ? '<a class="button secondary" href="' . $b . '/eingang">Alle zeigen</a>' : '') . '</form>';
+        if (!$d['eingang']) return '<section class="card">' . $kopf . '<p class="muted">' . ($suche !== '' ? 'Kein Fax gefunden.' : 'Noch keine Faxe empfangen.') . '</p></section>';
+        $o = '<section class="card">' . $kopf . ($suche !== '' ? '<p class="muted klein">' . count($d['eingang']) . ' Treffer</p>' : '')
+            . '<table class="fx-tabelle"><tr><th>Empfangen</th><th>Absender</th><th>Seiten</th><th></th></tr>';
         foreach ($d['eingang'] as $e) {
             $abs = $e['kontakt'] !== '' ? fx_h($e['kontakt']) . '<div class="muted klein">' . fx_h(Fax::anzeige(Fax::nummer($e['absender']))) . '</div>'
                 : ($e['absender'] !== '' ? fx_h(Fax::anzeige(Fax::nummer($e['absender']) ?: $e['absender'])) : '<span class="muted">unbekannt</span>');
+            if (($e['treffer'] ?? '') !== '') $abs .= '<div class="fx-treffer klein">' . fx_h($e['treffer']) . '</div>';
+            elseif ($ocr && !($e['erkannt'] ?? true)) $abs .= '<div class="muted klein">Text wird erkannt …</div>';
             $o .= '<tr class="' . ($e['gelesen'] ? '' : 'fx-neu') . '" data-vorschau="' . $b . '/vorschau?art=eingang&amp;datei=' . fx_h($e['name']) . '.pdf"><td>' . self::zeit($e['zeit']) . ($e['gelesen'] ? '' : ' ' . self::tag('ok', 'neu')) . '</td><td>' . $abs . '</td><td>'
                 . fx_h((string)($e['seiten'] ?? '')) . ($e['status'] !== '' && $e['status'] !== 'SUCCESS' ? ' ' . self::tag('warn', 'unvollständig') : '') . '</td><td class="fx-knoepfe">'
                 . '<a class="button small primary" href="' . $b . '/pdf?art=eingang&amp;datei=' . fx_h($e['name']) . '.pdf" target="_blank" rel="noopener">Öffnen</a>'
@@ -295,6 +303,12 @@ final class Ansicht {
             . ($bereit ? '' : '<p class="fx-hinweis">Dafür muss unter Verwaltung → Verbindungen → E-Mail-Versand eingerichtet sein.</p>')
             . '<form method="post" class="fx-form fx-schmal">' . self::csrf($d['csrf']) . '<input type="hidden" name="aktion" value="benachrichtigung-speichern">'
             . '<label>E-Mail-Adressen<input name="mail_eingang" maxlength="400" value="' . fx_h(implode(', ', $e['mail_eingang'])) . '" placeholder="empfang@example.org"></label>'
+            . '<button class="primary" type="submit">Speichern</button></form></section>';
+
+        $o .= '<section class="card"><h2>Texterkennung</h2><p class="muted">Empfangene Faxe werden im Hintergrund gelesen (Tesseract, auf diesem Server, nichts geht nach außen). '
+            . 'Dann findet die Suche im Faxeingang auch Wörter im Fax, z. B. einen Patientennamen. Der Text liegt geschützt neben dem Fax und wird mit ihm gelöscht.</p>'
+            . '<form method="post" class="fx-form fx-schmal">' . self::csrf($d['csrf']) . '<input type="hidden" name="aktion" value="ocr-speichern">'
+            . '<label class="check"><input type="checkbox" name="ocr" value="1"' . ($e['ocr'] ? ' checked' : '') . '> Texterkennung für empfangene Faxe</label>'
             . '<button class="primary" type="submit">Speichern</button></form></section>';
 
         $o .= '<section class="card"><h2>Aufbewahrung</h2><p class="muted">Faxe enthalten Gesundheitsdaten. Ältere Dateien löscht das Modul selbst, es sei denn, „unbegrenzt“ ist gewählt (dann bleibt alles, bis es von Hand gelöscht wird).</p>'

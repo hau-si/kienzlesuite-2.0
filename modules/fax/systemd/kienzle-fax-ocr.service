@@ -1,0 +1,35 @@
+# Kienzle-Suite, Modul fax: Texterkennung neuer Faxe (Tesseract), niedrige Priorität, höchstens 5 Faxe je Lauf (siehe .timer).
+[Unit]
+Description=Kienzle-Suite Modul fax (Texterkennung)
+
+[Service]
+Type=oneshot
+User=ks-fax
+Environment=KIENZLE_DATEN=/var/lib/kienzle/fax
+Environment=KIENZLE_AUSTAUSCH=/var/spool/kienzle/austausch/fax_telefon
+ExecStart=/usr/bin/php /opt/kienzle/fax/current/lib/haken.php ocr
+UMask=0077
+Nice=15
+IOSchedulingClass=idle
+CPUQuota=100%
+TimeoutStartSec=10min
+RestrictAddressFamilies=AF_UNIX
+PrivateNetwork=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/kienzle/fax

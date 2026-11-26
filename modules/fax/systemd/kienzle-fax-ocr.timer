@@ -1,0 +1,11 @@
+# Kienzle-Suite, Modul fax: Texterkennung neuer Faxe jede Minute (läuft nur, wenn etwas zu tun ist).
+[Unit]
+Description=Kienzle-Suite Modul fax (Texterkennung, jede Minute)
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=1min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target
