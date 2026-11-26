@@ -46,6 +46,7 @@ TLS_PORT = 5061
 RTP_START, RTP_END = 12000, 12999
 AMI_PORT = 5038
 AMI_USER = 'kienzle-fax'
+AMI_WEB_USER = 'kienzle-web'
 CA_LIST = '/etc/ssl/certs/ca-certificates.crt'
 
 # Anbietervorlagen (pjsip-provider.sh und telefonie-queue.sh von Kienzlefax).
@@ -719,8 +720,8 @@ def render_queues(c: dict) -> tuple[str, str]:
     return queues, rules
 
 
-def ami_secret() -> str:
-    path = DATA / 'ami.json'
+def ami_secret(datei: str = 'ami.json', user: str = AMI_USER) -> str:
+    path = DATA / datei
     try:
         value = json.loads(path.read_text(encoding='utf-8'))['secret']
         if re.fullmatch(r'[A-Za-z0-9]{32,64}', value):
@@ -728,7 +729,7 @@ def ami_secret() -> str:
     except (OSError, ValueError, KeyError, TypeError):
         pass
     value = secrets.token_hex(24)
-    write(path, json.dumps({'user': AMI_USER, 'secret': value, 'port': AMI_PORT}) + '\n', 0o600)
+    write(path, json.dumps({'user': user, 'secret': value, 'port': AMI_PORT}) + '\n', 0o600)
     return value
 
 
@@ -788,6 +789,9 @@ def base_files() -> dict[str, str]:
                          f'port={AMI_PORT}\nbindaddr=127.0.0.1\ndisplayconnects=no\nauthtimeout=10\nauthlimit=20\n\n'
                          f'[{AMI_USER}]\nsecret={ami_secret()}\ndeny=0.0.0.0/0.0.0.0\npermit=127.0.0.1/255.255.255.255\n'
                          'read=system,call,reporting\nwrite=system,call,originate\n\n'
+                         f'; Seite „Anrufe“ der Weboberfläche: Zustand lesen und per Klick wählen (keine Systembefehle).\n'
+                         f'[{AMI_WEB_USER}]\nsecret={ami_secret("ami-web.json", AMI_WEB_USER)}\ndeny=0.0.0.0/0.0.0.0\npermit=127.0.0.1/255.255.255.255\n'
+                         'read=call,reporting\nwrite=call,originate,reporting\n\n'
                          f'; Zugang des Steuerungsdienstes für die Rufgruppen (nur wenn eingeschaltet, sonst leer)\n#tryinclude "{CONTROL_CONF}"\n'),
         'musiconhold.conf': '; Wartemusik folgt mit Kienzlefon (Stufe 2); die Warteschlange klingelt.\n[general]\n',
         'indications.conf': INDICATIONS,

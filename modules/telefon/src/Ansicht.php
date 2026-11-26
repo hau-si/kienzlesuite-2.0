@@ -15,15 +15,18 @@ final class Ansicht {
     public static ?int $vorgaenge = null;
     /** Knopf „Rufgruppen“ im Seitenkopf zeigen (Recht vorhanden und Rufgruppen eingeschaltet). */
     public static bool $rufgruppen = false;
+    /** Knopf „Anrufe“ im Seitenkopf zeigen (Recht vorhanden). */
+    public static bool $anrufe = false;
 
     private static function tag(string $art, string $text): string { return '<span class="tag ' . $art . '">' . tf_h($text) . '</span>'; }
 
     private static function kopfzeile(string $route, bool $einstellungen): string {
         $b = tf_h(tf_basis());
-        $titel = ['/einstellungen' => 'Einstellungen', '/sprachmenue' => 'Sprachmenü', '/vorgaenge' => 'Vorgänge', '/rufgruppen' => 'Rufgruppen'][$route] ?? 'Telefonanlage';
+        $titel = ['/einstellungen' => 'Einstellungen', '/sprachmenue' => 'Sprachmenü', '/vorgaenge' => 'Vorgänge', '/rufgruppen' => 'Rufgruppen', '/anrufe' => 'Anrufe'][$route] ?? 'Telefonanlage';
         $link = $route !== '/' ? '<a class="button secondary" href="' . $b . '/">← Übersicht</a>'
             : (self::$vorgaenge !== null ? '<a class="button' . (self::$vorgaenge ? '' : ' secondary') . '" href="' . $b . '/vorgaenge">Vorgänge'
                 . (self::$vorgaenge ? ' (' . self::$vorgaenge . ')' : '') . '</a>' : '')
+              . (self::$anrufe ? '<a class="button secondary" href="' . $b . '/anrufe">Anrufe</a>' : '')
               . (self::$rufgruppen ? '<a class="button secondary" href="' . $b . '/rufgruppen">Rufgruppen</a>' : '')
               . (self::$sprachmenue ? '<a class="button secondary" href="' . $b . '/sprachmenue">Sprachmenü</a>' : '')
               . ($einstellungen ? '<a class="button secondary" href="' . $b . '/einstellungen">Einstellungen</a>' : '');
@@ -381,6 +384,8 @@ final class Ansicht {
             } else {
                 $knoepfe .= $knopf('vorgang-offen', $v['id'], $bereich === 'papierkorb' ? 'Wiederherstellen' : 'Wieder öffnen', 'secondary');
             }
+            $rueckruf = Anrufe::nummerNormal(self::wert($d['telefon'] ?? '')) ?? Anrufe::nummerNormal(self::wert($d['id'] ?? ''));
+            if (($sms['waehlen'] ?? false) && $rueckruf !== null) $knoepfe = $knopf('anrufen', $v['id'], 'Zurückrufen', 'secondary', '', ['nummer' => $rueckruf]) . $knoepfe;
             $knoepfe .= $knopf('vorgang-dringend', $v['id'], $st['dringend'] ? 'Nicht dringend' : 'Dringend', 'secondary', '', ['an' => $st['dringend'] ? '0' : '1']);
             $knoepfe .= $bereich === 'papierkorb' ? $knopf('vorgang-loeschen', $v['id'], 'Endgültig löschen', 'danger', 'Diesen Vorgang endgültig löschen? Das lässt sich nicht rückgängig machen.')
                 : $knopf('vorgang-loeschen', $v['id'], 'Löschen', 'danger', 'Diesen Vorgang in den Papierkorb legen?');
@@ -471,6 +476,50 @@ final class Ansicht {
                 . '<table class="tf-tabelle"><tr><th>Telefon</th><th>Normal</th><th>Rufstufe</th><th>ROT</th></tr>' . $zeilen . '</table><button class="primary" type="submit">Standards speichern</button></form>');
         }
         return $o . '</div>';
+    }
+
+    /** Seite „Anrufe“ (Entwurf B): oben Wählen und „Mein Telefon“, darunter die Live-Übersicht (alle 3 Sekunden neu). */
+    public static function anrufe(array $stand, array $cfg, string $csrf, bool $waehlen, string $mein, ?string $meldung, ?string $fehler): string {
+        $h = 'tf_h';
+        $b = $h(tf_basis());
+        $verborgen = '<input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '">';
+        $o = '<div class="tf">' . self::kopfzeile('/anrufe', true) . self::meldungen($meldung, $fehler) . '<div class="tf-waehlen">';
+        if ($waehlen) {
+            $o .= '<form method="post" action="' . $b . '/anrufe" class="tf-waehlfeld">' . $verborgen . '<input type="hidden" name="aktion" value="anrufen">'
+                . '<input name="nummer" inputmode="tel" maxlength="30" required placeholder="Nummer wählen …" aria-label="Nummer"' . ($mein === '' ? ' disabled' : '') . '>'
+                . '<button class="primary" type="submit"' . ($mein === '' ? ' disabled' : '') . '>Wählen</button></form>';
+        }
+        $opt = '<option value="">– bitte wählen –</option>';
+        foreach ($cfg['nebenstellen'] ?? [] as $n) $opt .= '<option value="' . $h((string)$n['nummer']) . '"' . ((string)$n['nummer'] === $mein ? ' selected' : '') . '>' . $h($n['nummer'] . ' ' . $n['name']) . '</option>';
+        $o .= '<form method="post" action="' . $b . '/anrufe" class="tf-inline tf-mein">' . $verborgen . '<input type="hidden" name="aktion" value="mein-telefon"><label>Mein Telefon <select name="nummer">' . $opt
+            . '</select></label><button class="small secondary" type="submit">Speichern</button></form></div>';
+        if ($waehlen && $mein === '') $o .= '<p class="muted">Zum Wählen zuerst „Mein Telefon“ auswählen: Das Telefon klingelt, nach dem Abheben wird die Nummer gewählt.</p>';
+        return $o . '<div id="tf-anrufe-live" data-quelle="' . $b . '/anrufe/stand">' . self::anrufeStand($stand, $csrf, $waehlen) . '</div></div>';
+    }
+
+    /** Live-Teil: links Warteschlange, rechts Telefone. */
+    public static function anrufeStand(array $stand, string $csrf, bool $waehlen): string {
+        $h = 'tf_h';
+        $b = $h(tf_basis());
+        if (!($stand['laeuft'] ?? false)) return '<section class="card"><p>' . self::tag('err', 'keine Verbindung') . ' <span class="muted">' . $h((string)($stand['fehler'] ?? 'Die Telefonanlage antwortet nicht.')) . '</span></p></section>';
+        $rufen = static fn(string $nr, string $text) => $waehlen && $nr !== '' ? '<form method="post" action="' . $b . '/anrufe" class="tf-inline"><input type="hidden" name="kienzle-csrf" value="' . $h($csrf)
+            . '"><input type="hidden" name="aktion" value="anrufen"><input type="hidden" name="nummer" value="' . $h($nr) . '"><button type="submit" class="link" title="Zurückrufen">' . $h($text) . '</button></form>' : $h($text);
+        $w = $stand['warteschlange'];
+        $o = '<div class="tf-live"><section class="card"><h2>Warteschlange ' . self::tag($w ? 'warn' : 'ok', $w ? count($w) . ' ' . (count($w) === 1 ? 'wartet' : 'warten') : 'niemand wartet') . '</h2>';
+        if ($w) {
+            $o .= '<ol class="tf-zeilen">';
+            foreach ($w as $x) $o .= '<li><span>' . ($x['schlange'] !== 'praxis' ? self::tag('err', 'ROT') . ' ' : '') . $rufen($x['wahl'], $x['nummer']) . '</span><span class="muted">' . $h($x['warten']) . '</span></li>';
+            $o .= '</ol>';
+        }
+        $o .= '<p class="muted">Im Sprachmenü: ' . (int)$stand['sprachmenue'] . '</p></section><section class="card"><h2>Telefone</h2>';
+        if (!$stand['telefone']) return $o . '<p class="muted">Noch keine Telefone angelegt.</p></section></div>';
+        $o .= '<ul class="tf-zeilen">';
+        $text = ['frei' => 'frei', 'klingelt' => 'klingelt', 'belegt' => 'im Gespräch', 'aus' => 'nicht angemeldet'];
+        foreach ($stand['telefone'] as $t) {
+            $rechts = $t['art'] === 'belegt' && $t['partner'] !== '' ? $h($t['partner']) . ($t['dauer'] !== '' ? ' · ' . $h($t['dauer']) : '') : $h($text[$t['art']]);
+            $o .= '<li class="tf-tel-' . $h($t['art']) . '"><span><span class="tf-punkt" aria-hidden="true"></span>' . $h($t['nummer'] . ' ' . $t['name']) . '</span><span>' . $rechts . '</span></li>';
+        }
+        return $o . '</ul></section></div>';
     }
 
     public static function einstellungen(array $cfg, array $status, string $csrf, bool $admin, ?string $leitung, ?array $zugang, string $server, ?string $meldung, ?string $fehler): string {

@@ -3,7 +3,7 @@ declare(strict_types=1);
 // Modul telefon: Einstellungen, Verschlüsselung der Passwörter, Generator-Aufruf, Seiten. Nur erfundene Daten.
 require dirname(__DIR__, 3) . '/core/php/modul/Kienzle.php';
 require dirname(__DIR__) . '/src/bootstrap.php';
-use KienzleTelefon\{Anlage, Ansicht, Vorgaenge};
+use KienzleTelefon\{Anlage, Ansicht, Anrufe, Vorgaenge};
 
 set_error_handler(static function (int $no, string $msg, string $file, int $line): bool { if (!(error_reporting() & $no)) return false; throw new ErrorException($msg, 0, $no, $file, $line); });
 function check(bool $ok, string $msg): void { if (!$ok) { fwrite(STDERR, "FEHLER: $msg\n"); exit(1); } }
@@ -169,4 +169,37 @@ check(substr_count($html, 'class="tf-haken"') === 1 && substr_count($html, 'clas
 Vorgaenge::anliegenAbhaken($k, '20261126_091400_000001', 1, false);
 check(Vorgaenge::stand('20261126_091400_000001')['anliegen'] === [], 'Haken entfernt');
 wirft(fn() => Vorgaenge::kommentieren($k, '20261126_091400_000001', ' '), 'Leerer Kommentar');
+// Anrufe: Auswertung der AMI-Antworten, Nummern, eigenes Telefon, Wählen (AMI nachgestellt).
+$neb = [['nummer' => '201', 'name' => 'Empfang'], ['nummer' => '202', 'name' => 'Labor'], ['nummer' => '203', 'name' => 'Büro'], ['nummer' => '204', 'name' => 'Dr. Beispiel']];
+$kan = [['response' => 'Success', 'eventlist' => 'start'],
+    ['event' => 'CoreShowChannel', 'channel' => 'PJSIP/201-00000001', 'connectedlinenum' => '+491701234567', 'duration' => '00:04:12', 'channelstatedesc' => 'Up', 'context' => 'kfx-phone-queue'],
+    ['event' => 'CoreShowChannel', 'channel' => 'PJSIP/kfx-leitung-l1-00000002', 'context' => 'kienzlefon-entry'],
+    ['event' => 'CoreShowChannel', 'channel' => 'PJSIP/202-00000003', 'connectedlinenum' => '<unknown>', 'exten' => 's', 'channelstatedesc' => 'Ringing'],
+    ['event' => 'CoreShowChannelsComplete']];
+$ger = [['event' => 'DeviceStateChange', 'device' => 'PJSIP/201', 'state' => 'INUSE'], ['event' => 'DeviceStateChange', 'device' => 'PJSIP/202', 'state' => 'RINGING'],
+    ['event' => 'DeviceStateChange', 'device' => 'PJSIP/203', 'state' => 'NOT_INUSE'], ['event' => 'DeviceStateChange', 'device' => 'PJSIP/204', 'state' => 'UNAVAILABLE']];
+$que = [['event' => 'QueueEntry', 'queue' => 'praxis', 'position' => '2', 'calleridnum' => '0301112223', 'wait' => '75'],
+    ['event' => 'QueueEntry', 'queue' => 'praxis', 'position' => '1', 'calleridnum' => '+491701234500', 'wait' => '160'],
+    ['event' => 'QueueEntry', 'queue' => 'kienzlefon-sonder', 'position' => '1', 'calleridnum' => 'anonymous', 'wait' => '5']];
+$a = Anrufe::auswerten($neb, $kan, $ger, $que);
+check(array_column($a['telefone'], 'art') === ['belegt', 'klingelt', 'frei', 'aus'] && $a['telefone'][0]['partner'] === '+491701234567' && $a['telefone'][0]['dauer'] === '4:12', 'Telefone ausgewertet');
+check($a['sprachmenue'] === 1 && array_column($a['warteschlange'], 'nummer') === ['+491701234500', '0301112223', 'unbekannt'] && $a['warteschlange'][0]['warten'] === '2:40'
+    && $a['warteschlange'][0]['wahl'] === '01701234500' && $a['warteschlange'][2]['wahl'] === '', 'Warteschlange ausgewertet');
+check(Anrufe::nummerNormal('+49 30 123-456') === '030123456' && Anrufe::nummerNormal('+33 1 23456') === '0033123456' && Anrufe::nummerNormal('030;rm') === null && Anrufe::nummerNormal('12') === null, 'Nummern');
+$html = Ansicht::anrufeStand(['laeuft' => true] + $a, 'x', true);
+check(str_contains($html, '2 warten') === false && str_contains($html, '3 warten') && str_contains($html, 'value="01701234500"') && str_contains($html, 'ROT') && str_contains($html, 'tf-tel-klingelt')
+    && str_contains($html, 'Im Sprachmenü: 1') && str_contains($html, '+491701234567 · 4:12'), 'Live-Teil');
+check(!str_contains(Ansicht::anrufeStand(['laeuft' => true] + $a, 'x', false), 'name="aktion" value="anrufen"'), 'Ohne Recht kein Rückruf-Knopf');
+check(str_contains(Ansicht::anrufeStand(['laeuft' => false, 'fehler' => 'Die Telefonanlage antwortet nicht.'], 'x', true), 'keine Verbindung'), 'Anlage aus');
+$gesendet = [];
+Anrufe::$ami = function (string $name, array $felder) use (&$gesendet) { $gesendet[] = [$name, $felder]; return [['response' => 'Success']]; };
+$cfgA = ['nebenstellen' => $neb];
+wirft(fn() => Anrufe::waehlen($k, $cfgA, '0301234567'), 'Wählen ohne eigenes Telefon', 'Mein Telefon');
+wirft(fn() => Anrufe::meinTelefonSetzen($k, $cfgA, '999'), 'Unbekanntes Telefon');
+Anrufe::meinTelefonSetzen($k, $cfgA, '203');
+check(Anrufe::meinTelefon($k, $cfgA) === '203', 'Mein Telefon gespeichert');
+check(str_contains(Anrufe::waehlen($k, $cfgA, '+49 30 1234567'), 'Telefon 203 klingelt'), 'Wählen');
+check($gesendet[0][0] === 'Originate' && $gesendet[0][1]['Channel'] === 'PJSIP/203' && $gesendet[0][1]['Exten'] === '0301234567' && $gesendet[0][1]['Context'] === 'kfx-phone-local', 'Originate-Auftrag');
+wirft(fn() => Anrufe::waehlen($k, $cfgA, '0301234567;Hangup'), 'Ungültige Nummer');
+Anrufe::$ami = null;
 echo "telefon.php: alles in Ordnung\n";

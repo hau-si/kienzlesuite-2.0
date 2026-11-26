@@ -48,3 +48,12 @@ document.addEventListener('submit', (e) => {
     }).catch(() => {});
   }, 20000);
 })();
+// Anrufe: Live-Teil alle 3 Sekunden neu laden (nur wenn die Seite sichtbar ist).
+(() => {
+  const live = document.getElementById('tf-anrufe-live');
+  if (!live || !window.fetch) return;
+  setInterval(() => {
+    if (document.hidden) return;
+    fetch(live.dataset.quelle, {credentials: 'same-origin', cache: 'no-store'}).then(r => r.ok ? r.text() : null).then(t => { if (t !== null) live.innerHTML = t; }).catch(() => {});
+  }, 3000);
+})();

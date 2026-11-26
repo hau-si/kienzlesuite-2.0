@@ -185,4 +185,18 @@ check(is_dir("$dir/daten/kienzlefon/spool/ready/20261126_111500_000004"), 'Papie
 aufruf($dir, '/telefon/vorgaenge?bereich=papierkorb', 'vorgaenge', 'benutzer', ['aktion' => 'vorgang-loeschen', 'kienzle-csrf' => $csrf, 'id' => '20261126_111500_000004']);
 clearstatcache();
 check(!is_dir("$dir/daten/kienzlefon/spool/ready/20261126_111500_000004"), 'Endgültig gelöscht samt Aufnahmen');
+// Anrufe: Live-Übersicht und Wählen (ohne laufende Anlage).
+check(str_contains(aufruf($dir, '/telefon/anrufe', 'vorgaenge'), '#CODE=403'), 'Anrufe ohne Recht');
+$o = aufruf($dir, '/telefon/anrufe', 'anrufe,waehlen');
+check(str_contains($o, 'Mein Telefon') && str_contains($o, 'keine Verbindung') && str_contains($o, 'data-quelle="/telefon/anrufe/stand"') && str_contains($o, 'Nummer wählen'), 'Anrufe-Seite');
+check(str_contains(aufruf($dir, '/telefon/anrufe/stand', 'anrufe'), 'keine Verbindung') && str_contains(aufruf($dir, '/telefon/anrufe/stand', 'waehlen'), '#CODE=403'), 'Live-Teil nur mit Recht');
+check(str_contains(aufruf($dir, '/telefon/', 'anrufe'), '/telefon/anrufe">Anrufe</a>'), 'Knopf Anrufe');
+$o = aufruf($dir, '/telefon/anrufe', 'anrufe,waehlen', 'benutzer', ['aktion' => 'anrufen', 'kienzle-csrf' => $csrf, 'nummer' => '0301234567']);
+check(str_contains($o, 'zuerst oben „Mein Telefon“'), 'Wählen ohne eigenes Telefon');
+$tel = json_decode((string)file_get_contents("$dir/daten/anlage.json"), true)['nebenstellen'][0]['nummer'];
+$o = aufruf($dir, '/telefon/anrufe', 'anrufe,waehlen', 'benutzer', ['aktion' => 'mein-telefon', 'kienzle-csrf' => $csrf, 'nummer' => $tel]);
+check(str_contains($o, 'Beim Wählen klingelt zuerst dieses Telefon') && str_contains($o, 'value="' . $tel . '" selected'), 'Mein Telefon gespeichert');
+$o = aufruf($dir, '/telefon/anrufe', 'anrufe,waehlen', 'benutzer', ['aktion' => 'anrufen', 'kienzle-csrf' => $csrf, 'nummer' => '0301234567']);
+check(str_contains($o, 'class="fehler"'), 'Wählen ohne Anlage meldet Fehler');
+check(str_contains(aufruf($dir, '/telefon/anrufe', 'anrufe', 'benutzer', ['aktion' => 'anrufen', 'kienzle-csrf' => $csrf, 'nummer' => '0301234567']), 'fehlt das Recht'), 'Wählen nur mit Recht');
 echo "seiten.php (telefon): alles in Ordnung\n";

@@ -1,5 +1,12 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.16
+
+- **Neue Seite „Anrufe“** (`/telefon/anrufe`, Entwurf B, Knopf in der Übersicht; Entscheidung des Nutzers: im Modul Telefon statt eigenem Modul): links die Warteschlange mit Nummer und Wartezeit (ROT markiert), Anzahl im Sprachmenü; rechts alle Telefone mit Zustand (frei, klingelt, im Gespräch mit Nummer und Dauer, nicht angemeldet). Aktualisiert sich alle 3 Sekunden, frisch aus Asterisk; gespeichert wird dabei nichts.
+- **Wählen per Klick:** „Mein Telefon“ einmal wählen; dann klingelt beim Wählen zuerst das eigene Telefon, nach dem Abheben wählt die Anlage die Nummer (wie am Telefon gewählt, mit denselben Sperren und Kanalgrenzen). Zurückrufen per Klick auf eine wartende Nummer und mit „Zurückrufen“ an jeder Vorgangskarte.
+- Neue Rechte `anrufe` („Live-Übersicht sehen“) und `waehlen` („per Klick wählen und zurückrufen“). Eigener AMI-Zugang `kienzle-web` nur von 127.0.0.1, ohne Systembefehle (lesen; wählen).
+- Geprüft mit Tests, davon einer mit echtem Asterisk (Anrufer in der Warteschlange erkannt, Wählauftrag angenommen). **Nicht geprüft:** VM, echte Telefone (Klingeln und Verbinden), Browser.
+
 ## 0.1.0-beta.15
 
 - **Tonaufnahmen anhören** (Seite „Vorgänge“, an jeder Karte „Aufnahmen anhören“): je aufgesprochenem Feld (Vorname, Nachname, Geburtsdatum, Rückrufnummer, Medikament 1, 2 …, Grund) ein Abspielfeld. Gilt für alle Vorgänge aus der Spracherkennung ab diesem Stand; ältere Aufnahmen wurden bisher sofort gelöscht.

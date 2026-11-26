@@ -5,7 +5,7 @@
 [module]
 id = "telefon"
 name = "Telefon"
-version = "0.1.0-beta.15"
+version = "0.1.0-beta.16"
 core_api = "2"
 description = "Telefonanlage: Leitungen der Anbieter, Telefone, Warteschlange, Sprachmenü (Kienzlefon) und Kanalgrenze. Stellt auch die Faxleitung für das Modul Fax bereit; Fax lässt sich erst danach installieren."
 
@@ -51,6 +51,14 @@ label = "Telefon: Namen der Telefone und Warteschlange ändern"
 [[rights]]
 id = "vorgaenge"
 label = "Telefon: aufgesprochene Anliegen (Rezept, Termin, Rückruf …) lesen und erledigen"
+
+[[rights]]
+id = "anrufe"
+label = "Telefon: Live-Übersicht der Anrufe sehen (wer wartet, wer telefoniert)"
+
+[[rights]]
+id = "waehlen"
+label = "Telefon: per Klick wählen und zurückrufen (eigenes Telefon klingelt zuerst)"
 
 [[rights]]
 id = "rufgruppen"

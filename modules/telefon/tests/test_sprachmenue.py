@@ -142,5 +142,45 @@ class Rufgruppen(unittest.TestCase):
         rx('core stop now')
 
 
+@unittest.skipUnless(ok(), 'Asterisk oder python3-cryptography fehlt (oder Port 5038 belegt)')
+class Anrufe(unittest.TestCase):
+    """Seite „Anrufe“: Der Zugang kienzle-web liest den Live-Stand (ein Anrufer in der Warteschlange) und darf wählen."""
+
+    def test_live_und_waehlen(self):
+        t = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, t, True)
+        env = {'PATH': '/usr/bin:/bin', 'KIENZLE_DATEN': str(t), 'KIENZLE_PROGRAMM': str(MODUL), 'KIENZLE_ASTERISK': '/bin/false', 'LANG': 'C.UTF-8'}
+        cfg = {'leitungen': [{'id': 'l1', 'name': 'Test', 'anbieter': 'andere', 'benutzer': '4930123456', 'passwort': 'nurtest', 'domain': 'sip.example.invalid'}],
+               'telefon': {'leitung_ein': 'l1', 'nummer_ein': '4930123456', 'leitung_aus': 'l1'}, 'netz': {'lokal': '192.0.2.0/24'},
+               'nebenstellen': [{'nummer': n, 'name': f'Telefon {n}', 'passwort': 'A' * 24, 'warteschlange': True} for n in ('201', '202')]}
+        r = subprocess.run(['/usr/bin/python3', '-B', str(MODUL / 'lib/anlage.py'), 'anwenden'], input=json.dumps(cfg), capture_output=True, text=True, env=env)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        conf = str(t / 'asterisk/etc/asterisk.conf')
+        p = subprocess.Popen([ASTERISK, '-f', '-n', '-C', conf], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.addCleanup(lambda: (p.poll() is None and p.send_signal(signal.SIGTERM), p.wait(10)))
+
+        def rx(cmd):
+            return subprocess.run([ASTERISK, '-C', conf, '-rx', cmd], capture_output=True, text=True, timeout=20).stdout
+        for _ in range(40):
+            time.sleep(0.5)
+            if 'Asterisk' in rx('core show version'):
+                break
+        rx('channel originate Local/s@kfx-phone-in application Wait 30')
+        php = ('require $argv[1] . "/src/bootstrap.php"; use KienzleTelefon\\{Anlage, Anrufe, Ami};'
+               ' $cfg = ["nebenstellen" => [["nummer" => "201", "name" => "Empfang"], ["nummer" => "202", "name" => "Labor"]]];'
+               ' for ($i = 0; $i < 20; $i++) { $s = Anrufe::stand($cfg); if ($s["warteschlange"]) break; usleep(500000); }'
+               ' $o = Ami::verbinden()->aktion("Originate", ["Channel" => "PJSIP/201", "Context" => "kfx-phone-local", "Exten" => "202", "Priority" => 1, "Async" => "true"]);'
+               ' echo json_encode(["stand" => $s, "originate" => $o[0]["response"] ?? ""]);')
+        r = subprocess.run(['php', '-r', php, str(MODUL)], capture_output=True, text=True, env=env, timeout=60)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        d = json.loads(r.stdout)
+        self.assertTrue(d['stand']['laeuft'], d)
+        self.assertEqual(len(d['stand']['warteschlange']), 1, d)
+        self.assertEqual([x['art'] for x in d['stand']['telefone']], ['aus', 'aus'])      # Telefone nicht angemeldet
+        self.assertEqual(d['originate'], 'Success')
+        self.assertIn('kienzle-web', rx('manager show user kienzle-web'))
+        rx('core stop now')
+
+
 if __name__ == '__main__':
     unittest.main()

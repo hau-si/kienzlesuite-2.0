@@ -5,7 +5,7 @@ declare(strict_types=1);
  * (auth_request) und Benutzer, Rolle und Rechte als KIENZLE_* übergeben.
  */
 require_once dirname(__DIR__) . '/src/bootstrap.php';
-use KienzleTelefon\{Anlage, Ansicht, Vorgaenge};
+use KienzleTelefon\{Anlage, Ansicht, Anrufe, Vorgaenge};
 
 header('X-Frame-Options: DENY');
 header('X-Content-Type-Options: nosniff');
@@ -23,7 +23,9 @@ try {
     $darfSprachmenue = $k->recht('sprachmenue');
     $darfVorgaenge = $k->recht('vorgaenge');
     $darfRufgruppen = $k->recht('rufgruppen');
-    if (!$darfStatus && !$darfNebenstellen && !$darfSprachmenue && !$darfVorgaenge && !$darfRufgruppen) $k->verweigern();
+    $darfAnrufe = $k->recht('anrufe');
+    $darfWaehlen = $k->recht('waehlen');
+    if (!$darfStatus && !$darfNebenstellen && !$darfSprachmenue && !$darfVorgaenge && !$darfRufgruppen && !$darfAnrufe && !$darfWaehlen) $k->verweigern();
     if (preg_match('#^/assets/([A-Za-z0-9][A-Za-z0-9_.-]{0,80})$#D', $rel, $m)) {
         $types = ['css' => 'text/css; charset=utf-8', 'js' => 'text/javascript; charset=utf-8'];
         $ext = strtolower(pathinfo($m[1], PATHINFO_EXTENSION));
@@ -82,6 +84,14 @@ try {
         readfile($file);
         exit;
     }
+    if ($rel === '/anrufe/stand') {
+        // Live-Übersicht als HTML-Ausschnitt (alle paar Sekunden von assets/app.js abgefragt), frisch aus Asterisk.
+        if (!$darfAnrufe) $k->verweigern();
+        header('Content-Type: text/html; charset=utf-8');
+        header('Cache-Control: no-store');
+        echo Ansicht::anrufeStand(Anrufe::stand(Anlage::laden()), $k->csrf(), $darfWaehlen);
+        exit;
+    }
     if ($rel === '/vorgaenge/anzahl') {
         // Für den Hinweis „neuer Vorgang“ auf der Seite (nur Zahlen, keine Inhalte).
         if (!$darfVorgaenge) $k->verweigern();
@@ -90,12 +100,13 @@ try {
         echo json_encode(Vorgaenge::anzahl());
         exit;
     }
-    if (!in_array($rel, ['/', '/einstellungen', '/sprachmenue', '/vorgaenge', '/rufgruppen'], true)) { http_response_code(404); echo 'Nicht gefunden.'; exit; }
+    if (!in_array($rel, ['/', '/einstellungen', '/sprachmenue', '/vorgaenge', '/rufgruppen', '/anrufe'], true)) { http_response_code(404); echo 'Nicht gefunden.'; exit; }
     if ($rel === '/rufgruppen' && !$darfRufgruppen) $k->verweigern();
+    if ($rel === '/anrufe' && !$darfAnrufe) $k->verweigern();
     if ($rel === '/vorgaenge' && !$darfVorgaenge) $k->verweigern();
     if ($rel === '/einstellungen' && !$darfNebenstellen) $k->verweigern();
     if ($rel === '/sprachmenue' && !$darfSprachmenue) $k->verweigern();
-    if ($rel === '/' && !$darfStatus && !$darfNebenstellen && !$darfSprachmenue && !$darfVorgaenge && !$darfRufgruppen) $k->verweigern();
+    if ($rel === '/' && !$darfStatus && !$darfNebenstellen && !$darfSprachmenue && !$darfVorgaenge && !$darfRufgruppen && !$darfAnrufe) $k->verweigern();
     header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
 
     $meldung = $fehler = null;
@@ -106,17 +117,19 @@ try {
         try {
             $aktion = (string)($_POST['aktion'] ?? '');
             $vorgang = in_array($aktion, ['vorgang-erledigt', 'vorgang-offen', 'vorgang-loeschen', 'vorgang-sms', 'vorgang-uebernehmen', 'vorgang-freigeben', 'vorgang-dringend', 'vorgang-kommentar', 'vorgang-anliegen'], true);
-            $nur = ['nebenstelle-speichern', 'sprachmenue-texte', 'wartemusik', 'vorgang-erledigt', 'vorgang-offen', 'vorgang-loeschen', 'vorgang-sms', 'vorgang-uebernehmen', 'vorgang-freigeben', 'vorgang-dringend', 'vorgang-kommentar', 'vorgang-anliegen', 'rufgruppe-schalten'];
+            $nur = ['nebenstelle-speichern', 'sprachmenue-texte', 'wartemusik', 'vorgang-erledigt', 'vorgang-offen', 'vorgang-loeschen', 'vorgang-sms', 'vorgang-uebernehmen', 'vorgang-freigeben', 'vorgang-dringend', 'vorgang-kommentar', 'vorgang-anliegen', 'rufgruppe-schalten', 'anrufen', 'mein-telefon'];
             if (!$admin && !in_array($aktion, $nur, true)) throw new InvalidArgumentException('Das dürfen nur Admins.');
             $erlaubt = match (true) {
                 $vorgang => $darfVorgaenge && $rel === '/vorgaenge',
                 $aktion === 'rufgruppe-schalten', $aktion === 'rufgruppen-speichern' => $darfRufgruppen && $rel === '/rufgruppen',
+                $aktion === 'anrufen' => $darfWaehlen && in_array($rel, ['/anrufe', '/vorgaenge'], true),
+                $aktion === 'mein-telefon' => ($darfWaehlen || $darfAnrufe) && $rel === '/anrufe',
                 in_array($aktion, ['sprachmenue-texte', 'wartemusik'], true) => $darfSprachmenue && $rel === '/sprachmenue',
                 default => $darfNebenstellen,
             };
             if (!$erlaubt) throw new InvalidArgumentException('Dafür fehlt das Recht.');
             $neu = match ($aktion) {
-                'sprachmenue-texte', 'wartemusik', 'vorgang-erledigt', 'vorgang-offen', 'vorgang-loeschen', 'vorgang-sms', 'vorgang-uebernehmen', 'vorgang-freigeben', 'vorgang-dringend', 'vorgang-kommentar', 'vorgang-anliegen', 'rufgruppe-schalten', 'rufgruppen-speichern' => null,
+                'sprachmenue-texte', 'wartemusik', 'vorgang-erledigt', 'vorgang-offen', 'vorgang-loeschen', 'vorgang-sms', 'vorgang-uebernehmen', 'vorgang-freigeben', 'vorgang-dringend', 'vorgang-kommentar', 'vorgang-anliegen', 'rufgruppe-schalten', 'rufgruppen-speichern', 'anrufen', 'mein-telefon' => null,
                 'whisper-einrichten' => Anlage::whisperWahl($cfg, $_POST),
                 'leitung-speichern' => Anlage::leitungSpeichern($cfg, $_POST, $k),
                 'leitung-loeschen' => Anlage::leitungLoeschen($cfg, (string)($_POST['id'] ?? '')),
@@ -132,7 +145,12 @@ try {
                 'zugang-zeigen' => null,
                 default => throw new InvalidArgumentException('Unbekannte Aktion.'),
             };
-            if ($aktion === 'rufgruppe-schalten') {
+            if ($aktion === 'anrufen') {
+                $meldung = Anrufe::waehlen($k, $cfg, (string)($_POST['nummer'] ?? ''));
+            } elseif ($aktion === 'mein-telefon') {
+                Anrufe::meinTelefonSetzen($k, $cfg, (string)($_POST['nummer'] ?? ''));
+                $meldung = 'Gespeichert. Beim Wählen klingelt zuerst dieses Telefon.';
+            } elseif ($aktion === 'rufgruppe-schalten') {
                 $meldung = Anlage::rufgruppeSchalten($_POST);
             } elseif ($aktion === 'rufgruppen-speichern') {
                 $meldung = Anlage::rufgruppenSpeichern($_POST);
@@ -192,7 +210,9 @@ try {
     header('Cache-Control: no-store');
     if ($rel === '/einstellungen' && in_array(Anlage::auftragStatus()['stand'] ?? '', ['laeuft', 'wartet'], true)) header('Refresh: 5');
     Ansicht::$sprachmenue = $darfSprachmenue && (bool)($cfg['kienzlefon']['aktiv'] ?? false);
-    if ($rel === '/rufgruppen') {
+    if ($rel === '/anrufe') {
+        $inhalt = Ansicht::anrufe(Anrufe::stand($cfg), $cfg, $k->csrf(), $darfWaehlen, Anrufe::meinTelefon($k, $cfg), $meldung, $fehler);
+    } elseif ($rel === '/rufgruppen') {
         try {
             $daten = Anlage::rufgruppenLesen();
         } catch (RuntimeException $e) {
@@ -214,7 +234,7 @@ try {
             if (is_array($letzte)) $stand[(string)$vid] = $k->nachricht((string)($letzte['job'] ?? '')) + ['zeit' => (int)($letzte['zeit'] ?? 0)];
         }
         $sms = ['bereit' => $k->nachrichtenBereit()['sms'], 'praxis' => trim((string)($k->praxis()['name'] ?? '')), 'stand' => $stand];
-        $inhalt = Ansicht::vorgaenge($liste, $bereich, Vorgaenge::anzahl(), $k->csrf(), $meldung, $fehler, $sms + ['ich' => $k->benutzer()]);
+        $inhalt = Ansicht::vorgaenge($liste, $bereich, Vorgaenge::anzahl(), $k->csrf(), $meldung, $fehler, $sms + ['ich' => $k->benutzer(), 'waehlen' => $darfWaehlen]);
     } elseif ($rel === '/sprachmenue') {
         try {
             $daten = Anlage::sprachmenueLesen();
@@ -229,6 +249,7 @@ try {
         $server = preg_replace('/:\d+$/', '', (string)($_SERVER['HTTP_HOST'] ?? '')) ?: 'Adresse des Servers';
         $inhalt = Ansicht::einstellungen($cfg, $status, $k->csrf(), $admin, $leitung, $zugang, (string)$server, $meldung, $fehler);
     } else {
+        Ansicht::$anrufe = $darfAnrufe;
         Ansicht::$rufgruppen = $darfRufgruppen && (bool)($cfg['kienzlefon']['rufgruppen'] ?? false);
         Ansicht::$vorgaenge = $darfVorgaenge && (bool)($cfg['kienzlefon']['aktiv'] ?? false) ? Vorgaenge::anzahlOffen() : null;
         $inhalt = Ansicht::uebersicht($cfg, $status, $darfNebenstellen, tf_fax_bereit(), $meldung, $fehler);
