@@ -1,5 +1,11 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.2
+
+- **Kienzlefon 2.7 übernommen** (Stufe 2 beginnt): Python-Paket, Tests, Dokumentation und Vorlagen unverändert unter `kienzlefon/` (Herkunft und Einbauweg: `kienzlefon/HERKUNFT.md`). Noch nicht eingebunden: Die Anlage arbeitet wie in beta.1; Sprachmenü, Zeiten und Ansagen folgen in den nächsten Versionen.
+- Sprachausgabe entschieden: Piper (Standard) und Google (nur feste Praxistexte), Kokoro wahlweise; Python-Pakete aus PyPI mit festen Versionen.
+- Die 597 Tests von Kienzlefon laufen in `tests/run-all.sh` und in der CI mit (ohne die nicht übernommenen Bash-Installer).
+
 ## 0.1.0-beta.1
 
 - **Neues Modul „Telefon“** auf Grundlage von Kienzlefax 3.5.0 und Kienzlefon 2.7 (Dr. Thomas Kienzle, MIT-Lizenz). Stufe 1 von 5 (`docs/PLAN-FAX-TELEFON.md`): die Telefonanlage aus Kienzlefax.

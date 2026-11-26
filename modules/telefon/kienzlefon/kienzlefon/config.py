@@ -1,0 +1,1401 @@
+# kienzlefon
+# Version: 2.4.1
+# Changelog:
+# - 2.4.1: Kokoro-Thorsten als lokale Standard-TTS integriert.
+# - 2.4.0: Explizite Abspielmodi fuer Ansagen und sichere Leertextpruefung ergaenzt.
+# - 2.3.2: Obsolete Hauptserver-Assistentenansage aus den Pflichtbausteinen entfernt.
+# - 2.3: Ansage fuer den digitalen Telefonassistenten als Pflichtbaustein ergaenzt.
+# - 2.2: AI-Listener, Slotanzahl, Lease-Zeiten und SIP-Passwoerter validiert.
+# - 2.0: Piper und lokales Qwen3-TTS mit globaler, validierter Sprecherwahl unterstuetzt.
+# - 1.9: Optionale Anonymisierung der Rufnummern in der Demoausgabe konfigurierbar gemacht.
+# - 1.8.2: Bereitschaftsdienst auch vor der ersten Tagesoeffnung aktiviert.
+# - 1.8: Expliziten Telepraxis-Demomodus ohne Public Key ergaenzt.
+# - 1.7: Optionales rotes Telefon und priorisierte Sonderqueue konfigurierbar gemacht.
+# - 1.6: Getrennte Whisper-Modelle und Initial-Prompts je Feldgruppe ergaenzt.
+# - 1.5: Konfigurierbare Ziellautheit und True-Peak-Grenze ergaenzt.
+# - 1.4: PIN-freies internes Ansagen-IVR und klare deutsche Menuebausteine umgesetzt.
+# - 1.3: Ansagen-IVR, Zusatztelefone und konfigurierbare Wahlregeln ergaenzt.
+# - 1.2: Versionsbezogene Validierungsmeldungen aktualisiert.
+# - 1.1: TTS-Pausen sowie IVR- und Notfalltelefonparameter ergaenzt.
+# - 1.0: Zentrale TOML-Konfiguration mit Zeitprofilen und strenger Validierung.
+
+from __future__ import annotations
+
+import ipaddress
+import json
+import math
+import re
+import tomllib
+from dataclasses import dataclass, field
+from datetime import datetime, time
+from pathlib import Path
+from typing import Any, Mapping
+from zoneinfo import ZoneInfo
+
+from .ivr_keys import MENU_CHOICES, MENU_PROMPTS, validated_order
+from .ivr_keys import DEFAULTS as IVR_KEY_DEFAULTS, FOLLOWUP_PROMPTS, GENERATED_PROMPTS, validate_keys
+from .middleware import MiddlewareConfig, phone_names, telephone_extensions
+from .models import CallType, FieldName
+from .queue_prompts import QUEUE_NUMBER_PROMPTS
+from .telephony_policy import ControlConfig, RoutingPolicy, policy_for
+
+SUPPORTED_WHISPER_MODELS = frozenset({"large-v3-turbo", "large-v3"})
+SUPPORTED_TTS_ENGINES = frozenset({"kokoro", "piper", "qwen", "google"})
+QWEN_SPEAKERS = (
+    "ryan",
+    "vivian",
+    "serena",
+    "aiden",
+    "eric",
+    "dylan",
+    "uncle_fu",
+    "ono_anna",
+    "sohee",
+)
+DEFAULT_MENU_INTRO = (
+    "Bitte wählen Sie nun durch Tastendruck auf Ihrem Telefon eine der folgenden Möglichkeiten."
+)
+PROMPT_MODE_VALUES = frozenset({"immer", "offen", "zu", "deaktiviert"})
+DEFAULT_PROMPT_MODES = {
+    "greeting_open": "offen",
+    "greeting_closed": "zu",
+    "emergency": "immer",
+}
+WEEKDAYS = ("montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag", "sonntag")
+UNKNOWN_CALLER_IDS = frozenset(
+    {"", "anonymous", "unknown", "unavailable", "private", "restricted", "withheld"}
+)
+TIME_RANGE = re.compile(r"^(\d{2}):(\d{2})-(\d{2}):(\d{2})$")
+SCHEDULED_OVERRIDE_ID = re.compile(r"^[a-f0-9]{32}$")
+
+
+class ConfigError(ValueError):
+    """Raised when a required or safety-relevant setting is invalid."""
+
+
+@dataclass(frozen=True)
+class TimeWindow:
+    start: time
+    end: time
+
+    def contains(self, value: time) -> bool:
+        return self.start <= value < self.end
+
+
+@dataclass(frozen=True)
+class WeeklySchedule:
+    days: tuple[tuple[TimeWindow, ...], ...]
+
+    def windows_for(self, weekday: int) -> tuple[TimeWindow, ...]:
+        return self.days[weekday]
+
+    def is_active(self, value: datetime) -> bool:
+        local_time = value.timetz().replace(tzinfo=None)
+        return any(window.contains(local_time) for window in self.windows_for(value.weekday()))
+
+    def after_last_window(self, value: datetime) -> bool:
+        windows = self.windows_for(value.weekday())
+        if not windows:
+            return True
+        local_time = value.timetz().replace(tzinfo=None)
+        return local_time >= windows[-1].end
+
+    def before_first_or_after_last_window(self, value: datetime) -> bool:
+        windows = self.windows_for(value.weekday())
+        if not windows:
+            return True
+        local_time = value.timetz().replace(tzinfo=None)
+        return local_time < windows[0].start or local_time >= windows[-1].end
+
+
+@dataclass(frozen=True)
+class PathsConfig:
+    spool: Path
+    runtime: Path
+    prompts: Path
+    prompt_masters: Path
+
+
+@dataclass(frozen=True)
+class PracticeConfig:
+    name: str
+    timezone: ZoneInfo
+
+
+@dataclass(frozen=True)
+class OverrideConfig:
+    active: bool
+    announcement: str
+    block_phone_hours: bool
+    expires_at: datetime | None
+    position: str
+    identifier: str = "legacy"
+    name: str = "Bisherige Sonderansage"
+    valid_from: datetime | None = None
+    priority: int = -1
+    source: str = "tts"
+    tts_path: Path | None = None
+    manual_path: Path | None = None
+
+    @property
+    def prompt_name(self) -> str:
+        return "override" if self.identifier == "legacy" else f"override_{self.identifier}"
+
+    def is_valid(self, value: datetime) -> bool:
+        if not self.active:
+            return False
+        if self.valid_from is not None and value < self.valid_from:
+            return False
+        return self.expires_at is None or value < self.expires_at
+
+
+@dataclass(frozen=True)
+class IVRConfig:
+    attempts: int
+    digit_timeout_ms: int
+    announcement_pause_ms: int
+    queue_name: str
+    queue_context: str
+    pharmacy_priority: int
+    red_enabled: bool
+    red_extension: str
+    red_ring_seconds: int
+    red_fallback_priority: int
+    specialist_announcement: bool
+
+
+@dataclass(frozen=True)
+class RecordingConfig:
+    format: str
+    short_silence_seconds: int
+    long_silence_seconds: int
+    short_max_seconds: int
+    long_max_seconds: int
+    stale_seconds: int
+
+
+@dataclass(frozen=True)
+class WhisperConfig:
+    standard_model: str
+    name_model: str
+    medication_model: str
+    first_name_prompt: str
+    last_name_prompt: str
+    medication_prompt: str
+    model_directory: Path
+    device: str
+    compute_type: str
+    cpu_threads: int
+    beam_size: int
+    language: str
+    poll_seconds: float
+    heartbeat_seconds: int
+    stale_heartbeat_seconds: int
+    max_attempts: int
+    commander_ip: str = ""
+    commander_timeout: float = 15.0
+
+    @property
+    def models(self) -> tuple[str, ...]:
+        return tuple(dict.fromkeys((self.standard_model, self.name_model, self.medication_model)))
+
+    def model_for(self, field: FieldName | str) -> str:
+        value = field.value if isinstance(field, FieldName) else str(field)
+        if value in {FieldName.FIRST_NAME.value, FieldName.LAST_NAME.value}:
+            return self.name_model
+        if value == FieldName.MEDICATION.value:
+            return self.medication_model
+        return self.standard_model
+
+    def initial_prompt_for(self, field: FieldName | str) -> str | None:
+        value = field.value if isinstance(field, FieldName) else str(field)
+        prompts = {
+            FieldName.FIRST_NAME.value: self.first_name_prompt,
+            FieldName.LAST_NAME.value: self.last_name_prompt,
+            FieldName.MEDICATION.value: self.medication_prompt,
+        }
+        return prompts.get(value) or None
+
+
+@dataclass(frozen=True)
+class TelepraxisConfig:
+    channel: str
+    output_directory: Path
+    demo: bool
+    anonymize_phone_numbers: bool
+    public_key: Path | None
+    attach_audio: bool | None = None
+
+
+@dataclass(frozen=True)
+class TTSConfig:
+    engine: str
+    kokoro_generator: Path
+    kokoro_model_directory: Path
+    kokoro_speed: float
+    voice: str
+    qwen_voice: str
+    qwen_language: str
+    qwen_seed: int
+    qwen_generator: Path
+    google_generator: Path
+    google_config: Path
+    voice_directory: Path
+    upload_directory: Path
+    volume: float
+    length_scale: float
+    sentence_silence: float
+    target_loudness_lufs: float
+    max_true_peak_db: float
+    google_rate: float | None = None
+
+
+@dataclass(frozen=True)
+class SipLineConfig:
+    enabled: bool
+    did: str
+    user: str
+    password: str
+    domain: str
+    outbound_proxy: str
+    expiration: int
+    use_for_outbound: bool
+
+
+@dataclass(frozen=True)
+class AsteriskConfig:
+    red_password: str
+    phone_transport: str
+    main_outbound_endpoint: str
+    main_outbound_number: str
+    outbound_counts_capacity: bool
+    first_queue_extension: int
+    queue_extension_count: int
+    direct_queue: SipLineConfig
+    direct_red: SipLineConfig
+
+
+@dataclass(frozen=True)
+class AIIntegrationConfig:
+    enabled: bool
+    listener_mode: str
+    listener_ip: str
+    listener_port: int
+    extension_count: int
+    lease_ttl_ms: int
+    publisher_timeout_ms: int
+    sip_passwords: tuple[str, ...]
+    assistant_enabled: bool = True
+    result_directory: Path | None = None
+
+    @property
+    def admission_enabled(self) -> bool:
+        return self.enabled and self.assistant_enabled
+
+    @property
+    def slot_ids(self) -> tuple[str, ...]:
+        return tuple(f"ai-slot-{index:02d}" for index in range(self.extension_count))
+
+    @property
+    def extensions(self) -> tuple[str, ...]:
+        return tuple(str(8810 + index) for index in range(self.extension_count))
+
+
+@dataclass(frozen=True)
+class AnnouncementIVRConfig:
+    extension: str
+    silence_seconds: int
+    max_seconds: int
+    audit_log: Path
+
+
+@dataclass(frozen=True)
+class StandaloneExtensionConfig:
+    extension: str
+    password: str
+
+
+@dataclass(frozen=True)
+class SpecialQueueConfig:
+    name: str
+    weight: int
+    additional_extensions: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class HoldMusicConfig:
+    installed: bool
+    mode: str
+
+
+@dataclass(frozen=True)
+class DialRulesConfig:
+    country_code: str
+    area_code: str
+    practice_number: str
+    minimum_external_digits: int
+    block_international: bool
+    block_0900: bool
+    block_0137: bool
+    block_118: bool
+    block_019: bool
+    block_0180: bool
+    block_0700: bool
+    block_032: bool
+    audit_log: Path
+    sip_target_formats: Mapping[str, str]
+
+
+@dataclass(frozen=True)
+class PromptConfig:
+    values: Mapping[str, str]
+
+    def __getitem__(self, key: str) -> str:
+        try:
+            return self.values[key]
+        except KeyError as exc:
+            raise ConfigError(f"Fehlender Ansagetext: [ansagen].{key}") from exc
+
+
+@dataclass(frozen=True)
+class AppConfig:
+    source: Path
+    paths: PathsConfig
+    practice: PracticeConfig
+    override: OverrideConfig
+    scheduled_overrides: tuple[OverrideConfig, ...]
+    ivr: IVRConfig
+    recording: RecordingConfig
+    whisper: WhisperConfig
+    telepraxis: TelepraxisConfig
+    tts: TTSConfig
+    asterisk: AsteriskConfig
+    ai_integration: AIIntegrationConfig
+    announcement_ivr: AnnouncementIVRConfig
+    standalone_extensions: tuple[StandaloneExtensionConfig, ...]
+    special_queue: SpecialQueueConfig
+    hold_music: HoldMusicConfig
+    dial_rules: DialRulesConfig
+    prompts: PromptConfig
+    prompt_sources: Mapping[str, str]
+    prompt_modes: Mapping[str, str]
+    opening_hours: WeeklySchedule
+    phone_hours: WeeklySchedule
+    pharmacy_hours: WeeklySchedule
+    specialist_hours: WeeklySchedule
+    middleware: MiddlewareConfig = MiddlewareConfig()
+    statistics_pbx_id: str = ""
+    ivr_keys: Mapping[str, str] = field(default_factory=lambda: IVR_KEY_DEFAULTS.copy())
+    menu_order: tuple[str, ...] = MENU_PROMPTS
+    menu_choices: tuple[str, ...] = MENU_CHOICES
+    control_api: ControlConfig = ControlConfig()
+    routing_policy: RoutingPolicy = field(default_factory=RoutingPolicy)
+    phone_names: Mapping[str, str] = field(default_factory=dict)
+
+    @property
+    def local_extensions(self) -> tuple[str, ...]:
+        first = self.asterisk.first_queue_extension
+        values = [
+            str(extension)
+            for extension in range(first, first + self.asterisk.queue_extension_count)
+        ]
+        if self.ivr.red_enabled:
+            values.append(self.ivr.red_extension)
+        values.append(self.announcement_ivr.extension)
+        values.extend(entry.extension for entry in self.standalone_extensions)
+        values.extend(str(extension) for extension in range(8800, 8805))
+        if self.hold_music.installed:
+            values.append("8805")
+        values.extend(self.ai_integration.extensions)
+        return tuple(dict.fromkeys(values))
+
+    def now(self) -> datetime:
+        return datetime.now(self.practice.timezone)
+
+    def override_is_active(self, value: datetime | None = None) -> bool:
+        return self.current_override(value) is not None
+
+    def current_override(self, value: datetime | None = None) -> OverrideConfig | None:
+        current = _localize(value or self.now(), self.practice.timezone)
+        candidates = [
+            entry for entry in self.scheduled_overrides if entry.is_valid(current)
+        ]
+        if self.override.is_valid(current):
+            candidates.append(self.override)
+        if not candidates:
+            return None
+        return max(candidates, key=lambda entry: entry.priority)
+
+    def practice_is_open(self, value: datetime | None = None) -> bool:
+        current = _localize(value or self.now(), self.practice.timezone)
+        return self.opening_hours.is_active(current)
+
+    def phone_is_open(self, value: datetime | None = None) -> bool:
+        current_override = self.current_override(value)
+        if current_override is not None and current_override.block_phone_hours:
+            return False
+        current = _localize(value or self.now(), self.practice.timezone)
+        return self.phone_hours.is_active(current)
+
+    def urgent_help_is_active(self, value: datetime | None = None) -> bool:
+        current = _localize(value or self.now(), self.practice.timezone)
+        return self.opening_hours.before_first_or_after_last_window(current)
+
+    def pharmacy_is_available(self, value: datetime | None = None) -> bool:
+        current = _localize(value or self.now(), self.practice.timezone)
+        return self.pharmacy_hours.is_active(current)
+
+    def specialist_is_available(self, value: datetime | None = None) -> bool:
+        current = _localize(value or self.now(), self.practice.timezone)
+        return self.specialist_hours.is_active(current)
+
+    def prompt_mode(self, name: str) -> str:
+        return self.prompt_modes.get(name, DEFAULT_PROMPT_MODES.get(name, "immer"))
+
+    def prompt_is_active(
+        self,
+        name: str,
+        value: datetime | None = None,
+        *,
+        practice_open: bool | None = None,
+    ) -> bool:
+        mode = self.prompt_mode(name)
+        if mode == "deaktiviert":
+            return False
+        if mode == "immer":
+            return True
+        open_now = self.practice_is_open(value) if practice_open is None else practice_open
+        return open_now if mode == "offen" else not open_now
+
+
+REQUIRED_PROMPTS = frozenset(
+    {
+        "greeting_open",
+        "greeting_closed",
+        "emergency",
+        "urgent_help",
+        "menu_intro",
+        "menu_open",
+        "menu_closed",
+        "pharmacy_access",
+        "specialist_access",
+        "opening_hours_choice",
+        "opening_hours_prefix",
+        "opening_hours_closed",
+        "phone_hours_prefix",
+        "phone_hours_closed",
+        "phone_hours",
+        "submenu_five",
+        "recording_hint",
+        "first_name",
+        "last_name",
+        "birth_date",
+        "callback_number",
+        "first_medication",
+        "next_medication",
+        "medication_choice",
+        "more_concern",
+        "concern_types",
+        "specialty",
+        "referral_reason",
+        "appointment",
+        "callback_reason",
+        "other",
+        "no_selection_open",
+        "no_selection_closed",
+        "invalid",
+        "completed",
+        "whisper_failure",
+        "prescription_information",
+        "pharmacy_agent",
+        "specialist_agent",
+        "personal_data_fallback",
+        "blocked_destination",
+        "admin_main",
+        "admin_prompt_select",
+        "admin_current_prompt",
+        "admin_prompt_actions",
+        "admin_record",
+        "admin_record_ready",
+        "admin_no_recording",
+        "admin_activated",
+        "admin_generated",
+        "admin_special_menu",
+        "admin_special_keep",
+        "admin_special_block",
+        "admin_special_disabled",
+        "admin_invalid",
+        "admin_special_status_disabled",
+        "admin_special_status_keep",
+        "admin_special_status_block",
+        "webadmin_record",
+        "webadmin_record_actions",
+        "webadmin_record_saved",
+        "webadmin_record_discarded",
+        "queue_thankyou",
+        "queue_youarenext",
+        "queue_thereare",
+        "queue_callswaiting",
+    } | QUEUE_NUMBER_PROMPTS.keys()
+)
+
+OPTIONAL_PROMPT_TEXTS = frozenset({"phone_hours"})
+CONFIGURABLE_PROMPT_MODES = REQUIRED_PROMPTS | {"opening_hours"}
+
+
+def _localize(value: datetime, timezone: ZoneInfo) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone)
+    return value.astimezone(timezone)
+
+
+def _section(raw: Mapping[str, Any], name: str) -> Mapping[str, Any]:
+    value = raw.get(name)
+    if not isinstance(value, Mapping):
+        raise ConfigError(f"Fehlender Konfigurationsabschnitt [{name}]")
+    return value
+
+
+def _required(section: Mapping[str, Any], key: str, section_name: str) -> Any:
+    if key not in section:
+        raise ConfigError(f"Fehlende Einstellung [{section_name}].{key}")
+    return section[key]
+
+
+def _path(base: Path, value: Any) -> Path:
+    candidate = Path(str(value)).expanduser()
+    if not candidate.is_absolute():
+        candidate = base / candidate
+    return candidate.resolve()
+
+
+def _optional_local_datetime(
+    value: Any, timezone: ZoneInfo, label: str = "[override].ablauf"
+) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError as exc:
+        raise ConfigError(f"{label} muss ein ISO-Datum mit Uhrzeit sein") from exc
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone)
+    return parsed.astimezone(timezone)
+
+
+def _scheduled_overrides(
+    prompt_masters: Path, timezone: ZoneInfo
+) -> tuple[OverrideConfig, ...]:
+    root = prompt_masters / "sonderansagen"
+    if not root.exists():
+        return ()
+    if not root.is_dir() or root.is_symlink():
+        raise ConfigError("Ablage der geplanten Sonderansagen ist unsicher")
+    entries: list[OverrideConfig] = []
+    for directory in sorted(root.iterdir(), key=lambda path: path.name):
+        if (
+            not SCHEDULED_OVERRIDE_ID.fullmatch(directory.name)
+            or not directory.is_dir()
+            or directory.is_symlink()
+        ):
+            continue
+        metadata_path = directory / "metadata.json"
+        if not metadata_path.is_file() or metadata_path.is_symlink():
+            raise ConfigError(
+                f"Metadaten der Sonderansage {directory.name} fehlen oder sind unsicher"
+            )
+        try:
+            if metadata_path.stat().st_size > 65_536:
+                raise ConfigError(
+                    f"Metadaten der Sonderansage {directory.name} sind zu gross"
+                )
+            with metadata_path.open("r", encoding="utf-8") as handle:
+                metadata = json.load(handle)
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ConfigError(
+                f"Metadaten der Sonderansage {directory.name} sind unlesbar"
+            ) from exc
+        if not isinstance(metadata, Mapping):
+            raise ConfigError(f"Metadaten der Sonderansage {directory.name} sind ungueltig")
+        name = metadata.get("name")
+        announcement = metadata.get("announcement")
+        active = metadata.get("active", False)
+        priority = metadata.get("priority", 100)
+        block_phone_hours = metadata.get("block_phone_hours")
+        position = metadata.get("position", "statt_begruessung")
+        source = metadata.get("source", "tts")
+        if not isinstance(name, str) or not name.strip() or len(name) > 100:
+            raise ConfigError(f"Name der Sonderansage {directory.name} ist ungueltig")
+        if not isinstance(announcement, str) or not announcement.strip():
+            raise ConfigError(f"Text der Sonderansage {directory.name} fehlt")
+        if not isinstance(active, bool):
+            raise ConfigError(f"Aktivstatus der Sonderansage {directory.name} ist ungueltig")
+        if isinstance(priority, bool) or not isinstance(priority, int) or not 0 <= priority <= 1000:
+            raise ConfigError(f"Prioritaet der Sonderansage {directory.name} ist ungueltig")
+        if not isinstance(block_phone_hours, bool):
+            raise ConfigError(
+                f"Telefonzeitensperre der Sonderansage {directory.name} ist ungueltig"
+            )
+        if position not in {
+            "statt_begruessung",
+            "vor_begruessung",
+            "nach_begruessung",
+        }:
+            raise ConfigError(f"Position der Sonderansage {directory.name} ist ungueltig")
+        if source not in {"tts", "manuell"}:
+            raise ConfigError(f"Audioquelle der Sonderansage {directory.name} ist ungueltig")
+        valid_from = _optional_local_datetime(
+            metadata.get("valid_from", ""),
+            timezone,
+            f"gueltig_ab der Sonderansage {directory.name}",
+        )
+        expires_at = _optional_local_datetime(
+            metadata.get("expires_at", ""),
+            timezone,
+            f"ablauf der Sonderansage {directory.name}",
+        )
+        if valid_from is not None and expires_at is not None and valid_from >= expires_at:
+            raise ConfigError(
+                f"Gueltigkeitsbeginn der Sonderansage {directory.name} muss vor dem Ablauf liegen"
+            )
+        tts_path = directory / "tts.wav"
+        manual_path = directory / "manuell.wav"
+        if not tts_path.is_file() or tts_path.is_symlink():
+            raise ConfigError(f"TTS-WAV der Sonderansage {directory.name} fehlt")
+        if source == "manuell" and (
+            not manual_path.is_file() or manual_path.is_symlink()
+        ):
+            raise ConfigError(f"Manuelle WAV der Sonderansage {directory.name} fehlt")
+        entries.append(
+            OverrideConfig(
+                active=active,
+                announcement=announcement.strip(),
+                block_phone_hours=block_phone_hours,
+                expires_at=expires_at,
+                position=str(position),
+                identifier=directory.name,
+                name=name.strip(),
+                valid_from=valid_from,
+                priority=priority,
+                source=str(source),
+                tts_path=tts_path,
+                manual_path=manual_path if manual_path.is_file() else None,
+            )
+        )
+    active_priorities: dict[int, str] = {}
+    for entry in entries:
+        if not entry.active:
+            continue
+        previous = active_priorities.get(entry.priority)
+        if previous is not None:
+            raise ConfigError(
+                "Aktive Sonderansagen muessen eindeutige Prioritaeten haben: "
+                f"{previous} und {entry.name}"
+            )
+        active_priorities[entry.priority] = entry.name
+    return tuple(entries)
+
+
+def parse_time_windows(values: object, label: str) -> tuple[TimeWindow, ...]:
+    if not isinstance(values, list):
+        raise ConfigError(f"{label} muss eine Liste von Zeitraeumen sein")
+    windows: list[TimeWindow] = []
+    for value in values:
+        match = TIME_RANGE.fullmatch(str(value))
+        if not match:
+            raise ConfigError(f"Ungueltiger Zeitraum {label}: {value!r}")
+        try:
+            start = time(int(match[1]), int(match[2]))
+            end = time(int(match[3]), int(match[4]))
+        except ValueError as exc:
+            raise ConfigError(f"Ungueltige Uhrzeit {label}: {value!r}") from exc
+        if start >= end:
+            raise ConfigError(f"Zeitraum muss am selben Tag enden {label}: {value!r}")
+        if windows and start < windows[-1].end:
+            raise ConfigError(f"Ueberlappende Zeitraeume {label}")
+        windows.append(TimeWindow(start, end))
+    return tuple(windows)
+
+
+def parse_schedule_input(text: str, label: str) -> list[str]:
+    text = text.strip()
+    values = [item.strip() for item in text.split(",")] if text else []
+    parse_time_windows(values, label)
+    return values
+
+
+def _schedule(raw: Mapping[str, Any], name: str) -> WeeklySchedule:
+    section = _section(raw, name)
+    return WeeklySchedule(tuple(
+        parse_time_windows(section.get(day, []), f"[{name}].{day}") for day in WEEKDAYS
+    ))
+
+
+def load_config(path: str | Path = "/etc/kienzlefon/kienzlefon.toml") -> AppConfig:
+    source = Path(path).expanduser().resolve()
+    with source.open("rb") as handle:
+        raw = tomllib.load(handle)
+    base = source.parent
+
+    paths = _section(raw, "pfade")
+    practice = _section(raw, "praxis")
+    override = _section(raw, "override")
+    ivr = _section(raw, "ivr")
+    recording = _section(raw, "aufnahme")
+    whisper = _section(raw, "whisper")
+    telepraxis = _section(raw, "telepraxis")
+    if "audio_beilegen" in telepraxis and type(telepraxis["audio_beilegen"]) is not bool:
+        raise ConfigError("[telepraxis].audio_beilegen muss true oder false sein")
+    tts = _section(raw, "tts")
+    asterisk = _section(raw, "asterisk")
+    ai_integration = _section(raw, "ki_integration")
+    ai_result_value = ai_integration.get("ergebnisverzeichnis", "")
+    if not isinstance(ai_result_value, str) or (ai_result_value and not Path(ai_result_value).is_absolute()):
+        raise ConfigError("[ki_integration].ergebnisverzeichnis muss leer oder absolut sein")
+    ai_result_directory = Path(ai_result_value) if ai_result_value else None
+    announcement_ivr = _section(raw, "ansagen_ivr")
+    standalone = _section(raw, "zusaetzliche_nebenstellen")
+    special_queue = _section(raw, "sonderqueue")
+    hold_music = raw.get("wartemusik", {})
+    if not isinstance(hold_music, Mapping):
+        raise ConfigError("[wartemusik] muss ein TOML-Abschnitt sein")
+    dial_rules = _section(raw, "wahlregeln")
+    direct_queue = _section(raw, "sip_direkte_queue")
+    direct_red = _section(raw, "sip_rotes_telefon")
+    prompts = _section(raw, "ansagen")
+    prompt_sources_raw = raw.get("ansagen_quellen", {})
+    if not isinstance(prompt_sources_raw, Mapping):
+        raise ConfigError("[ansagen_quellen] muss ein TOML-Abschnitt sein")
+    prompt_modes_raw = raw.get("ansagen_modus", {})
+    if not isinstance(prompt_modes_raw, Mapping):
+        raise ConfigError("[ansagen_modus] muss ein TOML-Abschnitt sein")
+
+    whisper_models = {
+        "modell_standard": str(_required(whisper, "modell_standard", "whisper")),
+        "modell_namen": str(_required(whisper, "modell_namen", "whisper")),
+        "modell_medikamente": str(_required(whisper, "modell_medikamente", "whisper")),
+    }
+    invalid_models = {
+        key: value for key, value in whisper_models.items() if value not in SUPPORTED_WHISPER_MODELS
+    }
+    if invalid_models:
+        detail = ", ".join(f"{key}={value!r}" for key, value in invalid_models.items())
+        raise ConfigError(f"Nicht unterstuetzte Whisper-Modellwahl: {detail}")
+
+    prompt_values = {**FOLLOWUP_PROMPTS, **{str(key): str(value) for key, value in prompts.items()}}
+    prompt_values.setdefault("menu_intro", DEFAULT_MENU_INTRO)
+    missing_prompts = REQUIRED_PROMPTS - prompt_values.keys()
+    if missing_prompts:
+        raise ConfigError(f"Fehlende Ansagetexte: {', '.join(sorted(missing_prompts))}")
+    empty_prompts = {
+        key
+        for key in REQUIRED_PROMPTS - OPTIONAL_PROMPT_TEXTS
+        if not prompt_values[key].strip()
+    }
+    if empty_prompts:
+        raise ConfigError(
+            "Leere Ansagetexte sind nicht zulaessig: "
+            + ", ".join(sorted(empty_prompts))
+        )
+
+    attempts = int(ivr.get("menue_durchlaeufe", 2))
+    if attempts != 2:
+        raise ConfigError("[ivr].menue_durchlaeufe ist verbindlich auf 2 festgelegt")
+    heartbeat = int(whisper.get("heartbeat_sekunden", 5))
+    heartbeat_stale = int(whisper.get("heartbeat_veraltet_sekunden", 20))
+    if heartbeat_stale <= heartbeat:
+        raise ConfigError("Whisper-Heartbeat muss vor seiner Verfallszeit erneuert werden")
+    max_attempts = int(whisper.get("maximale_versuche", 3))
+    commander_ip = str(whisper.get("commander_ip", "")).strip()
+    if commander_ip:
+        from ipaddress import ip_address
+
+        try:
+            address = ip_address(commander_ip)
+        except ValueError as exc:
+            raise ConfigError("[whisper].commander_ip muss eine IP-Adresse sein") from exc
+        if address.is_unspecified or address.is_multicast or getattr(address, "scope_id", None):
+            raise ConfigError("[whisper].commander_ip muss eine erreichbare Unicast-Adresse sein")
+    commander_timeout = float(whisper.get("commander_timeout_sekunden", 15))
+    if not 1 <= commander_timeout <= 60:
+        raise ConfigError("[whisper].commander_timeout_sekunden muss zwischen 1 und 60 liegen")
+    if max_attempts < 1:
+        raise ConfigError("[whisper].maximale_versuche muss mindestens 1 sein")
+
+    try:
+        timezone = ZoneInfo(str(practice.get("zeitzone", "Europe/Berlin")))
+    except Exception as exc:
+        raise ConfigError("Ungueltige [praxis].zeitzone") from exc
+    prompt_sources = {str(key): str(value) for key, value in prompt_sources_raw.items()}
+    invalid_sources = {
+        key: value for key, value in prompt_sources.items() if value not in {"tts", "manuell"}
+    }
+    if invalid_sources:
+        detail = ", ".join(f"{key}={value!r}" for key, value in sorted(invalid_sources.items()))
+        raise ConfigError(f"Ungueltige Ansagenquelle: {detail}")
+    allowed_source_keys = set(prompt_values) | {"opening_hours", "phone_hours", "override"}
+    unknown_source_keys = set(prompt_sources) - allowed_source_keys
+    if unknown_source_keys:
+        raise ConfigError(
+            "[ansagen_quellen] enthaelt unbekannte Ansagen: "
+            + ", ".join(sorted(unknown_source_keys))
+        )
+    prompt_modes = {str(key): str(value) for key, value in prompt_modes_raw.items()}
+    unknown_mode_keys = set(prompt_modes) - CONFIGURABLE_PROMPT_MODES
+    if unknown_mode_keys:
+        raise ConfigError(
+            "[ansagen_modus] enthaelt unbekannte Ansagen: "
+            + ", ".join(sorted(unknown_mode_keys))
+        )
+    invalid_modes = {
+        key: value
+        for key, value in prompt_modes.items()
+        if value not in PROMPT_MODE_VALUES
+    }
+    if invalid_modes:
+        detail = ", ".join(
+            f"{key}={value!r}" for key, value in sorted(invalid_modes.items())
+        )
+        raise ConfigError(f"Ungueltige Ansagenmodi: {detail}")
+
+    standalone_extensions = _standalone_extensions(standalone)
+    ai_enabled_value = ai_integration.get("aktiv", False)
+    if not isinstance(ai_enabled_value, bool):
+        raise ConfigError("[ki_integration].aktiv muss true oder false sein")
+    ai_assistant_value = ai_integration.get("assistent_aktiv", True)
+    if not isinstance(ai_assistant_value, bool):
+        raise ConfigError("[ki_integration].assistent_aktiv muss true oder false sein")
+    ai_password_values = ai_integration.get("sip_passwoerter", [])
+    if not isinstance(ai_password_values, list):
+        raise ConfigError("[ki_integration].sip_passwoerter muss eine Liste sein")
+    if any(not isinstance(value, str) for value in ai_password_values):
+        raise ConfigError("[ki_integration].sip_passwoerter darf nur Zeichenketten enthalten")
+    special_members = special_queue.get("zusaetzliche_nebenstellen", [])
+    if not isinstance(special_members, list):
+        raise ConfigError("[sonderqueue].zusaetzliche_nebenstellen muss eine Liste sein")
+    demo_value = telepraxis.get("demo", False)
+    if not isinstance(demo_value, bool):
+        raise ConfigError("[telepraxis].demo muss true oder false sein")
+    hold_music_installed = hold_music.get("installiert", False)
+    if not isinstance(hold_music_installed, bool):
+        raise ConfigError("[wartemusik].installiert muss true oder false sein")
+    hold_music_mode = str(hold_music.get("modus", "klingelzeichen")).strip()
+    if hold_music_mode not in {"klingelzeichen", "musik"}:
+        raise ConfigError("[wartemusik].modus muss klingelzeichen oder musik sein")
+    if hold_music_mode == "musik" and not hold_music_installed:
+        raise ConfigError("[wartemusik].modus musik erfordert installiert=true")
+    demo_mode = demo_value
+    anonymize_value = telepraxis.get("anrufernummern_anonymisieren", False)
+    if not isinstance(anonymize_value, bool):
+        raise ConfigError(
+            "[telepraxis].anrufernummern_anonymisieren muss true oder false sein"
+        )
+    if anonymize_value and not demo_mode:
+        raise ConfigError(
+            "[telepraxis].anrufernummern_anonymisieren ist nur bei demo=true zulaessig"
+        )
+    public_key_value = str(telepraxis.get("public_key", "")).strip()
+    if not demo_mode and not public_key_value:
+        raise ConfigError("[telepraxis].public_key ist im Produktivmodus erforderlich")
+    override_position = str(override.get("position", "statt_begruessung"))
+    if override_position not in {
+        "statt_begruessung",
+        "vor_begruessung",
+        "nach_begruessung",
+    }:
+        raise ConfigError(
+            "[override].position muss statt_begruessung, vor_begruessung "
+            "oder nach_begruessung sein"
+        )
+    paths_config = PathsConfig(
+        spool=_path(base, _required(paths, "spool", "pfade")),
+        runtime=_path(base, _required(paths, "runtime", "pfade")),
+        prompts=_path(base, _required(paths, "ansagen", "pfade")),
+        prompt_masters=_path(base, _required(paths, "ansagen_master", "pfade")),
+    )
+    scheduled_overrides = _scheduled_overrides(
+        paths_config.prompt_masters, timezone
+    )
+    scheduled_sources = {
+        entry.prompt_name: entry.source for entry in scheduled_overrides
+    }
+    try:
+        middleware = MiddlewareConfig.parse(raw.get("middleware", {}))
+    except (ValueError, TypeError) as exc:
+        raise ConfigError(str(exc)) from exc
+    statistics_pbx_id = str(_section(raw, "anrufstatistik").get("pbx_id", "")) if "anrufstatistik" in raw else ""
+    if statistics_pbx_id and not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", statistics_pbx_id):
+        raise ConfigError("[anrufstatistik].pbx_id ist ungueltig")
+    try:
+        menu_order = validated_order(ivr.get("ansagenreihenfolge", MENU_PROMPTS), MENU_PROMPTS)
+        menu_choices = validated_order(ivr.get("auswahlreihenfolge", MENU_CHOICES), MENU_CHOICES)
+        ivr_keys = validate_keys(raw.get("ivr_tasten", {}))
+        control_api = ControlConfig.parse(raw.get("control_api", {}))
+        names = phone_names(raw.get("nebenstellennamen", {}))
+        routing_policy = RoutingPolicy.parse(raw.get("routing_policy", {}))
+        if control_api.enabled:
+            if statistics_pbx_id and statistics_pbx_id != control_api.pbx_id:
+                raise ValueError("Steuerungsdienst und Anrufstatistik benötigen dieselbe Anlagenkennung")
+            statistics_pbx_id = control_api.pbx_id
+    except (ValueError, TypeError) as exc:
+        raise ConfigError(str(exc)) from exc
+    config = AppConfig(
+        control_api=control_api,
+        routing_policy=routing_policy,
+        phone_names=names,
+        statistics_pbx_id=statistics_pbx_id,
+        ivr_keys=ivr_keys,
+        menu_order=menu_order,
+        menu_choices=menu_choices,
+        middleware=middleware,
+        source=source,
+        paths=paths_config,
+        practice=PracticeConfig(name=str(_required(practice, "name", "praxis")), timezone=timezone),
+        override=OverrideConfig(
+            active=bool(override.get("aktiv", False)),
+            announcement=str(override.get("ansage", "")).strip(),
+            block_phone_hours=bool(override.get("telefonzeiten_sperren", True)),
+            expires_at=_optional_local_datetime(override.get("ablauf", ""), timezone),
+            position=override_position,
+            source=prompt_sources.get("override", "tts"),
+        ),
+        scheduled_overrides=scheduled_overrides,
+        ivr=IVRConfig(
+            attempts=attempts,
+            digit_timeout_ms=int(ivr.get("tasten_timeout_ms", 6000)),
+            announcement_pause_ms=int(ivr.get("ansage_pause_ms", 700)),
+            queue_name=str(ivr.get("queue", "praxis")),
+            queue_context=str(ivr.get("queue_context", "kfx-phone-queue,s,1")),
+            pharmacy_priority=int(ivr.get("apotheken_prioritaet", 10)),
+            red_enabled=bool(ivr.get("rotes_telefon_aktiv", True)),
+            red_extension=str(_required(ivr, "rote_nebenstelle", "ivr")),
+            red_ring_seconds=int(ivr.get("rotes_telefon_klingeldauer_sekunden", 20)),
+            red_fallback_priority=int(ivr.get("rotes_telefon_queue_prioritaet", 100)),
+            specialist_announcement=bool(ivr.get("fachstellen_ansage", False)),
+        ),
+        recording=RecordingConfig(
+            format=str(recording.get("format", "wav")),
+            short_silence_seconds=int(recording.get("stille_kurz_sekunden", 3)),
+            long_silence_seconds=int(recording.get("stille_lang_sekunden", 6)),
+            short_max_seconds=int(recording.get("maximum_kurz_sekunden", 30)),
+            long_max_seconds=int(recording.get("maximum_lang_sekunden", 180)),
+            stale_seconds=int(recording.get("verwaist_sekunden", 7200)),
+        ),
+        whisper=WhisperConfig(
+            standard_model=whisper_models["modell_standard"],
+            name_model=whisper_models["modell_namen"],
+            medication_model=whisper_models["modell_medikamente"],
+            first_name_prompt=str(whisper.get("initial_prompt_vorname", "")).strip(),
+            last_name_prompt=str(whisper.get("initial_prompt_nachname", "")).strip(),
+            medication_prompt=str(whisper.get("initial_prompt_medikamente", "")).strip(),
+            model_directory=_path(base, _required(whisper, "modellverzeichnis", "whisper")),
+            device=str(whisper.get("geraet", "cpu")),
+            compute_type=str(whisper.get("compute_type", "int8")),
+            cpu_threads=int(whisper.get("cpu_threads", 0)),
+            beam_size=int(whisper.get("beam_size", 5)),
+            language=str(whisper.get("sprache", "de")),
+            poll_seconds=float(whisper.get("poll_sekunden", 0.5)),
+            heartbeat_seconds=heartbeat,
+            stale_heartbeat_seconds=heartbeat_stale,
+            max_attempts=max_attempts,
+            commander_ip=commander_ip,
+            commander_timeout=commander_timeout,
+        ),
+        telepraxis=TelepraxisConfig(
+            channel=str(_required(telepraxis, "kanal", "telepraxis")),
+            output_directory=_path(base, _required(telepraxis, "ausgabeverzeichnis", "telepraxis")),
+            demo=demo_mode,
+            anonymize_phone_numbers=anonymize_value,
+            public_key=_path(base, public_key_value) if public_key_value else None,
+            attach_audio=telepraxis.get("audio_beilegen"),
+        ),
+        tts=TTSConfig(
+            engine=str(tts.get("engine", "kokoro")).strip().lower(),
+            kokoro_generator=Path(tts.get(
+                "kokoro_generator", "/usr/local/bin/kienzlefon-kokoro-tts-generate"
+            )),
+            kokoro_model_directory=Path(tts.get(
+                "kokoro_modellverzeichnis", "/var/lib/kienzlefon/kokoro-thorsten"
+            )),
+            kokoro_speed=float(tts.get("kokoro_speed", 1.0)),
+            voice=str(_required(tts, "stimme", "tts")),
+            qwen_voice=str(tts.get("qwen_stimme", "ryan")).strip().lower(),
+            qwen_language=str(tts.get("qwen_sprache", "German")).strip(),
+            qwen_seed=int(tts.get("qwen_seed", 42)),
+            qwen_generator=_path(
+                base,
+                tts.get(
+                    "qwen_generator",
+                    "/usr/local/bin/kienzlefon-qwen3-tts-generate",
+                ),
+            ),
+            google_rate=(None if tts.get("google_sprechtempo", "") == "" else float(tts["google_sprechtempo"])),
+            google_generator=Path(tts.get(
+                "google_generator", "/usr/local/bin/kienzlefon-google-tts-generate"
+            )),
+            google_config=Path(tts.get(
+                "google_konfig", "/etc/kienzlefon/google-tts.conf"
+            )),
+            voice_directory=_path(base, _required(tts, "stimmenverzeichnis", "tts")),
+            upload_directory=_path(base, _required(tts, "uploadverzeichnis", "tts")),
+            volume=float(tts.get("lautstaerke", 1.0)),
+            length_scale=float(tts.get("length_scale", 1.3)),
+            sentence_silence=float(tts.get("sentence_silence", 0.8)),
+            target_loudness_lufs=float(tts.get("ziel_lautheit_lufs", -19.0)),
+            max_true_peak_db=float(tts.get("max_true_peak_db", -2.0)),
+        ),
+        asterisk=AsteriskConfig(
+            red_password=str(_required(asterisk, "rotes_telefon_passwort", "asterisk")),
+            phone_transport=str(asterisk.get("telefon_transport", "transport-kfx-phone")),
+            main_outbound_endpoint=str(_required(asterisk, "hauptausgang_endpoint", "asterisk")),
+            main_outbound_number=str(_required(asterisk, "hauptausgang_nummer", "asterisk")),
+            outbound_counts_capacity=bool(asterisk.get("ausgehend_zaehlt_kanalgrenze", True)),
+            first_queue_extension=int(asterisk.get("erste_queue_nebenstelle", 201)),
+            queue_extension_count=int(asterisk.get("queue_nebenstellen_anzahl", 1)),
+            direct_queue=_sip_line(direct_queue, "sip_direkte_queue"),
+            direct_red=_sip_line(direct_red, "sip_rotes_telefon"),
+        ),
+        ai_integration=AIIntegrationConfig(
+            enabled=ai_enabled_value,
+            assistant_enabled=ai_assistant_value,
+            listener_mode=str(ai_integration.get("listener_bindung", "local")).strip(),
+            listener_ip=str(ai_integration.get("listener_ip", "127.0.0.1")).strip(),
+            listener_port=int(ai_integration.get("listener_port", 8190)),
+            extension_count=int(ai_integration.get("anzahl_nebenstellen", 0)),
+            lease_ttl_ms=int(ai_integration.get("lease_ttl_ms", 5000)),
+            publisher_timeout_ms=int(ai_integration.get("publisher_timeout_ms", 7000)),
+            sip_passwords=tuple(str(value) for value in ai_password_values),
+            result_directory=ai_result_directory,
+        ),
+        announcement_ivr=AnnouncementIVRConfig(
+            extension=str(announcement_ivr.get("nebenstelle", "777")),
+            silence_seconds=int(announcement_ivr.get("aufnahme_stille_sekunden", 3)),
+            max_seconds=int(announcement_ivr.get("aufnahme_max_sekunden", 180)),
+            audit_log=_path(
+                base,
+                announcement_ivr.get(
+                    "audit_log", "/var/lib/kienzlefon/ansagen-ivr-audit.jsonl"
+                ),
+            ),
+        ),
+        standalone_extensions=standalone_extensions,
+        special_queue=SpecialQueueConfig(
+            name=str(special_queue.get("name", "kienzlefon-sonder")).strip(),
+            weight=int(special_queue.get("gewicht", 100)),
+            additional_extensions=tuple(str(value) for value in special_members),
+        ),
+        hold_music=HoldMusicConfig(
+            installed=hold_music_installed,
+            mode=hold_music_mode,
+        ),
+        dial_rules=DialRulesConfig(
+            country_code=str(dial_rules.get("landesvorwahl", "49")),
+            area_code=str(_required(dial_rules, "ortsvorwahl", "wahlregeln")),
+            practice_number=str(_required(dial_rules, "praxisrufnummer", "wahlregeln")),
+            minimum_external_digits=int(dial_rules.get("min_extern_ziffern", 3)),
+            block_international=bool(dial_rules.get("international_gesperrt", True)),
+            block_0900=bool(dial_rules.get("sperre_0900", True)),
+            block_0137=bool(dial_rules.get("sperre_0137", True)),
+            block_118=bool(dial_rules.get("sperre_118", True)),
+            block_019=bool(dial_rules.get("sperre_019", True)),
+            block_0180=bool(dial_rules.get("sperre_0180", False)),
+            block_0700=bool(dial_rules.get("sperre_0700", False)),
+            block_032=bool(dial_rules.get("sperre_032", False)),
+            audit_log=_path(
+                base, dial_rules.get("audit_log", "/var/lib/kienzlefon/telefonie-audit.jsonl")
+            ),
+            sip_target_formats=dial_rules.get("sip_zielformate", {}),
+        ),
+        prompts=PromptConfig(prompt_values),
+        prompt_sources={**prompt_sources, **scheduled_sources},
+        prompt_modes=prompt_modes,
+        opening_hours=_schedule(raw, "oeffnungszeiten"),
+        phone_hours=_schedule(raw, "telefonzeiten"),
+        pharmacy_hours=_schedule(raw, "apothekenzeiten"),
+        specialist_hours=_schedule(raw, "fachstellenzeiten"),
+    )
+    override_manual_available = any(
+        (config.tts.upload_directory / f"override.{suffix}").is_file()
+        for suffix in ("wav16", "wav")
+    )
+    override_manual_selected = (
+        config.prompt_sources.get("override") != "tts" and override_manual_available
+    )
+    if (
+        config.override.is_valid(config.now())
+        and not config.override.announcement
+        and not override_manual_selected
+    ):
+        raise ConfigError("Aktiver Override benoetigt Text oder eine manuelle Override-Ansage")
+    generated = set(GENERATED_PROMPTS) if config.ivr_keys != IVR_KEY_DEFAULTS else set()
+    if config.menu_choices != MENU_CHOICES:
+        generated.update(("menu_open", "menu_closed"))
+    if generated:
+        for name in sorted(generated):
+            source = config.prompt_sources.get(name)
+            if source == "manuell" or (source != "tts" and any(
+                (config.tts.upload_directory / f"{name}.{suffix}").is_file()
+                for suffix in ("wav16", "wav")
+            )):
+                raise ConfigError(f"Für geänderte IVR-Tasten zuerst die Tastenansage {name} auf TTS stellen")
+    queue, red = config.asterisk.direct_queue, config.asterisk.direct_red
+    if queue.enabled and red.enabled and (
+        did_variants(queue.did, config.dial_rules.area_code) & did_variants(red.did, config.dial_rules.area_code)
+    ):
+        raise ConfigError("Direkte Praxisqueue und ROT benötigen verschiedene eingehende Rufnummern")
+    if config.recording.format != "wav":
+        raise ConfigError("[aufnahme].format ist fuer Version 1.7 verbindlich auf 'wav' festgelegt")
+    if config.tts.engine not in SUPPORTED_TTS_ENGINES:
+        raise ConfigError("[tts].engine muss kokoro, piper, qwen oder google sein")
+    if config.tts.google_rate is not None and not 0.25 <= config.tts.google_rate <= 2:
+        raise ConfigError("Google-Sprechtempo muss zwischen 0,25 und 2 liegen")
+    if not config.tts.google_generator.is_absolute():
+        raise ConfigError("[tts].google_generator muss ein absoluter Pfad sein")
+    if not config.tts.google_config.is_absolute():
+        raise ConfigError("[tts].google_konfig muss ein absoluter Pfad sein")
+    if not config.tts.kokoro_generator.is_absolute():
+        raise ConfigError("[tts].kokoro_generator muss ein absoluter Pfad sein")
+    if not config.tts.kokoro_model_directory.is_absolute():
+        raise ConfigError("[tts].kokoro_modellverzeichnis muss ein absoluter Pfad sein")
+    if not math.isfinite(config.tts.kokoro_speed) or config.tts.kokoro_speed <= 0:
+        raise ConfigError("[tts].kokoro_speed muss eine endliche Zahl groesser als 0 sein")
+    if not config.tts.voice.strip():
+        raise ConfigError("[tts].stimme darf nicht leer sein")
+    if config.tts.qwen_voice not in QWEN_SPEAKERS:
+        raise ConfigError(
+            "[tts].qwen_stimme ist nicht freigegeben: " + config.tts.qwen_voice
+        )
+    if config.tts.qwen_language != "German":
+        raise ConfigError("[tts].qwen_sprache ist verbindlich auf 'German' festgelegt")
+    if config.tts.qwen_seed < 0:
+        raise ConfigError("[tts].qwen_seed muss eine nichtnegative ganze Zahl sein")
+    if not config.tts.qwen_generator.is_absolute():
+        raise ConfigError("[tts].qwen_generator muss ein absoluter Pfad sein")
+    if not math.isfinite(config.tts.length_scale) or config.tts.length_scale <= 0:
+        raise ConfigError("[tts].length_scale muss eine endliche Zahl groesser als 0 sein")
+    if not math.isfinite(config.tts.sentence_silence) or config.tts.sentence_silence < 0:
+        raise ConfigError("[tts].sentence_silence muss eine endliche Zahl ab 0 sein")
+    if not -70.0 <= config.tts.target_loudness_lufs <= -5.0:
+        raise ConfigError("[tts].ziel_lautheit_lufs muss zwischen -70 und -5 liegen")
+    if not -9.0 <= config.tts.max_true_peak_db <= 0.0:
+        raise ConfigError("[tts].max_true_peak_db muss zwischen -9 und 0 liegen")
+    if not 0 <= config.ivr.announcement_pause_ms <= 10000:
+        raise ConfigError("[ivr].ansage_pause_ms muss zwischen 0 und 10000 liegen")
+    if config.ivr.red_ring_seconds < 1:
+        raise ConfigError("[ivr].rotes_telefon_klingeldauer_sekunden muss mindestens 1 sein")
+    if config.ivr.red_fallback_priority <= config.ivr.pharmacy_priority:
+        raise ConfigError(
+            "[ivr].rotes_telefon_queue_prioritaet muss groesser als die Apothekenprioritaet sein"
+        )
+    if not re.fullmatch(r"[1-9][0-9]{1,5}", config.ivr.red_extension):
+        raise ConfigError("[ivr].rote_nebenstelle ist ungueltig")
+    if not config.asterisk.red_password:
+        raise ConfigError("[asterisk].rotes_telefon_passwort darf nicht leer sein")
+    first = config.asterisk.first_queue_extension
+    last = first + config.asterisk.queue_extension_count - 1
+    if first <= int(config.ivr.red_extension) <= last:
+        raise ConfigError("Die rote Nebenstelle darf keine Nebenstelle der Praxisqueue sein")
+    if config.announcement_ivr.extension != "777":
+        raise ConfigError("[ansagen_ivr].nebenstelle ist verbindlich auf '777' festgelegt")
+    if config.ivr.red_extension == config.announcement_ivr.extension:
+        raise ConfigError("Das rote Telefon darf nicht die Ansagen-Nebenstelle 777 verwenden")
+    if first <= int(config.announcement_ivr.extension) <= last:
+        raise ConfigError("Die Ansagen-Nebenstelle 777 darf nicht Teil der Praxisqueue sein")
+    if config.hold_music.installed:
+        reserved = "8805"
+        collisions = set(config.ai_integration.extensions)
+        collisions.update(entry.extension for entry in config.standalone_extensions)
+        if (
+            first <= int(reserved) <= last
+            or config.ivr.red_extension == reserved
+            or config.announcement_ivr.extension == reserved
+            or reserved in collisions
+        ):
+            raise ConfigError("Die Wartemusik-Hoerprobe 8805 kollidiert mit einer Nebenstelle")
+    if config.announcement_ivr.silence_seconds < 1 or config.announcement_ivr.max_seconds < 1:
+        raise ConfigError("Aufnahmezeiten des Ansagen-IVR muessen positiv sein")
+    if config.ai_integration.listener_mode not in {"wireguard", "lan", "local"}:
+        raise ConfigError(
+            "[ki_integration].listener_bindung muss wireguard, lan oder local sein"
+        )
+    try:
+        listener_address = ipaddress.ip_address(config.ai_integration.listener_ip)
+    except ValueError as exc:
+        raise ConfigError("[ki_integration].listener_ip ist keine gueltige IP-Adresse") from exc
+    if listener_address.is_unspecified or listener_address.is_multicast:
+        raise ConfigError(
+            "[ki_integration].listener_ip darf keine Wildcard- oder Multicast-Adresse sein"
+        )
+    if config.ai_integration.listener_mode == "local" and not listener_address.is_loopback:
+        raise ConfigError("Die lokale KI-Anbindung muss an eine Loopback-IP binden")
+    if config.ai_integration.listener_mode != "local" and listener_address.is_loopback:
+        raise ConfigError("WireGuard-/LAN-Bindung darf keine Loopback-IP verwenden")
+    if not 1 <= config.ai_integration.listener_port <= 65535:
+        raise ConfigError("[ki_integration].listener_port muss zwischen 1 und 65535 liegen")
+    if config.ai_integration.enabled:
+        if not 1 <= config.ai_integration.extension_count <= 90:
+            raise ConfigError(
+                "Aktive KI-Anbindung benoetigt 1 bis 90 KI-Nebenstellen"
+            )
+    elif config.ai_integration.extension_count != 0:
+        raise ConfigError(
+            "Deaktivierte KI-Anbindung muss anzahl_nebenstellen = 0 verwenden"
+        )
+    if len(config.ai_integration.sip_passwords) != config.ai_integration.extension_count:
+        raise ConfigError(
+            "[ki_integration].sip_passwoerter muss genau ein Passwort je KI-Nebenstelle enthalten"
+        )
+    if any(len(password) < 24 for password in config.ai_integration.sip_passwords):
+        raise ConfigError("KI-SIP-Passwoerter muessen mindestens 24 Zeichen lang sein")
+    if not 1000 <= config.ai_integration.lease_ttl_ms <= 30000:
+        raise ConfigError("[ki_integration].lease_ttl_ms muss zwischen 1000 und 30000 liegen")
+    if config.ai_integration.publisher_timeout_ms <= config.ai_integration.lease_ttl_ms:
+        raise ConfigError(
+            "[ki_integration].publisher_timeout_ms muss groesser als lease_ttl_ms sein"
+        )
+    if config.dial_rules.country_code != "49":
+        raise ConfigError("[wahlregeln].landesvorwahl ist verbindlich auf '49' festgelegt")
+    if not re.fullmatch(r"0[1-9][0-9]+", config.dial_rules.area_code):
+        raise ConfigError("[wahlregeln].ortsvorwahl muss mit 0 beginnen und nur Ziffern enthalten")
+    if not re.fullmatch(r"[0-9]+", config.dial_rules.practice_number):
+        raise ConfigError("[wahlregeln].praxisrufnummer darf nur Ziffern enthalten")
+    if config.dial_rules.minimum_external_digits < 3:
+        raise ConfigError("[wahlregeln].min_extern_ziffern muss mindestens 3 sein")
+    formats = config.dial_rules.sip_target_formats
+    if not isinstance(formats, Mapping):
+        raise ConfigError("[wahlregeln].sip_zielformate muss eine Tabelle sein")
+    for endpoint, number_format in formats.items():
+        if (
+            not isinstance(endpoint, str)
+            or not re.fullmatch(r"[A-Za-z0-9_-]+", endpoint)
+            or number_format not in ("digits", "e164_plus", "national")
+        ):
+            raise ConfigError(
+                "[wahlregeln].sip_zielformate: Endpunkte und Formate "
+                "(digits, e164_plus, national) pruefen"
+            )
+    reserved = {str(value) for value in range(first, last + 1)} | {
+        config.ivr.red_extension,
+        config.announcement_ivr.extension,
+    }
+    ai_numbers = {str(value) for value in range(8800, 8805)} | set(
+        config.ai_integration.extensions
+    )
+    if reserved.intersection(ai_numbers):
+        raise ConfigError("KI-Nummernplan 8800 ff. kollidiert mit festen Nebenstellen")
+    extensions = [entry.extension for entry in config.standalone_extensions]
+    if (
+        len(extensions) != len(set(extensions))
+        or reserved.intersection(extensions)
+        or ai_numbers.intersection(extensions)
+    ):
+        raise ConfigError("Zusaetzliche Nebenstellen sind doppelt oder mit festen Nebenstellen belegt")
+    expected = [str(int(config.ivr.red_extension) + offset) for offset in range(1, len(extensions) + 1)]
+    if extensions != expected:
+        raise ConfigError("Zusaetzliche Nebenstellen muessen direkt nach dem roten Telefon aufsteigen")
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", config.special_queue.name):
+        raise ConfigError("[sonderqueue].name ist fuer Asterisk ungueltig")
+    if config.special_queue.name == config.ivr.queue_name:
+        raise ConfigError("Die Sonderqueue muss einen eigenen Namen besitzen")
+    if config.special_queue.weight < 1:
+        raise ConfigError("[sonderqueue].gewicht muss mindestens 1 sein")
+    selected = config.special_queue.additional_extensions
+    if len(selected) != len(set(selected)):
+        raise ConfigError("[sonderqueue].zusaetzliche_nebenstellen enthaelt Duplikate")
+    unknown = set(selected) - set(extensions)
+    if unknown:
+        raise ConfigError(
+            "Sonderqueue enthaelt unbekannte zusaetzliche Nebenstellen: "
+            + ", ".join(sorted(unknown))
+        )
+    unknown_middleware = set(config.middleware.extensions) - set(telephone_extensions(config))
+    if unknown_middleware:
+        raise ConfigError("Middleware enthaelt nicht eingerichtete Telefon-Nebenstellen: "
+                          + ", ".join(sorted(unknown_middleware)))
+    try:
+        policy_for(config)
+    except ValueError as exc:
+        raise ConfigError(str(exc)) from exc
+    return config
+
+
+def _standalone_extensions(section: Mapping[str, Any]) -> tuple[StandaloneExtensionConfig, ...]:
+    extensions = section.get("nebenstellen", [])
+    passwords = section.get("passwoerter", [])
+    if not isinstance(extensions, list) or not isinstance(passwords, list):
+        raise ConfigError("[zusaetzliche_nebenstellen] erwartet Listen")
+    if len(extensions) != len(passwords):
+        raise ConfigError("Nebenstellen und Passwoerter muessen gleich viele Eintraege haben")
+    result = tuple(
+        StandaloneExtensionConfig(str(extension), str(password))
+        for extension, password in zip(extensions, passwords, strict=True)
+    )
+    for entry in result:
+        if not re.fullmatch(r"[1-9][0-9]{1,5}", entry.extension) or not entry.password:
+            raise ConfigError("Ungueltige zusaetzliche Nebenstelle oder leeres Passwort")
+    return result
+
+
+def did_variants(value: str, area_code: str) -> set[str]:
+    if not value or not re.fullmatch(r"\+?[0-9]+", value):
+        return set()
+    number = value.removeprefix("+")
+    if number.startswith("00"):
+        return {number, number[2:]}
+    if number.startswith("0"):
+        return {number, "49" + number[1:]}
+    if value.startswith("+") or number.startswith("49") or not area_code:
+        return {number}
+    return {number, "49" + area_code.lstrip("0") + number}
+
+
+def _sip_line(section: Mapping[str, Any], name: str) -> SipLineConfig:
+    enabled = bool(section.get("aktiv", False))
+    line = SipLineConfig(
+        enabled=enabled,
+        did=str(section.get("rufnummer", "")),
+        user=str(section.get("benutzer", "")),
+        password=str(section.get("passwort", "")),
+        domain=str(section.get("domain", "")),
+        outbound_proxy=str(section.get("outbound_proxy", "")),
+        expiration=int(section.get("expiration", 300)),
+        use_for_outbound=bool(section.get("ausgehend_verwenden", False)),
+    )
+    if enabled:
+        missing = [
+            field
+            for field, value in (
+                ("rufnummer", line.did),
+                ("benutzer", line.user),
+                ("passwort", line.password),
+                ("domain", line.domain),
+            )
+            if not value
+        ]
+        if missing:
+            raise ConfigError(f"[{name}] aktiv, aber unvollstaendig: {', '.join(missing)}")
+    if line.use_for_outbound and not enabled:
+        raise ConfigError(f"[{name}].ausgehend_verwenden setzt aktiv=true voraus")
+    return line
+
+
+def caller_id_or_none(value: str | None) -> str | None:
+    normalized = (value or "").strip()
+    if normalized.casefold() in UNKNOWN_CALLER_IDS:
+        return None
+    return normalized
+
+
+def payload_fields(call_type: CallType) -> tuple[str, ...]:
+    common = ("vorname", "nachname", "geburtsdatum")
+    mapping = {
+        CallType.PRESCRIPTION: common + ("medikamente",),
+        CallType.REFERRAL: common + ("fachrichtung", "grund"),
+        CallType.APPOINTMENT: common + ("grund",),
+        CallType.CALLBACK_DETAILS: common + ("grund",),
+        CallType.CALLBACK_FALLBACK: ("grund",),
+        CallType.OTHER: common + ("anliegen",),
+        CallType.ERROR: (),
+    }
+    return mapping[call_type]

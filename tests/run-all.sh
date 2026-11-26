@@ -84,6 +84,13 @@ php modules/telefon/tests/seiten.php
 (cd modules/telefon/tests && python3 -B -m unittest discover -s . -p 'test_*.py')
 grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/telefon/module.toml | head -1)" modules/telefon/VERSION || { echo 'modules/telefon/VERSION passt nicht zu module.toml'; exit 1; }
 for h in modules/telefon/bin/* modules/telefon/lib/kfx/asterisk-rx; do sh -n "$h"; done
+# Kienzlefon 2.7 (unverändert übernommen): eigene Tests, ohne die nicht übernommenen Bash-Installer (HERKUNFT.md).
+if python3 -c 'import pytest, cryptography' 2>/dev/null; then
+  (cd modules/telefon/kienzlefon && python3 -B -m pytest -q -p no:cacheprovider tests \
+    -k 'not installer and not test_web_bind_address_without_wireguard and not test_passwordless_practice_reconfiguration and not test_numbered_voices_preserve_or_change_existing_selection and not test_saved_key_survives_interruption_and_can_be_replaced')
+else
+  echo 'pytest oder cryptography fehlt – Tests von Kienzlefon übersprungen.'
+fi
 bash -n modules/telefon/lib/kfx/pdf_with_header.sh
 
 step 'Modul Fax (modules/fax/tests)'

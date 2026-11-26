@@ -11,6 +11,9 @@ Transkription, Ansagen, KI). Beide MIT-Lizenz, von Dr. Thomas Kienzle.
 - Der Code wird **übernommen**; danach kann Thomas die Module hier weiterentwickeln.
 - **Alles** wird übernommen (Fax, Warteschlange, Sprachmenü, Whisper, Ansagen, KI, Middleware, App-Schnittstellen).
 - **SMS an Anrufer** soll möglich sein (über die SMS-Verbindung der Basis).
+- Die Telefonanlage bleibt im Modul Telefon (Prüfung am 26.11.2026: in der Basis wäre Asterisk weniger abgeschottet, mehr root-Code
+  und jedes Basis-Update träfe die Anlage). Eine Praxis nur mit Fax installiert Telefon ohne Telefone.
+- **Sprachausgabe:** Piper (Standard) und Google (nur feste Praxistexte), Kokoro wahlweise; Python-Pakete aus PyPI mit festen Versionen.
 - Benutzer, Rechte und Schnittstellen (Mail, SMS, T2med) kommen aus der Basis. Die eigenen Passwörter der alten
   Weboberflächen entfallen.
 
@@ -41,8 +44,8 @@ Modul telefon (ks-telefon)                         Modul fax (ks-fax)
 
 | Stufe | Inhalt | Stand |
 |---|---|---|
-| 1 | Basis: `[[exchange]]`, `[system] disables`, `core_api` 2. Telefon: Anlage (Leitungen, Nebenstellen, Warteschlange, Kanalgrenzen, Faxkanal). Fax: Drucker, Senden, Telefonbuch, Aufträge, Berichte, Eingang | diese Version |
-| 2 | Kienzlefon: Sprachmenü (AGI), Zeiten, Ansagen (Kokoro/Piper/Google), Anrufsbaum, Sonderqueue, rotes Telefon, Ansagen-IVR 777 | offen |
+| 1 | Basis: `[[exchange]]`, `[system] disables`, `core_api` 2. Telefon: Anlage (Leitungen, Nebenstellen, Warteschlange, Kanalgrenzen, Faxkanal). Fax: Drucker, Senden, Telefonbuch, Aufträge, Berichte, Eingang | fertig (Basis 0.22.0-beta.1, Telefon/Fax 0.1.0-beta.1) |
+| 2 | Kienzlefon: Sprachmenü (AGI), Zeiten, Ansagen (Piper/Google, Kokoro wahlweise), Anrufsbaum, Sonderqueue, rotes Telefon, Ansagen-IVR 777 | Code übernommen (Telefon beta.2), Einbau folgt |
 | 3 | Kienzlefon: Whisper-Worker, Vorgänge (Rezept, Überweisung …) mit Ablage im Modul und kurzer Löschfrist; Basis: Nachrichten-Ausgang für Module (SMS und Mail über die Verbindungen der Basis, ohne Zugangsdaten im Modul); SMS an Anrufer; Mail bei Faxeingang | offen |
 | 4 | Kienzlefon: Rufgruppen-Steuerung (Port 8767), AMI für die T2med-Middleware, KI-Übergabe (WireGuard), App-Schnittstelle; Firewall-Einträge | offen |
 | 5 | Kienzlefax: Scan-/Fax-Texterkennung (OCR), Samba-Freigaben über die Basis; Umzug bestehender Installationen (`kienzlefax-installer.env`, `kienzlefon.toml`) | offen |
