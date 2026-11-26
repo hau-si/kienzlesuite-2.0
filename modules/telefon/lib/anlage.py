@@ -307,7 +307,9 @@ def check(cfg: dict) -> dict:
     if wartemusik not in ('klingelzeichen', 'musik'):
         raise Fehler('Wartemusik: Klingelzeichen oder Musik wählen.')
     out['kienzlefon'] = {'aktiv': kz.get('aktiv') is True, 'tts': tts, 'google': google, 'wartemusik': wartemusik,
-                         'whisper_genau': kz.get('whisper_genau') is True}
+                         'whisper_genau': kz.get('whisper_genau') is True, 'rufgruppen': kz.get('rufgruppen') is True}
+    if out['kienzlefon']['rufgruppen'] and not out['kienzlefon']['aktiv']:
+        raise Fehler('Rufgruppen brauchen das eingeschaltete Sprachmenü.')
     if out['kienzlefon']['aktiv'] and not tel.get('leitung_ein'):
         raise Fehler('Sprachmenü: zuerst die eingehende Telefonleitung unter „Rufnummern“ wählen.')
     if out['kienzlefon']['aktiv']:
@@ -785,7 +787,8 @@ def base_files() -> dict[str, str]:
         'manager.conf': ('; AMI nur auf localhost, nur für den Fax-Dienst des Moduls.\n[general]\nenabled=yes\nwebenabled=no\n'
                          f'port={AMI_PORT}\nbindaddr=127.0.0.1\ndisplayconnects=no\nauthtimeout=10\nauthlimit=20\n\n'
                          f'[{AMI_USER}]\nsecret={ami_secret()}\ndeny=0.0.0.0/0.0.0.0\npermit=127.0.0.1/255.255.255.255\n'
-                         'read=system,call,reporting\nwrite=system,call,originate\n'),
+                         'read=system,call,reporting\nwrite=system,call,originate\n\n'
+                         f'; Zugang des Steuerungsdienstes für die Rufgruppen (nur wenn eingeschaltet, sonst leer)\n#tryinclude "{CONTROL_CONF}"\n'),
         'musiconhold.conf': '; Wartemusik folgt mit Kienzlefon (Stufe 2); die Warteschlange klingelt.\n[general]\n',
         'indications.conf': INDICATIONS,
         'udptl.conf': '[general]\nudptlstart=4000\nudptlend=4999\n',
@@ -825,6 +828,12 @@ KZF_BIN = PROGRAM / 'lib' / 'kzf-bin'         # Startskripte für die Programme,
 # Dateien, die Kienzlefon schreibt bzw. ändert (install_asterisk_config), zusätzlich zu den Dateien der Anlage.
 KZF_FILES = ('features.conf', 'musiconhold.conf', 'pjsip-kienzlefon.conf', 'extensions-kienzlefon.conf', 'queues-kienzlefon.conf',
              'features-kienzlefon.conf', 'musiconhold-kienzlefon.conf', 'queuerules-kienzlefon.conf')
+# Rufgruppen (Anlagensteuerung von Kienzlefon): AMI-Zugang nur für den Steuerungsdienst, Auftragsjournal im Datenordner.
+CONTROL_CONF = 'manager_kienzlefon_control.conf'
+CONTROL_USER = 'kienzlefon-control'
+CONTROL_DIR = DATA / 'kienzlefon' / 'control'
+CONTROL_AMI = DATA / 'kienzlefon' / 'control-ami.json'
+PBX_ID = 'kienzle-praxis'
 
 
 def toml_set(text: str, section: str, key: str, value) -> str:
@@ -868,6 +877,10 @@ def kienzlefon_toml(c: dict) -> str:
         ('tts', 'google_generator', str(KZF_BIN / 'kienzlefon-google-tts-generate')), ('tts', 'google_konfig', str(d / 'google-tts.conf')),
         ('tts', 'stimmenverzeichnis', str(d / 'piper-voices')), ('tts', 'uploadverzeichnis', str(d / 'upload')),
         ('asterisk', 'telefon_transport', 'transport-kfx-phone'),
+        # Rufgruppen: Steuerungsdienst nur auf diesem Rechner; Änderungen von außen (Middleware, App) bleiben aus.
+        ('control_api', 'enabled', bool(c['kienzlefon'].get('rufgruppen'))), ('control_api', 'bind', '127.0.0.1'), ('control_api', 'port', 8767),
+        ('control_api', 'allowed_networks', ['127.0.0.1/32']), ('control_api', 'credentials_file', str(d / 'control-identities.json')),
+        ('control_api', 'pbx_id', PBX_ID), ('routing_policy', 'remote_enabled', False),
         ('asterisk', 'hauptausgang_endpoint', endpoint(tel['leitung_aus']) if tel.get('leitung_aus') in by_id else 'kfx-phone-in-endpoint'),
         ('asterisk', 'hauptausgang_nummer', tel.get('kennung_aus') or '0'), ('asterisk', 'ausgehend_zaehlt_kanalgrenze', bool(tel.get('aus_zaehlt', True))),
         ('asterisk', 'erste_queue_nebenstelle', int(members[0]) if members else 201), ('asterisk', 'queue_nebenstellen_anzahl', max(1, len(members))),
@@ -884,6 +897,48 @@ def kienzlefon_toml(c: dict) -> str:
     if 'CHANGE_ME_RED_PHONE_SECRET' in text:
         text = toml_set(text, 'asterisk', 'rotes_telefon_passwort', secrets.token_hex(16))
     return text
+
+
+def _anpassen() -> None:
+    """Kienzlefon an das Modul anpassen (Journal im Datenordner, Prozesskennung der eigenen Asterisk-Instanz): lib/kzf_anpassung.py."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('kzf_anpassung', Path(__file__).resolve().parent / 'kzf_anpassung.py')
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    mod.DATA = DATA
+    mod.anpassen()
+
+
+def steuerung_einrichten(config) -> str:
+    """Rufgruppen ein/aus (wie control_setup.provision von Kienzlefon, aber ohne manager.conf umzuschreiben, die das Modul selbst
+    erzeugt): eigener AMI-Zugang (Geheimnis bleibt), lokale Identität, Rufgruppen-Richtlinie für die vorhandenen Telefone.
+    Liefert den Inhalt von manager_kienzlefon_control.conf."""
+    if not config.control_api.enabled:
+        CONTROL_AMI.unlink(missing_ok=True)
+        return '; Rufgruppen sind ausgeschaltet.\n'
+    _anpassen()
+    from kienzlefon.control_setup import ensure_credentials, write_policy
+    from kienzlefon.telephony_policy import RoutingPolicy, managed_phones, policy_for
+    try:
+        secret = json.loads(CONTROL_AMI.read_text(encoding='utf-8'))['secret']
+        if not re.fullmatch(r'[0-9a-f]{64}', secret):
+            raise ValueError
+    except (OSError, ValueError, KeyError, TypeError):
+        secret = secrets.token_hex(32)
+    write(CONTROL_AMI, json.dumps({'host': '127.0.0.1', 'port': AMI_PORT, 'user': CONTROL_USER, 'secret': secret}) + '\n', 0o600)
+    ensure_credentials(config)
+    # Richtlinie: beim ersten Einschalten aus den Telefonen der Warteschlange; gelöschte Telefone fallen heraus, neue kommen hinzu.
+    policy = config.routing_policy
+    phones = managed_phones(config)
+    if not policy.members or policy.members.keys() - phones.keys() or phones.keys() - policy.members.keys():
+        kept = RoutingPolicy(policy.remote_enabled, {k: v for k, v in policy.members.items() if k in phones}, policy.workplace_mode, policy.workplace_ids)
+        from dataclasses import replace
+        try:
+            write_policy(config, policy_for(replace(config, routing_policy=kept)), CONTROL_DIR)
+        except ValueError as e:
+            raise Fehler(f'Rufgruppen: {e}') from None
+    return (f'; Erzeugt vom Modul telefon: Zugang des Steuerungsdienstes (Rufgruppen), nur von diesem Rechner.\n[{CONTROL_USER}]\nsecret={secret}\n'
+            'deny=0.0.0.0/0.0.0.0\npermit=127.0.0.1/255.255.255.255\nread=system,call,agent,dialplan,reporting\nwrite=call,agent,reporting\n')
 
 
 def kienzlefon_anwenden(files: dict[str, str], c: dict) -> dict[str, str]:
@@ -907,6 +962,10 @@ def kienzlefon_anwenden(files: dict[str, str], c: dict) -> dict[str, str]:
         (KZF_DATA / 'google-tts.conf').unlink(missing_ok=True)
     try:
         config = load_config(KZF_CONFIG)
+        files = {**files, CONTROL_CONF: steuerung_einrichten(config)}
+        config = load_config(KZF_CONFIG)
+    except Fehler:
+        raise
     except Exception as e:  # noqa: BLE001 - Kienzlefon meldet Konfigurationsfehler mit eigenen Ausnahmen
         raise Fehler(f'Kienzlefon: {str(e)[:200]}') from None
     with tempfile.TemporaryDirectory(prefix='telefon-kienzlefon-') as tmp:
@@ -991,6 +1050,9 @@ def anwenden(cfg: dict) -> dict:
     files = render(c)
     if c['kienzlefon']['aktiv']:
         files = kienzlefon_anwenden({**files, **{n: t for n, t in base_files().items() if n in ('features.conf', 'musiconhold.conf')}}, c)
+    else:
+        files[CONTROL_CONF] = '; Rufgruppen sind ausgeschaltet.\n'
+        CONTROL_AMI.unlink(missing_ok=True)
     files = pfade_ersetzen(files)
     old = ''
     for name in ('pjsip.conf', 'pjsip-kfx-telefonie.conf'):
@@ -1016,6 +1078,8 @@ def anwenden(cfg: dict) -> dict:
                 rx('dialplan reload')
             if any(n.startswith('queue') for n in changed):
                 rx('module reload app_queue.so')
+            if any(n.startswith('manager') for n in changed):
+                rx('manager reload')
             if any(n.startswith(('features', 'musiconhold')) for n in changed):
                 rx('module reload features')
                 rx('moh reload')
@@ -1146,6 +1210,99 @@ def wartemusik_entfernen() -> dict:
     return wartemusik_stand()
 
 
+# ---- Rufgruppen Normal und ROT (Seite /telefon/rufgruppen) --------------------------------------------------------------
+def _steuerung():
+    """Kienzlefon mit dem Auftragsjournal des Moduls laden; liefert (Konfiguration, Prüfsumme von kienzlefon.toml)."""
+    import hashlib
+    if str(KZF_SOURCE) not in sys.path:
+        sys.path.insert(0, str(KZF_SOURCE))
+    _anpassen()
+    from kienzlefon.config import load_config
+    if not KZF_CONFIG.is_file():
+        return None, None
+    config = load_config(KZF_CONFIG)
+    return config, hashlib.sha256(KZF_CONFIG.read_bytes()).hexdigest()
+
+
+def rufgruppen_lesen() -> dict:
+    """Standards je Telefon (aus kienzlefon.toml) und die zuletzt von Asterisk bestätigte Teilnahme (members-confirmed.json)."""
+    config, stand = _steuerung()
+    if config is None or not config.control_api.enabled:
+        return {'ok': True, 'bereit': False}
+    from kienzlefon.telephony_policy import managed_phones, policy_for
+    policy = policy_for(config)
+    try:
+        bestaetigt = json.loads((CONTROL_DIR / 'members-confirmed.json').read_text(encoding='utf-8'))
+        alter = time.time() - (CONTROL_DIR / 'members-confirmed.json').stat().st_mtime
+    except (OSError, ValueError):
+        bestaetigt, alter = {}, None
+    live = bestaetigt.get('members') or {}
+    telefone = []
+    for nummer, name in sorted(managed_phones(config).items(), key=lambda x: int(x[0])):
+        m = policy.members[nummer]
+        telefone.append({'nummer': nummer, 'name': name, **{route: {
+            'zugelassen': m[route].eligible, 'standard': m[route].default_member, 'stufe': m[route].penalty,
+            'jetzt': nummer in (live.get(route) or [])} for route in ('normal', 'specialist')}})
+    return {'ok': True, 'bereit': True, 'stand': stand, 'revision': str(bestaetigt.get('revision', '')), 'bestaetigt': bool(bestaetigt),
+            'alter': alter, 'telefone': telefone}
+
+
+def rufgruppen_schalten(job: dict) -> dict:
+    """Ein Telefon jetzt an- oder abmelden (gilt bis zum nächsten Neustart der Anlage; danach wieder die Standards)."""
+    config, _ = _steuerung()
+    if config is None or not config.control_api.enabled:
+        raise Fehler('Rufgruppen sind ausgeschaltet.')
+    from kienzlefon.control_api import read_ami
+    from kienzlefon.telephony_ami import AsteriskPlant
+    from kienzlefon.telephony_control import Controller, Journal, SourceError
+    route, nummer, an = job.get('gruppe'), job.get('nummer'), job.get('an')
+    if route not in ('normal', 'specialist') or not isinstance(nummer, str) or not re.fullmatch(r'[0-9]{2,8}', nummer) or type(an) is not bool:
+        raise Fehler('Ungültige Angaben.')
+    plant = AsteriskPlant(read_ami(CONTROL_AMI))
+    try:
+        plant.connect()
+        Controller(Journal(CONTROL_DIR), plant).set_local_member(config, str(job.get('revision', '')), route, nummer, an)
+    except (SourceError, ValueError, OSError) as e:
+        raise Fehler(str(e)[:300] or 'Die Anlage hat nicht geantwortet.') from None
+    finally:
+        if plant.connection:
+            plant.connection.close()
+    return {'ok': True}
+
+
+def rufgruppen_speichern(job: dict) -> dict:
+    """Standards (wer nach einem Neustart klingelt), Zulassung und Rufstufe je Telefon; Freigaben für Middleware/App bleiben unverändert."""
+    config, stand = _steuerung()
+    if config is None or not config.control_api.enabled:
+        raise Fehler('Rufgruppen sind ausgeschaltet.')
+    if job.get('stand') != stand:
+        raise Fehler('Die Einstellungen wurden inzwischen geändert. Bitte die Seite neu laden.')
+    from dataclasses import replace
+    from kienzlefon.control_setup import write_policy
+    from kienzlefon.telephony_policy import RoutingPolicy, policy_for
+    policy = policy_for(config)
+    neu = {}
+    eingabe = job.get('telefone') if isinstance(job.get('telefone'), dict) else {}
+    for nummer, routes in policy.members.items():
+        e = eingabe.get(nummer) if isinstance(eingabe.get(nummer), dict) else {}
+        neu[nummer] = {}
+        for route, m in routes.items():
+            r = e.get(route) if isinstance(e.get(route), dict) else {}
+            zugelassen = r.get('zugelassen', m.eligible) is True
+            stufe = r.get('stufe', m.penalty)
+            if route == 'specialist':
+                stufe = 0
+            if type(stufe) is not int or not 0 <= stufe <= 1000:
+                raise Fehler(f'Rufstufe von {nummer}: 0 bis 1000.')
+            neu[nummer][route] = replace(m, eligible=zugelassen, default_member=zugelassen and r.get('standard', m.default_member) is True,
+                                         can_enable=zugelassen and m.can_enable, can_disable=zugelassen and m.can_disable, penalty=stufe)
+    try:
+        write_policy(config, RoutingPolicy(policy.remote_enabled, neu, policy.workplace_mode, policy.workplace_ids), CONTROL_DIR, expected_hash=stand)
+    except ValueError as e:
+        raise Fehler(str(e)[:300]) from None
+    return {'ok': True}
+
+
 # ---- Sprachmenü: Zeiten, Ansagetexte, Menütasten (Seite /telefon/sprachmenue) ---------------------------------------
 ZEITEN = {'oeffnungszeiten': 'Öffnungszeiten', 'telefonzeiten': 'Telefonzeiten', 'apothekenzeiten': 'Apotheken und Pflege',
           'fachstellenzeiten': 'Krankenhaus, Notarzt und Kollegen'}
@@ -1261,6 +1418,12 @@ def main(argv: list[str]) -> int:
         if action == 'sprachmenue-schreiben':
             raw = sys.stdin.read(1_000_000)
             print(json.dumps(sprachmenue_schreiben(json.loads(raw) if raw.strip() else {}), ensure_ascii=False))
+            return 0
+        if action in ('rufgruppen-lesen', 'rufgruppen-schalten', 'rufgruppen-speichern'):
+            raw = sys.stdin.read(200_000)
+            job = json.loads(raw) if raw.strip() else {}
+            r = rufgruppen_lesen() if action == 'rufgruppen-lesen' else rufgruppen_schalten(job) if action == 'rufgruppen-schalten' else rufgruppen_speichern(job)
+            print(json.dumps(r, ensure_ascii=False))
             return 0
         if action in ('wartemusik', 'wartemusik-entfernen', 'wartemusik-stand'):
             raw = sys.stdin.read(10_000)

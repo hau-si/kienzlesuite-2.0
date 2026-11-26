@@ -1,0 +1,10 @@
+# Kienzle-Suite, Modul telefon: Steuerungsdienst starten, sobald die Rufgruppen eingeschaltet sind.
+[Unit]
+Description=Kienzle-Suite Modul telefon (Rufgruppen eingeschaltet)
+
+[Path]
+PathExists=/var/lib/kienzle/telefon/kienzlefon/control-ami.json
+Unit=kienzle-telefon-steuerung.service
+
+[Install]
+WantedBy=multi-user.target

@@ -1,5 +1,11 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.12
+
+- **Unterbau für die Rufgruppen „Normal“ und „ROT“** (wer bei Taste 1 bzw. 9 klingelt; Telefone live an- und abmelden, Standards nach einem Neustart der Anlage). Steuerungsdienst von Kienzlefon als `kienzle-telefon-steuerung` (nur auf 127.0.0.1:8767, startet über `kienzle-telefon-steuerung.path`, sobald die Rufgruppen eingeschaltet sind), eigener AMI-Zugang nur von diesem Rechner (`manager_kienzlefon_control.conf`), Auftragsjournal im Datenordner, Befehle `anlage.py rufgruppen-lesen|-schalten|-speichern`. Kienzlefon bleibt unverändert; `lib/kzf_anpassung.py` biegt Journalordner und Prozesskennung (eigene Asterisk-Instanz statt `asterisk.service`) um.
+- **Noch ausgeschaltet und ohne Seite** (die Seite „Rufgruppen“ folgt nach Wahl des Entwurfs); am Verhalten der Anlage ändert sich nichts.
+- Geprüft mit echtem Asterisk (Telefone werden eingetragen, live abgemeldet, Standards gespeichert, nach einem Neustart von Asterisk wieder eingetragen). **Nicht geprüft:** VM, echte Telefone.
+
 ## 0.1.0-beta.11
 
 - **SMS an Anrufer** (Seite „Vorgänge“, aufklappbar an jeder Karte „SMS an den Anrufer“): Handynummer aus der Anrufernummer vorbelegt (sonst aus der Akte eintragen), Textvorschlag je Art ohne Gesundheitsangaben (z. B. „Ihr Rezept liegt zur Abholung bereit. Ihre Praxis …“), vor dem Senden änderbar, wahlweise danach als erledigt markieren. Der Stand („wird verschickt“, „verschickt“, „nicht verschickt“ mit Grund) steht an der Karte. Verschickt wird über den Nachrichten-Ausgang der Basis (Verbindung `nachrichten`, braucht Basis 0.22.0-beta.8 und eine SMS-Verbindung unter Verwaltung → Verbindungen); das Modul kennt den SMS-Zugang nicht und merkt sich je Vorgang nur die Auftragskennung.

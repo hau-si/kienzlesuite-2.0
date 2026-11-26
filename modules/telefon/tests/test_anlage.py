@@ -203,7 +203,8 @@ class Anlage(unittest.TestCase):
         self.assertIn('messages.log => warning,error\n', (etc / 'logger.conf').read_text())
         r = self.a.anwenden(beispiel())
         self.assertEqual(sorted(r['geaendert']), sorted(['extensions.conf', 'extensions-kfx-telefonie.conf', 'pjsip.conf', 'pjsip-kfx-telefonie.conf',
-                                                     'queuerules.conf', 'queuerules-kfx.conf', 'queues.conf', 'queues-kfx.conf']))
+                                                     'queuerules.conf', 'queuerules-kfx.conf', 'queues.conf', 'queues-kfx.conf',
+                                                     'manager_kienzlefon_control.conf']))
         self.assertIn(f'#tryinclude "{etc}/extensions-kfx-telefonie.conf"', (etc / 'extensions.conf').read_text())   # /etc/asterisk ersetzt
         self.assertFalse(r['laeuft'])
         self.assertEqual(oct((etc / 'pjsip.conf').stat().st_mode & 0o777), '0o600')
@@ -284,7 +285,7 @@ class KienzlefonBruecke(unittest.TestCase):
             self.a.check(b)
         with self.assertRaises(self.a.Fehler):
             self.a.check(self.cfg(tts='espeak'))
-        self.assertEqual(self.a.check(beispiel())['kienzlefon'], {'aktiv': False, 'tts': 'piper', 'wartemusik': 'klingelzeichen', 'whisper_genau': False,
+        self.assertEqual(self.a.check(beispiel())['kienzlefon'], {'aktiv': False, 'tts': 'piper', 'wartemusik': 'klingelzeichen', 'whisper_genau': False, 'rufgruppen': False,
                          'google': {'schluessel': '', 'stimme': 'de-DE-Chirp3-HD-Enceladus', 'tempo': 0.93}})
         b = self.cfg()
         b['kienzlefon']['wartemusik'] = 'radio'

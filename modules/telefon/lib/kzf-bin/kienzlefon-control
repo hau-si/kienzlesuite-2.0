@@ -4,6 +4,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'kienzlefon'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from kzf_anpassung import anpassen  # noqa: E402
+
+anpassen()   # Auftragsjournal im Datenordner, Prozesskennung der Asterisk-Instanz des Moduls (lib/kzf_anpassung.py)
 from kienzlefon.control_api import main  # noqa: E402
 
 sys.exit(main())
