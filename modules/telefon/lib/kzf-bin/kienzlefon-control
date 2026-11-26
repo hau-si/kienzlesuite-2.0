@@ -1,0 +1,9 @@
+#!/usr/bin/python3 -B
+# Startskript des Moduls telefon für „kienzlefon-control“ aus Kienzlefon 2.7 (kienzlefon.control_api:main); ersetzt /opt/kienzlefon/venv/bin/kienzlefon-control.
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'kienzlefon'))
+from kienzlefon.control_api import main  # noqa: E402
+
+sys.exit(main())

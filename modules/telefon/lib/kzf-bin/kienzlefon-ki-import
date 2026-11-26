@@ -1,0 +1,9 @@
+#!/usr/bin/python3 -B
+# Startskript des Moduls telefon für „kienzlefon-ki-import“ aus Kienzlefon 2.7 (kienzlefon.ai_import:main); ersetzt /opt/kienzlefon/venv/bin/kienzlefon-ki-import.
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'kienzlefon'))
+from kienzlefon.ai_import import main  # noqa: E402
+
+sys.exit(main())

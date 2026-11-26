@@ -1,0 +1,9 @@
+#!/usr/bin/python3 -B
+# Startskript des Moduls telefon für „kienzlefon-admission-listener“ aus Kienzlefon 2.7 (kienzlefon.admission:listener_main); ersetzt /opt/kienzlefon/venv/bin/kienzlefon-admission-listener.
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'kienzlefon'))
+from kienzlefon.admission import listener_main  # noqa: E402
+
+sys.exit(listener_main())

@@ -53,6 +53,7 @@ try {
                 'zwecke-speichern' => Anlage::zweckeSpeichern($cfg, $_POST),
                 'kanaele-speichern' => Anlage::kanaeleSpeichern($cfg, $_POST),
                 'netz-speichern' => Anlage::netzSpeichern($cfg, $_POST),
+                'sprachmenue-speichern' => Anlage::sprachmenueSpeichern($cfg, $_POST),
                 'nebenstellen-anlegen' => Anlage::nebenstellenAnlegen($cfg, (int)($_POST['anzahl'] ?? 0), $k),
                 'nebenstelle-speichern' => Anlage::nebenstelleSpeichern($cfg, $_POST),
                 'nebenstelle-loeschen' => Anlage::nebenstelleLoeschen($cfg, (string)($_POST['nummer'] ?? '')),

@@ -1,0 +1,9 @@
+#!/usr/bin/python3 -B
+# Startskript des Moduls telefon für „kienzlefon-config“ aus Kienzlefon 2.7 (kienzlefon.cli:config_main); ersetzt /opt/kienzlefon/venv/bin/kienzlefon-config.
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'kienzlefon'))
+from kienzlefon.cli import config_main  # noqa: E402
+
+sys.exit(config_main())

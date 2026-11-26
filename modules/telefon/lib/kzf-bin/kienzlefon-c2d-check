@@ -1,0 +1,9 @@
+#!/usr/bin/python3 -B
+# Startskript des Moduls telefon für „kienzlefon-c2d-check“ aus Kienzlefon 2.7 (kienzlefon.middleware_agi:main); ersetzt /opt/kienzlefon/venv/bin/kienzlefon-c2d-check.
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'kienzlefon'))
+from kienzlefon.middleware_agi import main  # noqa: E402
+
+sys.exit(main())

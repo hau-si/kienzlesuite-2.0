@@ -19,7 +19,7 @@ function aufruf(string $dir, string $uri, string $rechte, string $rolle = 'benut
         . ' require ' . var_export(dirname(__DIR__, 3) . '/core/php/modul/Kienzle.php', true) . '; require ' . var_export(dirname(__DIR__) . '/src/bootstrap.php', true) . ';'
         . ' $GLOBALS["tf_test_modul"] = new KienzleModul("telefon", $_SERVER, ' . var_export("$dir/verbindungen", true) . ', ' . var_export("$dir/schluessel", true) . ');'
         . ' register_shutdown_function(function () { echo "\n#CODE=" . (http_response_code() ?: 200); }); require ' . var_export(dirname(__DIR__) . '/public/index.php', true) . ';';
-    $env = ['KIENZLE_DATEN' => "$dir/daten", 'KIENZLE_ASTERISK' => '/bin/false', 'PATH' => '/usr/bin:/bin'];
+    $env = ['KIENZLE_DATEN' => "$dir/daten", 'KIENZLE_ASTERISK' => '/bin/false', 'KIENZLE_PROGRAMM' => dirname(__DIR__), 'PATH' => '/usr/bin:/bin'];
     $p = proc_open([PHP_BINARY, '-d', 'display_errors=stderr', '-r', $code], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $env);
     $out = (string)stream_get_contents($pipes[1]);
     $err = (string)stream_get_contents($pipes[2]);
@@ -48,4 +48,10 @@ check(!str_contains($o, 'Zugang für Telefon'), 'Zugang nur nach frischer Bestä
 $o = aufruf($dir, '/telefon/einstellungen', '', 'admin', ['aktion' => 'zugang-zeigen', 'kienzle-csrf' => $csrf, 'nummer' => '201'], time());
 check(str_contains($o, 'Zugang für Telefon 201') && preg_match('#<dt>Passwort</dt><dd><code>[A-Za-z0-9]{24}</code>#', $o) === 1, 'Zugang mit Bestätigung');
 check(str_contains(aufruf($dir, '/telefon/einstellungen', '', 'admin', ['aktion' => 'netz-speichern', 'kienzle-csrf' => 'falsch']), '#CODE=403'), 'CSRF');
+$o = aufruf($dir, '/telefon/einstellungen', '', 'admin', ['aktion' => 'sprachmenue-speichern', 'kienzle-csrf' => $csrf, 'aktiv' => '1', 'tts' => 'piper']);
+check(str_contains($o, 'zuerst die eingehende Telefonleitung'), 'Sprachmenü braucht die Telefonleitung');
+$lid = json_decode((string)file_get_contents("$dir/daten/anlage.json"), true)['leitungen'][0]['id'];
+aufruf($dir, '/telefon/einstellungen', '', 'admin', ['aktion' => 'zwecke-speichern', 'kienzle-csrf' => $csrf, 'tel_leitung_ein' => $lid, 'tel_nummer_ein' => '4930123456', 'tel_aus_zaehlt' => '1']);
+$o = aufruf($dir, '/telefon/einstellungen', '', 'admin', ['aktion' => 'sprachmenue-speichern', 'kienzle-csrf' => $csrf, 'aktiv' => '1', 'tts' => 'piper']);
+check(str_contains($o, 'Gespeichert.') && str_contains((string)file_get_contents("$dir/daten/asterisk/etc/extensions-kfx-telefonie.conf"), 'Goto(kienzlefon-entry,s,1)'), 'Sprachmenü über die Seite eingeschaltet');
 echo "seiten.php (telefon): alles in Ordnung\n";

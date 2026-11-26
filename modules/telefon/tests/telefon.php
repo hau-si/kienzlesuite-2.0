@@ -51,7 +51,8 @@ $cfg = Anlage::netzSpeichern($cfg, ['lokal' => '192.0.2.0/24']);
 $r = Anlage::speichern($cfg, $k);
 check(($r['ok'] ?? false) && !$r['laeuft'] && Anlage::eingerichtet(), 'gespeichert und angewendet');
 $pjsip = (string)file_get_contents("$dir/daten/asterisk/etc/pjsip.conf");
-check(str_contains($pjsip, 'password=SIP\;geheim') && str_contains($pjsip, '[203]') && (fileperms("$dir/daten/asterisk/etc/pjsip.conf") & 0777) === 0600, 'pjsip.conf erzeugt (0600)');
+$telefone = (string)file_get_contents("$dir/daten/asterisk/etc/pjsip-kfx-telefonie.conf");
+check(str_contains($pjsip, 'password=SIP\;geheim') && str_contains($telefone, '[203]') && (fileperms("$dir/daten/asterisk/etc/pjsip.conf") & 0777) === 0600, 'pjsip.conf erzeugt (0600)');
 check(!str_contains((string)file_get_contents("$dir/daten/anlage.json"), 'SIP;geheim'), 'anlage.json ohne Klartext');
 check((fileperms("$dir/daten/anlage.json") & 0777) === 0600, 'anlage.json 0600');
 $alt = Anlage::nebenstellePasswort($cfg, '202', $k);
@@ -68,6 +69,9 @@ check(end($cfg['nebenstellen'])['nummer'] === '201', 'freie Nummer wird wieder v
 $u = Anlage::ueberblick(['laeuft' => false]);
 check($u[0]['state'] === 'done' && $u[1]['state'] === 'done' && $u[2]['state'] === 'done' && $u[3]['state'] === 'error', 'Überblick nach Einrichtung');
 check(Anlage::status() === ['laeuft' => false], 'Status ohne Asterisk');
+wirft(fn() => Anlage::sprachmenueSpeichern($cfg, ['aktiv' => '1', 'tts' => 'espeak']), 'Sprachausgabe geprüft', 'Sprachausgabe');
+check(Anlage::sprachmenueSpeichern($cfg, ['aktiv' => '1', 'tts' => 'google'])['kienzlefon'] === ['aktiv' => true, 'tts' => 'google'], 'Sprachmenü-Schalter');
+check(Anlage::laden()['kienzlefon'] === ['aktiv' => false, 'tts' => 'piper'], 'Vorgabe: Sprachmenü aus, Piper');
 
 // Seiten
 $status = ['laeuft' => true, 'leitungen' => [$l['id'] => 'Registered'], 'telefone' => ['202' => 'Avail'], 'gespraeche' => 1, 'wartend' => 0];

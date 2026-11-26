@@ -171,6 +171,17 @@ final class Ansicht {
                 . self::formular($csrf, 'kanaele-speichern', $form, 'Speichern'));
         }
 
+        if ($admin) {
+            // Sprachmenü (Kienzlefon 2.7)
+            $kz = $cfg['kienzlefon'];
+            $form = self::haken('aktiv', 'Sprachmenü einschalten (Anrufer hören Begrüßung und Menü, statt direkt in der Warteschlange zu landen)', (bool)$kz['aktiv'])
+                . self::auswahl('tts', 'Sprachausgabe der Ansagen', Anlage::SPRACHAUSGABE, (string)$kz['tts']);
+            $o .= self::fold('sprachmenue', 'Sprachmenü', $kz['aktiv'] ? self::tag('ok', 'an') : self::tag('opt', 'aus'),
+                '<p class="muted">Sprachmenü aus Kienzlefon: Öffnungs- und Telefonzeiten, Begrüßung, Menü (Praxis, Rezept, Überweisung, Termin), Apotheken- und Fachstellenweg. '
+                . 'Noch in Arbeit: Erzeugen der Ansagen (Piper; Google und Kokoro wahlweise), Seiten für Zeiten und Texte, Aufnahme von Anliegen. Bis dahin besser ausgeschaltet lassen.</p>'
+                . self::formular($csrf, 'sprachmenue-speichern', $form, 'Speichern'));
+        }
+
         // Telefone
         $liste = '<table class="tf-tabelle"><tr><th>Nr.</th><th>Name</th><th>Warteschlange</th><th>Angemeldet</th><th></th></tr>';
         foreach ($cfg['nebenstellen'] as $n) {

@@ -1,5 +1,13 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.3
+
+- **Sprachmenü von Kienzlefon angeschlossen** (Einstellungen → Sprachmenü, Vorgabe aus): Die Anlage erzeugt ihre Asterisk-Dateien jetzt in der Aufteilung von Kienzlefax (`extensions-kfx-telefonie.conf`, `pjsip-kfx-telefonie.conf`, `queues-kfx.conf`, `queuerules-kfx.conf`). Ist das Sprachmenü an, setzt Kienzlefon 2.7 unverändert darauf auf (`install_asterisk_config`), und das Modul ersetzt die festen Pfade von Kienzlefon durch die eigenen Ordner. Der Praxiseingang geht dann an `kienzlefon-entry` statt direkt in die Warteschlange.
+- `kienzlefon.toml` liegt im Datenordner (`kienzlefon/`, 0600) und bekommt die Ordner des Moduls, Leitung und Absendernummer der Anlage und ein eigenes Passwort für das rote Telefon. Startskripte für alle Programme von Kienzlefon unter `lib/kzf-bin/`.
+- Sprachausgabe wählbar: Piper (Standard), Google und Kokoro wahlweise zuschaltbar. **Noch nicht gebaut:** Erzeugen der Ansagen, Seiten für Zeiten und Texte, Wartemusik, Aufnahme von Anliegen (Whisper). Ohne Ansagen spielt das Menü nichts ab; deshalb vorerst ausgeschaltet lassen.
+- Neues Paket `python3-cryptography` (braucht Kienzlefon für den Faxkanal-unabhängigen Teil des Sprachmenüs).
+- Geprüft mit Tests und Asterisk 20.6 in der Testumgebung: Ein Anruf in den Praxiseingang erreicht das Sprachmenü, das AGI läuft mit der Konfiguration des Moduls und fordert die Ansagen aus dem Modulordner an. Nicht auf der VM und nicht mit echtem Telefon geprüft.
+
 ## 0.1.0-beta.2
 
 - **Kienzlefon 2.7 übernommen** (Stufe 2 beginnt): Python-Paket, Tests, Dokumentation und Vorlagen unverändert unter `kienzlefon/` (Herkunft und Einbauweg: `kienzlefon/HERKUNFT.md`). Noch nicht eingebunden: Die Anlage arbeitet wie in beta.1; Sprachmenü, Zeiten und Ansagen folgen in den nächsten Versionen.

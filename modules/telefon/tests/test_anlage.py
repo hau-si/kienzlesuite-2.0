@@ -106,7 +106,7 @@ class Anlage(unittest.TestCase):
         self.fehler(b, 'ungültig')
 
     def test_pjsip(self):
-        p = self.a.render_pjsip(self.a.check(beispiel()))
+        p = ''.join(self.a.render_pjsip(self.a.check(beispiel())))
         self.assertIn('[transport-udp]\ntype=transport\nprotocol=udp\nbind=0.0.0.0:5070\n', p)
         self.assertIn('[transport-kfx-phone]\ntype=transport\nprotocol=udp\nbind=0.0.0.0:5060\nlocal_net=192.0.2.0/24\n', p)
         self.assertIn('password=geheim\\;mit\\\\zeichen\n', p)                     # ; und \ maskiert
@@ -122,13 +122,13 @@ class Anlage(unittest.TestCase):
     def test_tls(self):
         b = beispiel()
         b['leitungen'][0]['anbieter'] = '1und1-tls'
-        p = self.a.render_pjsip(self.a.check(b))
+        p = ''.join(self.a.render_pjsip(self.a.check(b)))
         self.assertIn('[transport-1und1-tls]\ntype=transport\nprotocol=tls\nbind=0.0.0.0:5061\n', p)
         self.assertIn('server_uri=sip:tls-sip.1und1.de:5061\\;transport=tls\n', p)
         self.assertIn('media_encryption=sdes\n', p)
 
     def test_dialplan(self):
-        e = self.a.render_extensions(self.a.check(beispiel()))
+        e = ''.join(self.a.render_extensions(self.a.check(beispiel())))
         self.assertIn('[kfx-leitung-l1-in]\nexten => _+X.,1,Goto(kfx-leitung-l1-in,${EXTEN:1},1)\nexten => 4930123459,1,Goto(fax-in,s,1)\n', e)
         self.assertIn('exten => _X.,1,Goto(fax-in,s,1)\n', e)            # nur ein Ziel auf der Leitung: jede Nummer
         self.assertIn('[kfx-leitung-l3-in]', e)
@@ -149,7 +149,7 @@ class Anlage(unittest.TestCase):
         b['leitungen'][1]['anbieter'] = 'voip2gsm'
         b['telefon']['ausland'] = True
         b['telefon']['aus_zaehlt'] = False
-        e = self.a.render_extensions(self.a.check(b))
+        e = ''.join(self.a.render_extensions(self.a.check(b)))
         self.assertIn('exten => _+X.,1,Goto(00${EXTEN:1},1)', e)
         self.assertNotIn('Auslandsgespraech gesperrt', e)
         self.assertIn(' same => n,Goto(dial)\n', e)
@@ -157,7 +157,7 @@ class Anlage(unittest.TestCase):
     def test_nur_telefon_ohne_fax(self):
         b = beispiel()
         b['fax'] = {'leitung': ''}
-        e = self.a.render_extensions(self.a.check(b))
+        e = ''.join(self.a.render_extensions(self.a.check(b)))
         self.assertNotIn('[fax-out]', e)
         self.assertNotIn('[fax-in]', e)
         self.assertIn('[kfx-leitung-l1-in]\nexten => _+X.,1,Goto(kfx-leitung-l1-in,${EXTEN:1},1)\nexten => _X.,1,NoOp(Leitung ohne Ziel)', e)
@@ -167,7 +167,7 @@ class Anlage(unittest.TestCase):
         b['telefon']['leitung_ein'] = 'l1'
         b['telefon']['nummer_ein'] = '4930123456'
         b['ueberlauf'] = {}
-        e = self.a.render_extensions(self.a.check(b))
+        e = ''.join(self.a.render_extensions(self.a.check(b)))
         block = e.split('[kfx-leitung-l1-in]')[1].split('\n\n')[0]
         self.assertIn('exten => 4930123459,1,Goto(fax-in,s,1)', block)
         self.assertIn('exten => 4930123456,1,Goto(kfx-phone-in,s,1)', block)
@@ -200,7 +200,9 @@ class Anlage(unittest.TestCase):
         self.assertNotIn('cdr_csv', mods)          # keine Anrufliste mit Rufnummern
         self.assertIn('messages.log => warning,error\n', (etc / 'logger.conf').read_text())
         r = self.a.anwenden(beispiel())
-        self.assertEqual(sorted(r['geaendert']), ['extensions.conf', 'pjsip.conf', 'queuerules.conf', 'queues.conf'])
+        self.assertEqual(sorted(r['geaendert']), sorted(['extensions.conf', 'extensions-kfx-telefonie.conf', 'pjsip.conf', 'pjsip-kfx-telefonie.conf',
+                                                     'queuerules.conf', 'queuerules-kfx.conf', 'queues.conf', 'queues-kfx.conf']))
+        self.assertIn(f'#tryinclude "{etc}/extensions-kfx-telefonie.conf"', (etc / 'extensions.conf').read_text())   # /etc/asterisk ersetzt
         self.assertFalse(r['laeuft'])
         self.assertEqual(oct((etc / 'pjsip.conf').stat().st_mode & 0o777), '0o600')
         self.assertEqual((self.tmp / 'praxis.txt').read_text(), 'Praxis Dr. med. Erika Beispiel\n')
@@ -213,12 +215,12 @@ class Anlage(unittest.TestCase):
 
     def test_transportaenderung_erkannt(self):
         c = self.a.check(beispiel())
-        p1 = self.a.render_pjsip(c)
+        p1 = ''.join(self.a.render_pjsip(c))
         c['nebenstellen'][0]['name'] = 'Empfang neu'
-        self.assertEqual(self.a.transports(p1), self.a.transports(self.a.render_pjsip(c)))
+        self.assertEqual(self.a.transports(p1), self.a.transports(''.join(self.a.render_pjsip(c))))
         b = beispiel()
         b['leitungen'][0]['anbieter'] = '1und1-tls'
-        self.assertNotEqual(self.a.transports(p1), self.a.transports(self.a.render_pjsip(self.a.check(b))))
+        self.assertNotEqual(self.a.transports(p1), self.a.transports(''.join(self.a.render_pjsip(self.a.check(b)))))
 
     def test_asterisk_ausgaben(self):
         reg = (' <Registration/ServerURI..............................>  <Auth....................>  <Status.......>\n'
@@ -252,6 +254,70 @@ class Anlage(unittest.TestCase):
         self.assertIn('Notrufe', json.loads(r.stdout)['fehler'])
         r = subprocess.run([sys.executable, '-B', str(LIB), 'status'], capture_output=True, text=True, env=env)
         self.assertEqual(json.loads(r.stdout), {'laeuft': False})
+
+
+class KienzlefonBruecke(unittest.TestCase):
+    """Sprachmenü: Kienzlefon 2.7 setzt auf die Dateien der Anlage auf; feste Pfade werden durch die des Moduls ersetzt."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.a = load(self.tmp)
+        os.environ['KIENZLE_PROGRAMM'] = str(HERE.parent)
+        self.a.PROGRAM = HERE.parent
+        self.a.KZF_SOURCE = HERE.parent / 'kienzlefon'
+        self.a.KZF_BIN = HERE.parent / 'lib' / 'kzf-bin'
+
+    def tearDown(self):
+        subprocess.run(['rm', '-r', '--', str(self.tmp)], check=False)
+
+    def cfg(self, aktiv=True, tts='piper'):
+        b = beispiel()
+        b['kienzlefon'] = {'aktiv': aktiv, 'tts': tts}
+        return b
+
+    def test_pruefung(self):
+        b = self.cfg()
+        b['telefon'] = {}
+        with self.assertRaises(self.a.Fehler):
+            self.a.check(b)
+        with self.assertRaises(self.a.Fehler):
+            self.a.check(self.cfg(tts='espeak'))
+        self.assertEqual(self.a.check(beispiel())['kienzlefon'], {'aktiv': False, 'tts': 'piper'})
+
+    def test_toml_set(self):
+        t = '[a]\n# Kommentar\nx = 1\n\n[b]\ny = "z"\n'
+        t = self.a.toml_set(t, 'a', 'x', 5)
+        t = self.a.toml_set(t, 'b', 'y', 'neu "q"')
+        t = self.a.toml_set(t, 'c', 'w', True)
+        self.assertEqual(t, '[a]\n# Kommentar\nx = 5\n\n[b]\ny = "neu \\"q\\""\n\n[c]\nw = true\n')
+
+    def test_sprachmenue_eingebunden(self):
+        r = self.a.anwenden(self.cfg())
+        etc = self.tmp / 'asterisk' / 'etc'
+        self.assertIn('extensions-kienzlefon.conf', r['geaendert'])
+        phone = (etc / 'extensions-kfx-telefonie.conf').read_text()
+        self.assertIn('same => n(accepted),Goto(kienzlefon-entry,s,1)', phone)
+        ivr = (etc / 'extensions-kienzlefon.conf').read_text()
+        self.assertIn(f'AGI({HERE.parent}/lib/kzf-bin/kienzlefon-agi,--config,{self.tmp}/kienzlefon/kienzlefon.toml', ivr)
+        for f in etc.iterdir():
+            text = f.read_text()
+            for bad in ('/opt/kienzlefon', '/etc/kienzlefon', '/etc/asterisk', 'telefon-kienzlefon-'):
+                self.assertNotIn(bad, text, f'{bad} in {f.name}')
+        self.assertIn(f'#include "{etc}/features-kienzlefon.conf"', (etc / 'features.conf').read_text())
+        toml = (self.tmp / 'kienzlefon' / 'kienzlefon.toml').read_text()
+        self.assertIn(f'ansagen = "{self.tmp}/kienzlefon/ansagen"', toml)
+        self.assertIn('engine = "piper"', toml)
+        self.assertIn('hauptausgang_endpoint = "kfx-leitung-l2"', toml)
+        self.assertNotIn('CHANGE_ME_RED_PHONE_SECRET', toml)
+        self.assertEqual(oct((self.tmp / 'kienzlefon' / 'kienzlefon.toml').stat().st_mode & 0o777), '0o600')
+        # Zweiter Lauf: nichts ändert sich (das Passwort des roten Telefons bleibt).
+        self.assertEqual(self.a.anwenden(self.cfg())['geaendert'], [])
+        # Grundgerüst beim Start von Asterisk überschreibt die Einbindungen von Kienzlefon nicht.
+        self.a.grundgeruest()
+        self.assertIn('features-kienzlefon.conf', (etc / 'features.conf').read_text())
+        # Ausschalten: Eingang wieder direkt in die Warteschlange.
+        self.a.anwenden(self.cfg(aktiv=False))
+        self.assertIn('same => n(accepted),Goto(kfx-phone-queue,s,1)', (etc / 'extensions-kfx-telefonie.conf').read_text())
 
 
 class FaxEmpfang(unittest.TestCase):

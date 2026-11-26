@@ -16,5 +16,5 @@ ersetzt in den von Kienzlefon geschriebenen Asterisk-Dateien die festen Pfade (`
 `/opt/kienzlefon/venv/bin`) durch die Ordner des Moduls. Programmaufrufe aus dem Dialplan gehen an kleine Startskripte des
 Moduls, die `kienzlefon` aus diesem Ordner laden.
 
-**Sprachausgabe (Entscheidung 26.11.2026):** Piper (Standard, lokal) und Google (nur feste Praxistexte), Kokoro wahlweise.
+**Sprachausgabe (Entscheidung 26.11.2026):** Piper (Standard, lokal); Google (nur feste Praxistexte) und Kokoro wahlweise zuschaltbar.
 Python-Pakete aus PyPI mit festen Versionen in einer eigenen Umgebung des Moduls.

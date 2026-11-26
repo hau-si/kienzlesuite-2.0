@@ -59,6 +59,8 @@ ANBIETER = {
     'andere': {'name': 'Anderer Anbieter', 'domain': ''},
 }
 NOTRUF = {'110', '112', '115', '116116', '116117'}
+# Sprachausgabe für die Ansagen von Kienzlefon: Piper (Standard, lokal), Google und Kokoro wahlweise.
+TTS = ('piper', 'google', 'kokoro')
 
 ID = re.compile(r'^[a-z0-9]{1,12}$')
 NUMMER = re.compile(r'^\+?[0-9]{3,20}$')
@@ -257,10 +259,17 @@ def check(cfg: dict) -> dict:
     if len(out['nebenstellen']) > 100:
         raise Fehler('Höchstens 100 Nebenstellen.')
 
+    kz = cfg.get('kienzlefon') or {}
+    tts = str(kz.get('tts') or 'piper')
+    if tts not in TTS:
+        raise Fehler('Sprachausgabe: Piper, Google oder Kokoro wählen.')
+    out['kienzlefon'] = {'aktiv': kz.get('aktiv') is True, 'tts': tts}
+    if out['kienzlefon']['aktiv'] and not tel.get('leitung_ein'):
+        raise Fehler('Sprachmenü: zuerst die eingehende Telefonleitung unter „Rufnummern“ wählen.')
     nz = cfg.get('netz') or {}
     netz = {'lokal': _net(nz.get('lokal'), 'Netz der Telefone'), 'erlaubt': _net(nz.get('erlaubt'), 'Erlaubtes Netz für Telefone'),
             'extern': _pattern(nz.get('extern'), HOST, 'Öffentliche Adresse', 'praxis.example.org')}
-    if out['nebenstellen'] and not netz['lokal']:
+    if (out['nebenstellen'] or out['kienzlefon']['aktiv']) and not netz['lokal']:
         raise Fehler('Netz der Telefone: Bitte angeben (z. B. 192.0.2.0/24), sonst darf sich kein Telefon anmelden.')
     if not netz['erlaubt']:
         netz['erlaubt'] = netz['lokal']
@@ -344,7 +353,8 @@ def render_line(line: dict, carries_fax: bool) -> str:
     return out
 
 
-def render_pjsip(c: dict) -> str:
+def render_pjsip(c: dict) -> tuple[str, str]:
+    """pjsip.conf (Transporte, Leitungen) und pjsip-kfx-telefonie.conf (Telefone) wie Kienzlefax."""
     tls = any(ANBIETER[x['anbieter']].get('tls') for x in c['leitungen'])
     nets = ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16']
     if c['netz']['lokal'] and not any(ipaddress.ip_network(c['netz']['lokal']).subnet_of(ipaddress.ip_network(n)) for n in nets):
@@ -358,21 +368,23 @@ def render_pjsip(c: dict) -> str:
     if tls:
         out += (f'\n[transport-1und1-tls]\ntype=transport\nprotocol=tls\nbind=0.0.0.0:{TLS_PORT}\nmethod=tlsv1_2\nverify_server=yes\n'
                 f'verify_client=no\nrequire_client_cert=no\nca_list_file={CA_LIST}\nallow_reload=no\n{external}{local}')
-    if c['nebenstellen']:
-        out += f'\n[transport-kfx-phone]\ntype=transport\nprotocol=udp\nbind=0.0.0.0:{PHONE_PORT}\nlocal_net={c["netz"]["lokal"]}\n'
+    phone = '; Erzeugt vom Modul telefon (Telefone wie Kienzlefax telefonie-queue.sh).\n'
+    if c['nebenstellen'] or c['kienzlefon']['aktiv']:
+        phone += f'\n[transport-kfx-phone]\ntype=transport\nprotocol=udp\nbind=0.0.0.0:{PHONE_PORT}\nlocal_net={c["netz"]["lokal"]}\n'
     carries = fax_line(c)
     for line in c['leitungen']:
         out += render_line(line, line['id'] in carries)
+    out += '\n#tryinclude "/etc/asterisk/pjsip-kfx-telefonie.conf"\n'
     allowed = c['netz']['erlaubt']
     for x in c['nebenstellen']:
         n = x['nummer']
         acl = '' if allowed == '0.0.0.0/0' else (f'deny=0.0.0.0/0.0.0.0\npermit={allowed}\ncontact_deny=0.0.0.0/0.0.0.0\ncontact_permit={allowed}\n')
-        out += (f'\n[{n}-auth]\ntype=auth\nauth_type=userpass\nusername={n}\npassword={cfg_value(x["passwort"])}\n'
+        phone += (f'\n[{n}-auth]\ntype=auth\nauth_type=userpass\nusername={n}\npassword={cfg_value(x["passwort"])}\n'
                 f'\n[{n}]\ntype=aor\nmax_contacts=1\nremove_existing=yes\nqualify_frequency=30\n'
                 f'\n[{n}]\ntype=endpoint\ntransport=transport-kfx-phone\ncontext=kfx-phone-local\ndisallow=all\nallow=g722,alaw,ulaw\n'
                 f'auth={n}-auth\naors={n}\ncallerid={x["name"]} <{n}>\ndirect_media=no\nrewrite_contact=yes\nrtp_symmetric=yes\n'
                 f'force_rport=yes\ndevice_state_busy_at=1\n{acl}')
-    return out
+    return out, phone
 
 
 CAPACITY = r"""
@@ -554,7 +566,7 @@ exten => s,1,NoOp(Telefonieeingang Sipgate-Ueberlauf)
  same => n(accepted),Goto(kfx-phone-queue,s,1)
 
 [kfx-phone-queue]
-exten => s,1,NoOp(Telefoniewarteschlange)
+exten => s,1,NoOp(KienzleFax Telefoniewarteschlange)
  same => n,Set(CHANNEL(language)=de)
  same => n,Set(KFX_QUEUE_WAITING=${QUEUE_WAITING_COUNT(praxis)})
  same => n,GotoIf($[${KFX_QUEUE_WAITING} >= @MAX_WARTEND@]?full)
@@ -568,7 +580,8 @@ exten => s,1,NoOp(Telefoniewarteschlange)
 """
 
 
-def render_extensions(c: dict) -> str:
+def render_extensions(c: dict) -> tuple[str, str]:
+    """Hauptdatei (Kanalgrenze, Leitungen, Fax) und Telefonie-Datei (extensions-kfx-telefonie.conf) wie Kienzlefax."""
     agi = str(PROGRAM / 'lib' / 'kfx' / 'kfx_update_status.agi')
     out = ('; Erzeugt vom Modul telefon der Kienzle-Suite (Vorlagen aus Kienzlefax). Änderungen gehen verloren.\n'
            '[general]\nstatic=yes\nwriteprotect=yes\nclearglobalvars=no\n')
@@ -594,6 +607,8 @@ def render_extensions(c: dict) -> str:
         out += (FAX_OUT.replace('@NATIONAL@', national).replace('@AGI@', agi).replace('@ENDPOINT@', endpoint(line['id']))
                 .replace('@KENNUNG@', c['fax']['kennung']).replace('@NAME@', c['fax']['name']))
         out += FAX_IN.replace('@SPOOL@', str(AST / 'spool' / 'fax-empfang')).replace('@EMPFANG@', str(PROGRAM / 'lib' / 'kfx' / 'fax-empfangen'))
+    out += '\n#tryinclude "/etc/asterisk/extensions-kfx-telefonie.conf"\n'
+    main, out = out, '; Erzeugt vom Modul telefon (Telefonie wie Kienzlefax telefonie-queue.sh). Änderungen gehen verloren.\n'
     out += PHONE.replace('@MAX_WARTEND@', str(c['warteschlange']['max_wartend']))
     # Interne Nebenstellen: klingeln nur, wenn frei (kein Anklopfen).
     out += '\n[kfx-phone-local]\n'
@@ -603,7 +618,17 @@ def render_extensions(c: dict) -> str:
                 f' same => n,GotoIf($["${{KFX_INTERNAL_TARGET_STATE}}"="NOT_INUSE"]?dial:busy)\n same => n(dial),Dial(PJSIP/{n},120)\n'
                 f' same => n,Hangup()\n same => n(busy),NoOp(Interner Anruf zu {n} abgewiesen: ${{KFX_INTERNAL_TARGET_STATE}})\n same => n,Hangup(17)\n\n')
     tel = c['telefon']
-    if tel.get('leitung_aus'):
+    if tel.get('leitung_aus') and c['kienzlefon']['aktiv']:
+        # Mit Kienzlefon: Ausgang genau wie Kienzlefax; Kienzlefon ersetzt ihn durch seine Wahlregeln (kienzlefon-outbound).
+        line = by_id[tel['leitung_aus']]
+        if ANBIETER[line['anbieter']].get('national'):
+            out += '; BEGIN voip2gsm\nexten => _+X.,1,Goto(00${EXTEN:1},1)\nexten => _0049X.,1,Goto(0${EXTEN:4},1)\nexten => _49X.,1,Goto(0${EXTEN:2},1)\n; END voip2gsm\n\n'
+        out += ('exten => _X.,1,NoOp(KienzleFax Telefonie ausgehend)\n'
+                f' same => n,GotoIf($["{"y" if tel["aus_zaehlt"] else "n"}"!="y"]?dial)\n'
+                ' same => n,Gosub(kfx_external_capacity,primary-phone,1)\n same => n,GotoIf($["${KFX_CAPACITY_OK}"="1"]?dial)\n'
+                ' same => n,NoOp(KFX PHONE outgoing rejected: primary provider capacity full)\n same => n,Hangup(17)\n'
+                f' same => n(dial),Set(CALLERID(num)={tel["kennung_aus"]})\n same => n,Dial(PJSIP/${{EXTEN}}@{endpoint(line["id"])},120)\n same => n,Hangup()\n')
+    elif tel.get('leitung_aus'):
         line = by_id[tel['leitung_aus']]
         if ANBIETER[line['anbieter']].get('national'):
             out += 'exten => _+X.,1,Goto(00${EXTEN:1},1)\nexten => _0049X.,1,Goto(0${EXTEN:4},1)\nexten => _49X.,1,Goto(0${EXTEN:2},1)\n'
@@ -623,19 +648,19 @@ def render_extensions(c: dict) -> str:
                 f' same => n(dial),Set(CALLERID(num)={tel["kennung_aus"]})\n same => n,Dial(PJSIP/${{EXTEN}}@{endpoint(line["id"])},120)\n same => n,Hangup()\n')
     else:
         out += 'exten => _X.,1,NoOp(Keine ausgehende Leitung eingerichtet)\n same => n,Hangup(21)\n'
-    return out
+    return main, out
 
 
 def render_queues(c: dict) -> tuple[str, str]:
     members = [x for x in c['nebenstellen'] if x['warteschlange']]
-    queues = ('; Erzeugt vom Modul telefon (Warteschlange aus Kienzlefax).\n[general]\npersistentmembers=no\n\n[praxis]\nstrategy=ringall\n'
+    queues = ('; Erzeugt vom Modul telefon (Warteschlange aus Kienzlefax).\n\n[praxis]\nstrategy=ringall\n'
               'autofill=yes\nringinuse=no\njoinempty=yes\nleavewhenempty=no\n'
               '; 19 Sekunden Rufversuch + 1 Sekunde = nächste Stufe nach 20 Sekunden\ntimeout=19\nretry=1\ndefaultrule=kfx-phone-progressive\n'
               'announce-position=yes\nannounce-frequency=60\nmin-announce-frequency=60\nannounce-to-first-user=yes\nannounce-holdtime=no\n'
               f'maxlen={c["warteschlange"]["max_wartend"]}\n')
     for i, x in enumerate(members):
         queues += f'member => PJSIP/{x["nummer"]},{i},{x["name"]},PJSIP/{x["nummer"]},no\n'
-    rules = '; Erzeugt vom Modul telefon.\n[kfx-phone-progressive]\n' + ''.join(f'penaltychange => {i * 20},,,{i}\n' for i in range(1, len(members)))
+    rules = '; Erzeugt vom Modul telefon (Kienzlefax).\n\n[kfx-phone-progressive]\n' + ''.join(f'penaltychange => {i * 20},,,{i}\n' for i in range(1, len(members)))
     return queues, rules
 
 
@@ -726,9 +751,120 @@ def placeholder_files() -> dict[str, str]:
 
 
 def render(c: dict) -> dict[str, str]:
+    """Alle erzeugten Dateien der Anlage in der Aufteilung von Kienzlefax (darauf setzt Kienzlefon auf)."""
     queues, rules = render_queues(c)
-    return {'pjsip.conf': render_pjsip(c), 'extensions.conf': render_extensions(c), 'queues.conf': queues, 'queuerules.conf': rules}
+    pjsip, pjsip_phone = render_pjsip(c)
+    ext, ext_phone = render_extensions(c)
+    return {'pjsip.conf': pjsip, 'pjsip-kfx-telefonie.conf': pjsip_phone, 'extensions.conf': ext, 'extensions-kfx-telefonie.conf': ext_phone,
+            'queues.conf': '[general]\npersistentmembers=no\n\n#include "/etc/asterisk/queues-kfx.conf"\n', 'queues-kfx.conf': queues,
+            'queuerules.conf': '; Erzeugt vom Modul telefon.\n#include "/etc/asterisk/queuerules-kfx.conf"\n', 'queuerules-kfx.conf': rules}
 
+
+
+# ---- Kienzlefon (Sprachmenü, Zeiten, Ansagen) ------------------------------------------------------------------
+KZF_SOURCE = PROGRAM / 'kienzlefon'          # unverändert übernommenes Kienzlefon 2.7 (kienzlefon/HERKUNFT.md)
+KZF_DATA = DATA / 'kienzlefon'
+KZF_CONFIG = KZF_DATA / 'kienzlefon.toml'
+KZF_BIN = PROGRAM / 'lib' / 'kzf-bin'         # Startskripte für die Programme, die der Dialplan von Kienzlefon aufruft
+# Dateien, die Kienzlefon schreibt bzw. ändert (install_asterisk_config), zusätzlich zu den Dateien der Anlage.
+KZF_FILES = ('features.conf', 'musiconhold.conf', 'pjsip-kienzlefon.conf', 'extensions-kienzlefon.conf', 'queues-kienzlefon.conf',
+             'features-kienzlefon.conf', 'musiconhold-kienzlefon.conf', 'queuerules-kienzlefon.conf')
+
+
+def toml_set(text: str, section: str, key: str, value) -> str:
+    """Einen Wert in einer TOML-Datei setzen und Kommentare behalten (wie _set_toml_value aus kienzlefon/webadmin.py, auch für Zahlen)."""
+    literal = ('true' if value else 'false') if isinstance(value, bool) else str(value) if isinstance(value, (int, float)) else json.dumps(value, ensure_ascii=False)
+    header = re.search(rf'^\[{re.escape(section)}\]\s*$', text, re.M)
+    if header is None:
+        return text.rstrip() + f'\n\n[{section}]\n{key} = {literal}\n'
+    nxt = re.search(r'^\[[^]]+\]\s*$', text[header.end():], re.M)
+    end = header.end() + (nxt.start() if nxt else len(text) - header.end())
+    body, n = re.subn(rf'^(?P<p>{re.escape(key)}\s*=\s*).*$', lambda m: m['p'] + literal, text[header.end():end], count=1, flags=re.M)
+    if n == 0:
+        body = body.rstrip() + f'\n{key} = {literal}\n'
+    return text[:header.end()] + body + text[end:]
+
+
+def kienzlefon_toml(c: dict) -> str:
+    """kienzlefon.toml: die gespeicherte Fassung (später aus den Seiten des Moduls) bzw. die Vorlage von Kienzlefon, mit den Ordnern
+    des Moduls und den Angaben der Anlage. Geheimnisse (rotes Telefon) werden einmal erzeugt und bleiben."""
+    try:
+        text = KZF_CONFIG.read_text(encoding='utf-8')
+    except OSError:
+        text = (KZF_SOURCE / 'config' / 'kienzlefon.toml.example').read_text(encoding='utf-8')
+    d = KZF_DATA
+    by_id = {x['id']: x for x in c['leitungen']}
+    tel = c['telefon']
+    members = sorted((x['nummer'] for x in c['nebenstellen'] if x['warteschlange']), key=int)
+    werte = [
+        ('pfade', 'spool', str(d / 'spool')), ('pfade', 'runtime', str(d / 'run')), ('pfade', 'ansagen', str(d / 'ansagen')),
+        ('pfade', 'ansagen_master', str(d / 'ansagen-master')), ('whisper', 'modellverzeichnis', str(d / 'modelle')),
+        ('telepraxis', 'ausgabeverzeichnis', str(d / 'vorgaenge')), ('telepraxis', 'public_key', str(d / 'telepraxis-public.pem')),
+        ('tts', 'engine', c['kienzlefon']['tts']), ('tts', 'kokoro_generator', str(KZF_BIN / 'kienzlefon-kokoro-tts-generate')),
+        ('tts', 'kokoro_modellverzeichnis', str(d / 'kokoro-thorsten')), ('tts', 'qwen_generator', str(KZF_BIN / 'kienzlefon-qwen3-tts-generate')),
+        ('tts', 'google_generator', str(KZF_BIN / 'kienzlefon-google-tts-generate')), ('tts', 'google_konfig', str(d / 'google-tts.conf')),
+        ('tts', 'stimmenverzeichnis', str(d / 'piper-voices')), ('tts', 'uploadverzeichnis', str(d / 'upload')),
+        ('asterisk', 'telefon_transport', 'transport-kfx-phone'),
+        ('asterisk', 'hauptausgang_endpoint', endpoint(tel['leitung_aus']) if tel.get('leitung_aus') in by_id else 'kfx-phone-in-endpoint'),
+        ('asterisk', 'hauptausgang_nummer', tel.get('kennung_aus') or '0'), ('asterisk', 'ausgehend_zaehlt_kanalgrenze', bool(tel.get('aus_zaehlt', True))),
+        ('asterisk', 'erste_queue_nebenstelle', int(members[0]) if members else 201), ('asterisk', 'queue_nebenstellen_anzahl', max(1, len(members))),
+        ('ansagen_ivr', 'audit_log', str(d / 'ansagen-ivr-audit.jsonl')), ('wahlregeln', 'audit_log', str(d / 'telefonie-audit.jsonl')),
+        ('control_api', 'credentials_file', str(d / 'control-identities.json')),
+        # Wartemusik kommt mit dem Einbau der Musik von Johannes Plachetka; bis dahin Klingelzeichen.
+        ('wartemusik', 'installiert', False), ('wartemusik', 'modus', 'klingelzeichen'),
+    ]
+    if c.get('praxis'):
+        werte.append(('praxis', 'name', c['praxis']))
+    for section, key, value in werte:
+        text = toml_set(text, section, key, value)
+    if 'CHANGE_ME_RED_PHONE_SECRET' in text:
+        text = toml_set(text, 'asterisk', 'rotes_telefon_passwort', secrets.token_hex(16))
+    return text
+
+
+def kienzlefon_anwenden(files: dict[str, str], c: dict) -> dict[str, str]:
+    """Kienzlefon auf die Dateien der Anlage setzen: install_asterisk_config aus Kienzlefon 2.7 in einem Arbeitsordner, danach die
+    festen Pfade von Kienzlefon durch die Ordner des Moduls ersetzen. Liefert alle Dateien (die der Anlage und die von Kienzlefon)."""
+    import sys
+    import tempfile
+    if str(KZF_SOURCE) not in sys.path:
+        sys.path.insert(0, str(KZF_SOURCE))
+    from kienzlefon.asterisk import AsteriskConfigError, install_asterisk_config
+    from kienzlefon.config import load_config
+    toml = kienzlefon_toml(c)
+    for sub in ('', 'spool', 'run', 'ansagen', 'ansagen-master', 'upload', 'vorgaenge', 'piper-voices'):
+        (KZF_DATA / sub).mkdir(mode=0o700, parents=True, exist_ok=True)
+    write(KZF_CONFIG, toml, 0o600)
+    try:
+        config = load_config(KZF_CONFIG)
+    except Exception as e:  # noqa: BLE001 - Kienzlefon meldet Konfigurationsfehler mit eigenen Ausnahmen
+        raise Fehler(f'Kienzlefon: {str(e)[:200]}') from None
+    with tempfile.TemporaryDirectory(prefix='telefon-kienzlefon-') as tmp:
+        staging = Path(tmp)
+        for name, text in files.items():
+            (staging / name).write_text(text, encoding='utf-8')
+        try:
+            install_asterisk_config(config, staging)
+        except AsteriskConfigError as e:
+            raise Fehler(f'Kienzlefon: {e}') from None
+        out = {}
+        for name in (*files, *KZF_FILES):
+            path = staging / name
+            if path.is_file():
+                # Einbindungen mit dem Pfad des Arbeitsordners (z. B. features-kienzlefon.conf) auf /etc/asterisk zurückführen.
+                out[name] = path.read_text(encoding='utf-8').replace(f'{staging}/', '/etc/asterisk/').replace(f'{staging.resolve()}/', '/etc/asterisk/')
+    return out
+
+
+def pfade_ersetzen(files: dict[str, str]) -> dict[str, str]:
+    """Feste Pfade von Kienzlefax/Kienzlefon (Einbindungen, Programmaufrufe) durch die Ordner des Moduls ersetzen."""
+    replace = {'/opt/kienzlefon/venv/bin/': f'{KZF_BIN}/', '/etc/kienzlefon/kienzlefon.toml': str(KZF_CONFIG), '/etc/asterisk/': f'{ETC}/'}
+    out = {}
+    for name, text in files.items():
+        for old, new in replace.items():
+            text = text.replace(old, new)
+        out[name] = text
+    return out
 
 # ---- Dateien und Asterisk ------------------------------------------------------------------------------------------
 def write(path: Path, text: str, mode: int = 0o600) -> bool:
@@ -752,7 +888,9 @@ def grundgeruest() -> None:
     for d in (ETC, AST / 'lib', AST / 'lib' / 'keys', AST / 'spool' / 'fax-empfang', AST / 'run', AST / 'log', AST / 'cache'):
         d.mkdir(mode=0o700, parents=True, exist_ok=True)
     for name, text in base_files().items():
-        write(ETC / name, text)
+        # features.conf und musiconhold.conf ergänzt Kienzlefon um Einbindungen; die schreibt nur „anwenden“ neu.
+        if name not in ('features.conf', 'musiconhold.conf') or not (ETC / name).exists():
+            write(ETC / name, text)
     for name, text in placeholder_files().items():
         if not (ETC / name).exists():
             write(ETC / name, text)
@@ -780,11 +918,15 @@ def anwenden(cfg: dict) -> dict:
     c = check(cfg)
     grundgeruest()
     files = render(c)
+    if c['kienzlefon']['aktiv']:
+        files = kienzlefon_anwenden({**files, **{n: t for n, t in base_files().items() if n in ('features.conf', 'musiconhold.conf')}}, c)
+    files = pfade_ersetzen(files)
     old = ''
-    try:
-        old = (ETC / 'pjsip.conf').read_text(encoding='utf-8')
-    except OSError:
-        pass
+    for name in ('pjsip.conf', 'pjsip-kfx-telefonie.conf'):
+        try:
+            old += (ETC / name).read_text(encoding='utf-8')
+        except OSError:
+            pass
     changed = [name for name, text in files.items() if write(ETC / name, text)]
     if c['praxis'] or not (DATA / 'praxis.txt').exists():
         write(DATA / 'praxis.txt', (c['praxis'] or 'Praxis') + '\n', 0o600)
@@ -792,17 +934,20 @@ def anwenden(cfg: dict) -> dict:
                                          'kennung': c['fax'].get('kennung', '')}) + '\n', 0o600)
     result = {'ok': True, 'geaendert': changed, 'neustart': False, 'laeuft': running()}
     if result['laeuft'] and changed:
-        if transports(old) != transports(files['pjsip.conf']):
+        if transports(old) != transports(files['pjsip.conf'] + files.get('pjsip-kfx-telefonie.conf', '')):
             # Wie Kienzlefax: Transportänderung braucht einen Neustart; erst wenn kein Gespräch mehr läuft.
             rx('core restart when convenient')
             result['neustart'] = True
         else:
-            if 'pjsip.conf' in changed:
+            if any(n.startswith('pjsip') for n in changed):
                 rx('module reload res_pjsip.so')
-            if 'extensions.conf' in changed:
+            if any(n.startswith('extensions') for n in changed):
                 rx('dialplan reload')
-            if 'queues.conf' in changed or 'queuerules.conf' in changed:
+            if any(n.startswith('queue') for n in changed):
                 rx('module reload app_queue.so')
+            if any(n.startswith(('features', 'musiconhold')) for n in changed):
+                rx('module reload features')
+                rx('moh reload')
             rx('pjsip send register *all')
     return result
 

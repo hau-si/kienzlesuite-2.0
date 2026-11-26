@@ -21,7 +21,8 @@ final class Anlage {
         return ['leitungen' => [], 'fax' => ['leitung' => '', 'nummer' => '', 'kennung' => '', 'name' => 'Fax'],
             'telefon' => ['leitung_ein' => '', 'nummer_ein' => '', 'leitung_aus' => '', 'kennung_aus' => '', 'aus_zaehlt' => true, 'ausland' => false, 'sonderrufnummern' => false],
             'ueberlauf' => ['leitung' => '', 'nummer' => ''], 'kanaele' => ['gesamt' => 4, 'telefon' => 3, 'fax' => 3, 'ueberlauf' => 2],
-            'warteschlange' => ['max_wartend' => 5], 'nebenstellen' => [], 'netz' => ['lokal' => '', 'erlaubt' => '', 'extern' => '']];
+            'warteschlange' => ['max_wartend' => 5], 'nebenstellen' => [], 'netz' => ['lokal' => '', 'erlaubt' => '', 'extern' => ''],
+            'kienzlefon' => ['aktiv' => false, 'tts' => 'piper']];
     }
 
     public static function laden(): array {
@@ -117,6 +118,16 @@ final class Anlage {
     public static function kanaeleSpeichern(array $cfg, array $p): array {
         foreach (['gesamt', 'telefon', 'fax', 'ueberlauf'] as $f) $cfg['kanaele'][$f] = (int)($p['k_' . $f] ?? 0) ?: null;
         $cfg['warteschlange']['max_wartend'] = (int)($p['max_wartend'] ?? 0) ?: null;
+        return $cfg;
+    }
+
+    public const SPRACHAUSGABE = ['piper' => 'Piper (lokal, Standard)', 'google' => 'Google (nur feste Praxistexte, Schlüssel nötig)', 'kokoro' => 'Kokoro-Thorsten (lokal, großer Download)'];
+
+    /** Sprachmenü (Kienzlefon) ein/aus und Sprachausgabe der Ansagen. */
+    public static function sprachmenueSpeichern(array $cfg, array $p): array {
+        $tts = (string)($p['tts'] ?? 'piper');
+        if (!isset(self::SPRACHAUSGABE[$tts])) throw new \InvalidArgumentException('Bitte eine Sprachausgabe wählen.');
+        $cfg['kienzlefon'] = ['aktiv' => !empty($p['aktiv']), 'tts' => $tts];
         return $cfg;
     }
 
