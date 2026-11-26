@@ -157,7 +157,6 @@ class PadGeraet:
             raise RuntimeError(f'Pad nicht erreichbar ({adresse}:{port}). Läuft es im Ethernet-Modus und stimmen Adresse und Port?')
         self.pruefen('Pad öffnen', L.STDeviceOpen(0, True))
         L.STControlSetCallback(self._cb, None)
-        self.pruefen('Display', L.STDisplaySetTarget(0))
 
     def pruefen(self, name: str, rc: int) -> int:
         if rc < 0:
@@ -168,6 +167,7 @@ class PadGeraet:
         pfad = os.path.join(self.temp, 'seite.png')
         bild.save(pfad)
         self.pruefen('Bild anzeigen', self.lib.STDisplayErase())
+        self.pruefen('Anzeigeziel', self.lib.STDisplaySetTarget(0))   # wie im Aufnahmetest (padsign.py): nach dem Löschen setzen
         self.pruefen('Bild anzeigen', self.lib.STDisplaySetImageFromFile(0, 0, pfad))
 
     def knoepfe(self, rechtecke: dict) -> dict:
@@ -179,7 +179,7 @@ class PadGeraet:
         rc = self.pruefen('Aufnahme', self.lib.STSignatureStart())
         self.zaehler.pop(EV_SIGNATUR, None)
         self.stift = {}
-        log(f'Aufnahme gestartet (Feld {tuple(feld)}, Rückgabe {rc}, läuft: {self.lib.STSignatureGetState()})')
+        log(f'Aufnahme gestartet (Feld {tuple(feld)}, Rückgabe {rc})')
 
     def unterschrift_neu(self) -> None:
         self.pruefen('Löschen', self.lib.STSignatureRetry())

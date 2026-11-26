@@ -1,5 +1,9 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.28
+
+- **Pad-Dienst an den funktionierenden Aufnahmetest angeglichen** (im Test `padsign.py` kommen die Stiftpunkte an, im Dienst bisher keine): Anzeigeziel wird wie im Test nach dem Löschen der Seite gesetzt, kein Statusabruf mehr zwischen Aufnahmestart und Unterschrift. **Nicht geprüft:** echtes Pad; falls weiterhin 0 Stiftereignisse, Protokoll `journalctl -u kienzle-signatur-pad` schicken.
+
 ## 0.1.0-beta.27
 
 - **Aufnahmetest mit Varianten (Fehlersuche „keine Stiftpunkte“):** Der einfache Test (`padsign.py`) nimmt am Delta eine Unterschrift auf (Rohdaten 1268 Bytes), der Pad-Dienst bekommt dagegen keine Stiftpunkte. Der Test lässt sich jetzt mit `PADSIGN=bild` (Seite wie im Dienst, als Bild) und/oder `PADSIGN=stop` (mit Anhalten statt Bestätigen abschließen) starten und meldet am Ende die Zahl der Stiftereignisse. Damit lässt sich eingrenzen, was im Dienst anders ist. Nicht am echten Pad geprüft.
