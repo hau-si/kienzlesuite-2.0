@@ -4,7 +4,7 @@
 [module]
 id = "signatur"
 name = "Signatur"
-version = "0.1.0-beta.16"
+version = "0.1.0-beta.25"
 core_api = "1"
 description = "Verträge, Aufklärungen und Datenschutzerklärungen am Unterschriftenpad unterschreiben lassen, auch zeitversetzt, und als PDF in T2med ablegen."
 
@@ -29,7 +29,7 @@ label = "Signatur: Vorgänge anlegen, ansehen und abbrechen"
 id = "vorlagen"
 label = "Signatur: Vorlagen und Vertragstexte ändern"
 
-# Startkontext für den zentralen Arbeitsplatz-Starter der Basis (Verwaltung → Starter): POST https://<server>/starter/signatur
+# Startkontext für den zentralen Arbeitsplatz-Starter der Basis (Verwaltung → Arbeitsplätze): POST https://<server>/starter/signatur
 [[starters]]
 schema = "kienzle-signatur"
 label = "Signatur"

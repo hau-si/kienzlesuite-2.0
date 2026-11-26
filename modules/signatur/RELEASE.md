@@ -1,5 +1,45 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.25
+
+- **Patient immer oben rechts wie in der Kasse:** Der Kasten ist stets sichtbar; ohne Vorwahl steht darin das Namensfeld (manuelle Eingabe), nach Übernahme aus T2med oder Kasse der Name mit „Anderen Patienten wählen“. Darunter die Dokumentauswahl.
+- **IGeL-Vertrag der Kasse ist fest:** Die älteste Vorlage der Art IGeL kann nicht gelöscht oder abgeschaltet werden und bleibt Art IGeL; der Text ist frei bearbeitbar.
+- **Vorgangsliste wie in der Kasse:** Links die Vorgänge der letzten 7 Tage, neuester oben, mit „Zum Pad senden“ und „Löschen“; „Abbrechen“ nur, solange der Vorgang am Pad liegt (dann kein Löschen). Löschen geht nun in jedem Status außer „am Pad“.
+- Einrichtungsleitfaden: erster Punkt „Benötigte Hardware“ (signotec Delta, Ethernet oder PoE-Ethernet). Nicht auf dem Server geprüft.
+
+## 0.1.0-beta.24
+
+- **Start aus T2med: HTTP 403 behoben (wahrscheinliche Ursache):** Die Kasse nimmt den öffentlichen T2med-Demo-Schlüssel, wenn unter Verwaltung → Verbindungen → T2med kein API-Schlüssel steht; Signatur schickte dann einen leeren Schlüssel und T2med lehnte den Abruf des Patienten ab. Signatur macht es jetzt wie die Kasse. Bei 401/403 nennt die Meldung (und `starter.log` am PC) den API-Schlüssel und den Drittanbieter-Zugriff als Ursache. Nicht gegen echtes T2med geprüft.
+
+## 0.1.0-beta.23
+
+- **Neues Layout der Startseite wie in der Kasse:** Links die offenen Vorgänge (am Pad zuerst, mit den Knöpfen zum Vorgang), rechts groß der Patient und darunter die Dokumentauswahl als Liste mit Auswahlpunkten (statt Auswahlfeld) und dem Knopf „Vorgang anlegen“. Auf schmalen Bildschirmen stehen die Spalten untereinander.
+- Symbole vor „Start“, „Alle Vorgänge“ und „Einstellungen“ im Seitenkopf. Nicht auf dem Server geprüft.
+
+## 0.1.0-beta.22
+
+- **Vorgewählter Patient oben:** Beim Start aus T2med (und bei der Übergabe aus der Kasse) erscheint oben ein Kasten mit Name und Geburtsdatum des Patienten. Das Patientenfeld in „Neuer Vorgang“ ist dann ausgeblendet; „Anderen Patienten wählen“ im Kasten setzt alles zurück. Nicht auf dem Server geprüft.
+
+## 0.1.0-beta.21
+
+- **Name und Anrede als Platzhalter:** `{{vorname}}`, `{{nachname}}`, `{{anrede}}` (Herr oder Frau) und `{{briefanrede}}` („Sehr geehrter Herr Mustermann“, „Sehr geehrte Frau Musterfrau“, bei divers, unbestimmt oder unbekannt „Guten Tag Vorname Nachname“). Vor- und Nachname sowie das Geschlecht kommen aus T2med und lassen sich in „Neuer Vorgang“ ändern. Einen Titel (Dr., Prof.) kennt die T2med-Schnittstelle nicht.
+- **Telefon und E-Mail in T2med übernehmen:** Bei einem Start aus T2med gibt es in „Neuer Vorgang“ das Häkchen „… nach der Unterschrift in T2med übernehmen“. Sind Telefon oder E-Mail geändert, steht der Vorgang mit „Für T2med vorgemerkt“ in der Liste; nach der Unterschrift schreibt der Knopf „Kontaktdaten in T2med übernehmen“ nur diese Angaben (Patient frisch lesen, nur Telefon und E-Mail ersetzen, mit Versionsprüfung zurückschreiben). Es wird nie automatisch geschrieben und nichts gelöscht. Das Zugriffstoken liegt dafür verschlüsselt höchstens 4 Stunden auf dem Server. Bei der Übergabe aus der Kasse gibt es das noch nicht (kommt mit der Rückgabe an die Kasse). Nicht auf dem Server und nicht gegen echtes T2med geprüft: bitte zuerst mit einem Testpatienten.
+- **Keine blauen Punkte mehr** im Menü: Auch „Pad-Software hochladen“ ist nur noch ein Hinweis.
+
+## 0.1.0-beta.20
+
+- **Platzhalter für Telefon, E-Mail, Geburtsdatum und Anschrift:** `{{telefon}}`, `{{email}}`, `{{geburtsdatum}}`, `{{adresse}}` stehen in Vorlagen zur Verfügung. Die Daten kommen aus T2med (Start aus T2med und Übergabe aus der Kasse) und lassen sich in „Neuer Vorgang“ unter „Weitere Patientendaten“ noch ändern.
+- **Platzhalter per Klick einfügen:** Unter dem Textfeld jeder Vorlage stehen Knöpfe für alle Platzhalter; ein Klick fügt den Platzhalter an der Cursorstelle ein.
+- **Übergabe aus der Kasse** öffnet „Neuer Vorgang“ mit Patient, Kontaktdaten und Leistungsliste; Dokument (und Pad) wählt man dort selbst. Nicht auf dem Server geprüft.
+
+## 0.1.0-beta.18
+
+- **Leistungsliste aus der Kasse:** „Neuer Vorgang“ nimmt eine Liste von Leistungen samt Patient entgegen (Übergabe über die Adresse, `#uebergabe=…`). Summe und Leistungen kommen aus der Liste ins Dokument, neuer Platzhalter `{{leistungen}}` (ohne Liste die eingegebene Leistung). Der Vorgang merkt sich Herkunft („kasse“), Verweis auf den Kassenvorgang und die Liste (Schema 4). Das Muster „IGeL-Vertrag“ nutzt `{{leistungen}}`; bereits gespeicherte Vorlagen bleiben unverändert und können den Platzhalter selbst einbauen. PDF, Rückgabe an die Kasse und Speichern in T2med folgen. Nicht auf der VM geprüft.
+
+## 0.1.0-beta.17
+
+- **Abgebrochene Vorgänge wieder aufnehmen:** In der Vorgangsliste hat ein abgebrochener Vorgang jetzt den Knopf „Wieder aufnehmen“. Er kehrt zu „Wartet auf Unterschrift“ zurück, war er schon unterschrieben, zu „Unterschrieben“; am Vorgang steht „Wieder aufgenommen.“ Eine abgelaufene T2med-Verbindung wird wie bisher angezeigt. Nicht im Browser geprüft.
+
 ## 0.1.0-beta.16
 
 - **Unterschrift am Pad: Fehlersuche und Umbau beim „OK“.** Das Protokoll aus beta.15 zeigte „0 Punkte erfasst“ bei sichtbarer Unterschrift und keine Stift-Ereignisse der Pad-Bibliothek. Ob die Zahl von `STSignatureStop` überhaupt die Punktzahl ist, ist unklar; deshalb entscheidet jetzt die Größe der Unterschriftsdaten (`STSignatureGetSignData` nach dem Anhalten). Sind Daten da, werden sie gespeichert (ohne `Confirm`, das nur das Display leert).

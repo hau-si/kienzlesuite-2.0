@@ -8,6 +8,8 @@ namespace KienzleSignatur;
  */
 class Fhir {
     public const KONTEXT = 'https://fhir.t2med.de/identifier/kontext';
+    /** Öffentlicher Demo-Schlüssel von T2med (github.com/T2med/fhir-demoapplication); gilt wie in der Kasse, wenn in der Basis kein Schlüssel hinterlegt ist. */
+    public const DEMO_SCHLUESSEL = '7QwA7931lJSQfMKuTH4MQXLn4YEiNhE5tggnYKlY4HE';
 
     /** @param array<string,mixed> $v Verbindung „t2med“ der Basis */
     public function __construct(private array $v, private string $caDatei = '') {}
@@ -20,12 +22,16 @@ class Fhir {
         return $url !== '' && in_array(rtrim($url, '/'), $liste, true);
     }
 
-    /** @return array{id:string,name:string,geburtsdatum:string} */
+    /** @return array{id:string,name:string,vorname:string,nachname:string,geschlecht:string,geburtsdatum:string,telefon:string,email:string,adresse:string} */
     public function patient(string $kontext, string $token): array {
         $basis = rtrim((string)($this->v['base_url'] ?? ''), '/');
         if ($basis === '') throw new \RuntimeException('T2med ist in der Basis nicht eingerichtet (Verwaltung → Verbindungen).');
         $antwort = $this->anfrage($basis . '/Patient?' . http_build_query(['identifier' => self::KONTEXT . '|' . $kontext]), $token);
-        if ($antwort['status'] !== 200) throw new \RuntimeException('Patient konnte nicht aus T2med geladen werden (HTTP ' . $antwort['status'] . '). Bitte frisch aus der Patientenakte öffnen.');
+        if ($antwort['status'] !== 200) throw new \RuntimeException('Patient konnte nicht aus T2med geladen werden (HTTP ' . $antwort['status'] . '). ' . match (true) {
+            $antwort['status'] === 401, $antwort['status'] === 403 => 'T2med lehnt den Zugriff ab: den API-Schlüssel (Verwaltung → Verbindungen → T2med) und den Drittanbieter-Zugriff in T2med prüfen; außerdem muss der Aufruf frisch aus der Patientenakte kommen.',
+            $antwort['status'] === 404 => 'Die Adresse oder der Kontext ist T2med unbekannt. Bitte frisch aus der Patientenakte öffnen und die FHIR-Adresse prüfen.',
+            default => 'Bitte frisch aus der Patientenakte öffnen.',
+        });
         $body = $antwort['body']; $liste = [];
         if (($body['resourceType'] ?? '') === 'Patient') $liste[] = $body;
         elseif (($body['resourceType'] ?? '') === 'Bundle') foreach ($body['entry'] ?? [] as $e) if (($e['resource']['resourceType'] ?? '') === 'Patient') $liste[] = $e['resource'];
@@ -34,14 +40,74 @@ class Fhir {
         $name = trim(implode(' ', array_filter((array)($n['given'] ?? []), 'is_string')) . ' ' . (is_string($n['family'] ?? null) ? $n['family'] : ''));
         $name = trim(preg_replace('/[\x00-\x1f\x7f]+/u', ' ', $name) ?? '');
         $geb = is_string($p['birthDate'] ?? null) && preg_match('/^\d{4}-\d{2}-\d{2}$/D', $p['birthDate']) ? $p['birthDate'] : '';
-        return ['id' => (string)$p['id'], 'name' => mb_substr($name !== '' ? $name : 'Patient ' . $p['id'], 0, 80), 'geburtsdatum' => $geb];
+        $tel = ''; $mail = '';
+        $kontakte = array_filter(is_array($p['telecom'] ?? null) ? $p['telecom'] : [], static fn($c) => is_array($c) && ($c['use'] ?? '') !== 'old' && is_string($c['value'] ?? null));
+        usort($kontakte, static fn($a, $b) => ($a['rank'] ?? PHP_INT_MAX) <=> ($b['rank'] ?? PHP_INT_MAX));
+        foreach ($kontakte as $c) {
+            $w = trim($c['value']);
+            if ($mail === '' && ($c['system'] ?? '') === 'email' && strlen($w) <= 254 && filter_var($w, FILTER_VALIDATE_EMAIL)) $mail = $w;
+            if ($tel === '' && in_array($c['system'] ?? '', ['phone', 'sms'], true) && preg_match('/^[0-9 +()\/.-]{3,40}$/D', $w)) $tel = $w;
+        }
+        $adresse = '';
+        foreach (is_array($p['address'] ?? null) ? $p['address'] : [] as $a) {
+            if (!is_array($a) || ($a['use'] ?? '') === 'old') continue;
+            $ende = $a['period']['end'] ?? '';
+            if (is_string($ende) && $ende !== '' && substr($ende, 0, 10) < date('Y-m-d')) continue;
+            $teile = array_filter(is_array($a['line'] ?? null) ? $a['line'] : [], 'is_string');
+            $teile[] = trim((string)($a['postalCode'] ?? '') . ' ' . (string)($a['city'] ?? ''));
+            $adresse = mb_substr(trim(preg_replace('/[\x00-\x1f\x7f]+/u', ' ', implode(', ', array_filter(array_slice($teile, 0, 5)))) ?? ''), 0, 200);
+            if ($adresse !== '') break;
+        }
+        $vorname = trim(preg_replace('/[\x00-\x1f\x7f]+/u', ' ', implode(' ', array_filter((array)($n['given'] ?? []), 'is_string'))) ?? '');
+        $nachname = trim(preg_replace('/[\x00-\x1f\x7f]+/u', ' ', is_string($n['family'] ?? null) ? $n['family'] : '') ?? '');
+        $geschlecht = in_array($p['gender'] ?? '', ['male', 'female', 'other', 'unknown'], true) ? $p['gender'] : 'unknown';
+        return ['id' => (string)$p['id'], 'name' => mb_substr($name !== '' ? $name : 'Patient ' . $p['id'], 0, 80), 'vorname' => mb_substr($vorname, 0, 80), 'nachname' => mb_substr($nachname, 0, 80), 'geschlecht' => $geschlecht,
+            'geburtsdatum' => $geb, 'telefon' => $tel, 'email' => $mail, 'adresse' => $adresse];
+    }
+
+    /**
+     * Telefon und/oder E-Mail eines Patienten in T2med ändern. Der Patient wird frisch gelesen, nur diese beiden Angaben werden
+     * ersetzt (leer = unverändert lassen, nie löschen), alles andere geht unverändert zurück; PUT mit If-Match auf die gelesene Version.
+     * @return array{telefon:bool,email:bool} was tatsächlich geändert wurde
+     */
+    public function kontaktSchreiben(string $patientId, string $token, string $telefon, string $email): array {
+        if (!preg_match('/^[A-Za-z0-9._-]{1,64}$/D', $patientId)) throw new \InvalidArgumentException('Ungültige Patienten-ID.');
+        $basis = rtrim((string)($this->v['base_url'] ?? ''), '/');
+        if ($basis === '') throw new \RuntimeException('T2med ist in der Basis nicht eingerichtet (Verwaltung → Verbindungen).');
+        $url = $basis . '/Patient/' . rawurlencode($patientId);
+        $alt = $this->anfrage($url, $token);
+        if ($alt['status'] !== 200 || !is_array($alt['body']) || ($alt['body']['resourceType'] ?? '') !== 'Patient' || ($alt['body']['id'] ?? '') !== $patientId) {
+            throw new \RuntimeException('Der Patient konnte vor dem Ändern nicht aus T2med gelesen werden (HTTP ' . $alt['status'] . '). Bitte frisch aus der Patientenakte öffnen.');
+        }
+        $p = $alt['body'];
+        $version = (string)($p['meta']['versionId'] ?? '');
+        $teil = $version !== '' ? preg_replace('~^.*/_history/~', '', $version) : '';
+        $telecom = is_array($p['telecom'] ?? null) ? array_values($p['telecom']) : [];
+        $geaendert = ['telefon' => false, 'email' => false];
+        foreach (['telefon' => ['phone', $telefon], 'email' => ['email', $email]] as $art => [$system, $wert]) {
+            if ($wert === '') continue;
+            $stelle = null;
+            foreach ($telecom as $i => $c) if (is_array($c) && ($c['system'] ?? '') === $system && ($c['use'] ?? '') !== 'old') { $stelle = $i; break; }
+            if ($stelle === null) { $telecom[] = ['system' => $system, 'value' => $wert, 'use' => 'home']; $geaendert[$art] = true; }
+            elseif (($telecom[$stelle]['value'] ?? '') !== $wert) { $telecom[$stelle]['value'] = $wert; $geaendert[$art] = true; }
+        }
+        if (!$geaendert['telefon'] && !$geaendert['email']) return $geaendert;
+        $p['telecom'] = $telecom;
+        $p['meta']['profile'] = ['https://fhir.t2med.de/StructureDefinition/FhirApiPatient|1.0.0'];
+        $kopf = ['Content-Type: application/fhir+json'];
+        if ($teil !== '' && preg_match('/^\d{1,12}$/D', $teil)) $kopf[] = 'If-Match: W/"' . $teil . '"';
+        $neu = $this->anfrage($url, $token, 'PUT', $p, $kopf);
+        if ($neu['status'] === 409) throw new \RuntimeException('Der Patient wurde in T2med inzwischen geändert. Bitte frisch aus der Patientenakte öffnen und erneut übernehmen.');
+        if ($neu['status'] < 200 || $neu['status'] > 299) throw new \RuntimeException('T2med hat die Änderung abgelehnt (HTTP ' . $neu['status'] . ').');
+        return $geaendert;
     }
 
     /** @return array{status:int,body:mixed} */
-    private function anfrage(string $url, string $token): array {
+    protected function anfrage(string $url, string $token, string $methode = 'GET', ?array $body = null, array $mehr = []): array {
         $key = (string)($this->v['api_key'] ?? '');
-        $kopf = ['Accept: application/fhir+json', 'Authorization: Bearer ' . $token, 'X-API-Key: ' . $key, 'X-FHIR-Profile: https://fhir.t2med.de/StructureDefinition/FhirApiPatient|1.0.0',
-            'User-Agent: kienzle-signatur'];
+        if ($key === '') $key = self::DEMO_SCHLUESSEL;
+        $kopf = array_merge(['Accept: application/fhir+json', 'Authorization: Bearer ' . $token, 'X-API-Key: ' . $key, 'X-FHIR-Profile: https://fhir.t2med.de/StructureDefinition/FhirApiPatient|1.0.0',
+            'X-TreatWarningAsError: true', 'Prefer: return=OperationOutcome', 'User-Agent: kienzle-signatur'], $mehr);
         $roh = ''; $zuGross = false;
         $curl = curl_init($url);
         $opt = [CURLOPT_HTTPHEADER => $kopf, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 20, CURLOPT_FOLLOWLOCATION => false, CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
@@ -50,6 +116,10 @@ class Fhir {
                 if (strlen($roh) + strlen($c) > 1024 * 1024) { $zuGross = true; return 0; }
                 $roh .= $c; return strlen($c);
             }];
+        if ($methode !== 'GET') {
+            $opt[CURLOPT_CUSTOMREQUEST] = $methode;
+            $opt[CURLOPT_POSTFIELDS] = json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
         if ($this->caDatei !== '') $opt[CURLOPT_CAINFO] = $this->caDatei;
         if (!empty($this->v['pin']) && $this->caDatei !== '') {
             $opt[CURLOPT_PINNEDPUBLICKEY] = self::pin($this->caDatei);

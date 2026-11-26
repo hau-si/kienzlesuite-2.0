@@ -43,9 +43,9 @@ final class Modules {
     /** @return list<array{id:string,label:string}> */
     public function rights(string $id): array { return $this->modules[$id]['rights'] ?? []; }
 
-    /** Webpfad des Moduls, das den Arbeitsplatz-Starter (/api.php) bedient, sonst leer. */
+    /** Webpfad des ersten Moduls mit Startkontexten für den Arbeitsplatz-Starter ([[starters]]), sonst leer. */
     public function starterPath(): string {
-        foreach ($this->modules as $m) if (($m['web']['starter'] ?? false) === true) return (string)$m['web']['path'];
+        foreach ($this->modules as $m) if (!empty($m['starters'])) return (string)$m['web']['path'];
         return '';
     }
 

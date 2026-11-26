@@ -64,7 +64,7 @@ LIMITS = {'exchange': 5, 'starters': 5, 'packages': 50, 'services': 20, 'firewal
 SCHEMA_SECTIONS = {
     'module': {'id', 'name', 'version', 'core_api', 'description'},
     'system': {'packages', 'services', 'user', 'data', 'disables'},
-    'web': {'path', 'upstream', 'protocol', 'entry', 'starter', 'einstellungen', 'uploads'},
+    'web': {'path', 'upstream', 'protocol', 'entry', 'starter', 'einstellungen', 'uploads'},   # starter: alter Schlüssel, wird nur noch angenommen und ignoriert
     'firewall': {'name', 'port', 'proto', 'scope'},
     'rights': {'id', 'label'},
     'backup': {'paths', 'snapshot', 'settings'},
@@ -270,10 +270,8 @@ class _Checker:
                 entry = self.rel_path(t['entry'], 'web.entry')
         elif 'entry' in t:
             self.error('web.entry', 'nur mit protocol = "fastcgi".')
-        starter = t.get('starter', False)
-        if not isinstance(starter, bool):
+        if 'starter' in t and not isinstance(t['starter'], bool):
             self.error('web.starter', 'muss true oder false sein.')
-            starter = False
         uploads = t.get('uploads', False)
         if not isinstance(uploads, bool):
             self.error('web.uploads', 'muss true oder false sein.')
@@ -282,7 +280,7 @@ class _Checker:
         if settings is not None and (not isinstance(settings, str) or not re.fullmatch(r'/|/[A-Za-z0-9][A-Za-z0-9._-]{0,60}(/[A-Za-z0-9][A-Za-z0-9._-]{0,60}){0,3}', settings)):
             self.error('web.einstellungen', 'muss ein Pfad unter dem Webpfad sein, z. B. „/settings.php“.')
             settings = None
-        return {'path': path, 'upstream': upstream, 'protocol': protocol, 'entry': entry, 'starter': starter, 'einstellungen': settings, 'uploads': uploads}
+        return {'path': path, 'upstream': upstream, 'protocol': protocol, 'entry': entry, 'einstellungen': settings, 'uploads': uploads}
 
     def firewall(self, items: list) -> list:
         if len(items) > LIMITS['firewall']:
@@ -616,8 +614,6 @@ def check_list(folders: list) -> dict:
         claim(('id', mid), mid, 'doppelte Modul-ID')
         if m['web']:
             claim(('path', m['web']['path']), mid, f'Webpfad {m["web"]["path"]}')
-            if m['web']['starter']:
-                claim(('starter',), mid, 'Arbeitsplatz-Starter (/api.php)')
         for st in m.get('starters', []):
             claim(('schema', st['schema']), mid, f'Startschema {st["schema"]}')
         for p in m['printers']:

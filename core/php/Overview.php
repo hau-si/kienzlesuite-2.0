@@ -166,11 +166,10 @@ final class Overview {
         if (array_filter($this->modules->all(), fn($m) => !empty($m['printers']))) {
             $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['drucker'], isset($manual['drucker']) ? 'done' : 'open', 'Auf jedem PC, von dem T2med druckt, die virtuellen Drucker (z. B. Terminzettel, vKasse) hinzufügen – Anleitung unter „Arbeitsplatz einrichten“', '/hilfe/arbeitsplatz#drucker', 'drucker');
         }
-        $starterId = array_key_first(array_filter($this->modules->all(), fn($m) => !empty($m['web']['starter'])));
+        $starterId = array_key_first(array_filter($this->modules->all(), fn($m) => !empty($m['starters'])));
         if ($starterId !== null) {
-            // Link in die Einstellungen des Moduls (dort liegt das Paket), nicht auf die Modulseite: so erscheint der blaue Punkt beim Modul.
-            $starterLink = ($this->modules->settingsUrl((string)$starterId) ?? '/verwaltung/module') . ($this->modules->settingsUrl((string)$starterId) !== null ? '#s-clients' : '');
-            $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['starter'], isset($manual['starter']) ? 'done' : 'open', 'In den Einstellungen des Moduls (z. B. Kasse → Arbeitsplätze) das Paket neu laden und auf jedem Arbeitsplatz ausführen', $starterLink, 'starter');
+            $starterLink = '/hilfe/arbeitsplatz#paket';
+            $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['starter'], isset($manual['starter']) ? 'done' : 'open', 'Unter Verwaltung → Arbeitsplätze das Paket neu laden und auf jedem Arbeitsplatz ausführen', $starterLink, 'starter');
         }
         if ((int)($this->db->one('SELECT COUNT(*) AS n FROM oidc_clients')['n'] ?? 0) > 0) {
             $out[] = self::item(self::MANUAL['dienste'], isset($manual['dienste']) ? 'done' : 'open', 'Die Anmelde-Adresse (Issuer) heißt jetzt https://' . ($this->config?->hostnames[0] ?? '') . '; in den angebundenen Diensten (Modulen) ändern', '/verwaltung/module', 'dienste');

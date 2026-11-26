@@ -1,3 +1,0 @@
-#!/bin/sh
-# Haken „update“ des Moduls sumup (läuft als ks-sumup).
-exec /usr/bin/php "$(dirname "$0")/kienzle-sumup" update

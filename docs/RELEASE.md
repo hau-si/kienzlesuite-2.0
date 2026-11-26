@@ -8,6 +8,41 @@
 - Der Installer installiert zusätzlich `acl` (für die Rechte des Austauschordners).
 - Beschreibung in `docs/MODULE-TOML.md`. Geprüft mit Tests; **nicht auf der VM geprüft** (ACL und Maskierung brauchen root und systemd).
 
+## 0.21.4-beta.67
+
+- **Starter unter Windows ohne schwarzes Fenster:** Das Starterprogramm wird für Windows ohne Konsole gebaut (`-H=windowsgui`), beim Aufruf aus T2med öffnet sich nur noch der Browser. Fehler stehen weiter in `starter.log` neben dem Programm. Das Paket auf den Arbeitsplätzen einmal neu ausführen (aktualisiert nur das Programm). Nicht unter Windows geprüft.
+
+## 0.21.4-beta.66
+
+- **Paket-Download „Serverzertifikat der Suite nicht lesbar“ behoben:** Die PHP-Einstellung `open_basedir` erlaubte nur `ca.crt`, nicht `server.crt`; der Starter braucht das Serverzertifikat für Fingerabdruck und Paket. Jetzt ist `server.crt` lesend freigegeben (`installer/vorlagen/php-fpm-core.conf`). **Nach dem Update einmal `sudo bash installer/install.sh`**, das schreibt die PHP-Einstellung neu. Nicht auf dem Server geprüft.
+
+## 0.21.4-beta.65
+
+- **Seite „Arbeitsplätze“ neu geordnet:** Oben steht das **Paket** (Starter, Zertifikat, Drucker in einem Durchgang), danach der **Name der Suite** (immer nötig). Zertifikat und virtuelle Drucker stehen darunter nur noch zum Aufklappen als Einrichtung **von Hand**, falls das Paket nicht klappt (Anker `#zertifikat`, `#drucker`, `#name`, `#paket` bleiben). Nicht auf der VM geprüft.
+
+## 0.21.4-beta.64
+
+- **Starter gehört zu „Arbeitsplätze“:** Die eigene Seite „Starter“ im Menü entfällt. Auf der Seite „Arbeitsplätze“ steht unten der Abschnitt „Paket für einen Arbeitsplatz“ (Startkontexte, Download je System, Schlüssel erneuern, nur für angemeldete Admins). Die alte Adresse leitet dorthin weiter.
+- **Ein Paket richtet den ganzen Arbeitsplatz ein:** Starterprogramm, Zertifikat, Aufruf aus T2med und die virtuellen Drucker der Module (vKasse, vTermine, vBriefversand) in einem Durchgang. Windows fragt für die Drucker einmal nach Administratorrechten (`install-drucker.ps1`), macOS und Linux nutzen `lpadmin` über sudo. Die Texte zur Druckereinrichtung bleiben als Rückfall auf der Seite.
+- **Erneutes Ausführen aktualisiert nur Änderungen:** Jede Zeile meldet „neu“, „aktualisiert“ oder „unverändert“ (Starterprogramm, Einstellungen, Zertifikat, Aufruf je Kontext, Drucker). Nicht auf der VM geprüft.
+- Das Erklärvideo liegt nicht mehr im Repository (zu groß, README-Link entfernt).
+- Die Umbenennung „sumup“ → „kasse“ ist abgeschlossen; der einmalige Umzug (`replaces`, Daten und Rechte, Datenbank-Schritt) ist wieder aus dem Code entfernt. Die Datenbank-Versionsnummer bleibt bei 4.
+- Prüfung von `module.toml`: der alte Schlüssel `web.starter` wird wieder angenommen (und ignoriert), damit ein installiertes altes Kasse-Modul die Basis-Aktualisierung nicht mehr blockiert.
+
+## 0.21.4-beta.63
+
+- **Starter nur noch an einer Stelle:** Die Hilfeseite „Arbeitsplätze“ und der Einrichtungs-Überblick verweisen auf die Seite „Starter“ (Verwaltung → Starter) statt auf das Paket der Kasse.
+- **Starter-Schlüssel erneuern mit Rückfrage:** Der Knopf steckt in einem eingeklappten Bereich „nur im Fehlerfall“, verlangt ein Häkchen und wird sonst vom Server abgelehnt.
+- **T2med-Aufruf der Kasse heißt jetzt `kienzle-kasse://`** (statt `kienzle-sumup://`). Die Adresse im T2med-Drittanbieter-Zugriff ändern und das Starter-Paket auf den Arbeitsplätzen neu ausführen. Nicht auf der VM geprüft.
+
+## 0.21.4-beta.62
+
+- **Erklärvideo im Repository:** `docs/video/Kienzle-Suite-Ueberblick.mp4` (2:38 Minuten, ohne Ton, erfundene Daten), in der README verlinkt. Keine Änderung am Programm.
+
+## 0.21.4-beta.61
+
+- **Neue Bildschirmfotos und Erklärvideo-Werkzeug:** Alle Bilder in `docs/screenshots` neu mit erfundenen Daten, dazu Starter, Kasse (Vorgänge, Ablage, IGeL, GOÄ-Rechner), Terminzettel, Signatur und ein Schaubild „Weg der Rechnung“. Neue Skripte: `scripts/bildschirmfotos-seiten.py`, `scripts/modul-vorschau/`, `scripts/video-bauen.py`. README und `AGENTS.md` angepasst. Keine Änderung am Programm.
+
 ## 0.21.4-beta.60
 
 - **Virtuelle Drucker dürfen Aufträge an die Ablage abgeben:** Die Einheit eines Druckers (z. B. „vKasse“) lief mit `ProtectSystem=strict` und durfte nur in den Datenordner des Moduls schreiben. Der Auftragsordner der Ablage (`/var/spool/kienzle/ablage/<modul>`) war schreibgeschützt. Die Rechnung kam an, die PDF wurde aber nie zum Netzwerkspeicher übergeben. Jetzt steht der Ordner in `ReadWritePaths` (mit `-`, falls er fehlt). Die Drucker-Einheit wird beim nächsten Abgleich (Verwaltung → Drucker oder automatisch) neu geschrieben und der Drucker neu gestartet. Nicht auf der VM geprüft.

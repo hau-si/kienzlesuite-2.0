@@ -39,6 +39,10 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 
 ![Einrichtung](docs/screenshots/einrichtung.png)
 
+**Arbeitsplatz-Starter:** Ein Programm je PC und ein Schlüssel für alle Module; T2med startet damit Kasse und Signatur mit dem aktuellen Patienten.
+
+![Starter](docs/screenshots/starter.png)
+
 **Verbindungen:** Zugänge, die mehrere Module brauchen (T2med, E-Mail, SMS, Letterxpress, Ablage per SFTP oder SMB), werden einmal eingetragen; ein Modul bekommt nur die, die es anmeldet.
 
 ![Verbindungen](docs/screenshots/verbindungen.png)
@@ -51,6 +55,36 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 
 ![Kasse-Einstellungen](docs/screenshots/kasse-einstellungen.png)
 
+**Kasse – Vorgänge:** Tag, Woche, Monat und Jahr mit Filtern, Abhaken in T2med und Excel-Liste für die Steuerberatung.
+
+![Kasse-Vorgänge](docs/screenshots/kasse-vorgaenge.png)
+
+**Der Weg einer Rechnung:** Verbindungsklick und Rechnung drucken aus T2med oder das IGeL-Modul der Kasse enden im Kassieren und, wenn gewünscht, als PDF im Netzwerkordner.
+
+![Weg der Rechnung](docs/screenshots/weg-der-rechnung.png)
+
+**Kasse – IGeL und GOÄ:** Leistungen ohne T2med-Rechnung kassieren; beim Anlegen einer Leistung genügt der Endpreis, der Faktor wird nach § 5 GOÄ errechnet.
+
+![IGeL](docs/screenshots/kasse-igel.png)
+
+![GOÄ-Rechner](docs/screenshots/kasse-goae.png)
+
+**Kasse – Ablage im Netzwerkordner:** Rechnungen als PDF (bezahlte oder jede gedruckte) in einen Ordner auf dem Netzwerkspeicher, Unterordner wie `Rechnungen/{jahr}/{monat}` werden bei Bedarf angelegt.
+
+![Kasse-Ablage](docs/screenshots/kasse-ablage.png)
+
+**Terminzettel:** Großer, lesbarer Zettel für den Bondrucker mit Kalender-QR-Code je Termin.
+
+![Terminzettel](docs/screenshots/terminzettel.png)
+
+**Signatur:** Vorgänge für Unterschriften am Pad, Pads je Arbeitsplatz und die Pad-Software von signotec (wird nicht mitgeliefert, Upload als ZIP).
+
+![Signatur-Vorgänge](docs/screenshots/signatur-vorgaenge.png)
+
+![Signatur-Pads](docs/screenshots/signatur-pads.png)
+
+![Signatur-Software](docs/screenshots/signatur-software.png)
+
 **Updater:** Updates je Modul und Basis aus signierten Releases (Kanal stabil oder beta), Sicherung vor dem Update, automatischer Rücksprung bei einem Fehler. Kein Update, solange z. B. eine Kartenzahlung läuft.
 
 ![Updates](docs/screenshots/updates.png)
@@ -59,7 +93,7 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 - Installation: [docs/INSTALLATION.md](docs/INSTALLATION.md)
 - Umsetzungsplan Schritt 1: [docs/PLAN.md](docs/PLAN.md)
 - Schnittstelle für Module: [docs/MODUL-SCHNITTSTELLE.md](docs/MODUL-SCHNITTSTELLE.md), Format [docs/MODULE-TOML.md](docs/MODULE-TOML.md)
-- Arbeitsregeln und Stand für Agenten (auch Claude Code): [AGENTS.md](AGENTS.md); Beispielrechnung aus T2med (erfunden): [modules/sumup/tests/fixtures](modules/sumup/tests/fixtures/README.md)
+- Arbeitsregeln und Stand für Agenten (auch Claude Code): [AGENTS.md](AGENTS.md); Beispielrechnung aus T2med (erfunden): [modules/kasse/tests/fixtures](modules/kasse/tests/fixtures/README.md)
 - Grundlage: [hau-si/kienzle-suite-beta](https://github.com/hau-si/kienzle-suite-beta), Fork von
   [thomaskien/t2med-sumup](https://github.com/thomaskien/t2med-sumup)
 

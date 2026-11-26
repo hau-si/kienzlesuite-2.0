@@ -101,14 +101,19 @@ function test_seite_menue_und_rechte(): void {
     check($u->get('/verwaltung/module')->status === 403, 'Mitarbeiter sieht Module');
 }
 
+function test_modulsymbole_vorhanden(): void {
+    $fallback = Kienzle\Core\View::icon('modul:gibt-es-nicht', 'app');
+    foreach (['kasse', 'terminzettel', 'signatur'] as $id) check(Kienzle\Core\View::icon('modul:' . $id, 'app') !== $fallback, 'Symbol für Modul fehlt: ' . $id);
+}
+
 function test_starter_weiterleitung_im_seitenkopf(): void {
     [$env, $m] = mod_env();
     $b = module_browser($env, $m);
     check(!str_contains($b->get('/')->body, 'data-starter='), 'Starter ohne Modul angekündigt');
     $mods = $env->modules->all();
-    $mods['kasse']['web']['starter'] = true;
+    $mods['kasse']['starters'] = [['schema' => 'kienzle-kasse', 'label' => 'Kasse']];
     $env->modules = Kienzle\Core\Modules::fromArray(array_values($mods));
-    check(str_contains($b->get('/')->body, '<body data-starter="/kasse">'), 'Starter-Ziel fehlt im Seitenkopf');
+    check(str_contains($b->get('/')->body, '<body data-starter="/kasse"'), 'Starter-Ziel fehlt im Seitenkopf');
     check(str_contains($b->get('/anmelden')->body, 'data-starter="/kasse"') || $b->get('/anmelden')->status === 303, 'Anmeldeseite ohne Starter-Ziel');
 }
 

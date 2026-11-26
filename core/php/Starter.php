@@ -12,7 +12,7 @@ final class Starter {
     public const CERTIFICATE = '/etc/kienzle/ca/server.crt';
 
     public const SYSTEMS = [
-        'windows' => ['label' => 'Windows', 'scripts' => ['install-windows.cmd', 'install-windows.ps1'], 'assets' => ['kienzle-starter-windows-amd64.exe', 'kienzle-starter-windows-arm64.exe']],
+        'windows' => ['label' => 'Windows', 'scripts' => ['install-windows.cmd', 'install-windows.ps1', 'install-drucker.ps1'], 'assets' => ['kienzle-starter-windows-amd64.exe', 'kienzle-starter-windows-arm64.exe']],
         'macos' => ['label' => 'macOS', 'scripts' => ['install-macos.command'], 'assets' => ['kienzle-starter-darwin-amd64', 'kienzle-starter-darwin-arm64']],
         'linux' => ['label' => 'Linux', 'scripts' => ['install-linux.sh'], 'assets' => ['kienzle-starter-linux-amd64', 'kienzle-starter-linux-arm64', 'kienzle-starter-linux-arm']],
     ];
@@ -48,8 +48,11 @@ final class Starter {
         return $der === false ? '' : hash('sha256', $der);
     }
 
-    /** @param array<string,string> $kontexte Schema → Pfad auf dem Server (/starter/<modul>) */
-    public function files(string $system, array $kontexte, string $serverUrl): array {
+    /**
+     * @param array<string,string> $kontexte Schema → Pfad auf dem Server (/starter/<modul>)
+     * @param list<array{name:string,url:string,papier?:string}> $drucker virtuelle Drucker der Module (Einrichtung am Arbeitsplatz)
+     */
+    public function files(string $system, array $kontexte, string $serverUrl, array $drucker = []): array {
         $spec = self::SYSTEMS[$system] ?? throw new Problem('Unbekanntes Betriebssystem.', 404);
         if (!$kontexte) throw new Problem('Kein installiertes Modul hat einen Startkontext.', 404);
         $pem = @file_get_contents($this->certificate);
@@ -60,8 +63,13 @@ final class Starter {
             'client.json' => ['data' => json_encode($client, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n", 'mode' => 0600],
             'schemas.txt' => ['data' => implode("\n", array_keys($kontexte)) . "\n", 'mode' => 0644],
             'server.crt' => ['data' => $pem, 'mode' => 0644],
-            'LIESMICH.txt' => ['data' => self::readme($system, $client['server_url'], array_keys($kontexte)), 'mode' => 0644],
+            'LIESMICH.txt' => ['data' => self::readme($system, $client['server_url'], array_keys($kontexte), (bool)$drucker), 'mode' => 0644],
         ];
+        if ($drucker) {
+            $lines = [];
+            foreach ($drucker as $d) $lines[] = preg_replace('/[|\r\n]/', '', $d['name']) . '|' . preg_replace('/[|\r\n]/', '', $d['url']) . '|' . ($d['papier'] ?? 'A4');
+            $files['drucker.txt'] = ['data' => implode("\n", $lines) . "\n", 'mode' => 0644];
+        }
         foreach ($spec['scripts'] as $script) {
             $path = $this->root . '/client/' . $script;
             if (!is_file($path)) throw new Problem('Installationsskript fehlt auf dem Server: ' . $script, 503);
@@ -118,7 +126,7 @@ final class Starter {
         return $offset;
     }
 
-    private static function readme(string $system, string $url, array $schemas): string {
+    private static function readme(string $system, string $url, array $schemas, bool $drucker = false): string {
         $nl = $system === 'windows' ? "\r\n" : "\n";
         $steps = match ($system) {
             'windows' => ["Diese ZIP-Datei mit Rechtsklick → „Alle extrahieren …“ entpacken (nicht direkt aus der ZIP starten).", "Im entpackten Ordner „install-windows.cmd“ doppelklicken. Meldet Windows „Der Computer wurde durch Windows geschützt“: „Weitere Informationen“ → „Trotzdem ausführen“.", "Die Sicherheitswarnung zum Zertifikat mit „Ja“ bestätigen (das Fenster kann hinter anderen liegen).", "„Kienzle-Starter eingerichtet“ erscheint. Der Ordner kann danach gelöscht werden."],

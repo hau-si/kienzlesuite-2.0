@@ -41,7 +41,7 @@ function sample_modules(): Modules {
     $json = shell_exec(escapeshellarg(dirname(__DIR__, 2) . '/core/bin/kienzle-modul-pruefen') . ' --alle --json ' . escapeshellarg(dirname(__DIR__, 2) . '/modules'));
     $data = json_decode((string)$json, true);
     check(is_array($data), 'Modulverzeichnis nicht erzeugt');
-    // Nur das Beispielmodul aus dem Repository; das echte Modul sumup hat eigene Tests (modules/sumup/tests).
+    // Nur das Beispielmodul aus dem Repository; das echte Modul kasse hat eigene Tests (modules/kasse/tests).
     $data['modules'] = array_values(array_filter($data['modules'], fn($m) => $m['module']['id'] === 'beispiel'));
     $kasse = $data['modules'][0];
     $kasse['module']['id'] = 'kasse'; $kasse['module']['name'] = 'Kasse'; $kasse['web']['path'] = '/kasse';

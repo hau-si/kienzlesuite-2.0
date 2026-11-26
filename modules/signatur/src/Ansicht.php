@@ -14,10 +14,10 @@ final class Ansicht {
 
     /** Seitenkopf mit Unterseiten wie in der Kasse: Start, Vorgänge, Einstellungen. */
     private static function kopfzeile(string $route, bool $darfVorlage, bool $admin): string {
-        $link = static fn(string $ziel, string $text, string $r): string => '<a class="button ' . ($route === $r ? 'primary' : 'secondary') . '" href="' . sg_h(sg_basis()) . $ziel . '"' . ($route === $r ? ' aria-current="page"' : '') . '>' . $text . '</a>';
+        $link = static fn(string $ziel, string $text, string $r, string $icon = ''): string => '<a class="button ' . ($route === $r ? 'primary' : 'secondary') . ' mit-icon" href="' . sg_h(sg_basis()) . $ziel . '"' . ($route === $r ? ' aria-current="page"' : '') . '>' . $icon . $text . '</a>';
         return '<header class="seitenkopf"><div><p class="eyebrow">Signatur</p><h1>' . ['/' => 'Unterschriften', '/vorgaenge' => 'Vorgänge', '/einstellungen' => 'Einstellungen'][$route] . '</h1></div>'
-            . '<span class="start-tools">' . ($route === '/' ? '' : $link('/', '← Start', '')) . ($route !== '/vorgaenge' ? $link('/vorgaenge', 'Alle Vorgänge', '/vorgaenge') : '')
-            . ($route !== '/einstellungen' && ($darfVorlage || $admin) ? $link('/einstellungen', 'Einstellungen', '/einstellungen') : '') . '</span></header>';
+            . '<span class="start-tools">' . ($route === '/' ? '' : $link('/', 'Start', '', self::HAUS)) . ($route !== '/vorgaenge' ? $link('/vorgaenge', 'Alle Vorgänge', '/vorgaenge', self::LISTE) : '')
+            . ($route !== '/einstellungen' && ($darfVorlage || $admin) ? $link('/einstellungen', 'Einstellungen', '/einstellungen', self::ZAHNRAD) : '') . '</span></header>';
     }
 
     /** Eine Zeile der Vorgangsliste mit Daten für die Filter (Art, Status, Suchtext). */
@@ -27,6 +27,11 @@ final class Ansicht {
         $stat = '<span class="us-status s-' . $h($v['status']) . '">' . $h(Seite::STATI[$v['status']] ?? $v['status']) . '</span>';
         if ($v['meldung'] !== '') $stat .= '<div class="muted klein-text">' . $h($v['meldung']) . '</div>';
         if ($v['status'] === 'wartet' && $v['kontext'] !== '' && !Seite::kontextGueltig($v)) $stat .= '<div class="muted klein-text">T2med-Verbindung abgelaufen: Das Ablegen braucht einen neuen Aufruf aus T2med.</div>';
+        if (($v['kontakt_status'] ?? '') !== '') {
+            $k = json_decode((string)$v['kontakt_neu'], true) ?: [];
+            $was = implode(' und ', array_filter([($k['telefon'] ?? '') !== '' ? 'Telefon ' . $k['telefon'] : '', ($k['email'] ?? '') !== '' ? 'E-Mail ' . $k['email'] : '']));
+            $stat .= '<div class="muted klein-text">' . ($v['kontakt_status'] === 'geschrieben' ? 'In T2med übernommen: ' : 'Für T2med vorgemerkt: ') . $h($was) . ($v['kontakt_status'] === 'fehler' ? ' – ' . $h((string)$v['kontakt_meldung']) : '') . '</div>';
+        }
         $suche = mb_strtolower($v['patient'] . ' ' . $v['titel'] . ' ' . (Seite::ARTEN[$v['art']] ?? $v['art']));
         return '<tr data-art="' . $h($v['art']) . '" data-status="' . $h($v['status']) . '" data-suche="' . $h($suche) . '"><td>' . $h(self::datum((int)$v['erstellt'])) . '</td><td>' . $h($v['patient']) . '</td><td>' . $h($v['titel']) . '</td><td>'
             . $h($padNamen[(int)($v['pad_id'] ?? 0)] ?? '–') . '</td><td>' . $stat . '</td><td class="us-aktionen">' . self::aktionen($v, $csrfFeld, $darfVorgang) . '</td></tr>';
@@ -36,10 +41,12 @@ final class Ansicht {
     private static function aktionen(array $v, string $csrfFeld, bool $darfVorgang): string {
         if (!$darfVorgang) return '';
         $o = '';
-        if (in_array($v['status'], ['wartet', 'fehler'], true) && (int)($v['pad_id'] ?? 0) > 0) $o .= self::knopf($csrfFeld, 'am-pad', (int)$v['id'], 'Am Pad zeigen', 'primary small');
+        if (in_array($v['status'], ['wartet', 'fehler'], true) && (int)($v['pad_id'] ?? 0) > 0) $o .= self::knopf($csrfFeld, 'am-pad', (int)$v['id'], 'Zum Pad senden', 'primary small');
         if ($v['status'] === 'am_pad') $o .= self::knopf($csrfFeld, 'vom-pad', (int)$v['id'], 'Vom Pad nehmen', 'small');
-        if (!in_array($v['status'], ['uebertragen', 'abgebrochen'], true)) $o .= self::knopf($csrfFeld, 'abbrechen', (int)$v['id'], 'Abbrechen', 'danger small');
-        if ($v['status'] === 'abgebrochen') $o .= self::knopf($csrfFeld, 'vorgang-loeschen', (int)$v['id'], 'Löschen', 'danger small', 'Diesen abgebrochenen Vorgang endgültig löschen?');
+        if (in_array($v['kontakt_status'] ?? '', ['offen', 'fehler'], true) && in_array($v['status'], ['unterschrieben', 'uebertragen'], true)) $o .= self::knopf($csrfFeld, 'kontakt-uebernehmen', (int)$v['id'], 'Kontaktdaten in T2med übernehmen', 'primary small', 'Telefon und E-Mail dieses Patienten in T2med ändern? Alle anderen Angaben bleiben unverändert.');
+        if ($v['status'] === 'abgebrochen') $o .= self::knopf($csrfFeld, 'wiederaufnehmen', (int)$v['id'], 'Wieder aufnehmen', 'primary small');
+        if ($v['status'] === 'am_pad') $o .= self::knopf($csrfFeld, 'abbrechen', (int)$v['id'], 'Abbrechen', 'danger small');
+        else $o .= self::knopf($csrfFeld, 'vorgang-loeschen', (int)$v['id'], 'Löschen', 'danger small', 'Diesen Vorgang endgültig löschen?');
         return $o;
     }
 
@@ -60,23 +67,31 @@ final class Ansicht {
             return $o . '</div>';
         }
 
-        // Start: der Vorgang, der gerade am Pad ist (sonst der zuletzt angelegte offene), dann „Neuer Vorgang“.
-        $o .= '<section class="card us-aktuell"><h2>' . ($aktuell && $aktuell['status'] === 'am_pad' ? 'Gerade am Pad' : 'Zuletzt angelegter Vorgang') . '</h2>';
-        if (!$aktuell) {
-            $o .= '<p class="muted">Kein offener Vorgang. Unten einen neuen anlegen.</p>';
-        } else {
-            $stat = '<span class="us-status s-' . $h($aktuell['status']) . '">' . $h(Seite::STATI[$aktuell['status']] ?? $aktuell['status']) . '</span>';
-            $o .= '<div class="us-patient"><div><strong class="us-name">' . $h($aktuell['patient']) . '</strong><div class="muted">' . $h($aktuell['titel']) . ' · angelegt ' . $h(self::datum((int)$aktuell['erstellt'])) . '</div>'
-                . '<div class="muted">Pad: ' . $h($padNamen[(int)($aktuell['pad_id'] ?? 0)] ?? 'nicht zugeordnet') . '</div></div><div>' . $stat
-                . ($aktuell['meldung'] !== '' ? '<div class="muted klein-text">' . $h($aktuell['meldung']) . '</div>' : '') . '</div></div>'
-                . '<div class="aktionen">' . self::aktionen($aktuell, $csrfFeld, $darfVorgang) . '</div>';
+        // Linke Spalte: offene Vorgänge (wie die Liste der Kasse), rechts groß Patient und Dokumentauswahl.
+        // Wie in der Kasse: die letzten Tage (7), neuester oben, unabhängig vom Status.
+        $grenze = time() - 7 * 86400;
+        $offene = array_values(array_filter($vorgaenge, fn($v) => (int)$v['erstellt'] >= $grenze));
+        usort($offene, fn($x, $y) => ((int)$y['erstellt'] <=> (int)$x['erstellt']) ?: ((int)$y['id'] <=> (int)$x['id']));
+        $links = '<aside class="card us-links"><div class="us-kopf"><h2>Vorgänge</h2><a class="muted klein-text" href="' . $h(sg_basis()) . '/vorgaenge">Alle</a></div>';
+        if (!$offene) $links .= '<p class="muted">Keine Vorgänge in den letzten Tagen. Rechts einen neuen anlegen.</p>';
+        foreach (array_slice($offene, 0, 30) as $v) {
+            $links .= '<div class="us-vz' . ($v['status'] === 'am_pad' ? ' am-pad' : '') . '"><div class="us-vz-kopf"><div><strong>' . $h($v['patient']) . '</strong><div class="muted klein-text">' . $h($v['titel']) . ' · ' . $h(self::datum((int)$v['erstellt'])) . '</div></div>'
+                . '<span class="us-status s-' . $h($v['status']) . '">' . $h(Seite::STATI[$v['status']] ?? $v['status']) . '</span></div>'
+                . ($v['meldung'] !== '' ? '<div class="muted klein-text">' . $h($v['meldung']) . '</div>' : '')
+                . '<div class="aktionen">' . self::aktionen($v, $csrfFeld, $darfVorgang) . '</div></div>';
         }
-        $o .= '</section>';
+        $links .= '</aside>';
+        // Patient aus T2med oder der Kasse: Kasten oben rechts (JS blendet ihn ein und das Patientenfeld im Formular aus).
+        $rechts = '';
+        if ($darfVorgang) $rechts .= '<section class="card us-gewaehlt" id="n-gewaehlt"><div class="us-patient"><div><div class="eyebrow muted" id="n-gewaehlt-quelle">PATIENT</div>'
+            . '<div id="n-gewaehlt-anzeige" hidden><strong class="us-name" id="n-gewaehlt-name"></strong><div class="muted" id="n-gewaehlt-info"></div></div>'
+            . '<div id="n-patient-feld"><label for="n-patient" class="sr-only">Patient</label><input id="n-patient" name="patient" form="n-form" maxlength="80" required placeholder="Name des Patienten, z. B. Max Mustermann"></div></div>'
+            . '<button type="button" class="small" id="n-gewaehlt-weg" hidden>Anderen Patienten wählen</button></div></section>';
 
         $aktive = array_values(array_filter($vorlagen, fn($v) => (int)$v['aktiv']));
         if ($darfVorgang) {
             $opt = '';
-            foreach ($aktive as $v) $opt .= '<option value="' . (int)$v['id'] . '">' . $h(Seite::ARTEN[$v['art']] ?? $v['art']) . ': ' . $h($v['titel']) . '</option>';
+            foreach ($aktive as $i => $v) $opt .= '<label class="us-dok"><input type="radio" name="vorlage_id" value="' . (int)$v['id'] . '"' . ($i === 0 ? ' checked' : '') . '><span><strong>' . $h($v['titel']) . '</strong><span class="muted klein-text">' . $h(Seite::ARTEN[$v['art']] ?? $v['art']) . '</span></span></label>';
             $padOpt = '';
             $aktivePads = array_values(array_filter($pads, fn($p) => (int)$p['aktiv']));
             if (count($aktivePads) > 1) {
@@ -84,23 +99,34 @@ final class Ansicht {
                 foreach ($aktivePads as $p) $padOpt .= '<option value="' . (int)$p['id'] . '">' . $h($p['name'] . ($p['arbeitsplatz'] !== '' ? ' (' . $p['arbeitsplatz'] . ')' : '')) . '</option>';
                 $padOpt .= '</select>';
             }
-            $o .= '<section class="card"><h2>Neuer Vorgang</h2>';
+            $rechts .= '<section class="card"><h2>Dokument wählen</h2>';
             if (!$aktive) {
-                $o .= '<p class="muted">Es gibt keine aktive Vorlage. Bitte unter Einstellungen eine Vorlage anlegen oder aktivieren.</p>';
+                $rechts .= '<p class="muted">Es gibt keine aktive Vorlage. Bitte unter Einstellungen eine Vorlage anlegen oder aktivieren.</p>';
             } else {
-                $o .= '<form method="post" class="us-form" autocomplete="off">' . $csrfFeld . '<input type="hidden" name="aktion" value="neu"><input type="hidden" name="kontext" id="n-kontext" value="">'
-                    . '<label for="n-vorlage">Dokument</label><select id="n-vorlage" name="vorlage_id">' . $opt . '</select>'
+                $rechts .= '<form method="post" class="us-form" id="n-form" autocomplete="off">' . $csrfFeld . '<input type="hidden" name="aktion" value="neu"><input type="hidden" name="kontext" id="n-kontext" value=""><input type="hidden" name="leistungen_json" id="n-leistungen" value=""><input type="hidden" name="quelle" id="n-quelle" value=""><input type="hidden" name="quelle_ref" id="n-quelle-ref" value="">'
+                    . '<div class="us-dokliste" role="radiogroup" aria-label="Dokument">' . $opt . '</div>'
                     . $padOpt
-                    . '<label for="n-patient">Patient</label><input id="n-patient" name="patient" maxlength="80" required placeholder="z. B. Max Mustermann">'
+                    . '<div id="n-liste" class="us-liste" hidden><strong>Leistungen aus der Kasse</strong><ul id="n-liste-eintraege"></ul><p class="muted" id="n-liste-summe"></p></div>'
+                    . '<details class="fold us-kontakt" id="n-kontakt"><summary>Weitere Patientendaten (für Platzhalter im Dokument)</summary><div class="us-body">'
+                    . '<input type="hidden" name="patient_id" id="n-patient-id" value=""><input type="hidden" name="telefon_alt" id="n-telefon-alt" value=""><input type="hidden" name="email_alt" id="n-email-alt" value="">'
+                    . '<label for="n-vorname">Vorname</label><input id="n-vorname" name="vorname" maxlength="80">'
+                    . '<label for="n-nachname">Nachname</label><input id="n-nachname" name="nachname" maxlength="80">'
+                    . '<label for="n-geschlecht">Anrede (aus T2med)</label><select id="n-geschlecht" name="geschlecht"><option value="">Keine Angabe (Guten Tag …)</option><option value="male">Herr</option><option value="female">Frau</option><option value="other">Divers oder unbestimmt (Guten Tag …)</option></select>'
+                    . '<label for="n-geburtsdatum">Geburtsdatum</label><input id="n-geburtsdatum" name="geburtsdatum" maxlength="20" placeholder="TT.MM.JJJJ">'
+                    . '<label for="n-telefon">Telefon</label><input id="n-telefon" name="telefon" maxlength="40" inputmode="tel">'
+                    . '<label for="n-email">E-Mail</label><input id="n-email" name="email" type="email" maxlength="254">'
+                    . '<label for="n-adresse">Anschrift</label><input id="n-adresse" name="adresse" maxlength="200">'
+                    . '<label class="check" id="n-kontakt-box" hidden><input type="checkbox" name="kontakt_uebernehmen" value="1"> Geänderte Telefonnummer und E-Mail nach der Unterschrift in T2med übernehmen (Knopf in der Vorgangsliste)</label>'
+                    . '</div></details>'
                     . '<label for="n-leistung">Leistung oder Thema</label><input id="n-leistung" name="leistung" maxlength="120" placeholder="z. B. Ultraschall der Schilddrüse">'
                     . '<label for="n-betrag">Betrag in Euro</label><input id="n-betrag" name="betrag" inputmode="decimal" maxlength="12" placeholder="z. B. 45,00">'
                     . '<label class="check"><input type="checkbox" name="druck_vorher" value="1"> Dokument vor der Unterschrift für den Patienten drucken</label>'
                     . '<label class="check"><input type="checkbox" name="druck_nachher" value="1"> Unterschriebenes Dokument danach drucken</label>'
                     . '<button class="primary" type="submit">Vorgang anlegen</button></form>';
             }
-            $o .= '</section>';
+            $rechts .= '</section>';
         }
-        return $o . '</div>';
+        return $o . '<div class="us-grid">' . $links . '<div class="us-rechts">' . $rechts . '</div></div></div>';
     }
 
     /** Vorgangsliste mit Suche (Patient, Vorgang, Dokumentart) und Filtern nach Dokumentart und Status; die Filter wirken im Browser (app.js). */
@@ -127,6 +153,9 @@ final class Ansicht {
     public static ?array $padSuche = null;
     public static int $padBearbeiten = 0;
 
+    private const HAUS = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10"/></svg>';
+    private const LISTE = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>';
+    private const ZAHNRAD = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>';
     private const STIFT = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>';
     private const MUELL = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>';
 
@@ -218,9 +247,8 @@ final class Ansicht {
 
     private static function vorlagen(string $csrfFeld, array $vorlagen, ?array $bearbeite): string {
         $h = 'sg_h';
-        $platz = implode(' ', array_map(fn($k) => '<code>{{' . $h($k) . '}}</code>', array_keys(Seite::PLATZHALTER)));
         $o = '<details class="fold" id="vorlagen"' . ($bearbeite ? ' open' : '') . '><summary><h2>Vorlagen und Vertragstexte</h2></summary><div class="us-body">'
-            . '<p class="muted">Platzhalter im Text: ' . $platz . '. Sie werden beim Anlegen des Vorgangs eingesetzt; der Text bleibt danach unverändert. '
+            . '<p class="muted">Platzhalter wie {{patient}} lassen sich unter dem Textfeld per Klick an der Cursorstelle einfügen. Sie werden beim Anlegen des Vorgangs eingesetzt; der Text bleibt danach unverändert. '
             . 'Die mitgelieferten Mustertexte sind nur Beispiele und müssen für Ihre Praxis geprüft werden.</p>';
         foreach ($vorlagen as $v) {
             $offen = $bearbeite && (int)$bearbeite['id'] === (int)$v['id'];
@@ -232,6 +260,13 @@ final class Ansicht {
         return $o . '</div></details>';
     }
 
+    /** Knöpfe, die einen Platzhalter an der Cursorstelle des Textfelds einfügen (app.js, data-platzhalter). */
+    private static function platzhalterKnoepfe(string $ziel): string {
+        $h = 'sg_h'; $o = '';
+        foreach (Seite::PLATZHALTER as $k => $beschreibung) $o .= '<button type="button" class="small" data-platzhalter="{{' . $h($k) . '}}" data-ziel="' . $h($ziel) . '" title="' . $h($beschreibung) . '">' . $h($k) . '</button>';
+        return $o;
+    }
+
     private static function vorlagenForm(string $csrfFeld, array $v): string {
         $h = 'sg_h';
         $id = (int)$v['id'];
@@ -241,9 +276,11 @@ final class Ansicht {
             . '<label for="v' . $id . '-art">Art</label><select id="v' . $id . '-art" name="art">' . $art . '</select>'
             . '<label for="v' . $id . '-titel">Titel</label><input id="v' . $id . '-titel" name="titel" maxlength="80" required value="' . $h((string)$v['titel']) . '">'
             . '<label for="v' . $id . '-text">Text</label><textarea id="v' . $id . '-text" name="text" rows="12" maxlength="' . Seite::MAX_TEXT . '" required>' . $h((string)$v['text']) . '</textarea>'
+            . '<div class="us-platz" role="group" aria-label="Platzhalter einfügen"><span class="muted">Platzhalter einfügen:</span>' . self::platzhalterKnoepfe('v' . $id . '-text') . '</div>'
             . '<label class="check"><input type="checkbox" name="aktiv" value="1"' . ((int)$v['aktiv'] ? ' checked' : '') . '> Aktiv (in „Neuer Vorgang“ wählbar)</label>'
             . '<div class="aktionen"><button class="primary" type="submit">Speichern</button></div></form>';
-        if ($id > 0) $o .= '<form method="post" class="inline us-loeschen">' . $csrfFeld . '<input type="hidden" name="aktion" value="vorlage-loeschen"><input type="hidden" name="id" value="' . $id . '"><button class="danger small" type="submit" data-bestaetigen="Vorlage endgültig löschen? Bestehende Vorgänge behalten ihren Text.">Vorlage löschen</button></form>';
+        if ($id > 0 && $id === Seite::festeVorlageId()) $o .= '<p class="muted klein-text">Dies ist der IGeL-Vertrag der Kasse: Er bleibt immer erhalten (Art und „Aktiv“ sind fest), der Text ist frei änderbar.</p>';
+        elseif ($id > 0) $o .= '<form method="post" class="inline us-loeschen">' . $csrfFeld . '<input type="hidden" name="aktion" value="vorlage-loeschen"><input type="hidden" name="id" value="' . $id . '"><button class="danger small" type="submit" data-bestaetigen="Vorlage endgültig löschen? Bestehende Vorgänge behalten ihren Text.">Vorlage löschen</button></form>';
         return $o;
     }
 }

@@ -1,5 +1,5 @@
 name: Release
-# Ein Tag „core-v<version>“ baut das Release der Basis, ein Tag „<modul>-v<version>“ (z. B. sumup-v2.0.0) das eines Moduls
+# Ein Tag „core-v<version>“ baut das Release der Basis, ein Tag „<modul>-v<version>“ (z. B. kasse-v2.0.0) das eines Moduls
 # (Archiv und Manifest) und veröffentlicht es auf GitHub. Die Signatur entsteht offline beim Herausgeber
 # (docs/RELEASE-ABLAUF.md) und wird danach als .sig hochgeladen. Bis dahin installieren Server das Release nur mit
 # abgeschalteter Signaturprüfung (Verwaltung → Updates).

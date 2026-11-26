@@ -46,8 +46,8 @@ final class Seite {
             'qr_summary' => ['string', 'Kalender-Titel (Präfix)', 'Termin Arztpraxis'],
             'cancel_enabled' => ['bool', 'Absage-QR unten auf dem Bon drucken', false],
             'cancel_to' => ['string', 'Empfänger (E-Mail-Adresse der Praxis)', ''],
-            'cancel_subject' => ['string', 'Betreff', 'Terminabsage'],
-            'cancel_body' => ['text', 'Nachrichtentext', "Guten Tag,\n\nich kann meinen Termin leider nicht wahrnehmen und sage ihn hiermit ab.\n\nMit freundlichen Grüßen"],
+            'cancel_subject' => ['string', 'Betreff', 'Terminabsage {{patient}}'],
+            'cancel_body' => ['text', 'Nachrichtentext', "Guten Tag,\n\nich kann meinen Termin leider nicht wahrnehmen und sage ihn hiermit ab:\n{{termine}}\n\nMit freundlichen Grüßen\n{{patient}}"],
             'cancel_caption' => ['string', 'Aufforderung im Balken über dem QR-Code', 'Verhindert? Bitte absagen.'],
             'cancel_size' => ['choice', 'Größe des Absage-QR-Codes', 'medium', ['small' => 'Klein', 'medium' => 'Mittel', 'large' => 'Groß']],
             'cut' => ['bool', 'Bon abschneiden', true],
@@ -68,6 +68,7 @@ final class Seite {
         $out = [];
         foreach (self::schema() as $k => $f) $out[$k] = is_array($d) && array_key_exists($k, $d) && self::passt($f, $d[$k]) ? $d[$k] : $f[2];
         if (($out['cancel_caption'] ?? '') === 'Termin absagen: Code mit dem Handy scannen') $out['cancel_caption'] = 'Verhindert? Bitte absagen.';   // alter Standardtext
+        if (($out['cancel_subject'] ?? '') === 'Terminabsage') $out['cancel_subject'] = 'Terminabsage {{patient}}';   // alter Standard: jetzt mit Patientennamen
         $out['enabled'] = true; // Bondruck ist mit dem Modul immer aktiv
         if (!is_array($d) || (!array_key_exists('name_text', $d) && !array_key_exists('address_text', $d))) {
             $kopf = self::kopfAusPraxis($praxis);
@@ -170,11 +171,13 @@ final class Seite {
         $name = trim($werte['name_text']) !== '';
         $angekommen = array_filter(self::protokoll(50), static fn($l) => str_contains($l, 'Bon an die Warteschlange')) !== [];
         return [
-            ['title' => 'Bondrucker für den Terminzettel zugeordnet', 'state' => $bon !== '' ? 'done' : 'open',
+            ['title' => 'Benötigte Hardware: Bondrucker', 'optional' => true, 'state' => 'open',
+                'hint' => 'Empfohlen: Epson TM-m30III (Bondrucker für Terminliste und Kasse).', 'link' => ''],
+            ['title' => 'Bondrucker für den Terminzettel zugeordnet', 'optional' => true, 'state' => $bon !== '' ? 'done' : 'open',
                 'hint' => 'Verwaltung → Drucker → „Wofür welcher Drucker?“ (Bondrucker wählen)', 'link' => '/terminzettel/'],
             ['title' => 'Terminzettel: Praxisname im Kopf', 'state' => $name ? 'done' : 'open', 'optional' => true,
                 'hint' => 'Einstellungen → Kopf: Praxisname, Adresse und Logo für den Bon', 'link' => '/terminzettel/#kopf'],
-            ['title' => 'Terminzettel aus T2med am Bondrucker angekommen', 'state' => $angekommen ? 'done' : 'open',
+            ['title' => 'Terminzettel aus T2med am Bondrucker angekommen', 'optional' => true, 'state' => $angekommen ? 'done' : 'open',
                 'hint' => 'Am Arbeitsplatz den Drucker „vTermine“ einrichten (Anleitung: Arbeitsplatz einrichten → Virtuelle Drucker) und in T2med unter Einstellungen → Kalender → Terminliste (DIN A6) wählen; dann einen Terminzettel drucken',
                 'link' => '/terminzettel/#drucker'],
         ];

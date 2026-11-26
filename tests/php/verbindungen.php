@@ -72,7 +72,7 @@ function test_modul_hilfen(): void {
     $enc = $k->verschluesseln('letterxpress-schluessel', 'letterxpress');
     check($k->entschluesseln($enc, 'letterxpress') === 'letterxpress-schluessel' && !str_contains($enc, 'letterxpress'), 'Ver-/Entschlüsseln');
     $zeit = new KienzleModul('zeit', ['X' => '1'], "$dir/verb", "$dir/keys");
-    foreach ([fn() => $k->entschluesseln($enc, 'sumup'), fn() => $zeit->entschluesseln($enc, 'letterxpress')] as $n => $bad) {
+    foreach ([fn() => $k->entschluesseln($enc, 'kasse'), fn() => $zeit->entschluesseln($enc, 'letterxpress')] as $n => $bad) {
         try { $bad(); throw new LogicException("Fall {$n} entschlüsselt"); } catch (RuntimeException) {}
     }
     try { new KienzleModul('../x'); throw new LogicException('ungültige ID'); } catch (InvalidArgumentException) {}

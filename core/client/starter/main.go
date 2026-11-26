@@ -1,6 +1,6 @@
 // kienzle-starter: gemeinsamer Arbeitsplatz-Starter der Kienzle-Suite.
 //
-// T2med ruft ihn über ein URL-Schema auf, z. B. kienzle-sumup://?kontextId=…&fhirBasisUrl=…&oAuthToken=… oder
+// T2med ruft ihn über ein URL-Schema auf, z. B. kienzle-kasse://?kontextId=…&fhirBasisUrl=…&oAuthToken=… oder
 // kienzle-signatur://…. Der Starter sucht das Schema in client.json, schickt den Kontext per HTTPS an die dort
 // eingetragene Adresse des Moduls (mit dem Starter-Schlüssel), öffnet den zurückgegebenen einmaligen Link im Browser
 // und beendet sich. Es läuft kein Dienst. Das Serverzertifikat wird über den Fingerabdruck aus client.json geprüft.

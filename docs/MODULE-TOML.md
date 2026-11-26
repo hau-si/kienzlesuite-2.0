@@ -66,7 +66,6 @@ Ohne `[web]` erscheint das Modul nicht im Menü (z. B. ein reines Druckmodul).
 | `upstream` | ja | genau `unix:/run/kienzle/<id>/web.sock`. Der Ordner gehört `ks-<id>`, Gruppe `www-data`, Rechte 0750: nur das Modul und nginx kommen hinein, andere Module nicht |
 | `protocol` | nein | `"http"` (Vorgabe: das Modul spricht HTTP über den Socket) oder `"fastcgi"` (PHP über php-fpm) |
 | `entry` | bei `fastcgi` | Einstiegsdatei im Modulordner, z. B. `public/index.php`; alle Anfragen unter `path` gehen an sie |
-| `starter` | nein | `true`: das Modul bedient den Arbeitsplatz-Starter (`POST https://<server>/api.php` ohne Anmeldung, siehe `docs/MODUL-SCHNITTSTELLE.md`). Nur mit `fastcgi`, höchstens ein Modul. Vorgabe `false` |
 | `uploads` | nein | `true`: Formular-Uploads (`multipart/form-data`, `$_FILES`) sind erlaubt, bis 3 MB je Datei. Sonst ist `file_uploads` im Modul-Dienst aus. Nur mit `fastcgi`. Vorgabe `false` |
 
 ### `[[firewall]]` – optional, höchstens 20
@@ -118,12 +117,12 @@ Virtuelle Drucker des Moduls. Die Druckerverwaltung der Basis legt sie an und en
 
 ### `[[starters]]` – optional
 
-Startkontexte für den zentralen Arbeitsplatz-Starter der Basis (Verwaltung → Starter). Nur mit `[web] protocol = "fastcgi"`. Höchstens 5 Einträge je Modul.
+Startkontexte für den zentralen Arbeitsplatz-Starter der Basis (Verwaltung → Arbeitsplätze). Nur mit `[web] protocol = "fastcgi"`. Höchstens 5 Einträge je Modul.
 
 | Feld | Pflicht | Bedeutung |
 |---|---|---|
 | `schema` | ja | URL-Schema, das T2med aufruft, `kienzle-<name>` (Kleinbuchstaben, Ziffern, Bindestrich); über alle Module eindeutig |
-| `label` | ja | Name des Kontexts für die Anzeige auf der Seite „Starter“ |
+| `label` | ja | Name des Kontexts für die Anzeige auf der Seite „Arbeitsplätze“ |
 
 Das Starterprogramm sendet `POST https://<server>/starter/<modul-id>` (JSON mit `context_id`, `fhir_base_url`, `oauth_token`, `action = "launch"`).
 Die Basis prüft vorher den Starter-Schlüssel; das Modul sieht `KIENZLE_OEFFENTLICH=starter` und `KIENZLE_STARTER_GEPRUEFT=1` und antwortet mit

@@ -58,8 +58,8 @@ HEALTH_SECONDS = int(E('KIENZLE_MODULE_HEALTH_SECONDS', '60'))
 SYSTEMD_RUN = Path(E('KIENZLE_SYSTEMD_RUN', '/run/systemd/system'))
 KEEP_RELEASES = 3
 KEEP_SNAPSHOTS = 3
-# beispiel: nur für Tests, nie installierbar; unterschrift: umbenannt in signatur, das alte GitHub-Release wird nicht mehr angeboten
-EXCLUDED = frozenset({'beispiel', 'unterschrift'})
+# beispiel: nur für Tests, nie installierbar; unterschrift (jetzt signatur) und sumup (jetzt kasse): die alten GitHub-Releases werden nicht mehr angeboten
+EXCLUDED = frozenset({'beispiel', 'unterschrift', 'sumup'})
 ID = re.compile(r'^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$')
 UNIT_NAME = re.compile(r'^kienzle-[a-z0-9-]+\.(service|timer|path|socket)$')
 
