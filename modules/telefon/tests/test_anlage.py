@@ -283,6 +283,17 @@ class KienzlefonBruecke(unittest.TestCase):
         with self.assertRaises(self.a.Fehler):
             self.a.check(self.cfg(tts='espeak'))
         self.assertEqual(self.a.check(beispiel())['kienzlefon'], {'aktiv': False, 'tts': 'piper'})
+        b = self.cfg()
+        b['nebenstellen'][1]['nummer'] = '205'
+        with self.assertRaises(self.a.Fehler) as e:
+            self.a.check(b)
+        self.assertIn('fortlaufend', str(e.exception))
+        b = self.cfg()
+        for x in b['nebenstellen']:
+            x['warteschlange'] = False
+        with self.assertRaises(self.a.Fehler) as e:
+            self.a.check(b)
+        self.assertIn('mindestens ein Telefon', str(e.exception))
 
     def test_toml_set(self):
         t = '[a]\n# Kommentar\nx = 1\n\n[b]\ny = "z"\n'

@@ -266,6 +266,13 @@ def check(cfg: dict) -> dict:
     out['kienzlefon'] = {'aktiv': kz.get('aktiv') is True, 'tts': tts}
     if out['kienzlefon']['aktiv'] and not tel.get('leitung_ein'):
         raise Fehler('Sprachmenü: zuerst die eingehende Telefonleitung unter „Rufnummern“ wählen.')
+    if out['kienzlefon']['aktiv']:
+        # Kienzlefon erwartet die Telefone der Warteschlange als lückenlose Reihe (wie Kienzlefax: erste Nummer und Anzahl).
+        reihe = sorted(int(x['nummer']) for x in out['nebenstellen'] if x['warteschlange'])
+        if not reihe:
+            raise Fehler('Sprachmenü: Bitte zuerst mindestens ein Telefon anlegen, das in der Warteschlange klingelt.')
+        if reihe != list(range(reihe[0], reihe[0] + len(reihe))):
+            raise Fehler(f'Sprachmenü: Die Telefone der Warteschlange müssen fortlaufend nummeriert sein (z. B. 201, 202, 203); jetzt: {", ".join(map(str, reihe))}.')
     nz = cfg.get('netz') or {}
     netz = {'lokal': _net(nz.get('lokal'), 'Netz der Telefone'), 'erlaubt': _net(nz.get('erlaubt'), 'Erlaubtes Netz für Telefone'),
             'extern': _pattern(nz.get('extern'), HOST, 'Öffentliche Adresse', 'praxis.example.org')}
@@ -845,7 +852,7 @@ def kienzlefon_anwenden(files: dict[str, str], c: dict) -> dict[str, str]:
             (staging / name).write_text(text, encoding='utf-8')
         try:
             install_asterisk_config(config, staging)
-        except AsteriskConfigError as e:
+        except (AsteriskConfigError, ValueError) as e:
             raise Fehler(f'Kienzlefon: {e}') from None
         out = {}
         for name in (*files, *KZF_FILES):

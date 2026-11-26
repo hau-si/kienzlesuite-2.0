@@ -104,6 +104,29 @@ final class Ansicht {
         return '<details class="fold" id="' . $id . '"' . ($offen ? ' open' : '') . '><summary><h2>' . tf_h($titel) . '</h2> ' . $zustand . '</summary><div class="tf-body">' . $inhalt . '</div></details>';
     }
 
+    /** Ansagen: Piper (optional nachgeladen) einrichten/entfernen, Ansagen erzeugen, Stand des letzten Auftrags. */
+    private static function ansagen(string $csrf, string $tts): string {
+        $st = Anlage::auftragStatus();
+        $namen = ['piper-einrichten' => 'Piper einrichten', 'piper-entfernen' => 'Piper entfernen', 'erzeugen' => 'Ansagen erzeugen', '' => 'Auftrag'];
+        $stand = match ($st['stand'] ?? '') {
+            'laeuft', 'wartet' => self::tag('warn', 'läuft'), 'fertig' => self::tag('ok', 'fertig'), 'fehler' => self::tag('err', 'Fehler'), default => '',
+        };
+        $knopf = static fn(string $aktion, string $text, string $klasse = '', string $frage = '', array $extra = []) => '<form method="post"' . ($frage !== '' ? ' data-confirm="' . tf_h($frage) . '"' : '')
+            . '><input type="hidden" name="kienzle-csrf" value="' . tf_h($csrf) . '"><input type="hidden" name="aktion" value="' . $aktion . '">'
+            . implode('', array_map(fn($k, $v) => '<input type="hidden" name="' . $k . '" value="' . tf_h($v) . '">', array_keys($extra), $extra))
+            . '<button class="' . $klasse . '" type="submit">' . tf_h($text) . '</button></form>';
+        $o = '<h3>Ansagen</h3><p>' . (Anlage::piperBereit() ? self::tag('ok', 'Piper eingerichtet') : self::tag('opt', 'Piper nicht geladen'))
+            . ' <span class="muted">Erzeugte Ansagen: ' . Anlage::ansagenAnzahl() . '</span></p>'
+            . '<p class="muted">Piper wird nur bei Bedarf geladen (Python-Pakete mit festen Versionen und die Stimme „Thorsten“, zusammen etwa 200 MB), damit das Modul klein bleibt. '
+            . 'Eigene Aufnahmen über die Nebenstelle 777 haben Vorrang vor erzeugten Ansagen.</p><div class="tf-knoepfe tf-links">';
+        if (!Anlage::piperBereit()) $o .= $knopf('piper-einrichten', 'Piper einrichten', 'primary', 'Piper und die Stimme jetzt aus dem Internet laden (etwa 200 MB)?');
+        else $o .= $knopf('ansagen-erzeugen', 'Geänderte Ansagen erzeugen', 'primary') . $knopf('ansagen-erzeugen', 'Alle neu erzeugen', 'secondary', 'Alle Ansagen neu erzeugen? Das dauert einige Minuten.', ['alle' => '1'])
+            . $knopf('piper-entfernen', 'Piper entfernen', 'danger', 'Piper und die Stimme löschen? Erzeugte Ansagen bleiben.');
+        $o .= '</div>';
+        if ($stand !== '') $o .= '<p>' . tf_h($namen[$st['aktion'] ?? ''] ?? 'Auftrag') . ': ' . $stand . ' <span class="muted">' . tf_h((string)($st['meldung'] ?? '')) . '</span></p>';
+        return $o;
+    }
+
     public static function einstellungen(array $cfg, array $status, string $csrf, bool $admin, ?string $leitung, ?array $zugang, string $server, ?string $meldung, ?string $fehler): string {
         $h = 'tf_h';
         $o = '<div class="tf">' . self::kopfzeile('/einstellungen', true) . self::meldungen($meldung, $fehler);
@@ -178,8 +201,8 @@ final class Ansicht {
                 . self::auswahl('tts', 'Sprachausgabe der Ansagen', Anlage::SPRACHAUSGABE, (string)$kz['tts']);
             $o .= self::fold('sprachmenue', 'Sprachmenü', $kz['aktiv'] ? self::tag('ok', 'an') : self::tag('opt', 'aus'),
                 '<p class="muted">Sprachmenü aus Kienzlefon: Öffnungs- und Telefonzeiten, Begrüßung, Menü (Praxis, Rezept, Überweisung, Termin), Apotheken- und Fachstellenweg. '
-                . 'Noch in Arbeit: Erzeugen der Ansagen (Piper; Google und Kokoro wahlweise), Seiten für Zeiten und Texte, Aufnahme von Anliegen. Bis dahin besser ausgeschaltet lassen.</p>'
-                . self::formular($csrf, 'sprachmenue-speichern', $form, 'Speichern'));
+                . 'Noch in Arbeit: Google und Kokoro, Seiten für Zeiten und Texte, Aufnahme von Anliegen. Erst einschalten, wenn die Ansagen erzeugt sind.</p>'
+                . self::formular($csrf, 'sprachmenue-speichern', $form, 'Speichern') . self::ansagen($csrf, (string)$kz['tts']));
         }
 
         // Telefone

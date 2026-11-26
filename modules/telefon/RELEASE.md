@@ -1,5 +1,13 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.5
+
+- **Piper wird optional nachgeladen** (Einstellungen → Sprachmenü → „Piper einrichten“), damit das Modul klein bleibt: eigene Python-Umgebung im Datenordner mit festen Versionen und Prüfsummen (`lib/piper/requirements-cp314.lock`, Piper 1.8.0 mit onnxruntime, für Python 3.14) und die Stimme „Thorsten“ (de_DE-thorsten-high) aus der festen Fassung v1.0.0 der Piper-Stimmen. Zusammen etwa 200 MB. „Piper entfernen“ löscht beides; erzeugte Ansagen bleiben.
+- **Ansagen erzeugen** („Geänderte Ansagen erzeugen“, „Alle neu erzeugen“): Kienzlefon 2.7 erzeugt die Ansagen mit Piper in den Ansagenordner des Moduls (alle Asterisk-Formate). Die Arbeit macht der Dienst `kienzle-telefon-ansagen` (Auftragsdatei); die Seite zeigt den Stand und lädt sich während eines Auftrags neu.
+- Sprachmenü einschalten geht nur, wenn mindestens ein Telefon in der Warteschlange ist und diese Telefone fortlaufend nummeriert sind (Vorgabe von Kienzlefon).
+- Neue Pakete: `ffmpeg`, `python3-venv`.
+- Geprüft mit Tests (Ansagen mit einem nachgestellten Piper und echtem ffmpeg). **Nicht geprüft:** echtes Laden von Piper und der Stimme (aus der Testumgebung gesperrt; die Prüfsumme der Stimme wird beim ersten Laden ermittelt und gespeichert, nicht vorher festgelegt), Google und Kokoro (folgen), VM.
+
 ## 0.1.0-beta.4
 
 - Beschreibung nennt, dass Telefon die Faxleitung für das Modul Fax bereitstellt und Fax erst danach installiert werden kann.

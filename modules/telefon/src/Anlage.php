@@ -131,6 +131,34 @@ final class Anlage {
         return $cfg;
     }
 
+    // ---- Ansagen und Piper (optional nachgeladen, lib/ansagen-auftrag über kienzle-telefon-ansagen.path) ------------
+    public const AUFTRAEGE = ['piper-einrichten', 'piper-entfernen', 'erzeugen'];
+
+    /** Auftrag für den Ansagen-Dienst ablegen (einer zur Zeit). */
+    public static function auftrag(string $aktion, bool $alle = false): void {
+        if (!in_array($aktion, self::AUFTRAEGE, true)) throw new \InvalidArgumentException('Unbekannter Auftrag.');
+        $dir = self::$data . '/kienzlefon';
+        if (!is_dir($dir)) mkdir($dir, 0700, true);
+        $st = self::auftragStatus();
+        if (is_file("$dir/auftrag.json") || ($st['stand'] ?? '') === 'laeuft' && (int)($st['zeit'] ?? 0) > time() - 3600) throw new \InvalidArgumentException('Ein Auftrag läuft noch. Bitte warten.');
+        if ($aktion === 'erzeugen' && !self::piperBereit() && (self::laden()['kienzlefon']['tts'] ?? 'piper') === 'piper') throw new \InvalidArgumentException('Erst Piper einrichten.');
+        $tmp = "$dir/.auftrag." . bin2hex(random_bytes(4));
+        file_put_contents($tmp, (string)json_encode(['aktion' => $aktion, 'alle' => $alle]));
+        chmod($tmp, 0600);
+        rename($tmp, "$dir/auftrag.json");
+    }
+
+    public static function auftragStatus(): array {
+        $d = json_decode((string)@file_get_contents(self::$data . '/kienzlefon/auftrag-status.json'), true);
+        $d = is_array($d) ? $d : [];
+        if (is_file(self::$data . '/kienzlefon/auftrag.json')) $d = ['aktion' => '', 'stand' => 'wartet', 'meldung' => 'Auftrag wartet auf den Dienst …', 'zeit' => time()];
+        return $d;
+    }
+
+    public static function piperBereit(): bool { return is_file(self::$data . '/piper/bereit.json'); }
+
+    public static function ansagenAnzahl(): int { return count(glob(self::$data . '/kienzlefon/ansagen/*.g722') ?: []); }
+
     public static function netzSpeichern(array $cfg, array $p): array {
         $cfg['netz'] = ['lokal' => trim((string)($p['lokal'] ?? '')), 'erlaubt' => trim((string)($p['erlaubt'] ?? '')), 'extern' => trim((string)($p['extern'] ?? ''))];
         return $cfg;

@@ -35,7 +35,7 @@ jobs:
       - name: Tests
         run: |
           [ -s teile.txt ] || exit 0
-          sudo apt-get update && sudo apt-get install -y php-cli php-sqlite3 php-mbstring php-gd php-curl php-xml php-zip openssl librsvg2-bin poppler-utils qpdf fonts-dejavu-core ghostscript python3-openpyxl python3-pil python3-qrcode tesseract-ocr tesseract-ocr-deu asterisk asterisk-modules asterisk-prompt-de libtiff-tools python3-reportlab python3-pypdf python3-pytest python3-cryptography
+          sudo apt-get update && sudo apt-get install -y php-cli php-sqlite3 php-mbstring php-gd php-curl php-xml php-zip openssl librsvg2-bin poppler-utils qpdf fonts-dejavu-core ghostscript python3-openpyxl python3-pil python3-qrcode tesseract-ocr tesseract-ocr-deu asterisk asterisk-modules asterisk-prompt-de libtiff-tools python3-reportlab python3-pypdf python3-pytest python3-cryptography ffmpeg
           sudo systemctl stop asterisk || true   # Paketdienst; der Faxtest startet eine eigene Instanz
           bash tests/run-all.sh
       - name: Starterprogramme bauen

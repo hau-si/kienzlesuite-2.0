@@ -54,6 +54,7 @@ try {
                 'kanaele-speichern' => Anlage::kanaeleSpeichern($cfg, $_POST),
                 'netz-speichern' => Anlage::netzSpeichern($cfg, $_POST),
                 'sprachmenue-speichern' => Anlage::sprachmenueSpeichern($cfg, $_POST),
+                'piper-einrichten', 'piper-entfernen', 'ansagen-erzeugen' => null,
                 'nebenstellen-anlegen' => Anlage::nebenstellenAnlegen($cfg, (int)($_POST['anzahl'] ?? 0), $k),
                 'nebenstelle-speichern' => Anlage::nebenstelleSpeichern($cfg, $_POST),
                 'nebenstelle-loeschen' => Anlage::nebenstelleLoeschen($cfg, (string)($_POST['nummer'] ?? '')),
@@ -61,7 +62,11 @@ try {
                 'zugang-zeigen' => null,
                 default => throw new InvalidArgumentException('Unbekannte Aktion.'),
             };
-            if ($aktion === 'zugang-zeigen') {
+            if (in_array($aktion, ['piper-einrichten', 'piper-entfernen', 'ansagen-erzeugen'], true)) {
+                Anlage::auftrag($aktion === 'ansagen-erzeugen' ? 'erzeugen' : $aktion, !empty($_POST['alle']));
+                $meldung = ['piper-einrichten' => 'Piper wird geladen (etwa 200 MB, einige Minuten). Der Stand steht unter „Sprachmenü“.',
+                    'piper-entfernen' => 'Piper wird entfernt.', 'ansagen-erzeugen' => 'Ansagen werden erzeugt. Der Stand steht unter „Sprachmenü“.'][$aktion];
+            } elseif ($aktion === 'zugang-zeigen') {
                 // Heikle Anzeige: Passwort eines Telefons nur nach frischer Bestätigung (Passwort+OTP oder Passkey).
                 if (!$k->frischBestaetigt(900)) { header('Location: ' . $k->bestaetigenAdresse($base . '/einstellungen#telefone'), true, 303); exit; }
                 $nr = (string)($_POST['nummer'] ?? '');
@@ -83,6 +88,7 @@ try {
     $status = Anlage::status();
     header('Content-Type: text/html; charset=utf-8');
     header('Cache-Control: no-store');
+    if ($rel === '/einstellungen' && in_array(Anlage::auftragStatus()['stand'] ?? '', ['laeuft', 'wartet'], true)) header('Refresh: 5');
     if ($rel === '/einstellungen') {
         $leitung = $admin && preg_match('/^[a-z0-9]{1,12}$/D', (string)($_GET['leitung'] ?? '')) ? (string)$_GET['leitung'] : null;
         $server = preg_replace('/:\d+$/', '', (string)($_SERVER['HTTP_HOST'] ?? '')) ?: 'Adresse des Servers';

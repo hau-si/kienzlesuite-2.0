@@ -31,3 +31,4 @@ main.modul { max-width: 980px; margin: 0; padding: 32px 40px 48px; }
 .tf-zugang dt { font-weight: 600; }
 .tf code { background: var(--soft); padding: 1px 5px; border-radius: 5px; font-size: 13px; }
 @media (max-width: 900px) { main.modul { padding: 20px 16px 40px; } .tf-zeile { flex-direction: column; align-items: flex-start; } }
+.tf-links { justify-content: flex-start; margin: 6px 0; }

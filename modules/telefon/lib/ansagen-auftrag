@@ -1,0 +1,116 @@
+#!/usr/bin/python3 -B
+"""Aufträge rund um die Ansagen des Sprachmenüs (Dienst kienzle-telefon-ansagen, als ks-telefon, gestartet über die Auftragsdatei).
+
+Piper ist **optional nachgeladen**, damit das Modul klein bleibt: Erst „Piper einrichten“ legt eine eigene Python-Umgebung im
+Datenordner an (Pakete mit festen Versionen und Prüfsummen aus lib/piper/requirements-cp314.lock) und lädt die Stimme
+de_DE-thorsten-high von einer festen Fassung (v1.0.0) der Piper-Stimmen. „Piper entfernen“ löscht beides wieder.
+
+Auftrag <daten>/kienzlefon/auftrag.json: {"aktion": "piper-einrichten" | "piper-entfernen" | "erzeugen", "alle": bool}
+Stand   <daten>/kienzlefon/auftrag-status.json: {"aktion", "stand": "laeuft" | "fertig" | "fehler", "meldung", "zeit"}
+"""
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+import urllib.request
+from pathlib import Path
+
+DATA = Path(os.environ.get('KIENZLE_DATEN', '/var/lib/kienzle/telefon'))
+KZF = DATA / 'kienzlefon'
+AUFTRAG = KZF / 'auftrag.json'
+STATUS = KZF / 'auftrag-status.json'
+PIPER = DATA / 'piper'
+VENV = PIPER / 'venv'
+BEREIT = PIPER / 'bereit.json'
+STIMMEN = KZF / 'piper-voices'
+HERE = Path(__file__).resolve().parent
+LOCK = HERE / 'piper' / 'requirements-cp314.lock'
+STIMME = 'de_DE-thorsten-high'
+STIMME_URL = os.environ.get('KIENZLE_PIPER_STIMME_URL', 'https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/de/de_DE/thorsten/high/')
+MAX_STIMME = 300 * 1024 * 1024
+
+
+def melden(aktion: str, stand: str, meldung: str) -> None:
+    tmp = STATUS.with_name('.auftrag-status.neu')
+    tmp.write_text(json.dumps({'aktion': aktion, 'stand': stand, 'meldung': meldung[:500], 'zeit': int(time.time())}, ensure_ascii=False) + '\n', encoding='utf-8')
+    os.replace(tmp, STATUS)
+
+
+def laufen(cmd: list[str], timeout: int, env: dict | None = None) -> str:
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
+    if r.returncode != 0:
+        raise RuntimeError((r.stderr or r.stdout).strip()[-400:] or f'Rückgabe {r.returncode}')
+    return r.stdout
+
+
+def laden(url: str, ziel: Path) -> str:
+    """Datei über HTTPS laden (Zertifikat geprüft), höchstens MAX_STIMME Bytes; liefert die SHA-256."""
+    part = ziel.with_name(ziel.name + '.part')
+    h = hashlib.sha256()
+    n = 0
+    with urllib.request.urlopen(url, timeout=60) as r, part.open('wb') as f:  # noqa: S310 – feste https-Adresse
+        while chunk := r.read(1 << 20):
+            n += len(chunk)
+            if n > MAX_STIMME:
+                raise RuntimeError('Stimme größer als erwartet; abgebrochen.')
+            h.update(chunk)
+            f.write(chunk)
+    os.replace(part, ziel)
+    return h.hexdigest()
+
+
+def piper_einrichten() -> str:
+    if sys.version_info[:2] != (3, 14):
+        raise RuntimeError(f'Die Paketliste ist für Python 3.14 (Ubuntu 26.04); hier läuft {sys.version_info[0]}.{sys.version_info[1]}.')
+    shutil.rmtree(VENV, ignore_errors=True)
+    PIPER.mkdir(mode=0o700, exist_ok=True)
+    laufen([sys.executable, '-m', 'venv', '--system-site-packages', str(VENV)], 300)
+    laufen([str(VENV / 'bin' / 'python'), '-m', 'pip', 'install', '--no-input', '--disable-pip-version-check', '--require-hashes', '--no-deps',
+            '--only-binary=:all:', '-r', str(LOCK)], 1800)
+    STIMMEN.mkdir(mode=0o700, parents=True, exist_ok=True)
+    sums = {name: laden(STIMME_URL + name, STIMMEN / name) for name in (f'{STIMME}.onnx', f'{STIMME}.onnx.json')}
+    laufen([str(VENV / 'bin' / 'python'), '-c', 'import piper'], 120)
+    BEREIT.write_text(json.dumps({'stimme': STIMME, 'pakete': LOCK.read_text(encoding='utf-8').count('--hash='), 'sha256': sums, 'zeit': int(time.time())}) + '\n')
+    return f'Piper eingerichtet (Stimme {STIMME}).'
+
+
+def piper_entfernen() -> str:
+    shutil.rmtree(PIPER, ignore_errors=True)
+    for f in STIMMEN.glob(f'{STIMME}.onnx*') if STIMMEN.is_dir() else []:
+        f.unlink(missing_ok=True)
+    return 'Piper entfernt. Erzeugte Ansagen bleiben erhalten.'
+
+
+def erzeugen(alle: bool) -> str:
+    cmd = [str(HERE / 'kzf-bin' / 'kienzlefon-ansagen'), '--config', str(KZF / 'kienzlefon.toml')] + (['--all'] if alle else [])
+    out = laufen(cmd, 3600, {**os.environ, 'KIENZLE_DATEN': str(DATA)})
+    zeilen = [z for z in out.splitlines() if z.strip()]
+    return zeilen[-1] if zeilen else 'Ansagen erzeugt.'
+
+
+def main() -> int:
+    try:
+        auftrag = json.loads(AUFTRAG.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return 0
+    finally:
+        AUFTRAG.unlink(missing_ok=True)
+    aktion = str(auftrag.get('aktion') or '')
+    arbeit = {'piper-einrichten': piper_einrichten, 'piper-entfernen': piper_entfernen, 'erzeugen': lambda: erzeugen(auftrag.get('alle') is True)}.get(aktion)
+    if arbeit is None:
+        melden(aktion[:30], 'fehler', 'Unbekannter Auftrag.')
+        return 1
+    melden(aktion, 'laeuft', 'Läuft …')
+    try:
+        melden(aktion, 'fertig', arbeit())
+        return 0
+    except (OSError, RuntimeError, subprocess.SubprocessError, ValueError) as e:
+        melden(aktion, 'fehler', str(e))
+        return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())
