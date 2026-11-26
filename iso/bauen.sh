@@ -39,7 +39,7 @@ xorriso -indev "$isoname" -outdev "$tmp/aus.iso" \
   -boot_image any replay \
   -volid CIDATA \
   -find /casper -type f -not -name vmlinuz -not -name initrd -exec rm -- \
-  -rm_r /pool /dists /install /preseed -- \
+  -rm_r /pool /dists -- \
   -map seed/user-data /user-data \
   -map seed/meta-data /meta-data \
   -map grub.cfg /boot/grub/grub.cfg \
