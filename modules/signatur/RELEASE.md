@@ -1,5 +1,9 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.29
+
+- Neu: `lib/padablauf.py` (Ablauftest am Pad mit mehreren Seiten, Wegwerf-Datenbank): `sudo systemctl stop kienzle-signatur-pad; sudo -u ks-signatur python3 /opt/kienzle/signatur/current/lib/padablauf.py <IP> 1002`; danach Dienst wieder starten. Zeigt im Protokoll Aufnahmestart, Stiftereignisse und Ergebnis. Mit `PADABLAUF=direkt` (vor `python3`: `sudo -u ks-signatur env PADABLAUF=direkt python3 …`) ohne Textseiten, gleich die Unterschriftsseite. Nur Werkzeug zur Fehlersuche, nicht am Pad geprüft.
+
 ## 0.1.0-beta.28
 
 - **Pad-Dienst an den funktionierenden Aufnahmetest angeglichen** (im Test `padsign.py` kommen die Stiftpunkte an, im Dienst bisher keine): Anzeigeziel wird wie im Test nach dem Löschen der Seite gesetzt, kein Statusabruf mehr zwischen Aufnahmestart und Unterschrift. **Nicht geprüft:** echtes Pad; falls weiterhin 0 Stiftereignisse, Protokoll `journalctl -u kienzle-signatur-pad` schicken.
