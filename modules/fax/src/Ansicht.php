@@ -20,14 +20,29 @@ final class Ansicht {
 
     private static function csrf(string $csrf): string { return '<input type="hidden" name="kienzle-csrf" value="' . fx_h($csrf) . '">'; }
 
-    /** Seitenkopf mit Unterseiten; Zähler für ungelesene Faxe und Fehlerberichte. */
+    private const SVG = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">';
+
+    /** Symbole der Menüpunkte (dieselbe Strichstärke und Größe wie in den Modulen Signatur und Kasse). */
+    public static function symbol(string $route): string {
+        return self::SVG . match ($route) {
+            '/' => '<path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>',
+            '/eingang' => '<path d="M22 12h-6l-2 3h-4l-2-3H2M5.5 5.1L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.7 4H7.3a2 2 0 0 0-1.8 1.1z"/>',
+            '/protokoll' => '<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',
+            '/fehler' => '<path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01"/>',
+            '/telefonbuch' => '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14zM20 17v4H6.5A2.5 2.5 0 0 1 4 18.5"/>',
+            '/einstellungen' => '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
+            default => '',
+        } . '</svg>';
+    }
+
+    /** Seitenkopf mit Unterseiten und Symbolen; Zähler für ungelesene Faxe und Fehlerberichte. */
     private static function kopfzeile(string $route, array $rechte, int $ungelesen, int $fehler): string {
         $b = fx_h(fx_basis());
         $links = '';
         foreach (self::SEITEN as $r => $t) {
             if (!self::darf($r, $rechte)) continue;
             $zahl = $r === '/eingang' && $ungelesen > 0 ? ' <span class="fx-zahl">' . $ungelesen . '</span>' : ($r === '/fehler' && $fehler > 0 ? ' <span class="fx-zahl fehler-zahl">' . $fehler . '</span>' : '');
-            $links .= '<a class="button ' . ($route === $r ? 'primary' : 'secondary') . ' small" href="' . $b . $r . '"' . ($route === $r ? ' aria-current="page"' : '') . '>' . fx_h($t) . $zahl . '</a>';
+            $links .= '<a class="button ' . ($route === $r ? 'primary' : 'secondary') . ' small mit-icon" href="' . $b . $r . '"' . ($route === $r ? ' aria-current="page"' : '') . '>' . self::symbol($r) . fx_h($t) . $zahl . '</a>';
         }
         return '<header class="seitenkopf"><div><p class="eyebrow">Fax</p><h1>' . fx_h(self::SEITEN[$route]) . '</h1></div><nav class="start-tools" aria-label="Fax">' . $links . '</nav></header>';
     }
@@ -75,15 +90,22 @@ final class Ansicht {
         $b = fx_h(fx_basis());
         $q = $d['quelle'];
         $tabs = '';
-        foreach ([...Fax::DRUCKER, 'sendefehler'] as $name) {
+        $druckerInfo = [];
+        foreach ($d['drucker'] as $x) $druckerInfo[$x['name']] = $x;
+        foreach ([...array_keys($d['zaehler']), 'sendefehler'] as $name) {
             $z = $d['zaehler'][$name] ?? 0;
-            $tabs .= '<a class="button small ' . ($name === $q ? 'primary' : 'secondary') . '" href="' . $b . '/?quelle=' . fx_h($name) . '">' . fx_h($name === 'sendefehler' ? 'Sendefehler' : $name)
+            if ($name === Fax::UPLOAD && $z === 0 && $q !== $name) continue;      // „Hochgeladen“ nur, wenn etwas drin liegt
+            $titel = match (true) { $name === 'sendefehler' => 'Sendefehler', $name === Fax::UPLOAD => 'Hochgeladen', $name === Fax::NAS => 'NAS-Ordner',
+                default => $name . (($druckerInfo[$name]['bezeichnung'] ?? '') !== '' ? ' · ' . $druckerInfo[$name]['bezeichnung'] : '') };
+            $tabs .= '<a class="button small ' . ($name === $q ? 'primary' : 'secondary') . '" href="' . $b . '/?quelle=' . fx_h($name) . '">' . fx_h($titel)
                 . ($z ? ' <span class="fx-zahl">' . $z . '</span>' : '') . '</a>';
         }
+        $fest = $druckerInfo[$q] ?? null;
+        $fest = $fest && $fest['nummer'] !== '' ? $fest : null;
         $liste = '';
         foreach ($d['dateien'] as $f) {
             $titel = $f['titel'] !== '' ? $f['titel'] : $f['datei'];
-            $liste .= '<li><label class="check"><input type="checkbox" name="dateien[]" value="' . fx_h($f['datei']) . '"' . (count($d['dateien']) === 1 ? ' checked' : '') . '> <span><strong>'
+            $liste .= '<li><label class="check"><input type="checkbox" name="dateien[]" value="' . fx_h($f['datei']) . '"' . (count($d['dateien']) === 1 || in_array($f['datei'], $d['vorgewaehlt'], true) ? ' checked' : '') . '> <span><strong>'
                 . fx_h($titel) . '</strong><span class="muted klein"> · ' . self::zeit($f['zeit']) . ' · ' . self::groesse($f['groesse']) . '</span></span></label>'
                 . ' <a class="klein" href="' . $b . '/pdf?art=quelle&amp;quelle=' . fx_h($q) . '&amp;datei=' . fx_h($f['datei']) . '" target="_blank" rel="noopener">ansehen</a></li>';
         }
@@ -91,17 +113,24 @@ final class Ansicht {
         foreach ($d['kontakte'] as $k) $kontakte .= '<option value="' . (int)$k['id'] . '">' . fx_h($k['name'] . ' · ' . Fax::anzeige($k['nummer'])) . '</option>';
         $empf = '';
         for ($i = 0; $i < Fax::MAX_EMPFAENGER; $i++) {
+            $vorName = $i === 0 && $fest ? ($fest['bezeichnung'] !== '' ? $fest['bezeichnung'] : $fest['name']) : '';
+            $vorNr = $i === 0 && $fest ? Fax::anzeige($fest['nummer']) : '';
             $empf .= '<fieldset class="fx-empfaenger"' . ($i > 0 ? ' data-weitere hidden' : '') . '><legend>Empfänger ' . ($i + 1) . '</legend>'
+                . ($i === 0 && $fest ? '<p class="muted klein">Feste Faxnummer des Druckers ' . fx_h($fest['name']) . ' (änderbar).</p>' : '')
                 . '<label>Telefonbuch<select name="empfaenger[' . $i . '][kontakt]">' . $kontakte . '</select></label>'
-                . '<div class="fx-zwei"><label>Name<input name="empfaenger[' . $i . '][name]" maxlength="80" autocomplete="off"></label>'
-                . '<label>Faxnummer<input name="empfaenger[' . $i . '][nummer]" maxlength="30" inputmode="tel" autocomplete="off" placeholder="030 1234567"></label></div>'
+                . '<div class="fx-zwei"><label>Name<input name="empfaenger[' . $i . '][name]" maxlength="80" autocomplete="off" value="' . fx_h($vorName) . '"></label>'
+                . '<label>Faxnummer<input name="empfaenger[' . $i . '][nummer]" maxlength="30" inputmode="tel" autocomplete="off" placeholder="030 1234567" value="' . fx_h($vorNr) . '"></label></div>'
                 . '<label class="check"><input type="checkbox" name="empfaenger[' . $i . '][merken]" value="1"> Im Telefonbuch speichern</label></fieldset>';
         }
         $o = '<form method="post" id="fx-senden" class="fx-raster">' . self::csrf($d['csrf']) . '<input type="hidden" name="quelle" value="' . fx_h($q) . '">'
-            . '<section class="card"><h2>1. Dokument wählen</h2><p class="muted">Am PC auf einen der Faxdrucker (vFax1 bis vFax5) drucken; das Dokument erscheint dann hier.</p>'
+            . '<section class="card"><h2>1. Dokument wählen</h2><p class="muted">Am PC auf einen Faxdrucker drucken (' . fx_h(implode(', ', array_column($d['drucker'], 'name'))) . '), eine Datei hierher ziehen'
+            . ($d['lauschordner'] ? ' oder in den NAS-Ordner legen' : '') . '. Das Dokument erscheint dann hier.</p>'
+            . '<div id="fx-drop" class="fx-drop" data-csrf="' . fx_h($d['csrf']) . '" data-ziel="' . $b . '/" tabindex="0"><strong>Dateien hier ablegen</strong><span class="muted klein">PDF, Bilder (JPEG, PNG, GIF, BMP, WebP) oder PostScript, bis 3 MB je Datei. '
+            . 'Word- und LibreOffice-Dokumente bitte zuerst als PDF speichern oder auf den Faxdrucker drucken.</span>'
+            . '<label class="button small secondary fx-datei">Dateien wählen<input type="file" id="fx-datei" multiple accept=".pdf,.ps,.jpg,.jpeg,.png,.gif,.bmp,.webp,application/pdf,image/*" hidden></label></div>'
             . '<div class="fx-tabs">' . $tabs . '</div>';
         $o .= $liste !== '' ? '<ul class="fx-dateien">' . $liste . '</ul><button class="small secondary" type="submit" name="aktion" value="quelle-loeschen" formnovalidate data-frage="Ausgewählte Dokumente löschen?">Ausgewählte löschen</button>'
-            : '<p class="muted">' . ($q === 'sendefehler' ? 'Keine fehlgeschlagenen Dokumente.' : 'Noch nichts auf ' . fx_h($q) . ' gedruckt.') . '</p>';
+            : '<p class="muted">' . ($q === 'sendefehler' ? 'Keine fehlgeschlagenen Dokumente.' : ($q === Fax::NAS ? 'Der NAS-Ordner ist leer.' : ($q === Fax::UPLOAD ? 'Noch nichts hochgeladen.' : 'Noch nichts auf ' . fx_h($q) . ' gedruckt.'))) . '</p>';
         $o .= '</section><section class="card"><h2>2. Empfänger</h2>' . $empf . '<button class="small secondary" type="button" data-mehr>Weiteren Empfänger hinzufügen</button>'
             . '<h2>3. Senden</h2><div class="fx-zwei"><label>Auflösung<select name="aufloesung"><option value="fine">fein (empfohlen)</option><option value="standard">normal</option></select></label>'
             . '<label class="check"><input type="checkbox" name="ecm" value="1" checked> Fehlerkorrektur (ECM)</label></div>'
@@ -148,7 +177,8 @@ final class Ansicht {
                 . '<a class="button small primary" href="' . $b . '/pdf?art=eingang&amp;datei=' . fx_h($e['name']) . '.pdf" target="_blank" rel="noopener">Öffnen</a>'
                 . '<form method="post" data-confirm="Dieses Fax endgültig löschen?">' . self::csrf($d['csrf']) . '<input type="hidden" name="aktion" value="eingang-loeschen"><input type="hidden" name="name" value="' . fx_h($e['name']) . '"><button class="small danger" type="submit">Löschen</button></form></td></tr>';
         }
-        return $o . '</table><p class="muted klein">Empfangene Faxe werden nach ' . (int)$d['einstellungen']['eingang_tage'] . ' Tagen gelöscht.</p></section>';
+        return $o . '</table><p class="muted klein">' . ((int)$d['einstellungen']['eingang_tage'] > 0 ? 'Empfangene Faxe werden nach ' . (int)$d['einstellungen']['eingang_tage'] . ' Tagen gelöscht.' : 'Empfangene Faxe werden unbegrenzt aufbewahrt.')
+            . ($d['einstellungen']['export']['ziel'] !== '' ? ' Neue Faxe werden zusätzlich auf das NAS exportiert.' : '') . '</p></section>';
     }
 
     private static function telefonbuch(array $d): string {
@@ -173,11 +203,55 @@ final class Ansicht {
 
     private static function einstellungen(array $d): string {
         $e = $d['einstellungen'];
-        $feld = static fn(string $n, string $l, int $v) => '<label>' . fx_h($l) . '<input type="number" name="' . $n . '" min="1" max="3650" value="' . $v . '"></label>';
-        return '<section class="card"><h2>Aufbewahrung</h2><p class="muted">Faxe enthalten Gesundheitsdaten. Ältere Dateien löscht das Modul selbst.</p><form method="post" class="fx-form fx-schmal">' . self::csrf($d['csrf'])
-            . '<input type="hidden" name="aktion" value="einstellungen-speichern">' . $feld('eingang_tage', 'Faxeingang (Tage)', $e['eingang_tage'])
-            . $feld('protokoll_tage', 'Sendeprotokoll und Fehlerberichte (Tage)', $e['protokoll_tage']) . $feld('drucker_tage', 'Gedruckte, nicht gesendete Dokumente (Tage)', $e['drucker_tage'])
-            . '<button class="primary" type="submit">Speichern</button></form></section>'
-            . '<section class="card"><h2>Faxleitung</h2><p>Leitung, Faxnummer und Absenderkennung stellt das Modul <a href="/telefon/einstellungen#rufnummern">Telefon</a> ein. Der Kopf jeder Faxseite trägt den Praxisnamen aus Verwaltung → Praxis.</p></section>';
+        $tage = static function (string $n, string $l, int $v): string {
+            return '<div class="fx-tage"><label>' . fx_h($l) . '<input type="number" name="' . $n . '" min="1" max="3650" value="' . ($v > 0 ? $v : 90) . '"' . ($v === 0 ? ' disabled' : '') . '></label>'
+                . '<label class="check"><input type="checkbox" name="' . $n . '_unbegrenzt" value="1" data-schalter="' . $n . '"' . ($v === 0 ? ' checked' : '') . '> unbegrenzt</label></div>';
+        };
+        $o = '<section class="card"><h2>Faxdrucker</h2><p class="muted">An den PCs einmal einrichten (Verwaltung → Drucker zeigt die Adresse). Jeder Drucker kann eine <strong>feste Faxnummer</strong> bekommen: '
+            . 'Dokumente von diesem Drucker tragen die Nummer schon als Empfänger ein; mit „sofort senden“ gehen sie ohne Rückfrage hinaus. Namen beginnen mit <code>' . fx_h(Fax::VORSATZ) . '</code>.</p>'
+            . '<form method="post" class="fx-form">' . self::csrf($d['csrf']) . '<input type="hidden" name="aktion" value="drucker-speichern"><table class="fx-tabelle fx-drucker"><tr><th>Name</th><th>Bezeichnung</th><th>Feste Faxnummer</th><th>Sofort senden</th></tr>';
+        $zeilen = $d['drucker'];
+        while (count($zeilen) < min(Fax::MAX_DRUCKER, count($d['drucker']) + 2)) $zeilen[] = ['name' => '', 'bezeichnung' => '', 'nummer' => '', 'sofort' => false];
+        foreach ($zeilen as $i => $x) {
+            $o .= '<tr><td><input name="drucker[' . $i . '][name]" maxlength="40" value="' . fx_h($x['name']) . '" placeholder="' . fx_h(Fax::VORSATZ) . '2" aria-label="Name"></td>'
+                . '<td><input name="drucker[' . $i . '][bezeichnung]" maxlength="60" value="' . fx_h($x['bezeichnung']) . '" placeholder="z. B. Labor" aria-label="Bezeichnung"></td>'
+                . '<td><input name="drucker[' . $i . '][nummer]" maxlength="30" inputmode="tel" value="' . fx_h($x['nummer'] !== '' ? Fax::anzeige($x['nummer']) : '') . '" placeholder="leer = beliebig" aria-label="Feste Faxnummer"></td>'
+                . '<td><input type="checkbox" name="drucker[' . $i . '][sofort]" value="1"' . ($x['sofort'] ? ' checked' : '') . ' aria-label="Sofort senden"></td></tr>';
+        }
+        $o .= '</table><p class="muted klein">Einen Drucker entfernen: Namen löschen. Zum Hinzufügen eine leere Zeile ausfüllen (höchstens ' . Fax::MAX_DRUCKER . ').</p>'
+            . '<p class="fx-hinweis"><strong>Nach jeder Änderung der Druckerliste:</strong> Verwaltung → Drucker → „Virtuelle Drucker der Module abgleichen“ (oder das Modul Fax unter Verwaltung → Module neu installieren bzw. aktualisieren). '
+            . 'Erst danach erscheinen neue Drucker, und entfernte verschwinden. Am PC neue Drucker einmal hinzufügen.</p>'
+            . '<button class="primary" type="submit">Druckerliste speichern</button></form></section>';
+
+        $o .= '<section class="card"><h2>Netzwerkspeicher (NAS)</h2>';
+        if (!$d['nasZiele']) {
+            $o .= '<p class="muted">Dafür braucht die Suite einen Netzwerkspeicher: Verwaltung → Verbindungen → Netzwerkspeicher einrichten und für das Modul Fax freigeben. Danach lässt sich hier der Export und ein Lauschordner einstellen.</p></section>';
+        } else {
+            $opt = static function (array $ziele, string $gewaehlt): string {
+                $r = '<option value="">– aus –</option>';
+                foreach ($ziele as $id => $name) $r .= '<option value="' . fx_h($id) . '"' . ($id === $gewaehlt ? ' selected' : '') . '>' . fx_h($name) . '</option>';
+                return $r;
+            };
+            $o .= '<form method="post" class="fx-form">' . self::csrf($d['csrf']) . '<input type="hidden" name="aktion" value="nas-speichern">'
+                . '<h3>Faxeingang exportieren</h3><p class="muted">Jedes neu empfangene Fax wird zusätzlich als PDF in diesen Ordner gelegt (Dateiname mit Datum und Absender). Das Fax bleibt auch im Modul.</p>'
+                . '<div class="fx-zwei"><label>Ziel<select name="export_ziel">' . $opt($d['nasZiele'], $e['export']['ziel']) . '</select></label>'
+                . '<label>Ordner auf dem NAS<input name="export_ordner" maxlength="120" value="' . fx_h($e['export']['ordner']) . '"></label></div>'
+                . '<label class="check"><input type="checkbox" name="export_jahresordner" value="1"' . ($e['export']['jahresordner'] ? ' checked' : '') . '> Unterordner je Jahr und Monat (z. B. 2026/11)</label>'
+                . '<h3>Lauschordner zum Senden</h3><p class="muted">Dateien (PDF, Bilder), die in diesem NAS-Ordner landen, holt das Modul etwa jede Minute ab und bietet sie unter „Fax senden“ → „NAS-Ordner“ an. '
+                . 'Auf dem NAS werden sie danach gelöscht. Der Ordner muss ein anderer sein als der Exportordner.</p>'
+                . '<div class="fx-zwei"><label>Ziel<select name="lausch_ziel">' . $opt($d['nasZiele'], $e['lausch']['ziel']) . '</select></label>'
+                . '<label>Ordner auf dem NAS<input name="lausch_ordner" maxlength="120" value="' . fx_h($e['lausch']['ordner']) . '"></label></div>'
+                . '<button class="primary" type="submit">Speichern</button></form></section>';
+        }
+
+        $o .= '<section class="card"><h2>Aufbewahrung</h2><p class="muted">Faxe enthalten Gesundheitsdaten. Ältere Dateien löscht das Modul selbst, es sei denn, „unbegrenzt“ ist gewählt (dann bleibt alles, bis es von Hand gelöscht wird).</p>'
+            . '<form method="post" class="fx-form fx-schmal">' . self::csrf($d['csrf']) . '<input type="hidden" name="aktion" value="aufbewahrung-speichern">'
+            . $tage('eingang_tage', 'Faxeingang (Tage)', $e['eingang_tage']) . $tage('protokoll_tage', 'Sendeprotokoll und Fehlerberichte (Tage)', $e['protokoll_tage'])
+            . $tage('drucker_tage', 'Gedruckte, nicht gesendete Dokumente (Tage)', $e['drucker_tage']) . '<button class="primary" type="submit">Speichern</button></form></section>';
+
+        $o .= '<section class="card"><h2>Faxleitung und Absenderkennung</h2><p>Leitung, Faxnummer und die <strong>Faxkennung</strong> (Name im Kopf jeder gesendeten Faxseite, beim Empfänger zu sehen) stellt das Modul '
+            . '<a href="/telefon/einstellungen#rufnummern">Telefon</a> ein: Einstellungen → Rufnummern → Fax. Bleibt die Faxkennung dort leer, gilt der Praxisname aus Verwaltung → Praxis'
+            . ($d['praxisname'] !== '' ? ' (aktuell „' . fx_h($d['praxisname']) . '“)' : '') . ', gekürzt auf 20 Zeichen ohne Umlaute.</p></section>';
+        return $o;
     }
 }

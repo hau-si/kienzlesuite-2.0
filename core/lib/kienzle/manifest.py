@@ -69,13 +69,14 @@ SCHEMA_SECTIONS = {
     'rights': {'id', 'label'},
     'backup': {'paths', 'snapshot', 'settings'},
     'printers': {'name', 'label', 'ppd', 'backend', 'command', 'formats', 'paper', 'share'},
+    'printer_list': {'prefix', 'default', 'file', 'label', 'command', 'paper', 'formats', 'share', 'max'},
     'connections': {'id', 'purpose', 'required'},
     'starters': {'schema', 'label'},
     'exchange': {'module', 'purpose'},
     'setup': {'overview'},
     'hooks': {*HOOKS, 'apparmor'},
 }
-TABLES = {'module', 'system', 'web', 'backup', 'setup', 'hooks'}
+TABLES = {'module', 'system', 'web', 'backup', 'setup', 'hooks', 'printer_list'}
 ARRAYS = {'firewall', 'rights', 'printers', 'connections', 'starters', 'exchange'}
 REQUIRED_TABLES = ('module', 'system')
 
@@ -200,6 +201,7 @@ class _Checker:
         out['rights'] = self.rights(data.get('rights', []))
         out['backup'] = self.backup(data['backup'], mid) if 'backup' in data else None
         out['printers'] = self.printers(data.get('printers', []))
+        out['printer_list'] = self.printer_list(data['printer_list'], out['printers'], mid) if 'printer_list' in data else None
         out['connections'] = self.connections(data.get('connections', []))
         out['starters'] = self.starters(data.get('starters', []), out['web'])
         out['exchange'] = self.exchange(data.get('exchange', []), mid)
@@ -408,6 +410,40 @@ class _Checker:
             out.append({'name': name, 'label': label, 'ppd': ppd, 'backend': backend, 'command': command, 'formats': formats, 'paper': paper, 'share': share})
         return out
 
+    def printer_list(self, t: dict, fixed: list, mid) -> dict | None:
+        """Veränderbare Druckerliste: Das Modul pflegt die Namen in einer Datei im Datenordner (z. B. Faxdrucker), die Basis
+        legt daraus beim Abgleichen virtuelle Drucker an. Alle Drucker der Liste teilen sich Programm, Beschreibung und Papier."""
+        where = 'printer_list'
+        prefix = self.pattern(t, 'prefix', where, re.compile(r'^[A-Za-z][A-Za-z0-9_-]{0,19}$'), 'vFax')
+        label = self.text(t, 'label', where)
+        command = self.rel_path(t['command'], f'{where}.command') if 'command' in t else self.error(where, '„command“ fehlt.')
+        file = self.pattern(t, 'file', where, re.compile(r'^[a-z][a-z0-9_.-]{0,40}\.json$'), 'drucker.json')
+        maximum = t.get('max', 10)
+        if not isinstance(maximum, int) or isinstance(maximum, bool) or not 1 <= maximum <= LIMITS['printers'] - len(fixed):
+            self.error(f'{where}.max', f'muss eine Zahl von 1 bis {LIMITS["printers"] - len(fixed)} sein (zusammen mit [[printers]] höchstens {LIMITS["printers"]}).')
+            maximum = 1
+        default = self.string_list(t, 'default', where, maximum) if 'default' in t else ([prefix] if prefix else [])
+        if prefix:
+            rx = re.compile(r'^' + re.escape(prefix) + r'[A-Za-z0-9_-]{0,%d}$' % (39 - len(prefix)))
+            for name in default:
+                if not rx.match(name):
+                    self.error(f'{where}.default', f'„{shown(name)}“ beginnt nicht mit „{prefix}“.')
+        formats = self.string_list(t, 'formats', where, 5) if 'formats' in t else ['application/pdf']
+        for f in formats:
+            if not FORMAT.match(f):
+                self.error(f'{where}.formats', f'„{shown(f)}“ ist kein Dateityp (z. B. application/pdf).')
+        paper = str(t.get('paper', 'A4'))
+        if paper not in ('A4', 'A5', 'A6'):
+            self.error(f'{where}.paper', 'erlaubt: A4, A5, A6.')
+        share = self.string_list(t, 'share', where, len(SHARES))
+        for s in share:
+            if s not in SHARES:
+                self.error(f'{where}.share', f'„{shown(s)}“ unbekannt. Erlaubt: {", ".join(SHARES)}.')
+        if any(p['name'].lower().startswith(prefix.lower()) for p in fixed if p['name'] and prefix):
+            self.error(f'{where}.prefix', 'darf nicht mit dem Namen eines festen Druckers beginnen.')
+        return {'prefix': prefix, 'default': default, 'file': file, 'label': label, 'command': command, 'paper': paper, 'formats': formats,
+                'share': share, 'max': maximum}
+
     def connections(self, items: list) -> list:
         if len(items) > LIMITS['connections']:
             self.error('connections', f'höchstens {LIMITS["connections"]} Einträge.')
@@ -520,6 +556,8 @@ def _referenced(manifest: dict) -> list[tuple[str, str, bool]]:
         refs.append(('setup.overview', manifest['setup']['overview'], True))
     if manifest['web'] and manifest['web']['entry']:
         refs.append(('web.entry', manifest['web']['entry'], False))
+    if manifest.get('printer_list'):
+        refs.append(('printer_list.command', manifest['printer_list']['command'], True))
     for n, p in enumerate(manifest['printers'], 1):
         if p['ppd']:
             refs.append((f'printers[{n}].ppd', p['ppd'], False))
@@ -626,6 +664,8 @@ def check_list(folders: list) -> dict:
             claim(('schema', st['schema']), mid, f'Startschema {st["schema"]}')
         for p in m['printers']:
             claim(('printer', p['name'].lower()), mid, f'Drucker „{p["name"]}“')
+        for name in (m.get('printer_list') or {}).get('default', []):
+            claim(('printer', name.lower()), mid, f'Drucker „{name}“')
         for f in m['firewall']:
             for owner, other in ports:
                 if owner != mid and other['proto'] == f['proto'] and other['from'] <= f['to'] and f['from'] <= other['to']:

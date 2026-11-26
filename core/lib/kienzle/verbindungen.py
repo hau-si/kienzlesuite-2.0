@@ -381,7 +381,12 @@ def distribute(config: dict) -> list[str]:
             os.chmod(spool, 0o2770)
             if CHOWN and _group_exists('ks-ablage'):
                 shutil.chown(spool, group, 'ks-ablage')
-            out['ablage'] = {'ausgang': str(spool), 'ziele': [{'id': t['id'], 'name': t['name']} for t in config['ablage']]}
+            inbox = spool / 'eingang'
+            inbox.mkdir(mode=0o2770, exist_ok=True)
+            os.chmod(inbox, 0o2770)
+            if CHOWN and _group_exists('ks-ablage'):
+                shutil.chown(inbox, group, 'ks-ablage')
+            out['ablage'] = {'ausgang': str(spool), 'eingang': str(inbox), 'ziele': [{'id': t['id'], 'name': t['name']} for t in config['ablage']]}
         _write(ETC / 'module' / f'{mid}.json', out, 0o640, group)
         wanted.add(f'{mid}.json')
     for old in (ETC / 'module').glob('*.json') if (ETC / 'module').is_dir() else []:

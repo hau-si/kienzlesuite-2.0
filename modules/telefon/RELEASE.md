@@ -1,5 +1,9 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.8
+
+- **Faxkennung (Name im Faxkopf) leer = Praxisname:** Bleibt das Feld unter Einstellungen → Rufnummern → Fax → „Faxkennung“ leer, nimmt die Anlage den Praxisnamen aus Verwaltung → Praxis (ohne Sonderzeichen, Umlaute als ae/oe/ue), sonst „Fax“. **Bis 60 statt 20 Zeichen:** Der volle Name steht als Kopfzeile (`FAXOPT(headerinfo)`) auf jeder Seite; die Stationskennung im Faxprotokoll erlaubt technisch nur 20 Zeichen und bekommt die an Wortgrenze gekürzte Form. Das Feld ist deutlicher beschriftet; das Modul Fax verweist darauf. Nicht an einem echten Faxgerät geprüft (ob der Kopf beim Empfänger vollständig erscheint, hängt auch vom Gerät ab).
+
 ## 0.1.0-beta.7
 
 - **Neue Seite „Sprachmenü“** (`/telefon/sprachmenue`, Knopf in der Übersicht und unter Einstellungen → Sprachmenü): Ausklappzeilen für Öffnungszeiten, Telefonzeiten, Apotheken und Pflege, Krankenhaus/Notarzt/Kollegen (je Wochentag, mehrere Zeiträume mit Komma), Begrüßung und Notfall, Menü und Tasten (alle vier Auswahlmenüs), Aufnahme von Anliegen, Warteschlange (Zahlwörter eingeklappt), Ansagen-Telefon 777 und weitere Texte. Je Text „Spielen: immer / nur wenn geöffnet / nur wenn geschlossen / nie“, wo Kienzlefon das vorsieht, die Vorgabe als Hinweis und ein Abspielfeld, sobald die Ansage erzeugt ist.

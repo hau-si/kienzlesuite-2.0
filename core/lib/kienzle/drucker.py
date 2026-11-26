@@ -482,7 +482,7 @@ def unit_text(p: dict, port: int) -> str:
     cmd = PROGRAMS / mid / 'current' / p['command']
     return (f'# Kienzle-Suite: virtueller Drucker „{p["name"]}“ des Moduls {mid} (von kienzle-drucker erzeugt).\n[Unit]\n'
             f'Description=Kienzle-Suite Drucker {p["name"]} ({mid})\nAfter=network.target avahi-daemon.service\nWants=avahi-daemon.service\n\n'
-            f'[Service]\nUser=ks-{mid}\nGroup=ks-{mid}\n'
+            f'[Service]\nUser=ks-{mid}\nGroup=ks-{mid}\nEnvironment=KIENZLE_DRUCKER={p["name"]}\n'
             f'ExecStartPre=/usr/bin/mkdir -p {spool}\n'
             f'ExecStart={BIN["ippeveprinter"]} -p {port} -n localhost -r off -c {cmd} -f {",".join(p["formats"])} -d {spool} {p["scheme"]}\n'
             'Restart=on-failure\nNoNewPrivileges=yes\nProtectSystem=strict\nProtectHome=yes\nPrivateTmp=yes\n'
@@ -505,7 +505,7 @@ def _start_unit(unit: str, p: dict, port: int) -> None:
         log = open(STATE / f'{p["scheme"]}.log', 'ab')     # noqa: SIM115 – bleibt für den Hintergrundprozess offen
         subprocess.Popen([BIN['runuser'], '-u', f'ks-{p["modul"]}', '--', BIN['ippeveprinter'], '-p', str(port), '-n', 'localhost', '-r', 'off',
                           '-c', str(PROGRAMS / p['modul'] / 'current' / p['command']), '-f', ','.join(p['formats']), '-d', str(spool), p['scheme']],
-                         stdout=log, stderr=log, start_new_session=True)
+                         stdout=log, stderr=log, start_new_session=True, env={**os.environ, 'KIENZLE_DRUCKER': p['name']})
     elif SYSTEMCTL and Path(SYSTEMCTL).is_file():
         subprocess.run([SYSTEMCTL, 'daemon-reload'], capture_output=True, timeout=60)
         subprocess.run([SYSTEMCTL, 'enable', unit], capture_output=True, timeout=60)
@@ -526,6 +526,36 @@ def _stop_unit(unit: str) -> None:
         subprocess.run([SYSTEMCTL, 'daemon-reload'], capture_output=True, timeout=60)
 
 
+def listed(m: dict) -> list[dict]:
+    """Drucker aus der veränderbaren Druckerliste eines Moduls ([printer_list]): Namen aus <Datenordner>/<file>, sonst die
+    Vorgabe. Namen müssen mit dem Präfix beginnen; mehr als „max“ Namen und doppelte werden ignoriert."""
+    pl = m.get('printer_list')
+    if not pl:
+        return []
+    mid = m['module']['id']
+    names = None
+    path = DATA / mid / pl['file']
+    try:
+        info = path.lstat()
+        if stat.S_ISREG(info.st_mode) and info.st_size <= 65536:
+            data = json.loads(path.read_text(encoding='utf-8'))
+            raw = data.get('drucker') if isinstance(data, dict) else None
+            if isinstance(raw, list):
+                names = [str(x.get('name') if isinstance(x, dict) else x) for x in raw]
+    except (OSError, ValueError):
+        names = None
+    if names is None:
+        names = list(pl['default'])
+    rx = re.compile(r'^' + re.escape(pl['prefix']) + r'[A-Za-z0-9_-]{0,%d}$' % (39 - len(pl['prefix'])))
+    out, seen = [], set()
+    for name in names:
+        if rx.match(name) and name.lower() not in seen and len(out) < pl['max']:
+            seen.add(name.lower())
+            out.append({'name': name, 'label': pl['label'], 'ppd': None, 'backend': None, 'command': pl['command'], 'formats': pl['formats'],
+                        'paper': pl['paper'], 'share': pl['share']})
+    return out
+
+
 def sync() -> list[str]:
     """Virtuelle Drucker an modules.json angleichen: fehlende anlegen, veraltete und verwaiste entfernen.
 
@@ -536,7 +566,9 @@ def sync() -> list[str]:
     wanted = {}
     for m in registry:
         mid = m['module']['id']
-        for p in m.get('printers') or []:
+        for p in [*(m.get('printers') or []), *listed(m)]:
+            if p['name'] in wanted or p['name'].lower() in {w.lower() for w in wanted}:
+                continue                                      # Name schon von einem anderen Drucker belegt
             wanted[p['name']] = {**p, 'command': p.get('command'), 'formats': p.get('formats') or ['application/pdf'], 'modul': mid, 'scheme': scheme(mid, p['name'])}
     installed = _read(STATE / 'installiert.json', {})
     shares_now = _read(STATE / 'freigaben.json', {})

@@ -5,13 +5,14 @@
 [module]
 id = "fax"
 name = "Fax"
-version = "0.1.0-beta.2"
+version = "0.1.0-beta.3"
 core_api = "2"
 description = "Papierloses Fax: am PC auf einen Faxdrucker drucken, Empfänger wählen, senden; Sendeprotokoll, Fehlerberichte, Faxeingang. Braucht das Modul Telefon (Telefonanlage); eine Praxis nur mit Fax richtet dort nur die Faxleitung ein."
 requires = ["telefon"]
 
 [system]
-packages = ["php-fpm", "php-cli", "php-sqlite3", "php-mbstring", "ghostscript"]
+packages = ["php-fpm", "php-cli", "php-sqlite3", "php-mbstring", "php-gd", "ghostscript"]
+services = ["kienzle-fax-pflege.service", "kienzle-fax-pflege.timer"]
 user = "ks-fax"
 data = "/var/lib/kienzle/fax"
 
@@ -21,6 +22,7 @@ upstream = "unix:/run/kienzle/fax/web.sock"
 protocol = "fastcgi"
 entry = "public/index.php"
 einstellungen = "/einstellungen"
+uploads = true
 
 [[rights]]
 id = "senden"
@@ -34,40 +36,22 @@ label = "Fax: Faxeingang lesen und löschen"
 id = "telefonbuch"
 label = "Fax: Telefonbuch bearbeiten"
 
-[[printers]]
-name = "vFax1"
-label = "Fax senden: Dokument erscheint im Modul Fax unter vFax1."
-command = "printer/vfax1"
+# Faxdrucker: ein Drucker „vFax“; weitere (vFax2, vFaxLabor …) trägt der Admin in den Einstellungen des Moduls ein. Das Modul schreibt die
+# Namen nach drucker.json, die Basis legt sie beim Abgleichen an (Verwaltung → Drucker → „Virtuelle Drucker der Module abgleichen“).
+[printer_list]
+prefix = "vFax"
+default = ["vFax"]
+file = "drucker.json"
+label = "Fax senden: Dokument erscheint im Modul Fax."
+command = "printer/vfax"
 formats = ["application/pdf", "application/postscript"]
 share = ["ipp", "samba"]
+max = 10
 
-[[printers]]
-name = "vFax2"
-label = "Fax senden: Dokument erscheint im Modul Fax unter vFax2."
-command = "printer/vfax2"
-formats = ["application/pdf", "application/postscript"]
-share = ["ipp", "samba"]
-
-[[printers]]
-name = "vFax3"
-label = "Fax senden: Dokument erscheint im Modul Fax unter vFax3."
-command = "printer/vfax3"
-formats = ["application/pdf", "application/postscript"]
-share = ["ipp", "samba"]
-
-[[printers]]
-name = "vFax4"
-label = "Fax senden: Dokument erscheint im Modul Fax unter vFax4."
-command = "printer/vfax4"
-formats = ["application/pdf", "application/postscript"]
-share = ["ipp", "samba"]
-
-[[printers]]
-name = "vFax5"
-label = "Fax senden: Dokument erscheint im Modul Fax unter vFax5."
-command = "printer/vfax5"
-formats = ["application/pdf", "application/postscript"]
-share = ["ipp", "samba"]
+[[connections]]
+id = "ablage"
+purpose = "Empfangene Faxe auf dem NAS ablegen und Dateien zum Senden aus einem Lauschordner holen"
+required = false
 
 [[exchange]]
 module = "telefon"

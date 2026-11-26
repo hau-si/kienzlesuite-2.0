@@ -295,7 +295,7 @@ final class Ansicht {
                 . '<fieldset><legend>Fax</legend>' . self::auswahl('fax_leitung', 'Leitung für Fax', $leitungen, (string)$f['leitung'])
                 . self::feld('fax_nummer', 'Faxnummer (wie der Anbieter sie schickt)', (string)$f['nummer'], 'z. B. 4930123459')
                 . self::feld('fax_kennung', 'Absendernummer für Faxe', (string)$f['kennung'], 'Leer = Faxnummer.')
-                . self::feld('fax_name', 'Faxkennung', (string)$f['name'], 'Kurzer Name, z. B. „Praxis Beispiel“.') . '</fieldset>'
+                . self::feld('fax_name', 'Faxkennung (Absenderkennung im Faxkopf, Anzeige beim Empfänger)', (string)$f['name'], 'Leer = Praxisname aus Verwaltung → Praxis. Bis 60 Zeichen; als Kopfzeile jeder Seite. Im Faxprotokoll (Stationskennung) sind technisch nur 20 Zeichen möglich, dort steht die gekürzte Form.') . '</fieldset>'
                 . '<fieldset><legend>Überlauf (sipgate trunking, erprobt)</legend>' . self::auswahl('ueb_leitung', 'Leitung für den Überlauf', $leitungen, (string)$u['leitung'])
                 . self::feld('ueb_nummer', 'Rufnummer des Überlaufs', (string)$u['nummer']) . '</fieldset>';
             $zweck = $t['leitung_ein'] !== '' || $f['leitung'] !== '';

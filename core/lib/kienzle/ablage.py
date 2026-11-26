@@ -194,6 +194,43 @@ class Remote:
         self.command(cds + [f'rename {quote(part)} {quote(name)}'])
         return '/'.join([p for p in [self.t['ordner'], folder] if p] + [name])
 
+    def listing(self, folder: str) -> list[str]:
+        """Dateinamen (keine Ordner) eines Ordners auf dem NAS; leer, wenn der Ordner fehlt."""
+        parts = [p for p in self.t['ordner'].split('/') + folder.split('/') if p]
+        try:
+            out = self.command(self._cds(parts) + (['ls -1'] if self.t['art'] == 'sftp' else ['ls']))
+        except Fehler:
+            return []
+        names = []
+        for line in out.splitlines():
+            if self.t['art'] == 'sftp':
+                name = line.strip()
+            else:
+                m = re.match(r'^  (\S.*?)\s+([A-Z]*)\s+(\d+)\s+\w{3} \w{3} ', line)
+                if not m or 'D' in m.group(2):
+                    continue
+                name = m.group(1)
+            if NAME.match(name) and not name.endswith('.part') and name not in names:
+                names.append(name)
+        return sorted(names)
+
+    def fetch(self, folder: str, name: str, local: Path) -> None:
+        """Eine Datei holen (Prüfsumme über zweites Lesen), dann auf dem NAS löschen."""
+        if not NAME.match(name):
+            raise Fehler('Dateiname ungültig.')
+        parts = [p for p in self.t['ordner'].split('/') + folder.split('/') if p]
+        cds = self._cds(parts)
+        second = self.work / 'zweite'
+        self.command(cds + [f'get {quote(name)} {quote(str(local))}'])
+        self.command(cds + [f'get {quote(name)} {quote(str(second))}'])
+        if not local.is_file() or not second.is_file() or sha256(local) != sha256(second):
+            raise Fehler('Prüfung nach dem Herunterladen fehlgeschlagen.')
+        second.unlink()
+
+    def remove(self, folder: str, name: str) -> None:
+        parts = [p for p in self.t['ordner'].split('/') + folder.split('/') if p]
+        self.command(self._cds(parts) + [('rm ' if self.t['art'] == 'sftp' else 'del ') + quote(name)])
+
     def probe(self, folder: str) -> None:
         name = f'kienzle-verbindungstest-{secrets.token_hex(6)}.txt'
         src = self.work / 'probe'
@@ -267,6 +304,63 @@ def _status(jobs: dict) -> None:
     os.replace(tmp, STATE / 'status.json')
 
 
+LISTEN_EXT = re.compile(r'^[a-z0-9]{2,5}$')
+LISTEN_MAX = 20     # Dateien je Durchlauf und Modul
+
+
+def listen(module_dir: Path, targets: dict[str, dict]) -> dict:
+    """Lauschordner auf dem NAS: neue Dateien in <Modul>/eingang/ holen, erst nach geprüfter Kopie auf dem NAS löschen.
+
+    Die Anfrage schreibt das Modul in lauschen.anfrage: {"ziel": "<id>", "ordner": "Fax-Eingang", "endungen": ["pdf", …]}."""
+    info = {'modul': module_dir.name, 'zeit': int(time.time()), 'zustand': 'ok', 'anzahl': 0}
+    request = module_dir / 'lauschen.anfrage'
+    try:
+        if request.is_symlink() or request.stat().st_size > 2048:
+            raise Fehler('Lauschordner: Anfrage ungültig.')
+        req = json.loads(request.read_text(encoding='utf-8'))
+        if not isinstance(req, dict):
+            raise Fehler('Lauschordner: Anfrage ungültig.')
+        target = targets.get(str(req.get('ziel')))
+        if target is None:
+            raise Fehler('Lauschordner: unbekanntes Ziel.')
+        folder = remote_dir(str(req.get('ordner', '')))
+        if not folder:
+            raise Fehler('Lauschordner: Ordner fehlt.')
+        exts = [str(e).lower() for e in (req.get('endungen') or []) if LISTEN_EXT.match(str(e).lower())][:10] or ['pdf']
+        inbox = module_dir / 'eingang'
+        inbox.mkdir(mode=0o2770, exist_ok=True)
+        if inbox.is_symlink():
+            raise Fehler('Lauschordner: Eingang ungültig.')
+        with tempfile.TemporaryDirectory(prefix='kienzle-ablage-') as tmp:
+            remote = Remote(target, Path(tmp))
+            for name in remote.listing(folder):
+                if name.rsplit('.', 1)[-1].lower() not in exts:
+                    continue
+                if info['anzahl'] >= LISTEN_MAX:
+                    break
+                local = Path(tmp) / 'datei'
+                local.unlink(missing_ok=True)
+                remote.fetch(folder, name, local)
+                if local.stat().st_size > MAX_FILE:
+                    raise Fehler(f'Lauschordner: „{name}“ ist zu groß.')
+                dest = inbox / name
+                n = 1
+                while dest.exists():
+                    dest = inbox / f'{n}-{name}'
+                    n += 1
+                shutil.copyfile(local, dest)
+                os.chmod(dest, 0o660)
+                try:
+                    remote.remove(folder, name)
+                except Fehler:
+                    dest.unlink(missing_ok=True)       # sonst käme die Datei beim nächsten Durchlauf doppelt
+                    raise
+                info['anzahl'] += 1
+    except (Fehler, OSError, ValueError, subprocess.SubprocessError) as e:
+        info.update(zustand='fehler', meldung=str(e)[:200])
+    return info
+
+
 def process() -> dict:
     """Alle Aufträge aller Module abarbeiten. Fehlgeschlagene bleiben liegen und werden später erneut versucht."""
     targets = load_targets()
@@ -314,6 +408,9 @@ def process() -> dict:
                             shutil.move(str(f), failed / f.name)
                     info['zustand'] = 'aufgegeben'
             jobs[key] = info
+    for module_dir in sorted(p for p in SPOOL.iterdir() if p.is_dir() and not p.is_symlink()) if SPOOL.is_dir() else []:
+        if re.fullmatch(r'[a-z][a-z0-9-]{1,28}', module_dir.name) and (module_dir / 'lauschen.anfrage').is_file():
+            jobs[f'{module_dir.name}/lauschen'] = listen(module_dir, targets)
     # Erledigte Einträge eine Woche lang anzeigen.
     for key, info in old.items():
         if key not in jobs and info.get('zustand') in ('abgelegt', 'aufgegeben') and info.get('zeit', 0) > time.time() - 7 * 86400:

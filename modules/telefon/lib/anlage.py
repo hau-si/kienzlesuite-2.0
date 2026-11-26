@@ -93,6 +93,30 @@ def _name(value, name: str, limit: int = 40) -> str:
     return value
 
 
+def _ascii(text) -> str:
+    text = str(text or '').strip()
+    for a, b in (('ä', 'ae'), ('ö', 'oe'), ('ü', 'ue'), ('Ä', 'Ae'), ('Ö', 'Oe'), ('Ü', 'Ue'), ('ß', 'ss')):
+        text = text.replace(a, b)
+    return re.sub(r' +', ' ', re.sub(r'[^A-Za-z0-9 .&/-]', '', text)).strip()
+
+
+def _kuerzen(text: str, limit: int) -> str:
+    if len(text) > limit:
+        cut = text[:limit]
+        text = cut.rsplit(' ', 1)[0] if ' ' in cut and text[limit] != ' ' else cut
+    return text.strip(' .&/-')
+
+
+def kennung_kurz(name) -> str:
+    """Stationskennung im Faxprotokoll: T.30 erlaubt nur 20 Zeichen (ASCII); an Wortgrenze gekürzt."""
+    return _kuerzen(_ascii(name), 20) or 'Fax'
+
+
+def kennung_aus_praxis(praxis) -> str:
+    """Vorgabe der Faxkennung (Name im Faxkopf): Praxisname der Basis ohne Sonderzeichen, höchstens 60 Zeichen; sonst „Fax“."""
+    return _kuerzen(_ascii(praxis), 60) or 'Fax'
+
+
 def _pattern(value, regex: re.Pattern, name: str, example: str, required: bool = False) -> str:
     value = '' if value is None else str(value).strip()
     if not value:
@@ -201,7 +225,7 @@ def check(cfg: dict) -> dict:
             raise Fehler('Fax: sipgate trunking ist nur für den Telefonie-Überlauf vorgesehen.')
         fax['nummer'] = did(_pattern(f.get('nummer'), NUMMER, 'Faxnummer', '4930123459', required=True))
         fax['kennung'] = _pattern(f.get('kennung'), NUMMER, 'Absendernummer für Faxe', '4930123459') or fax['nummer']
-        fax['name'] = _name(f.get('name'), 'Faxkennung', 20) or 'Fax'
+        fax['name'] = _name(f.get('name'), 'Faxkennung', 60) or kennung_aus_praxis(cfg.get('praxis'))
     out['fax'] = fax
 
     t = cfg.get('telefon') or {}
@@ -515,6 +539,8 @@ exten => _0X.,1,NoOp(FAX OUT | jobid=${KFX_JOBID})
  same => n,Set(FAXOPT(maxrate)=9600)
  same => n,Set(CALLERID(num)=@KENNUNG@)
  same => n,Set(CALLERID(name)=@NAME@)
+ same => n,Set(FAXOPT(headerinfo)=@NAME@)
+ same => n,Set(FAXOPT(localstationid)=@KURZ@)
  same => n,Dial(PJSIP/${EXTEN}@@ENDPOINT@,60,gU(kfx_sendfax^${KFX_JOBID}^${KFX_FILE}))
  same => n,Hangup()
 
@@ -627,7 +653,7 @@ def render_extensions(c: dict) -> tuple[str, str]:
                     'exten => _[1-9]X.,1,Goto(00${EXTEN},1)\n') if ANBIETER[line['anbieter']].get('national') else (
             '; Ziele national (0…), international (00…) oder ohne 00 gespeichert (wie das Modul fax: 49…, 33…).\nexten => _[1-9]X.,1,Goto(00${EXTEN},1)\n')
         out += (FAX_OUT.replace('@NATIONAL@', national).replace('@AGI@', agi).replace('@ENDPOINT@', endpoint(line['id']))
-                .replace('@KENNUNG@', c['fax']['kennung']).replace('@NAME@', c['fax']['name']))
+                .replace('@KENNUNG@', c['fax']['kennung']).replace('@NAME@', c['fax']['name']).replace('@KURZ@', kennung_kurz(c['fax']['name'])))
         out += FAX_IN.replace('@SPOOL@', str(AST / 'spool' / 'fax-empfang')).replace('@EMPFANG@', str(PROGRAM / 'lib' / 'kfx' / 'fax-empfangen'))
     out += '\n#tryinclude "/etc/asterisk/extensions-kfx-telefonie.conf"\n'
     main, out = out, '; Erzeugt vom Modul telefon (Telefonie wie Kienzlefax telefonie-queue.sh). Änderungen gehen verloren.\n'

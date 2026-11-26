@@ -138,6 +138,13 @@ und entfernt sie mit dem Modul:
   ohne `backend` verwirft das Backend `kienzle-leer` der Basis die Ausgabe der Filter.
 
 
+### Lauschordner auf dem Netzwerkspeicher
+
+Mit der Verbindung „ablage“ kann ein Modul auch Dateien vom NAS holen: `$k->lauschen($ziel, 'Ordner', ['pdf'])` schaltet einen Lauschordner
+ein (leeres Ziel schaltet aus). `ks-ablage` holt neue Dateien mit den genannten Endungen (höchstens 20 je Durchlauf) nach
+`$k->lauschenEingang()`, prüft sie durch zweites Lesen und löscht sie erst danach auf dem NAS. Das Modul liest und löscht die Dateien dort
+selbst. Dateien mit gleichem Namen werden nicht überschrieben (Vorsatz `1-`, `2-` …).
+
 ## Seiten im Rahmen der Suite
 
 Ein PHP-Modul kann eine Seite in den Rahmen der Suite setzen (Seitenleiste, Kopf, Praxisname): Inhalt mit `ob_start()` sammeln und

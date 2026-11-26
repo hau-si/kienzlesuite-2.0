@@ -1,3 +1,0 @@
-#!/bin/sh
-# Virtueller Faxdrucker „vFax4“: Dokument für das Fax ablegen (ippeveprinter der Basis, als ks-fax).
-exec /usr/bin/php "$(dirname "$0")/../lib/druckauftrag.php" vFax4 "$@"

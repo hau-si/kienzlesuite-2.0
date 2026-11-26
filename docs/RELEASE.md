@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.4
+
+- **Veränderbare Druckerliste für Module** (`[printer_list]` in `module.toml`, siehe `docs/MODULE-TOML.md`): Ein Modul pflegt die Namen virtueller Drucker selbst (Datei im Datenordner), die Basis legt sie beim Abgleichen an (Verwaltung → Drucker → „Virtuelle Drucker der Module abgleichen“, auch bei Installieren und Aktualisieren). Namen müssen mit einem festen Vorsatz beginnen (schützt Namen anderer Module); fehlt die Datei oder ist sie kaputt, gilt die Vorgabe. Der Druckername kommt als `KIENZLE_DRUCKER` im Umfeld des Druckprogramms an. Die Einheiten der IPP-Drucker bekommen diese Zeile, deshalb startet der erste Abgleich nach dem Update alle virtuellen Drucker einmal neu.
+- **Lauschordner auf dem NAS** (Verbindung „ablage“): `$k->lauschen($ziel, $ordner, $endungen)` meldet einen Ordner auf dem NAS an; `ks-ablage` holt neue Dateien (höchstens 20 je Durchlauf) nach `$k->lauschenEingang()`, prüft sie durch zweites Lesen und löscht sie erst danach auf dem NAS. Gleichnamige Dateien werden nicht überschrieben. Geprüft mit dem nachgebauten NAS (SMB und SFTP); nicht an einem echten NAS.
+
 ## 0.22.0-beta.3
 
 - **Abhängigkeiten zwischen Modulen** (`[module] requires` in `module.toml`, ab `core_api = "2"`): Ein Modul lässt sich erst installieren, wenn die genannten Module da sind; unter Verwaltung → Module steht dann „Braucht zuerst: …“ und „Installieren“ ist ausgegraut. Ein Modul, das noch gebraucht wird, lässt sich nicht entfernen („Wird noch gebraucht von: …“). Erster Fall: Fax braucht Telefon.
