@@ -1,5 +1,9 @@
 # Release-Notizen Fax
 
+## 0.1.0-beta.8
+
+- Lauschordner: Eine für das Modul nicht lesbare Datei wird nicht mehr als „leer“ gemeldet und in den Fehlerordner geschoben, sondern bleibt liegen und wird im Protokoll genannt. (Ursache der Nichtübernahme war ein Rechtefehler im Ablage-Dienst der Basis, siehe Basis 0.22.0-beta.9.)
+
 ## 0.1.0-beta.7
 
 - **„Fax senden“ neu (Entwurf A „Liste mit Häkchen“):** Alle Dokumente aus allen Quellen (Faxdrucker, NAS-Ordner, hochgeladen, Sendefehler) stehen in **einer** Liste, neueste oben, mit Quelle, Zeit und **Seitenzahl**. Das **neueste ist vorgewählt**. Rechts die **Vorschau** (oberer Teil der ersten Seite, in Graustufen wie beim Faxgerät); sie folgt der Maus über der Liste.

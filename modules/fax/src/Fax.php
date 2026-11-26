@@ -831,7 +831,9 @@ final class Fax {
             $name = basename($f);
             if (!is_file($f) || is_link($f) || str_starts_with($name, '.')) continue;
             try {
-                $pdf = self::alsPdf((string)file_get_contents($f), $name);
+                $roh = @file_get_contents($f);
+                if ($roh === false) { error_log('fax: Lauschordner: ' . $name . ' ist nicht lesbar (Rechte); bleibt liegen.'); continue; }
+                $pdf = self::alsPdf($roh, $name);
                 $ziel = self::ordner('drucker') . '/' . self::NAS;
                 if (!is_dir($ziel)) mkdir($ziel, 0700, true);
                 self::druckAblegen(self::NAS, $pdf, $name);
