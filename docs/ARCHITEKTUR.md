@@ -25,8 +25,8 @@ Code dafür entsteht.
   - AppArmor sperrt `gs` und `qpdf` außerhalb erwarteter Pfade: lokale Regeln unter `/etc/apparmor.d/local/` je Datenordner.
   - sudo-rs statt sudo: in sudoers keine Platzhalter in Befehlsargumenten verwenden.
   - Python 3.14: jedes Python-Modul bekommt eine eigene virtuelle Umgebung mit festen Versionen (z. B. Obergrenze für `av`).
-- Installation: Standard-ISO, optional mit einer `autoinstall`-Datei, die am Ende den Suite-Installer startet.
-  Keine eigene ISO.
+- Installation: Standard-ISO mit einer `autoinstall`-Datei (Vorlage `installer/autoinstall.yaml`) oder die Installations-ISO
+  aus `iso/` (offizielle Ubuntu-ISO plus Autoinstall, Startmenü und `holen.py`, das die signierte Basis aus GitHub holt).
 
 ## Aufbau
 

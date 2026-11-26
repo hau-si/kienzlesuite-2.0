@@ -51,6 +51,24 @@ Prüfliste für die Test-VM: `docs/VM-TEST.md`.
 4. Beim ersten Start läuft der Installer der Suite von selbst. Den Einrichtungslink zeigt danach
    `sudo journalctl -u kienzle-erstinstallation` bzw. `sudo kienzle-admin einrichtungslink`.
 
+## Installations-ISO (iso/)
+
+Für eine Installation fast ohne Eingaben: `bash iso/bauen.sh UBUNTU-26.04.x-live-server-amd64.iso` erzeugt aus der offiziellen
+Ubuntu-ISO (vorher gegen `SHA256SUMS` von releases.ubuntu.com prüfen) die Datei `kienzle-suite-installer.iso`. Gebaut wird nur ergänzend
+(`xorriso`): Autoinstall, Startmenü, `holen.py` und die Release-Schlüssel.
+
+- Interaktiv bleiben nur drei Ubuntu-Bildschirme: **Netzwerk** (DHCP oder feste Adresse), **Datenträger** (Platte und Größe, Rest bleibt frei)
+  und **Benutzer/Passwort** (Servername ist mit `suite` vorbelegt). Sprache, Tastatur (de), Zeitzone, SSH-Server, Sicherheitsupdates laufen ohne Rückfrage.
+- Das Startmenü wählt Kanal und Herkunft: *stabil (signiert)*, *Beta (unsignierte Vorabversionen erlaubt)*, *Zweig main* oder *Zweig beta*
+  (nur wenn es kein Release gibt). Unsignierte Stände werden nur durch ausdrückliche Menüwahl zugelassen und mit der Prüfsumme des Manifests
+  (Releases) bzw. gar nicht (Zweig) abgesichert.
+- Beim ersten Start holt `kienzle-holen` das neueste Release des Kanals, prüft die Ed25519-Signatur mit den Schlüsseln der ISO
+  (`installer/release-keys`), packt es nach `/opt/kienzle-installer` und startet `install.sh`. Schlägt etwas fehl, bleibt das System bestehen und
+  der Dienst versucht es nach 2 Minuten erneut (`sudo journalctl -u kienzle-erstinstallation`).
+- Stand: Logik (Download, Signatur, Auspacken, Menü, Autoinstall-Aufbau) ist mit `iso/tests` getestet; **der Start von der ISO ist noch nicht auf einer
+  VM geprüft**. Die „kleine ISO, die Ubuntu nachlädt“ (Netzstart) ist noch nicht gebaut: Sie braucht zusätzlich viel Arbeitsspeicher und einen
+  Weg, die ISO-Dateien im Live-System bereitzustellen.
+
 ## Was der Installer einrichtet
 
 - nginx und php-fpm (nur die Suite; die Beispielseite der Distribution wird abgeschaltet), eigene Zertifizierungsstelle.

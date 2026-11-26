@@ -1,0 +1,62 @@
+# Kienzle-Suite: Autoinstall für die Installations-ISO (iso/bauen.sh). Nur drei Bildschirme bleiben interaktiv:
+# Netzwerk (DHCP oder feste Adresse), Datenträger (Platte und Größe) und Benutzer/Passwort mit vorbelegtem Namen „suite“.
+# Alles andere läuft ohne Rückfrage. Die ISO-Dateien liegen im installierten Live-System unter /cdrom/kienzle/.
+autoinstall:
+  version: 1
+  interactive-sections:
+    - network
+    - storage
+    - identity
+  locale: de_DE.UTF-8
+  keyboard:
+    layout: de
+  timezone: Europe/Berlin
+  source:
+    id: ubuntu-server
+  identity:
+    hostname: suite
+    username: praxisadmin
+  ssh:
+    install-server: true
+    allow-pw: true
+  storage:
+    layout:
+      name: lvm
+  packages:
+    - ca-certificates
+    - python3
+  updates: security
+  late-commands:
+    # Programm und Schlüssel von der ISO ins neue System; Kanal und Zulassung unsignierter Stände aus der Startzeile.
+    - mkdir -p /target/usr/share/kienzle-iso
+    - cp -r /cdrom/kienzle/release-keys /target/usr/share/kienzle-iso/release-keys
+    - install -m 0755 /cdrom/kienzle/holen.py /target/usr/local/sbin/kienzle-holen
+    - |
+      set -e
+      cmd=$(cat /proc/cmdline)
+      kanal=stabil; zweig=''; unsig=''
+      case "$cmd" in *kienzle.kanal=beta*) kanal=beta ;; esac
+      case "$cmd" in *kienzle.zweig=main*) zweig='--zweig main' ;; *kienzle.zweig=beta*) zweig='--zweig beta' ;; esac
+      case "$cmd" in *kienzle.unsigniert=1*) unsig='--unsigniert-erlauben' ;; esac
+      printf 'KIENZLE_OPTIONEN="--kanal %s %s %s"\n' "$kanal" "$unsig" "$zweig" > /target/etc/kienzle-erstinstallation.env
+    - |
+      cat > /target/etc/systemd/system/kienzle-erstinstallation.service <<'UNIT'
+      [Unit]
+      Description=Kienzle-Suite: Erstinstallation (Download und Installer der Basis)
+      After=network-online.target
+      Wants=network-online.target
+      ConditionPathExists=!/var/lib/kienzle/core/core.sqlite
+
+      [Service]
+      Type=oneshot
+      EnvironmentFile=/etc/kienzle-erstinstallation.env
+      ExecStart=/bin/sh -c 'exec /usr/bin/python3 /usr/local/sbin/kienzle-holen $KIENZLE_OPTIONEN --name "$(hostname)"'
+      Restart=on-failure
+      RestartSec=120
+      StandardOutput=journal+console
+      TimeoutStartSec=3600
+
+      [Install]
+      WantedBy=multi-user.target
+      UNIT
+    - curtin in-target -- systemctl enable kienzle-erstinstallation.service
