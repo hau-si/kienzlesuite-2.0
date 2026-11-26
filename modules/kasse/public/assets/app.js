@@ -13,7 +13,7 @@ let receiptPrintPayment = null; const quittungNote = {};
 const exportTried = new Set();
 const printTried = new Set();
 let printTouched = false;
-function message(text='') { $('message').textContent = text; $('message').hidden = !text; }
+function message(text='', ok=false) { $('message').textContent = text; $('message').hidden = !text; $('message').classList.toggle('ok', !!ok); }
 async function api(action, data={}) {
   const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 75000);
   try {
@@ -124,7 +124,7 @@ function renderInvoices() {
     const later = element('button','Überweisung','text-button invoice-later');
     later.onclick = () => run(async() => {
       // Ist der Rechnungsdruck eingeschaltet, kommt die Rechnung jetzt einmal auf den Praxisdrucker (für die Überweisung).
-      const result = await api('invoice_later', {invoice_id: invoice.id}); if (result.message) message(result.message);
+      const result = await api('invoice_later', {invoice_id: invoice.id}); if (result.message) message(result.message, true);
       invoiceLater.add(invoice.id); await load();
     });
     // Einheitliche Zahlungswahl wie in der freien Eingabe: Chips mit Symbolen + ein Knopf. Die Einzelknöpfe bleiben (versteckt) als Auslöser.
@@ -169,7 +169,7 @@ function renderInvoices() {
             + '\n\nDabei gehen die Rechnung mit Patientendaten an Letterxpress.' + (live ? ' Das kostet Porto und Druck. Ein zweiter Versand ist nicht möglich.' : '');
           if (!confirm(text)) return;
           const result = await api('invoice_letter', {invoice_id: invoice.id});
-          message(result.message); await load();
+          message(result.message, true); await load();
         });
         box.append(post);
       }
@@ -536,7 +536,7 @@ $('switch-transfer').onclick=()=>run(async()=>{ state.payment=await api('switch_
 $('switch-later').onclick=()=>run(async()=>{
   // T2med-Rechnung: Der Überweisungs-QR-Code steht auf der Rechnung. Wie „Patient zahlt später“ in der Rechnungsliste: Rechnung drucken (wenn eingeschaltet) und zurück zur Auswahl.
   const id=state.payment.invoice_id, invoice=(state.invoices||[]).find(i=>i.id===id);
-  if(invoice && state.print?.t2med_auto && !invoice.printed_at) { const result=await api('invoice_later',{invoice_id:id}); if(result.message) message(result.message); }
+  if(invoice && state.print?.t2med_auto && !invoice.printed_at) { const result=await api('invoice_later',{invoice_id:id}); if(result.message) message(result.message, true); }
   if(id) invoiceLater.add(id);
   retrySelection=true; startRequest=null; await load(); renderPayment(); updateTotal();
 });

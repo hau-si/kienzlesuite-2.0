@@ -40,7 +40,7 @@ function kopfZeile() {
     b.onclick = () => { if (sortKey === th.dataset.key) sortDir = -sortDir; else { sortKey = th.dataset.key; sortDir = th.dataset.key === 'date' || th.dataset.key === 'invoice_cents' ? -1 : 1; } zeigen(); };
     th.replaceChildren(b);
   }
-  $('vg-th-storno').hidden = !data.rights.storno;
+  $('vg-th-post').hidden = !data.rights.letter; $('vg-th-storno').hidden = !data.rights.storno;
 }
 async function stornieren(r) {
   const hinweis = r.status === 'Überweisung offen' ? 'Es wurde noch nichts bezahlt; die offene Rechnung wird storniert.' : r.method === 'card' ? 'Die Kartenzahlung wird dabei NICHT automatisch erstattet (Rückzahlung am Terminal oder im SumUp-Konto).' : r.method === 'cash' ? 'Das Bargeld bitte dem Patienten zurückgeben.' : 'Eine Rückzahlung bitte selbst veranlassen.';
@@ -48,6 +48,12 @@ async function stornieren(r) {
   const grund = prompt('Grund der Stornierung (optional, höchstens 200 Zeichen):', '');
   if (grund === null) return;
   try { await api('storno', {payment_id: r.id, note: grund.slice(0, 200)}); await laden(); } catch (e) { alert(e.message); }
+}
+async function perPost(r, knopf) {
+  if (!confirm('Rechnung ' + r.number + ' über ' + euro(r.invoice_cents) + ' für ' + (r.patient || 'den Patienten') + ' jetzt per Post über Letterxpress versenden?\nDas geht nur einmal.')) return;
+  knopf.disabled = true;
+  try { const j = await api('vorgaenge_post', {invoice_id: r.id}); alert(j.message || 'Gesendet.'); } catch (e) { alert(e.message); }
+  await laden();
 }
 function sichtbar() {
   const q = $('vg-search').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -71,6 +77,7 @@ function zeigen() {
     const betrag = el('td', euro(r.invoice_cents), 'num');
     const ist = el('td'); if (r.art === 'T2med' && r.can_done) ist.append(el('span', r.done_date ? '✓ ' + r.done_date.split('-').reverse().join('.') : '–', r.done_date ? 'tag ok' : 'muted'));
     tr.append(c0, el('td', r.date.split('-').reverse().join('.') + ' ' + r.time), el('td', r.art, 'tag ' + (r.art === 'T2med' ? 'info' : 'ok')), el('td', r.number), el('td', r.patient || '–'), el('td', ZAHLUNG[r.method] || ''), status_td, betrag, ist);
+    if (data.rights.letter) { const pk = el('td'); if (r.can_post) { const pb = el('button', 'Per Post senden', 'secondary small'); pb.type = 'button'; pb.setAttribute('aria-label', 'Rechnung ' + r.number + ' per Post senden'); pb.onclick = () => perPost(r, pb); pk.append(pb); } tr.append(pk); }
     if (data.rights.storno) { const sk = el('td'); if (r.can_storno) { const sb = el('button', 'Stornieren', 'secondary small'); sb.type = 'button'; sb.setAttribute('aria-label', 'Rechnung ' + r.number + ' stornieren'); sb.onclick = () => stornieren(r); sk.append(sb); } tr.append(sk); }
     body.append(tr);
   }
