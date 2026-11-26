@@ -1,5 +1,9 @@
 # Terminzettel – Release-Notizen
 
+## 1.3.0-beta.18
+
+- **Absage-QR mit Patientenname und Terminen:** Der Betreff lautet standardmäßig „Terminabsage {{patient}}“ (der alte Standard „Terminabsage“ wird so übernommen). Im Betreff und im Text der Mail stehen die Platzhalter `{{patient}}`, `{{termine}}` (alle Termine mit Art), `{{termine_kurz}}` (nur Tag und Uhrzeit) und `{{erster_termin}}`; Einfüge-Knöpfe unter dem Textfeld. Passt die Liste nicht in den QR-Code, wird sie erst gekürzt, dann weggelassen. Nicht auf der VM geprüft.
+
 ## 1.3.0-beta.17
 
 - Einrichtungsleitfaden: erster Punkt „Benötigte Hardware“ (Bondrucker Epson TM-m30III empfohlen).
