@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.46
+
+- **Fehler behoben (beta.45):** Auf Servern mit bestehender Datenbank zeigte die Kasse nur „Der Vorgang konnte nicht verarbeitet werden“, weil die neue Spalte „Unterschrift erforderlich“ nicht angelegt wurde (Datenbankversion nicht erhöht). Die Datenbank wird jetzt beim Start auf Version 22 gebracht; ein Test deckt die Migration von Version 21 ab. Bitte beta.45 überspringen.
+
 ## 2.3.4-beta.45
 
 - **Haken „Unterschrift erforderlich“ je Leistung** (Einstellungen → Leistungskatalog, in der Liste als Spalte „Unterschrift“). Der Knopf „Zur Unterschrift“ erscheint in der Kasse nur noch, wenn mindestens eine gewählte Leistung diesen Haken hat.
