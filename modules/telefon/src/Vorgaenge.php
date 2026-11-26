@@ -43,31 +43,143 @@ final class Vorgaenge {
         rename($tmp, $ziel);
     }
 
-    /** Vorgänge eines Bereichs (offen|erledigt), neueste zuerst. Jeder Eintrag: id, zeit, typ, daten (payload) oder fehler. */
-    public static function liste(\KienzleModul $k, string $bereich = 'offen'): array {
-        $dir = self::ordner() . ($bereich === 'erledigt' ? '/erledigt' : '');
-        $dateien = glob($dir . '/*.json.enc') ?: [];
+    public const BEREICHE = ['neu' => 'Neu', 'bearbeitung' => 'In Bearbeitung', 'erledigt' => 'Erledigt', 'papierkorb' => 'Papierkorb'];
+    private const ORTE = ['offen' => '', 'erledigt' => '/erledigt', 'papierkorb' => '/papierkorb'];
+
+    private static function pfad(string $id, string $ort, string $endung = '.json.enc'): string { return self::ordner() . self::ORTE[$ort] . '/' . $id . $endung; }
+
+    /** Wo liegt der Vorgang (offen, erledigt, papierkorb)? */
+    public static function ort(string $id): ?string {
+        if (!preg_match(self::ID, $id)) return null;
+        foreach (array_keys(self::ORTE) as $ort) if (is_file(self::pfad($id, $ort)) && !is_link(self::pfad($id, $ort))) return $ort;
+        return null;
+    }
+
+    private static function ortOderFehler(string $id): string {
+        $ort = self::ort($id);
+        if ($ort === null) throw new \InvalidArgumentException('Unbekannter Vorgang.');
+        return $ort;
+    }
+
+    /** Bearbeitungsstand ohne Patientendaten (Klartext): status neu|bearbeitung, bearbeiter, name, seit, dringend, anliegen (abgehakt). */
+    public static function stand(string $id, ?string $ort = null): array {
+        $ort ??= self::ort($id) ?? 'offen';
+        $d = json_decode((string)@file_get_contents(self::pfad($id, $ort, '.stand.json')), true);
+        $d = is_array($d) ? $d : [];
+        return ['status' => ($d['status'] ?? '') === 'bearbeitung' ? 'bearbeitung' : 'neu', 'bearbeiter' => (string)($d['bearbeiter'] ?? ''), 'name' => (string)($d['name'] ?? ''),
+            'seit' => (int)($d['seit'] ?? 0), 'dringend' => (bool)($d['dringend'] ?? false), 'anliegen' => is_array($d['anliegen'] ?? null) ? $d['anliegen'] : []];
+    }
+
+    private static function standSchreiben(string $id, string $ort, array $stand): void {
+        self::schreiben(self::pfad($id, $ort, '.stand.json'), (string)json_encode($stand, JSON_UNESCAPED_UNICODE), 0600);
+    }
+
+    /** Kommentare (können Patientendaten enthalten): verschlüsselt mit dem Modulschlüssel. */
+    public static function kommentare(\KienzleModul $k, string $id, ?string $ort = null): array {
+        $ort ??= self::ort($id) ?? 'offen';
+        $wert = @file_get_contents(self::pfad($id, $ort, '.kommentare'));
+        if ($wert === false || trim($wert) === '') return [];
+        try {
+            $d = json_decode($k->entschluesseln(trim($wert), 'vorgaenge-kommentare'), true);
+        } catch (\Throwable) {
+            return [['von' => '', 'name' => '', 'zeit' => 0, 'text' => '(Kommentare ließen sich nicht entschlüsseln.)']];
+        }
+        return is_array($d) ? $d : [];
+    }
+
+    /** Vorgänge eines Bereichs (neu, bearbeitung, erledigt, papierkorb; „offen“ = neu und bearbeitung), dringende zuerst, sonst neueste zuerst. */
+    public static function liste(\KienzleModul $k, string $bereich = 'neu'): array {
+        $ort = in_array($bereich, ['erledigt', 'papierkorb'], true) ? $bereich : 'offen';
+        $dateien = glob(self::ordner() . self::ORTE[$ort] . '/*.json.enc') ?: [];
         if (!$dateien) return [];
         $geheim = self::geheimerSchluessel($k);
         $out = [];
         foreach ($dateien as $f) {
             $id = substr(basename($f), 0, -strlen('.json.enc'));
             if (!preg_match(self::ID, $id) || is_link($f)) continue;
+            $stand = self::stand($id, $ort);
+            if ($ort === 'offen' && in_array($bereich, ['neu', 'bearbeitung'], true) && $stand['status'] !== $bereich) continue;
+            $eintrag = ['id' => $id, 'zeit' => '', 'typ' => '', 'daten' => [], 'ort' => $ort, 'stand' => $stand, 'kommentare' => self::kommentare($k, $id, $ort),
+                'geaendert' => (int)filemtime($f)];
             try {
                 $r = self::entschluesseln((string)file_get_contents($f, false, null, 0, self::MAX_DATEI), $geheim);
                 $p = is_array($r['payload'] ?? null) ? $r['payload'] : [];
-                $out[] = ['id' => $id, 'zeit' => (string)($p['_kienzlefon']['erstellt_am'] ?? $r['received_at'] ?? ''), 'typ' => (string)($r['typ'] ?? ''), 'daten' => $p,
-                    'erledigt_am' => $bereich === 'erledigt' ? (int)filemtime($f) : 0];
+                $out[] = ['zeit' => (string)($p['_kienzlefon']['erstellt_am'] ?? $r['received_at'] ?? ''), 'typ' => (string)($r['typ'] ?? ''), 'daten' => $p] + $eintrag;
             } catch (\Throwable) {
                 error_log('telefon: Vorgang ' . $id . ' ließ sich nicht entschlüsseln.');
-                $out[] = ['id' => $id, 'zeit' => '', 'typ' => '', 'daten' => [], 'fehler' => 'Ließ sich nicht entschlüsseln.', 'erledigt_am' => 0];
+                $out[] = ['fehler' => 'Ließ sich nicht entschlüsseln.'] + $eintrag;
             }
         }
-        usort($out, fn($a, $b) => strcmp($b['id'], $a['id']));
+        usort($out, fn($a, $b) => [$b['stand']['dringend'], $b['id']] <=> [$a['stand']['dringend'], $a['id']]);
         return $out;
     }
 
+    /** Anzahl je Bereich (ohne Schlüssel, nur aus dem Bearbeitungsstand). */
+    public static function anzahl(): array {
+        $n = ['neu' => 0, 'bearbeitung' => 0, 'erledigt' => count(glob(self::ordner() . '/erledigt/*.json.enc') ?: []), 'papierkorb' => count(glob(self::ordner() . '/papierkorb/*.json.enc') ?: [])];
+        foreach (glob(self::ordner() . '/*.json.enc') ?: [] as $f) $n[self::stand(substr(basename($f), 0, -strlen('.json.enc')), 'offen')['status']]++;
+        return $n;
+    }
+
     public static function anzahlOffen(): int { return count(glob(self::ordner() . '/*.json.enc') ?: []); }
+
+    /** Vorgang samt Stand und Kommentaren an einen anderen Ort legen (offen, erledigt, papierkorb). */
+    public static function verschieben(string $id, string|bool $nach = 'erledigt'): void {
+        if (is_bool($nach)) $nach = $nach ? 'offen' : 'erledigt';   // alte Aufrufe: verschieben($id, true) = wieder öffnen
+        if (!isset(self::ORTE[$nach])) throw new \InvalidArgumentException('Unbekanntes Ziel.');
+        $von = self::ortOderFehler($id);
+        if ($von === $nach) return;
+        if (!is_dir(self::ordner() . self::ORTE[$nach])) mkdir(self::ordner() . self::ORTE[$nach], 0700, true);
+        foreach (['.json.enc', '.stand.json', '.kommentare'] as $e) {
+            if (!is_file(self::pfad($id, $von, $e))) continue;
+            rename(self::pfad($id, $von, $e), self::pfad($id, $nach, $e));
+            touch(self::pfad($id, $nach, $e));   // Löschfrist (erledigt, Papierkorb) zählt ab jetzt
+        }
+    }
+
+    /** „Löschen“: erst in den Papierkorb (7 Tage, wiederherstellbar), aus dem Papierkorb endgültig. */
+    public static function loeschen(string $id): bool {
+        $ort = self::ortOderFehler($id);
+        if ($ort !== 'papierkorb') { self::verschieben($id, 'papierkorb'); return false; }
+        foreach (['.json.enc', '.stand.json', '.kommentare'] as $e) if (is_file(self::pfad($id, $ort, $e))) unlink(self::pfad($id, $ort, $e));
+        return true;
+    }
+
+    /** Übernehmen (auch von einem anderen Benutzer), zurück zu „Neu“, dringend an/aus, Teilanliegen abhaken. */
+    public static function uebernehmen(\KienzleModul $k, string $id): void {
+        if (self::ortOderFehler($id) !== 'offen') throw new \InvalidArgumentException('Nur offene Vorgänge lassen sich übernehmen.');
+        $s = self::stand($id, 'offen');
+        self::standSchreiben($id, 'offen', ['status' => 'bearbeitung', 'bearbeiter' => $k->benutzer(), 'name' => $k->name() ?: $k->benutzer(), 'seit' => time()] + $s);
+    }
+
+    public static function freigeben(string $id): void {
+        if (self::ortOderFehler($id) !== 'offen') throw new \InvalidArgumentException('Nur offene Vorgänge.');
+        self::standSchreiben($id, 'offen', ['status' => 'neu', 'bearbeiter' => '', 'name' => '', 'seit' => 0] + self::stand($id, 'offen'));
+    }
+
+    public static function dringend(string $id, bool $an): void {
+        $ort = self::ortOderFehler($id);
+        self::standSchreiben($id, $ort, ['dringend' => $an] + self::stand($id, $ort));
+    }
+
+    public static function anliegenAbhaken(\KienzleModul $k, string $id, int $nr, bool $an): void {
+        $ort = self::ortOderFehler($id);
+        if ($nr < 0 || $nr > 50) throw new \InvalidArgumentException('Unbekanntes Anliegen.');
+        $s = self::stand($id, $ort);
+        if ($an) $s['anliegen'][(string)$nr] = ['von' => $k->name() ?: $k->benutzer(), 'zeit' => time()];
+        else unset($s['anliegen'][(string)$nr]);
+        self::standSchreiben($id, $ort, $s);
+    }
+
+    public static function kommentieren(\KienzleModul $k, string $id, string $text): void {
+        $ort = self::ortOderFehler($id);
+        $text = trim(str_replace("\r", '', $text));
+        if ($text === '' || mb_strlen($text) > 2000) throw new \InvalidArgumentException('Kommentar fehlt oder ist länger als 2000 Zeichen.');
+        $liste = self::kommentare($k, $id, $ort);
+        if (count($liste) >= 100) throw new \InvalidArgumentException('Höchstens 100 Kommentare je Vorgang.');
+        $liste[] = ['von' => $k->benutzer(), 'name' => $k->name() ?: $k->benutzer(), 'zeit' => time(), 'text' => $text];
+        self::schreiben(self::pfad($id, $ort, '.kommentare'), $k->verschluesseln((string)json_encode($liste, JSON_UNESCAPED_UNICODE), 'vorgaenge-kommentare'), 0600);
+    }
 
     private static function geheimerSchluessel(\KienzleModul $k): \OpenSSLAsymmetricKey {
         $wert = @file_get_contents(self::geheim());
@@ -91,18 +203,6 @@ final class Vorgaenge {
         $r = json_decode($plain, true);
         if (!is_array($r)) throw new \RuntimeException('Inhalt beschädigt.');
         return $r;
-    }
-
-    /** offen → erledigt (zurueck=false) bzw. erledigt → offen (zurueck=true). */
-    public static function verschieben(string $id, bool $zurueck = false): void {
-        if (!preg_match(self::ID, $id)) throw new \InvalidArgumentException('Unbekannter Vorgang.');
-        $offen = self::ordner() . "/$id.json.enc";
-        $erledigt = self::ordner() . "/erledigt/$id.json.enc";
-        [$von, $nach] = $zurueck ? [$erledigt, $offen] : [$offen, $erledigt];
-        if (!is_file($von) || is_link($von)) throw new \InvalidArgumentException('Unbekannter Vorgang.');
-        if (!is_dir(dirname($nach))) mkdir(dirname($nach), 0700, true);
-        rename($von, $nach);
-        touch($nach);   // Löschfrist der erledigten Vorgänge zählt ab jetzt
     }
 
     // ---- SMS an Anrufer (Nachrichten-Ausgang der Basis) ---------------------------------------------------------------
@@ -133,21 +233,13 @@ final class Vorgaenge {
     }
 
     public static function smsSenden(\KienzleModul $k, string $id, string $an, string $text): void {
-        if (!preg_match(self::ID, $id) || (!is_file(self::ordner() . "/$id.json.enc") && !is_file(self::ordner() . "/erledigt/$id.json.enc"))) throw new \InvalidArgumentException('Unbekannter Vorgang.');
+        self::ortOderFehler($id);
         $an = preg_replace('/[\s\/()-]/', '', $an) ?? '';
         if (str_starts_with($an, '0') && !str_starts_with($an, '00')) $an = '+49' . substr($an, 1);
         $job = $k->smsSenden($an, trim($text));
         $liste = self::smsListe();
         $liste[$id][] = ['job' => $job, 'zeit' => time()];
-        $liste = array_filter($liste, fn($x, $vid) => is_file(self::ordner() . "/$vid.json.enc") || is_file(self::ordner() . "/erledigt/$vid.json.enc") || $vid === $id, ARRAY_FILTER_USE_BOTH);
+        $liste = array_filter($liste, fn($x, $vid) => self::ort((string)$vid) !== null, ARRAY_FILTER_USE_BOTH);
         self::schreiben(self::ordner() . '/sms.json', (string)json_encode($liste), 0600);
-    }
-
-    public static function loeschen(string $id): void {
-        if (!preg_match(self::ID, $id)) throw new \InvalidArgumentException('Unbekannter Vorgang.');
-        foreach ([self::ordner() . "/$id.json.enc", self::ordner() . "/erledigt/$id.json.enc"] as $f) {
-            if (is_file($f) && !is_link($f)) { unlink($f); return; }
-        }
-        throw new \InvalidArgumentException('Unbekannter Vorgang.');
     }
 }

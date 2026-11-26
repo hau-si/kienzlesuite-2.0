@@ -71,6 +71,14 @@ try {
         exit;
     }
     if ($rel === '') $rel = '/';
+    if ($rel === '/vorgaenge/anzahl') {
+        // Für den Hinweis „neuer Vorgang“ auf der Seite (nur Zahlen, keine Inhalte).
+        if (!$darfVorgaenge) $k->verweigern();
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        echo json_encode(Vorgaenge::anzahl());
+        exit;
+    }
     if (!in_array($rel, ['/', '/einstellungen', '/sprachmenue', '/vorgaenge', '/rufgruppen'], true)) { http_response_code(404); echo 'Nicht gefunden.'; exit; }
     if ($rel === '/rufgruppen' && !$darfRufgruppen) $k->verweigern();
     if ($rel === '/vorgaenge' && !$darfVorgaenge) $k->verweigern();
@@ -86,8 +94,8 @@ try {
         if (!$k->csrfGueltig($_POST['kienzle-csrf'] ?? null)) { http_response_code(403); echo 'Sitzung abgelaufen. Bitte die Seite neu laden.'; exit; }
         try {
             $aktion = (string)($_POST['aktion'] ?? '');
-            $vorgang = in_array($aktion, ['vorgang-erledigt', 'vorgang-offen', 'vorgang-loeschen', 'vorgang-sms'], true);
-            $nur = ['nebenstelle-speichern', 'sprachmenue-texte', 'wartemusik', 'vorgang-erledigt', 'vorgang-offen', 'vorgang-loeschen', 'vorgang-sms', 'rufgruppe-schalten'];
+            $vorgang = in_array($aktion, ['vorgang-erledigt', 'vorgang-offen', 'vorgang-loeschen', 'vorgang-sms', 'vorgang-uebernehmen', 'vorgang-freigeben', 'vorgang-dringend', 'vorgang-kommentar', 'vorgang-anliegen'], true);
+            $nur = ['nebenstelle-speichern', 'sprachmenue-texte', 'wartemusik', 'vorgang-erledigt', 'vorgang-offen', 'vorgang-loeschen', 'vorgang-sms', 'vorgang-uebernehmen', 'vorgang-freigeben', 'vorgang-dringend', 'vorgang-kommentar', 'vorgang-anliegen', 'rufgruppe-schalten'];
             if (!$admin && !in_array($aktion, $nur, true)) throw new InvalidArgumentException('Das dürfen nur Admins.');
             $erlaubt = match (true) {
                 $vorgang => $darfVorgaenge && $rel === '/vorgaenge',
@@ -97,7 +105,7 @@ try {
             };
             if (!$erlaubt) throw new InvalidArgumentException('Dafür fehlt das Recht.');
             $neu = match ($aktion) {
-                'sprachmenue-texte', 'wartemusik', 'vorgang-erledigt', 'vorgang-offen', 'vorgang-loeschen', 'vorgang-sms', 'rufgruppe-schalten', 'rufgruppen-speichern' => null,
+                'sprachmenue-texte', 'wartemusik', 'vorgang-erledigt', 'vorgang-offen', 'vorgang-loeschen', 'vorgang-sms', 'vorgang-uebernehmen', 'vorgang-freigeben', 'vorgang-dringend', 'vorgang-kommentar', 'vorgang-anliegen', 'rufgruppe-schalten', 'rufgruppen-speichern' => null,
                 'whisper-einrichten' => Anlage::whisperWahl($cfg, $_POST),
                 'leitung-speichern' => Anlage::leitungSpeichern($cfg, $_POST, $k),
                 'leitung-loeschen' => Anlage::leitungLoeschen($cfg, (string)($_POST['id'] ?? '')),
@@ -119,12 +127,17 @@ try {
                 $meldung = Anlage::rufgruppenSpeichern($_POST);
             } elseif ($vorgang) {
                 $id = (string)($_POST['id'] ?? '');
-                match ($aktion) {
-                    'vorgang-erledigt' => Vorgaenge::verschieben($id), 'vorgang-offen' => Vorgaenge::verschieben($id, true),
-                    'vorgang-sms' => Vorgaenge::smsSenden($k, $id, (string)($_POST['an'] ?? ''), (string)($_POST['text'] ?? '')), default => Vorgaenge::loeschen($id),
+                $meldung = match ($aktion) {
+                    'vorgang-erledigt' => (function () use ($id) { Vorgaenge::verschieben($id, 'erledigt'); return 'Als erledigt markiert. Erledigte Vorgänge werden nach 7 Tagen gelöscht.'; })(),
+                    'vorgang-offen' => (function () use ($id) { Vorgaenge::verschieben($id, 'offen'); return 'Wieder offen.'; })(),
+                    'vorgang-loeschen' => Vorgaenge::loeschen($id) ? 'Vorgang endgültig gelöscht.' : 'In den Papierkorb gelegt (wird nach 7 Tagen gelöscht, bis dahin wiederherstellbar).',
+                    'vorgang-sms' => (function () use ($k, $id) { Vorgaenge::smsSenden($k, $id, (string)($_POST['an'] ?? ''), (string)($_POST['text'] ?? '')); return 'SMS wird verschickt (innerhalb einer Minute). Der Stand steht an der Karte.'; })(),
+                    'vorgang-uebernehmen' => (function () use ($k, $id) { Vorgaenge::uebernehmen($k, $id); return 'Übernommen. Der Vorgang steht jetzt unter „In Bearbeitung“.'; })(),
+                    'vorgang-freigeben' => (function () use ($id) { Vorgaenge::freigeben($id); return 'Zurück zu „Neu“.'; })(),
+                    'vorgang-dringend' => (function () use ($id) { Vorgaenge::dringend($id, ($_POST['an'] ?? '') === '1'); return ($_POST['an'] ?? '') === '1' ? 'Als dringend markiert.' : 'Nicht mehr dringend.'; })(),
+                    'vorgang-kommentar' => (function () use ($k, $id) { Vorgaenge::kommentieren($k, $id, (string)($_POST['text'] ?? '')); return 'Kommentar gespeichert.'; })(),
+                    default => (function () use ($k, $id) { Vorgaenge::anliegenAbhaken($k, $id, (int)($_POST['nr'] ?? -1), ($_POST['an'] ?? '') === '1'); return 'Gespeichert.'; })(),
                 };
-                $meldung = ['vorgang-erledigt' => 'Als erledigt markiert. Erledigte Vorgänge werden nach 7 Tagen gelöscht.', 'vorgang-offen' => 'Wieder offen.',
-                    'vorgang-loeschen' => 'Vorgang gelöscht.', 'vorgang-sms' => 'SMS wird verschickt (innerhalb einer Minute). Der Stand steht an der Karte.'][$aktion];
                 if ($aktion === 'vorgang-sms' && !empty($_POST['erledigt'])) { Vorgaenge::verschieben($id); $meldung .= ' Vorgang als erledigt markiert.'; }
             } elseif ($aktion === 'whisper-einrichten') {
                 Anlage::speichern($neu, $k);
@@ -177,7 +190,7 @@ try {
         }
         $inhalt = Ansicht::rufgruppen($daten, $k->csrf(), $admin, $meldung, $fehler);
     } elseif ($rel === '/vorgaenge') {
-        $bereich = ($_GET['bereich'] ?? '') === 'erledigt' ? 'erledigt' : 'offen';
+        $bereich = isset(Vorgaenge::BEREICHE[(string)($_GET['bereich'] ?? '')]) ? (string)$_GET['bereich'] : 'neu';
         try {
             $liste = Vorgaenge::liste($k, $bereich);
         } catch (RuntimeException $e) {
@@ -190,7 +203,7 @@ try {
             if (is_array($letzte)) $stand[(string)$vid] = $k->nachricht((string)($letzte['job'] ?? '')) + ['zeit' => (int)($letzte['zeit'] ?? 0)];
         }
         $sms = ['bereit' => $k->nachrichtenBereit()['sms'], 'praxis' => trim((string)($k->praxis()['name'] ?? '')), 'stand' => $stand];
-        $inhalt = Ansicht::vorgaenge($liste, $bereich, Vorgaenge::anzahlOffen(), $k->csrf(), $meldung, $fehler, $sms);
+        $inhalt = Ansicht::vorgaenge($liste, $bereich, Vorgaenge::anzahl(), $k->csrf(), $meldung, $fehler, $sms + ['ich' => $k->benutzer()]);
     } elseif ($rel === '/sprachmenue') {
         try {
             $daten = Anlage::sprachmenueLesen();

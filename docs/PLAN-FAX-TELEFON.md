@@ -55,7 +55,7 @@ Modul telefon (ks-telefon)                         Modul fax (ks-fax)
 Entscheidung des Nutzers: Middleware, App und KI kommen später als **Module**; Zugriff von außen auf die Anlage vorerst nicht.
 
 - **kienzlefon-app (Praxis-App, ca. 17 000 Zeilen PHP):** kein zweites Modul, sonst gäbe es zwei Posteingänge für dieselben Vorgänge.
-  Ihre fehlenden Funktionen wandern in die Seite „Vorgänge“ des Moduls telefon: „In Bearbeitung“ mit Bearbeiter (angemeldeter
+  Ihre fehlenden Funktionen wandern in die Seite „Vorgänge“ des Moduls telefon (erledigt in Telefon beta.14; SMS-Empfang und Quellserver vorerst nicht, Entscheidung des Nutzers): „In Bearbeitung“ mit Bearbeiter (angemeldeter
   Benutzer der Suite) und Übernahme, Teilanliegen abhaken, Kommentare, „Dringend“, Papierkorb, Neu-Laden mit Ton, wahlweise
   Tonaufnahme anhören (kurze Frist). Status und Kommentare verschlüsselt neben dem Vorgang. Entfällt: eigene Anmeldung,
   Quellserver/SCP-Abholer, eigener SMS-Worker (Basis), Installer. Offen: SMS-**Empfang** über die FRITZ!Box (bräuchte einen

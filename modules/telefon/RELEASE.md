@@ -1,5 +1,18 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.14
+
+- **Seite „Vorgänge“ ausgebaut** (Funktionen aus der Praxis-App kienzlefon-app, ohne eigenes Modul):
+  - Reiter **Neu / In Bearbeitung / Erledigt / Papierkorb** mit Zählern.
+  - **Übernehmen**: der angemeldete Benutzer bearbeitet den Vorgang („In Bearbeitung von … seit …“); andere können ihn übernehmen, „zurück zu Neu“ gibt ihn frei.
+  - **Dringend** (rote Marke, steht oben).
+  - **Teilanliegen abhaken** bei mehreren Anliegen eines Anrufs (wer, wann).
+  - **Kommentare** je Vorgang (verschlüsselt mit dem Modulschlüssel; Bearbeitungsstand ohne Patientendaten daneben).
+  - **Papierkorb**: „Löschen“ legt den Vorgang 7 Tage in den Papierkorb (wiederherstellbar), dort „Endgültig löschen“.
+  - **Hinweis auf neue Vorgänge**: Die Seite fragt alle 20 Sekunden nur die Anzahl ab und zeigt dann einen Hinweis mit kurzem Ton (kein Neuladen, damit angefangene Texte bleiben).
+- Bewusst nicht übernommen: eigene Anmeldung, Quellserver und SMS-Empfang (Entscheidung des Nutzers), Anhören der Tonaufnahmen (werden nach dem Umwandeln gelöscht).
+- Geprüft mit Tests. **Nicht geprüft:** VM, Browser (Ton, Hinweis).
+
 ## 0.1.0-beta.13
 
 - **Seite „Rufgruppen“** (`/telefon/rufgruppen`, Entwurf C, Knopf in der Übersicht): je Gruppe eine Karte („Normal“ = Taste 1, „ROT“ = Taste 9) mit den Telefonen als Knöpfe; farbig = klingelt, ein Klick meldet sofort an oder ab (bis zum nächsten Neustart der Anlage). Admins stellen darunter die Standards nach einem Neustart und die Rufstufen ein. Die letzte Nummer einer Gruppe lässt sich nicht abmelden.

@@ -326,55 +326,95 @@ final class Ansicht {
         $d = $v['daten'];
         $nr = Vorgaenge::handynummer(self::wert($d['telefon'] ?? '')) ?: Vorgaenge::handynummer(self::wert($d['id'] ?? ''));
         $b = $h(tf_basis());
-        return $o . '<details class="how tf-sms"><summary>SMS an den Anrufer</summary><form method="post" action="' . $b . '/vorgaenge' . ($bereich === 'erledigt' ? '?bereich=erledigt' : '') . '" class="tf-form">'
+        return $o . '<details class="how tf-sms"><summary>SMS an den Anrufer</summary><form method="post" action="' . $b . '/vorgaenge?bereich=' . $h($bereich) . '" class="tf-form">'
             . '<input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"><input type="hidden" name="aktion" value="vorgang-sms"><input type="hidden" name="id" value="' . $h((string)$v['id']) . '">'
             . '<label>Handynummer<input name="an" value="' . $h($nr) . '" inputmode="tel" maxlength="20" required placeholder="+491701234567"></label>'
             . ($nr === '' ? '<small class="muted">Die Anrufernummer ist keine Handynummer oder unbekannt; bitte die Nummer aus der Akte eintragen.</small>' : '')
             . '<label>Text<textarea name="text" rows="2" maxlength="320" required>' . $h(Vorgaenge::smsVorlage((string)$v['typ'], (string)($sms['praxis'] ?? ''))) . '</textarea></label>'
             . '<small class="muted">Keine Befunde oder Diagnosen in SMS schreiben. Höchstens 320 Zeichen.</small>'
-            . ($bereich === 'offen' ? self::haken('erledigt', 'Danach als erledigt markieren', true) : '')
+            . (in_array($bereich, ['neu', 'bearbeitung', 'offen'], true) ? self::haken('erledigt', 'Danach als erledigt markieren', true) : '')
             . '<button class="primary" type="submit">SMS senden</button></form></details>';
     }
 
     /** Seite „Vorgänge“: aufgesprochene Anliegen als Karten, Reiter Offen/Erledigt. */
-    public static function vorgaenge(array $liste, string $bereich, int $offen, string $csrf, ?string $meldung, ?string $fehler, array $sms = []): string {
+    public static function vorgaenge(array $liste, string $bereich, array|int $anzahl, string $csrf, ?string $meldung, ?string $fehler, array $sms = []): string {
         $h = 'tf_h';
         $b = $h(tf_basis());
-        $o = '<div class="tf">' . self::kopfzeile('/vorgaenge', true) . self::meldungen($meldung, $fehler)
-            . '<nav class="tf-reiter"><a href="' . $b . '/vorgaenge"' . ($bereich === 'offen' ? ' aria-current="page"' : '') . '>Offen (' . $offen . ')</a>'
-            . '<a href="' . $b . '/vorgaenge?bereich=erledigt"' . ($bereich === 'erledigt' ? ' aria-current="page"' : '') . '>Erledigt</a></nav>';
+        if (is_int($anzahl)) $anzahl = ['neu' => $anzahl, 'bearbeitung' => 0, 'erledigt' => 0, 'papierkorb' => 0];
+        $offen = in_array($bereich, ['neu', 'bearbeitung', 'offen'], true);
+        $ziel = $b . '/vorgaenge?bereich=' . $h($bereich);
+        $o = '<div class="tf" id="tf-vorgaenge" data-anzahl="' . $b . '/vorgaenge/anzahl" data-neu="' . (int)$anzahl['neu'] . '">' . self::kopfzeile('/vorgaenge', true) . self::meldungen($meldung, $fehler)
+            . '<p class="tf-neu-hinweis" hidden role="status"><strong>Neuer Vorgang eingegangen.</strong> <a href="' . $b . '/vorgaenge?bereich=neu">Jetzt anzeigen</a></p><nav class="tf-reiter">';
+        foreach (Vorgaenge::BEREICHE as $k => $titel) {
+            $zahl = in_array($k, ['neu', 'bearbeitung'], true) || $anzahl[$k] > 0 ? ' (' . (int)$anzahl[$k] . ')' : '';
+            $o .= '<a href="' . $b . '/vorgaenge?bereich=' . $k . '"' . ($bereich === $k ? ' aria-current="page"' : '') . '>' . $h($titel) . $zahl . '</a>';
+        }
+        $o .= '</nav>';
         if ($bereich === 'erledigt') $o .= '<p class="muted">Erledigte Vorgänge werden 7 Tage nach dem Erledigen gelöscht.</p>';
-        if (!$liste) return $o . '<section class="card"><p class="muted">' . ($bereich === 'offen' ? 'Keine offenen Vorgänge.' : 'Keine erledigten Vorgänge.') . '</p></section></div>';
-        $knopf = static fn(string $aktion, string $id, string $text, string $klasse, string $frage = '') => '<form method="post" action="' . $b . '/vorgaenge' . ($bereich === 'erledigt' ? '?bereich=erledigt' : '') . '"'
+        if ($bereich === 'papierkorb') $o .= '<p class="muted">Gelöschte Vorgänge bleiben hier 7 Tage und lassen sich wiederherstellen.</p>';
+        if (!$liste) return $o . '<section class="card"><p class="muted">' . (['neu' => 'Keine neuen Vorgänge.', 'bearbeitung' => 'Niemand bearbeitet gerade einen Vorgang.',
+            'erledigt' => 'Keine erledigten Vorgänge.', 'papierkorb' => 'Der Papierkorb ist leer.'][$bereich] ?? 'Keine Vorgänge.') . '</p></section></div>';
+        $formular = static fn(string $aktion, string $id, string $inhalt, string $frage = '', string $klasse = '') => '<form method="post" action="' . $ziel . '"' . ($klasse !== '' ? ' class="' . $klasse . '"' : '')
             . ($frage !== '' ? ' data-confirm="' . $h($frage) . '"' : '') . '><input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"><input type="hidden" name="aktion" value="' . $aktion
-            . '"><input type="hidden" name="id" value="' . $h($id) . '"><button class="small ' . $klasse . '" type="submit">' . $h($text) . '</button></form>';
+            . '"><input type="hidden" name="id" value="' . $h($id) . '">' . $inhalt . '</form>';
+        $knopf = static fn(string $aktion, string $id, string $text, string $klasse, string $frage = '', array $extra = []) => $formular($aktion, $id,
+            implode('', array_map(fn($n, $w) => '<input type="hidden" name="' . $n . '" value="' . $h($w) . '">', array_keys($extra), $extra))
+            . '<button class="small ' . $klasse . '" type="submit">' . $h($text) . '</button>', $frage);
+        $uhr = static function (string|int $wert): string {
+            try {
+                $t = is_int($wert) ? (new \DateTimeImmutable('@' . $wert)) : new \DateTimeImmutable($wert);
+                return $t->setTimezone(new \DateTimeZone('Europe/Berlin'))->format('d.m.Y, H:i') . ' Uhr';
+            } catch (\Exception) {
+                return '';
+            }
+        };
         foreach ($liste as $v) {
             $d = $v['daten'];
+            $st = $v['stand'] ?? Vorgaenge::stand($v['id']);
             $typ = Vorgaenge::TYPEN[$v['typ']] ?? ($v['typ'] !== '' ? $v['typ'] : 'Vorgang');
-            try {
-                $zeit = $v['zeit'] !== '' ? (new \DateTimeImmutable((string)$v['zeit']))->setTimezone(new \DateTimeZone('Europe/Berlin'))->format('d.m.Y, H:i') . ' Uhr' : '';
-            } catch (\Exception) {
-                $zeit = '';
-            }
             $name = trim(self::wert($d['vorname'] ?? '') . ' ' . self::wert($d['nachname'] ?? ''));
-            $o .= '<section class="card tf-vorgang"><header><div><span class="tag ' . ($v['typ'] === 'kienzlefon_error' || isset($v['fehler']) ? 'err' : 'ok') . '">' . $h($typ) . '</span> <strong>'
-                . $h($name !== '' ? $name : 'Name nicht verstanden') . '</strong><div class="muted">' . $h($zeit)
-                . (self::wert($d['id'] ?? '') !== '' && self::wert($d['id']) !== 'unbekannt' ? ' · Anruf von ' . $h(self::wert($d['id'])) : '') . '</div></div><div class="tf-knoepfe">'
-                . ($bereich === 'offen' ? $knopf('vorgang-erledigt', $v['id'], 'Erledigt', 'primary') : $knopf('vorgang-offen', $v['id'], 'Wieder öffnen', 'secondary'))
-                . $knopf('vorgang-loeschen', $v['id'], 'Löschen', 'danger', 'Diesen Vorgang endgültig löschen?') . '</div></header>';
+            $knoepfe = '';
+            if ($offen) {
+                $eigen = $st['status'] === 'bearbeitung' && $st['bearbeiter'] === ($sms['ich'] ?? '');
+                $knoepfe .= !$eigen ? $knopf('vorgang-uebernehmen', $v['id'], 'Übernehmen', $st['status'] === 'bearbeitung' ? 'secondary' : 'primary') : '';
+                $knoepfe .= $knopf('vorgang-erledigt', $v['id'], 'Erledigt', $eigen ? 'primary' : 'secondary');
+            } else {
+                $knoepfe .= $knopf('vorgang-offen', $v['id'], $bereich === 'papierkorb' ? 'Wiederherstellen' : 'Wieder öffnen', 'secondary');
+            }
+            $knoepfe .= $knopf('vorgang-dringend', $v['id'], $st['dringend'] ? 'Nicht dringend' : 'Dringend', 'secondary', '', ['an' => $st['dringend'] ? '0' : '1']);
+            $knoepfe .= $bereich === 'papierkorb' ? $knopf('vorgang-loeschen', $v['id'], 'Endgültig löschen', 'danger', 'Diesen Vorgang endgültig löschen? Das lässt sich nicht rückgängig machen.')
+                : $knopf('vorgang-loeschen', $v['id'], 'Löschen', 'danger', 'Diesen Vorgang in den Papierkorb legen?');
+            $o .= '<section class="card tf-vorgang' . ($st['dringend'] ? ' tf-dringend' : '') . '"><header><div>' . ($st['dringend'] ? self::tag('err', 'dringend') . ' ' : '')
+                . '<span class="tag ' . ($v['typ'] === 'kienzlefon_error' || isset($v['fehler']) ? 'err' : 'ok') . '">' . $h($typ) . '</span> <strong>'
+                . $h($name !== '' ? $name : 'Name nicht verstanden') . '</strong><div class="muted">' . $h($uhr((string)$v['zeit']))
+                . (self::wert($d['id'] ?? '') !== '' && self::wert($d['id']) !== 'unbekannt' ? ' · Anruf von ' . $h(self::wert($d['id'])) : '') . '</div>'
+                . ($st['status'] === 'bearbeitung' && $offen ? '<div class="tf-bearbeiter">In Bearbeitung von <strong>' . $h($st['name']) . '</strong> seit ' . $h($uhr($st['seit']))
+                    . ' ' . $knopf('vorgang-freigeben', $v['id'], 'zurück zu „Neu“', 'link') . '</div>' : '')
+                . '</div><div class="tf-knoepfe">' . $knoepfe . '</div></header>';
             if (isset($v['fehler'])) {
                 $o .= '<p class="fehler">' . $h($v['fehler']) . '</p>';
             } else {
                 $felder = self::felder($d);
                 foreach ((array)($d['anliegen_liste'] ?? []) as $i => $a) {
                     if (!is_array($a)) continue;
-                    $felder .= '<dt>' . $h((string)($i + 1) . '. ' . (Vorgaenge::TYPEN[(string)($a['typ'] ?? '')] ?? 'Anliegen')) . '</dt><dd><dl class="tf-dl">' . self::felder($a) . '</dl></dd>';
+                    $ab = $st['anliegen'][(string)$i] ?? null;
+                    $haken = $formular('vorgang-anliegen', $v['id'], '<input type="hidden" name="nr" value="' . (int)$i . '"><input type="hidden" name="an" value="' . ($ab ? '0' : '1') . '">'
+                        . '<button type="submit" class="tf-haken' . ($ab ? ' an' : '') . '" aria-pressed="' . ($ab ? 'true' : 'false') . '" title="' . ($ab ? 'Erledigt – klicken, um den Haken zu entfernen' : 'Als erledigt abhaken') . '">'
+                        . ($ab ? '✓' : '') . '</button>', '', 'tf-inline');
+                    $felder .= '<dt>' . $haken . ' ' . $h((string)($i + 1) . '. ' . (Vorgaenge::TYPEN[(string)($a['typ'] ?? '')] ?? 'Anliegen')) . '</dt><dd' . ($ab ? ' class="tf-abgehakt"' : '') . '><dl class="tf-dl">' . self::felder($a) . '</dl>'
+                        . ($ab ? '<small class="muted">Erledigt von ' . $h((string)($ab['von'] ?? '')) . ', ' . $h($uhr((int)($ab['zeit'] ?? 0))) . '</small>' : '') . '</dd>';
                 }
                 if ($v['typ'] === 'kienzlefon_error') $felder .= '<dt>Hinweis</dt><dd>Die Aufnahme ließ sich nicht vollständig verarbeiten. Bitte zurückrufen.</dd>';
                 $o .= $felder !== '' ? '<dl class="tf-dl">' . $felder . '</dl>' : '<p class="muted">Nichts verstanden. Bitte zurückrufen.</p>';
                 $o .= self::smsTeil($v, $bereich, $csrf, $sms);
             }
-            $o .= '</section>';
+            // Kommentare (verschlüsselt gespeichert)
+            $kom = $v['kommentare'] ?? [];
+            $liste2 = '';
+            foreach ($kom as $c) $liste2 .= '<li><span class="muted">' . $h((string)($c['name'] ?? '')) . ', ' . $h($uhr((int)($c['zeit'] ?? 0))) . ':</span> ' . nl2br($h((string)($c['text'] ?? ''))) . '</li>';
+            $o .= '<details class="how tf-kommentare"' . ($kom ? ' open' : '') . '><summary>Kommentare' . ($kom ? ' (' . count($kom) . ')' : '') . '</summary>' . ($liste2 !== '' ? '<ul>' . $liste2 . '</ul>' : '')
+                . $formular('vorgang-kommentar', $v['id'], '<textarea name="text" rows="2" maxlength="2000" required placeholder="z. B. „Rezept liegt am Empfang“"></textarea><button class="small secondary" type="submit">Kommentar speichern</button>', '', 'tf-form tf-breit')
+                . '</details></section>';
         }
         return $o . '</div>';
     }

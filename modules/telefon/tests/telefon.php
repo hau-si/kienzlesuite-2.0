@@ -158,4 +158,15 @@ $html = Ansicht::rufgruppen($rg, 'x', true, null, null);
 check(substr_count($html, 'tf-chip an') === 2 && str_contains($html, 'tf-chip aus') && str_contains($html, 'Rotes &lt;Telefon&gt;') && str_contains($html, '1 klingelt')
     && str_contains($html, 'name="tel[201][normal]" value="1" checked') && str_contains($html, 'name="an" value="1"') && !str_contains($html, 'Steuerung startet'), 'Rufgruppen-Ansicht');
 check(!str_contains(Ansicht::rufgruppen($rg, 'x', false, null, null), 'rufgruppen-speichern'), 'Standards nur für Admins sichtbar');
+// Teilanliegen abhaken (ohne Patientendaten im Klartext-Stand) und Darstellung.
+Vorgaenge::anliegenAbhaken($k, '20261126_091400_000001', 1, true);
+$stand = Vorgaenge::stand('20261126_091400_000001');
+check(isset($stand['anliegen']['1']['von']) && $stand['status'] === 'neu', 'Teilanliegen abgehakt');
+$v = ['id' => '20261126_091400_000001', 'zeit' => '2026-11-26T09:14:00+01:00', 'typ' => 'mehrere_anliegen', 'ort' => 'offen', 'stand' => $stand, 'kommentare' => [],
+    'daten' => ['vorname' => 'Max', 'nachname' => 'Mustermann', 'anliegen_liste' => [['typ' => 'rezeptbestellung', 'medikamente' => 'Ibuprofen 400'], ['typ' => 'termin', 'grund' => 'Kontrolle']]]];
+$html = Ansicht::vorgaenge([$v], 'neu', ['neu' => 1, 'bearbeitung' => 0, 'erledigt' => 0, 'papierkorb' => 0], 'x', null, null, ['bereit' => false]);
+check(substr_count($html, 'class="tf-haken"') === 1 && substr_count($html, 'class="tf-haken an"') === 1 && str_contains($html, 'tf-abgehakt') && str_contains($html, '>Übernehmen<'), 'Teilanliegen in der Karte');
+Vorgaenge::anliegenAbhaken($k, '20261126_091400_000001', 1, false);
+check(Vorgaenge::stand('20261126_091400_000001')['anliegen'] === [], 'Haken entfernt');
+wirft(fn() => Vorgaenge::kommentieren($k, '20261126_091400_000001', ' '), 'Leerer Kommentar');
 echo "telefon.php: alles in Ordnung\n";

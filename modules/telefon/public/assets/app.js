@@ -25,3 +25,26 @@ document.addEventListener('submit', (e) => {
       .catch(() => { status.textContent = 'Keine Verbindung zum Server. Bitte noch einmal versuchen.'; los.disabled = false; });
   });
 })();
+// Vorgänge: alle 20 Sekunden nur die Anzahl abfragen; bei neuen Vorgängen Hinweis zeigen und kurz piepen (kein Neuladen, damit
+// angefangene Kommentare und SMS-Texte nicht verloren gehen).
+(() => {
+  const seite = document.getElementById('tf-vorgaenge');
+  if (!seite || !window.fetch) return;
+  let neu = Number(seite.dataset.neu || 0);
+  const hinweis = seite.querySelector('.tf-neu-hinweis');
+  const piep = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = ctx.createOscillator(); const g = ctx.createGain();
+      o.frequency.value = 880; g.gain.value = 0.08; o.connect(g); g.connect(ctx.destination);
+      o.start(); o.stop(ctx.currentTime + 0.25);
+    } catch (e) { /* Ton ist nur eine Hilfe */ }
+  };
+  setInterval(() => {
+    fetch(seite.dataset.anzahl, {credentials: 'same-origin', cache: 'no-store'}).then(r => r.ok ? r.json() : null).then(d => {
+      if (!d || typeof d.neu !== 'number') return;
+      if (d.neu > neu && hinweis) { hinweis.hidden = false; piep(); document.title = '(' + d.neu + ') ' + document.title.replace(/^\(\d+\) /, ''); }
+      neu = d.neu;
+    }).catch(() => {});
+  }, 20000);
+})();

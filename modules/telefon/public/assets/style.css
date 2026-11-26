@@ -68,3 +68,13 @@ main.modul { max-width: 980px; margin: 0; padding: 32px 40px 48px; }
 .tf-chip.aus { opacity: .5; cursor: not-allowed; border-style: dashed; }
 .tf-chip:focus-visible { outline: 2px solid #0f6b5f; outline-offset: 2px; }
 .tf-form .tf-tabelle input.tf-taste { width: 5em; }
+.tf-dringend { border-left: 4px solid #b8322a; }
+.tf-bearbeiter { margin-top: 4px; font-size: 14px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.tf-bearbeiter form { display: inline; margin: 0; }
+.tf button.link { background: none; border: 0; padding: 0; color: #0f6b5f; text-decoration: underline; cursor: pointer; font: inherit; font-size: 13px; }
+.tf .tf-haken { min-height: 0; min-width: 0; box-sizing: border-box; width: 22px; height: 22px; border: 2px solid #0f6b5f; border-radius: 5px; background: #fff; color: #fff; font-weight: 700; line-height: 1; padding: 0; cursor: pointer; vertical-align: middle; }
+.tf .tf-haken.an { background: #0f6b5f; }
+.tf-abgehakt > .tf-dl { opacity: .55; text-decoration: line-through; }
+.tf-kommentare ul { margin: 6px 0; padding-left: 18px; }
+.tf-kommentare li { margin: 4px 0; }
+.tf-neu-hinweis { padding: 10px 14px; border-radius: 9px; background: #fff3d6; }

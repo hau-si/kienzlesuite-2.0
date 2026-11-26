@@ -1135,7 +1135,8 @@ def pflege(now: float | None = None) -> int:
                     removed += 1
             except OSError:
                 pass
-    for folder, days in ((AST / 'log', LOG_KEEP_DAYS), (AST / 'spool' / 'fax-empfang', 2), (KZF_DATA / 'vorgaenge' / 'erledigt', ERLEDIGT_TAGE)):
+    for folder, days in ((AST / 'log', LOG_KEEP_DAYS), (AST / 'spool' / 'fax-empfang', 2), (KZF_DATA / 'vorgaenge' / 'erledigt', ERLEDIGT_TAGE),
+                         (KZF_DATA / 'vorgaenge' / 'papierkorb', ERLEDIGT_TAGE)):
         for p in folder.glob('*') if folder.is_dir() else []:
             try:
                 if p.is_file() and not p.is_symlink() and p.stat().st_mtime < now - days * 86400:
