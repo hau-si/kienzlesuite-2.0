@@ -107,7 +107,8 @@ final class Ansicht {
     /** Ansagen: Piper (optional nachgeladen) einrichten/entfernen, Ansagen erzeugen, Stand des letzten Auftrags. */
     private static function ansagen(string $csrf, string $tts): string {
         $st = Anlage::auftragStatus();
-        $namen = ['piper-einrichten' => 'Piper einrichten', 'piper-entfernen' => 'Piper entfernen', 'erzeugen' => 'Ansagen erzeugen', '' => 'Auftrag'];
+        $namen = ['piper-einrichten' => 'Piper einrichten', 'piper-entfernen' => 'Piper entfernen', 'kokoro-einrichten' => 'Kokoro einrichten', 'kokoro-entfernen' => 'Kokoro entfernen',
+            'erzeugen' => 'Ansagen erzeugen', '' => 'Auftrag'];
         $stand = match ($st['stand'] ?? '') {
             'laeuft', 'wartet' => self::tag('warn', 'läuft'), 'fertig' => self::tag('ok', 'fertig'), 'fehler' => self::tag('err', 'Fehler'), default => '',
         };
@@ -116,12 +117,15 @@ final class Ansicht {
             . implode('', array_map(fn($k, $v) => '<input type="hidden" name="' . $k . '" value="' . tf_h($v) . '">', array_keys($extra), $extra))
             . '<button class="' . $klasse . '" type="submit">' . tf_h($text) . '</button></form>';
         $o = '<h3>Ansagen</h3><p>' . (Anlage::piperBereit() ? self::tag('ok', 'Piper eingerichtet') : self::tag('opt', 'Piper nicht geladen'))
+            . ' ' . (Anlage::kokoroBereit() ? self::tag('ok', 'Kokoro eingerichtet') : '') . (Anlage::googleBereit() ? ' ' . self::tag('ok', 'Google-Schlüssel gespeichert') : '')
             . ' <span class="muted">Erzeugte Ansagen: ' . Anlage::ansagenAnzahl() . '</span></p>'
             . '<p class="muted">Piper wird nur bei Bedarf geladen (Python-Pakete mit festen Versionen und die Stimme „Thorsten“, zusammen etwa 200 MB), damit das Modul klein bleibt. '
             . 'Eigene Aufnahmen über die Nebenstelle 777 haben Vorrang vor erzeugten Ansagen.</p><div class="tf-knoepfe tf-links">';
         if (!Anlage::piperBereit()) $o .= $knopf('piper-einrichten', 'Piper einrichten', 'primary', 'Piper und die Stimme jetzt aus dem Internet laden (etwa 200 MB)?');
-        else $o .= $knopf('ansagen-erzeugen', 'Geänderte Ansagen erzeugen', 'primary') . $knopf('ansagen-erzeugen', 'Alle neu erzeugen', 'secondary', 'Alle Ansagen neu erzeugen? Das dauert einige Minuten.', ['alle' => '1'])
-            . $knopf('piper-entfernen', 'Piper entfernen', 'danger', 'Piper und die Stimme löschen? Erzeugte Ansagen bleiben.');
+        else $o .= $knopf('piper-entfernen', 'Piper entfernen', 'danger', 'Piper und die Stimme löschen? Erzeugte Ansagen bleiben.');
+        if ($tts === 'kokoro' || Anlage::kokoroBereit()) $o .= Anlage::kokoroBereit() ? $knopf('kokoro-entfernen', 'Kokoro entfernen', 'danger', 'Kokoro löschen? Erzeugte Ansagen bleiben.')
+            : $knopf('kokoro-einrichten', 'Kokoro einrichten', 'primary', 'Kokoro-Thorsten jetzt laden? Das sind mehrere GB (PyTorch, Modell) und dauert lange.');
+        if (Anlage::ttsBereit()) $o .= $knopf('ansagen-erzeugen', 'Geänderte Ansagen erzeugen', 'primary') . $knopf('ansagen-erzeugen', 'Alle neu erzeugen', 'secondary', 'Alle Ansagen neu erzeugen? Das dauert einige Minuten.', ['alle' => '1']);
         $o .= '</div>';
         if ($stand !== '') $o .= '<p>' . tf_h($namen[$st['aktion'] ?? ''] ?? 'Auftrag') . ': ' . $stand . ' <span class="muted">' . tf_h((string)($st['meldung'] ?? '')) . '</span></p>';
         return $o;
@@ -198,7 +202,13 @@ final class Ansicht {
             // Sprachmenü (Kienzlefon 2.7)
             $kz = $cfg['kienzlefon'];
             $form = self::haken('aktiv', 'Sprachmenü einschalten (Anrufer hören Begrüßung und Menü, statt direkt in der Warteschlange zu landen)', (bool)$kz['aktiv'])
-                . self::auswahl('tts', 'Sprachausgabe der Ansagen', Anlage::SPRACHAUSGABE, (string)$kz['tts']);
+                . self::auswahl('tts', 'Sprachausgabe der Ansagen', Anlage::SPRACHAUSGABE, (string)$kz['tts'])
+                . '<details class="how"' . ($kz['tts'] === 'google' ? ' open' : '') . '><summary>Google (wahlweise)</summary><p class="muted">Nur die festen Ansagetexte der Praxis gehen an Google, keine Anrufer- oder Patientendaten. '
+                . 'Schlüssel: Google Cloud Console → APIs & Dienste → Anmeldedaten (Text-to-Speech API freigeben).</p>'
+                . self::feld('google_schluessel', 'Google-API-Schlüssel', '', ($kz['google']['schluessel'] ?? '') !== '' ? 'Gespeichert. Leer lassen, um ihn zu behalten.' : 'Noch keiner gespeichert.', 'password', ' autocomplete="new-password"')
+                . (($kz['google']['schluessel'] ?? '') !== '' ? self::haken('google_entfernen', 'Gespeicherten Schlüssel löschen', false) : '')
+                . self::feld('google_stimme', 'Stimme', (string)($kz['google']['stimme'] ?? ''), 'Leer = de-DE-Chirp3-HD-Enceladus.')
+                . self::feld('google_tempo', 'Sprechtempo', (string)($kz['google']['tempo'] ?? ''), 'Leer = 0,93 (0,25 bis 2).') . '</details>';
             $o .= self::fold('sprachmenue', 'Sprachmenü', $kz['aktiv'] ? self::tag('ok', 'an') : self::tag('opt', 'aus'),
                 '<p class="muted">Sprachmenü aus Kienzlefon: Öffnungs- und Telefonzeiten, Begrüßung, Menü (Praxis, Rezept, Überweisung, Termin), Apotheken- und Fachstellenweg. '
                 . 'Noch in Arbeit: Google und Kokoro, Seiten für Zeiten und Texte, Aufnahme von Anliegen. Erst einschalten, wenn die Ansagen erzeugt sind.</p>'

@@ -282,7 +282,16 @@ class KienzlefonBruecke(unittest.TestCase):
             self.a.check(b)
         with self.assertRaises(self.a.Fehler):
             self.a.check(self.cfg(tts='espeak'))
-        self.assertEqual(self.a.check(beispiel())['kienzlefon'], {'aktiv': False, 'tts': 'piper'})
+        self.assertEqual(self.a.check(beispiel())['kienzlefon'], {'aktiv': False, 'tts': 'piper',
+                         'google': {'schluessel': '', 'stimme': 'de-DE-Chirp3-HD-Enceladus', 'tempo': 0.93}})
+        with self.assertRaises(self.a.Fehler) as e:
+            self.a.check(self.cfg(tts='google'))
+        self.assertIn('Google-Schlüssel', str(e.exception))
+        for bad in ({'schluessel': 'kurz'}, {'schluessel': 'A' * 30, 'tempo': '3'}, {'schluessel': 'A' * 30, 'stimme': 'x; rm'}):
+            b = self.cfg(tts='google')
+            b['kienzlefon']['google'] = bad
+            with self.assertRaises(self.a.Fehler):
+                self.a.check(b)
         b = self.cfg()
         b['nebenstellen'][1]['nummer'] = '205'
         with self.assertRaises(self.a.Fehler) as e:
@@ -301,6 +310,21 @@ class KienzlefonBruecke(unittest.TestCase):
         t = self.a.toml_set(t, 'b', 'y', 'neu "q"')
         t = self.a.toml_set(t, 'c', 'w', True)
         self.assertEqual(t, '[a]\n# Kommentar\nx = 5\n\n[b]\ny = "neu \\"q\\""\n\n[c]\nw = true\n')
+
+    def test_google_konfiguration(self):
+        b = self.cfg(tts='google')
+        b['kienzlefon']['google'] = {'schluessel': 'AIza' + 'x' * 35, 'stimme': 'de-DE-Chirp3-HD-Achernar', 'tempo': '1,1'}
+        self.a.anwenden(b)
+        conf = self.tmp / 'kienzlefon' / 'google-tts.conf'
+        self.assertEqual(conf.read_text().splitlines()[1:], ['API_KEY=AIza' + 'x' * 35, 'VOICE=de-DE-Chirp3-HD-Achernar', 'LANG=de-DE', 'RATE=1.1'])
+        self.assertEqual(oct(conf.stat().st_mode & 0o777), '0o600')
+        toml = (self.tmp / 'kienzlefon' / 'kienzlefon.toml').read_text()
+        self.assertIn('engine = "google"', toml)
+        self.assertNotIn('AIza', toml)                      # Schlüssel nur in der Generator-Datei
+        self.assertIn(f'google_generator = "{HERE.parent}/lib/kzf-bin/kienzlefon-google-tts-generate"', toml)
+        b['kienzlefon'] = {'aktiv': True, 'tts': 'piper'}
+        self.a.anwenden(b)
+        self.assertFalse(conf.exists())                     # ohne Schlüssel keine Datei
 
     def test_sprachmenue_eingebunden(self):
         r = self.a.anwenden(self.cfg())

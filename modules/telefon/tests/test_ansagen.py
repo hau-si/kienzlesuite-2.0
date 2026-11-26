@@ -72,5 +72,30 @@ class Ansagen(unittest.TestCase):
         self.assertFalse((kzf / 'piper-voices' / 'de_DE-thorsten-high.onnx').exists())
 
 
+class Kokoro(unittest.TestCase):
+    """lib/kokoro-einrichten ruft den Installer von Kienzlefon mit Ziel im Datenordner und ohne root-Prüfung auf (Ersatz-Installer)."""
+
+    def test_aufrufer(self):
+        t = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, t, True)
+        fake = t / 'install.py'
+        fake.write_text('import json, os\nfrom pathlib import Path\nINSTALL_ROOT = Path("/opt/kienzlefon/kokoro")\n'
+                        'def install(config):\n    if os.geteuid() != 0:\n        raise RuntimeError("root")\n'
+                        '    Path(os.environ["ERGEBNIS"]).write_text(json.dumps([str(INSTALL_ROOT), str(config)]))\n')
+        env = {'PATH': '/usr/bin:/bin', 'KIENZLE_DATEN': str(t / 'daten'), 'KIENZLE_KOKORO_INSTALLER': str(fake), 'ERGEBNIS': str(t / 'ergebnis.json')}
+        r = subprocess.run([sys.executable, '-B', str(MODUL / 'lib/kokoro-einrichten')], env=env, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(json.loads((t / 'ergebnis.json').read_text()), [str(t / 'daten' / 'kokoro'), str(t / 'daten' / 'kienzlefon' / 'kienzlefon.toml')])
+
+    def test_entfernen(self):
+        t = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, t, True)
+        for d in ('kokoro/venv', 'kienzlefon/kokoro', 'kienzlefon/kokoro-thorsten'):
+            (t / d).mkdir(parents=True)
+        (t / 'kienzlefon' / 'auftrag.json').write_text('{"aktion": "kokoro-entfernen"}')
+        subprocess.run([sys.executable, '-B', str(MODUL / 'lib/ansagen-auftrag')], env={'PATH': '/usr/bin:/bin', 'KIENZLE_DATEN': str(t)})
+        self.assertEqual(json.loads((t / 'kienzlefon' / 'auftrag-status.json').read_text())['stand'], 'fertig')
+        self.assertFalse((t / 'kokoro').exists() or (t / 'kienzlefon' / 'kokoro').exists() or (t / 'kienzlefon' / 'kokoro-thorsten').exists())
+
 if __name__ == '__main__':
     unittest.main()

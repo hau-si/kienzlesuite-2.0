@@ -69,9 +69,14 @@ check(end($cfg['nebenstellen'])['nummer'] === '201', 'freie Nummer wird wieder v
 $u = Anlage::ueberblick(['laeuft' => false]);
 check($u[0]['state'] === 'done' && $u[1]['state'] === 'done' && $u[2]['state'] === 'done' && $u[3]['state'] === 'error', 'Überblick nach Einrichtung');
 check(Anlage::status() === ['laeuft' => false], 'Status ohne Asterisk');
-wirft(fn() => Anlage::sprachmenueSpeichern($cfg, ['aktiv' => '1', 'tts' => 'espeak']), 'Sprachausgabe geprüft', 'Sprachausgabe');
-check(Anlage::sprachmenueSpeichern($cfg, ['aktiv' => '1', 'tts' => 'google'])['kienzlefon'] === ['aktiv' => true, 'tts' => 'google'], 'Sprachmenü-Schalter');
-check(Anlage::laden()['kienzlefon'] === ['aktiv' => false, 'tts' => 'piper'], 'Vorgabe: Sprachmenü aus, Piper');
+wirft(fn() => Anlage::sprachmenueSpeichern($cfg, ['aktiv' => '1', 'tts' => 'espeak'], $k), 'Sprachausgabe geprüft', 'Sprachausgabe');
+$g = Anlage::sprachmenueSpeichern($cfg, ['aktiv' => '1', 'tts' => 'google', 'google_schluessel' => 'AIza' . str_repeat('x', 35), 'google_tempo' => '1,1'], $k)['kienzlefon'];
+check($g['aktiv'] === true && $g['tts'] === 'google' && str_starts_with($g['google']['schluessel'], 'v1:') && $g['google']['tempo'] === '1,1', 'Sprachmenü-Schalter, Google-Schlüssel verschlüsselt');
+$cfg2 = $cfg; $cfg2['kienzlefon'] = $g;
+check(Anlage::sprachmenueSpeichern($cfg2, ['aktiv' => '1', 'tts' => 'google', 'google_schluessel' => ''], $k)['kienzlefon']['google']['schluessel'] === $g['google']['schluessel'], 'leerer Schlüssel behält den alten');
+check(Anlage::sprachmenueSpeichern($cfg2, ['tts' => 'piper', 'google_entfernen' => '1'], $k)['kienzlefon']['google']['schluessel'] === '', 'Schlüssel löschen');
+check(Anlage::klartext($cfg2, $k)['kienzlefon']['google']['schluessel'] === 'AIza' . str_repeat('x', 35), 'Schlüssel für den Generator entschlüsselt');
+check(Anlage::laden()['kienzlefon']['aktiv'] === false && Anlage::laden()['kienzlefon']['tts'] === 'piper', 'Vorgabe: Sprachmenü aus, Piper');
 
 // Seiten
 $status = ['laeuft' => true, 'leitungen' => [$l['id'] => 'Registered'], 'telefone' => ['202' => 'Avail'], 'gespraeche' => 1, 'wartend' => 0];

@@ -5,7 +5,9 @@ Piper ist **optional nachgeladen**, damit das Modul klein bleibt: Erst „Piper 
 Datenordner an (Pakete mit festen Versionen und Prüfsummen aus lib/piper/requirements-cp314.lock) und lädt die Stimme
 de_DE-thorsten-high von einer festen Fassung (v1.0.0) der Piper-Stimmen. „Piper entfernen“ löscht beides wieder.
 
-Auftrag <daten>/kienzlefon/auftrag.json: {"aktion": "piper-einrichten" | "piper-entfernen" | "erzeugen", "alle": bool}
+Kokoro (wahlweise, groß) lädt „kokoro-einrichten“ über lib/kokoro-einrichten mit dem Installer von Kienzlefon; Google braucht keine Pakete.
+
+Auftrag <daten>/kienzlefon/auftrag.json: {"aktion": "piper-einrichten" | "piper-entfernen" | "kokoro-einrichten" | "kokoro-entfernen" | "erzeugen", "alle": bool}
 Stand   <daten>/kienzlefon/auftrag-status.json: {"aktion", "stand": "laeuft" | "fertig" | "fehler", "meldung", "zeit"}
 """
 import hashlib
@@ -84,6 +86,17 @@ def piper_entfernen() -> str:
     return 'Piper entfernt. Erzeugte Ansagen bleiben erhalten.'
 
 
+def kokoro_einrichten() -> str:
+    laufen([sys.executable, '-B', str(HERE / 'kokoro-einrichten')], 3600, {**os.environ, 'KIENZLE_DATEN': str(DATA)})
+    return 'Kokoro-Thorsten eingerichtet (Modell geprüft, Testansage erzeugt).'
+
+
+def kokoro_entfernen() -> str:
+    for d in (DATA / 'kokoro', KZF / 'kokoro', KZF / 'kokoro-thorsten'):
+        shutil.rmtree(d, ignore_errors=True)
+    return 'Kokoro entfernt. Erzeugte Ansagen bleiben erhalten.'
+
+
 def erzeugen(alle: bool) -> str:
     cmd = [str(HERE / 'kzf-bin' / 'kienzlefon-ansagen'), '--config', str(KZF / 'kienzlefon.toml')] + (['--all'] if alle else [])
     out = laufen(cmd, 3600, {**os.environ, 'KIENZLE_DATEN': str(DATA)})
@@ -99,7 +112,8 @@ def main() -> int:
     finally:
         AUFTRAG.unlink(missing_ok=True)
     aktion = str(auftrag.get('aktion') or '')
-    arbeit = {'piper-einrichten': piper_einrichten, 'piper-entfernen': piper_entfernen, 'erzeugen': lambda: erzeugen(auftrag.get('alle') is True)}.get(aktion)
+    arbeit = {'piper-einrichten': piper_einrichten, 'piper-entfernen': piper_entfernen, 'kokoro-einrichten': kokoro_einrichten,
+              'kokoro-entfernen': kokoro_entfernen, 'erzeugen': lambda: erzeugen(auftrag.get('alle') is True)}.get(aktion)
     if arbeit is None:
         melden(aktion[:30], 'fehler', 'Unbekannter Auftrag.')
         return 1

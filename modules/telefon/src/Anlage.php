@@ -22,7 +22,7 @@ final class Anlage {
             'telefon' => ['leitung_ein' => '', 'nummer_ein' => '', 'leitung_aus' => '', 'kennung_aus' => '', 'aus_zaehlt' => true, 'ausland' => false, 'sonderrufnummern' => false],
             'ueberlauf' => ['leitung' => '', 'nummer' => ''], 'kanaele' => ['gesamt' => 4, 'telefon' => 3, 'fax' => 3, 'ueberlauf' => 2],
             'warteschlange' => ['max_wartend' => 5], 'nebenstellen' => [], 'netz' => ['lokal' => '', 'erlaubt' => '', 'extern' => ''],
-            'kienzlefon' => ['aktiv' => false, 'tts' => 'piper']];
+            'kienzlefon' => ['aktiv' => false, 'tts' => 'piper', 'google' => ['schluessel' => '', 'stimme' => '', 'tempo' => '']]];
     }
 
     public static function laden(): array {
@@ -66,6 +66,7 @@ final class Anlage {
     public static function klartext(array $cfg, \KienzleModul $k): array {
         foreach ($cfg['leitungen'] ?? [] as $i => $l) $cfg['leitungen'][$i]['passwort'] = self::offen((string)($l['passwort'] ?? ''), $k, 'leitung');
         foreach ($cfg['nebenstellen'] ?? [] as $i => $n) $cfg['nebenstellen'][$i]['passwort'] = self::offen((string)($n['passwort'] ?? ''), $k, 'nebenstelle');
+        if (isset($cfg['kienzlefon']['google']['schluessel'])) $cfg['kienzlefon']['google']['schluessel'] = self::offen((string)$cfg['kienzlefon']['google']['schluessel'], $k, 'google');
         $name = preg_replace('/[^\p{L}\p{N} .&\/-]/u', '', $k->praxis()['name']) ?? '';
         $cfg['praxis'] = mb_substr(trim($name), 0, 60);
         return $cfg;
@@ -124,15 +125,20 @@ final class Anlage {
     public const SPRACHAUSGABE = ['piper' => 'Piper (lokal, Standard)', 'google' => 'Google (nur feste Praxistexte, Schlüssel nötig)', 'kokoro' => 'Kokoro-Thorsten (lokal, großer Download)'];
 
     /** Sprachmenü (Kienzlefon) ein/aus und Sprachausgabe der Ansagen. */
-    public static function sprachmenueSpeichern(array $cfg, array $p): array {
+    public static function sprachmenueSpeichern(array $cfg, array $p, \KienzleModul $k): array {
         $tts = (string)($p['tts'] ?? 'piper');
         if (!isset(self::SPRACHAUSGABE[$tts])) throw new \InvalidArgumentException('Bitte eine Sprachausgabe wählen.');
-        $cfg['kienzlefon'] = ['aktiv' => !empty($p['aktiv']), 'tts' => $tts];
+        $alt = (array)($cfg['kienzlefon']['google'] ?? []);
+        $schluessel = trim((string)($p['google_schluessel'] ?? ''));
+        $google = ['schluessel' => $schluessel !== '' ? $k->verschluesseln($schluessel, 'google') : (string)($alt['schluessel'] ?? ''),
+            'stimme' => trim((string)($p['google_stimme'] ?? '')) ?: (string)($alt['stimme'] ?? ''), 'tempo' => trim((string)($p['google_tempo'] ?? '')) ?: ($alt['tempo'] ?? '')];
+        if (!empty($p['google_entfernen'])) $google['schluessel'] = '';
+        $cfg['kienzlefon'] = ['aktiv' => !empty($p['aktiv']), 'tts' => $tts, 'google' => $google];
         return $cfg;
     }
 
     // ---- Ansagen und Piper (optional nachgeladen, lib/ansagen-auftrag über kienzle-telefon-ansagen.path) ------------
-    public const AUFTRAEGE = ['piper-einrichten', 'piper-entfernen', 'erzeugen'];
+    public const AUFTRAEGE = ['piper-einrichten', 'piper-entfernen', 'kokoro-einrichten', 'kokoro-entfernen', 'erzeugen'];
 
     /** Auftrag für den Ansagen-Dienst ablegen (einer zur Zeit). */
     public static function auftrag(string $aktion, bool $alle = false): void {
@@ -141,7 +147,8 @@ final class Anlage {
         if (!is_dir($dir)) mkdir($dir, 0700, true);
         $st = self::auftragStatus();
         if (is_file("$dir/auftrag.json") || ($st['stand'] ?? '') === 'laeuft' && (int)($st['zeit'] ?? 0) > time() - 3600) throw new \InvalidArgumentException('Ein Auftrag läuft noch. Bitte warten.');
-        if ($aktion === 'erzeugen' && !self::piperBereit() && (self::laden()['kienzlefon']['tts'] ?? 'piper') === 'piper') throw new \InvalidArgumentException('Erst Piper einrichten.');
+        if ($aktion === 'erzeugen' && !self::ttsBereit()) throw new \InvalidArgumentException(match (self::laden()['kienzlefon']['tts'] ?? 'piper') {
+            'google' => 'Erst den Google-Schlüssel eintragen und speichern.', 'kokoro' => 'Erst Kokoro einrichten.', default => 'Erst Piper einrichten.' });
         $tmp = "$dir/.auftrag." . bin2hex(random_bytes(4));
         file_put_contents($tmp, (string)json_encode(['aktion' => $aktion, 'alle' => $alle]));
         chmod($tmp, 0600);
@@ -156,6 +163,15 @@ final class Anlage {
     }
 
     public static function piperBereit(): bool { return is_file(self::$data . '/piper/bereit.json'); }
+
+    public static function kokoroBereit(): bool { return is_file(self::$data . '/kienzlefon/kokoro/kienzlefon-kokoro-tts-generate'); }
+
+    public static function googleBereit(): bool { return is_file(self::$data . '/kienzlefon/google-tts.conf'); }
+
+    /** Ist die gewählte Sprachausgabe einsatzbereit (Piper/Kokoro geladen, Google mit Schlüssel)? */
+    public static function ttsBereit(): bool {
+        return match (self::laden()['kienzlefon']['tts'] ?? 'piper') { 'google' => self::googleBereit(), 'kokoro' => self::kokoroBereit(), default => self::piperBereit() };
+    }
 
     public static function ansagenAnzahl(): int { return count(glob(self::$data . '/kienzlefon/ansagen/*.g722') ?: []); }
 

@@ -263,7 +263,22 @@ def check(cfg: dict) -> dict:
     tts = str(kz.get('tts') or 'piper')
     if tts not in TTS:
         raise Fehler('Sprachausgabe: Piper, Google oder Kokoro wählen.')
-    out['kienzlefon'] = {'aktiv': kz.get('aktiv') is True, 'tts': tts}
+    g = kz.get('google') if isinstance(kz.get('google'), dict) else {}
+    google = {'schluessel': _text(g.get('schluessel'), 'Google-Schlüssel', 200), 'stimme': _text(g.get('stimme'), 'Google-Stimme', 60) or 'de-DE-Chirp3-HD-Enceladus',
+              'tempo': g.get('tempo') if g.get('tempo') not in (None, '') else 0.93}
+    if google['schluessel'] and not re.fullmatch(r'[A-Za-z0-9_-]{20,200}', google['schluessel']):
+        raise Fehler('Google-Schlüssel: nur Buchstaben, Ziffern, - und _ (so wie in der Google Cloud Console angezeigt).')
+    if not re.fullmatch(r'[a-z]{2}-[A-Z]{2}-[A-Za-z0-9-]{1,50}', google['stimme']):
+        raise Fehler('Google-Stimme: z. B. de-DE-Chirp3-HD-Enceladus.')
+    try:
+        google['tempo'] = round(float(str(google['tempo']).replace(',', '.')), 2)
+    except ValueError:
+        raise Fehler('Google-Sprechtempo: Zahl zwischen 0,25 und 2.') from None
+    if not 0.25 <= google['tempo'] <= 2.0:
+        raise Fehler('Google-Sprechtempo: Zahl zwischen 0,25 und 2.')
+    if tts == 'google' and not google['schluessel']:
+        raise Fehler('Sprachausgabe Google: Bitte den Google-Schlüssel eintragen (Text-to-Speech API).')
+    out['kienzlefon'] = {'aktiv': kz.get('aktiv') is True, 'tts': tts, 'google': google}
     if out['kienzlefon']['aktiv'] and not tel.get('leitung_ein'):
         raise Fehler('Sprachmenü: zuerst die eingehende Telefonleitung unter „Rufnummern“ wählen.')
     if out['kienzlefon']['aktiv']:
@@ -807,7 +822,7 @@ def kienzlefon_toml(c: dict) -> str:
         ('pfade', 'spool', str(d / 'spool')), ('pfade', 'runtime', str(d / 'run')), ('pfade', 'ansagen', str(d / 'ansagen')),
         ('pfade', 'ansagen_master', str(d / 'ansagen-master')), ('whisper', 'modellverzeichnis', str(d / 'modelle')),
         ('telepraxis', 'ausgabeverzeichnis', str(d / 'vorgaenge')), ('telepraxis', 'public_key', str(d / 'telepraxis-public.pem')),
-        ('tts', 'engine', c['kienzlefon']['tts']), ('tts', 'kokoro_generator', str(KZF_BIN / 'kienzlefon-kokoro-tts-generate')),
+        ('tts', 'engine', c['kienzlefon']['tts']), ('tts', 'kokoro_generator', str(d / 'kokoro' / 'kienzlefon-kokoro-tts-generate')),
         ('tts', 'kokoro_modellverzeichnis', str(d / 'kokoro-thorsten')), ('tts', 'qwen_generator', str(KZF_BIN / 'kienzlefon-qwen3-tts-generate')),
         ('tts', 'google_generator', str(KZF_BIN / 'kienzlefon-google-tts-generate')), ('tts', 'google_konfig', str(d / 'google-tts.conf')),
         ('tts', 'stimmenverzeichnis', str(d / 'piper-voices')), ('tts', 'uploadverzeichnis', str(d / 'upload')),
@@ -842,6 +857,12 @@ def kienzlefon_anwenden(files: dict[str, str], c: dict) -> dict[str, str]:
     for sub in ('', 'spool', 'run', 'ansagen', 'ansagen-master', 'upload', 'vorgaenge', 'piper-voices'):
         (KZF_DATA / sub).mkdir(mode=0o700, parents=True, exist_ok=True)
     write(KZF_CONFIG, toml, 0o600)
+    # Google: Schlüssel nur in dieser Datei (0600) für den Generator von Kienzlefon; leer, solange keiner eingetragen ist.
+    g = c['kienzlefon']['google']
+    if g['schluessel']:
+        write(KZF_DATA / 'google-tts.conf', f'# Erzeugt vom Modul telefon.\nAPI_KEY={g["schluessel"]}\nVOICE={g["stimme"]}\nLANG=de-DE\nRATE={g["tempo"]}\n', 0o600)
+    else:
+        (KZF_DATA / 'google-tts.conf').unlink(missing_ok=True)
     try:
         config = load_config(KZF_CONFIG)
     except Exception as e:  # noqa: BLE001 - Kienzlefon meldet Konfigurationsfehler mit eigenen Ausnahmen

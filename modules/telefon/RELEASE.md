@@ -1,5 +1,13 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.6
+
+- **Google wahlweise zuschaltbar** (Einstellungen → Sprachmenü → „Google (wahlweise)“): API-Schlüssel (verschlüsselt gespeichert, nie wieder angezeigt, leer lassen = behalten, eigener Haken zum Löschen), Stimme und Sprechtempo. Für den Generator von Kienzlefon steht der Schlüssel nur in `kienzlefon/google-tts.conf` (0600), nicht in `kienzlefon.toml`. Es gehen nur die festen Ansagetexte an Google.
+- **Kokoro wahlweise nachladen** („Kokoro einrichten“/„Kokoro entfernen“): Der Installer aus Kienzlefon läuft unverändert (feste Modell-Prüfsummen, eigene Python-Laufzeit 3.12, Paketliste), aber mit Ziel im Datenordner und ohne root (`lib/kokoro-einrichten`). Groß (mehrere GB) und langsam; deshalb nur auf ausdrücklichen Knopfdruck.
+- „Ansagen erzeugen“ erscheint, sobald die gewählte Sprachausgabe bereit ist (Piper geladen, Kokoro geladen bzw. Google-Schlüssel gespeichert).
+- Neue Pakete für Kokoro: `espeak-ng`, `libsndfile1`, `libgomp1`, `git` (der Installer lädt zwei Pakete aus Git-Quellen).
+- Geprüft mit Tests (Prüfung der Google-Angaben, Generator-Datei 0600, Aufrufer des Kokoro-Installers mit Ersatz-Installer). **Nicht geprüft:** echter Abruf bei Google, echtes Laden von Kokoro, VM.
+
 ## 0.1.0-beta.5
 
 - **Piper wird optional nachgeladen** (Einstellungen → Sprachmenü → „Piper einrichten“), damit das Modul klein bleibt: eigene Python-Umgebung im Datenordner mit festen Versionen und Prüfsummen (`lib/piper/requirements-cp314.lock`, Piper 1.8.0 mit onnxruntime, für Python 3.14) und die Stimme „Thorsten“ (de_DE-thorsten-high) aus der festen Fassung v1.0.0 der Piper-Stimmen. Zusammen etwa 200 MB. „Piper entfernen“ löscht beides; erzeugte Ansagen bleiben.

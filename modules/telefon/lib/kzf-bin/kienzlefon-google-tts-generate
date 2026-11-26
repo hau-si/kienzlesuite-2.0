@@ -1,0 +1,4 @@
+#!/bin/sh
+# Startskript des Moduls telefon für den Google-Generator aus Kienzlefon 2.7 (scripts/google-tts); nur Python-Bordmittel.
+# Die Konfiguration (Schlüssel, Stimme, Tempo) übergibt Kienzlefon mit --config (<daten>/kienzlefon/google-tts.conf, 0600).
+exec /usr/bin/python3 -B "$(dirname "$0")/../../kienzlefon/scripts/google-tts/kienzlefon-google-tts-generate" "$@"

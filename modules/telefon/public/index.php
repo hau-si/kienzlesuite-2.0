@@ -53,8 +53,8 @@ try {
                 'zwecke-speichern' => Anlage::zweckeSpeichern($cfg, $_POST),
                 'kanaele-speichern' => Anlage::kanaeleSpeichern($cfg, $_POST),
                 'netz-speichern' => Anlage::netzSpeichern($cfg, $_POST),
-                'sprachmenue-speichern' => Anlage::sprachmenueSpeichern($cfg, $_POST),
-                'piper-einrichten', 'piper-entfernen', 'ansagen-erzeugen' => null,
+                'sprachmenue-speichern' => Anlage::sprachmenueSpeichern($cfg, $_POST, $k),
+                'piper-einrichten', 'piper-entfernen', 'kokoro-einrichten', 'kokoro-entfernen', 'ansagen-erzeugen' => null,
                 'nebenstellen-anlegen' => Anlage::nebenstellenAnlegen($cfg, (int)($_POST['anzahl'] ?? 0), $k),
                 'nebenstelle-speichern' => Anlage::nebenstelleSpeichern($cfg, $_POST),
                 'nebenstelle-loeschen' => Anlage::nebenstelleLoeschen($cfg, (string)($_POST['nummer'] ?? '')),
@@ -62,10 +62,11 @@ try {
                 'zugang-zeigen' => null,
                 default => throw new InvalidArgumentException('Unbekannte Aktion.'),
             };
-            if (in_array($aktion, ['piper-einrichten', 'piper-entfernen', 'ansagen-erzeugen'], true)) {
+            if (in_array($aktion, ['piper-einrichten', 'piper-entfernen', 'kokoro-einrichten', 'kokoro-entfernen', 'ansagen-erzeugen'], true)) {
                 Anlage::auftrag($aktion === 'ansagen-erzeugen' ? 'erzeugen' : $aktion, !empty($_POST['alle']));
                 $meldung = ['piper-einrichten' => 'Piper wird geladen (etwa 200 MB, einige Minuten). Der Stand steht unter „Sprachmenü“.',
-                    'piper-entfernen' => 'Piper wird entfernt.', 'ansagen-erzeugen' => 'Ansagen werden erzeugt. Der Stand steht unter „Sprachmenü“.'][$aktion];
+                    'piper-entfernen' => 'Piper wird entfernt.', 'kokoro-einrichten' => 'Kokoro wird geladen (mehrere GB, kann lange dauern). Der Stand steht unter „Sprachmenü“.',
+                    'kokoro-entfernen' => 'Kokoro wird entfernt.', 'ansagen-erzeugen' => 'Ansagen werden erzeugt. Der Stand steht unter „Sprachmenü“.'][$aktion];
             } elseif ($aktion === 'zugang-zeigen') {
                 // Heikle Anzeige: Passwort eines Telefons nur nach frischer Bestätigung (Passwort+OTP oder Passkey).
                 if (!$k->frischBestaetigt(900)) { header('Location: ' . $k->bestaetigenAdresse($base . '/einstellungen#telefone'), true, 303); exit; }

@@ -1,0 +1,29 @@
+#!/usr/bin/python3 -B
+"""Kokoro-Thorsten optional nachladen (Auftrag „kokoro-einrichten“, als ks-telefon).
+
+Ruft scripts/kokoro/install.py aus Kienzlefon 2.7 unverändert auf (feste Modell-Prüfsummen, eigene Python-Laufzeit 3.12,
+Paketliste requirements-cpu.lock.txt). Abweichend vom Original-Installer liegt alles im Datenordner des Moduls statt unter
+/opt/kienzlefon/kokoro, und er läuft ohne root: Seine root-Prüfung schützt dort nur /opt, das hier nicht berührt wird.
+Der fertige Generator landet unter [tts] kokoro_generator (<daten>/kienzlefon/kokoro/…), das Modell unter kokoro_modellverzeichnis.
+"""
+import importlib.util
+import os
+import sys
+from pathlib import Path
+
+DATA = Path(os.environ.get('KIENZLE_DATEN', '/var/lib/kienzle/telefon'))
+INSTALLER = Path(os.environ.get('KIENZLE_KOKORO_INSTALLER', Path(__file__).resolve().parents[1] / 'kienzlefon' / 'scripts' / 'kokoro' / 'install.py'))
+
+
+def main() -> int:
+    spec = importlib.util.spec_from_file_location('kienzlefon_kokoro_install', INSTALLER)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    mod.INSTALL_ROOT = DATA / 'kokoro'
+    os.geteuid = lambda: 0  # noqa: E731 – nur in diesem Prozess; der Installer schreibt hier nur in den Datenordner
+    mod.install(DATA / 'kienzlefon' / 'kienzlefon.toml')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
