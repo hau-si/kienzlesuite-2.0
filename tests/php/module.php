@@ -101,9 +101,24 @@ function test_seite_menue_und_rechte(): void {
     check($u->get('/verwaltung/module')->status === 403, 'Mitarbeiter sieht Module');
 }
 
+function test_abhaengigkeit_fax_braucht_telefon(): void {
+    [$env, $m] = mod_env(['installed' => [['id' => 'telefon', 'name' => 'Telefon', 'version' => '0.1.0', 'path' => '/telefon']],
+        'available' => [['id' => 'fax', 'name' => 'Fax', 'version' => '0.1.0', 'path' => '/fax', 'requires' => ['telefon']]]]);
+    $page = module_browser($env, $m)->get('/verwaltung/module')->body;
+    check(!str_contains($page, 'Braucht zuerst') && str_contains($page, ' Installieren</button>'), 'Fax ist installierbar, wenn Telefon da ist');
+    [$env, $m] = mod_env(['installed' => [], 'available' => [['id' => 'fax', 'name' => 'Fax', 'version' => '0.1.0', 'path' => '/fax', 'requires' => ['telefon', '../x']],
+        ['id' => 'telefon', 'name' => 'Telefon', 'version' => '0.1.0', 'path' => '/telefon']]]);
+    $page = module_browser($env, $m)->get('/verwaltung/module')->body;
+    check(str_contains($page, 'Braucht zuerst: <strong>Telefon</strong>') && str_contains($page, '<button disabled title="Erst Telefon installieren">'), 'Fax ohne Telefon: Hinweis und ausgegraute Schaltfläche');
+    [$env, $m] = mod_env(['installed' => [['id' => 'telefon', 'name' => 'Telefon', 'version' => '0.1.0', 'path' => '/telefon'],
+        ['id' => 'fax', 'name' => 'Fax', 'version' => '0.1.0', 'path' => '/fax', 'requires' => ['telefon']]], 'available' => []]);
+    $page = module_browser($env, $m)->get('/verwaltung/module')->body;
+    check(str_contains($page, 'Wird noch gebraucht von: Fax') && str_contains($page, '<button class="danger" disabled>'), 'Telefon nicht entfernbar, solange Fax installiert ist');
+}
+
 function test_modulsymbole_vorhanden(): void {
     $fallback = Kienzle\Core\View::icon('modul:gibt-es-nicht', 'app');
-    foreach (['kasse', 'terminzettel', 'signatur'] as $id) check(Kienzle\Core\View::icon('modul:' . $id, 'app') !== $fallback, 'Symbol für Modul fehlt: ' . $id);
+    foreach (['kasse', 'terminzettel', 'signatur', 'fax', 'telefon'] as $id) check(Kienzle\Core\View::icon('modul:' . $id, 'app') !== $fallback, 'Symbol für Modul fehlt: ' . $id);
 }
 
 function test_starter_weiterleitung_im_seitenkopf(): void {

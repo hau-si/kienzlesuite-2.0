@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.2
+
+- **Abhängigkeiten zwischen Modulen** (`[module] requires` in `module.toml`, ab `core_api = "2"`): Ein Modul lässt sich erst installieren, wenn die genannten Module da sind; unter Verwaltung → Module steht dann „Braucht zuerst: …“ und „Installieren“ ist ausgegraut. Ein Modul, das noch gebraucht wird, lässt sich nicht entfernen („Wird noch gebraucht von: …“). Erster Fall: Fax braucht Telefon.
+- **Symbole** für die Module Fax (Faxgerät mit Hörer) und Telefon (Hörer) in der Seitenleiste und unter Module.
+- Nicht auf der VM geprüft.
+
 ## 0.22.0-beta.1
 
 - **Schnittstelle für Module, Version 2 (`core_api = "2"`)**, für die neuen Module Fax und Telefon (`docs/PLAN-FAX-TELEFON.md`). Version 1 bleibt gültig; die bisherigen Module ändern sich nicht.

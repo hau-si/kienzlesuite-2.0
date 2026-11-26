@@ -227,6 +227,18 @@ class Austausch(Fehler):
         self.invalid(replace('user = "ks-beispiel"', 'user = "ks-beispiel"\ndisables = ["asterisk.service"]'), 'module.core_api', 'core_api = "2"')
 
 
+class Abhaengigkeit(Fehler):
+    API2 = replace('core_api = "1"', 'core_api = "2"')
+
+    def test_requires(self):
+        text = replace('core_api = "2"', 'core_api = "2"\nrequires = ["telefon"]', self.API2)
+        self.assertEqual(manifest.check_text(text)['module']['requires'], ['telefon'])
+        self.assertEqual(manifest.check_text(BEISPIEL)['module']['requires'], [])
+        self.invalid(text.replace('"telefon"', '"beispiel"'), 'module.requires', 'andere Modul-ID')
+        self.invalid(text.replace('"telefon"', '"../x"'), 'module.requires', 'andere Modul-ID')
+        self.invalid(replace('core_api = "1"', 'core_api = "1"\nrequires = ["telefon"]'), 'module.requires', 'core_api = "2"')
+
+
 class Web(Fehler):
     def test_pfad(self):
         for bad in ('/Beispiel', 'beispiel', '/beispiel/', '/a/b', '/', '/-x', '/' + 'a' * 32):

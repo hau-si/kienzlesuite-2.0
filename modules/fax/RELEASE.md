@@ -1,5 +1,11 @@
 # Release-Notizen Fax
 
+## 0.1.0-beta.2
+
+- **Braucht das Modul Telefon** (`requires`): Unter Verwaltung → Module lässt sich Fax erst nach Telefon installieren; die Beschreibung nennt die Abhängigkeit. Eine Praxis nur mit Fax richtet in Telefon nur die Faxleitung ein.
+- Eigenes Symbol (Faxgerät mit Hörer).
+- Nicht auf der VM geprüft.
+
 ## 0.1.0-beta.1
 
 - **Neues Modul „Fax“** auf Grundlage von Kienzlefax 3.5.0 (`kienzlefax.php`, Dr. Thomas Kienzle, MIT-Lizenz). Senden und Empfangen über die Telefonanlage des Moduls Telefon (gemeinsamer Austauschordner der Basis).

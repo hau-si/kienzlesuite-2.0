@@ -62,7 +62,7 @@ LIMITS = {'exchange': 5, 'starters': 5, 'packages': 50, 'services': 20, 'firewal
           'connections': len(CONNECTIONS)}
 
 SCHEMA_SECTIONS = {
-    'module': {'id', 'name', 'version', 'core_api', 'description'},
+    'module': {'id', 'name', 'version', 'core_api', 'description', 'requires'},
     'system': {'packages', 'services', 'user', 'data', 'disables'},
     'web': {'path', 'upstream', 'protocol', 'entry', 'starter', 'einstellungen', 'uploads'},   # starter: alter Schlüssel, wird nur noch angenommen und ignoriert
     'firewall': {'name', 'port', 'proto', 'scope'},
@@ -227,6 +227,14 @@ class _Checker:
                                           f'(unterstützt: {", ".join(sorted(supported_api()))}).')
         out['core_api'] = api
         out['description'] = self.text(t, 'description', 'module', required=False, limit=300)
+        # Module, die vorher installiert sein müssen (z. B. Fax braucht Telefon); erst ab core_api 2.
+        requires = self.string_list(t, 'requires', 'module', 5)
+        for r in requires:
+            if not ID.match(r) or r == mid:
+                self.error('module.requires', f'„{shown(r)}“ ist keine andere Modul-ID.')
+        if requires and api == '1':
+            self.error('module.requires', 'gibt es erst mit core_api = "2".')
+        out['requires'] = [r for r in requires if ID.match(r) and r != mid]
         return out
 
     def system(self, t: dict, mid: str | None) -> dict:

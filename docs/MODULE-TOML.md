@@ -43,6 +43,7 @@ mit dem Archiv `modules/<id>/…` (`scripts/release-bauen <id>`). Das Programm l
 | `version` | ja | `X.Y.Z`, optional mit Vorabkennung: `2.1.0-beta.3` |
 | `core_api` | ja | Text, z. B. `"1"`; muss in `core/API` stehen |
 | `description` | nein | kurze Beschreibung (höchstens 300 Zeichen) |
+| `requires` | nein | nur `core_api = "2"`: Module, die vorher installiert sein müssen (IDs, höchstens 5), z. B. `["telefon"]`. Installieren geht erst danach, Entfernen der gebrauchten Module erst ohne dieses Modul |
 
 ### `[system]` – Pflicht
 

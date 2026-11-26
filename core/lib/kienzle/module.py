@@ -176,7 +176,7 @@ def bundled() -> dict[str, dict]:
 
 def _summary(m: dict) -> dict:
     return {'id': m['module']['id'], 'name': m['module']['name'], 'version': m['module']['version'], 'description': m['module'].get('description') or '',
-            'path': (m.get('web') or {}).get('path'), 'core_api': m['module']['core_api']}
+            'path': (m.get('web') or {}).get('path'), 'core_api': m['module']['core_api'], 'requires': m['module'].get('requires', [])}
 
 
 def check() -> dict:
@@ -201,7 +201,7 @@ def check() -> dict:
                     continue
             except release.Fehler:
                 continue
-            base = known or {'id': mid, 'name': (have.get(mid) or {}).get('module', {}).get('name', mid), 'description': '', 'path': None, 'core_api': None}
+            base = known or {'id': mid, 'name': (have.get(mid) or {}).get('module', {}).get('name', mid), 'description': '', 'path': None, 'core_api': None, 'requires': []}
             offer[mid] = {**base, 'version': r['version'], 'source': 'github', 'signed': signed}
     except (update.Fehler, OSError, ValueError, KeyError, TypeError) as e:
         error = str(e)[:200]
@@ -663,6 +663,9 @@ def install(mid: str, version: str | None = None) -> str:
     set_status(running={'action': 'aktualisieren' if have else 'installieren', 'id': mid, 'step': 'laden', 'since': int(time.time())})
     folder, origin = fetch(mid, version, current, work)
     m = validate(folder, mid)
+    missing = [r for r in m['module'].get('requires', []) if r not in installed()]
+    if missing:
+        raise Fehler(f'{m["module"]["name"]} braucht zuerst das Modul „{", ".join(missing)}“. Bitte dieses vorher installieren.')
     new = m['module']['version']
     if current is not None and not release.newer(new, current):
         raise Fehler(f'{mid} {new} ist nicht neuer als die installierte Version {current}.')
@@ -745,6 +748,9 @@ def remove(mid: str, delete_data: bool) -> str:
         raise Fehler('Modul ist nicht installiert.')
     if busy(m):
         raise Fehler(f'{m["module"]["name"]} ist gerade beschäftigt. Bitte später erneut versuchen.')
+    users = [o['module']['name'] for oid, o in installed().items() if oid != mid and mid in o['module'].get('requires', [])]
+    if users:
+        raise Fehler(f'{m["module"]["name"]} wird noch gebraucht von: {", ".join(users)}. Bitte zuerst dieses Modul entfernen.')
     set_status(running={'action': 'entfernen', 'id': mid, 'step': 'entfernen', 'since': int(time.time())})
     _remove(mid, m, delete_data)
     log(f'{mid}: entfernt' + (' samt Daten.' if delete_data else '; Daten bleiben unter /var/lib/kienzle/' + mid + '.'))

@@ -1543,8 +1543,14 @@ final class Web {
         $post = fn(string $aktion, string $label, string $hidden = '', string $class = '', string $extra = '') => '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . $hidden
             . '<input type="hidden" name="aktion" value="' . $aktion . '">' . $extra . '<button' . ($class !== '' ? ' class="' . $class . '"' : '') . $off . '>' . $label . '</button></form>';
         $tiles = '';
+        // Abhängigkeiten (module.toml: requires): Namen der Module, installierte IDs, wer welches Modul braucht.
+        $namen = [];
+        foreach ([...$st['installed'], ...$st['available']] as $x) $namen[(string)$x['id']] = (string)$x['name'];
+        $da = array_map(fn($x) => (string)$x['id'], $st['installed']);
+        $nameVon = fn(array $ids) => implode(', ', array_map(fn($i) => $namen[$i] ?? $i, $ids));
         foreach ($st['installed'] as $m) {
             $hidden = '<input type="hidden" name="id" value="' . V::h($m['id']) . '">';
+            $nutzer = array_values(array_map(fn($x) => (string)$x['id'], array_filter($st['installed'], fn($x) => in_array($m['id'], (array)($x['requires'] ?? []), true))));
             $state = '';
             $stopped = false;
             if ($m['dienste']) {
@@ -1565,7 +1571,8 @@ final class Web {
                 . '<small><strong>' . V::h($m['name']) . ' entfernen.</strong> Ohne Häkchen bleiben die Daten erhalten; eine spätere Installation übernimmt sie.</small>'
                 . '<label class="check"><input type="checkbox" name="daten" value="1"> Auch alle Daten löschen (nicht rückgängig zu machen)</label>'
                 . '<label class="muted">Zur Bestätigung den Namen „' . V::h($m['name']) . '“ eintippen<input name="bestaetigung" autocomplete="off" required maxlength="80" placeholder="' . V::h($m['name']) . '"></label>'
-                . '<button class="danger"' . $off . '>' . V::icon('st:papierkorb') . ' Modul entfernen</button></form></details></div></details>';
+                . ($nutzer ? '<small class="error">Wird noch gebraucht von: ' . V::h($nameVon($nutzer)) . '. Erst dieses Modul entfernen.</small>' : '')
+                . '<button class="danger"' . ($nutzer ? ' disabled' : $off) . '>' . V::icon('st:papierkorb') . ' Modul entfernen</button></form></details></div></details>';
             $formUpd = fn(string $aktion, string $label, string $class, string $icon, string $title = '') => '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="' . $aktion . '">'
                 . '<button class="' . $class . '" title="' . V::h($title ?: strip_tags($label)) . '"' . $off . '>' . V::icon($icon) . ($label !== '' ? ' ' . $label : '') . '</button></form>';
             // Ein rundes Pfeil-Symbol für beides: Update einspielen (wenn eins da ist) oder nach einem Update suchen.
@@ -1582,12 +1589,14 @@ final class Web {
                 . '<div class="mod-foot">' . $more . '</div></div>';
         }
         foreach ($st['available'] as $m) {
+            $fehlt = array_values(array_filter((array)($m['requires'] ?? []), fn($r) => !in_array($r, $da, true)));
             $tiles .= '<div class="mod-tile available"><div class="mod-head"><span class="t-ico">' . V::icon('modul:' . $m['id']) . '</span><span class="tag">verfügbar</span></div>'
                 . '<p class="mod-name">' . V::h($m['name']) . '</p><p class="muted mod-sub">Version ' . V::h($m['version']) . ($m['signed'] === false ? ' <span class="tag warn">nicht signiert</span>' : '') . '</p>'
                 . ($m['description'] !== '' ? '<p class="muted mod-desc">' . V::h($m['description']) . '</p>' : '')
                 . '<p class="muted mod-desc">' . ($m['source'] === 'github' ? 'Von GitHub' : 'Mit der Basis geliefert') . ($m['path'] ? ' · Adresse ' . V::h($m['path']) : '') . '</p>'
                 . '<div class="mod-foot"><form method="post" action="/verwaltung/module">' . $csrf . '<input type="hidden" name="aktion" value="installieren"><input type="hidden" name="id" value="' . V::h($m['id']) . '">'
-                . '<button' . $off . '>' . V::icon('st:herunter') . ' Installieren</button></form></div></div>';
+                . ($fehlt ? '<p class="muted mod-desc">Braucht zuerst: <strong>' . V::h($nameVon($fehlt)) . '</strong></p>' : '')
+                . '<button' . ($fehlt ? ' disabled title="Erst ' . V::h($nameVon($fehlt)) . ' installieren"' : $off) . '>' . V::icon('st:herunter') . ' Installieren</button></form></div></div>';
         }
         // Erklärung zum blauen Punkt: offene Einrichtungspunkte, die hier (oder bei einem Modul) zu erledigen sind.
         $hinweise = '';

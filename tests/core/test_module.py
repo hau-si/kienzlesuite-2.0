@@ -227,6 +227,22 @@ class Modulverwaltung(unittest.TestCase):
             self.assertIn(('unmask', 'asterisk.service'), calls)
             self.assertNotIn(('start', 'asterisk.service'), calls)
 
+    def test_abhaengigkeit_beim_installieren_und_entfernen(self):
+        self.zweites_modul('test-fax', '')
+        d = self.t / 'mitgeliefert' / 'test-fax'
+        (d / 'module.toml').write_text((d / 'module.toml').read_text().replace('core_api = "2"\n', 'core_api = "2"\nrequires = ["test-tel"]\n'))
+        self.zweites_modul('test-tel', '')
+        with self.assertRaises(self.mo.Fehler) as e:
+            self.mo.dispatch({'action': 'installieren', 'id': 'test-fax'})
+        self.assertIn('braucht zuerst', str(e.exception))
+        self.mo.dispatch({'action': 'installieren', 'id': 'test-tel'})
+        self.mo.dispatch({'action': 'installieren', 'id': 'test-fax'})
+        with self.assertRaises(self.mo.Fehler) as e:
+            self.mo.dispatch({'action': 'entfernen', 'id': 'test-tel'})
+        self.assertIn('noch gebraucht von', str(e.exception))
+        self.mo.dispatch({'action': 'entfernen', 'id': 'test-fax'})
+        self.mo.dispatch({'action': 'entfernen', 'id': 'test-tel'})
+
     def test_release_von_github(self):
         """Neuere Version als Release „test-kasse-v1.1.0“ (Ordner-Quelle statt GitHub), unsigniert zugelassen (Vorgabe)."""
         self.mo.dispatch({'action': 'installieren', 'id': 'test-kasse'})
