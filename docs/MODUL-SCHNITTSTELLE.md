@@ -58,6 +58,21 @@ Der Starter öffnet nach dem Aufruf `https://<server>/#launch=<64 Hexzeichen>&m=
 Die Basis gibt diesen Teil nach der Anmeldung an `<web.path>/#launch=…` weiter (core.js, über `sessionStorage` im selben Tab,
 falls erst angemeldet werden muss). Der Code verlässt den Browser dabei nicht.
 
+## Arbeitsplatz und „Akte öffnen“ (Kienzle-Agent)
+
+Die Basis weiß, an welchem PC der Browser sitzt, wenn dort der Kienzle-Agent läuft (gleiche Adresse oder unter Mein Konto gewählt).
+PHP: `$k->arbeitsplatz()` liefert `['id', 'name', 'online']` oder `null`.
+
+Den Patienten in T2med öffnen (GDT-Satz 6301 an den Agent des PCs): aus der Modulseite per JavaScript
+
+```js
+fetch('/arbeitsplatz/akte', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', Accept: 'application/json'},
+  body: JSON.stringify({modul: 'telefon', csrf: '<CSRF-Marke des Moduls>', patientennummer: '4711'})})
+// 200 {ok, auftrag, platz} · 409 {error, waehlen?} (PC nicht erkannt oder Agent nicht verbunden) · 403 (Sitzung/CSRF)
+```
+
+Stand: `GET /arbeitsplatz/stand?id=<auftrag>` → `offen`, `abgeholt`, `ok: geschrieben`, `fehler: …`, `verfallen`.
+
 ## Gesundheitsprüfung
 
 Die Basis antwortet auf `GET https://<server>/_health` (nur von localhost) mit `{"status":"ok","version":"…"}`.

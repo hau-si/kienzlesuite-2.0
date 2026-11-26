@@ -1,5 +1,17 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.10
+
+- **Kienzle-Agent (Windows):** Das Paket der Seite „Arbeitsplätze“ richtet jetzt ein Programm für alles ein: Starter für T2med **und** Dienst mit Systemrechten (geplante Aufgabe „Kienzle-Agent“ beim Start des PCs, startet nach Ende oder Aktualisierung neu). Programm in `C:\Program Files\Kienzle`, Einstellungen in `C:\ProgramData\Kienzle` (Benutzer dürfen nur lesen; der eigene Zugang `agent.json` nur System und Administratoren).
+- Der Agent meldet sich einmal mit dem Starter-Schlüssel an und bekommt einen **eigenen Zugang je PC** (in der Suite nur als SHA-256). Danach fragt er etwa alle 2 Sekunden `/agent/abholen` und hält den PC selbst aktuell: **Starterprogramm** (lädt neue Fassungen aus der Suite, prüft die Prüfsumme, tauscht sich aus), **Aufrufe aus T2med** (für alle Benutzer, HKLM), `client.json` samt Starter-Schlüssel, **Zertifizierungsstelle** (vertrauenswürdig für den ganzen PC) und **virtuelle Drucker** (wie `install-drucker.ps1`, ohne Rückfragen). Ein Paket ist danach nur noch zur Reparatur nötig.
+- **„Akte öffnen“ in T2med** als Dienst der Basis für alle Module: Die Modulseite schickt `POST /arbeitsplatz/akte {modul, csrf, patientennummer}` (CSRF-Marke des Moduls); die Basis baut den GDT-Satz 6301 (wie kienzlefon-t2med) und gibt ihn an den Agent des PCs, der ihn als `C:\Kienzle\GDT\AUFRUFi.gdt` ablegt. Aufrufe verfallen nach 60 Sekunden. Die Patientennummer kommt nicht ins Protokoll.
+- **Welcher PC?** Der Agent, der gerade von derselben Adresse wie der Browser fragt; ist das nicht eindeutig (Terminalserver), einmal unter Mein Konto → „Mein Arbeitsplatz“ wählen (Cookie). Module sehen den Arbeitsplatz als `KIENZLE_ARBEITSPLATZ` (`$k->arbeitsplatz()`).
+- Seite „Arbeitsplätze“: Liste der eingerichteten PCs (verbunden/zuletzt, Adresse, Version, Rückmeldung zu Druckern und Aktualisierung), umbenennen, entfernen (der Agent verliert den Zugang).
+- Der Starter prüft das Serverzertifikat jetzt auch über die **Zertifizierungsstelle der Suite** (`ca.crt` im Paket), nicht nur über den Fingerabdruck des einzelnen Zertifikats: Nach neuem Servernamen oder Zertifikat bleibt die Verbindung bestehen.
+- Datenbank Version 5 (Tabellen `arbeitsplaetze`, `arbeitsplatz_auftraege`).
+- Sicherheit: Der Agent führt nur feste Aufgaben aus (Datei mit fester Endung in den festen GDT-Ordner, Drucker mit geprüften Namen und Adressen auf dem Server, Programm nur mit passender Prüfsumme); keine Befehle aus der Suite. Fehlversuche an `/agent/…` werden gebremst.
+- Geprüft mit Tests (PHP: Anmelden, Abholen, Sollzustand, GDT, Zuordnung, Seiten; Go: Anmelden, Angleichen, GDT, Selbstaktualisierung, Zertifizierungsstelle; Windows-Teile nur übersetzt und mit `go vet` geprüft). **Nicht geprüft:** auf einem echten Windows-PC (geplante Aufgabe, Registrierung, Zertifikat, Drucker, Austausch des laufenden Programms), mit T2med und auf der VM. macOS und Linux bekommen vorerst nur den Starter ohne Dienst.
+
 ## 0.22.0-beta.9
 
 - **Fehler behoben, Lauschordner auf dem NAS:** Der Ablage-Dienst legte die geholten Dateien mit Rechten 0660 (Gruppe ks-ablage) ab; das Modul ist Besitzer des Ordners, aber nicht in dieser Gruppe, und konnte sie nicht lesen („Permission denied“). Jetzt 0664 (der Ordner mit 2770 schließt andere Benutzer weiterhin aus); schon liegende Dateien werden beim nächsten Lauf (alle 5 Minuten) lesbar gemacht. Test ergänzt.

@@ -58,7 +58,7 @@ if command -v node >/dev/null; then
 fi
 
 step 'PHP: Basis (tests/php)'
-for t in tests/php/core.php tests/php/passkeys.php tests/php/web.php tests/php/cli.php tests/php/firewall.php tests/php/updates.php tests/php/verbindungen.php tests/php/sicherung.php tests/php/einrichtung.php tests/php/drucker.php tests/php/oidc.php tests/php/server.php tests/php/uhrzeit.php tests/php/module.php tests/php/startseite.php tests/php/konto_mail.php tests/php/starter.php; do echo "-- $t"; php "$t"; done
+for t in tests/php/core.php tests/php/passkeys.php tests/php/web.php tests/php/cli.php tests/php/firewall.php tests/php/updates.php tests/php/verbindungen.php tests/php/sicherung.php tests/php/einrichtung.php tests/php/drucker.php tests/php/oidc.php tests/php/server.php tests/php/uhrzeit.php tests/php/module.php tests/php/startseite.php tests/php/konto_mail.php tests/php/starter.php tests/php/arbeitsplaetze.php; do echo "-- $t"; php "$t"; done
 
 step 'Modul Kasse (modules/kasse/tests)'
 for t in critical reader-cancel invoice t2med-invoice letterxpress letterdrucker auto-print settings tax goae-t2med cash transfer print-format mail-mime suite fhir-error startseite review discard goae-verzeichnis; do
