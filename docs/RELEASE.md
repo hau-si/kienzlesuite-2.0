@@ -1,10 +1,16 @@
 # Basis – Release-Notizen
 
-## 0.22.0-beta.2
+## 0.22.0-beta.3
 
 - **Abhängigkeiten zwischen Modulen** (`[module] requires` in `module.toml`, ab `core_api = "2"`): Ein Modul lässt sich erst installieren, wenn die genannten Module da sind; unter Verwaltung → Module steht dann „Braucht zuerst: …“ und „Installieren“ ist ausgegraut. Ein Modul, das noch gebraucht wird, lässt sich nicht entfernen („Wird noch gebraucht von: …“). Erster Fall: Fax braucht Telefon.
 - **Symbole** für die Module Fax (Faxgerät mit Hörer) und Telefon (Hörer) in der Seitenleiste und unter Module.
 - Nicht auf der VM geprüft.
+
+## 0.22.0-beta.2
+
+- **Passwortregeln einstellbar** (Verwaltung → Sicherheit → „Passwörter“): Mindestlänge (6–64), Zahl der Zeichenarten (1–4), Mindeststärke (0–4), Sperre häufiger Muster und Sperre des Anmeldenamens im Passwort. Standard wie bisher (10 Zeichen, Muster- und Namensprüfung); die Regeln gelten für neue und geänderte Passwörter, bestehende bleiben gültig.
+- **Warnung bei zu lockeren Regeln** (rot: Länge unter 8 oder Mustersperre aus; gelb: Länge unter 10, Namensprüfung aus oder weder Stärke noch Zeichenarten bei unter 12 Zeichen). Der Abschnitt öffnet sich dann von selbst und trägt das Schild „Warnung“.
+- **Stärkebalken** beim Festlegen und Ändern eines Passworts (Einrichtungslink, erster Admin, Konto → Passwort ändern): zeigt Stärke von „sehr schwach“ bis „sehr gut“ und was noch fehlt. Die Rechnung steht in `Passwords::score` und `passwort.js` (gleiche Ergebnisse). Nicht auf der VM geprüft.
 
 ## 0.22.0-beta.1
 

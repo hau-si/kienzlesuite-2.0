@@ -3,7 +3,7 @@ declare(strict_types=1);
 // Bausteine der Basis: TOTP (RFC 6238), Verschlüsselung, Passwörter, Konten, Einrichtungslinks, Konfiguration, Modulverzeichnis.
 require __DIR__ . '/lib.php';
 
-use Kienzle\Core\{Config, Modules, Passwords, Secrets, Totp, Users};
+use Kienzle\Core\{Config, Modules, PasswordPolicy, Passwords, Secrets, Totp, Users};
 
 function test_totp_rfc6238_testwerte(): void {
     // RFC 6238, Anhang B (8 Stellen; die Suite nutzt 6 Stellen mit demselben Verfahren).
@@ -63,6 +63,34 @@ function test_passwortregeln(): void {
     problem(fn() => Passwords::check('anna-Garten-Haus', 'anna'), 422, 'Passwort mit Anmeldenamen angenommen');
     Passwords::check('Wiesen-Blume-Fahrrad-7', 'anna');
     check(str_starts_with(Passwords::hash('x'), '$argon2id$'), 'kein Argon2id');
+}
+
+function test_passwortrichtlinie(): void {
+    $env = new Env();
+    check(PasswordPolicy::load($env->db) === PasswordPolicy::DEFAULTS, 'Standardregeln');
+    // Stärke: schwache Muster niedrig, lange Wortfolgen hoch
+    check(Passwords::score('abc') === 0 && Passwords::score('aaaaaaaaaaaa') === 0 && Passwords::score('passwort123') === 0 && Passwords::score('abcdefghijkl') === 0, 'Muster nicht als schwach erkannt');
+    check(Passwords::score('Wiesen-Blume-Fahrrad-7') === 4 && Passwords::score('anna-Garten-Haus', 'anna') === 0, 'Stärke gut/Anmeldename');
+    check(Passwords::classes('abc') === 1 && Passwords::classes('Abc1') === 3 && Passwords::classes('Abc1!') === 4 && Passwords::classes('ÄÖÜ') === 1, 'Zeichenarten');
+    // Regeln greifen
+    $streng = PasswordPolicy::normalize(['min' => 14, 'klassen' => 3, 'staerke' => 3, 'schwach' => true, 'login' => true]);
+    problem(fn() => Passwords::check('Wiesen-Blume', '', $streng), 422, 'zu kurz nach Richtlinie angenommen');
+    problem(fn() => Passwords::check('wiesenblumefahrrad', '', $streng), 422, 'zu wenige Zeichenarten angenommen');
+    Passwords::check('Wiesen-Blume-Fahrrad-7', '', $streng);
+    $lax = PasswordPolicy::normalize(['min' => 6, 'klassen' => 1, 'staerke' => 0]);
+    Passwords::check('aaaabc', '', $lax);   // schwach-Sperre aus, Login aus
+    problem(fn() => PasswordPolicy::save($env->db, ['min' => 3]), 422, 'Länge 3 angenommen');
+    problem(fn() => PasswordPolicy::save($env->db, ['min' => 10, 'klassen' => 9]), 422, 'Zeichenarten 9 angenommen');
+    PasswordPolicy::save($env->db, ['min' => 14, 'klassen' => 2, 'staerke' => 2, 'schwach' => '1', 'login' => '1']);
+    check(PasswordPolicy::load($env->db)['min'] === 14, 'Regeln nicht gespeichert');
+    $id = $env->users->create('berta', '', true);
+    problem(fn() => $env->users->setPassword($id, 'Kurz-7-Pw'), 422, 'Benutzer: Regel nicht angewendet');
+    $env->users->setPassword($id, 'Wiesen-Blume-Fahrrad-7');
+    // Warnungen
+    check(PasswordPolicy::warnings(PasswordPolicy::DEFAULTS) !== [] && PasswordPolicy::warnings(PasswordPolicy::DEFAULTS)[0]['stufe'] === 'gelb', 'Standard: Hinweis auf kurze Länge und fehlende Stärke erwartet');
+    $arten = array_column(PasswordPolicy::warnings(['min' => 6, 'klassen' => 1, 'staerke' => 0, 'schwach' => false, 'login' => false]), 'stufe');
+    check(in_array('rot', $arten, true) && in_array('gelb', $arten, true), 'zu lockere Regeln ohne rote und gelbe Warnung');
+    check(PasswordPolicy::warnings(['min' => 14, 'klassen' => 2, 'staerke' => 2, 'schwach' => true, 'login' => true]) === [], 'strenge Regeln warnen');
 }
 
 function test_anmeldenamen(): void {

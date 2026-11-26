@@ -5,7 +5,7 @@ require __DIR__ . '/lib.php';
 require __DIR__ . '/browser.php';
 require_once dirname(__DIR__, 2) . '/core/php/modul/Kienzle.php';
 
-use Kienzle\Core\{Auth, Connections, Totp};
+use Kienzle\Core\{Auth, Connections, PasswordPolicy, Totp};
 
 function test_ersteinrichtung_mit_link_und_otp(): void {
     $env = new Env();
@@ -225,6 +225,13 @@ function test_verwaltung_braucht_bestaetigung_und_csrf(): void {
     check(str_contains($b->get('/konto')->body, 'Authenticator-App</h2><span class="tag ok fold-status">eingerichtet</span>'), 'Konto: Statusschild der Authenticator-App fehlt');
     $page = $b->get('/verwaltung/sicherheit')->body;
     check(str_contains($page, 'Firewall <span class="tag') && str_contains($page, 'Zugang (Abmeldezeiten)') && str_contains($page, 'Protokoll</h2>') && str_contains($page, 'name="idle_einheit"'), 'Sicherheit unvollständig');
+    check(str_contains($page, 'id="passwoerter"') && str_contains($page, 'name="staerke"') && str_contains($page, 'Mindestlänge'), 'Sicherheit: Abschnitt Passwörter fehlt');
+    check($b->post('/verwaltung/passwortregeln', ['min' => '4', 'klassen' => '1', 'staerke' => '0'])->status === 422, 'Mindestlänge 4 angenommen');
+    $pr = $b->post('/verwaltung/passwortregeln', ['min' => '6', 'klassen' => '1', 'staerke' => '0']);
+    check($pr->status === 200 && str_contains($pr->body, 'Warnung:') && str_contains($pr->body, 'tag warn">Warnung'), 'Zu lockere Regeln ohne Warnung');
+    check($b->post('/verwaltung/passwortregeln', ['min' => '14', 'klassen' => '2', 'staerke' => '2', 'schwach' => '1', 'login' => '1'])->status === 200 && PasswordPolicy::load($env->db)['min'] === 14, 'Passwortregeln nicht gespeichert');
+    check(str_contains($b->get('/konto')->body, 'data-staerke="1"') && str_contains($b->get('/konto')->body, 'data-min="14"'), 'Konto: Stärkebalken fehlt');
+    check($b->post('/verwaltung/passwortregeln', ['min' => '10', 'klassen' => '1', 'staerke' => '0', 'schwach' => '1', 'login' => '1'])->status === 200, 'Regeln zurücksetzen');
     check($b->post('/verwaltung/zugang', ['idle' => '2', 'idle_einheit' => 'd', 'max' => '3', 'max_einheit' => 'd'])->status === 200 && $env->auth->idleSeconds() === 172800, 'Zugang in Tagen nicht gespeichert');
     check($b->post('/verwaltung/zugang', ['idle' => '400', 'idle_einheit' => 'd', 'max' => '400', 'max_einheit' => 'd'])->status === 422, 'mehr als ein Jahr angenommen');
     check($b->post('/verwaltung/zugang', ['idle' => '365', 'idle_einheit' => 'd', 'max' => '365', 'max_einheit' => 'd'])->status === 200, 'ein Jahr abgelehnt');

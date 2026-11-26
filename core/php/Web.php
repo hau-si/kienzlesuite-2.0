@@ -655,7 +655,7 @@ final class Web {
                 : '<p>Ersten Admin anlegen. Er verwaltet Benutzer, Firewall, Updates und Sicherung und meldet sich mit Passwort und Code aus einer Authenticator-App an.</p>'
                 . V::input('login', 'Anmeldename', 'text', $this->req?->field('login', 64) ?? '', 'autocomplete="username" autocapitalize="none" required')
                 . V::input('display', 'Name (optional)', 'text', $this->req?->field('display', 80) ?? ''))
-            . V::input('password', 'Neues Passwort (mindestens 10 Zeichen)', 'password', '', 'autocomplete="new-password" required')
+            . V::input('password', 'Neues Passwort (mindestens ' . PasswordPolicy::load($this->db)['min'] . ' Zeichen)', 'password', '', 'autocomplete="new-password" required ' . $this->passwordAttrs($user ? $user['login'] : '', $user ? '' : 'login'))
             . V::input('password2', 'Passwort wiederholen', 'password', '', 'autocomplete="new-password" required')
             . '<button>Speichern</button></form>';
         return Response::html(V::page($user ? 'Passwort festlegen' : 'Einrichtung', $body, null, $this->config->practice), $error ? 422 : 200);
@@ -954,7 +954,7 @@ final class Web {
             . '<button>Bestätigungscode schicken</button></form>', $pending !== '');
         $folds .= $fold('Passwort ändern', '', '<form method="post" action="/konto/passwort" class="box">' . $csrf
             . V::input('current', 'Bisheriges Passwort', 'password', '', 'autocomplete="current-password" required')
-            . V::input('password', 'Neues Passwort', 'password', '', 'autocomplete="new-password" required')
+            . V::input('password', 'Neues Passwort', 'password', '', 'autocomplete="new-password" required ' . $this->passwordAttrs((string)($this->session['login'] ?? '')))
             . V::input('password2', 'Neues Passwort wiederholen', 'password', '', 'autocomplete="new-password" required')
             . '<button>Ändern</button></form>');
         if ($needsOtp) $folds .= $fold('Handynummer für SMS-Code (Ersatz)', $ok($phone !== '', 'hinterlegt', 'nicht hinterlegt'),
@@ -1139,6 +1139,7 @@ final class Web {
             if (!$get && $action === '/loeschen') return $this->userDelete($id, $admin);
         }
         if ($r->path === '/verwaltung/sicherheit') return $this->securityPage();
+        if ($r->path === '/verwaltung/passwortregeln' && !$get) return $this->passwordRulesSave($r, $admin);
         if ($r->path === '/verwaltung/zugang') return $get ? $this->accessPage() : $this->accessSave($r, $admin);
         if ($r->path === '/verwaltung/protokoll' && $get) return $this->protocol();
         if ($r->path === '/verwaltung/firewall') return $get ? $this->firewallPage() : $this->firewallApply($r, $admin);
@@ -1413,6 +1414,43 @@ final class Web {
         return preg_match('#</h1>(.*)</main>#s', $page->body, $m) ? $m[1] : '';
     }
 
+    /** Attribute für passwort.js (Stärkebalken): Regeln, Anmeldename (fest oder aus einem Feld des Formulars). */
+    private function passwordAttrs(string $login = '', string $loginField = ''): string {
+        $p = PasswordPolicy::load($this->db);
+        return 'data-staerke="1" data-min="' . $p['min'] . '" data-klassen="' . $p['klassen'] . '" data-min-staerke="' . $p['staerke'] . '" data-schwach="' . ($p['schwach'] ? '1' : '0') . '"'
+            . ($login !== '' && $p['login'] ? ' data-login="' . V::h($login) . '"' : '') . ($loginField !== '' && $p['login'] ? ' data-login-feld="' . V::h($loginField) . '"' : '');
+    }
+
+    /** Abschnitt „Passwörter“ der Sicherheitsseite: Regeln einstellen, bei zu lockeren Werten warnen. */
+    private function passwordRulesBody(): string {
+        $p = PasswordPolicy::load($this->db);
+        $warn = PasswordPolicy::warnings($p);
+        $o = $warn ? '<ul class="warnliste" role="alert">' . implode('', array_map(fn($w) => '<li class="' . $w['stufe'] . '"><strong>Warnung:</strong> ' . V::h($w['text']) . '</li>', $warn)) . '</ul>'
+            : '<p class="notice" role="status">Die Regeln sind streng genug.</p>';
+        $opt = '';
+        foreach (PasswordPolicy::STAERKE as $i => $t) $opt .= '<option value="' . $i . '"' . ($p['staerke'] === $i ? ' selected' : '') . '>' . V::h($t) . '</option>';
+        $kl = '';
+        foreach ([1 => '1 (keine Vorgabe)', 2 => '2 Zeichenarten', 3 => '3 Zeichenarten', 4 => 'alle 4 Zeichenarten'] as $i => $t) $kl .= '<option value="' . $i . '"' . ($p['klassen'] === $i ? ' selected' : '') . '>' . V::h($t) . '</option>';
+        return $o . '<form method="post" action="/verwaltung/passwortregeln">' . V::csrf($this->session['csrf'])
+            . V::input('min', 'Mindestlänge in Zeichen (6 bis 64, empfohlen 12 oder mehr)', 'number', (string)$p['min'], 'min="6" max="64" required')
+            . '<label>Zeichenarten (Kleinbuchstaben, Großbuchstaben, Ziffern, Sonderzeichen)<select name="klassen">' . $kl . '</select></label>'
+            . '<label>Mindeststärke (der Balken beim Festlegen eines Passworts)<select name="staerke">' . $opt . '</select></label>'
+            . '<label class="check"><input type="checkbox" name="schwach" value="1"' . ($p['schwach'] ? ' checked' : '') . '> Häufige Passwörter und Muster („passwort“, „123456“, „qwertz“) ablehnen</label>'
+            . '<label class="check"><input type="checkbox" name="login" value="1"' . ($p['login'] ? ' checked' : '') . '> Passwörter mit dem Anmeldenamen ablehnen</label>'
+            . '<p class="muted">Die Regeln gelten für neue und geänderte Passwörter. Bestehende Passwörter bleiben gültig, bis sie geändert werden.</p><button>Speichern</button></form>';
+    }
+
+    private function passwordRulesSave(Request $r, string $admin): Response {
+        try {
+            PasswordPolicy::save($this->db, ['min' => $r->field('min', 3), 'klassen' => $r->field('klassen', 2), 'staerke' => $r->field('staerke', 2),
+                'schwach' => $r->field('schwach', 2) === '1', 'login' => $r->field('login', 2) === '1']);
+        } catch (Problem $e) {
+            return $this->securityPage($e->getMessage());
+        }
+        $this->audit->write($admin, 'passwortregeln-gespeichert', 'passwortregeln');
+        return $this->securityPage(null, 'Gespeichert.');
+    }
+
     /** Sicherheit: Firewall, Zugang (Abmeldezeiten) und Protokoll als aufklappbare Abschnitte in einer Karte. */
     private function securityPage(?string $error = null, ?string $notice = null): Response {
         $log = $this->protocol();
@@ -1422,9 +1460,11 @@ final class Web {
             $fw = Response::html('<main><h1>x</h1><p class="muted">' . V::h($e->getMessage()) . '</p></main>'); $fwState = 'off';
         }
         $open = fn(string $id) => str_contains((string)($this->req?->query['bereich'] ?? ''), $id) || $error !== null && $id === 'zugang' ? ' open' : '';
+        $pwWarn = PasswordPolicy::warnings(PasswordPolicy::load($this->db)) !== [];
         $body = V::error($error) . V::notice($notice) . '<section class="card">'
             . '<details class="fold" id="firewall"' . ($open('firewall') ?: ($fwState === 'pending' ? ' open' : '')) . '><summary><h2>Firewall</h2></summary>' . self::stripCards(self::inner($fw)) . '</details>'
             . '<details class="fold" id="zugang"' . $open('zugang') . '><summary><h2>Zugang (Abmeldezeiten)</h2></summary>' . $this->accessBody() . '</details>'
+            . '<details class="fold" id="passwoerter"' . ($open('passwoerter') ?: ($pwWarn ? ' open' : '')) . '><summary><h2>Passwörter</h2>' . ($pwWarn ? '<span class="tag warn">Warnung</span>' : '') . '</summary>' . $this->passwordRulesBody() . '</details>'
             . '<details class="fold" id="protokoll"' . $open('protokoll') . '><summary><h2>Protokoll</h2></summary>' . self::stripCards(self::inner($log)) . '</details></section>';
         V::$status = ['Firewall' => [$fwState === 'active', 'aktiv', $fwState === 'pending' ? 'wartet auf Bestätigung' : 'aus']];
         $response = Response::html(V::page('Sicherheit', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);

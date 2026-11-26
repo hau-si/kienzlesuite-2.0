@@ -124,7 +124,7 @@ final class Users {
 
     public function setPassword(int $id, string $password): void {
         $user = $this->require($id);
-        Passwords::check($password, $user['login']);
+        Passwords::check($password, $user['login'], PasswordPolicy::load($this->db));
         $this->db->query('UPDATE users SET password_hash=?, updated_at=? WHERE id=?', [Passwords::hash($password), time(), $id]);
     }
 
