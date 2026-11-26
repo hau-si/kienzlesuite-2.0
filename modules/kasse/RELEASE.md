@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.49
+
+- **Hinweis zur Versandart:** „Nur Inland“ ist als empfohlen gekennzeichnet, „Automatisch“ als fehleranfällig (Letterxpress erkennt die Anschrift im PDF nicht immer); die Fehlermeldung „keine lesbare Anschrift“ empfiehlt dasselbe.
+
 ## 2.3.4-beta.48
 
 - **Knopf „Per Post senden“ in der Vorgänge-Liste** (Spalte „Post“, nur mit dem Recht „Rechnungen per Post senden“): Er erscheint bei T2med-Rechnungen aus dem Rechnungseingang, die noch nicht an Letterxpress gingen, und fragt vor dem Versand nach. Eine Rechnung lässt sich nur einmal verschicken: Nach dem Versand (auch im Testbetrieb) verschwindet der Knopf, und der Server lehnt einen zweiten Versand ab. Bezahlte oder gerade kassierte Rechnungen werden nicht verschickt. Voraussetzungen wie bei „Per Post senden“ an der Kasse (Letterxpress eingeschaltet, Original-PDF noch vorhanden).

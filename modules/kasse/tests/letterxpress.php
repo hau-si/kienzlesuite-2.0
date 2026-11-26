@@ -89,6 +89,7 @@ try {
     check(count($http->calls) === $before + 1, 'Zweiter Versand ging an Letterxpress');
     $rows = array_column($vg->list('tag', date('Y-m-d'))['items'], null, 'id');
     check($rows[$new]['can_post'] === false, 'Knopf nach dem Versand noch da');
+    $app->db->query('DELETE FROM invoice_inbox WHERE id=?', [$new]);
     $http->calls = array_slice($http->calls, 0, 1);   // die folgenden Prüfungen zählen ab dem ersten Auftrag
 
     // 3. Testbriefe sperren nicht; live gesendete Rechnungen nie ein zweites Mal.
