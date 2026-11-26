@@ -78,7 +78,8 @@ function updateTotal() {
   $('total').textContent = Number.isFinite(sum) ? euro(sum) : '—';
   const method = payMethod(), cash = method === 'cash', transfer = method === 'transfer';
   $('pay-transfer-label').hidden = !state.bank_ready;
-  $('pay').textContent = transfer ? (sum > 0 ? euro(sum) + ' per Überweisung – Rechnung erstellen' : 'Per Überweisung') : cash ? (sum > 0 ? euro(sum) + ' bar erhalten – Rechnung erstellen' : 'Bar kassieren') : (sum > 0 ? euro(sum) + ' mit Karte kassieren' : 'Mit Karte kassieren');
+  const art = transfer ? 'Überweisung' : cash ? 'Bar' : 'Karte';
+  $('pay').textContent = sum > 0 ? euro(sum) + ' · ' + art : art;
   $('pay').classList.toggle('cash', cash || transfer);
   signaturKnopf(sum);
   // Barzahlung braucht kein freies Terminal, aber Praxisdaten für die Rechnung.
@@ -116,11 +117,11 @@ function renderInvoices() {
       retrySelection = false; state.reader_payment = null; readerMessage = '';
       sessionStorage.removeItem(key); renderPayment();
     });
-    const card = element('button',euro(invoice.amount_cents)+' mit Karte (EC) kassieren','primary wide invoice-pay');
+    const card = element('button',euro(invoice.amount_cents)+' · Karte','primary wide invoice-pay');
     card.onclick = pay('card');
-    const cash = element('button','Bar bezahlt','secondary wide invoice-cash');
+    const cash = element('button','Bar','secondary wide invoice-cash');
     cash.onclick = () => { if (confirm(euro(invoice.amount_cents)+' bar erhalten? Die Zahlung wird als bezahlt erfasst.')) pay('cash')(); };
-    const later = element('button','Patient zahlt später (Überweisung)','text-button invoice-later');
+    const later = element('button','Überweisung','text-button invoice-later');
     later.onclick = () => run(async() => {
       // Ist der Rechnungsdruck eingeschaltet, kommt die Rechnung jetzt einmal auf den Praxisdrucker (für die Überweisung).
       const result = await api('invoice_later', {invoice_id: invoice.id}); if (result.message) message(result.message);
@@ -133,7 +134,7 @@ function renderInvoices() {
     const canPost = !!(state.letter?.enabled && invoice.letter?.postable && !invoice.letter?.locked);
     if (canPost) options.push(['post', '✉ Per Post']);
     const go = element('button', '', 'primary wide invoice-go');
-    const labels = {card: euro(invoice.amount_cents) + ' mit Karte kassieren', cash: euro(invoice.amount_cents) + ' bar erhalten', later: 'Überweisung: Rechnung zurückstellen und drucken', post: 'Per Post senden (Letterxpress)'};
+    const labels = {card: euro(invoice.amount_cents) + ' · Karte', cash: euro(invoice.amount_cents) + ' · Bar', later: 'Überweisung', post: 'Per Post senden'};
     const radios = {};
     // Die Liste wird alle paar Sekunden neu aufgebaut: eine von Hand gewählte Zahlart bleibt erhalten, „Karte“ ist nur die Vorauswahl.
     const chosen = options.some(o => o[0] === chosenMethod.get(invoice.id)) ? chosenMethod.get(invoice.id) : 'card';
