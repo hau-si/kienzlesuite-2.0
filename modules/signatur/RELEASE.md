@@ -1,5 +1,9 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.27
+
+- **Aufnahmetest mit Varianten (Fehlersuche „keine Stiftpunkte“):** Der einfache Test (`padsign.py`) nimmt am Delta eine Unterschrift auf (Rohdaten 1268 Bytes), der Pad-Dienst bekommt dagegen keine Stiftpunkte. Der Test lässt sich jetzt mit `PADSIGN=bild` (Seite wie im Dienst, als Bild) und/oder `PADSIGN=stop` (mit Anhalten statt Bestätigen abschließen) starten und meldet am Ende die Zahl der Stiftereignisse. Damit lässt sich eingrenzen, was im Dienst anders ist. Nicht am echten Pad geprüft.
+
 ## 0.1.0-beta.26
 
 - **Fehlersuche Pad: Bereich der Stiftpunkte im Protokoll.** Bei „OK“ nennt die Protokollzeile jetzt zusätzlich, in welchem Bereich (x, y) und mit welchem größten Druck Stiftpunkte ankamen („Bereich keine“, wenn das Pad nichts meldet). Daran sieht man, ob die Punkte außerhalb des Unterschriftsfelds liegen oder gar nicht ankommen. Nicht am echten Pad geprüft.
