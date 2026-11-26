@@ -38,6 +38,7 @@ final class Module {
         $link = fn(string $card) => $base . '/settings.php#' . $card;
         $practice = trim((string)$config->get('practice', 'name', '')) !== '' && trim((string)$config->get('practice', 'street', '')) !== '';
         $items = [
+            ['title' => 'Benötigte Hardware: Bondrucker', 'optional' => true, 'state' => 'open', 'hint' => 'Empfohlen: Epson TM-m30III (Bondrucker für Terminliste und Kasse).', 'link' => $link('s-checklist')],
             ['title' => 'Praxisname und Anschrift für Rechnungen', 'state' => $practice ? 'done' : 'open', 'hint' => 'Einstellungen → Praxis & Rechnungen', 'link' => $link('s-practice')],
             ['title' => Suite::connected('t2med') ? 'T2med-Verbindung der Suite vorhanden' : 'T2med-Verbindung fehlt', 'state' => Suite::connected('t2med') ? 'done' : 'open',
                 'hint' => 'Verwaltung → Verbindungen der Suite (Adresse, API-Key, Zertifikat); der Link im Bereich „T2med-Anbindung“ führt direkt dorthin', 'link' => $link('s-fhir')],

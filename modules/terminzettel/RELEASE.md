@@ -1,5 +1,9 @@
 # Terminzettel – Release-Notizen
 
+## 1.3.0-beta.17
+
+- Einrichtungsleitfaden: erster Punkt „Benötigte Hardware“ (Bondrucker Epson TM-m30III empfohlen).
+
 ## 1.3.0-beta.16
 
 - **Keine blauen Punkte mehr:** Die Hinweise der Einrichtung (Bondrucker, Zettel aus T2med angekommen) bleiben in der Übersicht sichtbar, zählen aber nicht mehr als „noch zu tun“ und setzen keinen Punkt im Menü.

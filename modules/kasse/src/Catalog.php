@@ -8,8 +8,8 @@ final class Catalog {
 
     /** Katalog für die Verwaltung im Adminpanel. */
     public function overview(): array {
-        $services = array_map(static fn($s) => ['vat' => (bool)$s['vat'], 'on_request' => (bool)$s['on_request']] + $s,
-            $this->db->query('SELECT id,label,category,price_cents,goae_code,factor,fee_type,on_request,vat,base_cents,default_reason FROM services WHERE active=1 ORDER BY LENGTH(category)=0, category COLLATE NOCASE, label COLLATE NOCASE')->fetchAll());
+        $services = array_map(static fn($s) => ['vat' => (bool)$s['vat'], 'on_request' => (bool)$s['on_request'], 'signature' => (bool)$s['signature']] + $s,
+            $this->db->query('SELECT id,label,category,price_cents,goae_code,factor,fee_type,on_request,vat,base_cents,default_reason,signature FROM services WHERE active=1 ORDER BY LENGTH(category)=0, category COLLATE NOCASE, label COLLATE NOCASE')->fetchAll());
         $groups = array_map(static fn($g) => ['id' => $g['id'], 'label' => $g['label'], 'services' => json_decode($g['service_ids_json'], true, 32, JSON_THROW_ON_ERROR)],
             $this->db->query('SELECT * FROM service_groups WHERE active=1 ORDER BY label COLLATE NOCASE')->fetchAll());
         return ['services' => $services, 'groups' => $groups, 'fee_types' => ServiceCatalog::FEES,
@@ -30,6 +30,8 @@ final class Catalog {
         if (!is_bool($onRequest)) throw new Problem('Ungültige Angabe für Leistung auf Verlangen.');
         $vat = $input['vat'] ?? false;
         if (!is_bool($vat)) throw new Problem('Ungültige Angabe zur Mehrwertsteuer.');
+        $signature = $input['signature'] ?? false;
+        if (!is_bool($signature)) throw new Problem('Ungültige Angabe zur Unterschrift.');
         // GOÄ-Rechner: Mit Einfachsatz muss der Preis Einfachsatz × Faktor entsprechen (±1 Cent Rundung).
         $baseInput = $code !== '' ? App::string($input, 'base', 16, false) : '';
         $base = $baseInput !== '' ? Money::cents($baseInput, $this->config->get('app', 'max_amount_cents')) : 0;
@@ -40,9 +42,9 @@ final class Catalog {
             if (abs($expected - $cents) > 1) throw new Problem('Einfachsatz × Faktor ergibt ' . Money::format($expected) . ', eingetragen sind ' . Money::format($cents) . '. Bitte den Preis anpassen oder den GOÄ-Rechner verwenden.');
         }
         if ($id === '') {
-            $this->db->query('INSERT INTO services(id,label,category,price_cents,goae_code,factor,fee_type,on_request,vat,base_cents,default_reason,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)', [App::id(), $label, $category, $cents, $code, $factor, $type, (int)$onRequest, (int)$vat, $base, $reason, time()]);
+            $this->db->query('INSERT INTO services(id,label,category,price_cents,goae_code,factor,fee_type,on_request,vat,base_cents,default_reason,signature,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)', [App::id(), $label, $category, $cents, $code, $factor, $type, (int)$onRequest, (int)$vat, $base, $reason, (int)$signature, time()]);
         } else {
-            if ($this->db->query('UPDATE services SET label=?,category=?,price_cents=?,goae_code=?,factor=?,fee_type=?,on_request=?,vat=?,base_cents=?,default_reason=?,updated_at=? WHERE id=? AND active=1', [$label, $category, $cents, $code, $factor, $type, (int)$onRequest, (int)$vat, $base, $reason, time(), $id])->rowCount() !== 1) throw new Problem('Leistung nicht gefunden.', 404);
+            if ($this->db->query('UPDATE services SET label=?,category=?,price_cents=?,goae_code=?,factor=?,fee_type=?,on_request=?,vat=?,base_cents=?,default_reason=?,signature=?,updated_at=? WHERE id=? AND active=1', [$label, $category, $cents, $code, $factor, $type, (int)$onRequest, (int)$vat, $base, $reason, (int)$signature, time(), $id])->rowCount() !== 1) throw new Problem('Leistung nicht gefunden.', 404);
         }
     }
     public function deleteService(string $id): void {

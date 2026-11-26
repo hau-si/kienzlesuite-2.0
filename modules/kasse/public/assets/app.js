@@ -44,7 +44,11 @@ document.querySelectorAll('input[name="pay-method"]').forEach(r => r.addEventLis
 const SIGNATUR = document.body.dataset.signatur || '';
 function signaturKnopf(sum) {
   const knopf = $('sign-send'); if (!knopf) return;
-  knopf.hidden = !SIGNATUR || !state || !state.patient;
+  // Nur anzeigen, wenn mindestens eine gewählte Leistung eine Unterschrift verlangt (Haken im Leistungskatalog).
+  const ids = state ? selectedIds() : new Set();
+  const noetig = !!state && state.services.some(s => ids.has(s.id) && s.signature);
+  knopf.hidden = !SIGNATUR || !state || !state.patient || !noetig;
+  const hinweis = $('sign-note'); if (hinweis && knopf.hidden) hinweis.hidden = true;
   knopf.disabled = !(sum > 0) || busy;
 }
 function signaturListe() {

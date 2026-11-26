@@ -38,7 +38,7 @@ Oberfläche, Hilfetexte, Dokumentation und Commit-Nachrichten auf Deutsch.
 
 ## Hinweise für neue Sitzungen (Stand 25.11.2026)
 
-**Stand:** Basis 0.21.4-beta.67, Kasse (`kasse`) 2.3.4-beta.44, Terminzettel 1.3.0-beta.16, Signatur 0.1.0-beta.24; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
+**Stand:** Basis 0.21.4-beta.67, Kasse (`kasse`) 2.3.4-beta.45, Terminzettel 1.3.0-beta.17, Signatur 0.1.0-beta.25; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
 (Basis 0.19.1). Der Nutzer testet auf einer echten Ubuntu-26.04-VM (Aktualisierung dort: `cd ~/kienzlesuite-2.0 && git pull && sudo bash installer/install.sh`,
 oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nicht ins Repository.
 
@@ -84,6 +84,7 @@ oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nich
 
 ### Nicht auf echter Hardware geprüft (der Nutzer testet auf der VM)
 
+- Neu am 26.11.2026 (Kasse beta.45, Signatur beta.25, Terminzettel beta.17): Leistungskatalog der Kasse hat je Leistung `services.signature` („Unterschrift erforderlich“); der Knopf „Zur Unterschrift“ zeigt sich nur, wenn eine gewählte Leistung den Haken hat. Signatur: Patientenkasten oben rechts immer sichtbar (Namensfeld per `form="n-form"`), `Seite::festeVorlageId()` = ältester IGeL-Vertrag, nicht löschbar/abschaltbar. Überblick jedes Moduls beginnt mit „Benötigte Hardware“ (TM-m30III; signotec Delta mit Ethernet/PoE). Nicht auf der VM geprüft.
 - Neu am 25.11.2026 (Basis beta.66/67, Kasse beta.43/44, Terminzettel beta.16, Signatur beta.19–23): Download des Starter-Pakets nach dem `open_basedir`-Fix (`server.crt` in `installer/vorlagen/php-fpm-core.conf`; auf der VM danach `install.sh --aktualisieren` bzw. Update), Windows-Starter ohne Konsolenfenster (`-H=windowsgui`), Aufruf aus T2med in die Kasse-Startseite mit Seitenleiste, Platzhalter-Knöpfe, Patientenkasten und neues Layout in Signatur, Rückschreiben von Telefon/E-Mail per `PUT /Patient` (Testpatient!).
 
 - Zentraler Starter (Seite „Arbeitsplätze“, Paket, Installationsskripte, Go-Starter, nginx `/starter/<modul>`, Weiterleitung `&m=`), Signatur-Start aus T2med und alle Signatur-Pad-Dienste/-Seiten: nur mit Tests, nicht mit T2med, Pad oder im Browser geprüft.

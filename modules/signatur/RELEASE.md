@@ -1,5 +1,12 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.25
+
+- **Patient immer oben rechts wie in der Kasse:** Der Kasten ist stets sichtbar; ohne Vorwahl steht darin das Namensfeld (manuelle Eingabe), nach Übernahme aus T2med oder Kasse der Name mit „Anderen Patienten wählen“. Darunter die Dokumentauswahl.
+- **IGeL-Vertrag der Kasse ist fest:** Die älteste Vorlage der Art IGeL kann nicht gelöscht oder abgeschaltet werden und bleibt Art IGeL; der Text ist frei bearbeitbar.
+- **Vorgangsliste wie in der Kasse:** Links die Vorgänge der letzten 7 Tage, neuester oben, mit „Zum Pad senden“ und „Löschen“; „Abbrechen“ nur, solange der Vorgang am Pad liegt (dann kein Löschen). Löschen geht nun in jedem Status außer „am Pad“.
+- Einrichtungsleitfaden: erster Punkt „Benötigte Hardware“ (signotec Delta, Ethernet oder PoE-Ethernet). Nicht auf dem Server geprüft.
+
 ## 0.1.0-beta.24
 
 - **Start aus T2med: HTTP 403 behoben (wahrscheinliche Ursache):** Die Kasse nimmt den öffentlichen T2med-Demo-Schlüssel, wenn unter Verwaltung → Verbindungen → T2med kein API-Schlüssel steht; Signatur schickte dann einen leeren Schlüssel und T2med lehnte den Abruf des Patienten ab. Signatur macht es jetzt wie die Kasse. Bei 401/403 nennt die Meldung (und `starter.log` am PC) den API-Schlüssel und den Drittanbieter-Zugriff als Ursache. Nicht gegen echtes T2med geprüft.

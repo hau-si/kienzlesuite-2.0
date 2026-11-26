@@ -41,12 +41,12 @@ final class Ansicht {
     private static function aktionen(array $v, string $csrfFeld, bool $darfVorgang): string {
         if (!$darfVorgang) return '';
         $o = '';
-        if (in_array($v['status'], ['wartet', 'fehler'], true) && (int)($v['pad_id'] ?? 0) > 0) $o .= self::knopf($csrfFeld, 'am-pad', (int)$v['id'], 'Am Pad zeigen', 'primary small');
+        if (in_array($v['status'], ['wartet', 'fehler'], true) && (int)($v['pad_id'] ?? 0) > 0) $o .= self::knopf($csrfFeld, 'am-pad', (int)$v['id'], 'Zum Pad senden', 'primary small');
         if ($v['status'] === 'am_pad') $o .= self::knopf($csrfFeld, 'vom-pad', (int)$v['id'], 'Vom Pad nehmen', 'small');
         if (in_array($v['kontakt_status'] ?? '', ['offen', 'fehler'], true) && in_array($v['status'], ['unterschrieben', 'uebertragen'], true)) $o .= self::knopf($csrfFeld, 'kontakt-uebernehmen', (int)$v['id'], 'Kontaktdaten in T2med übernehmen', 'primary small', 'Telefon und E-Mail dieses Patienten in T2med ändern? Alle anderen Angaben bleiben unverändert.');
-        if (!in_array($v['status'], ['uebertragen', 'abgebrochen'], true)) $o .= self::knopf($csrfFeld, 'abbrechen', (int)$v['id'], 'Abbrechen', 'danger small');
         if ($v['status'] === 'abgebrochen') $o .= self::knopf($csrfFeld, 'wiederaufnehmen', (int)$v['id'], 'Wieder aufnehmen', 'primary small');
-        if ($v['status'] === 'abgebrochen') $o .= self::knopf($csrfFeld, 'vorgang-loeschen', (int)$v['id'], 'Löschen', 'danger small', 'Diesen abgebrochenen Vorgang endgültig löschen?');
+        if ($v['status'] === 'am_pad') $o .= self::knopf($csrfFeld, 'abbrechen', (int)$v['id'], 'Abbrechen', 'danger small');
+        else $o .= self::knopf($csrfFeld, 'vorgang-loeschen', (int)$v['id'], 'Löschen', 'danger small', 'Diesen Vorgang endgültig löschen?');
         return $o;
     }
 
@@ -68,11 +68,13 @@ final class Ansicht {
         }
 
         // Linke Spalte: offene Vorgänge (wie die Liste der Kasse), rechts groß Patient und Dokumentauswahl.
-        $offene = array_values(array_filter($vorgaenge, fn($v) => !in_array($v['status'], ['uebertragen', 'abgebrochen'], true)));
-        usort($offene, fn($x, $y) => ($y['status'] === 'am_pad') <=> ($x['status'] === 'am_pad') ?: ((int)$y['erstellt'] <=> (int)$x['erstellt']));
+        // Wie in der Kasse: die letzten Tage (7), neuester oben, unabhängig vom Status.
+        $grenze = time() - 7 * 86400;
+        $offene = array_values(array_filter($vorgaenge, fn($v) => (int)$v['erstellt'] >= $grenze));
+        usort($offene, fn($x, $y) => ((int)$y['erstellt'] <=> (int)$x['erstellt']) ?: ((int)$y['id'] <=> (int)$x['id']));
         $links = '<aside class="card us-links"><div class="us-kopf"><h2>Vorgänge</h2><a class="muted klein-text" href="' . $h(sg_basis()) . '/vorgaenge">Alle</a></div>';
-        if (!$offene) $links .= '<p class="muted">Kein offener Vorgang. Rechts einen neuen anlegen.</p>';
-        foreach (array_slice($offene, 0, 8) as $v) {
+        if (!$offene) $links .= '<p class="muted">Keine Vorgänge in den letzten Tagen. Rechts einen neuen anlegen.</p>';
+        foreach (array_slice($offene, 0, 30) as $v) {
             $links .= '<div class="us-vz' . ($v['status'] === 'am_pad' ? ' am-pad' : '') . '"><div class="us-vz-kopf"><div><strong>' . $h($v['patient']) . '</strong><div class="muted klein-text">' . $h($v['titel']) . ' · ' . $h(self::datum((int)$v['erstellt'])) . '</div></div>'
                 . '<span class="us-status s-' . $h($v['status']) . '">' . $h(Seite::STATI[$v['status']] ?? $v['status']) . '</span></div>'
                 . ($v['meldung'] !== '' ? '<div class="muted klein-text">' . $h($v['meldung']) . '</div>' : '')
@@ -81,8 +83,10 @@ final class Ansicht {
         $links .= '</aside>';
         // Patient aus T2med oder der Kasse: Kasten oben rechts (JS blendet ihn ein und das Patientenfeld im Formular aus).
         $rechts = '';
-        if ($darfVorgang) $rechts .= '<section class="card us-gewaehlt" id="n-gewaehlt" hidden><div class="us-patient"><div><div class="eyebrow muted" id="n-gewaehlt-quelle">AUSGEWÄHLTER PATIENT</div><strong class="us-name" id="n-gewaehlt-name"></strong><div class="muted" id="n-gewaehlt-info"></div></div>'
-            . '<button type="button" class="small" id="n-gewaehlt-weg">Anderen Patienten wählen</button></div></section>';
+        if ($darfVorgang) $rechts .= '<section class="card us-gewaehlt" id="n-gewaehlt"><div class="us-patient"><div><div class="eyebrow muted" id="n-gewaehlt-quelle">PATIENT</div>'
+            . '<div id="n-gewaehlt-anzeige" hidden><strong class="us-name" id="n-gewaehlt-name"></strong><div class="muted" id="n-gewaehlt-info"></div></div>'
+            . '<div id="n-patient-feld"><label for="n-patient" class="sr-only">Patient</label><input id="n-patient" name="patient" form="n-form" maxlength="80" required placeholder="Name des Patienten, z. B. Max Mustermann"></div></div>'
+            . '<button type="button" class="small" id="n-gewaehlt-weg" hidden>Anderen Patienten wählen</button></div></section>';
 
         $aktive = array_values(array_filter($vorlagen, fn($v) => (int)$v['aktiv']));
         if ($darfVorgang) {
@@ -99,10 +103,9 @@ final class Ansicht {
             if (!$aktive) {
                 $rechts .= '<p class="muted">Es gibt keine aktive Vorlage. Bitte unter Einstellungen eine Vorlage anlegen oder aktivieren.</p>';
             } else {
-                $rechts .= '<form method="post" class="us-form" autocomplete="off">' . $csrfFeld . '<input type="hidden" name="aktion" value="neu"><input type="hidden" name="kontext" id="n-kontext" value=""><input type="hidden" name="leistungen_json" id="n-leistungen" value=""><input type="hidden" name="quelle" id="n-quelle" value=""><input type="hidden" name="quelle_ref" id="n-quelle-ref" value="">'
+                $rechts .= '<form method="post" class="us-form" id="n-form" autocomplete="off">' . $csrfFeld . '<input type="hidden" name="aktion" value="neu"><input type="hidden" name="kontext" id="n-kontext" value=""><input type="hidden" name="leistungen_json" id="n-leistungen" value=""><input type="hidden" name="quelle" id="n-quelle" value=""><input type="hidden" name="quelle_ref" id="n-quelle-ref" value="">'
                     . '<div class="us-dokliste" role="radiogroup" aria-label="Dokument">' . $opt . '</div>'
                     . $padOpt
-                    . '<div id="n-patient-feld"><label for="n-patient">Patient</label><input id="n-patient" name="patient" maxlength="80" required placeholder="z. B. Max Mustermann"></div>'
                     . '<div id="n-liste" class="us-liste" hidden><strong>Leistungen aus der Kasse</strong><ul id="n-liste-eintraege"></ul><p class="muted" id="n-liste-summe"></p></div>'
                     . '<details class="fold us-kontakt" id="n-kontakt"><summary>Weitere Patientendaten (für Platzhalter im Dokument)</summary><div class="us-body">'
                     . '<input type="hidden" name="patient_id" id="n-patient-id" value=""><input type="hidden" name="telefon_alt" id="n-telefon-alt" value=""><input type="hidden" name="email_alt" id="n-email-alt" value="">'
@@ -276,7 +279,8 @@ final class Ansicht {
             . '<div class="us-platz" role="group" aria-label="Platzhalter einfügen"><span class="muted">Platzhalter einfügen:</span>' . self::platzhalterKnoepfe('v' . $id . '-text') . '</div>'
             . '<label class="check"><input type="checkbox" name="aktiv" value="1"' . ((int)$v['aktiv'] ? ' checked' : '') . '> Aktiv (in „Neuer Vorgang“ wählbar)</label>'
             . '<div class="aktionen"><button class="primary" type="submit">Speichern</button></div></form>';
-        if ($id > 0) $o .= '<form method="post" class="inline us-loeschen">' . $csrfFeld . '<input type="hidden" name="aktion" value="vorlage-loeschen"><input type="hidden" name="id" value="' . $id . '"><button class="danger small" type="submit" data-bestaetigen="Vorlage endgültig löschen? Bestehende Vorgänge behalten ihren Text.">Vorlage löschen</button></form>';
+        if ($id > 0 && $id === Seite::festeVorlageId()) $o .= '<p class="muted klein-text">Dies ist der IGeL-Vertrag der Kasse: Er bleibt immer erhalten (Art und „Aktiv“ sind fest), der Text ist frei änderbar.</p>';
+        elseif ($id > 0) $o .= '<form method="post" class="inline us-loeschen">' . $csrfFeld . '<input type="hidden" name="aktion" value="vorlage-loeschen"><input type="hidden" name="id" value="' . $id . '"><button class="danger small" type="submit" data-bestaetigen="Vorlage endgültig löschen? Bestehende Vorgänge behalten ihren Text.">Vorlage löschen</button></form>';
         return $o;
     }
 }

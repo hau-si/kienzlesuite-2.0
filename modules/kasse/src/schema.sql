@@ -3,7 +3,8 @@ CREATE TABLE IF NOT EXISTS services (
     active INTEGER NOT NULL DEFAULT 1, updated_at INTEGER NOT NULL,
     goae_code TEXT NOT NULL DEFAULT '', factor TEXT NOT NULL DEFAULT '',
     fee_type TEXT NOT NULL DEFAULT 'standard', on_request INTEGER NOT NULL DEFAULT 0,
-    vat INTEGER NOT NULL DEFAULT 0, base_cents INTEGER NOT NULL DEFAULT 0, default_reason TEXT NOT NULL DEFAULT ''
+    vat INTEGER NOT NULL DEFAULT 0, base_cents INTEGER NOT NULL DEFAULT 0, default_reason TEXT NOT NULL DEFAULT '',
+    signature INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS service_groups (
     id TEXT PRIMARY KEY, label TEXT NOT NULL, service_ids_json TEXT NOT NULL,

@@ -1,5 +1,10 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.45
+
+- **Haken „Unterschrift erforderlich“ je Leistung** (Einstellungen → Leistungskatalog, in der Liste als Spalte „Unterschrift“). Der Knopf „Zur Unterschrift“ erscheint in der Kasse nur noch, wenn mindestens eine gewählte Leistung diesen Haken hat.
+- Einrichtungsleitfaden: erster Punkt „Benötigte Hardware“ (Bondrucker Epson TM-m30III empfohlen). Nicht auf dem Server geprüft.
+
 ## 2.3.4-beta.44
 
 - **Aufruf aus T2med öffnet die normale Kasse mit Seitenleiste:** Statt einer eigenen Vollbildseite ohne Menü öffnet sich die Startseite der Kasse (Seitenleiste, Rechnungsliste links) und rechts gleich die Kassenansicht mit dem Patienten aus T2med. Die Rechnungsliste schaltet dabei nicht von selbst auf eine andere Rechnung um. Die direkte Adresse `/kasse/kassieren` zeigt die Kassenansicht ebenfalls im Rahmen der Suite. Nicht auf dem Server geprüft.

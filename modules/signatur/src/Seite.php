@@ -69,6 +69,11 @@ final class Seite {
         return self::pdo()->query($sql)->fetchAll();
     }
 
+    /** Der IGeL-Vertrag, den die Kasse für Leistungen mit „Unterschrift erforderlich“ verwendet: die älteste Vorlage der Art IGeL. Nicht löschbar, nicht abschaltbar, Art bleibt; der Inhalt ist frei bearbeitbar. */
+    public static function festeVorlageId(): int {
+        return (int)self::pdo()->query("SELECT id FROM vorlagen WHERE art='igel' ORDER BY id LIMIT 1")->fetchColumn();
+    }
+
     public static function vorlage(int $id): ?array {
         $st = self::pdo()->prepare('SELECT * FROM vorlagen WHERE id=?');
         $st->execute([$id]);
@@ -87,6 +92,7 @@ final class Seite {
         $pdo = self::pdo();
         if ($id > 0) {
             if (!self::vorlage($id)) throw new \InvalidArgumentException('Vorlage nicht gefunden.');
+            if ($id === self::festeVorlageId()) { $art = 'igel'; $aktiv = 1; }
             $pdo->prepare('UPDATE vorlagen SET art=?, titel=?, text=?, aktiv=?, muster=0, geaendert=? WHERE id=?')->execute([$art, $titel, $text, $aktiv, time(), $id]);
             return $id;
         }
@@ -97,6 +103,7 @@ final class Seite {
 
     public static function vorlageLoeschen(int $id): void {
         if (!self::vorlage($id)) throw new \InvalidArgumentException('Vorlage nicht gefunden.');
+        if ($id === self::festeVorlageId()) throw new \InvalidArgumentException('Der IGeL-Vertrag der Kasse kann nicht gelöscht werden. Der Text lässt sich aber ändern.');
         // Bestehende Vorgänge behalten ihren fest eingesetzten Text; nur der Verweis wird gelöst.
         self::pdo()->prepare('UPDATE vorgaenge SET vorlage_id=NULL WHERE vorlage_id=?')->execute([$id]);
         self::pdo()->prepare('DELETE FROM vorlagen WHERE id=?')->execute([$id]);
@@ -302,8 +309,8 @@ final class Seite {
     public static function vorgangLoeschen(int $id): void {
         $v = self::vorgang($id);
         if (!$v) throw new \InvalidArgumentException('Vorgang nicht gefunden.');
-        if ($v['status'] !== 'abgebrochen') throw new \InvalidArgumentException('Nur abgebrochene Vorgänge lassen sich löschen.');
-        self::pdo()->prepare('DELETE FROM vorgaenge WHERE id=? AND status="abgebrochen"')->execute([$id]);
+        if ($v['status'] === 'am_pad') throw new \InvalidArgumentException('Der Vorgang liegt gerade am Pad. Bitte zuerst abbrechen.');
+        self::pdo()->prepare("DELETE FROM vorgaenge WHERE id=? AND status<>'am_pad'")->execute([$id]);
     }
 
     public static function abbrechen(int $id): void {
@@ -341,6 +348,8 @@ final class Seite {
         $musterOffen = (int)self::pdo()->query('SELECT COUNT(*) FROM vorlagen WHERE muster=1 AND aktiv=1')->fetchColumn();
         $pad = Pad::status()['installiert'];
         return [
+            ['title' => 'Benötigte Hardware: Unterschriftenpad', 'optional' => true, 'state' => 'open',
+                'hint' => 'Empfohlen wird derzeit nur das signotec Delta, Version mit Ethernet oder PoE-Ethernet.', 'link' => ''],
             ['title' => 'Pad-Software von signotec hochladen', 'optional' => true, 'state' => $pad ? 'done' : 'open',
              'hint' => $pad ? 'Die Bibliotheken von signotec sind hinterlegt.' : 'Die Software für das Unterschriftenpad liegt nicht bei und muss einmal von einem Admin hochgeladen werden.',
              'link' => '/signatur/einstellungen#pad'],

@@ -18,7 +18,7 @@ $vl = Seite::vorlagen();
 check(count($vl) === 3 && count(array_unique(array_column($vl, 'art'))) === 3, 'drei Mustervorlagen erwartet');
 check((int)Speicher::pdo()->query('PRAGMA user_version')->fetchColumn() === Speicher::VERSION, 'Schemaversion');
 check(count(Seite::vorlagen()) === 3, 'Muster dürfen nicht doppelt angelegt werden');
-check(Seite::ueberblick()[0]['state'] === 'open', 'Überblick: Mustertexte offen');
+check(Seite::ueberblick()[2]['state'] === 'open', 'Überblick: Mustertexte offen');
 
 // Platzhalter
 Seite::pruefePlatzhalter('Name {{patient}} am {{ datum }}');
@@ -77,6 +77,8 @@ check(Seite::vorgang((int)$igel['id']) !== null, 'wartende Vorgänge werden nie 
 
 // Vorlage löschen löst den Verweis, der Vorgang bleibt
 $vorl = (int)Seite::vorgang((int)$igel['id'])['vorlage_id'];
+wirft(fn() => Seite::vorlageLoeschen($vorl), 'fester IGeL-Vertrag nicht löschbar');
+\KienzleSignatur\Speicher::pdo()->exec("UPDATE vorlagen SET art='sonstige' WHERE id=" . $vorl);
 Seite::vorlageLoeschen($vorl);
 check(Seite::vorlage($vorl) === null && Seite::vorgang((int)$igel['id'])['vorlage_id'] === null, 'Vorlage gelöscht, Vorgang bleibt');
 
@@ -124,7 +126,7 @@ check($stand['installiert'] && $stand['version'] === '9.0.1' && $stand['von'] ==
 check(is_file(Pad::ordnerPfad() . '/libSTPadLib.so') && is_file(Pad::ordnerPfad() . '/libSTCPImageEngine.so') && is_file(Pad::ordnerPfad() . '/Lizenzvertrag-signotec.txt'), 'Dateien abgelegt');
 check(!file_exists($dir . '/evil.so') && !file_exists(dirname($dir) . '/evil.so') && count(glob($dir . '/signotec/*')) === 4, 'nur feste Dateinamen, nichts außerhalb');
 check(decoct(fileperms(Pad::ordnerPfad() . '/libSTPadLib.so') & 0777) === '640', 'Dateirechte 0640');
-check(Seite::ueberblick()[0]['state'] === 'done', 'Überblick: Pad-Software erledigt');
+check(Seite::ueberblick()[1]['state'] === 'done', 'Überblick: Pad-Software erledigt');
 $htmlAdmin = Ansicht::seite('/einstellungen', 'tok', [], [], true, true, null, null, null, Pad::status());
 check(str_contains($htmlAdmin, 'id="pad-los"') && str_contains($htmlAdmin, 'signoPAD-API Linux 9.0.1') && str_contains($htmlAdmin, 'Pad-Software entfernen'), 'Admin sieht Upload und Stand');
 check(!str_contains(Ansicht::seite('/einstellungen', 'tok', [], [], true, true, null, null), 'id="pad-los"'), 'ohne Admin kein Upload');
@@ -181,7 +183,7 @@ $zweiter = Seite::vorgangAnlegen($neu + ['pad_id' => $pa], 'x');
 wirft(fn() => Seite::amPadZeigen($zweiter), 'ein Pad zeigt nur einen Vorgang');
 wirft(fn() => Seite::amPadZeigen($vp), 'schon am Pad');
 $html = Ansicht::seite('/vorgaenge', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null, null, null, Seite::pads());
-check(str_contains($html, 'Vom Pad nehmen') && str_contains($html, 'Am Pad zeigen') && str_contains($html, 's-am_pad'), 'Knöpfe und Status in der Liste');
+check(str_contains($html, 'Vom Pad nehmen') && str_contains($html, 'Zum Pad senden') && str_contains($html, 's-am_pad'), 'Knöpfe und Status in der Liste');
 Seite::vomPadNehmen($vp);
 check(Seite::vorgang($vp)['status'] === 'wartet', 'vom Pad genommen');
 wirft(fn() => Seite::vomPadNehmen($vp), 'nicht am Pad');
@@ -205,7 +207,8 @@ Seite::abbrechen($vp);
 
 // Löschen abgebrochener Vorgänge
 $lv = Seite::vorgangAnlegen($neu + ['pad_id' => $pa], 'x');
-wirft(fn() => Seite::vorgangLoeschen($lv), 'nur abgebrochene löschbar');
+Seite::amPadZeigen($lv);
+wirft(fn() => Seite::vorgangLoeschen($lv), 'am Pad liegender Vorgang nicht löschbar');
 Seite::abbrechen($lv);
 Seite::vorgangLoeschen($lv);
 check(Seite::vorgang($lv) === null, 'abgebrochener Vorgang gelöscht');
@@ -336,5 +339,12 @@ check(Seite::vorgang($kid3)['kontakt_status'] === 'fehler' && str_contains(Seite
 wirft(fn() => $fake->kontaktSchreiben('../x', 'tok', '0711 1', ''), 'ungültige Patienten-ID');
 $fake->aufrufe = [];
 check($fake->kontaktSchreiben('p1', 'tok', '0711 1', 'alt@example.invalid') === ['telefon' => false, 'email' => false] && count($fake->aufrufe) === 1, 'Unveränderte Werte: kein PUT');
+
+// Fester IGeL-Vertrag: Art/Aktiv fest, Text änderbar.
+$fest = Seite::festeVorlageId();
+check($fest > 0, 'fester IGeL-Vertrag vorhanden');
+Seite::vorlageSpeichern(['id' => $fest, 'art' => 'sonstige', 'titel' => 'IGeL neu', 'text' => 'Neuer Text {{patient}}', 'aktiv' => '']);
+$fv = Seite::vorlage($fest);
+check($fv['art'] === 'igel' && (int)$fv['aktiv'] === 1 && $fv['text'] === 'Neuer Text {{patient}}', 'fester IGeL-Vertrag: Text änderbar, Art und Aktiv bleiben');
 
 echo "Signatur-Tests grün.\n";

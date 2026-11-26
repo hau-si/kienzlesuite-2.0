@@ -170,6 +170,8 @@ final class Seite {
         $name = trim($werte['name_text']) !== '';
         $angekommen = array_filter(self::protokoll(50), static fn($l) => str_contains($l, 'Bon an die Warteschlange')) !== [];
         return [
+            ['title' => 'Benötigte Hardware: Bondrucker', 'optional' => true, 'state' => 'open',
+                'hint' => 'Empfohlen: Epson TM-m30III (Bondrucker für Terminliste und Kasse).', 'link' => ''],
             ['title' => 'Bondrucker für den Terminzettel zugeordnet', 'optional' => true, 'state' => $bon !== '' ? 'done' : 'open',
                 'hint' => 'Verwaltung → Drucker → „Wofür welcher Drucker?“ (Bondrucker wählen)', 'link' => '/terminzettel/'],
             ['title' => 'Terminzettel: Praxisname im Kopf', 'state' => $name ? 'done' : 'open', 'optional' => true,

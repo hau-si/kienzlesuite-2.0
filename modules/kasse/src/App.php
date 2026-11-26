@@ -122,7 +122,7 @@ final class App {
             'patient' => ['name' => $visit['patient_name'], 'birthdate' => $visit['patient_birthdate']],
             'completed' => $visit['completed_at'] !== null,
             't2med' => !self::isManual($visit) && $visit['patient_id'] !== 'inbox' && $visit['oauth_cipher'] !== '',
-            'services' => array_map(static fn($s) => ['vat' => (bool)$s['vat']] + $s, $this->db->query('SELECT id,label,category,price_cents,goae_code,factor,fee_type,on_request,vat,base_cents,default_reason FROM services WHERE active=1 ORDER BY LENGTH(category)=0, category COLLATE NOCASE, label COLLATE NOCASE')->fetchAll()),
+            'services' => array_map(static fn($s) => ['vat' => (bool)$s['vat'], 'signature' => (bool)$s['signature']] + $s, $this->db->query('SELECT id,label,category,price_cents,goae_code,factor,fee_type,on_request,vat,base_cents,default_reason,signature FROM services WHERE active=1 ORDER BY LENGTH(category)=0, category COLLATE NOCASE, label COLLATE NOCASE')->fetchAll()),
             'tax' => array_intersect_key(Tax::settings($this->config), ['small_business' => 1, 'rate' => 1, 'manual_vat' => 1]),
             'groups' => array_map(static fn($g) => ['id' => $g['id'], 'label' => $g['label'], 'services' => json_decode($g['service_ids_json'], true, 32, JSON_THROW_ON_ERROR)], $this->db->query('SELECT * FROM service_groups WHERE active=1 ORDER BY label COLLATE NOCASE')->fetchAll()),
             'local_receipts' => $this->config->practiceReady(), 'bank_ready' => $this->bank->ready(),
