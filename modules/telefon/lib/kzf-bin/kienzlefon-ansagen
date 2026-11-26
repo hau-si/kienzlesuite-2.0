@@ -1,0 +1,16 @@
+#!/usr/bin/python3 -B
+# Startskript des Moduls telefon für „kienzlefon-ansagen“ aus Kienzlefon 2.7 (kienzlefon.cli:prompts_main); ersetzt /opt/kienzlefon/venv/bin/kienzlefon-ansagen.
+import os
+import sys
+from pathlib import Path
+
+# Piper liegt (optional nachgeladen) in einer eigenen Umgebung im Datenordner; Kienzlefon ruft es als „python -m piper“ mit dem
+# laufenden Interpreter auf. Ist die Umgebung da, deshalb mit deren Python neu starten.
+_venv = Path(os.environ.get('KIENZLE_DATEN', '/var/lib/kienzle/telefon')) / 'piper' / 'venv' / 'bin' / 'python'
+if _venv.is_file() and not os.environ.get('KIENZLE_PIPER_UMGEBUNG'):
+    os.environ['KIENZLE_PIPER_UMGEBUNG'] = '1'
+    os.execv(str(_venv), [str(_venv), '-B', *sys.argv])
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'kienzlefon'))
+from kienzlefon.cli import prompts_main  # noqa: E402
+
+sys.exit(prompts_main())

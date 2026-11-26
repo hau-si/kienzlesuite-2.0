@@ -1,0 +1,41 @@
+# Kienzle-Suite, Modul telefon: eigene Asterisk-Instanz (Ubuntu-Paket) als ks-telefon, Konfiguration im Datenordner.
+# Der Paketdienst asterisk.service ist abgeschaltet ([system] disables).
+[Unit]
+Description=Kienzle-Suite Modul telefon (Telefonanlage)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ks-telefon
+Environment=KIENZLE_DATEN=/var/lib/kienzle/telefon
+Environment=KFX_BASE=/var/spool/kienzle/austausch/fax_telefon
+WorkingDirectory=/var/lib/kienzle/telefon
+ExecStartPre=/usr/bin/python3 -B /opt/kienzle/telefon/current/lib/anlage.py grundgeruest
+ExecStart=/usr/sbin/asterisk -f -n -C /var/lib/kienzle/telefon/asterisk/etc/asterisk.conf
+Restart=on-failure
+RestartSec=5
+UMask=0077
+LimitNOFILE=8192
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/kienzle/telefon -/var/spool/kienzle/austausch/fax_telefon
+
+[Install]
+WantedBy=multi-user.target

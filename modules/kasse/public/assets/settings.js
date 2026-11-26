@@ -219,9 +219,8 @@ const GROUPS = [
   {id: 'netz', label: 'Arbeitsplätze', cards: ['s-clients']},
   {id: 'sicherheit', label: 'Protokoll', cards: ['s-audit']},
 ];
+// Die Einstellungsseite hat nur noch einen Bereich (keine Reiter mehr); die Leistungsliste liegt auf der eigenen Seite „IGeL“.
 const TABS = [
-  {id: 'abrechnung', label: 'Abrechnung', hint: 'laufend', cards: ['s-inbox-list']},
-  {id: 'leistungen', label: 'Leistungen', hint: 'GOÄ', cards: ['s-catalog']},
   {id: 'einrichtung', label: 'Einrichtung', hint: 'einmalig', cards: ['s-checklist', ...GROUPS.flatMap(g => g.cards)], groups: GROUPS},
 ];
 let lastOpenCards = [];
@@ -250,6 +249,7 @@ function layoutTabs(data) {
       panel.append(box);
       for (const id of group.cards) { const card = $(id); if (card) box.append(card); }
     }
+    const eingang = $('s-inbox-list'); if (eingang) panel.append(eingang);
   }
   const open = renderChecklist(data);
   rankGroups();
@@ -257,7 +257,7 @@ function layoutTabs(data) {
     for (const id of lastOpenCards) openGroupOf(id);
     openGroupOf(location.hash.slice(1));
     const hash = location.hash.slice(1);
-    activate(TABS.some(t => t.id === hash) ? hash : tabOf(hash) || (open ? 'einrichtung' : 'abrechnung'));
+    activate('einrichtung');
     if (tabOf(hash)) setTimeout(() => $(hash)?.scrollIntoView({block: 'start'}), 50);
   } else activate(activeTab);
 }
@@ -354,6 +354,9 @@ function renderChecklist(data) {
   lastOpenCards = required.filter(i => !i.done).map(i => i.card);
   lastItems = items;
   badge('einrichtung', open);
+  const fold = $('checklist-fold'), tag = $('checklist-tag');
+  if (tag) { tag.textContent = open ? open + ' offen' : 'fertig'; tag.className = 'tag ' + (open ? 'warn' : 'ok'); }
+  if (fold && !fold.dataset.touched) { fold.open = open > 0; fold.dataset.auto = String(open > 0); fold.ontoggle = () => { if (String(fold.open) !== fold.dataset.auto) fold.dataset.touched = '1'; }; }
   return open;
 }
 async function busy(button, action) {
@@ -362,9 +365,10 @@ async function busy(button, action) {
 }
 async function loadSettings() {
   const data = await api('get');
+  if (document.body.dataset.seite === 'igel') { show('settings'); loadCatalog(); return; }
   if (data.role === 'staff') { staffMode(data); return; }
   document.body.classList.remove('staff');
-  render(data); show('settings'); loadInbox(); loadCatalog();
+  render(data); show('settings'); loadInbox();
 }
 
 // Mitarbeiter-Zugang: nur die freigegebenen Bereiche, keine Einstellungen oder Schlüssel.
@@ -377,6 +381,7 @@ function staffMode(data) {
   const take = id => { const card = $(id); if (card) { card.hidden = false; panel.append(card); } };
   if (can('inbox') || can('letter')) { take('s-inbox-list'); loadInbox(); }
   if (can('catalog')) { take('s-catalog'); loadCatalog(); }
+  if (!panel.children.length && can('catalog')) { location.replace(BASE + 'igel'); return; }
   if (!panel.children.length) panel.append(el('p', 'Für diesen Zugang sind keine Bereiche freigegeben. Bitte beim Administrator melden.', 'muted'));
   show('settings');
 }
@@ -404,7 +409,7 @@ function ippIpNote(url, ips) {
 })();
 
 // Sicherheitsprotokoll: letzte Vorgänge der Einstellungsseite anzeigen.
-$('audit-load').onclick = async () => {
+if ($('audit-load')) $('audit-load').onclick = async () => {
   try {
     const result = await api('audit');
     const box = $('audit-list');
@@ -432,13 +437,13 @@ function renderCatalog(data) {
   if (!data.services.length) box.append(el('p', 'Noch keine Leistungen angelegt.', 'muted'));
   else {
     const table = el('table', null, 'fw-table'), head = el('tr');
-    for (const h of ['Bezeichnung', 'GOÄ', 'Faktor', 'Preis', 'MwSt.', '']) head.append(el('th', h));
+    for (const h of ['Bezeichnung', 'GOÄ', 'Faktor', 'Preis', 'MwSt.', 'Unterschrift', '']) head.append(el('th', h));
     table.append(head);
     for (const sv of data.services) {
       const tr = el('tr');
       const name = el('td', sv.label + (sv.on_request ? ' (auf Verlangen)' : ''));
       const factor = sv.goae_code && sv.factor ? sv.factor.replace('.', ',') + (sv.fee_type !== 'standard' ? ' · ' + (feeLabels[sv.fee_type] || '') : '') : '–';
-      tr.append(name, el('td', sv.goae_code || '–'), el('td', factor), el('td', eur(sv.price_cents)), el('td', sv.vat ? 'ja' : '–'));
+      tr.append(name, el('td', sv.goae_code || '–'), el('td', factor), el('td', eur(sv.price_cents)), el('td', sv.vat ? 'ja' : '–'), el('td', sv.signature ? 'ja' : '–'));
       const actions = el('td'); const edit = el('button', 'Bearbeiten', 'secondary small-button', {type: 'button'});
       edit.onclick = () => fillCatalogForm(sv);
       const del = el('button', 'Löschen', 'secondary small-button', {type: 'button'});
@@ -455,6 +460,8 @@ function renderCatalog(data) {
   const price = el('input', null, null, {type: 'text', id: 'cat-price', inputmode: 'decimal', maxlength: '12', required: '', placeholder: '10,00'});
   const vat = el('input', null, null, {type: 'checkbox', id: 'cat-vat'});
   const vatRow = el('label', null, 'check'); vatRow.append(vat, document.createTextNode(' mit MwSt. (im Preis enthalten)'));
+  const signature = el('input', null, null, {type: 'checkbox', id: 'cat-signature'});
+  const signRow = el('label', null, 'check'); signRow.append(signature, document.createTextNode(' Unterschrift erforderlich (Knopf „Zur Unterschrift“ in der Kasse, Modul Signatur)'));
   if (data.tax.small_business) { vat.disabled = true; vatRow.append(el('small', ' – Kleinunternehmerregelung ist eingeschaltet, Rechnungen werden ohne MwSt. erstellt.', 'muted')); }
   const onRequest = el('input', null, null, {type: 'checkbox', id: 'cat-on-request'});
   const onRow = el('label', null, 'check'); onRow.append(onRequest, document.createTextNode(' Leistung auf Verlangen'));
@@ -514,12 +521,12 @@ function renderCatalog(data) {
   const clear = () => { form.reset(); id.value = ''; factor.value = '2,3'; goae.open = false; show(''); vorschlag.hide(); save.textContent = 'Leistung hinzufügen'; reset.hidden = true; $('cat-form-title').textContent = 'Leistung anlegen oder ändern'; };
   reset.onclick = clear;
   const buttons = el('div', null, 'row-buttons'); buttons.append(save, reset);
-  form.append(id, catField('Bezeichnung', label), catField('Preis in Euro', price), vatRow, goae, onWrap, buttons);
+  form.append(id, catField('Bezeichnung', label), catField('Preis in Euro', price), vatRow, signRow, goae, onWrap, buttons);
   form.onsubmit = e => { e.preventDefault(); busy(save, async () => { goaePruefen(code.value); apply(await api('catalog_service_save', {id: id.value, label: label.value, price: price.value,
-    goae_code: code.value, fee_type: type.value, factor: factor.value, base: base.value, on_request: onRequest.checked, default_reason: reason.value, vat: vat.checked && !vat.disabled})); }); };
+    goae_code: code.value, fee_type: type.value, factor: factor.value, base: base.value, on_request: onRequest.checked, default_reason: reason.value, vat: vat.checked && !vat.disabled, signature: signature.checked})); }); };
   window.fillCatalogForm = sv => {
     id.value = sv.id; label.value = sv.label; price.value = (sv.price_cents / 100).toFixed(2).replace('.', ','); code.value = sv.goae_code || '';
-    factor.value = (sv.factor || '2.3').replace('.', ','); type.value = sv.fee_type; onRequest.checked = !!sv.on_request; reason.value = sv.default_reason || ''; vat.checked = !!sv.vat;
+    factor.value = (sv.factor || '2.3').replace('.', ','); type.value = sv.fee_type; onRequest.checked = !!sv.on_request; reason.value = sv.default_reason || ''; vat.checked = !!sv.vat; signature.checked = !!sv.signature;
     base.value = sv.base_cents ? (sv.base_cents / 100).toFixed(2).replace('.', ',') : ''; target.value = sv.base_cents ? price.value : '';
     goae.open = !!sv.goae_code; show(''); save.textContent = 'Änderung speichern'; reset.hidden = false;
     $('cat-form-title').textContent = 'Leistung ändern: ' + sv.label; label.focus();
@@ -643,4 +650,4 @@ async function loadInbox() {
   try { renderInbox(await api('inbox_overview')); }
   catch (error) { $('inbox-box').replaceChildren(el('p', error.message, 'muted')); }
 }
-$('inbox-load').onclick = loadInbox;
+if ($('inbox-load')) $('inbox-load').onclick = loadInbox;

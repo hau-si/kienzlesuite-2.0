@@ -17,6 +17,7 @@ function st_env(): array {
     $crt = $env->dir . '/server.crt';
     exec('openssl req -x509 -newkey rsa:2048 -nodes -keyout ' . escapeshellarg($env->dir . '/k.key') . ' -out ' . escapeshellarg($crt) . ' -subj /CN=kienzle.example.org -days 2 2>/dev/null', $o, $code);
     check($code === 0 && is_file($crt), 'Testzertifikat nicht erzeugt');
+    copy($crt, $env->dir . '/ca.crt');   // Zertifizierungsstelle neben server.crt (im Test dasselbe selbstsignierte Zertifikat)
     $st = new Starter($env->db, $env->secrets, $env->config, dirname(__DIR__, 2) . '/core', $crt);
     return [$env, $st];
 }
@@ -60,6 +61,7 @@ function test_seite_und_paket(): void {
     check($zip->status === 200 && $zip->header('Content-Type') === 'application/zip' && str_starts_with($zip->body, "PK\x03\x04"), 'ZIP');
     check(str_contains($zip->body, 'install-linux.sh') && str_contains($zip->body, 'schemas.txt') && str_contains($zip->body, 'kienzle-igel') && str_contains($zip->body, '"/starter/kasse"'), 'Paketinhalt');
     check(str_contains($zip->body, $st->key()) && str_contains($zip->body, '"server_url": "https://kienzle.example.org"'), 'client.json');
+    check(str_contains($zip->body, 'ca.crt'), 'Paket enthält die Zertifizierungsstelle');
     check($b->get('/verwaltung/arbeitsplaetze/amiga.zip')->status === 404, 'unbekanntes System');
     $mitDrucker = $st->files('windows', ['kienzle-kasse' => '/starter/kasse'], 'https://kienzle.example.org', [['name' => 'vKasse', 'url' => 'http://kienzle.example.org:631/printers/vKasse', 'papier' => 'A4']]);
     check(($mitDrucker['drucker.txt']['data'] ?? '') === "vKasse|http://kienzle.example.org:631/printers/vKasse|A4\n" && isset($mitDrucker['install-drucker.ps1']), 'Paket ohne Druckerliste');

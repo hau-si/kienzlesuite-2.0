@@ -41,7 +41,7 @@ final class Letterxpress {
     private function reason(array $response): string {
         if ($response['status'] === 401 || $response['status'] === 403) return 'Letterxpress lehnt Benutzername oder API-Key ab.';
         $message = is_array($response['body']) && is_string($response['body']['message'] ?? null) ? preg_replace('/[\x00-\x1f\x7f]/u', ' ', $response['body']['message']) : '';
-        if (stripos($message, 'could not be determined') !== false) return 'Letterxpress findet im PDF keine lesbare Anschrift (Adressfenster der Rechnung) und kann Inland/Ausland nicht bestimmen. Anschrift im T2med-Rechnungsformular im Adressfenster prüfen oder unter Einstellungen die Versandart fest auf „Inland“ stellen. (HTTP ' . $response['status'] . ')';
+        if (stripos($message, 'could not be determined') !== false) return 'Letterxpress findet im PDF keine lesbare Anschrift (Adressfenster der Rechnung) und kann Inland/Ausland nicht bestimmen. Anschrift im T2med-Rechnungsformular im Adressfenster prüfen oder (empfohlen) unter Einstellungen die Versandart fest auf „Nur Inland“ stellen, weil die automatische Erkennung von Letterxpress fehleranfällig ist. (HTTP ' . $response['status'] . ')';
         if (stripos($message, 'verschl') !== false) return 'Letterxpress lehnt das PDF ab (verschlüsselt oder nicht A4-Hochformat). Das PDF muss A4 hoch und ohne Kennwortschutz sein (Papierformat des Windows-Druckers „vKasse“ prüfen). (HTTP ' . $response['status'] . ')';
         return 'Letterxpress antwortet mit HTTP ' . $response['status'] . ($message !== '' ? ': ' . mb_substr($message, 0, 160) : '.');
     }

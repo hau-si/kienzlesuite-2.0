@@ -58,6 +58,21 @@ Der Starter öffnet nach dem Aufruf `https://<server>/#launch=<64 Hexzeichen>&m=
 Die Basis gibt diesen Teil nach der Anmeldung an `<web.path>/#launch=…` weiter (core.js, über `sessionStorage` im selben Tab,
 falls erst angemeldet werden muss). Der Code verlässt den Browser dabei nicht.
 
+## Arbeitsplatz und „Akte öffnen“ (Kienzle-Agent)
+
+Die Basis weiß, an welchem PC der Browser sitzt, wenn dort der Kienzle-Agent läuft (gleiche Adresse oder unter Mein Konto gewählt).
+PHP: `$k->arbeitsplatz()` liefert `['id', 'name', 'online']` oder `null`.
+
+Den Patienten in T2med öffnen (GDT-Satz 6301 an den Agent des PCs): aus der Modulseite per JavaScript
+
+```js
+fetch('/arbeitsplatz/akte', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', Accept: 'application/json'},
+  body: JSON.stringify({modul: 'telefon', csrf: '<CSRF-Marke des Moduls>', patientennummer: '4711'})})
+// 200 {ok, auftrag, platz} · 409 {error, waehlen?} (PC nicht erkannt oder Agent nicht verbunden) · 403 (Sitzung/CSRF)
+```
+
+Stand: `GET /arbeitsplatz/stand?id=<auftrag>` → `offen`, `abgeholt`, `ok: geschrieben`, `fehler: …`, `verfallen`.
+
 ## Gesundheitsprüfung
 
 Die Basis antwortet auf `GET https://<server>/_health` (nur von localhost) mit `{"status":"ok","version":"…"}`.
@@ -91,6 +106,23 @@ Verbindungen. Ändert der Admin etwas, wird die Datei neu geschrieben; Module le
 ```php
 $fhir = $k->verbindung('t2med');      // null, wenn nicht eingerichtet
 ```
+
+## Nachrichten-Ausgang (SMS und E-Mail)
+
+Angemeldet mit `[[connections]] id = "nachrichten"`. Das Modul kennt weder den SMS- noch den E-Mail-Zugang. Es legt einen Auftrag
+in seinem Ausgang ab (`/var/spool/kienzle/nachrichten/<id>/`); der Dienst `ks-nachrichten` verschickt ihn innerhalb von etwa
+20 Sekunden mit den Verbindungen der Basis (SMS über seven.io, E-Mail über SMTP oder Gmail) und schreibt das Ergebnis zurück.
+Fehlschläge werden 30 Minuten lang wiederholt. Je Modul höchstens 60 SMS und 120 E-Mails pro Stunde.
+
+```php
+$bereit = $k->nachrichtenBereit();                     // ['sms' => bool, 'mail' => bool]
+$job = $k->smsSenden('+491701234567', 'Ihr Rezept liegt zur Abholung bereit.');      // höchstens 320 Zeichen
+$job = $k->mailSenden(['empfang@example.org'], 'Neues Fax eingegangen', $text);       // 1–5 Adressen, nur Text
+$k->nachricht($job);                                    // ['stand' => 'wartet'|'gesendet'|'fehler'|'unbekannt', 'meldung' => …]
+```
+
+Texte so knapp wie möglich und **ohne Befunde, Diagnosen oder Anhänge**; SMS und E-Mail sind nicht Ende-zu-Ende verschlüsselt.
+Eigene Dienste des Moduls, die Nachrichten ablegen, tragen `-/var/spool/kienzle/nachrichten/<id>` in `ReadWritePaths` ein.
 
 ## Netzwerkspeicher
 
@@ -137,6 +169,13 @@ und entfernt sie mit dem Modul:
 - Ältere Art, `ppd` (+ `backend`): Backend 0755 und PPD 0644 aus dem Programmordner, Adresse `kienzle-<id>-<name>:/<name>`;
   ohne `backend` verwirft das Backend `kienzle-leer` der Basis die Ausgabe der Filter.
 
+
+### Lauschordner auf dem Netzwerkspeicher
+
+Mit der Verbindung „ablage“ kann ein Modul auch Dateien vom NAS holen: `$k->lauschen($ziel, 'Ordner', ['pdf'])` schaltet einen Lauschordner
+ein (leeres Ziel schaltet aus). `ks-ablage` holt neue Dateien mit den genannten Endungen (höchstens 20 je Durchlauf) nach
+`$k->lauschenEingang()`, prüft sie durch zweites Lesen und löscht sie erst danach auf dem NAS. Das Modul liest und löscht die Dateien dort
+selbst. Dateien mit gleichem Namen werden nicht überschrieben (Vorsatz `1-`, `2-` …).
 
 ## Seiten im Rahmen der Suite
 

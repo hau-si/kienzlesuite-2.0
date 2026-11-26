@@ -1,0 +1,41 @@
+# Kienzle-Suite, Modul telefon: Steuerungsdienst aus Kienzlefon (Rufgruppen Normal und ROT). Hört nur auf 127.0.0.1:8767.
+# Mit eingeschalteten Rufgruppen trägt dieser Dienst die Telefone in die Warteschlange ein (auch nach jedem Asterisk-Neustart);
+# deshalb startet er immer wieder neu. Gestartet wird er über kienzle-telefon-steuerung.path, sobald die Rufgruppen eingeschaltet sind.
+[Unit]
+Description=Kienzle-Suite Modul telefon (Rufgruppen, Steuerungsdienst)
+After=kienzle-telefon-asterisk.service
+ConditionPathExists=/var/lib/kienzle/telefon/kienzlefon/control-ami.json
+
+[Service]
+Type=simple
+User=ks-telefon
+Environment=KIENZLE_DATEN=/var/lib/kienzle/telefon
+WorkingDirectory=/var/lib/kienzle/telefon
+ExecStart=/opt/kienzle/telefon/current/lib/kzf-bin/kienzlefon-control --config /var/lib/kienzle/telefon/kienzlefon/kienzlefon.toml
+Restart=always
+RestartSec=5
+UMask=0077
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=localhost
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/kienzle/telefon
+
+[Install]
+WantedBy=multi-user.target

@@ -18,6 +18,28 @@ def fake_qr(size: int = 200):
     return Image.new("1", (size, size), 1)
 
 
+class AbsageMail(unittest.TestCase):
+    def ticket(self):
+        return app.ParsedTicket(patient="Max Muster", appointments=[
+            app.Appointment("Mo", "07.12.2026", "09:30", "Kontrolle"), app.Appointment("Di", "15.12.2026", "10:00", "")])
+
+    def test_platzhalter_in_betreff_und_text(self):
+        from urllib.parse import unquote
+        cancel = {"to": "praxis@example.de", "subject": "Terminabsage {{patient}}", "body": "Absage:\n{{termine}}\n{{patient}}"}
+        url = unquote(app.cancel_mailto(cancel, self.ticket()).decode())
+        self.assertIn("subject=Terminabsage Max Muster&", url)
+        self.assertIn("Mo 07.12.2026 09:30 Kontrolle", url)
+        self.assertIn("Di 15.12.2026 10:00", url)
+        kurz = unquote(app.cancel_mailto(cancel, self.ticket(), 1).decode())
+        self.assertNotIn("Kontrolle", kurz)
+        ohne = unquote(app.cancel_mailto(cancel, self.ticket(), 2).decode())
+        self.assertNotIn("07.12.2026", ohne)
+        self.assertIn("Max Muster", ohne)
+
+    def test_ohne_ticket_bleibt_es_lesbar(self):
+        self.assertIn("subject=Terminabsage", app.cancel_mailto({"to": "a@b.de", "subject": "Terminabsage {{patient}}", "body": ""}).decode().replace("%20", " "))
+
+
 class AbsageBlock(unittest.TestCase):
     def test_zeilen_nach_dem_fragezeichen(self):
         self.assertEqual(app._bar_lines("Verhindert? Bitte absagen."), ["Verhindert?", "Bitte absagen."])

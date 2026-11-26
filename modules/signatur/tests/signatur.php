@@ -18,7 +18,7 @@ $vl = Seite::vorlagen();
 check(count($vl) === 3 && count(array_unique(array_column($vl, 'art'))) === 3, 'drei Mustervorlagen erwartet');
 check((int)Speicher::pdo()->query('PRAGMA user_version')->fetchColumn() === Speicher::VERSION, 'Schemaversion');
 check(count(Seite::vorlagen()) === 3, 'Muster dürfen nicht doppelt angelegt werden');
-check(Seite::ueberblick()[0]['state'] === 'open', 'Überblick: Mustertexte offen');
+check(Seite::ueberblick()[2]['state'] === 'open', 'Überblick: Mustertexte offen');
 
 // Platzhalter
 Seite::pruefePlatzhalter('Name {{patient}} am {{ datum }}');
@@ -77,6 +77,8 @@ check(Seite::vorgang((int)$igel['id']) !== null, 'wartende Vorgänge werden nie 
 
 // Vorlage löschen löst den Verweis, der Vorgang bleibt
 $vorl = (int)Seite::vorgang((int)$igel['id'])['vorlage_id'];
+wirft(fn() => Seite::vorlageLoeschen($vorl), 'fester IGeL-Vertrag nicht löschbar');
+\KienzleSignatur\Speicher::pdo()->exec("UPDATE vorlagen SET art='sonstige' WHERE id=" . $vorl);
 Seite::vorlageLoeschen($vorl);
 check(Seite::vorlage($vorl) === null && Seite::vorgang((int)$igel['id'])['vorlage_id'] === null, 'Vorlage gelöscht, Vorgang bleibt');
 
@@ -124,7 +126,7 @@ check($stand['installiert'] && $stand['version'] === '9.0.1' && $stand['von'] ==
 check(is_file(Pad::ordnerPfad() . '/libSTPadLib.so') && is_file(Pad::ordnerPfad() . '/libSTCPImageEngine.so') && is_file(Pad::ordnerPfad() . '/Lizenzvertrag-signotec.txt'), 'Dateien abgelegt');
 check(!file_exists($dir . '/evil.so') && !file_exists(dirname($dir) . '/evil.so') && count(glob($dir . '/signotec/*')) === 4, 'nur feste Dateinamen, nichts außerhalb');
 check(decoct(fileperms(Pad::ordnerPfad() . '/libSTPadLib.so') & 0777) === '640', 'Dateirechte 0640');
-check(Seite::ueberblick()[0]['state'] === 'done', 'Überblick: Pad-Software erledigt');
+check(Seite::ueberblick()[1]['state'] === 'done', 'Überblick: Pad-Software erledigt');
 $htmlAdmin = Ansicht::seite('/einstellungen', 'tok', [], [], true, true, null, null, null, Pad::status());
 check(str_contains($htmlAdmin, 'id="pad-los"') && str_contains($htmlAdmin, 'signoPAD-API Linux 9.0.1') && str_contains($htmlAdmin, 'Pad-Software entfernen'), 'Admin sieht Upload und Stand');
 check(!str_contains(Ansicht::seite('/einstellungen', 'tok', [], [], true, true, null, null), 'id="pad-los"'), 'ohne Admin kein Upload');
@@ -181,7 +183,7 @@ $zweiter = Seite::vorgangAnlegen($neu + ['pad_id' => $pa], 'x');
 wirft(fn() => Seite::amPadZeigen($zweiter), 'ein Pad zeigt nur einen Vorgang');
 wirft(fn() => Seite::amPadZeigen($vp), 'schon am Pad');
 $html = Ansicht::seite('/vorgaenge', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null, null, null, Seite::pads());
-check(str_contains($html, 'Vom Pad nehmen') && str_contains($html, 'Am Pad zeigen') && str_contains($html, 's-am_pad'), 'Knöpfe und Status in der Liste');
+check(str_contains($html, 'Vom Pad nehmen') && str_contains($html, 'Zum Pad senden') && str_contains($html, 's-am_pad'), 'Knöpfe und Status in der Liste');
 Seite::vomPadNehmen($vp);
 check(Seite::vorgang($vp)['status'] === 'wartet', 'vom Pad genommen');
 wirft(fn() => Seite::vomPadNehmen($vp), 'nicht am Pad');
@@ -205,7 +207,8 @@ Seite::abbrechen($vp);
 
 // Löschen abgebrochener Vorgänge
 $lv = Seite::vorgangAnlegen($neu + ['pad_id' => $pa], 'x');
-wirft(fn() => Seite::vorgangLoeschen($lv), 'nur abgebrochene löschbar');
+Seite::amPadZeigen($lv);
+wirft(fn() => Seite::vorgangLoeschen($lv), 'am Pad liegender Vorgang nicht löschbar');
 Seite::abbrechen($lv);
 Seite::vorgangLoeschen($lv);
 check(Seite::vorgang($lv) === null, 'abgebrochener Vorgang gelöscht');
@@ -287,6 +290,15 @@ check($kl['text'] === 'Tel … Mail … Geb … Adr …', 'Ohne Kontaktdaten ble
 wirft(fn() => Seite::vorgangAnlegen(['vorlage_id' => $kt, 'pad_id' => $padT, 'patient' => 'K', 'email' => 'kein-mail'], 'x', $praxis), 'ungültige E-Mail');
 wirft(fn() => Seite::vorgangAnlegen(['vorlage_id' => $kt, 'pad_id' => $padT, 'patient' => 'K', 'telefon' => 'abc<script>'], 'x', $praxis), 'ungültiges Telefon');
 
+// API-Schlüssel: leer = Demo-Schlüssel wie in der Kasse; 403 mit Hinweis
+$kopfTest = new class(['base_url' => 'https://t2med.example.org/aps/fhir/api/r4', 'api_key' => '']) extends Fhir {
+    public array $kopf = []; public int $status = 403;
+    protected function anfrage(string $url, string $token, string $methode = 'GET', ?array $body = null, array $mehr = []): array { return ['status' => $this->status, 'body' => null]; }
+};
+try { $kopfTest->patient('k1', 'tok'); check(false, '403 ohne Fehler'); } catch (RuntimeException $e) { check(str_contains($e->getMessage(), 'HTTP 403') && str_contains($e->getMessage(), 'API-Schlüssel'), '403 mit Hinweis auf den API-Schlüssel'); }
+$rm = new ReflectionMethod(Fhir::class, 'anfrage');
+check(Fhir::DEMO_SCHLUESSEL !== '' && str_contains((string)file_get_contents(dirname(__DIR__) . '/src/Fhir.php'), "if (\$key === '') \$key = self::DEMO_SCHLUESSEL;"), 'Leerer Schlüssel nutzt den Demo-Schlüssel');
+
 // Anrede-Platzhalter
 $at = Seite::vorlageSpeichern(['art' => 'sonstige', 'titel' => 'Anrede-Test', 'text' => '{{briefanrede}}|{{anrede}}|{{vorname}}|{{nachname}}', 'aktiv' => 1]);
 $an = fn(array $x) => Seite::vorgang(Seite::vorgangAnlegen(['vorlage_id' => $at, 'pad_id' => $padT, 'patient' => 'Max Mustermann'] + $x, 'x', $praxis))['text'];
@@ -327,5 +339,12 @@ check(Seite::vorgang($kid3)['kontakt_status'] === 'fehler' && str_contains(Seite
 wirft(fn() => $fake->kontaktSchreiben('../x', 'tok', '0711 1', ''), 'ungültige Patienten-ID');
 $fake->aufrufe = [];
 check($fake->kontaktSchreiben('p1', 'tok', '0711 1', 'alt@example.invalid') === ['telefon' => false, 'email' => false] && count($fake->aufrufe) === 1, 'Unveränderte Werte: kein PUT');
+
+// Fester IGeL-Vertrag: Art/Aktiv fest, Text änderbar.
+$fest = Seite::festeVorlageId();
+check($fest > 0, 'fester IGeL-Vertrag vorhanden');
+Seite::vorlageSpeichern(['id' => $fest, 'art' => 'sonstige', 'titel' => 'IGeL neu', 'text' => 'Neuer Text {{patient}}', 'aktiv' => '']);
+$fv = Seite::vorlage($fest);
+check($fv['art'] === 'igel' && (int)$fv['aktiv'] === 1 && $fv['text'] === 'Neuer Text {{patient}}', 'fester IGeL-Vertrag: Text änderbar, Art und Aktiv bleiben');
 
 echo "Signatur-Tests grün.\n";

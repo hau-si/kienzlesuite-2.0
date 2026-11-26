@@ -77,3 +77,17 @@
   open();
   window.addEventListener('hashchange', open);
 })();
+
+// Platzhalter für die Absage-Mail: an der Cursorstelle des zuletzt gewählten Felds (Betreff oder Text) einfügen.
+(() => {
+  const felder = ['f-cancel_subject', 'f-cancel_body'].map((id) => document.getElementById(id)).filter(Boolean);
+  if (!felder.length) return;
+  let ziel = document.getElementById('f-cancel_body') || felder[0];
+  felder.forEach((f) => f.addEventListener('focus', () => { ziel = f; }));
+  document.querySelectorAll('[data-platzhalter]').forEach((b) => b.addEventListener('click', () => {
+    const t = b.dataset.platzhalter, a = ziel.selectionStart ?? ziel.value.length, e = ziel.selectionEnd ?? a;
+    ziel.value = ziel.value.slice(0, a) + t + ziel.value.slice(e);
+    ziel.focus(); ziel.setSelectionRange(a + t.length, a + t.length);
+    ziel.dispatchEvent(new Event('input', { bubbles: true }));
+  }));
+})();

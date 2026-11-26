@@ -16,7 +16,7 @@ register_shutdown_function(fn() => array_map('unlink', glob("$dir/*") ?: []) && 
 // Vorgaben und Eingabeprüfung
 $defaults = Seite::werte();
 check($defaults['qr_size'] === 'medium' && $defaults['enabled'] === true && $defaults['heading'] === 'IHRE TERMINE', 'Vorgaben');
-$in = ['enabled' => '1', 'logo_enabled' => '1', 'logo_size' => 'large', 'logo_align' => 'right', 'cancel_enabled' => '1', 'cancel_to' => 'praxis@example.org', 'cancel_subject' => 'Terminabsage', 'cancel_body' => "Guten Tag\r\nich sage ab", 'cancel_caption' => 'Absagen', 'cancel_size' => 'small', 'name_text' => 'Praxis Beispiel', 'name_size' => '2x2', 'name_bold' => '1',
+$in = ['enabled' => '1', 'logo_enabled' => '1', 'logo_size' => 'large', 'logo_align' => 'right', 'cancel_enabled' => '1', 'cancel_to' => 'praxis@example.org', 'cancel_subject' => 'Terminabsage {{patient}}', 'cancel_body' => "Guten Tag\r\nich sage ab", 'cancel_caption' => 'Absagen', 'cancel_size' => 'small', 'name_text' => 'Praxis Beispiel', 'name_size' => '2x2', 'name_bold' => '1',
     'address_text' => "Musterweg 1\r\n12345 Beispielstadt", 'address_size' => '1x1',
     'heading' => 'TERMINE', 'heading_size' => '2x2', 'show_patient' => '1', 'appointment_size' => '1x2', 'footer_text' => '', 'footer_size' => '1x1',
     'qr_enabled' => '1', 'qr_position' => 'below', 'qr_size' => 'large', 'qr_summary' => 'Termin Praxis', 'cut' => ''];
@@ -150,4 +150,10 @@ $k = new KienzleModul('terminzettel', ['KIENZLE_MENUE' => rawurlencode('{"apps":
 $seite = $k->rahmen('Terminzettel', $html, ['roh' => true, 'kopf' => $kopf]);
 check(str_contains($seite, '<aside class="side">') && str_contains($seite, 'href="/terminzettel/"') && str_contains($seite, 'assets/app.js?v=') && str_contains($seite, 'Bon-1'), 'Seite im Rahmen der Suite mit Seitenleiste');
 check(preg_match('#assets/style\.css\?v=[0-9a-f]{8}"#', $kopf) === 1 && preg_match('#assets/app\.js\?v=[0-9a-f]{8}"#', $kopf) === 1, 'Skript und Stil ohne Versionsanhang: Zwischenspeicher zeigt nach einem Update alte Dateien');
+// Neuer Standardtext der Absage-Mail; alte Standardtexte werden ersetzt.
+$alt = ['cancel_body' => "Guten Tag,\n\nich kann meinen Termin leider nicht wahrnehmen und sage ihn hiermit ab:\n{{termine}}\n\nMit freundlichen Grüßen\n{{patient}}", 'cancel_subject' => 'Terminabsage'];
+file_put_contents(Seite::$data . '/werte.json', json_encode($alt));
+$neu = Seite::werte();
+check(str_contains($neu['cancel_body'], "leider muss ich meinen Termin am\n\n{{termine}}\n\nabsagen.") && str_ends_with($neu['cancel_body'], "Viele Grüße,\n{{patient}}") && $neu['cancel_subject'] === 'Terminabsage {{patient}}', 'Neuer Standardtext der Absage-Mail');
+
 echo "OK: Terminzettel-Einstellungen, Layout, Ablage und Vorschau.\n";

@@ -3,7 +3,10 @@
 (Abbrechen, Löschen, OK), nimmt die Unterschrift auf und speichert sie als PNG und als Rohdaten.
 
 Aufruf:  python3 padsign.py <IP> [Port] [Bibliotheksordner] [Ausgabeordner]
-Die Datei im Ausgabeordner (Vorgabe: Bibliotheksordner) heißt unterschrift-test.png und unterschrift-test.sdb."""
+Die Datei im Ausgabeordner (Vorgabe: Bibliotheksordner) heißt unterschrift-test.png und unterschrift-test.sdb.
+
+Fehlersuche (Umgebungsvariable PADSIGN, Wörter mit Komma):  bild = Seite wie im Pad-Dienst als Bild statt Text anzeigen;
+stop = mit STSignatureStop statt STSignatureConfirm abschließen. Am Ende steht, wie viele Stiftereignisse ankamen."""
 from __future__ import annotations
 
 import ctypes
@@ -56,10 +59,15 @@ def main(argv: list[str]) -> int:
         f = getattr(lib, name)
         f.argtypes = args
         f.restype = None if name == 'STControlSetCallback' else I
+    varianten = set(os.environ.get('PADSIGN', '').split(','))
     ereignis: list[tuple[int, int]] = []
+    stift = [0]
     signal = threading.Event()
 
     def rueckruf(art, daten, groesse, _):
+        if art == 4:
+            stift[0] += 1
+            return
         wert = ctypes.cast(daten, ctypes.POINTER(ctypes.c_int))[0] if daten and groesse > 0 else 0
         ereignis.append((art, wert))
         signal.set()
@@ -78,14 +86,26 @@ def main(argv: list[str]) -> int:
             pruefen(lib, 'Ziel', lib.STDisplaySetTarget(FOREGROUND))
             lib.STDisplaySetFont('DejaVu Sans', 30, 0)
             pruefen(lib, 'Text', lib.STDisplaySetTextInRect(40, 30, b - 80, 120, 0, 'Testseite der Kienzle-Suite. Bitte unten im Feld unterschreiben.', 0))
-            feld = (40, 170, b - 80, h - 170 - 150)
-            lib.STDisplaySetTextInRect(feld[0], feld[1] + feld[3] - 60, feld[2], 60, 0, 'x ' + '_' * 60, 0)
-            tasten = {}
-            breite = (b - 80 - 2 * 30) // 3
-            for i, text in enumerate(('Abbrechen', 'Löschen', 'OK')):
-                links = 40 + i * (breite + 30)
-                lib.STDisplaySetTextInRect(links, h - 120, breite, 90, 1, '[ ' + text + ' ]', 0)
-                tasten[pruefen(lib, 'Schaltfläche', lib.STSensorAddHotSpot(links, h - 130, breite, 110))] = text
+            if 'bild' in varianten:
+                import padseiten
+                seite = padseiten.unterschriftsseite('Test', 'Testpatient')
+                pfad = os.path.join(ordner, 'seite-test.png')
+                seite['bild'].save(pfad)
+                lib.STDisplaySetImageFromFile.argtypes = [I, I, W]
+                pruefen(lib, 'Bild', lib.STDisplaySetImageFromFile(0, 0, pfad))
+                feld = seite['feld']
+                tasten = {}
+                for name, rechteck in seite['knoepfe'].items():
+                    tasten[pruefen(lib, 'Schaltfläche', lib.STSensorAddHotSpot(*rechteck))] = name
+            else:
+                feld = (40, 170, b - 80, h - 170 - 150)
+                lib.STDisplaySetTextInRect(feld[0], feld[1] + feld[3] - 60, feld[2], 60, 0, 'x ' + '_' * 60, 0)
+                tasten = {}
+                breite = (b - 80 - 2 * 30) // 3
+                for i, text in enumerate(('Abbrechen', 'Löschen', 'OK')):
+                    links = 40 + i * (breite + 30)
+                    lib.STDisplaySetTextInRect(links, h - 120, breite, 90, 1, '[ ' + text + ' ]', 0)
+                    tasten[pruefen(lib, 'Schaltfläche', lib.STSensorAddHotSpot(links, h - 130, breite, 110))] = text
             pruefen(lib, 'Unterschriftsfeld', lib.STSensorSetSignRect(*feld))
             pruefen(lib, 'Aufnahme starten', lib.STSignatureStart())
             padtest.schritt('Bitte auf dem Pad unterschreiben und mit OK bestätigen (Wartezeit 2 Minuten).')
@@ -109,7 +129,11 @@ def main(argv: list[str]) -> int:
                         padtest.schritt('Abgebrochen.')
                         return 1
                     elif taste == 'OK':
-                        pruefen(lib, 'Bestätigen', lib.STSignatureConfirm())
+                        padtest.schritt(f'Stiftereignisse bisher: {stift[0]}')
+                        if 'stop' in varianten:
+                            padtest.schritt(f'Stopp: {lib.STSignatureStop()}')
+                        else:
+                            pruefen(lib, 'Bestätigen', lib.STSignatureConfirm())
                         groesse = ctypes.c_int(0)
                         pruefen(lib, 'Rohdaten (Größe)', lib.STSignatureGetSignData(None, ctypes.byref(groesse)))
                         puffer = (ctypes.c_ubyte * groesse.value)()

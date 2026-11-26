@@ -13,7 +13,7 @@ let receiptPrintPayment = null; const quittungNote = {};
 const exportTried = new Set();
 const printTried = new Set();
 let printTouched = false;
-function message(text='') { $('message').textContent = text; $('message').hidden = !text; }
+function message(text='', ok=false) { $('message').textContent = text; $('message').hidden = !text; $('message').classList.toggle('ok', !!ok); }
 async function api(action, data={}) {
   const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 75000);
   try {
@@ -44,7 +44,11 @@ document.querySelectorAll('input[name="pay-method"]').forEach(r => r.addEventLis
 const SIGNATUR = document.body.dataset.signatur || '';
 function signaturKnopf(sum) {
   const knopf = $('sign-send'); if (!knopf) return;
-  knopf.hidden = !SIGNATUR || !state || !state.patient;
+  // Nur anzeigen, wenn mindestens eine gewählte Leistung eine Unterschrift verlangt (Haken im Leistungskatalog).
+  const ids = state ? selectedIds() : new Set();
+  const noetig = !!state && state.services.some(s => ids.has(s.id) && s.signature);
+  knopf.hidden = !SIGNATUR || !state || !state.patient || !noetig;
+  const hinweis = $('sign-note'); if (hinweis && knopf.hidden) hinweis.hidden = true;
   knopf.disabled = !(sum > 0) || busy;
 }
 function signaturListe() {
@@ -74,7 +78,8 @@ function updateTotal() {
   $('total').textContent = Number.isFinite(sum) ? euro(sum) : '—';
   const method = payMethod(), cash = method === 'cash', transfer = method === 'transfer';
   $('pay-transfer-label').hidden = !state.bank_ready;
-  $('pay').textContent = transfer ? (sum > 0 ? euro(sum) + ' per Überweisung – Rechnung erstellen' : 'Per Überweisung') : cash ? (sum > 0 ? euro(sum) + ' bar erhalten – Rechnung erstellen' : 'Bar kassieren') : (sum > 0 ? euro(sum) + ' mit Karte kassieren' : 'Mit Karte kassieren');
+  const art = transfer ? 'Überweisung' : cash ? 'Bar' : 'Karte';
+  $('pay').textContent = sum > 0 ? euro(sum) + ' · ' + art : art;
   $('pay').classList.toggle('cash', cash || transfer);
   signaturKnopf(sum);
   // Barzahlung braucht kein freies Terminal, aber Praxisdaten für die Rechnung.
@@ -112,14 +117,14 @@ function renderInvoices() {
       retrySelection = false; state.reader_payment = null; readerMessage = '';
       sessionStorage.removeItem(key); renderPayment();
     });
-    const card = element('button',euro(invoice.amount_cents)+' mit Karte (EC) kassieren','primary wide invoice-pay');
+    const card = element('button',euro(invoice.amount_cents)+' · Karte','primary wide invoice-pay');
     card.onclick = pay('card');
-    const cash = element('button','Bar bezahlt','secondary wide invoice-cash');
+    const cash = element('button','Bar','secondary wide invoice-cash');
     cash.onclick = () => { if (confirm(euro(invoice.amount_cents)+' bar erhalten? Die Zahlung wird als bezahlt erfasst.')) pay('cash')(); };
-    const later = element('button','Patient zahlt später (Überweisung)','text-button invoice-later');
+    const later = element('button','Überweisung','text-button invoice-later');
     later.onclick = () => run(async() => {
       // Ist der Rechnungsdruck eingeschaltet, kommt die Rechnung jetzt einmal auf den Praxisdrucker (für die Überweisung).
-      const result = await api('invoice_later', {invoice_id: invoice.id}); if (result.message) message(result.message);
+      const result = await api('invoice_later', {invoice_id: invoice.id}); if (result.message) message(result.message, true);
       invoiceLater.add(invoice.id); await load();
     });
     // Einheitliche Zahlungswahl wie in der freien Eingabe: Chips mit Symbolen + ein Knopf. Die Einzelknöpfe bleiben (versteckt) als Auslöser.
@@ -129,7 +134,7 @@ function renderInvoices() {
     const canPost = !!(state.letter?.enabled && invoice.letter?.postable && !invoice.letter?.locked);
     if (canPost) options.push(['post', '✉ Per Post']);
     const go = element('button', '', 'primary wide invoice-go');
-    const labels = {card: euro(invoice.amount_cents) + ' mit Karte kassieren', cash: euro(invoice.amount_cents) + ' bar erhalten', later: 'Überweisung: Rechnung zurückstellen und drucken', post: 'Per Post senden (Letterxpress)'};
+    const labels = {card: euro(invoice.amount_cents) + ' · Karte', cash: euro(invoice.amount_cents) + ' · Bar', later: 'Überweisung', post: 'Per Post senden'};
     const radios = {};
     // Die Liste wird alle paar Sekunden neu aufgebaut: eine von Hand gewählte Zahlart bleibt erhalten, „Karte“ ist nur die Vorauswahl.
     const chosen = options.some(o => o[0] === chosenMethod.get(invoice.id)) ? chosenMethod.get(invoice.id) : 'card';
@@ -164,7 +169,7 @@ function renderInvoices() {
             + '\n\nDabei gehen die Rechnung mit Patientendaten an Letterxpress.' + (live ? ' Das kostet Porto und Druck. Ein zweiter Versand ist nicht möglich.' : '');
           if (!confirm(text)) return;
           const result = await api('invoice_letter', {invoice_id: invoice.id});
-          message(result.message); await load();
+          message(result.message, true); await load();
         });
         box.append(post);
       }
@@ -531,7 +536,7 @@ $('switch-transfer').onclick=()=>run(async()=>{ state.payment=await api('switch_
 $('switch-later').onclick=()=>run(async()=>{
   // T2med-Rechnung: Der Überweisungs-QR-Code steht auf der Rechnung. Wie „Patient zahlt später“ in der Rechnungsliste: Rechnung drucken (wenn eingeschaltet) und zurück zur Auswahl.
   const id=state.payment.invoice_id, invoice=(state.invoices||[]).find(i=>i.id===id);
-  if(invoice && state.print?.t2med_auto && !invoice.printed_at) { const result=await api('invoice_later',{invoice_id:id}); if(result.message) message(result.message); }
+  if(invoice && state.print?.t2med_auto && !invoice.printed_at) { const result=await api('invoice_later',{invoice_id:id}); if(result.message) message(result.message, true); }
   if(id) invoiceLater.add(id);
   retrySelection=true; startRequest=null; await load(); renderPayment(); updateTotal();
 });

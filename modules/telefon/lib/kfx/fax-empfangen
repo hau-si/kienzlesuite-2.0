@@ -1,0 +1,60 @@
+#!/usr/bin/python3 -B
+"""Faxempfang (aus dem Dialplan fax-in, läuft als ks-telefon): TIFF in PDF wandeln und in den Austauschordner legen.
+
+Kienzlefax legte das PDF nach /srv/scan/fax-eingang (tiff2pdf im Dialplan). Hier landet es in
+<Austauschordner>/empfang/<name>.pdf mit <name>.json (Zeit, Absendernummer, Seiten, Status); das Modul fax holt es ab.
+Aufruf: fax-empfangen <name> <FAXSTATUS> <FAXPAGES>   (name = JJJJMMTT-hhmmss_<absender>_<id>, nur Ziffern/Buchstaben)
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+DATA = Path(os.environ.get('KIENZLE_DATEN', '/var/lib/kienzle/telefon'))
+EXCHANGE = Path(os.environ.get('KFX_BASE', '/var/spool/kienzle/austausch/fax_telefon'))
+TIFF2PDF = os.environ.get('KFX_TIFF2PDF', '/usr/bin/tiff2pdf')
+NAME = re.compile(r'^[0-9]{8}-[0-9]{6}_[0-9a-z]{1,32}_[0-9]{1,40}$')
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) < 2 or not NAME.match(argv[1]):
+        print('fax-empfangen: Name ungültig', file=sys.stderr)
+        return 2
+    name = argv[1]
+    status = re.sub(r'[^A-Z]', '', argv[2] if len(argv) > 2 else '')[:20]
+    pages = int(argv[3]) if len(argv) > 3 and argv[3].isdigit() else None
+    tiff = DATA / 'asterisk' / 'spool' / 'fax-empfang' / f'{name}.tif'
+    if not tiff.is_file() or tiff.stat().st_size == 0:
+        print(f'fax-empfangen: keine Seiten empfangen ({status or "ohne Status"})', file=sys.stderr)
+        tiff.unlink(missing_ok=True)
+        return 0
+    inbox = EXCHANGE / 'empfang'
+    try:
+        inbox.mkdir(mode=0o770, exist_ok=True)
+    except OSError:
+        print('fax-empfangen: Austauschordner fehlt (Modul Fax installiert?); TIFF bleibt zwei Tage liegen.', file=sys.stderr)
+        return 1
+    part = inbox / f'.{name}.pdf.part'
+    r = subprocess.run([TIFF2PDF, '-o', str(part), str(tiff)], capture_output=True, text=True, timeout=300)
+    if r.returncode != 0 or not part.is_file() or part.stat().st_size == 0:
+        part.unlink(missing_ok=True)
+        print('fax-empfangen: Umwandlung in PDF fehlgeschlagen; TIFF bleibt liegen.', file=sys.stderr)
+        return 1
+    absender = name.split('_')[1]
+    meta = {'name': name, 'empfangen': datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+            'absender': '' if absender == 'unbekannt' else absender, 'seiten': pages, 'status': status}
+    tmp = inbox / f'.{name}.json.part'
+    tmp.write_text(json.dumps(meta, ensure_ascii=False) + '\n', encoding='utf-8')
+    for p in (part, tmp):
+        os.chmod(p, 0o660)
+    os.replace(part, inbox / f'{name}.pdf')
+    os.replace(tmp, inbox / f'{name}.json')   # JSON zuletzt: erst dann ist der Eingang vollständig
+    tiff.unlink(missing_ok=True)
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))

@@ -16,11 +16,12 @@ $version = ks_h(trim((string)file_get_contents(dirname(__DIR__) . '/VERSION')));
 $base = ks_h(Suite::base() . '/');
 $csrf = ks_h($k->csrf());
 $einstellungen = Suite::settingsRights() !== [];
+$igel = in_array('catalog', Suite::settingsRights(), true);
 ob_start();
 ?>
-<header class="seitenkopf"><div><p class="eyebrow">Kasse</p><h1>Kassieren</h1></div><span class="start-tools"><span id="day-stats" class="muted small"></span><a class="button secondary" href="<?= $base ?>vorgaenge">📋 Vorgänge</a><?php if ($einstellungen): ?><a class="button secondary" href="<?= $base ?>einstellungen">⚙ Einstellungen<span id="setup-count" class="zaehler" hidden></span></a><?php endif; ?></span></header>
+<header class="seitenkopf"><div><p class="eyebrow">Kasse</p><h1>Kassieren</h1></div><?= \KienzleKasse\Kopf::knoepfe('start', $base, $igel, $einstellungen, '<span id="day-stats" class="muted small"></span>') ?></header>
 <div class="start-grid">
-<aside class="start-left" aria-label="Rechnungen"><div class="start-tabs" id="kinds" role="tablist" aria-label="Art"></div><div class="start-tabs" id="tabs" role="tablist"></div>
+<aside class="start-left" aria-label="Rechnungen"><div class="start-left-kopf"><span class="muted small">Rechnungen</span><button id="inv-refresh" class="start-refresh" type="button" title="Liste aktualisieren" aria-label="Liste aktualisieren">↻</button></div><div class="start-tabs" id="kinds" role="tablist" aria-label="Art"></div><div class="start-tabs" id="tabs" role="tablist"></div>
 <input id="inv-search" class="inv-search" type="search" placeholder="Name suchen" autocomplete="off" aria-label="Rechnungen nach Namen suchen">
 <button id="free-entry" class="free-entry" type="button">Freie Eingabe (IGeL, GOÄ)</button>
 <div id="inbox" class="inbox-list"></div><p id="inbox-empty" class="muted small" hidden>Keine Rechnungen in dieser Ansicht.</p>

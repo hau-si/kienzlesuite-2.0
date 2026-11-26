@@ -1,0 +1,114 @@
+# Telefon: Telefonanlage (Asterisk) mit Leitungen, Nebenstellen, Warteschlange und Faxkanal für das Modul fax.
+# Auf Grundlage von Kienzlefax 3.5.0 und Kienzlefon 2.7 von Dr. Thomas Kienzle, für die Kienzle-Suite 2.0 als Modul umgebaut.
+# Stufe 1: Anlage aus Kienzlefax. Sprachmenü, Transkription, Ansagen und KI aus Kienzlefon folgen (docs/PLAN-FAX-TELEFON.md).
+
+[module]
+id = "telefon"
+name = "Telefon"
+version = "0.1.0-beta.20"
+core_api = "2"
+description = "Telefonanlage: Leitungen der Anbieter, Telefone, Warteschlange, Sprachmenü (Kienzlefon) und Kanalgrenze. Stellt auch die Faxleitung für das Modul Fax bereit; Fax lässt sich erst danach installieren."
+
+[system]
+packages = ["asterisk", "asterisk-modules", "asterisk-prompt-de", "php-fpm", "php-cli", "php-mbstring", "php-curl", "php-sqlite3", "python3", "python3-reportlab", "python3-pypdf", "python3-cryptography", "ghostscript", "qpdf", "libtiff-tools", "acl", "ffmpeg", "python3-venv", "espeak-ng", "libsndfile1", "libgomp1", "git"]
+services = ["kienzle-telefon-asterisk.service", "kienzle-telefon-fax.service", "kienzle-telefon-pflege.service", "kienzle-telefon-pflege.timer", "kienzle-telefon-ansagen.service", "kienzle-telefon-ansagen.path", "kienzle-telefon-whisper.service", "kienzle-telefon-whisper.path", "kienzle-telefon-steuerung.service", "kienzle-telefon-steuerung.path", "kienzle-telefon-prov.service", "kienzle-telefon-ereignisse.service"]
+disables = ["asterisk.service"]
+user = "ks-telefon"
+data = "/var/lib/kienzle/telefon"
+
+[web]
+path = "/telefon"
+upstream = "unix:/run/kienzle/telefon/web.sock"
+protocol = "fastcgi"
+entry = "public/index.php"
+einstellungen = "/einstellungen"
+
+[[firewall]]
+name = "Telefon: Telefone der Praxis (SIP)"
+port = 5060
+proto = "udp"
+
+[[firewall]]
+name = "Telefon: Einrichtung der Telefone (Provisionierung)"
+port = 8780
+proto = "tcp"
+
+[[firewall]]
+name = "Telefon: Anbieter (SIP)"
+port = 5070
+proto = "udp"
+scope = "any"
+
+[[firewall]]
+name = "Telefon: Sprache und Fax (RTP)"
+port = "12000-12999"
+proto = "udp"
+scope = "any"
+
+[[rights]]
+id = "status"
+label = "Telefon: Zustand der Anlage ansehen"
+
+[[rights]]
+id = "nebenstellen"
+label = "Telefon: Namen der Telefone und Warteschlange ändern"
+
+[[rights]]
+id = "vorgaenge"
+label = "Telefon: aufgesprochene Anliegen (Rezept, Termin, Rückruf …) lesen und erledigen"
+
+[[rights]]
+id = "anrufe"
+label = "Telefon: Live-Übersicht der Anrufe sehen (wer wartet, wer telefoniert)"
+
+[[rights]]
+id = "waehlen"
+label = "Telefon: per Klick wählen und zurückrufen (eigenes Telefon klingelt zuerst)"
+
+[[rights]]
+id = "rufgruppen"
+label = "Telefon: Telefone in den Rufgruppen Normal und ROT an- und abmelden"
+
+[[rights]]
+id = "sprachmenue"
+label = "Telefon: Zeiten, Ansagetexte und Menütasten des Sprachmenüs ändern"
+
+[[rights]]
+id = "patienten"
+label = "Telefon: Patienten im T2med-Telefonverzeichnis suchen und Akte in T2med öffnen"
+
+[[rights]]
+id = "statistik"
+label = "Telefon: Anrufstatistik sehen (ohne Nummern und Namen)"
+
+[[starters]]
+schema = "kienzle-telefonverzeichnis"
+label = "Telefonverzeichnis aus T2med laden"
+
+[[connections]]
+id = "t2med"
+purpose = "Telefonverzeichnis (Patienten mit Telefonnummern) aus T2med laden"
+required = false
+
+[[connections]]
+id = "nachrichten"
+purpose = "SMS an Anrufer aus den Vorgängen (z. B. „Ihr Rezept liegt bereit“)"
+required = false
+
+[[exchange]]
+module = "fax"
+purpose = "Faxaufträge senden und empfangene Faxe übergeben (Format aus Kienzlefax)"
+
+[backup]
+paths = ["/var/lib/kienzle/telefon/anlage.json", "/var/lib/kienzle/telefon/ami.json"]
+settings = ["/var/lib/kienzle/telefon/anlage.json"]
+
+[setup]
+overview = "bin/setup-overview"
+
+[hooks]
+install = "bin/install"
+update = "bin/update"
+remove = "bin/remove"
+busy = "bin/busy"
+health = "bin/health"

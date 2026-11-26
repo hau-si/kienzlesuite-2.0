@@ -73,7 +73,7 @@ final class Settings {
             'enabled' => ['type' => 'bool', 'label' => 'Rechnungen per Post über Letterxpress versenden', 'help' => 'Benutzername, API-Key und Test/Live stehen zentral unter Verwaltung → Verbindungen der Suite (Letterxpress).'],
             'color' => ['type' => 'choice', 'label' => 'Druck', 'default' => '1', 'choices' => ['1' => 'Schwarz-Weiß', '4' => 'Farbe']],
             'duplex' => ['type' => 'bool', 'label' => 'Beidseitig drucken', 'default' => false],
-            'shipping' => ['type' => 'choice', 'label' => 'Versandart', 'default' => 'auto', 'choices' => ['auto' => 'Automatisch (Inland oder Ausland)', 'national' => 'Nur Inland', 'international' => 'Ausland']],
+            'shipping' => ['type' => 'choice', 'label' => 'Versandart', 'default' => 'auto', 'choices' => ['auto' => 'Automatisch (Inland oder Ausland) – fehleranfällig', 'national' => 'Nur Inland (empfohlen)', 'international' => 'Ausland']],
             'registered' => ['type' => 'choice', 'label' => 'Einschreiben', 'default' => 'none', 'choices' => ['none' => 'Kein Einschreiben', 'r1' => 'Einwurf-Einschreiben', 'r2' => 'Einschreiben']],
         ]],
         'invoice_export' => ['label' => 'Ablage im Netzwerkordner', 'fields' => [

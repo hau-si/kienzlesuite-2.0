@@ -156,6 +156,7 @@ async function einrichtung() {
 }
 $('free-entry').onclick = frei;
 $('inv-search').addEventListener('input', anzeigen);
+$('inv-refresh').addEventListener('click', () => { liste(); tag(); });
 window.addEventListener('message', event => { if (event.origin === location.origin && event.data === 'ks-refresh') { liste(); tag(); } });
 liste(); tag(); einrichtung();
 setInterval(() => { if (!document.hidden) { liste(); tag(); } }, 15000);

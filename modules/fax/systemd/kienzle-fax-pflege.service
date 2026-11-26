@@ -1,0 +1,31 @@
+# Kienzle-Suite, Modul fax: Ergebnisse abholen, „sofort senden“, Lauschordner, Export auf das NAS, Aufräumen (jede Minute, siehe .timer).
+[Unit]
+Description=Kienzle-Suite Modul fax (Pflege)
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+User=ks-fax
+Environment=KIENZLE_DATEN=/var/lib/kienzle/fax
+Environment=KIENZLE_AUSTAUSCH=/var/spool/kienzle/austausch/fax_telefon
+ExecStart=/usr/bin/php /opt/kienzle/fax/current/lib/haken.php pflege
+UMask=0077
+RestrictAddressFamilies=AF_UNIX
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/kienzle/fax -/var/spool/kienzle/austausch/fax_telefon -/var/spool/kienzle/ablage/fax -/var/spool/kienzle/nachrichten/fax

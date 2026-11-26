@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""Anrufername aus dem T2med-Telefonverzeichnis (AGI, Telefonanlage des Moduls telefon).
+
+Aufruf im Wählplan am Anfang des Telefonie-Eingangs: AGI(<programm>/lib/anrufername.agi,<datenordner>).
+Sucht die Nummer des Anrufers in <daten>/t2med/patienten.sqlite (nur lesen) und setzt CALLERID(name) auf „Nachname, Vorname“,
+wenn genau ein Patient passt. Sonst bleibt alles, wie es ist. Schreibt nichts, protokolliert keine Nummern oder Namen.
+Nummernschlüssel wie src/Verzeichnis.php::schluessel (Tests prüfen beide mit denselben Beispielen).
+"""
+from __future__ import annotations
+
+import json
+import re
+import sqlite3
+import sys
+from pathlib import Path
+
+
+def schluessel(roh: str, ortsvorwahl: str = '') -> str | None:
+    s = re.sub(r'(?i)tel:', '', roh).replace('(0)', '').strip()
+    if not re.fullmatch(r'\+?[0-9 ()/.-]{3,40}', s):
+        return None
+    plus = s.startswith('+')
+    d = re.sub(r'\D', '', s)
+    if plus:
+        k = d
+    elif d.startswith('00'):
+        k = d[2:]
+    elif d.startswith('0'):
+        k = '49' + d[1:]
+    elif d.startswith('49') and len(d) >= 10:
+        k = d
+    elif ortsvorwahl and 3 <= len(d) <= 9:
+        k = '49' + ortsvorwahl[1:] + d
+    else:
+        k = ''
+    return k if re.fullmatch(r'[1-9][0-9]{5,14}', k) else None
+
+
+def name_fuer(daten: Path, nummer: str) -> str | None:
+    try:
+        e = json.loads((daten / 't2med' / 'einstellungen.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        e = {}
+    if e.get('anrufername', True) is False:
+        return None
+    vw = str(e.get('ortsvorwahl') or '')
+    k = schluessel(nummer, vw if re.fullmatch(r'0[1-9][0-9]{1,5}', vw) else '')
+    db = daten / 't2med' / 'patienten.sqlite'
+    if k is None or not db.is_file():
+        return None
+    con = sqlite3.connect(f'file:{db}?mode=ro', uri=True, timeout=0.3)
+    try:
+        rows = con.execute('SELECT DISTINCT p.rid, p.nachname, p.vorname FROM patienten p JOIN telefone t ON t.rid = p.rid WHERE t.schluessel = ? LIMIT 2', (k,)).fetchall()
+    finally:
+        con.close()
+    if len(rows) != 1:
+        return None
+    _, nach, vor = rows[0]
+    name = ', '.join(x for x in (nach, vor) if x)
+    name = re.sub(r'[\x00-\x1f\x7f"\\]', '', name)[:40].strip()
+    return name or None
+
+
+def main() -> int:
+    env = {}
+    for line in sys.stdin:
+        line = line.rstrip('\n')
+        if not line:
+            break
+        k, _, v = line.partition(':')
+        env[k.strip()] = v.strip()
+    daten = Path(sys.argv[1]) if len(sys.argv) > 1 else Path('/var/lib/kienzle/telefon')
+    try:
+        name = name_fuer(daten, env.get('agi_callerid', ''))
+    except Exception:          # nie den Anruf stören
+        name = None
+    if name:
+        sys.stdout.write(f'SET VARIABLE "CALLERID(name)" "{name}"\n')
+        sys.stdout.flush()
+        sys.stdin.readline()
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

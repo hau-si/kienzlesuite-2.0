@@ -1,5 +1,32 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.29
+
+- Neu: `lib/padablauf.py` (Ablauftest am Pad mit mehreren Seiten, Wegwerf-Datenbank): `sudo systemctl stop kienzle-signatur-pad; sudo -u ks-signatur python3 /opt/kienzle/signatur/current/lib/padablauf.py <IP> 1002`; danach Dienst wieder starten. Zeigt im Protokoll Aufnahmestart, Stiftereignisse und Ergebnis. Mit `PADABLAUF=direkt` (vor `python3`: `sudo -u ks-signatur env PADABLAUF=direkt python3 …`) ohne Textseiten, gleich die Unterschriftsseite. Nur Werkzeug zur Fehlersuche, nicht am Pad geprüft.
+
+## 0.1.0-beta.28
+
+- **Pad-Dienst an den funktionierenden Aufnahmetest angeglichen** (im Test `padsign.py` kommen die Stiftpunkte an, im Dienst bisher keine): Anzeigeziel wird wie im Test nach dem Löschen der Seite gesetzt, kein Statusabruf mehr zwischen Aufnahmestart und Unterschrift. **Nicht geprüft:** echtes Pad; falls weiterhin 0 Stiftereignisse, Protokoll `journalctl -u kienzle-signatur-pad` schicken.
+
+## 0.1.0-beta.27
+
+- **Aufnahmetest mit Varianten (Fehlersuche „keine Stiftpunkte“):** Der einfache Test (`padsign.py`) nimmt am Delta eine Unterschrift auf (Rohdaten 1268 Bytes), der Pad-Dienst bekommt dagegen keine Stiftpunkte. Der Test lässt sich jetzt mit `PADSIGN=bild` (Seite wie im Dienst, als Bild) und/oder `PADSIGN=stop` (mit Anhalten statt Bestätigen abschließen) starten und meldet am Ende die Zahl der Stiftereignisse. Damit lässt sich eingrenzen, was im Dienst anders ist. Nicht am echten Pad geprüft.
+
+## 0.1.0-beta.26
+
+- **Fehlersuche Pad: Bereich der Stiftpunkte im Protokoll.** Bei „OK“ nennt die Protokollzeile jetzt zusätzlich, in welchem Bereich (x, y) und mit welchem größten Druck Stiftpunkte ankamen („Bereich keine“, wenn das Pad nichts meldet). Daran sieht man, ob die Punkte außerhalb des Unterschriftsfelds liegen oder gar nicht ankommen. Nicht am echten Pad geprüft.
+
+## 0.1.0-beta.25
+
+- **Patient immer oben rechts wie in der Kasse:** Der Kasten ist stets sichtbar; ohne Vorwahl steht darin das Namensfeld (manuelle Eingabe), nach Übernahme aus T2med oder Kasse der Name mit „Anderen Patienten wählen“. Darunter die Dokumentauswahl.
+- **IGeL-Vertrag der Kasse ist fest:** Die älteste Vorlage der Art IGeL kann nicht gelöscht oder abgeschaltet werden und bleibt Art IGeL; der Text ist frei bearbeitbar.
+- **Vorgangsliste wie in der Kasse:** Links die Vorgänge der letzten 7 Tage, neuester oben, mit „Zum Pad senden“ und „Löschen“; „Abbrechen“ nur, solange der Vorgang am Pad liegt (dann kein Löschen). Löschen geht nun in jedem Status außer „am Pad“.
+- Einrichtungsleitfaden: erster Punkt „Benötigte Hardware“ (signotec Delta, Ethernet oder PoE-Ethernet). Nicht auf dem Server geprüft.
+
+## 0.1.0-beta.24
+
+- **Start aus T2med: HTTP 403 behoben (wahrscheinliche Ursache):** Die Kasse nimmt den öffentlichen T2med-Demo-Schlüssel, wenn unter Verwaltung → Verbindungen → T2med kein API-Schlüssel steht; Signatur schickte dann einen leeren Schlüssel und T2med lehnte den Abruf des Patienten ab. Signatur macht es jetzt wie die Kasse. Bei 401/403 nennt die Meldung (und `starter.log` am PC) den API-Schlüssel und den Drittanbieter-Zugriff als Ursache. Nicht gegen echtes T2med geprüft.
+
 ## 0.1.0-beta.23
 
 - **Neues Layout der Startseite wie in der Kasse:** Links die offenen Vorgänge (am Pad zuerst, mit den Knöpfen zum Vorgang), rechts groß der Patient und darunter die Dokumentauswahl als Liste mit Auswahlpunkten (statt Auswahlfeld) und dem Knopf „Vorgang anlegen“. Auf schmalen Bildschirmen stehen die Spalten untereinander.

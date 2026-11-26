@@ -70,6 +70,7 @@ final class Web {
         if ($r->path === '/_health') return $this->health();
         if (!$this->config->ownHost($r->header('host'))) throw new Problem('Unbekannter Servername.', 421);
         if ($r->path === '/_starter-pruefen') return $this->starterPruefen($r);
+        if (str_starts_with($r->path, '/agent/')) return $this->agentApi($r);
         if (preg_match('#^/_auth/([a-z][a-z0-9-]{1,28})$#D', $r->path, $m)) return $this->forward($r, $m[1]);
         // OpenID Connect: Abfragen der Dienste selbst (ohne Cookie, ohne Origin des Browsers).
         if ($this->oidc && ($r->path === '/.well-known/openid-configuration' || in_array($r->path, ['/oidc/jwks', '/oidc/token', '/oidc/userinfo'], true))) return $this->oidcApi($r);
@@ -97,6 +98,9 @@ final class Web {
         if ($stage === 'otp') return $r->path === '/anmelden/code' ? ($get ? $this->codePage() : $this->code($r)) : ($r->path === '/anmelden/code/sms' && !$get ? $this->smsCodeSend() : Response::redirect('/anmelden/code'));
         if ($stage === 'enroll') return $r->path === '/konto/otp' ? ($get ? $this->enrollPage() : $this->enroll($r)) : Response::redirect('/konto/otp');
         if ($stage !== 'full') return Response::redirect('/anmelden' . ($get && $r->path !== '/' ? '?weiter=' . rawurlencode($r->path) : ''));
+        // „Akte öffnen“ aus Modulseiten: JSON mit der CSRF-Marke des Moduls (die Seite kennt nur diese).
+        if ($r->path === '/arbeitsplatz/akte' && !$get) return $this->akteOeffnen($r);
+        if ($r->path === '/arbeitsplatz/stand' && $get) return $this->akteStand($r);
         if (!$get) $this->checkCsrf($r);
 
         $routes = [
@@ -108,6 +112,7 @@ final class Web {
             'POST /konto/codes' => fn() => $this->newCodes(),
             'POST /konto/telefon' => fn() => $this->savePhone($r),
             'POST /konto/email' => fn() => $this->saveEmail($r),
+            'POST /konto/arbeitsplatz' => fn() => $this->meinArbeitsplatz($r),
             'POST /konto/name' => fn() => $this->saveName($r),
             'POST /konto/email-code' => fn() => $this->confirmEmail($r),
             'POST /konto/geraete' => fn() => $this->revoke($r),
@@ -152,7 +157,7 @@ final class Web {
             $routerText = '<p>Den Namen <code>' . V::h($name) . '</code> mit der Adresse <code>' . V::h($ip) . '</code> im Router oder einem eigenen DNS-Server eintragen (meist die IT). '
                 . 'Manche Router kennen Geräte im Netz auch automatisch unter ihrem Rechnernamen mit einer eigenen Endung; dann unter Verwaltung → Server genau diesen Namen mit der Endung des Routers wählen.</p>';
         }
-        $lead = '<p class="lead">Pro PC genügt ein Paket: Es richtet den Starter für T2med, das Zertifikat der Suite und die virtuellen Drucker auf einmal ein, und wer es später noch einmal ausführt, aktualisiert nur das, was sich geändert hat. '
+        $lead = '<p class="lead">Pro PC genügt ein Paket: Es richtet den Kienzle-Agent ein (Starter für T2med, Zertifikat der Suite, virtuelle Drucker, „Akte öffnen“). Unter Windows hält der Agent danach alles selbst aktuell, auch neue Drucker und Module; ein zweites Mal ist das Paket nur zur Reparatur nötig. '
             . 'Der PC muss außerdem den Namen der Suite kennen (Schritt 2). Klappt etwas nicht, steht unten jeder Schritt auch zum Einrichten von Hand.</p>';
         $zertifikat = ''
             . '<details class="box" id="zertifikat"><summary><strong>Zertifikat von Hand einrichten</strong></summary>'
@@ -486,7 +491,14 @@ final class Web {
             ->with('X-Kienzle-Bestaetigt', (string)(int)$session['confirmed_at'])
             ->with('X-Kienzle-Drucker', rawurlencode(json_encode($this->printerRoles() + ['bonbreite' => $this->bonWidth()], JSON_UNESCAPED_UNICODE)))
             ->with('X-Kienzle-Menue', $this->moduleMenu((int)$session['user_id'], (int)$session['user_admin'] === 1, (string)$session['login']))
-            ->with('X-Kienzle-Praxis', rawurlencode(json_encode(['name' => $this->config->practice] + $this->address() + $this->master(), JSON_UNESCAPED_UNICODE)));
+            ->with('X-Kienzle-Praxis', rawurlencode(json_encode(['name' => $this->config->practice] + $this->address() + $this->master(), JSON_UNESCAPED_UNICODE)))
+            ->with('X-Kienzle-Arbeitsplatz', $this->arbeitsplatzKopf($r));
+    }
+
+    /** Arbeitsplatz des Browsers für Modulseiten (Name und ob der Agent verbunden ist; leer, wenn unbekannt). */
+    private function arbeitsplatzKopf(Request $r): string {
+        $p = $this->ap()->fuerBrowser($r->remote, (string)$r->cookie(Arbeitsplaetze::COOKIE));
+        return $p ? rawurlencode(json_encode(['id' => $p['id'], 'name' => $p['name'], 'online' => time() - (int)$p['zuletzt'] <= Arbeitsplaetze::ONLINE], JSON_UNESCAPED_UNICODE)) : '';
     }
 
     /**
@@ -655,7 +667,7 @@ final class Web {
                 : '<p>Ersten Admin anlegen. Er verwaltet Benutzer, Firewall, Updates und Sicherung und meldet sich mit Passwort und Code aus einer Authenticator-App an.</p>'
                 . V::input('login', 'Anmeldename', 'text', $this->req?->field('login', 64) ?? '', 'autocomplete="username" autocapitalize="none" required')
                 . V::input('display', 'Name (optional)', 'text', $this->req?->field('display', 80) ?? ''))
-            . V::input('password', 'Neues Passwort (mindestens 10 Zeichen)', 'password', '', 'autocomplete="new-password" required')
+            . V::input('password', 'Neues Passwort (mindestens ' . PasswordPolicy::load($this->db)['min'] . ' Zeichen)', 'password', '', 'autocomplete="new-password" required ' . $this->passwordAttrs($user ? $user['login'] : '', $user ? '' : 'login'))
             . V::input('password2', 'Passwort wiederholen', 'password', '', 'autocomplete="new-password" required')
             . '<button>Speichern</button></form>';
         return Response::html(V::page($user ? 'Passwort festlegen' : 'Einrichtung', $body, null, $this->config->practice), $error ? 422 : 200);
@@ -954,7 +966,7 @@ final class Web {
             . '<button>Bestätigungscode schicken</button></form>', $pending !== '');
         $folds .= $fold('Passwort ändern', '', '<form method="post" action="/konto/passwort" class="box">' . $csrf
             . V::input('current', 'Bisheriges Passwort', 'password', '', 'autocomplete="current-password" required')
-            . V::input('password', 'Neues Passwort', 'password', '', 'autocomplete="new-password" required')
+            . V::input('password', 'Neues Passwort', 'password', '', 'autocomplete="new-password" required ' . $this->passwordAttrs((string)($this->session['login'] ?? '')))
             . V::input('password2', 'Neues Passwort wiederholen', 'password', '', 'autocomplete="new-password" required')
             . '<button>Ändern</button></form>');
         if ($needsOtp) $folds .= $fold('Handynummer für SMS-Code (Ersatz)', $ok($phone !== '', 'hinterlegt', 'nicht hinterlegt'),
@@ -973,6 +985,7 @@ final class Web {
             . '<button type="button">Passkey hinzufügen</button><p class="error" hidden></p></div>');
         $folds .= $fold('Gemerkte Geräte', '<span class="tag fold-status">' . ($devices !== '' ? count($this->auth->devices($uid, $this->token)) : 0) . '</span>',
             $devices !== '' ? '<table><tr><th>Gerät</th><th>Zuletzt</th><th></th></tr>' . $devices . '</table><form method="post" action="/konto/geraete">' . $csrf . '<input type="hidden" name="id" value="all"><button class="link">Alle abmelden</button></form>' : '<p>Keine.</p>');
+        $folds .= $this->arbeitsplatzFold($fold, $csrf);
         $body = V::error($error) . V::notice($notice) . $profil . '<section class="card konto">' . $folds . '</section>';
         V::$status = [];
         return Response::html(V::page('Mein Konto', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
@@ -1139,6 +1152,7 @@ final class Web {
             if (!$get && $action === '/loeschen') return $this->userDelete($id, $admin);
         }
         if ($r->path === '/verwaltung/sicherheit') return $this->securityPage();
+        if ($r->path === '/verwaltung/passwortregeln' && !$get) return $this->passwordRulesSave($r, $admin);
         if ($r->path === '/verwaltung/zugang') return $get ? $this->accessPage() : $this->accessSave($r, $admin);
         if ($r->path === '/verwaltung/protokoll' && $get) return $this->protocol();
         if ($r->path === '/verwaltung/firewall') return $get ? $this->firewallPage() : $this->firewallApply($r, $admin);
@@ -1413,6 +1427,43 @@ final class Web {
         return preg_match('#</h1>(.*)</main>#s', $page->body, $m) ? $m[1] : '';
     }
 
+    /** Attribute für passwort.js (Stärkebalken): Regeln, Anmeldename (fest oder aus einem Feld des Formulars). */
+    private function passwordAttrs(string $login = '', string $loginField = ''): string {
+        $p = PasswordPolicy::load($this->db);
+        return 'data-staerke="1" data-min="' . $p['min'] . '" data-klassen="' . $p['klassen'] . '" data-min-staerke="' . $p['staerke'] . '" data-schwach="' . ($p['schwach'] ? '1' : '0') . '"'
+            . ($login !== '' && $p['login'] ? ' data-login="' . V::h($login) . '"' : '') . ($loginField !== '' && $p['login'] ? ' data-login-feld="' . V::h($loginField) . '"' : '');
+    }
+
+    /** Abschnitt „Passwörter“ der Sicherheitsseite: Regeln einstellen, bei zu lockeren Werten warnen. */
+    private function passwordRulesBody(): string {
+        $p = PasswordPolicy::load($this->db);
+        $warn = PasswordPolicy::warnings($p);
+        $o = $warn ? '<ul class="warnliste" role="alert">' . implode('', array_map(fn($w) => '<li class="' . $w['stufe'] . '"><strong>Warnung:</strong> ' . V::h($w['text']) . '</li>', $warn)) . '</ul>'
+            : '<p class="notice" role="status">Die Regeln sind streng genug.</p>';
+        $opt = '';
+        foreach (PasswordPolicy::STAERKE as $i => $t) $opt .= '<option value="' . $i . '"' . ($p['staerke'] === $i ? ' selected' : '') . '>' . V::h($t) . '</option>';
+        $kl = '';
+        foreach ([1 => '1 (keine Vorgabe)', 2 => '2 Zeichenarten', 3 => '3 Zeichenarten', 4 => 'alle 4 Zeichenarten'] as $i => $t) $kl .= '<option value="' . $i . '"' . ($p['klassen'] === $i ? ' selected' : '') . '>' . V::h($t) . '</option>';
+        return $o . '<form method="post" action="/verwaltung/passwortregeln">' . V::csrf($this->session['csrf'])
+            . V::input('min', 'Mindestlänge in Zeichen (6 bis 64, empfohlen 12 oder mehr)', 'number', (string)$p['min'], 'min="6" max="64" required')
+            . '<label>Zeichenarten (Kleinbuchstaben, Großbuchstaben, Ziffern, Sonderzeichen)<select name="klassen">' . $kl . '</select></label>'
+            . '<label>Mindeststärke (der Balken beim Festlegen eines Passworts)<select name="staerke">' . $opt . '</select></label>'
+            . '<label class="check"><input type="checkbox" name="schwach" value="1"' . ($p['schwach'] ? ' checked' : '') . '> Häufige Passwörter und Muster („passwort“, „123456“, „qwertz“) ablehnen</label>'
+            . '<label class="check"><input type="checkbox" name="login" value="1"' . ($p['login'] ? ' checked' : '') . '> Passwörter mit dem Anmeldenamen ablehnen</label>'
+            . '<p class="muted">Die Regeln gelten für neue und geänderte Passwörter. Bestehende Passwörter bleiben gültig, bis sie geändert werden.</p><button>Speichern</button></form>';
+    }
+
+    private function passwordRulesSave(Request $r, string $admin): Response {
+        try {
+            PasswordPolicy::save($this->db, ['min' => $r->field('min', 3), 'klassen' => $r->field('klassen', 2), 'staerke' => $r->field('staerke', 2),
+                'schwach' => $r->field('schwach', 2) === '1', 'login' => $r->field('login', 2) === '1']);
+        } catch (Problem $e) {
+            return $this->securityPage($e->getMessage());
+        }
+        $this->audit->write($admin, 'passwortregeln-gespeichert', 'passwortregeln');
+        return $this->securityPage(null, 'Gespeichert.');
+    }
+
     /** Sicherheit: Firewall, Zugang (Abmeldezeiten) und Protokoll als aufklappbare Abschnitte in einer Karte. */
     private function securityPage(?string $error = null, ?string $notice = null): Response {
         $log = $this->protocol();
@@ -1422,9 +1473,11 @@ final class Web {
             $fw = Response::html('<main><h1>x</h1><p class="muted">' . V::h($e->getMessage()) . '</p></main>'); $fwState = 'off';
         }
         $open = fn(string $id) => str_contains((string)($this->req?->query['bereich'] ?? ''), $id) || $error !== null && $id === 'zugang' ? ' open' : '';
+        $pwWarn = PasswordPolicy::warnings(PasswordPolicy::load($this->db)) !== [];
         $body = V::error($error) . V::notice($notice) . '<section class="card">'
             . '<details class="fold" id="firewall"' . ($open('firewall') ?: ($fwState === 'pending' ? ' open' : '')) . '><summary><h2>Firewall</h2></summary>' . self::stripCards(self::inner($fw)) . '</details>'
             . '<details class="fold" id="zugang"' . $open('zugang') . '><summary><h2>Zugang (Abmeldezeiten)</h2></summary>' . $this->accessBody() . '</details>'
+            . '<details class="fold" id="passwoerter"' . ($open('passwoerter') ?: ($pwWarn ? ' open' : '')) . '><summary><h2>Passwörter</h2>' . ($pwWarn ? '<span class="tag warn">Warnung</span>' : '') . '</summary>' . $this->passwordRulesBody() . '</details>'
             . '<details class="fold" id="protokoll"' . $open('protokoll') . '><summary><h2>Protokoll</h2></summary>' . self::stripCards(self::inner($log)) . '</details></section>';
         V::$status = ['Firewall' => [$fwState === 'active', 'aktiv', $fwState === 'pending' ? 'wartet auf Bestätigung' : 'aus']];
         $response = Response::html(V::page('Sicherheit', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
@@ -1543,8 +1596,14 @@ final class Web {
         $post = fn(string $aktion, string $label, string $hidden = '', string $class = '', string $extra = '') => '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . $hidden
             . '<input type="hidden" name="aktion" value="' . $aktion . '">' . $extra . '<button' . ($class !== '' ? ' class="' . $class . '"' : '') . $off . '>' . $label . '</button></form>';
         $tiles = '';
+        // Abhängigkeiten (module.toml: requires): Namen der Module, installierte IDs, wer welches Modul braucht.
+        $namen = [];
+        foreach ([...$st['installed'], ...$st['available']] as $x) $namen[(string)$x['id']] = (string)$x['name'];
+        $da = array_map(fn($x) => (string)$x['id'], $st['installed']);
+        $nameVon = fn(array $ids) => implode(', ', array_map(fn($i) => $namen[$i] ?? $i, $ids));
         foreach ($st['installed'] as $m) {
             $hidden = '<input type="hidden" name="id" value="' . V::h($m['id']) . '">';
+            $nutzer = array_values(array_map(fn($x) => (string)$x['id'], array_filter($st['installed'], fn($x) => in_array($m['id'], (array)($x['requires'] ?? []), true))));
             $state = '';
             $stopped = false;
             if ($m['dienste']) {
@@ -1565,7 +1624,8 @@ final class Web {
                 . '<small><strong>' . V::h($m['name']) . ' entfernen.</strong> Ohne Häkchen bleiben die Daten erhalten; eine spätere Installation übernimmt sie.</small>'
                 . '<label class="check"><input type="checkbox" name="daten" value="1"> Auch alle Daten löschen (nicht rückgängig zu machen)</label>'
                 . '<label class="muted">Zur Bestätigung den Namen „' . V::h($m['name']) . '“ eintippen<input name="bestaetigung" autocomplete="off" required maxlength="80" placeholder="' . V::h($m['name']) . '"></label>'
-                . '<button class="danger"' . $off . '>' . V::icon('st:papierkorb') . ' Modul entfernen</button></form></details></div></details>';
+                . ($nutzer ? '<small class="error">Wird noch gebraucht von: ' . V::h($nameVon($nutzer)) . '. Erst dieses Modul entfernen.</small>' : '')
+                . '<button class="danger"' . ($nutzer ? ' disabled' : $off) . '>' . V::icon('st:papierkorb') . ' Modul entfernen</button></form></details></div></details>';
             $formUpd = fn(string $aktion, string $label, string $class, string $icon, string $title = '') => '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="' . $aktion . '">'
                 . '<button class="' . $class . '" title="' . V::h($title ?: strip_tags($label)) . '"' . $off . '>' . V::icon($icon) . ($label !== '' ? ' ' . $label : '') . '</button></form>';
             // Ein rundes Pfeil-Symbol für beides: Update einspielen (wenn eins da ist) oder nach einem Update suchen.
@@ -1582,12 +1642,14 @@ final class Web {
                 . '<div class="mod-foot">' . $more . '</div></div>';
         }
         foreach ($st['available'] as $m) {
+            $fehlt = array_values(array_filter((array)($m['requires'] ?? []), fn($r) => !in_array($r, $da, true)));
             $tiles .= '<div class="mod-tile available"><div class="mod-head"><span class="t-ico">' . V::icon('modul:' . $m['id']) . '</span><span class="tag">verfügbar</span></div>'
                 . '<p class="mod-name">' . V::h($m['name']) . '</p><p class="muted mod-sub">Version ' . V::h($m['version']) . ($m['signed'] === false ? ' <span class="tag warn">nicht signiert</span>' : '') . '</p>'
                 . ($m['description'] !== '' ? '<p class="muted mod-desc">' . V::h($m['description']) . '</p>' : '')
                 . '<p class="muted mod-desc">' . ($m['source'] === 'github' ? 'Von GitHub' : 'Mit der Basis geliefert') . ($m['path'] ? ' · Adresse ' . V::h($m['path']) : '') . '</p>'
                 . '<div class="mod-foot"><form method="post" action="/verwaltung/module">' . $csrf . '<input type="hidden" name="aktion" value="installieren"><input type="hidden" name="id" value="' . V::h($m['id']) . '">'
-                . '<button' . $off . '>' . V::icon('st:herunter') . ' Installieren</button></form></div></div>';
+                . ($fehlt ? '<p class="muted mod-desc">Braucht zuerst: <strong>' . V::h($nameVon($fehlt)) . '</strong></p>' : '')
+                . '<button' . ($fehlt ? ' disabled title="Erst ' . V::h($nameVon($fehlt)) . ' installieren"' : $off) . '>' . V::icon('st:herunter') . ' Installieren</button></form></div></div>';
         }
         // Erklärung zum blauen Punkt: offene Einrichtungspunkte, die hier (oder bei einem Modul) zu erledigen sind.
         $hinweise = '';
@@ -1700,10 +1762,10 @@ final class Web {
         return $busy ? $response->with('Refresh', '5') : $response;
     }
 
-    /** Klicksperre: Update-Abfragen (Basis und Module) höchstens alle 30 Sekunden, damit das GitHub-Limit nicht aufgebraucht wird. */
+    /** Klicksperre: Update-Abfragen (Basis und Module) höchstens alle 10 Sekunden, damit das GitHub-Limit nicht aufgebraucht wird. */
     private function pruefSperre(): void {
         $last = (int)$this->db->setting('sperre:update-pruefen');
-        $rest = $last + 30 - time();
+        $rest = $last + 10 - time();
         if ($rest > 0) throw new Problem('Bitte kurz warten: Die nächste Abfrage ist in ' . $rest . ' Sekunden möglich (Schutz vor dem GitHub-Limit).', 429);
         $this->db->store('sperre:update-pruefen', (string)time());
     }
@@ -1922,7 +1984,8 @@ final class Web {
             . '</section>';
         // Nutzung
         $rows = '';
-        foreach ($st['nutzung'] as $u) $rows .= '<tr><td>' . V::h((string)$u['name']) . '</td><td>' . V::h((string)$u['verbindung']) . '</td><td>' . V::h((string)$u['zweck']) . '</td><td>' . (($u['pflicht'] ?? false) ? 'ja' : 'nein') . '</td></tr>';
+        $art = ['t2med' => 'T2med', 'mail' => 'E-Mail', 'ablage' => 'Netzwerkspeicher', 'letterxpress' => 'Letterxpress', 'nachrichten' => 'SMS und E-Mail (Versand durch die Basis)'];
+        foreach ($st['nutzung'] as $u) $rows .= '<tr><td>' . V::h((string)$u['name']) . '</td><td>' . V::h($art[(string)$u['verbindung']] ?? (string)$u['verbindung']) . '</td><td>' . V::h((string)$u['zweck']) . '</td><td>' . (($u['pflicht'] ?? false) ? 'ja' : 'nein') . '</td></tr>';
         $body .= '<section><h2>Wer nutzt was</h2>' . ($rows !== '' ? '<table><tr><th>Modul</th><th>Verbindung</th><th>Wofür</th><th>Nötig</th></tr>' . $rows . '</table>' : '<p>Kein installiertes Modul nutzt eine zentrale Verbindung.</p>') . '</section>';
         $body = preg_replace('#(<p>Zugänge, die mehrere Module brauchen.*?</p>)#s', '<section class="card">$1</section>', $body, 1);
         // Jeder Abschnitt klappt zu; eingerichtete tragen ein grünes „✓ eingerichtet“, offene und fehlerhafte bleiben aufgeklappt.
@@ -2105,8 +2168,9 @@ final class Web {
         $st = $this->st();
         $list = $this->modules->starters();
         $body = V::error($error) . ($notice ? '<p class="notice">' . V::h($notice) . '</p>' : '')
-            . '<p>Ein Paket pro Arbeitsplatz richtet Starterprogramm, Zertifikat und virtuelle Drucker auf einmal ein; erneutes Ausführen aktualisiert nur, was sich geändert hat. Das Starterprogramm öffnet Module direkt aus T2med (aktueller Patient wird mitgegeben). Es wird einmal je PC eingerichtet und bedient alle '
-            . 'installierten Module; neue Module erscheinen hier von selbst, danach das Paket auf den PCs einmal erneut einrichten.</p>';
+            . '<p>Ein Paket pro Arbeitsplatz richtet den <strong>Kienzle-Agent</strong> ein: ein Programm, das Module direkt aus T2med öffnet (aktueller Patient wird mitgegeben) und unter Windows als Dienst mit Systemrechten läuft. '
+            . 'Der Agent fragt die Suite alle paar Sekunden und hält Starter, Aufrufe, Zertifikat und virtuelle Drucker selbst aktuell; „Akte öffnen“ legt er als GDT-Datei in <code>C:\Kienzle\GDT</code> ab '
+            . '(in T2med beim GDT-Gerät „Telefonaufruf“ als Importdatei <code>C:\Kienzle\GDT\AUFRUFi.gdt</code> eintragen). Er führt keine Befehle der Suite aus, nur diese festen Aufgaben. macOS und Linux bekommen vorerst nur den Starter (ohne Dienst).</p>';
         if (!$list) return $body . '<p class="muted">Kein installiertes Modul bietet einen Startkontext an.</p>';
         $rows = '';
         foreach ($list as $s) $rows .= '<tr><td>' . V::h($this->modules->name($s['modul'])) . '</td><td>' . V::h($s['label']) . '</td><td><code>' . V::h($s['schema'] . '://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}') . '</code></td></tr>';
@@ -2118,6 +2182,7 @@ final class Web {
             if (!$st->hasPrograms($key)) $missing[] = $spec['label'];
         }
         $body .= '</p>' . (!empty($missing) ? '<p class="muted">Für ' . V::h(implode(', ', $missing)) . ' liegen auf dem Server noch keine Starterprogramme; das Paket enthält dann nur die Skripte.</p>' : '');
+        $body .= $this->arbeitsplatzListe();
         $body .= '<h3>Starter-Schlüssel</h3><p class="muted">Ein Schlüssel für alle Module. Er muss nur im Fehlerfall erneuert werden, zum Beispiel wenn ein Paket in falsche Hände geraten ist.</p>'
             . '<details class="box"><summary><strong>Schlüssel erneuern (nur im Fehlerfall)</strong></summary>'
             . '<p class="error">Achtung: Nach dem Erneuern funktionieren alle bisher eingerichteten Arbeitsplätze nicht mehr. Auf jedem Arbeitsplatz muss danach ein neues Paket ausgeführt werden.</p>'
@@ -2127,12 +2192,144 @@ final class Web {
         return $body;
     }
 
+    // --- Kienzle-Agent (ein Programm am PC: Starter für T2med und Dienst mit Systemrechten) ------------------------
+
+    private ?Arbeitsplaetze $ap = null;
+    public static string $clientDist = '';             // Ordner der Programme (Tests); leer = <Basis>/client-dist
+
+    private function ap(): Arbeitsplaetze { return $this->ap ??= new Arbeitsplaetze($this->db); }
+
+    private function clientDist(): string { return self::$clientDist !== '' ? self::$clientDist : dirname(__DIR__) . '/client-dist'; }
+
+    /** Programme (Datei → SHA-256) aus client-dist/SHA256SUMS. */
+    private function agentProgramme(): array {
+        $out = [];
+        foreach (preg_split('/\r?\n/', (string)@file_get_contents($this->clientDist() . '/SHA256SUMS')) ?: [] as $z) {
+            if (preg_match('/^([0-9a-f]{64})\s+\*?(kienzle-starter-[a-z0-9-]+(?:\.exe)?)$/D', trim($z), $m) && is_file($this->clientDist() . '/' . $m[2])) $out[$m[2]] = $m[1];
+        }
+        return $out;
+    }
+
+    /** Sollzustand für die Agents: Programme, Startkontexte, Drucker, Zertifizierungsstelle, Ablage der GDT-Datei. */
+    private function agentSoll(): array {
+        return ['server_url' => $this->serverUrl(), 'launcher_key' => $this->st()->key(), 'programme' => $this->agentProgramme(), 'kontexte' => $this->starterKontexte(), 'drucker' => $this->starterDrucker(),
+            'ca' => (string)@file_get_contents(self::$caFile), 'gdt' => ['ordner' => 'C:\\Kienzle\\GDT']];
+    }
+
+    /** Schnittstelle der Agents (ohne Sitzung; Starter-Schlüssel bzw. eigener Zugang je PC; Fehlversuche gebremst). */
+    private function agentApi(Request $r): Response {
+        $throttle = new Throttle($this->db, Throttle::normalize($r->remote));
+        try { $throttle->check('agent'); } catch (Problem) { return Response::json(['error' => 'Zu viele Fehlversuche, bitte später erneut.'], 429); }
+        $json = json_decode($r->body, true);
+        $json = is_array($json) ? $json : [];
+        $fail = function (int $code, string $text) use ($throttle): Response { $throttle->fail('agent', 20, 600); return Response::json(['error' => $text], $code); };
+        if ($r->path === '/agent/anmelden' && $r->method === 'POST') {
+            if (!$this->starter || !$this->starter->verify($r->header('authorization'))) return $fail(401, 'Starter-Schlüssel ungültig.');
+            $a = $this->ap()->anmelden((string)($json['rechner'] ?? ''), (string)($json['system'] ?? ''), $r->remote);
+            $this->audit->write('agent', 'arbeitsplatz-angemeldet', $a['name']);
+            return Response::json($a);
+        }
+        $platz = $this->ap()->pruefen($r->header('authorization'));
+        if (!$platz) return $fail(401, 'Arbeitsplatz unbekannt oder entfernt. Bitte das Paket auf diesem PC neu einrichten.');
+        if ($r->path === '/agent/abholen' && $r->method === 'POST') {
+            $auftraege = $this->ap()->abholen($platz, $r->remote, (string)($json['version'] ?? ''), (string)($json['zustand'] ?? ''));
+            $soll = $this->agentSoll();
+            $stand = hash('sha256', (string)json_encode($soll));
+            $out = ['auftraege' => $auftraege, 'stand' => $stand, 'name' => $platz['name']];
+            if (($json['stand'] ?? '') !== $stand) $out['soll'] = $soll;
+            return Response::json($out);
+        }
+        if ($r->path === '/agent/ergebnis' && $r->method === 'POST') {
+            $this->ap()->ergebnis($platz, (string)($json['auftrag'] ?? ''), ($json['ok'] ?? false) === true, (string)($json['text'] ?? ''));
+            return Response::json(['ok' => true]);
+        }
+        if ($r->method === 'GET' && preg_match('#^/agent/programm/(kienzle-starter-[a-z0-9-]+(?:\.exe)?)$#D', $r->path, $m) && isset($this->agentProgramme()[$m[1]])) {
+            return new Response(200, (string)file_get_contents($this->clientDist() . '/' . $m[1]), [['Content-Type', 'application/octet-stream'], ['Cache-Control', 'no-store']]);
+        }
+        return Response::json(['error' => 'Unbekannt.'], 404);
+    }
+
+    /** „Akte öffnen“: GDT-Aufruf an den Agent des PCs, an dem der Browser sitzt. Patientennummer wird nicht protokolliert. */
+    private function akteOeffnen(Request $r): Response {
+        $json = json_decode($r->body, true);
+        $json = is_array($json) ? $json : [];
+        $modul = (string)($json['modul'] ?? '');
+        $access = preg_match('/^[a-z][a-z0-9-]{1,28}$/D', $modul) ? ($this->users->access((int)$this->session['user_id'])[$modul] ?? null) : null;
+        if (!$access || !hash_equals(self::moduleCsrf((string)$this->session['csrf'], $modul), (string)($json['csrf'] ?? ''))) {
+            return Response::json(['error' => 'Sitzung abgelaufen. Bitte die Seite neu laden.'], 403);
+        }
+        $platz = $this->ap()->fuerBrowser($r->remote, (string)$r->cookie(Arbeitsplaetze::COOKIE));
+        if (!$platz) return Response::json(['error' => 'Dieser PC ist nicht erkannt. Bitte einmal unter „Mein Konto“ → „Mein Arbeitsplatz“ den PC wählen (oder den Agent auf diesem PC einrichten).', 'waehlen' => '/konto#arbeitsplatz'], 409);
+        if (time() - (int)$platz['zuletzt'] > Arbeitsplaetze::ONLINE) return Response::json(['error' => 'Der Agent auf „' . $platz['name'] . '“ ist gerade nicht verbunden (PC aus oder Dienst gestoppt).'], 409);
+        $gdt = Arbeitsplaetze::gdt((string)($json['patientennummer'] ?? ''));
+        $id = $this->ap()->auftrag($platz['id'], 'gdt', ['datei' => 'AUFRUFi.gdt', 'inhalt' => $gdt]);
+        $this->audit->write((string)$this->session['login'], 'akte-oeffnen', $modul . ' → ' . $platz['name']);
+        return Response::json(['ok' => true, 'auftrag' => $id, 'platz' => $platz['name']]);
+    }
+
+    private function akteStand(Request $r): Response {
+        $platz = $this->ap()->fuerBrowser($r->remote, (string)$r->cookie(Arbeitsplaetze::COOKIE));
+        return Response::json(['stand' => $platz ? $this->ap()->stand($r->get('id', 20), $platz['id']) : 'unbekannt']);
+    }
+
+    /** Mein Konto → „Mein Arbeitsplatz“: Wahl im Browser merken (Cookie, ein Jahr); leer = automatisch über die Adresse. */
+    private function meinArbeitsplatz(Request $r): Response {
+        $id = $r->field('platz', 20);
+        if ($id !== '' && !$this->ap()->holen($id)) throw new Problem('Arbeitsplatz nicht gefunden.', 404);
+        $this->flash($id === '' ? 'Arbeitsplatz wird wieder automatisch erkannt.' : 'Gespeichert: Dieser Browser gehört zu „' . $this->ap()->holen($id)['name'] . '“.');
+        $cookie = Arbeitsplaetze::COOKIE . '=' . $id . '; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=' . ($id === '' ? 0 : 31536000);
+        return Response::redirect('/konto#arbeitsplatz')->with('Set-Cookie', $cookie);
+    }
+
+    private function arbeitsplatzFold(callable $fold, string $csrf): string {
+        $liste = $this->ap()->liste();
+        if (!$liste) return '';
+        $gewaehlt = (string)($this->req?->cookie(Arbeitsplaetze::COOKIE) ?? '');
+        $jetzt = $this->ap()->fuerBrowser($this->req?->remote ?? '', $gewaehlt);
+        $opt = '<option value="">Automatisch (über die Adresse dieses PCs)</option>';
+        foreach ($liste as $p) $opt .= '<option value="' . V::h($p['id']) . '"' . ($p['id'] === $gewaehlt ? ' selected' : '') . '>' . V::h($p['name'] . ($p['online'] ? '' : ' (nicht verbunden)')) . '</option>';
+        $tag = $jetzt ? '<span class="tag ok fold-status">' . V::h($jetzt['name']) . '</span>' : '<span class="tag warn fold-status">nicht erkannt</span>';
+        return '<div id="arbeitsplatz">' . $fold('Mein Arbeitsplatz', $tag, '<p class="muted">An welchem PC dieser Browser läuft, z. B. für „Akte öffnen“ in T2med. Meist erkennt die Suite das selbst; '
+            . 'bei Terminalservern oder mehreren Benutzern an einem PC hier einmal wählen (gilt nur für diesen Browser).</p>'
+            . '<form method="post" action="/konto/arbeitsplatz">' . $csrf . '<p><label>Arbeitsplatz <select name="platz">' . $opt . '</select></label></p><button>Speichern</button></form>') . '</div>';
+    }
+
+    private function arbeitsplatzListe(): string {
+        $liste = $this->ap()->liste();
+        $o = '<h3 id="plaetze">Eingerichtete Arbeitsplätze</h3>';
+        if (!$liste) return $o . '<p class="muted">Noch keiner. Nach dem Ausführen des Pakets erscheint der PC hier mit seinem Rechnernamen.</p>';
+        $o .= '<table><thead><tr><th>Name</th><th>Rechner</th><th>Stand</th><th>Adresse</th><th>Version</th><th></th></tr></thead><tbody>';
+        foreach ($liste as $p) {
+            $zuletzt = (int)$p['zuletzt'] > 0 ? date('d.m.Y H:i', (int)$p['zuletzt']) : '–';
+            $o .= '<tr><td><form method="post" action="/verwaltung/arbeitsplaetze" class="inline">' . $this->hidden('platz-umbenennen') . '<input type="hidden" name="id" value="' . V::h($p['id']) . '">'
+                . '<input name="name" value="' . V::h($p['name']) . '" maxlength="40" aria-label="Name"> <button class="small secondary">Umbenennen</button></form></td>'
+                . '<td>' . V::h($p['rechner']) . '</td><td>' . ($p['online'] ? '<span class="tag ok">verbunden</span>' : '<span class="tag warn">zuletzt ' . V::h($zuletzt) . '</span>')
+                . ($p['zustand'] !== '' ? '<div class="muted small">' . V::h($p['zustand']) . '</div>' : '') . '</td><td>' . V::h($p['ip']) . '</td><td>' . V::h($p['version']) . '</td>'
+                . '<td><form method="post" action="/verwaltung/arbeitsplaetze" class="inline">' . $this->hidden('platz-entfernen')
+                . '<input type="hidden" name="id" value="' . V::h($p['id']) . '"><button class="small danger">Entfernen</button></form></td></tr>';
+        }
+        return $o . '</tbody></table>';
+    }
+
     private function starterPage(?string $error = null, ?string $notice = null): Response {
         return $this->workstationHelp($error, $notice);
     }
 
     private function starterAction(Request $r, string $admin): Response {
-        if ($r->field('aktion') !== 'erneuern') throw new Problem('Unbekannte Aktion.', 400);
+        $aktion = $r->field('aktion');
+        if ($aktion === 'platz-umbenennen' || $aktion === 'platz-entfernen') {
+            $p = $this->ap()->holen($r->field('id', 20)) ?? throw new Problem('Arbeitsplatz nicht gefunden.', 404);
+            if ($aktion === 'platz-umbenennen') {
+                $this->ap()->umbenennen($p['id'], $r->field('name', 60));
+                $this->flash('Arbeitsplatz umbenannt.');
+            } else {
+                $this->ap()->entfernen($p['id']);
+                $this->audit->write($admin, 'arbeitsplatz-entfernt', $p['name']);
+                $this->flash('Arbeitsplatz „' . $p['name'] . '“ entfernt. Sein Agent hat keinen Zugang mehr; zum erneuten Einrichten das Paket auf dem PC ausführen.');
+            }
+            return Response::redirect('/hilfe/arbeitsplatz#plaetze');
+        }
+        if ($aktion !== 'erneuern') throw new Problem('Unbekannte Aktion.', 400);
         if ($r->field('bestaetigt', 1) !== '1') throw new Problem('Bitte das Erneuern des Schlüssels ausdrücklich bestätigen.', 422);
         $this->st()->renew();
         $this->audit->write($admin, 'starter-schluessel-erneuert', '');
@@ -2211,6 +2408,21 @@ final class Web {
             . V::input('name', 'Name der Warteschlange (leer = Vorschlag)', 'text', '', 'maxlength="40"')
             . '<button' . $dis . '>Anlegen</button></form>';
         $net = $st['net'];
+        if ($st['fileshares']) {
+            $body .= '<h2>Ordner zum Ablegen (Windows-Freigabe)</h2><p>Module können einen Ordner anbieten, in den Arbeitsplätze Dateien ziehen. Die Anmeldung in Windows '
+                . 'erfolgt mit dem angezeigten Benutzer und einem Kennwort, das Sie hier vergeben (8 bis 64 Zeichen). Erreichbar nur, wenn die Firewall '
+                . '„Drucken über Windows-Freigabe (445)“ für das Praxisnetz freigegeben ist.</p>';
+            foreach ($st['fileshares'] as $f) {
+                $user = 'ks-' . $f['modul'];
+                $body .= '<form method="post" action="/verwaltung/drucker" class="box">' . $this->hidden('dateifreigabe', ['key' => $f['key']])
+                    . '<p><strong>' . V::h($f['name']) . '</strong> – ' . V::h($f['label']) . ' <small>(Modul ' . V::h($f['modul']) . ')</small><br>'
+                    . ($f['on'] ? 'Eingeschaltet: <code>\\\\' . V::h($this->printerHost()) . '\\' . V::h($f['name']) . '</code>, Benutzer <code>' . V::h($user) . '</code>'
+                        : 'Ausgeschaltet. Benutzer für die Anmeldung wird <code>' . V::h($user) . '</code>.') . '</p>'
+                    . V::input('kennwort', $f['on'] ? 'Neues Kennwort (leer = unverändert)' : 'Kennwort', 'password', '', 'autocomplete="new-password" minlength="8" maxlength="64"' . ($f['on'] ? '' : ' required'))
+                    . '<button name="an" value="1"' . $dis . '>' . ($f['on'] ? 'Kennwort ändern' : 'Einschalten') . '</button>'
+                    . ($f['on'] ? ' <button name="an" value="0"' . $dis . '>Ausschalten</button>' : '') . '</form>';
+            }
+        }
         $body .= '<h2>Windows-Netz</h2>';
         $body .= '<p>Arbeitsgruppe: <strong>' . V::h($net['arbeitsgruppe']) . '</strong>. Hinweis: Windows 11 Pro lässt Gastzugriff auf Windows-Freigaben ab 24H2 '
             . 'nicht mehr zu; dort besser über IPP drucken.</p>'
@@ -2242,8 +2454,8 @@ final class Web {
                 . "Add-PrinterDriver -Name \"Microsoft IPP Class Driver\"\n\$url = \"" . $url . "\"\n\$fehler = ''\n"
                 . "# Anschluss und Drucker anlegen, bis zu viermal (direkt nach dem Neustart des Spoolers ist der Anschluss manchmal noch nicht nutzbar)\n"
                 . "for (\$i = 1; \$i -le 4 -and -not (Get-Printer -Name \"" . $name . "\" -ErrorAction SilentlyContinue); \$i++) {\n"
-                . "  if (-not (Get-PrinterPort -Name \$url -ErrorAction SilentlyContinue)) { try { Add-PrinterPort -Name \$url -ErrorAction Stop } catch { \$fehler = \$_.Exception.Message } }\n  Start-Sleep 3\n"
-                . "  try { Add-Printer -Name \"" . $name . "\" -DriverName \"Microsoft IPP Class Driver\" -PortName \$url -ErrorAction Stop } catch { \$fehler = \$_.Exception.Message }\n}\n"
+                . "  if (-not (Get-PrinterPort -Name \$url -ErrorAction SilentlyContinue)) { try { Add-PrinterPort -Name \$url -ErrorAction Stop } catch { \$fehler = 'Anschluss: ' + \$_.Exception.Message } }\n  Start-Sleep 3\n"
+                . "  try { Add-Printer -Name \"" . $name . "\" -DriverName \"Microsoft IPP Class Driver\" -PortName \$url -ErrorAction Stop } catch { \$fehler = (\$fehler + ' | Drucker: ' + \$_.Exception.Message).Trim(' |') }\n}\n"
                 . "if (Get-Printer -Name \"" . $name . "\" -ErrorAction SilentlyContinue) { Get-Printer -Name \"" . $name . "\" | Select-Object Name, DriverName, PortName }\n"
                 . "else { Write-Warning ('Drucker nicht angelegt. Grund: ' + \$fehler) }"
                ;
@@ -2292,6 +2504,7 @@ final class Web {
                 'entfernen' => $p->remove($r->field('name', 60)),
                 'testseite' => $p->testPage($r->field('name', 60)),
                 'freigabe' => $p->share($r->field('name', 60), $share),
+                'dateifreigabe' => $p->fileShare($r->field('key', 60), $r->field('an') === '1', $r->field('kennwort', 64)),
                 'abgleichen' => $p->sync(),
                 'abbrechen' => $p->cancelJob($r->field('auftrag', 60)),
                 'alle-abbrechen' => $p->cancelAll($r->field('name', 60)),
@@ -2302,7 +2515,7 @@ final class Web {
             if ($e->http === 422 || $e->http === 409 || $e->http === 404) return $this->printersPage($e->getMessage());
             throw $e;
         }
-        $this->audit->write($admin, 'drucker-' . $a, $a === 'abbrechen' ? $r->field('auftrag', 60) : ($a === 'arbeitsgruppe' ? $r->field('arbeitsgruppe', 20) : $r->field('name', 60)));
+        $this->audit->write($admin, 'drucker-' . $a, $a === 'abbrechen' ? $r->field('auftrag', 60) : ($a === 'arbeitsgruppe' ? $r->field('arbeitsgruppe', 20) : ($a === 'dateifreigabe' ? $r->field('key', 60) . ($r->field('an') === '1' ? ' an' : ' aus') : $r->field('name', 60))));
         $this->flash('Auftrag an den Druckerdienst übergeben.');
         return Response::redirect('/verwaltung/drucker');
     }

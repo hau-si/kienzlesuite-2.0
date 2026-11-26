@@ -1,5 +1,78 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.13
+
+- **Neu: Dateifreigaben der Module (`[[fileshare]]`).** Ein Modul kann einen Ordner seines Datenverzeichnisses als Windows-Freigabe zum Ablegen anbieten. Unter Verwaltung → Drucker → „Ordner zum Ablegen“ schaltet ein Admin sie ein (Vorgabe: aus). Zugriff **mit Anmeldung**: Der Admin vergibt beim Einschalten ein Kennwort (Samba-Benutzer `ks-<modul>`, wird beim Ausschalten gelöscht), damit auch Windows 11 24H2 zugreifen kann. Nur aus den Netzen, für die die Firewall „Drucken über Windows-Freigabe (445)“ freigegeben ist; keine Symlinks, keine versteckten Dateien, Dateien gehören dem Modulbenutzer (0600). Erster Nutzer: Fax „Fax-Ausgang“ (Fax 0.1.0-beta.12). Nicht am echten Arbeitsplatz geprüft.
+
+## 0.22.0-beta.12
+
+- **Fehler behoben, Lauschordner:** Dateien mit Umlauten oder ß im Namen (z. B. „Datenschutzerklärung_2.pdf“) wurden vom Ablage-Dienst übersehen, weil er nur ASCII-Namen zuließ; sie blieben für immer auf dem NAS liegen. Jetzt sind Buchstaben aller Sprachen, Ziffern, Leerzeichen, Klammern, Punkt, Komma, Plus und Minus erlaubt (beim Holen auf NFC-Schreibweise gebracht, weil manche NAS Umlaute getrennt melden). Pfad-, Steuer- und Sonderzeichen wie `;` bleiben verboten. Gilt nur für den Lauschordner, Aufträge der Module bleiben streng. Test ergänzt.
+
+## 0.22.0-beta.11
+
+- **Lauschordner fast sofort:** Neuer Dienst `kienzle-ablage-lauschen` (Timer alle 15 Sekunden) prüft nur die Lauschordner auf dem NAS (`kienzle-ablage lauschen`); bisher geschah das nur alle 5 Minuten. Ohne Lauschordner-Anfrage endet er sofort, er überlappt sich nicht mit dem normalen Auftragsdurchlauf (Sperrdatei) und fasst Aufträge nicht an. Fehler stehen weiter in `status.json` (kein Fehlercode im Takt). Der Installer richtet den Timer ein. Test ergänzt.
+
+## 0.22.0-beta.10
+
+- **Kienzle-Agent (Windows):** Das Paket der Seite „Arbeitsplätze“ richtet jetzt ein Programm für alles ein: Starter für T2med **und** Dienst mit Systemrechten (geplante Aufgabe „Kienzle-Agent“ beim Start des PCs, startet nach Ende oder Aktualisierung neu). Programm in `C:\Program Files\Kienzle`, Einstellungen in `C:\ProgramData\Kienzle` (Benutzer dürfen nur lesen; der eigene Zugang `agent.json` nur System und Administratoren).
+- Der Agent meldet sich einmal mit dem Starter-Schlüssel an und bekommt einen **eigenen Zugang je PC** (in der Suite nur als SHA-256). Danach fragt er etwa alle 2 Sekunden `/agent/abholen` und hält den PC selbst aktuell: **Starterprogramm** (lädt neue Fassungen aus der Suite, prüft die Prüfsumme, tauscht sich aus), **Aufrufe aus T2med** (für alle Benutzer, HKLM), `client.json` samt Starter-Schlüssel, **Zertifizierungsstelle** (vertrauenswürdig für den ganzen PC) und **virtuelle Drucker** (wie `install-drucker.ps1`, ohne Rückfragen). Ein Paket ist danach nur noch zur Reparatur nötig.
+- **„Akte öffnen“ in T2med** als Dienst der Basis für alle Module: Die Modulseite schickt `POST /arbeitsplatz/akte {modul, csrf, patientennummer}` (CSRF-Marke des Moduls); die Basis baut den GDT-Satz 6301 (wie kienzlefon-t2med) und gibt ihn an den Agent des PCs, der ihn als `C:\Kienzle\GDT\AUFRUFi.gdt` ablegt. Aufrufe verfallen nach 60 Sekunden. Die Patientennummer kommt nicht ins Protokoll.
+- **Welcher PC?** Der Agent, der gerade von derselben Adresse wie der Browser fragt; ist das nicht eindeutig (Terminalserver), einmal unter Mein Konto → „Mein Arbeitsplatz“ wählen (Cookie). Module sehen den Arbeitsplatz als `KIENZLE_ARBEITSPLATZ` (`$k->arbeitsplatz()`).
+- Seite „Arbeitsplätze“: Liste der eingerichteten PCs (verbunden/zuletzt, Adresse, Version, Rückmeldung zu Druckern und Aktualisierung), umbenennen, entfernen (der Agent verliert den Zugang).
+- Der Starter prüft das Serverzertifikat jetzt auch über die **Zertifizierungsstelle der Suite** (`ca.crt` im Paket), nicht nur über den Fingerabdruck des einzelnen Zertifikats: Nach neuem Servernamen oder Zertifikat bleibt die Verbindung bestehen.
+- Datenbank Version 5 (Tabellen `arbeitsplaetze`, `arbeitsplatz_auftraege`).
+- Sicherheit: Der Agent führt nur feste Aufgaben aus (Datei mit fester Endung in den festen GDT-Ordner, Drucker mit geprüften Namen und Adressen auf dem Server, Programm nur mit passender Prüfsumme); keine Befehle aus der Suite. Fehlversuche an `/agent/…` werden gebremst.
+- Geprüft mit Tests (PHP: Anmelden, Abholen, Sollzustand, GDT, Zuordnung, Seiten; Go: Anmelden, Angleichen, GDT, Selbstaktualisierung, Zertifizierungsstelle; Windows-Teile nur übersetzt und mit `go vet` geprüft). **Nicht geprüft:** auf einem echten Windows-PC (geplante Aufgabe, Registrierung, Zertifikat, Drucker, Austausch des laufenden Programms), mit T2med und auf der VM. macOS und Linux bekommen vorerst nur den Starter ohne Dienst.
+
+## 0.22.0-beta.9
+
+- **Fehler behoben, Lauschordner auf dem NAS:** Der Ablage-Dienst legte die geholten Dateien mit Rechten 0660 (Gruppe ks-ablage) ab; das Modul ist Besitzer des Ordners, aber nicht in dieser Gruppe, und konnte sie nicht lesen („Permission denied“). Jetzt 0664 (der Ordner mit 2770 schließt andere Benutzer weiterhin aus); schon liegende Dateien werden beim nächsten Lauf (alle 5 Minuten) lesbar gemacht. Test ergänzt.
+
+## 0.22.0-beta.8
+
+- **Nachrichten-Ausgang für Module:** Module, die die Verbindung `nachrichten` anmelden, können SMS und E-Mail über die Zugänge der Basis verschicken, **ohne die Zugangsdaten zu kennen** (bisher bekam ein Modul für E-Mail das SMTP-Passwort; SMS gab es für Module gar nicht). Das Modul legt einen Auftrag in `/var/spool/kienzle/nachrichten/<modul>/` ab (PHP: `$k->smsSenden()`, `$k->mailSenden()`, Stand mit `$k->nachricht()`), der neue Dienst `kienzle-nachrichten` (eigener Benutzer `ks-nachrichten`, alle 20 Sekunden) verschickt ihn und meldet das Ergebnis zurück. Fehlschläge werden 30 Minuten lang wiederholt; je Modul höchstens 60 SMS und 120 E-Mails pro Stunde; ins Protokoll kommen nie Empfänger oder Inhalte. Die Zugänge liest nur `ks-nachrichten` (`/etc/kienzle/verbindungen/nachrichten.json`, 0640).
+- Verwaltung → Verbindungen → „Wer nutzt was“ zeigt die Verbindungen mit Namen statt Kennung.
+- Geprüft mit Tests (Verteilung, Dienst mit Ersatz-Versand, Wiederholung, Grenze, PHP-Hilfe). **Nicht geprüft:** echter Versand über seven.io und SMTP/Gmail aus dem Dienst, Anlegen des Benutzers und des Zeitgebers durch `install.sh` auf Ubuntu 26.04.
+
+## 0.22.0-beta.7
+
+- **Windows-Druckerskript** (`install-drucker.ps1` im Starter-Paket und Anleitung unter „Arbeitsplätze“): Bei „Drucker … nicht angelegt“ nennt die Meldung jetzt getrennt den Fehler beim Anlegen des Anschlusses und beim Anlegen des Druckers (vorher verdeckte der zweite den ersten) und prüft, ob die Druckeradresse vom Arbeitsplatz aus antwortet. Häufigste Ursache: Der Drucker fehlt auf dem Server (Verwaltung → Drucker → „Virtuelle Drucker der Module abgleichen“) oder Port 631 ist blockiert.
+- **Umlaute in der PowerShell-Ausgabe** („unverändert“ statt „unverÃ¤ndert“): Die Skripte werden mit UTF-8-Kennung (BOM) ausgeliefert.
+- Nicht auf Windows geprüft.
+
+## 0.22.0-beta.6
+
+- **Fehler behoben: Modul-Update scheiterte mit „Vorgang fehlgeschlagen (Error)“**, wenn das Modul im Datenordner Sockets oder Pipes hat. Betroffen war das Telefonmodul (laufendes Asterisk legt `asterisk.ctl` an): Der Schnappschuss vor dem Update brach beim Kopieren ab. Sockets, Pipes und Gerätedateien werden jetzt übersprungen (sie gehören nicht in einen Schnappschuss). Das Protokoll (`/var/lib/kienzle/module/module.log`) nennt bei unbekannten Fehlern jetzt die Ursache. Mit Test nachgestellt (Socket und Pipe im Datenordner). Nach dem Update der Basis das Telefonmodul erneut aktualisieren; es wurde beim Abbruch nichts verändert.
+
+## 0.22.0-beta.5
+
+- **Klicksperre bei Update-Abfragen von 30 auf 10 Sekunden** („Jetzt nach Updates suchen“, Basis und Module). Bei vielen Klicks hintereinander gilt weiter der Schutz vor dem GitHub-Limit (60 Abfragen pro Stunde und IP-Adresse ohne Anmeldung).
+
+## 0.22.0-beta.4
+
+- **Veränderbare Druckerliste für Module** (`[printer_list]` in `module.toml`, siehe `docs/MODULE-TOML.md`): Ein Modul pflegt die Namen virtueller Drucker selbst (Datei im Datenordner), die Basis legt sie beim Abgleichen an (Verwaltung → Drucker → „Virtuelle Drucker der Module abgleichen“, auch bei Installieren und Aktualisieren). Namen müssen mit einem festen Vorsatz beginnen (schützt Namen anderer Module); fehlt die Datei oder ist sie kaputt, gilt die Vorgabe. Der Druckername kommt als `KIENZLE_DRUCKER` im Umfeld des Druckprogramms an. Die Einheiten der IPP-Drucker bekommen diese Zeile, deshalb startet der erste Abgleich nach dem Update alle virtuellen Drucker einmal neu.
+- **Lauschordner auf dem NAS** (Verbindung „ablage“): `$k->lauschen($ziel, $ordner, $endungen)` meldet einen Ordner auf dem NAS an; `ks-ablage` holt neue Dateien (höchstens 20 je Durchlauf) nach `$k->lauschenEingang()`, prüft sie durch zweites Lesen und löscht sie erst danach auf dem NAS. Gleichnamige Dateien werden nicht überschrieben. Geprüft mit dem nachgebauten NAS (SMB und SFTP); nicht an einem echten NAS.
+
+## 0.22.0-beta.3
+
+- **Abhängigkeiten zwischen Modulen** (`[module] requires` in `module.toml`, ab `core_api = "2"`): Ein Modul lässt sich erst installieren, wenn die genannten Module da sind; unter Verwaltung → Module steht dann „Braucht zuerst: …“ und „Installieren“ ist ausgegraut. Ein Modul, das noch gebraucht wird, lässt sich nicht entfernen („Wird noch gebraucht von: …“). Erster Fall: Fax braucht Telefon.
+- **Symbole** für die Module Fax (Faxgerät mit Hörer) und Telefon (Hörer) in der Seitenleiste und unter Module.
+- Nicht auf der VM geprüft.
+
+## 0.22.0-beta.2
+
+- **Passwortregeln einstellbar** (Verwaltung → Sicherheit → „Passwörter“): Mindestlänge (6–64), Zahl der Zeichenarten (1–4), Mindeststärke (0–4), Sperre häufiger Muster und Sperre des Anmeldenamens im Passwort. Standard wie bisher (10 Zeichen, Muster- und Namensprüfung); die Regeln gelten für neue und geänderte Passwörter, bestehende bleiben gültig.
+- **Warnung bei zu lockeren Regeln** (rot: Länge unter 8 oder Mustersperre aus; gelb: Länge unter 10, Namensprüfung aus oder weder Stärke noch Zeichenarten bei unter 12 Zeichen). Der Abschnitt öffnet sich dann von selbst und trägt das Schild „Warnung“.
+- **Stärkebalken** beim Festlegen und Ändern eines Passworts (Einrichtungslink, erster Admin, Konto → Passwort ändern): zeigt Stärke von „sehr schwach“ bis „sehr gut“ und was noch fehlt. Die Rechnung steht in `Passwords::score` und `passwort.js` (gleiche Ergebnisse). Nicht auf der VM geprüft.
+
+## 0.22.0-beta.1
+
+- **Schnittstelle für Module, Version 2 (`core_api = "2"`)**, für die neuen Module Fax und Telefon (`docs/PLAN-FAX-TELEFON.md`). Version 1 bleibt gültig; die bisherigen Module ändern sich nicht.
+  - `[[exchange]]`: gemeinsamer Austauschordner zweier Module. Melden beide einander an, legt die Basis `/var/spool/kienzle/austausch/<a>_<b>` an (root, 0770, ACL nur für die beiden Modulbenutzer), trägt ihn in die Weboberfläche beider Module ein (`open_basedir`, `ReadWritePaths`) und startet deren Dienste neu. Kein anderes Modul kommt hinein.
+  - `[system] disables`: Dienste aus Ubuntu-Paketen, die ein Modul selbst betreibt, werden gestoppt und maskiert (zugelassen nur `asterisk.service`); beim Entfernen wird die Maskierung aufgehoben.
+- Der Installer installiert zusätzlich `acl` (für die Rechte des Austauschordners).
+- Beschreibung in `docs/MODULE-TOML.md`. Geprüft mit Tests; **nicht auf der VM geprüft** (ACL und Maskierung brauchen root und systemd).
+
 ## 0.21.4-beta.67
 
 - **Starter unter Windows ohne schwarzes Fenster:** Das Starterprogramm wird für Windows ohne Konsole gebaut (`-H=windowsgui`), beim Aufruf aus T2med öffnet sich nur noch der Browser. Fehler stehen weiter in `starter.log` neben dem Programm. Das Paket auf den Arbeitsplätzen einmal neu ausführen (aktualisiert nur das Programm). Nicht unter Windows geprüft.
@@ -41,7 +114,7 @@
 
 ## 0.21.4-beta.59
 
-- **Klicksperre bei Update-Abfragen:** „Jetzt nach Updates suchen“ (Basis und Module) geht höchstens alle 30 Sekunden. Davor erscheint „Bitte kurz warten …“ mit der Restzeit. Grund: GitHub erlaubt ohne Anmeldung nur 60 Abfragen pro Stunde und IP-Adresse (Fehler „HTTP 403 rate limit exceeded“). Nicht auf der VM geprüft.
+- **Klicksperre bei Update-Abfragen:** „Jetzt nach Updates suchen“ (Basis und Module) geht höchstens alle 30 Sekunden (ab 0.22.0-beta.5: 10 Sekunden). Davor erscheint „Bitte kurz warten …“ mit der Restzeit. Grund: GitHub erlaubt ohne Anmeldung nur 60 Abfragen pro Stunde und IP-Adresse (Fehler „HTTP 403 rate limit exceeded“). Nicht auf der VM geprüft.
 
 ## 0.21.4-beta.58
 

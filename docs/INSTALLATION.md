@@ -51,6 +51,26 @@ Prüfliste für die Test-VM: `docs/VM-TEST.md`.
 4. Beim ersten Start läuft der Installer der Suite von selbst. Den Einrichtungslink zeigt danach
    `sudo journalctl -u kienzle-erstinstallation` bzw. `sudo kienzle-admin einrichtungslink`.
 
+## Start-ISO (iso/): einfachster Weg
+
+Die kleine Start-ISO (rund 100–150 MB) liegt als Download im GitHub-Release **„start-iso“** (GitHub → Releases → „Start-ISO (neueste)“); sie wird
+von `.github/workflows/iso.yml` gebaut. Auf Windows reicht: Datei laden, mit Rufus oder balenaEtcher auf einen USB-Stick schreiben (oder an die VM hängen),
+davon starten.
+
+- **Voraussetzungen:** Internet per DHCP beim Start und rund **6 GB Arbeitsspeicher** oder mehr: Ubuntu Server 26.04.1 wird beim Start geladen
+  (2,7 GB) und im Arbeitsspeicher gehalten. Eine feste Adresse für den Download: Menüeintrag mit „e“ bearbeiten (Hinweis steht in der Menüdatei).
+- **Eingaben:** Nur drei Ubuntu-Bildschirme bleiben: **Netzwerk** (DHCP oder feste Adresse), **Datenträger** (Platte und Größe, Rest bleibt frei)
+  und **Benutzer/Passwort** (Servername mit `suite` vorbelegt). Sprache, Tastatur (de), Zeitzone, SSH-Server und Sicherheitsupdates laufen ohne Rückfrage.
+- **Startmenü:** *stabil (signiert)*, *Beta (unsignierte Vorabversionen erlaubt)*, *Zweig main* oder *Zweig beta* (nur wenn es kein Release gibt).
+  Unsignierte Stände gibt es nur durch ausdrückliche Menüwahl; bei Releases schützt dann noch die Prüfsumme des Manifests, beim Zweig nichts.
+- **Danach** holt `kienzle-holen` beim ersten Start das neueste Release des Kanals, prüft die Ed25519-Signatur mit den Schlüsseln aus
+  `installer/release-keys` (in der ISO eingebettet), packt es nach `/opt/kienzle-installer` und startet `install.sh`. Schlägt etwas fehl, bleibt das
+  System bestehen und der Dienst versucht es nach 2 Minuten erneut (`sudo journalctl -u kienzle-erstinstallation`).
+- **Bauen:** `bash iso/bauen.sh` (Linux, braucht `xorriso`, `gpgv`): lädt die Ubuntu-ISO, prüft sie gegen `SHA256SUMS` mit GPG-Signatur (fester
+  Fingerabdruck der Ubuntu-CD-Schlüssel), entfernt das große Dateisystem und ergänzt Menü und Autoinstall (Bezeichnung `CIDATA`).
+- **Stand:** Download, Signaturprüfung, Seed und Menü sind mit `iso/tests` getestet. **Der Start von der ISO ist noch nicht auf einer VM geprüft**
+  (offene Punkte: ob cloud-init den Seed über die Bezeichnung `CIDATA` findet, ob Secure Boot mit dem verkleinerten Abbild startet).
+
 ## Was der Installer einrichtet
 
 - nginx und php-fpm (nur die Suite; die Beispielseite der Distribution wird abgeschaltet), eigene Zertifizierungsstelle.

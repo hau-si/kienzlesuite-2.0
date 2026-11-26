@@ -1,0 +1,50 @@
+#!/usr/bin/python3 -B
+"""Startet den Fax-Worker aus Kienzlefax, sobald der Faxkanal eingerichtet ist (Dienst kienzle-telefon-fax, als ks-telefon).
+
+Bis dahin (kein Austauschordner mit dem Modul fax, keine Faxleitung, kein AMI-Zugang) wartet er und prüft jede halbe Minute.
+"""
+import json
+import os
+import sys
+import time
+from pathlib import Path
+
+DATA = Path(os.environ.get('KIENZLE_DATEN', '/var/lib/kienzle/telefon'))
+EXCHANGE = Path(os.environ.get('KFX_BASE', '/var/spool/kienzle/austausch/fax_telefon'))
+HERE = Path(__file__).resolve().parent
+PROGRAM = Path(os.environ.get('KIENZLE_PROGRAMM', '/opt/kienzle/telefon/current'))
+
+
+def ready() -> dict | None:
+    try:
+        fax = json.loads((DATA / 'fax.json').read_text(encoding='utf-8'))
+        ami = json.loads((DATA / 'ami.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return None
+    if not fax.get('aktiv') or not EXCHANGE.is_dir() or not ami.get('secret'):
+        return None
+    return ami
+
+
+def main() -> int:
+    told = False
+    while True:
+        ami = ready()
+        if ami:
+            break
+        if not told:
+            print('fax-dienst: Faxkanal noch nicht eingerichtet (Faxleitung oder Modul Fax fehlt); warte.', flush=True)
+            told = True
+        time.sleep(30)
+    kfx = PROGRAM / 'lib' / 'kfx'
+    env = {**os.environ, 'KFX_BASE': str(EXCHANGE), 'KFX_AMI_HOST': '127.0.0.1', 'KFX_AMI_PORT': str(ami.get('port', 5038)),
+           'KFX_AMI_USER': str(ami.get('user', 'kienzle-fax')), 'KFX_AMI_PASS': str(ami['secret']), 'KFX_DIAL_CONTEXT': 'fax-out',
+           'KFX_ASTERISK_BIN': str(kfx / 'asterisk-rx'), 'KFX_PDF_HEADER_SCRIPT': str(kfx / 'pdf_with_header.sh'),
+           'KFX_PRAXIS_DATEI': str(DATA / 'praxis.txt'), 'KIENZLE_DATEN': str(DATA)}
+    worker = HERE / 'kienzlefax-worker.py'
+    os.execve('/usr/bin/python3', ['/usr/bin/python3', '-B', str(worker)], env)
+    return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())

@@ -753,11 +753,24 @@ def append_logo(r: EscPosRenderer, cfg: dict[str, Any]) -> None:
         eprint("Logo konnte nicht gedruckt werden.")
 
 
-def cancel_mailto(cancel: dict[str, Any]) -> bytes:
-    """mailto:-Adresse für den Absage-QR: Empfänger, Betreff und Nachrichtentext (UTF-8, prozentkodiert)."""
+def cancel_fill(text: str, ticket: "ParsedTicket | None", stufe: int = 0) -> str:
+    """Platzhalter im Betreff/Text der Absage-Mail: {{patient}}, {{termine}} (alle Termine mit Art), {{termine_kurz}} (nur Tag und Uhrzeit),
+    {{erster_termin}}. Stufe 0 = volle Liste, 1 = kurze Liste, 2 = ohne Termine (wenn der QR-Code sonst zu dicht würde)."""
+    patient = ticket.patient if ticket else ""
+    termine = ticket.appointments if ticket else []
+    voll = "\n".join(f"{a.weekday} {a.date} {a.time}" + (f" {a.kind}" if a.kind else "") for a in termine)
+    kurz = "\n".join(f"{a.weekday} {a.date} {a.time}" for a in termine)
+    erster = f"{termine[0].weekday} {termine[0].date} {termine[0].time}" if termine else ""
+    werte = {"patient": patient, "termine": (voll, kurz, "")[stufe], "termine_kurz": (kurz, kurz, "")[stufe], "erster_termin": erster}
+    return re.sub(r"\{\{\s*([a-z_]+)\s*\}\}", lambda m: werte.get(m.group(1), m.group(0)), text)
+
+
+def cancel_mailto(cancel: dict[str, Any], ticket: "ParsedTicket | None" = None, stufe: int = 0) -> bytes:
+    """mailto:-Adresse für den Absage-QR: Empfänger, Betreff und Nachrichtentext (UTF-8, prozentkodiert), Platzhalter ersetzt."""
     from urllib.parse import quote
-    body = str(cancel.get("body", "")).replace("\n", "\r\n")
-    return ("mailto:" + quote(str(cancel.get("to", "")), safe="@.+-_") + "?subject=" + quote(str(cancel.get("subject", "")), safe="")
+    body = cancel_fill(str(cancel.get("body", "")), ticket, stufe).replace("\n", "\r\n")
+    subject = cancel_fill(str(cancel.get("subject", "")), ticket, 2).replace("\n", " ").strip()
+    return ("mailto:" + quote(str(cancel.get("to", "")), safe="@.+-_") + "?subject=" + quote(subject, safe="")
             + "&body=" + quote(body, safe="")).encode("ascii")
 
 
@@ -825,19 +838,26 @@ def cancel_block_image(qr_image, caption: str):
     return img.convert("1", dither=Image.NONE)
 
 
-def append_cancel_qr(r: EscPosRenderer, cfg: dict[str, Any]) -> None:
+def append_cancel_qr(r: EscPosRenderer, cfg: dict[str, Any], ticket: "ParsedTicket | None" = None) -> None:
     """Absage-QR auf dem Bon: Balken mit der Aufforderung oben, darunter der QR-Code im runden Rahmen; er öffnet eine vorbereitete
     E-Mail zum Absagen. Ein Fehler darf den Ausdruck nie verhindern (ohne Schrift oder Bildbibliothek gibt es Text und schlichten QR)."""
     cancel = cfg.get("cancel_qr", {})
     if not isinstance(cancel, dict) or not cfg_bool(cancel, "enabled", False):
         return
     try:
-        from calendar_qr import build_qr_image
+        from calendar_qr import PayloadTooLarge, build_qr_image
         from escpos import raster_image
         caption = str(cancel.get("caption", "")).strip()
         # 32 Punkte für Rahmen und Abstand (2 × (6 + 10)): Der ganze Block darf höchstens 384 Punkte breit sein (Rastergrenze).
         room = min(int(cancel.get("width_dots", 292)), r.page_width - 32, 352)
-        qr = build_qr_image(cancel_mailto(cancel), {"max_width_dots": max(64, room)})
+        qr = None
+        for stufe in (0, 1, 2):   # passt die Terminliste nicht mehr in den QR-Code, erst kürzer, dann ohne Termine
+            try:
+                qr = build_qr_image(cancel_mailto(cancel, ticket, stufe), {"max_width_dots": max(64, room)})
+                break
+            except PayloadTooLarge:
+                if stufe == 2:
+                    raise
         r.line("")
         try:
             image = cancel_block_image(qr, caption)
@@ -907,7 +927,7 @@ def render_escpos(ticket: ParsedTicket, cfg: dict[str, Any]) -> bytes:
             r.line(separator * r.cols(r.sizes["footer"]), align="left", bold=False, size=r.sizes["footer"])
         r.block("footer", r.sizes["footer"])
 
-    append_cancel_qr(r, cfg)
+    append_cancel_qr(r, cfg, ticket)
     return r.finish()
 
 

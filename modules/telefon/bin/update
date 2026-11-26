@@ -1,0 +1,3 @@
+#!/bin/sh
+# Haken „update“ des Moduls telefon (läuft als ks-telefon).
+exec /usr/bin/php "$(dirname "$0")/../lib/haken.php" update

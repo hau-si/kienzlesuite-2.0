@@ -1,0 +1,10 @@
+# Kienzle-Suite, Modul telefon: täglich aufräumen.
+[Unit]
+Description=Kienzle-Suite Modul telefon (Aufräumen, täglich)
+
+[Timer]
+OnCalendar=*-*-* 03:17:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

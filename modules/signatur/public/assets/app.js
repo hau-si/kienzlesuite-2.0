@@ -35,25 +35,26 @@
   function patientZeigen(quelle, d) {
     var kasten = document.getElementById('n-gewaehlt'), feld = document.getElementById('n-patient-feld'), name = document.getElementById('n-patient');
     if (!kasten || !feld || !name || !name.value) return;
+    document.getElementById('n-gewaehlt-anzeige').hidden = false; document.getElementById('n-gewaehlt-weg').hidden = false;
     document.getElementById('n-gewaehlt-quelle').textContent = quelle === 'kasse' ? 'PATIENT AUS DER KASSE' : 'PATIENT AUS T2MED';
     document.getElementById('n-gewaehlt-name').textContent = name.value;
     var geb = String(d.geburtsdatum || ''), m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(geb);
     document.getElementById('n-gewaehlt-info').textContent = geb ? 'Geboren am ' + (m ? m[3] + '.' + m[2] + '.' + m[1] : geb) : '';
-    kasten.hidden = false; feld.hidden = true;
+    feld.hidden = true;
     kasten.scrollIntoView({ block: 'nearest' });
   }
   (function () {
     var weg = document.getElementById('n-gewaehlt-weg');
     if (!weg) return;
     weg.addEventListener('click', function () {
-      var form = document.getElementById('n-patient').form;
+      var form = document.getElementById('n-form');
       ['n-patient', 'n-kontext', 'n-patient-id', 'n-telefon-alt', 'n-email-alt', 'n-vorname', 'n-nachname', 'n-geburtsdatum', 'n-telefon', 'n-email', 'n-adresse', 'n-leistungen', 'n-quelle', 'n-quelle-ref'].forEach(function (id) { var f = document.getElementById(id); if (f) f.value = ''; });
       var g = document.getElementById('n-geschlecht'); if (g) g.value = '';
       ['n-leistung', 'n-betrag'].forEach(function (id) { var f = document.getElementById(id); if (f) { f.value = ''; f.readOnly = false; } });
       var l = document.getElementById('n-liste'); if (l) l.hidden = true;
       var kb = document.getElementById('n-kontakt-box'); if (kb) kb.hidden = true;
       Array.prototype.forEach.call(form.querySelectorAll('p.notice, p.error'), function (p) { p.remove(); });
-      document.getElementById('n-gewaehlt').hidden = true; document.getElementById('n-patient-feld').hidden = false;
+      document.getElementById('n-gewaehlt-anzeige').hidden = true; document.getElementById('n-gewaehlt-weg').hidden = true; document.getElementById('n-gewaehlt-quelle').textContent = 'PATIENT'; document.getElementById('n-patient-feld').hidden = false;
       document.getElementById('n-patient').focus();
     });
   })();

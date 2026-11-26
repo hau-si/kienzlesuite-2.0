@@ -1,0 +1,9 @@
+#!/usr/bin/python3 -B
+# Startskript des Moduls telefon für „kienzlefon-transfer-setup“ aus Kienzlefon 2.7 (kienzlefon.transfer_setup:main); ersetzt /opt/kienzlefon/venv/bin/kienzlefon-transfer-setup.
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'kienzlefon'))
+from kienzlefon.transfer_setup import main  # noqa: E402
+
+sys.exit(main())

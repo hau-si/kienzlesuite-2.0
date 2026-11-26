@@ -1,0 +1,3 @@
+#!/bin/sh
+# Haken „busy“ des Moduls fax (läuft als ks-fax).
+exec /usr/bin/php "$(dirname "$0")/../lib/haken.php" busy

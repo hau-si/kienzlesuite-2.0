@@ -29,6 +29,7 @@ API = re.compile(r'^[1-9]\d{0,3}$')
 PACKAGE = re.compile(r'^[a-z0-9][a-z0-9+.-]{1,62}$')
 WEB_PATH = re.compile(r'^/[a-z0-9][a-z0-9-]{0,30}$')
 RIGHT = re.compile(r'^[a-z][a-z0-9_]{0,30}$')
+SHARE_NAME = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,30}$')
 PRINTER = re.compile(r'^[A-Za-z0-9_-]{1,40}$')
 REL_PATH = re.compile(r'^[A-Za-z0-9_][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_][A-Za-z0-9_.-]*)*$')
 PORT = re.compile(r'^(\d{1,5})(?:-(\d{1,5}))?$')
@@ -47,29 +48,38 @@ RESERVED_RIGHTS = frozenset({'admin'})
 APPARMOR = frozenset({'gs', 'qpdf'})
 HOOKS = ('install', 'update', 'remove', 'busy', 'health')
 # Zentrale Verbindungen der Basis, die ein Modul anmelden kann (Zugangsdaten bekommen nur anmeldende Module).
-CONNECTIONS = ('t2med', 'mail', 'ablage', 'letterxpress')
+CONNECTIONS = ('t2med', 'mail', 'ablage', 'letterxpress', 'nachrichten')
 SHARES = ('samba', 'ipp')
 STARTER_SCHEMA = re.compile(r'^kienzle-[a-z0-9-]{1,30}$')
+# Dienste aus Ubuntu-Paketen, die die Basis abschalten darf, weil das Modul sie selbst betreibt ([system] disables).
+DISABLES = frozenset({'asterisk.service'})
+# Gemeinsame Austauschordner zweier Module ([[exchange]]): /var/spool/kienzle/austausch/<a>_<b> (IDs sortiert).
+EXCHANGE_BASE = '/var/spool/kienzle/austausch'
+# Abschnitte und Schlüssel, die erst ab dieser API-Version gelten.
+API_2 = '2'
 FORMAT = re.compile(r'^[a-z]+/[a-z0-9.+-]{1,60}$')
 
-LIMITS = {'starters': 5, 'packages': 50, 'services': 20, 'firewall': 20, 'rights': 30, 'printers': 10, 'paths': 20,
+LIMITS = {'exchange': 5, 'starters': 5, 'packages': 50, 'services': 20, 'firewall': 20, 'rights': 30, 'printers': 10, 'paths': 20, 'fileshares': 3,
           'connections': len(CONNECTIONS)}
 
 SCHEMA_SECTIONS = {
-    'module': {'id', 'name', 'version', 'core_api', 'description'},
-    'system': {'packages', 'services', 'user', 'data'},
+    'module': {'id', 'name', 'version', 'core_api', 'description', 'requires'},
+    'system': {'packages', 'services', 'user', 'data', 'disables'},
     'web': {'path', 'upstream', 'protocol', 'entry', 'starter', 'einstellungen', 'uploads'},   # starter: alter Schlüssel, wird nur noch angenommen und ignoriert
     'firewall': {'name', 'port', 'proto', 'scope'},
     'rights': {'id', 'label'},
     'backup': {'paths', 'snapshot', 'settings'},
     'printers': {'name', 'label', 'ppd', 'backend', 'command', 'formats', 'paper', 'share'},
+    'printer_list': {'prefix', 'default', 'file', 'label', 'command', 'paper', 'formats', 'share', 'max'},
     'connections': {'id', 'purpose', 'required'},
     'starters': {'schema', 'label'},
+    'exchange': {'module', 'purpose'},
+    'fileshare': {'id', 'name', 'label', 'path'},
     'setup': {'overview'},
     'hooks': {*HOOKS, 'apparmor'},
 }
-TABLES = {'module', 'system', 'web', 'backup', 'setup', 'hooks'}
-ARRAYS = {'firewall', 'rights', 'printers', 'connections', 'starters'}
+TABLES = {'module', 'system', 'web', 'backup', 'setup', 'hooks', 'printer_list'}
+ARRAYS = {'firewall', 'rights', 'printers', 'connections', 'starters', 'exchange', 'fileshare'}
 REQUIRED_TABLES = ('module', 'system')
 
 
@@ -193,8 +203,13 @@ class _Checker:
         out['rights'] = self.rights(data.get('rights', []))
         out['backup'] = self.backup(data['backup'], mid) if 'backup' in data else None
         out['printers'] = self.printers(data.get('printers', []))
+        out['printer_list'] = self.printer_list(data['printer_list'], out['printers'], mid) if 'printer_list' in data else None
         out['connections'] = self.connections(data.get('connections', []))
         out['starters'] = self.starters(data.get('starters', []), out['web'])
+        out['exchange'] = self.exchange(data.get('exchange', []), mid)
+        out['fileshares'] = self.fileshares(data.get('fileshare', []), out['system'])
+        if (out['exchange'] or out['system']['disables'] or out['fileshares']) and module.get('core_api') == '1':
+            self.error('module.core_api', '[[exchange]], [[fileshare]] und [system] disables gibt es erst mit core_api = "2".')
         out['setup'] = self.setup(data.get('setup', {}))
         out['hooks'] = self.hooks(data.get('hooks', {}))
         return None if self.errors else out
@@ -217,6 +232,14 @@ class _Checker:
                                           f'(unterstützt: {", ".join(sorted(supported_api()))}).')
         out['core_api'] = api
         out['description'] = self.text(t, 'description', 'module', required=False, limit=300)
+        # Module, die vorher installiert sein müssen (z. B. Fax braucht Telefon); erst ab core_api 2.
+        requires = self.string_list(t, 'requires', 'module', 5)
+        for r in requires:
+            if not ID.match(r) or r == mid:
+                self.error('module.requires', f'„{shown(r)}“ ist keine andere Modul-ID.')
+        if requires and api == '1':
+            self.error('module.requires', 'gibt es erst mit core_api = "2".')
+        out['requires'] = [r for r in requires if ID.match(r) and r != mid]
         return out
 
     def system(self, t: dict, mid: str | None) -> dict:
@@ -236,7 +259,11 @@ class _Checker:
         data = self.text(t, 'data', 'system', limit=100)
         if data is not None and mid and data != f'{BASE_DATA}/{mid}':
             self.error('system.data', f'muss „{BASE_DATA}/{mid}“ sein.')
-        return {'packages': packages, 'services': services, 'user': user, 'data': data}
+        disables = self.string_list(t, 'disables', 'system', len(DISABLES))
+        for d in disables:
+            if d not in DISABLES:
+                self.error('system.disables', f'„{shown(d)}“ darf nicht abgeschaltet werden. Erlaubt: {", ".join(sorted(DISABLES))}.')
+        return {'packages': packages, 'services': services, 'user': user, 'data': data, 'disables': [d for d in disables if d in DISABLES]}
 
     def web(self, t: dict, mid: str | None) -> dict:
         path = self.pattern(t, 'path', 'web', WEB_PATH, '/kasse')
@@ -386,6 +413,40 @@ class _Checker:
             out.append({'name': name, 'label': label, 'ppd': ppd, 'backend': backend, 'command': command, 'formats': formats, 'paper': paper, 'share': share})
         return out
 
+    def printer_list(self, t: dict, fixed: list, mid) -> dict | None:
+        """Veränderbare Druckerliste: Das Modul pflegt die Namen in einer Datei im Datenordner (z. B. Faxdrucker), die Basis
+        legt daraus beim Abgleichen virtuelle Drucker an. Alle Drucker der Liste teilen sich Programm, Beschreibung und Papier."""
+        where = 'printer_list'
+        prefix = self.pattern(t, 'prefix', where, re.compile(r'^[A-Za-z][A-Za-z0-9_-]{0,19}$'), 'vFax')
+        label = self.text(t, 'label', where)
+        command = self.rel_path(t['command'], f'{where}.command') if 'command' in t else self.error(where, '„command“ fehlt.')
+        file = self.pattern(t, 'file', where, re.compile(r'^[a-z][a-z0-9_.-]{0,40}\.json$'), 'drucker.json')
+        maximum = t.get('max', 10)
+        if not isinstance(maximum, int) or isinstance(maximum, bool) or not 1 <= maximum <= LIMITS['printers'] - len(fixed):
+            self.error(f'{where}.max', f'muss eine Zahl von 1 bis {LIMITS["printers"] - len(fixed)} sein (zusammen mit [[printers]] höchstens {LIMITS["printers"]}).')
+            maximum = 1
+        default = self.string_list(t, 'default', where, maximum) if 'default' in t else ([prefix] if prefix else [])
+        if prefix:
+            rx = re.compile(r'^' + re.escape(prefix) + r'[A-Za-z0-9_-]{0,%d}$' % (39 - len(prefix)))
+            for name in default:
+                if not rx.match(name):
+                    self.error(f'{where}.default', f'„{shown(name)}“ beginnt nicht mit „{prefix}“.')
+        formats = self.string_list(t, 'formats', where, 5) if 'formats' in t else ['application/pdf']
+        for f in formats:
+            if not FORMAT.match(f):
+                self.error(f'{where}.formats', f'„{shown(f)}“ ist kein Dateityp (z. B. application/pdf).')
+        paper = str(t.get('paper', 'A4'))
+        if paper not in ('A4', 'A5', 'A6'):
+            self.error(f'{where}.paper', 'erlaubt: A4, A5, A6.')
+        share = self.string_list(t, 'share', where, len(SHARES))
+        for s in share:
+            if s not in SHARES:
+                self.error(f'{where}.share', f'„{shown(s)}“ unbekannt. Erlaubt: {", ".join(SHARES)}.')
+        if any(p['name'].lower().startswith(prefix.lower()) for p in fixed if p['name'] and prefix):
+            self.error(f'{where}.prefix', 'darf nicht mit dem Namen eines festen Druckers beginnen.')
+        return {'prefix': prefix, 'default': default, 'file': file, 'label': label, 'command': command, 'paper': paper, 'formats': formats,
+                'share': share, 'max': maximum}
+
     def connections(self, items: list) -> list:
         if len(items) > LIMITS['connections']:
             self.error('connections', f'höchstens {LIMITS["connections"]} Einträge.')
@@ -431,6 +492,53 @@ class _Checker:
             out.append({'schema': schema, 'label': self.text(t, 'label', where, limit=60)})
         return out
 
+    def exchange(self, items: list, mid: str | None) -> list:
+        """Austauschordner mit einem anderen Modul. Die Basis legt ihn nur an, wenn beide Module einander anmelden."""
+        if len(items) > LIMITS['exchange']:
+            self.error('exchange', f'höchstens {LIMITS["exchange"]} Einträge.')
+            return []
+        out, seen = [], set()
+        for n, t in enumerate(items, 1):
+            where = f'exchange[{n}]'
+            other = self.pattern(t, 'module', where, ID, 'telefon')
+            if other is not None:
+                if other == mid:
+                    self.error(f'{where}.module', 'muss ein anderes Modul sein.')
+                    other = None
+                elif other in seen:
+                    self.error(f'{where}.module', f'„{other}“ ist doppelt.')
+                    other = None
+            purpose = self.text(t, 'purpose', where, limit=120)
+            if other is not None and mid:
+                seen.add(other)
+                out.append({'module': other, 'purpose': purpose, 'path': exchange_dir(mid, other)})
+        return out
+
+    def fileshares(self, items: list, system: dict) -> list:
+        """Ordner im Datenverzeichnis des Moduls, den ein Admin als Windows-Freigabe zum Ablegen von Dateien einschalten kann (aus), standardmäßig aus."""
+        if len(items) > LIMITS['fileshares']:
+            self.error('fileshare', f'höchstens {LIMITS["fileshares"]} Einträge.')
+            return []
+        out, ids, names = [], set(), set()
+        for n, t in enumerate(items, 1):
+            where = f'fileshare[{n}]'
+            fid = self.pattern(t, 'id', where, ID, 'ablage')
+            name = self.pattern(t, 'name', where, SHARE_NAME, 'Fax-Ausgang')
+            label = self.text(t, 'label', where, limit=80)
+            path = self.rel_path(t['path'], f'{where}.path') if 'path' in t else self.error(where, '„path“ fehlt.')
+            if fid is not None and fid in ids:
+                self.error(f'{where}.id', f'„{fid}“ ist doppelt.')
+                fid = None
+            if name is not None and name.lower() in names:
+                self.error(f'{where}.name', f'„{name}“ ist doppelt.')
+                name = None
+            if None in (fid, name, label, path) or not system.get('data'):
+                continue
+            ids.add(fid)
+            names.add(name.lower())
+            out.append({'id': fid, 'name': name, 'label': label, 'path': f'{system["data"]}/{path}'})
+        return out
+
     def setup(self, t: dict) -> dict:
         return {'overview': self.rel_path(t['overview'], 'setup.overview') if 'overview' in t else None}
 
@@ -442,6 +550,11 @@ class _Checker:
                 self.error('hooks.apparmor', f'„{shown(prog)}“ ist nicht freigegeben. Erlaubt: {", ".join(sorted(APPARMOR))}.')
         out['apparmor'] = apparmor
         return out
+
+
+def exchange_dir(a: str, b: str) -> str:
+    """Pfad des Austauschordners zweier Module (IDs enthalten kein „_“, daher eindeutig)."""
+    return f'{EXCHANGE_BASE}/{"_".join(sorted((a, b)))}'
 
 
 def check_text(text: str) -> dict:
@@ -471,6 +584,8 @@ def _referenced(manifest: dict) -> list[tuple[str, str, bool]]:
         refs.append(('setup.overview', manifest['setup']['overview'], True))
     if manifest['web'] and manifest['web']['entry']:
         refs.append(('web.entry', manifest['web']['entry'], False))
+    if manifest.get('printer_list'):
+        refs.append(('printer_list.command', manifest['printer_list']['command'], True))
     for n, p in enumerate(manifest['printers'], 1):
         if p['ppd']:
             refs.append((f'printers[{n}].ppd', p['ppd'], False))
@@ -577,6 +692,8 @@ def check_list(folders: list) -> dict:
             claim(('schema', st['schema']), mid, f'Startschema {st["schema"]}')
         for p in m['printers']:
             claim(('printer', p['name'].lower()), mid, f'Drucker „{p["name"]}“')
+        for name in (m.get('printer_list') or {}).get('default', []):
+            claim(('printer', name.lower()), mid, f'Drucker „{name}“')
         for f in m['firewall']:
             for owner, other in ports:
                 if owner != mid and other['proto'] == f['proto'] and other['from'] <= f['to'] and f['from'] <= other['to']:

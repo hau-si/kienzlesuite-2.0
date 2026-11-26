@@ -1,0 +1,9 @@
+#!/usr/bin/python3 -B
+# Startskript des Moduls telefon für „kienzlefon-webadmin-worker“ aus Kienzlefon 2.7 (kienzlefon.webadmin:worker_main); ersetzt /opt/kienzlefon/venv/bin/kienzlefon-webadmin-worker.
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'kienzlefon'))
+from kienzlefon.webadmin import worker_main  # noqa: E402
+
+sys.exit(worker_main())

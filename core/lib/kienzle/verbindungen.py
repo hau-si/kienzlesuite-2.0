@@ -37,6 +37,7 @@ STATE = Path(E('KIENZLE_VERB_STATE', '/var/lib/kienzle/verbindungen'))
 REQUEST = Path(E('KIENZLE_VERB_REQUEST', '/var/lib/kienzle/core/anfragen/verbindungen.json'))
 MODULES = Path(E('KIENZLE_VERB_MODULES', '/var/lib/kienzle/core/modules.json'))
 SPOOL = Path(E('KIENZLE_ABLAGE_SPOOL', '/var/spool/kienzle/ablage'))
+NACHRICHTEN_SPOOL = Path(E('KIENZLE_NACHRICHTEN_SPOOL', '/var/spool/kienzle/nachrichten'))
 ABLAGE_PUB = Path(E('KIENZLE_ABLAGE_SCHLUESSEL', '/var/lib/kienzle/ablage/.ssh/id_ed25519') + '.pub')
 OPENSSL = E('KIENZLE_OPENSSL', '/usr/bin/openssl')
 CHOWN = E('KIENZLE_VERB_CHOWN', '1') == '1'          # Tests ohne root: 0
@@ -356,6 +357,7 @@ def distribute(config: dict) -> list[str]:
     notes = []
     _write(ETC / 'ablage.json', {'ziele': config['ablage']}, 0o640, 'ks-ablage' if _group_exists('ks-ablage') else None)
     wanted = set()
+    senden = []                                         # Module mit Nachrichten-Ausgang (Verbindung „nachrichten“)
     for m in registry():
         mid = m['module']['id']
         group = f'ks-{mid}'
@@ -381,12 +383,29 @@ def distribute(config: dict) -> list[str]:
             os.chmod(spool, 0o2770)
             if CHOWN and _group_exists('ks-ablage'):
                 shutil.chown(spool, group, 'ks-ablage')
-            out['ablage'] = {'ausgang': str(spool), 'ziele': [{'id': t['id'], 'name': t['name']} for t in config['ablage']]}
+            inbox = spool / 'eingang'
+            inbox.mkdir(mode=0o2770, exist_ok=True)
+            os.chmod(inbox, 0o2770)
+            if CHOWN and _group_exists('ks-ablage'):
+                shutil.chown(inbox, group, 'ks-ablage')
+            out['ablage'] = {'ausgang': str(spool), 'eingang': str(inbox), 'ziele': [{'id': t['id'], 'name': t['name']} for t in config['ablage']]}
+        if 'nachrichten' in ids:
+            # Ausgang für SMS und E-Mail: das Modul legt Aufträge ab, ks-nachrichten verschickt sie mit den Zugängen der Basis.
+            ausgang = NACHRICHTEN_SPOOL / mid
+            ausgang.mkdir(mode=0o2770, parents=True, exist_ok=True)
+            os.chmod(ausgang, 0o2770)
+            if CHOWN and _group_exists('ks-nachrichten'):
+                shutil.chown(ausgang, group, 'ks-nachrichten')
+            out['nachrichten'] = {'ausgang': str(ausgang), 'sms': bool(config.get('sms')), 'mail': bool(config.get('mail'))}
+            senden.append(mid)
         _write(ETC / 'module' / f'{mid}.json', out, 0o640, group)
         wanted.add(f'{mid}.json')
     for old in (ETC / 'module').glob('*.json') if (ETC / 'module').is_dir() else []:
         if old.name not in wanted:
             old.unlink()
+    # Zugänge für den Nachrichten-Dienst (nur ks-nachrichten liest sie) und die Liste der Module, deren Ausgang er abarbeitet.
+    _write(ETC / 'nachrichten.json', {'sms': config.get('sms') or None, 'mail': config.get('mail') or None, 'module': sorted(senden)}, 0o640,
+           'ks-nachrichten' if _group_exists('ks-nachrichten') else None)
     return notes
 
 

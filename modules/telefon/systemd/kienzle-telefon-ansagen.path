@@ -1,0 +1,10 @@
+# Kienzle-Suite, Modul telefon: Aufträge für Piper und die Ansagen (Auftragsdatei aus der Weboberfläche).
+[Unit]
+Description=Kienzle-Suite Modul telefon (Ansagen, Aufträge)
+
+[Path]
+PathExists=/var/lib/kienzle/telefon/kienzlefon/auftrag.json
+Unit=kienzle-telefon-ansagen.service
+
+[Install]
+WantedBy=multi-user.target

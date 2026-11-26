@@ -64,7 +64,7 @@ final class Vorgaenge {
             $status = $post ? ($i['lxp_status'] === 'unknown' ? 'Postversand unklar' : 'per Letterxpress verschickt' . ($i['lxp_mode'] === 'live' ? '' : ' (Test)'))
                 : ((int)$i['received_at'] < $limit ? 'abgelaufen' : ($i['parked_at'] !== null ? 'zurückgestellt' : ($i['transfer_at'] !== null ? 'überwiesen (offen)' : 'offen')));
             $out[] = ['id' => $i['id'], 'source' => 'inbox', 'date' => $day, 'time' => $time, 'art' => 'T2med', 'number' => (string)$i['invoice_number'], 'patient' => (string)$i['patient_name'], 'birthdate' => (string)$i['patient_birthdate'],
-                'method' => $post ? 'transfer' : '', 'status' => $status, 'post' => $post, 'invoice_cents' => (int)$i['amount_cents'], 'vat_cents' => 0, 'net_cents' => 0, 'paid_cents' => 0, 'storno' => '', 'done_date' => '', 'can_done' => false, 'sort' => (int)$i['received_at']];
+                'method' => $post ? 'transfer' : '', 'status' => $status, 'post' => $post, 'can_post' => $this->config->get('letterxpress', 'enabled', false) && $i['lxp_status'] === '' && is_string($i['pdf']) && str_starts_with($i['pdf'], '%PDF-'), 'invoice_cents' => (int)$i['amount_cents'], 'vat_cents' => 0, 'net_cents' => 0, 'paid_cents' => 0, 'storno' => '', 'done_date' => '', 'can_done' => false, 'sort' => (int)$i['received_at']];
         }
         usort($out, static fn($a, $b) => $b['sort'] <=> $a['sort']);
         return ['period' => ['art' => $art, 'label' => $p['label'], 'file' => $p['file'], 'from' => $p['from'], 'to' => $p['to']], 'items' => $out, 'now' => time()];
@@ -86,6 +86,20 @@ final class Vorgaenge {
             ['title' => 'Bezahlt (ohne Storno)', 'type' => 'money', 'width' => 20], ['title' => 'Stornonummer', 'width' => 22], ['title' => 'In T2med abgehakt am', 'type' => 'date', 'width' => 20]];
         $x = new Xlsx(); $x->sheet('Vorgänge', $columns, $rows, true);
         return $x->build();
+    }
+
+    /** Offene T2med-Rechnung aus der Vorgänge-Liste einmalig per Post (Letterxpress) versenden; schon versandte (auch im Test) und bezahlte werden abgelehnt. */
+    public function post(string $inboxId, Letterxpress $letter, InvoiceExport $export, callable $file): array {
+        if (!preg_match('/^[a-f0-9]{32}$/D', $inboxId)) throw new Problem('Ungültige Rechnung.', 422);
+        $row = $this->db->one('SELECT lxp_status FROM invoice_inbox WHERE id=? AND superseded_at IS NULL', [$inboxId]);
+        if (!$row) throw new Problem('Diese Rechnung gibt es nicht (mehr). Bitte die Liste neu laden.', 404);
+        if ($row['lxp_status'] !== '') throw new Problem('Diese Rechnung wurde schon an Letterxpress übergeben und wird nicht noch einmal verschickt.', 409);
+        $sent = $letter->send($inboxId);
+        if ($export->letterInvoices()) {
+            $status = $file($inboxId);
+            $sent['message'] .= $status['status'] === 'done' ? ' PDF in der Ablage gespeichert.' : ' PDF NICHT in der Ablage gespeichert: ' . $status['error'];
+        }
+        return $sent;
     }
 
     /** T2med-Rechnungen als „in T2med abgerechnet“ abhaken oder zurücknehmen. */

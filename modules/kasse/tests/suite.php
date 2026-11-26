@@ -128,6 +128,13 @@ try {
     $appJs = (string)file_get_contents(dirname(__DIR__) . '/public/assets/app.js');
     $indexPhp = (string)file_get_contents(dirname(__DIR__) . '/seiten/index.php');
     check(str_contains($appJs, '#uebergabe=') && str_contains($appJs, 'signaturSenden') && str_contains($indexPhp, 'id="sign-send"') && str_contains($indexPhp, "=== 'signatur'"), 'Knopf „Zur Unterschrift“ (Übergabe an Signatur) fehlt');
+    check(str_contains($appJs, 's.signature') && str_contains($appJs, '!noetig'), 'Knopf „Zur Unterschrift“ nur bei Leistungen mit Unterschrift');
+    $seiten = dirname(__DIR__) . '/seiten/';
+    check(str_contains((string)file_get_contents(dirname(__DIR__) . '/public/index.php'), "'/igel' => 'igel.php'") && str_contains((string)file_get_contents($seiten . 'igel.php'), 'id="s-catalog"') && !str_contains((string)file_get_contents($seiten . 'settings.php'), 'id="s-catalog"'), 'IGeL-Liste liegt nicht auf eigener Seite');
+    foreach (['start', 'vorgaenge', 'settings', 'igel'] as $seite) check(str_contains((string)file_get_contents($seiten . $seite . '.php'), 'Kopf::knoepfe('), 'Seitenkopf mit Symbolen fehlt: ' . $seite);
+    check(str_contains((string)file_get_contents($seiten . 'start.php'), 'id="inv-refresh"') && str_contains((string)file_get_contents($seiten . 'settings.php'), 'id="checklist-fold"'), 'Aktualisieren-Knopf oder zuklappbare Einrichtungsliste fehlt');
+    $kopf = \KienzleKasse\Kopf::knoepfe('igel', '/kasse/', true, true);
+    check(substr_count($kopf, '<svg') === 4 && str_contains($kopf, 'aria-current="page"') && !str_contains(\KienzleKasse\Kopf::knoepfe('start', '/kasse/', false, false), 'IGeL'), 'Kopfknöpfe falsch');
     $js = (string)file_get_contents(dirname(__DIR__) . '/public/assets/vorgaenge.js');
     check(str_contains($js, 'sortieren(') && str_contains($js, "api('storno'") && str_contains((string)file_get_contents(dirname(__DIR__) . '/seiten/vorgaenge.php'), 'data-key="number"'), 'Sortierung und Storno in der Vorgänge-Liste');
     [$code] = $vg(['kassieren'], ['action' => 'vorgaenge', 'art' => 'woche', 'date' => date('Y-m-d')]);
@@ -139,6 +146,10 @@ try {
     check($code === 403, 'Storno ohne Recht „storno“');
     [$code] = $vg(['kassieren', 'storno'], ['action' => 'storno', 'payment_id' => str_repeat('0', 32)]);
     check($code !== 403, 'Storno mit Recht „storno“ abgelehnt');
+    [$code] = $vg(['kassieren'], ['action' => 'vorgaenge_post', 'invoice_id' => str_repeat('0', 32)]);
+    check($code === 403, 'Postversand aus den Vorgängen ohne Recht „letter“');
+    [$code] = $vg(['kassieren', 'letter'], ['action' => 'vorgaenge_post', 'invoice_id' => str_repeat('0', 32)]);
+    check($code === 404 || $code === 409, 'Postversand unbekannter Rechnung abgelehnt: ' . $code);
     [$code] = $vg(['kassieren'], ['action' => 'vorgaenge_done', 'ids' => [], 'done' => true]);
     check($code === 403, 'Abhaken ohne Recht „paid“');
     [$code] = $vg(['paid'], ['action' => 'vorgaenge_done', 'ids' => [], 'done' => true]);

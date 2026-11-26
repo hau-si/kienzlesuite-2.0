@@ -1,0 +1,148 @@
+#!/usr/bin/env python3
+"""Anrufstatistik des Moduls telefon: hört auf die Ereignisse der eigenen Telefonanlage (AMI, nur 127.0.0.1) und schreibt
+<daten>/statistik/statistik.sqlite. Gespeichert werden nur Zeitpunkte, gewählte Anliegen im Sprachmenü und Wartezeiten der
+Warteschlange – keine Rufnummern, Namen oder Kanäle.
+
+Quellen:
+  UserEvent KienzlefonCallEntered/KienzlefonCallRoute (Statistik-Haken von Kienzlefon, wenn das Sprachmenü an ist)
+  QueueCallerJoin, AgentConnect, QueueCallerAbandon (Warteschlange; KF_STATS_CALL_ID über channelvars verknüpft)
+Zugang: <daten>/ami-ereignisse.json (nur lesen: user, agent). Läuft als Dienst kienzle-telefon-ereignisse, verbindet neu bei Abbruch.
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+import socket
+import sqlite3
+import sys
+import time
+from datetime import datetime
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+DATA = Path(os.environ.get('KIENZLE_DATEN', '/var/lib/kienzle/telefon'))
+TZ = ZoneInfo('Europe/Berlin')
+CALL_ID = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', re.I)
+ROUTE = re.compile(r'[a-z_]{1,30}')
+AUFBEWAHREN = 2 * 366 * 86400
+
+
+def db(path: Path | None = None) -> sqlite3.Connection:
+    path = path or DATA / 'statistik' / 'statistik.sqlite'
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    con = sqlite3.connect(path, timeout=5)
+    con.executescript('''
+        CREATE TABLE IF NOT EXISTS anrufe (id TEXT PRIMARY KEY, zeit INTEGER NOT NULL, tag TEXT NOT NULL, stunde INTEGER NOT NULL, wochentag INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS routen (id TEXT NOT NULL, route TEXT NOT NULL, PRIMARY KEY (id, route));
+        CREATE TABLE IF NOT EXISTS warten (id TEXT PRIMARY KEY, zeit INTEGER NOT NULL, tag TEXT NOT NULL, ergebnis TEXT NOT NULL, sekunden INTEGER NOT NULL);
+        CREATE INDEX IF NOT EXISTS anrufe_tag ON anrufe(tag);
+        CREATE INDEX IF NOT EXISTS warten_tag ON warten(tag);
+    ''')
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+    return con
+
+
+def anruf(con: sqlite3.Connection, aid: str, zeit: int) -> None:
+    t = datetime.fromtimestamp(zeit, TZ)
+    con.execute('INSERT OR IGNORE INTO anrufe (id, zeit, tag, stunde, wochentag) VALUES (?, ?, ?, ?, ?)', (aid, zeit, t.strftime('%Y-%m-%d'), t.hour, t.isoweekday()))
+
+
+def verarbeiten(con: sqlite3.Connection, e: dict, jetzt: int | None = None) -> None:
+    """Ein AMI-Ereignis (Schlüssel klein geschrieben) in die Statistik übernehmen."""
+    jetzt = jetzt or int(time.time())
+    art = e.get('event', '').lower()
+    if art == 'userevent':
+        cid = e.get('callid', '')
+        if not CALL_ID.fullmatch(cid):
+            return
+        name = e.get('userevent', '')
+        if name == 'KienzlefonCallEntered':
+            zeit = int(e['enteredat']) if e.get('enteredat', '').isdigit() else jetzt
+            anruf(con, cid, zeit if abs(zeit - jetzt) < 86400 else jetzt)
+        elif name == 'KienzlefonCallRoute' and ROUTE.fullmatch(e.get('route', '')):
+            anruf(con, cid, jetzt)
+            con.execute('INSERT OR IGNORE INTO routen (id, route) VALUES (?, ?)', (cid, e['route']))
+        return
+    if art not in ('queuecallerjoin', 'agentconnect', 'queuecallerabandon') or e.get('queue') not in ('praxis', 'kienzlefon-sonder'):
+        return
+    linked = re.sub(r'[^0-9.]', '', e.get('linkedid', '') or e.get('uniqueid', ''))[:40]
+    if not linked:
+        return
+    cid = e.get('chanvariable(kf_stats_call_id)', '')
+    aid = cid if CALL_ID.fullmatch(cid) else 'q:' + linked
+    if art == 'queuecallerjoin':
+        anruf(con, aid, jetzt)           # ohne Sprachmenü zählt der Eintritt in die Warteschlange als Anruf
+        if aid != 'q:' + linked:
+            con.execute('INSERT OR IGNORE INTO routen (id, route) VALUES (?, ?)', (aid, 'queue'))
+        return
+    sek = int(e.get('holdtime', '0')) if e.get('holdtime', '0').isdigit() else 0
+    t = datetime.fromtimestamp(jetzt, TZ)
+    con.execute('INSERT OR REPLACE INTO warten (id, zeit, tag, ergebnis, sekunden) VALUES (?, ?, ?, ?, ?)',
+                (aid, jetzt, t.strftime('%Y-%m-%d'), 'angenommen' if art == 'agentconnect' else 'aufgelegt', min(sek, 86400)))
+
+
+def aufraeumen(con: sqlite3.Connection, jetzt: int | None = None) -> None:
+    grenze = (jetzt or int(time.time())) - AUFBEWAHREN
+    con.execute('DELETE FROM routen WHERE id IN (SELECT id FROM anrufe WHERE zeit < ?)', (grenze,))
+    con.execute('DELETE FROM anrufe WHERE zeit < ?', (grenze,))
+    con.execute('DELETE FROM warten WHERE zeit < ?', (grenze,))
+
+
+def lesen(sock: socket.socket):
+    """AMI-Nachrichten als Wörterbücher (Schlüssel klein)."""
+    puffer = b''
+    while True:
+        while b'\r\n\r\n' not in puffer:
+            teil = sock.recv(65536)
+            if not teil:
+                return
+            puffer += teil
+            if len(puffer) > 4_000_000:
+                raise ConnectionError('AMI: Nachricht zu groß')
+        roh, puffer = puffer.split(b'\r\n\r\n', 1)
+        msg = {}
+        for zeile in roh.decode('utf-8', 'replace').split('\r\n'):
+            k, sep, v = zeile.partition(':')
+            if sep:
+                msg[k.strip().lower()] = v.strip()
+        yield msg
+
+
+def lauf() -> None:
+    zugang = json.loads((DATA / 'ami-ereignisse.json').read_text(encoding='utf-8'))
+    sock = socket.create_connection(('127.0.0.1', int(zugang.get('port', 5038))), timeout=30)
+    sock.settimeout(None)
+    sock.recv(200)                                  # Begrüßung
+    sock.sendall((f"Action: Login\r\nUsername: {zugang['user']}\r\nSecret: {zugang['secret']}\r\nEvents: user,agent\r\n\r\n").encode())
+    con = db()
+    zuletzt = 0
+    for msg in lesen(sock):
+        if msg.get('response', '').lower() == 'error':
+            raise ConnectionError('AMI: Anmeldung abgelehnt')
+        if 'event' in msg:
+            verarbeiten(con, msg)
+            con.commit()
+        if time.time() - zuletzt > 3600:
+            aufraeumen(con)
+            con.commit()
+            zuletzt = time.time()
+    raise ConnectionError('AMI: Verbindung beendet')
+
+
+def main() -> int:
+    pause = 5
+    while True:
+        try:
+            lauf()
+        except (OSError, ConnectionError, ValueError, KeyError) as e:
+            print(f'telefon-ereignisse: {type(e).__name__}: {str(e)[:120]} – neuer Versuch in {pause} s', file=sys.stderr, flush=True)
+        time.sleep(pause)
+        pause = min(pause * 2, 120)
+
+
+if __name__ == '__main__':
+    sys.exit(main())

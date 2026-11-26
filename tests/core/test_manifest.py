@@ -65,7 +65,7 @@ class Gueltig(unittest.TestCase):
 
     def test_alle_module_im_repository_gueltig(self):
         result = manifest.check_all(ROOT / 'modules')
-        self.assertEqual(result['core_api'], ['1'])
+        self.assertEqual(result['core_api'], ['1', '2'])
         self.assertIn('beispiel', [m['module']['id'] for m in result['modules']])
 
     def test_beispiel_in_der_dokumentation_entspricht_dem_beispielmodul(self):
@@ -103,7 +103,7 @@ class Gueltig(unittest.TestCase):
         self.assertEqual(m['firewall'][0]['scope'], 'any')
 
     def test_api_aus_core_api(self):
-        self.assertEqual(manifest.supported_api(), frozenset({'1'}))
+        self.assertEqual(manifest.supported_api(), frozenset({'1', '2'}))
         self.assertRegex((ROOT / 'core' / 'VERSION').read_text().strip(), manifest.VERSION)
 
 
@@ -170,7 +170,7 @@ class Modul(Fehler):
 
     def test_core_api(self):
         self.invalid(replace('core_api = "1"', 'core_api = 1'), 'module.core_api', 'ungültig')
-        self.invalid(replace('core_api = "1"', 'core_api = "2"'), 'module.core_api', 'nicht unterstützt')
+        self.invalid(replace('core_api = "1"', 'core_api = "3"'), 'module.core_api', 'nicht unterstützt')
         self.invalid(replace('core_api = "1"\n', ''), 'module', '„core_api“ fehlt')
 
 
@@ -197,6 +197,57 @@ class System(Fehler):
                 self.invalid(replace('"kienzle-beispiel-worker.service"', f'"{bad}"'), 'system.services')
         units = '"kienzle-beispiel.service", "kienzle-beispiel-sync.timer"'
         manifest.check_text(replace('"kienzle-beispiel-worker.service"', units))
+
+
+class Austausch(Fehler):
+    """[[exchange]] und [system] disables (core_api 2)."""
+    API2 = replace('core_api = "1"', 'core_api = "2"')
+
+    def test_austausch(self):
+        m = manifest.check_text(self.API2 + '\n[[exchange]]\nmodule = "telefon"\npurpose = "Faxaufträge"\n')
+        self.assertEqual(m['exchange'], [{'module': 'telefon', 'purpose': 'Faxaufträge', 'path': '/var/spool/kienzle/austausch/beispiel_telefon'}])
+        self.assertEqual(manifest.exchange_dir('telefon', 'fax'), '/var/spool/kienzle/austausch/fax_telefon')
+
+    def test_dateifreigabe(self):
+        """[[fileshare]]: Ordner im Datenverzeichnis, den ein Admin als Windows-Freigabe zum Ablegen einschalten kann."""
+        eintrag = '\n[[fileshare]]\nid = "ablage"\nname = "Fax-Ausgang"\nlabel = "Faxe zum Senden ablegen"\npath = "ablage"\n'
+        m = manifest.check_text(self.API2 + eintrag)
+        self.assertEqual(m['fileshares'], [{'id': 'ablage', 'name': 'Fax-Ausgang', 'label': 'Faxe zum Senden ablegen', 'path': '/var/lib/kienzle/beispiel/ablage'}])
+        self.invalid(BEISPIEL + eintrag, 'module.core_api', 'core_api = "2"')
+        self.invalid(self.API2 + eintrag.replace('"ablage"\nname', '"ablage"\nname', 1) + eintrag, 'fileshare[2].id', 'doppelt')
+        self.invalid(self.API2 + eintrag.replace('path = "ablage"', 'path = "../etc"'), 'fileshare[1].path', 'kein gültiger Pfad')
+        self.invalid(self.API2 + eintrag.replace('Fax-Ausgang', 'Fax Ausgang/x'), 'fileshare[1].name', 'ungültig')
+        self.invalid(self.API2 + eintrag.replace('\npath = "ablage"', ''), 'fileshare[1]', '„path“ fehlt')
+
+    def test_austausch_regeln(self):
+        self.invalid(BEISPIEL + '\n[[exchange]]\nmodule = "telefon"\npurpose = "x"\n', 'module.core_api', 'core_api = "2"')
+        self.invalid(self.API2 + '\n[[exchange]]\nmodule = "beispiel"\npurpose = "x"\n', 'exchange[1].module', 'anderes Modul')
+        self.invalid(self.API2 + '\n[[exchange]]\nmodule = "../core"\npurpose = "x"\n', 'exchange[1].module', 'ungültig')
+        self.invalid(self.API2 + '\n[[exchange]]\nmodule = "fax"\n', 'exchange[1]', '„purpose“ fehlt')
+        two = '\n[[exchange]]\nmodule = "fax"\npurpose = "x"\n'
+        self.invalid(self.API2 + two + two, 'exchange[2].module', 'doppelt')
+        self.invalid(self.API2 + '\n[[exchange]]\nmodule = "fax"\npurpose = "x"\nweg = 1\n', 'exchange', 'unbekannter Schlüssel')
+
+    def test_paketdienste_abschalten(self):
+        text = replace('user = "ks-beispiel"', 'user = "ks-beispiel"\ndisables = ["asterisk.service"]', self.API2)
+        self.assertEqual(manifest.check_text(text)['system']['disables'], ['asterisk.service'])
+        self.assertEqual(manifest.check_text(BEISPIEL)['system']['disables'], [])
+        for bad in ('ssh.service', 'nginx.service', 'kienzle-core-php.service'):
+            with self.subTest(bad):
+                self.invalid(text.replace('asterisk.service', bad), 'system.disables', 'darf nicht')
+        self.invalid(replace('user = "ks-beispiel"', 'user = "ks-beispiel"\ndisables = ["asterisk.service"]'), 'module.core_api', 'core_api = "2"')
+
+
+class Abhaengigkeit(Fehler):
+    API2 = replace('core_api = "1"', 'core_api = "2"')
+
+    def test_requires(self):
+        text = replace('core_api = "2"', 'core_api = "2"\nrequires = ["telefon"]', self.API2)
+        self.assertEqual(manifest.check_text(text)['module']['requires'], ['telefon'])
+        self.assertEqual(manifest.check_text(BEISPIEL)['module']['requires'], [])
+        self.invalid(text.replace('"telefon"', '"beispiel"'), 'module.requires', 'andere Modul-ID')
+        self.invalid(text.replace('"telefon"', '"../x"'), 'module.requires', 'andere Modul-ID')
+        self.invalid(replace('core_api = "1"', 'core_api = "1"\nrequires = ["telefon"]'), 'module.requires', 'core_api = "2"')
 
 
 class Web(Fehler):
@@ -310,6 +361,19 @@ class Drucker(Fehler):
         self.invalid(replace('ppd = "printer/beispiel.ppd"\n', 'ppd = "printer/beispiel.ppd"\nformats = ["application/pdf"]\n'), 'printers[1].formats', 'nur zusammen')
         m = manifest.check_text(replace('formats = ["application/pdf"]\n', '', BEISPIEL))
         self.assertEqual(m['printers'][1]['formats'], ['application/pdf'])
+
+    LISTE = ('\n[printer_list]\nprefix = "vBsp"\nlabel = "Beispiel"\ncommand = "printer/kienzle-beispiel-druck"\nfile = "drucker.json"\nmax = 3\n')
+
+    def test_druckerliste(self):
+        m = manifest.check_text(BEISPIEL + self.LISTE)
+        pl = m['printer_list']
+        self.assertEqual((pl['prefix'], pl['default'], pl['max'], pl['paper'], pl['formats']), ('vBsp', ['vBsp'], 3, 'A4', ['application/pdf']))
+        self.assertIsNone(manifest.check_text(BEISPIEL)['printer_list'])
+        self.invalid(BEISPIEL + self.LISTE.replace('max = 3', 'max = 9'), 'printer_list.max')
+        self.invalid(BEISPIEL + self.LISTE.replace('"vBsp"', '"v Bsp"'), 'printer_list.prefix')
+        self.invalid(BEISPIEL + self.LISTE + 'default = ["vXyz"]\n', 'printer_list.default', 'beginnt nicht')
+        self.invalid(BEISPIEL + self.LISTE.replace('printer/kienzle-beispiel-druck', '../x'), 'printer_list.command')
+        self.invalid(BEISPIEL + self.LISTE.replace('drucker.json', '../drucker.json'), 'printer_list.file')
 
     def test_pflichtfelder_und_freigabe(self):
         self.invalid(replace('ppd = "printer/beispiel.ppd"\n', ''), 'printers[1]', '„command“ oder „ppd“ fehlt')
@@ -486,7 +550,7 @@ class Befehl(Ordner):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(json.loads(r.stdout), manifest.check_folder(BEISPIEL_DIR))
         r = self.run_cli('--alle', '--json', str(ROOT / 'modules'))
-        self.assertEqual(json.loads(r.stdout)['core_api'], ['1'])
+        self.assertEqual(json.loads(r.stdout)['core_api'], ['1', '2'])
 
     def test_ungueltig(self):
         folder = self.module(text=replace(VERSION_LINE, 'version = "1"'))

@@ -444,3 +444,16 @@ main.modul { max-width: 940px; }
 
 /* Meldung, die hinter den angeklickten Block gewandert ist */
 .notice.nahe, .error.nahe { margin: 10px 0; }
+
+/* Passwortstärke (passwort.js) */
+.staerke { margin: 6px 0 14px; }
+.staerke-bahn { height: 8px; border-radius: 4px; background: #e3ebe8; overflow: hidden; }
+.staerke-balken { height: 100%; width: 0; border-radius: 4px; background: #c2410c; transition: width .15s; }
+.staerke-balken.s1 { background: #d97706; }
+.staerke-balken.s2 { background: #c9a400; }
+.staerke-balken.s3 { background: #4d9a62; }
+.staerke-balken.s4 { background: var(--teal, #12695d); }
+.staerke-text { font-size: 13px; color: #55685f; margin-top: 4px; }
+.warnliste { list-style: none; margin: 0 0 14px; padding: 0; }
+.warnliste li { padding: 9px 12px; border-radius: 10px; margin-bottom: 6px; background: #fff0ca; color: #6b4d00; }
+.warnliste li.rot { background: #fff3ed; color: #8a2d06; border: 1px solid #f3d8cc; }

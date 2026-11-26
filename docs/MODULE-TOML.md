@@ -1,6 +1,6 @@
 # Modul-Beschreibung `module.toml`
 
-Gilt für `core_api = "1"` (Basis ab 0.2.0). Jedes Modul liegt in `modules/<id>/` und bringt dort eine `module.toml` mit.
+Gilt für `core_api = "1"` (Basis ab 0.2.0) und `core_api = "2"` (Basis ab 0.22.0: zusätzlich `[system] disables`, `[[exchange]]` und `[[fileshare]]`). Jedes Modul liegt in `modules/<id>/` und bringt dort eine `module.toml` mit.
 Geprüft wird sie mit
 
 ```
@@ -43,6 +43,7 @@ mit dem Archiv `modules/<id>/…` (`scripts/release-bauen <id>`). Das Programm l
 | `version` | ja | `X.Y.Z`, optional mit Vorabkennung: `2.1.0-beta.3` |
 | `core_api` | ja | Text, z. B. `"1"`; muss in `core/API` stehen |
 | `description` | nein | kurze Beschreibung (höchstens 300 Zeichen) |
+| `requires` | nein | nur `core_api = "2"`: Module, die vorher installiert sein müssen (IDs, höchstens 5), z. B. `["telefon"]`. Installieren geht erst danach, Entfernen der gebrauchten Module erst ohne dieses Modul |
 
 ### `[system]` – Pflicht
 
@@ -51,6 +52,7 @@ mit dem Archiv `modules/<id>/…` (`scripts/release-bauen <id>`). Das Programm l
 | `user` | ja | genau `ks-<id>`; der Systembenutzer, unter dem alle Dienste und Haken des Moduls laufen |
 | `data` | ja | genau `/var/lib/kienzle/<id>`; eigener Datenordner (0700) |
 | `packages` | nein | Ubuntu-Pakete, höchstens 50, Muster `[a-z0-9][a-z0-9+.-]+`. Die Basis installiert sie. |
+| `disables` | nein | nur `core_api = "2"`: Dienste aus Ubuntu-Paketen, die das Modul selbst betreibt; die Basis stoppt und maskiert sie bei der Installation und hebt die Maskierung beim Entfernen auf. Erlaubt: `asterisk.service` (Modul Telefon betreibt eine eigene Asterisk-Instanz) |
 | `services` | nein | systemd-Einheiten des Moduls, höchstens 20, nur `kienzle-<id>[-…].service/.timer/.path/.socket`. Die Dateien liegen im Modul unter `systemd/<name>`; jeder Dienst muss genau `User=ks-<id>` enthalten (keine Gruppen, keine Befehle mit Vorrechten) |
 
 ### `[web]` – optional
@@ -114,6 +116,24 @@ Virtuelle Drucker des Moduls. Die Druckerverwaltung der Basis legt sie an und en
 | `backend` | nein | nur mit `ppd`: CUPS-Backend im Modulordner (ausführbar, läuft als Benutzer `lp`). Ohne Backend verwirft die Warteschlange die Ausgabe der Filter (Backend `kienzle-leer` der Basis) |
 | `share` | nein | Liste aus `"samba"` und `"ipp"`: wie die Arbeitsplätze den Drucker erreichen. IPP ist bei virtuellen Druckern immer an (Standardweg für alle Betriebssysteme), auch wenn es hier fehlt; Samba (alte Windows-Freigabe) ist nur eine Vorgabe für neue Drucker, der Admin schaltet es unter Verwaltung → Drucker ein oder aus |
 
+### `[printer_list]` – optional
+
+Veränderbare Druckerliste (z. B. Faxdrucker, die der Admin in den Einstellungen des Moduls erweitert). Das Modul schreibt die Namen
+nach `/var/lib/kienzle/<id>/<file>` (`{"drucker": [{"name": "vFax"}, …]}`); die Basis legt beim Abgleichen (Verwaltung → Drucker →
+„Virtuelle Drucker der Module abgleichen“, auch bei Installieren und Aktualisieren des Moduls) für jeden Namen einen virtuellen Drucker an.
+Alle Drucker der Liste teilen sich Programm, Beschreibung und Papier. Das Programm bekommt den Druckernamen in der Umgebungsvariablen
+`KIENZLE_DRUCKER`. Zusammen mit `[[printers]]` höchstens 10 Drucker.
+
+| Schlüssel | Pflicht | Regel |
+|---|---|---|
+| `prefix` | ja | Jeder Name muss so beginnen (z. B. `vFax`); schützt Namen anderer Module |
+| `label` | ja | Beschreibung |
+| `command` | ja | Programm im Modulordner wie bei `[[printers]]` |
+| `file` | ja | Dateiname im Datenordner, `*.json`, höchstens 64 KB |
+| `default` | nein | Namen, solange die Datei fehlt oder kaputt ist (Vorgabe: nur `prefix`) |
+| `max` | nein | höchstens so viele Drucker aus der Liste (Vorgabe 10) |
+| `paper`, `formats`, `share` | nein | wie bei `[[printers]]` |
+
 ### `[[starters]]` – optional
 
 Startkontexte für den zentralen Arbeitsplatz-Starter der Basis (Verwaltung → Arbeitsplätze). Nur mit `[web] protocol = "fastcgi"`. Höchstens 5 Einträge je Modul.
@@ -136,9 +156,39 @@ bekommen deren Zugangsdaten; sie sind dann nur für `ks-<id>` lesbar. Zugänge, 
 
 | Schlüssel | Pflicht | Regel |
 |---|---|---|
-| `id` | ja | `"t2med"` (FHIR-Zugang zu T2med), `"mail"` (E-Mail-Versand: `art` = `smtp` mit Server und Zugang oder `gmail` mit `client_id`, `client_secret`, `refresh_token` für die Gmail-API, Umfang gmail.send; ein Modul muss beide Arten unterstützen oder `art` prüfen), `"letterxpress"` (Briefversand: `username`, `api_key`, `modus` = `test`/`live`) oder `"ablage"` (Netzwerkspeicher); je einmal |
+| `id` | ja | `"t2med"` (FHIR-Zugang zu T2med), `"mail"` (E-Mail-Versand: `art` = `smtp` mit Server und Zugang oder `gmail` mit `client_id`, `client_secret`, `refresh_token` für die Gmail-API, Umfang gmail.send; ein Modul muss beide Arten unterstützen oder `art` prüfen), `"letterxpress"` (Briefversand: `username`, `api_key`, `modus` = `test`/`live`), `"ablage"` (Netzwerkspeicher) oder `"nachrichten"` (SMS und E-Mail über den Nachrichten-Ausgang der Basis, ohne Zugangsdaten im Modul; siehe `docs/MODUL-SCHNITTSTELLE.md`); je einmal |
 | `purpose` | ja | wofür das Modul die Verbindung nutzt, höchstens 120 Zeichen; wird dem Admin angezeigt |
 | `required` | nein | `true` (Vorgabe): ohne die Verbindung arbeitet das Modul nicht; `false`: nur einzelne Funktionen fehlen |
+
+### `[[exchange]]` – optional, höchstens 5, nur `core_api = "2"`
+
+Gemeinsamer Austauschordner mit einem anderen Modul (z. B. Fax ↔ Telefon). Die Basis legt ihn erst an, wenn **beide** Module
+installiert sind und einander anmelden: `/var/spool/kienzle/austausch/<a>_<b>` (IDs alphabetisch), root, 0770, ACL nur für
+`ks-<a>` und `ks-<b>` (auch als Vorgabe für neue Dateien). Danach starten die Dienste beider Module neu.
+
+| Schlüssel | Pflicht | Regel |
+|---|---|---|
+| `module` | ja | ID des anderen Moduls |
+| `purpose` | ja | wofür der Ordner dient, höchstens 120 Zeichen |
+
+- Die Weboberfläche (php-fpm) des Moduls darf den Ordner lesen und schreiben (`open_basedir`, `ReadWritePaths`).
+- Eigene Dienste des Moduls tragen ihn selbst ein: `ReadWritePaths=… -/var/spool/kienzle/austausch/<a>_<b>` (mit `-`, falls er noch fehlt).
+- Neue Dateien bekommen die Rechte über die Vorgabe-ACL nur, wenn sie mit Gruppenrechten angelegt werden (Modus 0660 bzw. 0770,
+  z. B. `chmod` nach `tempnam`). Inhalt und Format des Ordners legen die beiden Module fest.
+
+### `[[fileshare]]` – optional, höchstens 3, nur `core_api = "2"`
+
+Ordner im Datenverzeichnis des Moduls, den ein Admin unter Verwaltung → Drucker als **Windows-Freigabe zum Ablegen** einschalten kann
+(Vorgabe: aus). Beim Einschalten vergibt der Admin ein Kennwort (8 bis 64 Zeichen); angemeldet wird mit dem Samba-Benutzer `ks-<id>`, Gastzugriff gibt es nicht (Windows 11 24H2 verlangt eine Anmeldung). Dateien gehören `ks-<id>` (Modus 0600, Ordner 0700); beim Ausschalten wird der Samba-Zugang gelöscht. Erreichbar
+nur, wenn die Firewall „Drucken über Windows-Freigabe (445)“ für das Netz freigegeben ist. Das Modul überwacht den Ordner selbst
+(z. B. mit einer `.path`-Einheit) und muss unvollständig kopierte Dateien abwarten.
+
+| Schlüssel | Pflicht | Regel |
+|---|---|---|
+| `id` | ja | Kennung, klein geschrieben, innerhalb des Moduls eindeutig |
+| `name` | ja | Freigabename (Buchstaben, Ziffern, `_`, `-`; höchstens 31 Zeichen), darf kein Druckername sein |
+| `label` | ja | Beschreibung für den Admin, höchstens 80 Zeichen |
+| `path` | ja | Ordner relativ zu `[system] data` (z. B. `ablage`); die Basis legt ihn beim Einschalten an |
 
 ### `[setup]` – optional
 

@@ -12,6 +12,8 @@ Installieren bzw. Aktualisieren:
  5. FastCGI-Module: eigene php-fpm-Instanz als ks-<id> (Dienst kienzle-<id>-php.service, gehärtet wie die Basis).
     Eigene Dienste des Moduls aus <modul>/systemd/<name> (nur mit User=ks-<id>).
  6. Modulverzeichnis, nginx, AppArmor, Verbindungen und virtuelle Drucker neu schreiben (kienzle-web module).
+    Paketdienste aus [system] disables abschalten (maskieren); Austauschordner ([[exchange]]) anlegen, sobald beide Module
+    einander anmelden (root, 0770, ACL nur für die beiden Modulbenutzer), und die Dienste beider Module neu starten.
  7. Haken install bzw. update als ks-<id>, Dienste starten, hooks.health binnen 60 Sekunden.
  8. Bei Fehler: alter Verweis und Daten-Schnappschuss zurück (Aktualisieren) bzw. Modul wieder entfernen (Erstinstallation).
 Entfernen: hooks.remove, Dienste und Einheiten entfernen, Programm löschen; Daten und Benutzer nur auf ausdrücklichen Wunsch.
@@ -44,6 +46,9 @@ UNITS = Path(E('KIENZLE_MODULE_UNITS', '/etc/systemd/system'))
 TMPFILES = Path(E('KIENZLE_MODULE_TMPFILES', '/etc/tmpfiles.d'))
 RUN = Path(E('KIENZLE_MODULE_RUN', '/run/kienzle'))
 SPOOL = Path(E('KIENZLE_MODULE_SPOOL', '/var/spool/kienzle/ablage'))
+NACHRICHTEN_SPOOL = Path(E('KIENZLE_MODULE_NACHRICHTEN', '/var/spool/kienzle/nachrichten'))
+EXCHANGE = Path(E('KIENZLE_MODULE_AUSTAUSCH', manifest.EXCHANGE_BASE))
+SETFACL = E('KIENZLE_MODULE_SETFACL', '/usr/bin/setfacl')
 WEB = E('KIENZLE_MODULE_WEB', str(Path(__file__).resolve().parents[2] / 'bin' / 'kienzle-web'))
 SYSTEMCTL = E('KIENZLE_MODULE_SYSTEMCTL', '/usr/bin/systemctl')
 APT = E('KIENZLE_MODULE_APT', '/usr/bin/apt-get')
@@ -172,7 +177,7 @@ def bundled() -> dict[str, dict]:
 
 def _summary(m: dict) -> dict:
     return {'id': m['module']['id'], 'name': m['module']['name'], 'version': m['module']['version'], 'description': m['module'].get('description') or '',
-            'path': (m.get('web') or {}).get('path'), 'core_api': m['module']['core_api']}
+            'path': (m.get('web') or {}).get('path'), 'core_api': m['module']['core_api'], 'requires': m['module'].get('requires', [])}
 
 
 def check() -> dict:
@@ -197,7 +202,7 @@ def check() -> dict:
                     continue
             except release.Fehler:
                 continue
-            base = known or {'id': mid, 'name': (have.get(mid) or {}).get('module', {}).get('name', mid), 'description': '', 'path': None, 'core_api': None}
+            base = known or {'id': mid, 'name': (have.get(mid) or {}).get('module', {}).get('name', mid), 'description': '', 'path': None, 'core_api': None, 'requires': []}
             offer[mid] = {**base, 'version': r['version'], 'source': 'github', 'signed': signed}
     except (update.Fehler, OSError, ValueError, KeyError, TypeError) as e:
         error = str(e)[:200]
@@ -391,8 +396,10 @@ def phpfpm_binary() -> str:
 
 def fpm_conf(m: dict) -> str:
     mid = m['module']['id']
-    readable = [f'/opt/kienzle/{mid}/', f'/var/lib/kienzle/{mid}/', '/opt/kienzle/core/', f'/etc/kienzle/verbindungen/module/{mid}.json',
+    readable = [*(x['path'] + '/' for x in m.get('exchange', [])),
+                f'/opt/kienzle/{mid}/', f'/var/lib/kienzle/{mid}/', '/opt/kienzle/core/', f'/etc/kienzle/verbindungen/module/{mid}.json',
                 f'/etc/kienzle/schluessel/{mid}.key', '/var/lib/kienzle/drucker/status.json', f'/var/spool/kienzle/ablage/{mid}/',
+                f'/var/spool/kienzle/nachrichten/{mid}/',
                 '/etc/kienzle/ca/ca.crt', '/etc/kienzle/ca/server.crt', '/tmp/', '/usr/bin/', '/usr/share/fonts/', '/usr/share/fonts-dejavu-core/']
     return '\n'.join([
         f'; Kienzle-Suite, Modul {mid}: eigene php-fpm-Instanz als ks-{mid}. Von der Modulverwaltung geschrieben; Änderungen gehen verloren.',
@@ -424,7 +431,9 @@ def fpm_unit(m: dict, binary: str) -> str:
         'ProtectKernelModules=yes', 'ProtectKernelLogs=yes', 'ProtectControlGroups=yes', 'ProtectClock=yes', 'ProtectHostname=yes',
         'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6', 'RestrictNamespaces=yes', 'RestrictRealtime=yes', 'RestrictSUIDSGID=yes',
         'LockPersonality=yes', 'SystemCallArchitectures=native', 'CapabilityBoundingSet=',
-        f'ReadWritePaths=/var/lib/kienzle/{mid} /run/kienzle/{mid} -/var/spool/kienzle/ablage/{mid}', '', '[Install]', 'WantedBy=multi-user.target', ''])
+        f'ReadWritePaths=/var/lib/kienzle/{mid} /run/kienzle/{mid} -/var/spool/kienzle/ablage/{mid} -/var/spool/kienzle/nachrichten/{mid}'
+        + ''.join(f' -{x["path"]}' for x in m.get('exchange', [])),
+        '', '[Install]', 'WantedBy=multi-user.target', ''])
 
 
 def units(folder: Path, m: dict) -> list[str]:
@@ -449,6 +458,58 @@ def units(folder: Path, m: dict) -> list[str]:
     if not without_systemd():
         _run(['/usr/bin/systemd-tmpfiles', '--create', str(TMPFILES / f'kienzle-{mid}.conf')], timeout=60)
     return names
+
+
+def disable_package_services(m: dict) -> None:
+    """Dienste aus Ubuntu-Paketen abschalten, die das Modul selbst betreibt (z. B. asterisk.service): stoppen und maskieren,
+    damit auch ein Paket-Update sie nicht wieder startet."""
+    for name in m['system'].get('disables', []):
+        if name in manifest.DISABLES:
+            _systemctl('disable', '--now', name)
+            _systemctl('mask', name)
+            log(f'{m["module"]["id"]}: Paketdienst {name} abgeschaltet.')
+
+
+def release_package_services(mid: str, m: dict | None) -> None:
+    """Beim Entfernen: Maskierung aufheben, wenn kein anderes installiertes Modul den Dienst abschaltet (nicht starten)."""
+    if not m:
+        return
+    others = {d for oid, om in installed().items() if oid != mid for d in om['system'].get('disables', [])}
+    for name in m['system'].get('disables', []):
+        if name in manifest.DISABLES and name not in others:
+            _systemctl('unmask', name)
+
+
+def exchanges() -> set[str]:
+    """Austauschordner aller Modulpaare, die einander anmelden. Liefert die Module, deren Ordner neu angelegt wurde
+    (deren Dienste müssen neu starten, damit der Ordner in ReadWritePaths greift)."""
+    have = installed()
+    fresh: set[str] = set()
+    for mid, m in have.items():
+        for x in m.get('exchange', []):
+            other = have.get(x['module'])
+            if not other or mid not in [y['module'] for y in other.get('exchange', [])] or mid > x['module']:
+                continue
+            path = Path(manifest.exchange_dir(mid, x['module']).replace(manifest.EXCHANGE_BASE, str(EXCHANGE), 1))
+            if path.is_symlink():
+                raise Fehler(f'Austauschordner {path.name} ist ein Verweis.')
+            new = not path.is_dir()
+            path.mkdir(mode=0o770, parents=True, exist_ok=True)
+            os.chmod(path, 0o770)
+            if not OWNER:
+                shutil.chown(path, 'root', 'root')
+                if not Path(SETFACL).is_file() and APT:
+                    _run([APT, 'install', '-y', '-q', '--no-install-recommends', 'acl'], timeout=600,
+                         env={**os.environ, 'DEBIAN_FRONTEND': 'noninteractive'})
+                users = [f'ks-{mid}', f'ks-{x["module"]}']
+                spec = ','.join([f'u:{u}:rwx' for u in users] + [f'd:u:{u}:rwx' for u in users] + ['m::rwx', 'd:m::rwx', 'o::---', 'd:o::---'])
+                r = _run([SETFACL, '-m', spec, str(path)], timeout=60)
+                if r.returncode != 0:
+                    raise Fehler(f'Austauschordner {path.name}: Rechte ließen sich nicht setzen: ' + (r.stderr or '').strip()[:200])
+            if new:
+                log(f'Austauschordner {path.name} angelegt ({mid} und {x["module"]}).')
+                fresh |= {mid, x['module']}
+    return fresh
 
 
 def unit_names(mid: str) -> list[str]:
@@ -575,13 +636,26 @@ def stop(mid: str) -> None:
         _systemctl('stop', n)
 
 
+def _ohne_sonderdateien(folder: str, names: list[str]) -> list[str]:
+    """Sockets, Pipes und Gerätedateien (z. B. asterisk.ctl der laufenden Telefonanlage) lassen sich nicht kopieren und gehören nicht in den Schnappschuss."""
+    skip = []
+    for n in names:
+        try:
+            mode = os.lstat(os.path.join(folder, n)).st_mode
+        except OSError:
+            continue
+        if stat.S_ISSOCK(mode) or stat.S_ISFIFO(mode) or stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
+            skip.append(n)
+    return skip
+
+
 def snapshot(mid: str, version: str) -> Path | None:
     data = DATA / mid
     if not data.is_dir():
         return None
     target = STATE / 'schnappschuesse' / mid / f'{version}-{time.time_ns()}'
     target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    shutil.copytree(data, target, symlinks=True)
+    shutil.copytree(data, target, symlinks=True, ignore=_ohne_sonderdateien)
     snaps = sorted(target.parent.iterdir())
     for old in snaps[:-KEEP_SNAPSHOTS]:
         shutil.rmtree(old, ignore_errors=True)
@@ -605,6 +679,9 @@ def install(mid: str, version: str | None = None) -> str:
     set_status(running={'action': 'aktualisieren' if have else 'installieren', 'id': mid, 'step': 'laden', 'since': int(time.time())})
     folder, origin = fetch(mid, version, current, work)
     m = validate(folder, mid)
+    missing = [r for r in m['module'].get('requires', []) if r not in installed()]
+    if missing:
+        raise Fehler(f'{m["module"]["name"]} braucht zuerst das Modul „{", ".join(missing)}“. Bitte dieses vorher installieren.')
     new = m['module']['version']
     if current is not None and not release.newer(new, current):
         raise Fehler(f'{mid} {new} ist nicht neuer als die installierte Version {current}.')
@@ -614,6 +691,7 @@ def install(mid: str, version: str | None = None) -> str:
     set_status(running={'action': 'aktualisieren' if have else 'installieren', 'id': mid, 'step': 'installieren', 'since': int(time.time())})
     snap = snapshot(mid, current) if have else None
     packages(m)
+    disable_package_services(m)
     account(mid)
     if have:
         stop(mid)
@@ -621,10 +699,13 @@ def install(mid: str, version: str | None = None) -> str:
     try:
         names = units(PROGRAMS / mid / 'current', m)
         register()
+        partners = exchanges() - {mid}
         r = hook(m, 'update' if have else 'install', {'KIENZLE_VORHER': current or ''})
         if r is not None and r.returncode != 0:
             raise Fehler(f'Haken {"update" if have else "install"} fehlgeschlagen: ' + (r.stderr or r.stdout).strip()[-300:])
         start(names)
+        for other in sorted(partners):
+            start(unit_names(other))
         if not healthy(m):
             raise Fehler('Das Modul antwortet nach dem Start nicht (hooks.health).')
     except Fehler as e:
@@ -652,6 +733,7 @@ def install(mid: str, version: str | None = None) -> str:
 
 
 def _remove(mid: str, m: dict | None, delete_data: bool, run_hook: bool = True) -> None:
+    release_package_services(mid, m)
     if m and run_hook:
         r = hook(m, 'remove')
         if r is not None and r.returncode != 0:
@@ -672,6 +754,7 @@ def _remove(mid: str, m: dict | None, delete_data: bool, run_hook: bool = True) 
         shutil.rmtree(DATA / mid, ignore_errors=True)
         shutil.rmtree(STATE / 'schnappschuesse' / mid, ignore_errors=True)
         shutil.rmtree(SPOOL / mid, ignore_errors=True)
+        shutil.rmtree(NACHRICHTEN_SPOOL / mid, ignore_errors=True)
         if not OWNER:
             _run(['/usr/sbin/userdel', f'ks-{mid}'], timeout=60)
 
@@ -682,6 +765,9 @@ def remove(mid: str, delete_data: bool) -> str:
         raise Fehler('Modul ist nicht installiert.')
     if busy(m):
         raise Fehler(f'{m["module"]["name"]} ist gerade beschäftigt. Bitte später erneut versuchen.')
+    users = [o['module']['name'] for oid, o in installed().items() if oid != mid and mid in o['module'].get('requires', [])]
+    if users:
+        raise Fehler(f'{m["module"]["name"]} wird noch gebraucht von: {", ".join(users)}. Bitte zuerst dieses Modul entfernen.')
     set_status(running={'action': 'entfernen', 'id': mid, 'step': 'entfernen', 'since': int(time.time())})
     _remove(mid, m, delete_data)
     log(f'{mid}: entfernt' + (' samt Daten.' if delete_data else '; Daten bleiben unter /var/lib/kienzle/' + mid + '.'))
@@ -755,6 +841,6 @@ def handle() -> None:
             set_status(running=None, last={'ok': True, 'message': msg[:400], 'time': int(time.time())})
         except (Fehler, update.Fehler, release.Fehler, OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as e:
             msg = str(e) if isinstance(e, (Fehler, update.Fehler, release.Fehler)) else f'Vorgang fehlgeschlagen ({type(e).__name__}).'
-            log(f'Abgebrochen: {msg}')
+            log(f'Abgebrochen: {msg}' + ('' if isinstance(e, (Fehler, update.Fehler, release.Fehler)) else f' [{type(e).__name__}: {str(e)[:300]}]'))
             set_status(running=None, last={'ok': False, 'message': msg[:400], 'time': int(time.time())})
         check()

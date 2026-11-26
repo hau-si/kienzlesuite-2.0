@@ -92,6 +92,27 @@ function test_ablegen(): void {
     try { (new KienzleModul('zeit', ['X' => '1'], $dir, $dir))->ablegen('steuerbuero', 'x', 'a.pdf'); throw new LogicException('ohne Verbindung abgelegt'); } catch (RuntimeException) {}
 }
 
+function test_nachrichten(): void {
+    $dir = tmpdir();
+    mkdir("$dir/ausgang");
+    file_put_contents("$dir/telefon.json", json_encode(['nachrichten' => ['ausgang' => "$dir/ausgang", 'sms' => true, 'mail' => false]]));
+    $k = new KienzleModul('telefon', ['X' => '1'], $dir, $dir);
+    check($k->nachrichtenBereit() === ['sms' => true, 'mail' => false], 'Bereitschaft');
+    $job = $k->smsSenden('+491701234567', 'Ihr Rezept liegt bereit.');
+    check(json_decode((string)file_get_contents("$dir/ausgang/$job.json"), true) === ['art' => 'sms', 'an' => '+491701234567', 'text' => 'Ihr Rezept liegt bereit.'], 'SMS-Auftrag');
+    check(decoct(fileperms("$dir/ausgang/$job.json") & 0777) === '640' && !glob("$dir/ausgang/.*.neu"), 'Rechte oder halbfertiger Auftrag');
+    check($k->nachricht($job)['stand'] === 'wartet', 'wartet');
+    unlink("$dir/ausgang/$job.json");
+    file_put_contents("$dir/ausgang/$job.ergebnis", json_encode(['stand' => 'gesendet', 'meldung' => 'SMS verschickt.', 'zeit' => 1]));
+    check($k->nachricht($job) === ['stand' => 'gesendet', 'meldung' => 'SMS verschickt.'], 'Ergebnis');
+    check($k->nachricht('../x')['stand'] === 'unbekannt', 'Pfad im Auftrag');
+    foreach ([fn() => $k->smsSenden('0170123', 'x'), fn() => $k->smsSenden('+491701234567', str_repeat('x', 321)), fn() => $k->mailSenden('keine', 'a', 'b')] as $f) {
+        try { $f(); throw new LogicException('ungültig angenommen'); } catch (InvalidArgumentException) {}
+    }
+    try { $k->mailSenden('fax@example.org', 'Neues Fax', 'Text'); throw new LogicException('Mail ohne Zugang angenommen'); } catch (RuntimeException $e) { check(str_contains($e->getMessage(), 'E-Mail ist in der Basis nicht eingerichtet'), 'Meldung'); }
+    try { (new KienzleModul('fax', ['X' => '1'], $dir, $dir))->smsSenden('+491701234567', 'x'); throw new LogicException('ohne Verbindung angenommen'); } catch (RuntimeException) {}
+}
+
 function test_letterxpress(): void {
     [$env, $c] = con_env(['letterxpress' => ['username' => 'praxis-test', 'modus' => 'live', 'schluessel_gesetzt' => true]]);
     [$b] = admin_browser($env);

@@ -45,6 +45,8 @@ final class View {
         'start:einrichtung' => '<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2h9"/>',
         'modul:kasse' => '<rect x="4" y="13" width="16" height="7" rx="1"/><path d="M7 13V6h10v7M9 9h6M8 17h.01M12 17h.01M16 17h.01"/>',
         'modul:terminzettel' => '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',
+        'modul:fax' => '<rect x="8" y="9" width="13" height="11" rx="1"/><path d="M11 9V4h7v5"/><path d="M3 9a2 2 0 012-2h1a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M12 13h2M16 13h2M12 16h2M16 16h2"/>',
+        'modul:telefon' => '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2"/>',
         'modul:signatur' => '<path d="M3 17c3-4 4-8 6-8s0 6 2 6 2-4 4-4 1 3 3 3 3-1 3-1"/><path d="M3 21h18"/>',
         'st:disk' => '<rect x="3" y="14" width="18" height="6" rx="1"/><path d="M5 14l3-9h8l3 9M7 17h.01"/>',
         'st:ram' => '<rect x="3" y="8" width="18" height="8" rx="1"/><path d="M7 16v3M11 16v3M15 16v3M7 8V5M11 8V5M15 8V5"/>',
@@ -153,7 +155,7 @@ final class View {
         $brand = '<a class="brand" href="/" title="Start"><span class="mark" aria-hidden="true">K' . (!empty($nav['offenLogo']) ? '<span class="logo-dot" title="Die Einrichtung ist noch nicht abgeschlossen"></span>' : '') . '</span><span><strong>Kienzle-Suite</strong>'
             . '<span class="sub">' . self::h($practice !== '' ? $practice : 'Praxis') . '</span></span></a>';
         $head = '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="icon" type="image/svg+xml" href="/assets/favicon.svg"><link rel="stylesheet" href="/assets/core.css?v=36"><script src="/assets/core.js?v=7" defer></script>' . ($extra['kopf'] ?? '') . '</head><body'
+            . '<title>' . self::h($title) . ' – Kienzle-Suite</title><link rel="icon" type="image/svg+xml" href="/assets/favicon.svg"><link rel="stylesheet" href="/assets/core.css?v=37"><script src="/assets/core.js?v=7" defer></script><script src="/assets/passwort.js?v=1" defer></script>' . ($extra['kopf'] ?? '') . '</head><body'
             . (self::$starter !== '' ? ' data-starter="' . self::h(self::$starter) . '"' : '')
             . (self::$starterMap ? ' data-starter-map="' . self::h((string)json_encode(self::$starterMap)) . '"' : '') . ($extra['body'] ?? '') . '>';
         if (!$nav) {

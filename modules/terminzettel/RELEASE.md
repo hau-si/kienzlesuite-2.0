@@ -1,5 +1,17 @@
 # Terminzettel – Release-Notizen
 
+## 1.3.0-beta.19
+
+- **Neuer Standardtext der Absage-Mail:** „Guten Tag, leider muss ich meinen Termin am {{termine}} absagen. Viele Grüße, {{patient}}“, Betreff „Terminabsage {{patient}}“. Die bisherigen Standardtexte werden beim Öffnen der Einstellungen durch den neuen ersetzt; selbst geänderte Texte bleiben unverändert. Nicht auf der VM geprüft.
+
+## 1.3.0-beta.18
+
+- **Absage-QR mit Patientenname und Terminen:** Der Betreff lautet standardmäßig „Terminabsage {{patient}}“ (der alte Standard „Terminabsage“ wird so übernommen). Im Betreff und im Text der Mail stehen die Platzhalter `{{patient}}`, `{{termine}}` (alle Termine mit Art), `{{termine_kurz}}` (nur Tag und Uhrzeit) und `{{erster_termin}}`; Einfüge-Knöpfe unter dem Textfeld. Passt die Liste nicht in den QR-Code, wird sie erst gekürzt, dann weggelassen. Nicht auf der VM geprüft.
+
+## 1.3.0-beta.17
+
+- Einrichtungsleitfaden: erster Punkt „Benötigte Hardware“ (Bondrucker Epson TM-m30III empfohlen).
+
 ## 1.3.0-beta.16
 
 - **Keine blauen Punkte mehr:** Die Hinweise der Einrichtung (Bondrucker, Zettel aus T2med angekommen) bleiben in der Übersicht sichtbar, zählen aber nicht mehr als „noch zu tun“ und setzen keinen Punkt im Menü.

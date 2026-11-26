@@ -22,7 +22,7 @@ try {
     $action = App::string($input, 'action', 32);
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
     if ($origin !== '' && $origin !== rtrim($app->config->get('app', 'base_url'), '/')) throw new Problem('Unzulässiger Ursprung.', 403);
-    $vorgang = in_array($action, ['vorgaenge', 'vorgaenge_done'], true) && (Suite::can('export') || Suite::can('paid') || Suite::can('periods') || Suite::can('storno'));
+    $vorgang = in_array($action, ['vorgaenge', 'vorgaenge_done', 'vorgaenge_post'], true) && (Suite::can('export') || Suite::can('paid') || Suite::can('periods') || Suite::can('storno'));
     $stornoRecht = $action === 'storno' && Suite::can('storno');   // Stornieren aus der Vorgänge-Liste braucht nur das Recht „Rechnungen stornieren“
     if (!$vorgang && !$stornoRecht && !Suite::can('kassieren')) throw new Problem('Für die Kasse fehlt das Recht „Kassieren“. Bitte den Admin fragen (Verwaltung → Benutzer).', 403);
     // Marke der Suite für dieses Modul (meta kienzle-csrf der Seite) bei allem außer dem reinen Abfragen des Zustands.
@@ -54,7 +54,10 @@ try {
         $art = App::string($input, 'art', 8);
         if (in_array($art, ['monat', 'jahr'], true) && !Suite::can('periods')) throw new Problem('Für die Monats- und Jahresansicht fehlt das Recht „Monats- und Jahresansicht der Vorgänge“.', 403);
         $result = (new \KienzleKasse\Vorgaenge($app->db, $app->config))->list($art, App::string($input, 'date', 10));
-        $result['rights'] = ['export' => Suite::can('export'), 'paid' => Suite::can('paid'), 'periods' => Suite::can('periods'), 'storno' => Suite::can('storno')];
+        $result['rights'] = ['export' => Suite::can('export'), 'paid' => Suite::can('paid'), 'periods' => Suite::can('periods'), 'storno' => Suite::can('storno'), 'letter' => Suite::can('letter')];
+    } elseif ($action === 'vorgaenge_post') {
+        if (!Suite::can('letter')) throw new Problem('Zum Versand per Post fehlt das Recht „Rechnungen per Post senden“. Bitte den Admin fragen.', 403);
+        $result = $app->vorgangPost(App::string($input, 'invoice_id', 32));
     } elseif ($action === 'vorgaenge_done') {
         if (!Suite::can('paid')) throw new Problem('Zum Abhaken fehlt das Recht „Bezahlt-Liste abhaken“.', 403);
         $ids = $input['ids'] ?? null;

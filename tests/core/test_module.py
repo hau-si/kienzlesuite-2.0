@@ -46,7 +46,7 @@ class Modulverwaltung(unittest.TestCase):
         env = {'KIENZLE_MODULE_STATE': self.t / 'state', 'KIENZLE_MODULE_REQUEST': self.t / 'anfragen' / 'module.json',
                'KIENZLE_MODULE_PROGRAMME': self.t / 'opt', 'KIENZLE_MODULE_MITGELIEFERT': self.t / 'mitgeliefert', 'KIENZLE_MODULE_DATEN': self.t / 'daten',
                'KIENZLE_MODULE_ETC': self.t / 'etc', 'KIENZLE_MODULE_UNITS': self.t / 'units', 'KIENZLE_MODULE_TMPFILES': self.t / 'tmpfiles',
-               'KIENZLE_MODULE_RUN': self.t / 'run', 'KIENZLE_MODULE_SPOOL': self.t / 'spool', 'KIENZLE_MODULE_WEB': web,
+               'KIENZLE_MODULE_RUN': self.t / 'run', 'KIENZLE_MODULE_SPOOL': self.t / 'spool', 'KIENZLE_MODULE_AUSTAUSCH': self.t / 'austausch', 'KIENZLE_MODULE_WEB': web,
                'KIENZLE_MODULE_APT': '', 'KIENZLE_MODULE_OWNER': os.environ.get('USER') or 'root', 'KIENZLE_MODULE_HEALTH_SECONDS': '0',
                'KIENZLE_MODULE_UID': os.getuid(), 'KIENZLE_OHNE_SYSTEMD': '1', 'KIENZLE_MODULE_PHPFPM': '/usr/sbin/php-fpm8.5',
                'KIENZLE_UPDATE_QUELLE': f'ordner:{self.t / "quelle"}', 'KIENZLE_UPDATE_STATE': self.t / 'update', 'KIENZLE_UPDATE_KEYS': self.t / 'keys'}
@@ -135,6 +135,24 @@ class Modulverwaltung(unittest.TestCase):
         self.assertEqual((self.data() / 'kasse.sqlite').read_text(), 'daten 1.1.0')
         self.assertEqual(json.loads((self.t / 'modules.json').read_text())['modules'][0]['module']['version'], '1.1.0')
 
+    def test_update_mit_socket_im_datenordner(self):
+        """Eine laufende Telefonanlage legt asterisk.ctl (Unix-Socket) im Datenordner ab; der Schnappschuss darf daran nicht scheitern."""
+        import socket
+        self.mo.dispatch({'action': 'installieren', 'id': 'test-kasse'})
+        (self.data() / 'kasse.sqlite').write_text('daten 1.0.0')
+        (self.data() / 'run').mkdir()
+        sock = socket.socket(socket.AF_UNIX)
+        self.addCleanup(sock.close)
+        sock.bind(str(self.data() / 'run' / 'asterisk.ctl'))
+        os.mkfifo(self.data() / 'run' / 'pipe')
+        self.bundle('1.1.0')
+        self.mo.check()
+        self.mo.dispatch({'action': 'aktualisieren', 'id': 'test-kasse'})
+        self.assertEqual(json.loads((self.t / 'modules.json').read_text())['modules'][0]['module']['version'], '1.1.0')
+        snaps = list((self.t / 'state' / 'schnappschuesse' / 'test-kasse').iterdir())
+        self.assertEqual((snaps[-1] / 'kasse.sqlite').read_text(), 'daten 1.0.0')
+        self.assertFalse((snaps[-1] / 'run' / 'asterisk.ctl').exists())
+
     def test_automatisch_aktualisieren(self):
         self.mo.dispatch({'action': 'installieren', 'id': 'test-kasse'})
         self.bundle('1.1.0')
@@ -195,6 +213,53 @@ class Modulverwaltung(unittest.TestCase):
         (d / 'systemd' / 'kienzle-test-kasse-worker.service').write_text('[Service]\nUser=ks-test-kasse\nExecStart=/bin/true\n')
         self.mo.dispatch({'action': 'installieren', 'id': 'test-kasse'})
         self.assertTrue((self.t / 'units' / 'kienzle-test-kasse-worker.service').is_file())
+
+    def zweites_modul(self, mid: str, extra: str, api: str = '2') -> None:
+        d = self.t / 'mitgeliefert' / mid
+        (d / 'bin').mkdir(parents=True)
+        (d / 'public').mkdir()
+        (d / 'public' / 'index.php').write_text('<?php echo 1;\n')
+        (d / 'module.toml').write_text(f'[module]\nid = "{mid}"\nname = "{mid}"\nversion = "1.0.0"\ncore_api = "{api}"\n\n'
+                                       f'[system]\nuser = "ks-{mid}"\ndata = "/var/lib/kienzle/{mid}"\n{extra}\n'
+                                       f'[web]\npath = "/{mid}"\nupstream = "unix:/run/kienzle/{mid}/web.sock"\nprotocol = "fastcgi"\nentry = "public/index.php"\n')
+
+    def test_austauschordner_erst_wenn_beide_einander_anmelden(self):
+        self.zweites_modul('test-fax', '\n[[exchange]]\nmodule = "test-tel"\npurpose = "Faxaufträge"\n')
+        self.zweites_modul('test-tel', 'disables = ["asterisk.service"]\n\n[[exchange]]\nmodule = "test-fax"\npurpose = "Faxaufträge"\n')
+        calls = []
+        with mock.patch.object(self.mo, '_systemctl', lambda *a: calls.append(a)):
+            self.mo.dispatch({'action': 'installieren', 'id': 'test-fax'})
+            ordner = self.t / 'austausch' / 'test-fax_test-tel'
+            self.assertFalse(ordner.exists())
+            unit = (self.t / 'units' / 'kienzle-test-fax-php.service').read_text()
+            self.assertIn(' -/var/spool/kienzle/austausch/test-fax_test-tel', unit)
+            self.assertIn('/var/spool/kienzle/austausch/test-fax_test-tel/:', (self.t / 'etc' / 'test-fax' / 'php-fpm.conf').read_text())
+            self.mo.dispatch({'action': 'installieren', 'id': 'test-tel'})
+            self.assertTrue(ordner.is_dir())
+            self.assertEqual(stat.S_IMODE(ordner.stat().st_mode), 0o770)
+            self.assertIn(('mask', 'asterisk.service'), calls)
+            # Der Partner startet neu, damit der neue Ordner in seinem Dienst beschreibbar ist.
+            self.assertIn(('restart', 'kienzle-test-fax-php.service'), calls)
+            calls.clear()
+            self.mo.dispatch({'action': 'entfernen', 'id': 'test-tel'})
+            self.assertIn(('unmask', 'asterisk.service'), calls)
+            self.assertNotIn(('start', 'asterisk.service'), calls)
+
+    def test_abhaengigkeit_beim_installieren_und_entfernen(self):
+        self.zweites_modul('test-fax', '')
+        d = self.t / 'mitgeliefert' / 'test-fax'
+        (d / 'module.toml').write_text((d / 'module.toml').read_text().replace('core_api = "2"\n', 'core_api = "2"\nrequires = ["test-tel"]\n'))
+        self.zweites_modul('test-tel', '')
+        with self.assertRaises(self.mo.Fehler) as e:
+            self.mo.dispatch({'action': 'installieren', 'id': 'test-fax'})
+        self.assertIn('braucht zuerst', str(e.exception))
+        self.mo.dispatch({'action': 'installieren', 'id': 'test-tel'})
+        self.mo.dispatch({'action': 'installieren', 'id': 'test-fax'})
+        with self.assertRaises(self.mo.Fehler) as e:
+            self.mo.dispatch({'action': 'entfernen', 'id': 'test-tel'})
+        self.assertIn('noch gebraucht von', str(e.exception))
+        self.mo.dispatch({'action': 'entfernen', 'id': 'test-fax'})
+        self.mo.dispatch({'action': 'entfernen', 'id': 'test-tel'})
 
     def test_release_von_github(self):
         """Neuere Version als Release „test-kasse-v1.1.0“ (Ordner-Quelle statt GitHub), unsigniert zugelassen (Vorgabe)."""

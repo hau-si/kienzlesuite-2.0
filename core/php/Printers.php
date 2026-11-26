@@ -37,9 +37,15 @@ final class Printers {
             $jobs[] = ['id' => (string)$j['id'], 'drucker' => (string)($j['drucker'] ?? ''), 'benutzer' => mb_substr((string)($j['benutzer'] ?? ''), 0, 40),
                 'groesse' => (int)($j['groesse'] ?? 0), 'zeit' => mb_substr((string)($j['zeit'] ?? ''), 0, 40)];
         }
+        $files = [];
+        foreach ((array)($s['dateifreigaben'] ?? []) as $f) {
+            if (!is_array($f) || !preg_match('/^[a-z][a-z0-9-]*\/[a-z][a-z0-9-]*$/D', (string)($f['key'] ?? ''))) continue;
+            $files[] = ['key' => (string)$f['key'], 'name' => mb_substr((string)($f['name'] ?? ''), 0, 31), 'label' => mb_substr((string)($f['label'] ?? ''), 0, 80),
+                'modul' => mb_substr((string)($f['modul'] ?? ''), 0, 30), 'on' => ($f['an'] ?? false) === true];
+        }
         $n = is_array($s['netz'] ?? null) ? $s['netz'] : [];
         $net = ['arbeitsgruppe' => mb_substr((string)($n['arbeitsgruppe'] ?? 'WORKGROUP'), 0, 15)];
-        return ['queues' => $queues, 'found' => $found, 'jobs' => $jobs, 'net' => $net, 'searched' => (int)($s['gesucht'] ?? 0), 'error' => mb_substr((string)($s['fehler'] ?? ''), 0, 300),
+        return ['queues' => $queues, 'fileshares' => $files, 'found' => $found, 'jobs' => $jobs, 'net' => $net, 'searched' => (int)($s['gesucht'] ?? 0), 'error' => mb_substr((string)($s['fehler'] ?? ''), 0, 300),
             'last' => is_array($s['letzte'] ?? null) ? View::frisch($s['letzte']) : null, 'pending' => is_file($this->request()), 'service' => is_file(self::$unit)];
     }
 
@@ -61,6 +67,12 @@ final class Printers {
         // Virtuelle Drucker der Module sind immer per IPP freigegeben; Samba (alte Windows-Freigabe) ist optional.
         $this->write(['action' => 'freigabe', 'name' => $this->known($name), 'freigabe' => self::shares($virtual ? [...$share, 'ipp'] : $share)]);
     }
+    /** Dateifreigabe eines Moduls (Windows-Freigabe zum Ablegen) ein- oder ausschalten. */
+    public function fileShare(string $key, bool $on, string $password = ''): void {
+        if (!array_filter($this->status()['fileshares'], fn($f) => $f['key'] === $key)) throw new Problem('Freigabe nicht gefunden.', 404);
+        $this->write(['action' => 'dateifreigabe', 'key' => $key, 'an' => $on] + ($on && $password !== '' ? ['kennwort' => $password] : []));
+    }
+
     public function sync(): void { $this->write(['action' => 'abgleichen']); }
 
     public function cancelJob(string $id): void {

@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+# Übernommen aus Kienzlefax 3.5.0 (installer-modular/pdf_with_header.sh) von Dr. Thomas Kienzle, MIT-Lizenz.
+# Kienzle-Suite, Modul telefon: Praxisname aus KFX_PRAXIS_DATEI (von der Basis), sonst unverändert.
+set -euo pipefail
+
+# Usage:
+#   pdf_with_header.sh INPUT.pdf OUTPUT.pdf
+#
+# Header on EACH page:
+#   Left:  "<DATE>"
+#   Center:"<PRACTICE_NAME>"
+#   Right: "Seite X/Y"
+#
+# Customize via env:
+#   PRACTICE_NAME="Praxis Dr. Beispiel"
+#   DATE_FMT="%d.%m.%Y %H:%M"
+#   TOP_OFFSET_MM="4"     # distance from top edge to text baseline (smaller => higher)
+#   HEADER_BAND_MM="3"    # slim reserved top band; original content is scaled below it
+#   FONT_NAME="Helvetica"
+#   FONT_SIZE="8"
+#   LEFT_MARGIN_MM="12"
+#   RIGHT_MARGIN_MM="12"
+
+if [[ $# -lt 2 ]]; then
+  echo "Usage: $0 INPUT.pdf OUTPUT.pdf" >&2
+  exit 2
+fi
+
+IN="$1"
+OUT="$2"
+
+if [[ ! -f "$IN" ]]; then
+  echo "ERROR: input not found: $IN" >&2
+  exit 2
+fi
+
+if [[ -z "${PRACTICE_NAME:-}" && -r "${KFX_PRAXIS_DATEI:-}" ]]; then PRACTICE_NAME="$(head -c 120 "$KFX_PRAXIS_DATEI" | head -n 1)"; fi
+PRACTICE_NAME="${PRACTICE_NAME:-KienzleFax}"
+DATE_FMT="${DATE_FMT:-%d.%m.%Y %H:%M}"
+
+TOP_OFFSET_MM="${TOP_OFFSET_MM:-4}"
+HEADER_BAND_MM="${HEADER_BAND_MM:-3}"
+LEFT_MARGIN_MM="${LEFT_MARGIN_MM:-12}"
+RIGHT_MARGIN_MM="${RIGHT_MARGIN_MM:-12}"
+
+FONT_NAME="${FONT_NAME:-Helvetica}"
+FONT_SIZE="${FONT_SIZE:-8}"
+
+python3 - "$IN" "$OUT" "$PRACTICE_NAME" "$DATE_FMT" \
+        "$TOP_OFFSET_MM" "$HEADER_BAND_MM" "$LEFT_MARGIN_MM" "$RIGHT_MARGIN_MM" \
+        "$FONT_NAME" "$FONT_SIZE" <<'PY'
+import sys
+from datetime import datetime
+from pathlib import Path
+from io import BytesIO
+
+from reportlab.pdfgen import canvas
+from reportlab.lib.units import mm
+from reportlab.pdfbase.pdfmetrics import stringWidth
+
+try:
+    from pypdf import PdfReader, PdfWriter, Transformation
+    from pypdf._page import PageObject
+except ModuleNotFoundError:
+    from PyPDF2 import PdfReader, PdfWriter, Transformation
+    from PyPDF2._page import PageObject
+
+in_path = Path(sys.argv[1])
+out_path = Path(sys.argv[2])
+
+practice = sys.argv[3]
+date_fmt = sys.argv[4]
+
+top_offset_mm = float(sys.argv[5])
+header_band_mm = float(sys.argv[6])
+left_margin_mm = float(sys.argv[7])
+right_margin_mm = float(sys.argv[8])
+
+font_name = sys.argv[9]
+font_size = float(sys.argv[10])
+
+reader = PdfReader(str(in_path))
+total_pages = len(reader.pages)
+stamp_date = datetime.now().strftime(date_fmt)
+
+writer = PdfWriter()
+
+def make_overlay(page_w, page_h, page_no, total_pages):
+    """
+    Create a single-page PDF overlay (in memory) with a 3-part header:
+      left: date/time
+      center: practice name
+      right: page x/y
+    """
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=(page_w, page_h))
+
+    c.setFont(font_name, font_size)
+
+    # Compact fax header near the top edge.
+    y = page_h - (top_offset_mm * mm)
+
+    left_text = stamp_date
+    center_text = practice
+    right_text = f"Seite {page_no}/{total_pages}"
+
+    x_left = left_margin_mm * mm
+    x_right_edge = page_w - (right_margin_mm * mm)
+
+    # Left
+    c.drawString(x_left, y, left_text)
+
+    # Right (right-aligned)
+    w_right = stringWidth(right_text, font_name, font_size)
+    c.drawString(x_right_edge - w_right, y, right_text)
+
+    # Center (centered on page)
+    w_center = stringWidth(center_text, font_name, font_size)
+    c.drawString((page_w - w_center) / 2.0, y, center_text)
+
+    c.showPage()
+    c.save()
+    buf.seek(0)
+    return PdfReader(buf).pages[0]
+
+for idx, page in enumerate(reader.pages, start=1):
+    w = float(page.mediabox.width)
+    h = float(page.mediabox.height)
+
+    header_band = max(0.0, header_band_mm * mm)
+    content_h = max(1.0, h - header_band)
+    scale = min(1.0, content_h / h)
+    tx = (w - (w * scale)) / 2.0
+    ty = 0.0
+
+    composed = PageObject.create_blank_page(width=w, height=h)
+    page.add_transformation(Transformation().scale(scale).translate(tx=tx, ty=ty))
+    composed.merge_page(page)
+
+    overlay = make_overlay(w, h, idx, total_pages)
+    composed.merge_page(overlay)
+    writer.add_page(composed)
+
+out_path.parent.mkdir(parents=True, exist_ok=True)
+with out_path.open("wb") as f:
+    writer.write(f)
+PY

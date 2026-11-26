@@ -24,6 +24,7 @@ final class ModuleAdmin {
             return ['id' => (string)$m['id'], 'name' => mb_substr((string)($m['name'] ?? $m['id']), 0, 80), 'version' => (string)$m['version'],
                 'description' => mb_substr((string)($m['description'] ?? ''), 0, 300), 'path' => is_string($m['path'] ?? null) ? $m['path'] : null,
                 'source' => ($m['source'] ?? '') === 'github' ? 'github' : 'mitgeliefert', 'signed' => $m['signed'] ?? null,
+                'requires' => array_values(array_filter((array)($m['requires'] ?? []), fn($r) => is_string($r) && preg_match(self::ID, $r))),
                 'dienste' => array_values(array_filter(array_map(static fn($d) => is_array($d) && is_string($d['name'] ?? null) && preg_match('/^[A-Za-z0-9@_.-]{1,80}$/D', $d['name'])
                     ? ['name' => $d['name'], 'aktiv' => is_bool($d['aktiv'] ?? null) ? $d['aktiv'] : null] : null, (array)($m['dienste'] ?? [])))),
                 'update' => $u ? ['version' => (string)$u['version'], 'source' => ($u['source'] ?? '') === 'github' ? 'github' : 'mitgeliefert', 'signed' => $u['signed'] ?? null] : null];
