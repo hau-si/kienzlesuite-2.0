@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.6
+
+- **Fehler behoben: Modul-Update scheiterte mit „Vorgang fehlgeschlagen (Error)“**, wenn das Modul im Datenordner Sockets oder Pipes hat. Betroffen war das Telefonmodul (laufendes Asterisk legt `asterisk.ctl` an): Der Schnappschuss vor dem Update brach beim Kopieren ab. Sockets, Pipes und Gerätedateien werden jetzt übersprungen (sie gehören nicht in einen Schnappschuss). Das Protokoll (`/var/lib/kienzle/module/module.log`) nennt bei unbekannten Fehlern jetzt die Ursache. Mit Test nachgestellt (Socket und Pipe im Datenordner). Nach dem Update der Basis das Telefonmodul erneut aktualisieren; es wurde beim Abbruch nichts verändert.
+
 ## 0.22.0-beta.5
 
 - **Klicksperre bei Update-Abfragen von 30 auf 10 Sekunden** („Jetzt nach Updates suchen“, Basis und Module). Bei vielen Klicks hintereinander gilt weiter der Schutz vor dem GitHub-Limit (60 Abfragen pro Stunde und IP-Adresse ohne Anmeldung).

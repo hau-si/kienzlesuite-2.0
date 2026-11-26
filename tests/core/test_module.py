@@ -135,6 +135,24 @@ class Modulverwaltung(unittest.TestCase):
         self.assertEqual((self.data() / 'kasse.sqlite').read_text(), 'daten 1.1.0')
         self.assertEqual(json.loads((self.t / 'modules.json').read_text())['modules'][0]['module']['version'], '1.1.0')
 
+    def test_update_mit_socket_im_datenordner(self):
+        """Eine laufende Telefonanlage legt asterisk.ctl (Unix-Socket) im Datenordner ab; der Schnappschuss darf daran nicht scheitern."""
+        import socket
+        self.mo.dispatch({'action': 'installieren', 'id': 'test-kasse'})
+        (self.data() / 'kasse.sqlite').write_text('daten 1.0.0')
+        (self.data() / 'run').mkdir()
+        sock = socket.socket(socket.AF_UNIX)
+        self.addCleanup(sock.close)
+        sock.bind(str(self.data() / 'run' / 'asterisk.ctl'))
+        os.mkfifo(self.data() / 'run' / 'pipe')
+        self.bundle('1.1.0')
+        self.mo.check()
+        self.mo.dispatch({'action': 'aktualisieren', 'id': 'test-kasse'})
+        self.assertEqual(json.loads((self.t / 'modules.json').read_text())['modules'][0]['module']['version'], '1.1.0')
+        snaps = list((self.t / 'state' / 'schnappschuesse' / 'test-kasse').iterdir())
+        self.assertEqual((snaps[-1] / 'kasse.sqlite').read_text(), 'daten 1.0.0')
+        self.assertFalse((snaps[-1] / 'run' / 'asterisk.ctl').exists())
+
     def test_automatisch_aktualisieren(self):
         self.mo.dispatch({'action': 'installieren', 'id': 'test-kasse'})
         self.bundle('1.1.0')

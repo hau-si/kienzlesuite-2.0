@@ -633,13 +633,26 @@ def stop(mid: str) -> None:
         _systemctl('stop', n)
 
 
+def _ohne_sonderdateien(folder: str, names: list[str]) -> list[str]:
+    """Sockets, Pipes und Gerätedateien (z. B. asterisk.ctl der laufenden Telefonanlage) lassen sich nicht kopieren und gehören nicht in den Schnappschuss."""
+    skip = []
+    for n in names:
+        try:
+            mode = os.lstat(os.path.join(folder, n)).st_mode
+        except OSError:
+            continue
+        if stat.S_ISSOCK(mode) or stat.S_ISFIFO(mode) or stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
+            skip.append(n)
+    return skip
+
+
 def snapshot(mid: str, version: str) -> Path | None:
     data = DATA / mid
     if not data.is_dir():
         return None
     target = STATE / 'schnappschuesse' / mid / f'{version}-{time.time_ns()}'
     target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    shutil.copytree(data, target, symlinks=True)
+    shutil.copytree(data, target, symlinks=True, ignore=_ohne_sonderdateien)
     snaps = sorted(target.parent.iterdir())
     for old in snaps[:-KEEP_SNAPSHOTS]:
         shutil.rmtree(old, ignore_errors=True)
@@ -824,6 +837,6 @@ def handle() -> None:
             set_status(running=None, last={'ok': True, 'message': msg[:400], 'time': int(time.time())})
         except (Fehler, update.Fehler, release.Fehler, OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as e:
             msg = str(e) if isinstance(e, (Fehler, update.Fehler, release.Fehler)) else f'Vorgang fehlgeschlagen ({type(e).__name__}).'
-            log(f'Abgebrochen: {msg}')
+            log(f'Abgebrochen: {msg}' + ('' if isinstance(e, (Fehler, update.Fehler, release.Fehler)) else f' [{type(e).__name__}: {str(e)[:300]}]'))
             set_status(running=None, last={'ok': False, 'message': msg[:400], 'time': int(time.time())})
         check()
