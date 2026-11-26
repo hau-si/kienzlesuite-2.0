@@ -132,4 +132,18 @@ check(str_contains($o, 'SMS wird verschickt') && str_contains($o, 'als erledigt 
 check(str_contains(aufruf($dir, '/telefon/vorgaenge?bereich=erledigt', 'vorgaenge'), 'SMS wird verschickt …'), 'Stand an der Karte');
 $o = aufruf($dir, '/telefon/vorgaenge?bereich=erledigt', 'vorgaenge', 'benutzer', ['aktion' => 'vorgang-sms', 'kienzle-csrf' => $csrf, 'id' => '20261126_091400_000001', 'an' => '12345', 'text' => 'x']);
 check(str_contains($o, 'Handynummer bitte im Format'), 'Ungültige Nummer');
+// Rufgruppen: eigenes Recht, Schalter in den Einstellungen; ohne laufendes Asterisk meldet die Seite „Steuerung startet“.
+check(str_contains(aufruf($dir, '/telefon/rufgruppen', 'vorgaenge'), '#CODE=403'), 'Rufgruppen ohne Recht');
+check(str_contains(aufruf($dir, '/telefon/rufgruppen', 'rufgruppen'), 'noch nicht eingeschaltet'), 'Rufgruppen aus');
+$o = aufruf($dir, '/telefon/einstellungen', '', 'admin', ['aktion' => 'sprachmenue-speichern', 'kienzle-csrf' => $csrf, 'aktiv' => '1', 'tts' => 'piper', 'rufgruppen' => '1']);
+check(str_contains($o, 'Gespeichert.') && str_contains((string)file_get_contents("$dir/daten/asterisk/etc/manager_kienzlefon_control.conf"), '[kienzlefon-control]'), 'Rufgruppen eingeschaltet');
+$o = aufruf($dir, '/telefon/rufgruppen', 'rufgruppen');
+check(str_contains($o, 'Steuerung startet') && str_contains($o, 'name="aktion" value="rufgruppe-schalten"') && str_contains($o, 'ROT') && !str_contains($o, 'Standards speichern'), 'Rufgruppen-Seite für MFA');
+check(str_contains(aufruf($dir, '/telefon/rufgruppen', '', 'admin'), 'Standards speichern'), 'Standards für Admins');
+check(str_contains(aufruf($dir, '/telefon/', 'rufgruppen'), '/telefon/rufgruppen">Rufgruppen</a>'), 'Knopf Rufgruppen');
+$o = aufruf($dir, '/telefon/rufgruppen', 'rufgruppen', 'benutzer', ['aktion' => 'rufgruppe-schalten', 'kienzle-csrf' => $csrf, 'gruppe' => 'normal', 'nummer' => '202', 'an' => '0', 'revision' => 'r1:x:1']);
+check(str_contains($o, 'class="fehler"'), 'Schalten ohne Anlage meldet Fehler');
+check(str_contains(aufruf($dir, '/telefon/rufgruppen', 'rufgruppen', 'benutzer', ['aktion' => 'rufgruppen-speichern', 'kienzle-csrf' => $csrf]), 'nur Admins'), 'Standards nur Admin');
+$o = aufruf($dir, '/telefon/einstellungen', '', 'admin', ['aktion' => 'sprachmenue-speichern', 'kienzle-csrf' => $csrf, 'aktiv' => '1', 'tts' => 'piper']);
+check(str_contains((string)file_get_contents("$dir/daten/asterisk/etc/manager_kienzlefon_control.conf"), 'ausgeschaltet') && !is_file("$dir/daten/kienzlefon/control-ami.json"), 'Rufgruppen wieder aus');
 echo "seiten.php (telefon): alles in Ordnung\n";

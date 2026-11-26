@@ -1288,7 +1288,7 @@ def rufgruppen_speichern(job: dict) -> dict:
         neu[nummer] = {}
         for route, m in routes.items():
             r = e.get(route) if isinstance(e.get(route), dict) else {}
-            zugelassen = r.get('zugelassen', m.eligible) is True
+            zugelassen = r.get('zugelassen', m.eligible or r.get('standard') is True) is True
             stufe = r.get('stufe', m.penalty)
             if route == 'specialist':
                 stufe = 0

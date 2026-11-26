@@ -47,8 +47,27 @@ Modul telefon (ks-telefon)                         Modul fax (ks-fax)
 | 1 | Basis: `[[exchange]]`, `[system] disables`, `core_api` 2. Telefon: Anlage (Leitungen, Nebenstellen, Warteschlange, Kanalgrenzen, Faxkanal). Fax: Drucker, Senden, Telefonbuch, Aufträge, Berichte, Eingang | fertig (Basis 0.22.0-beta.1, Telefon/Fax 0.1.0-beta.1) |
 | 2 | Kienzlefon: Sprachmenü (AGI), Zeiten, Ansagen (Piper; Google und Kokoro wahlweise), Anrufsbaum, Sonderqueue, rotes Telefon, Ansagen-IVR 777 | Code übernommen (beta.2), Sprachmenü angeschlossen (beta.3), Piper optional nachladen und Ansagen erzeugen (beta.5), Google und Kokoro wahlweise (beta.6), Seite „Sprachmenü“ für Zeiten, Texte und Tasten (beta.7), Wartemusik von Johannes Plachetka oder eigene Datei (beta.9) |
 | 3 | Kienzlefon: Whisper-Worker, Vorgänge (Rezept, Überweisung …) mit Ablage im Modul und kurzer Löschfrist; Basis: Nachrichten-Ausgang für Module (SMS und Mail über die Verbindungen der Basis, ohne Zugangsdaten im Modul); SMS an Anrufer; Mail bei Faxeingang | Whisper optional nachladen, Seite „Vorgänge“ verschlüsselt mit Löschfrist (Telefon beta.10); Nachrichten-Ausgang der Basis (0.22.0-beta.8), SMS an Anrufer (Telefon beta.11), E-Mail bei Faxeingang (Fax beta.4) – fertig |
-| 4 | Kienzlefon: Rufgruppen-Steuerung (Port 8767), AMI für die T2med-Middleware, KI-Übergabe (WireGuard), App-Schnittstelle; Firewall-Einträge | offen |
+| 4 | Kienzlefon: Rufgruppen-Steuerung (Port 8767), AMI für die T2med-Middleware, KI-Übergabe (WireGuard), App-Schnittstelle; Firewall-Einträge | Rufgruppen nur lokal mit Seite (Telefon beta.12/13); Middleware und App als eigene Schritte, siehe „Vorschlag: Middleware und App“ |
 | 5 | Kienzlefax: Scan-/Fax-Texterkennung (OCR), Samba-Freigaben über die Basis; Umzug bestehender Installationen (`kienzlefax-installer.env`, `kienzlefon.toml`) | offen |
+
+## Vorschlag: Middleware und App (Stand 26.11.2026, Entscheidung des Nutzers ausstehend)
+
+Entscheidung des Nutzers: Middleware, App und KI kommen später als **Module**; Zugriff von außen auf die Anlage vorerst nicht.
+
+- **kienzlefon-app (Praxis-App, ca. 17 000 Zeilen PHP):** kein zweites Modul, sonst gäbe es zwei Posteingänge für dieselben Vorgänge.
+  Ihre fehlenden Funktionen wandern in die Seite „Vorgänge“ des Moduls telefon: „In Bearbeitung“ mit Bearbeiter (angemeldeter
+  Benutzer der Suite) und Übernahme, Teilanliegen abhaken, Kommentare, „Dringend“, Papierkorb, Neu-Laden mit Ton, wahlweise
+  Tonaufnahme anhören (kurze Frist). Status und Kommentare verschlüsselt neben dem Vorgang. Entfällt: eigene Anmeldung,
+  Quellserver/SCP-Abholer, eigener SMS-Worker (Basis), Installer. Offen: SMS-**Empfang** über die FRITZ!Box (bräuchte einen
+  Nachrichten-Eingang der Basis), Kontaktformular und IONOS-Sprachbot (brauchen einen Server im Internet).
+- **kienzlefon-t2med (Middleware, PHP/ReactPHP + Go-Importer):** eigenes Modul (Vorschlag `anrufe`, braucht `telefon`).
+  Funktionen in dieser Reihenfolge: 1. Live-Übersicht (Warteschlange, Gespräche, Nebenstellen) und Wählen per Klick;
+  2. Anrufername aus T2med auf dem Telefon und Patientensuche (Telefonverzeichnis über die T2med-Verbindung der Basis statt
+  Demo-Schlüssel); 3. Akte öffnen per GDT (Freigabe über die Basis); 4. Anrufstatistik. Umbau: Dienst nur auf 127.0.0.1 hinter
+  nginx mit Anmeldung der Suite, Pfade im Datenordner, eigener AMI-Benutzer mit wenigen Rechten, den das Modul telefon über den
+  Austauschordner bereitstellt, Rufgruppen über den Steuerungsdienst (schon da). `tel:`-Links am Arbeitsplatz über den zentralen
+  Starter der Basis statt eines eigenen Python-Clients.
+- **KI-Übergabe:** erst, wenn es den KI-Dienst gibt (Schnittstelle beschrieben in `kienzlefon/docs/SPEZIFIKATION-…-v1.1.md`).
 
 ## Was bei der Übernahme anders ist
 

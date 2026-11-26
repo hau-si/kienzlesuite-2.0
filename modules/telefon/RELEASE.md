@@ -1,5 +1,11 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.13
+
+- **Seite „Rufgruppen“** (`/telefon/rufgruppen`, Entwurf C, Knopf in der Übersicht): je Gruppe eine Karte („Normal“ = Taste 1, „ROT“ = Taste 9) mit den Telefonen als Knöpfe; farbig = klingelt, ein Klick meldet sofort an oder ab (bis zum nächsten Neustart der Anlage). Admins stellen darunter die Standards nach einem Neustart und die Rufstufen ein. Die letzte Nummer einer Gruppe lässt sich nicht abmelden.
+- Einschalten unter Einstellungen → Sprachmenü → „Rufgruppen“ (braucht das Sprachmenü). Neues Recht `rufgruppen` („Telefone in den Rufgruppen an- und abmelden“), z. B. für MFA.
+- Geprüft mit Tests (Seite, Rechte, Ein-/Ausschalten; Schalten gegen echtes Asterisk im Test von beta.12). **Nicht geprüft:** VM, echte Telefone.
+
 ## 0.1.0-beta.12
 
 - **Unterbau für die Rufgruppen „Normal“ und „ROT“** (wer bei Taste 1 bzw. 9 klingelt; Telefone live an- und abmelden, Standards nach einem Neustart der Anlage). Steuerungsdienst von Kienzlefon als `kienzle-telefon-steuerung` (nur auf 127.0.0.1:8767, startet über `kienzle-telefon-steuerung.path`, sobald die Rufgruppen eingeschaltet sind), eigener AMI-Zugang nur von diesem Rechner (`manager_kienzlefon_control.conf`), Auftragsjournal im Datenordner, Befehle `anlage.py rufgruppen-lesen|-schalten|-speichern`. Kienzlefon bleibt unverändert; `lib/kzf_anpassung.py` biegt Journalordner und Prozesskennung (eigene Asterisk-Instanz statt `asterisk.service`) um.

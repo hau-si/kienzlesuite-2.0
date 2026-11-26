@@ -150,4 +150,12 @@ $v = Vorgaenge::liste($k);
 $html = Ansicht::vorgaenge($v, 'offen', 2, $k->csrf(), null, null, $sms);
 check(str_contains($html, 'SMS verschickt') && str_contains($html, 'value="+4930123456"') === false && str_contains($html, 'name="aktion" value="vorgang-sms"'), 'SMS-Formular und Stand');
 check(!str_contains(Ansicht::vorgaenge($v, 'offen', 2, $k->csrf(), null, null, ['bereit' => false]), 'vorgang-sms'), 'ohne SMS-Zugang kein Formular');
+// Rufgruppen-Seite (Entwurf C) mit erfundenem Stand.
+$rg = ['bereit' => true, 'bestaetigt' => true, 'stand' => str_repeat('a', 64), 'revision' => 'r1:e:3', 'telefone' => [
+    ['nummer' => '201', 'name' => 'Empfang', 'normal' => ['zugelassen' => true, 'standard' => true, 'stufe' => 0, 'jetzt' => true], 'specialist' => ['zugelassen' => true, 'standard' => true, 'stufe' => 0, 'jetzt' => false]],
+    ['nummer' => '299', 'name' => 'Rotes <Telefon>', 'normal' => ['zugelassen' => false, 'standard' => false, 'stufe' => 0, 'jetzt' => false], 'specialist' => ['zugelassen' => true, 'standard' => true, 'stufe' => 0, 'jetzt' => true]]]];
+$html = Ansicht::rufgruppen($rg, 'x', true, null, null);
+check(substr_count($html, 'tf-chip an') === 2 && str_contains($html, 'tf-chip aus') && str_contains($html, 'Rotes &lt;Telefon&gt;') && str_contains($html, '1 klingelt')
+    && str_contains($html, 'name="tel[201][normal]" value="1" checked') && str_contains($html, 'name="an" value="1"') && !str_contains($html, 'Steuerung startet'), 'Rufgruppen-Ansicht');
+check(!str_contains(Ansicht::rufgruppen($rg, 'x', false, null, null), 'rufgruppen-speichern'), 'Standards nur für Admins sichtbar');
 echo "telefon.php: alles in Ordnung\n";

@@ -13,15 +13,18 @@ final class Ansicht {
     public static bool $sprachmenue = false;
     /** Anzahl offener Vorgänge für den Knopf im Seitenkopf (null = Knopf nicht zeigen). */
     public static ?int $vorgaenge = null;
+    /** Knopf „Rufgruppen“ im Seitenkopf zeigen (Recht vorhanden und Rufgruppen eingeschaltet). */
+    public static bool $rufgruppen = false;
 
     private static function tag(string $art, string $text): string { return '<span class="tag ' . $art . '">' . tf_h($text) . '</span>'; }
 
     private static function kopfzeile(string $route, bool $einstellungen): string {
         $b = tf_h(tf_basis());
-        $titel = ['/einstellungen' => 'Einstellungen', '/sprachmenue' => 'Sprachmenü', '/vorgaenge' => 'Vorgänge'][$route] ?? 'Telefonanlage';
+        $titel = ['/einstellungen' => 'Einstellungen', '/sprachmenue' => 'Sprachmenü', '/vorgaenge' => 'Vorgänge', '/rufgruppen' => 'Rufgruppen'][$route] ?? 'Telefonanlage';
         $link = $route !== '/' ? '<a class="button secondary" href="' . $b . '/">← Übersicht</a>'
             : (self::$vorgaenge !== null ? '<a class="button' . (self::$vorgaenge ? '' : ' secondary') . '" href="' . $b . '/vorgaenge">Vorgänge'
                 . (self::$vorgaenge ? ' (' . self::$vorgaenge . ')' : '') . '</a>' : '')
+              . (self::$rufgruppen ? '<a class="button secondary" href="' . $b . '/rufgruppen">Rufgruppen</a>' : '')
               . (self::$sprachmenue ? '<a class="button secondary" href="' . $b . '/sprachmenue">Sprachmenü</a>' : '')
               . ($einstellungen ? '<a class="button secondary" href="' . $b . '/einstellungen">Einstellungen</a>' : '');
         return '<header class="seitenkopf"><div><p class="eyebrow">Telefon</p><h1>' . $titel . '</h1></div><span class="start-tools">' . $link . '</span></header>';
@@ -376,6 +379,54 @@ final class Ansicht {
         return $o . '</div>';
     }
 
+    /** Seite „Rufgruppen“ (Entwurf C): je Gruppe eine Karte mit den Telefonen als Knöpfe; Standards zugeklappt (nur Admins). */
+    public static function rufgruppen(array $d, string $csrf, bool $admin, ?string $meldung, ?string $fehler): string {
+        $h = 'tf_h';
+        $b = $h(tf_basis());
+        $o = '<div class="tf">' . self::kopfzeile('/rufgruppen', true) . self::meldungen($meldung, $fehler);
+        if (!($d['bereit'] ?? false)) {
+            return $o . '<section class="card"><p>Die Rufgruppen sind noch nicht eingeschaltet.</p><p class="muted">Ein Admin schaltet sie unter Einstellungen → Sprachmenü ein (das Sprachmenü muss an sein).</p></section></div>';
+        }
+        $o .= '<p class="muted">Ein Klick auf ein Telefon meldet es sofort an oder ab. Das gilt bis zum nächsten Neustart der Telefonanlage; danach klingeln wieder die Standard-Telefone.</p>';
+        if (!($d['bestaetigt'] ?? false)) $o .= '<p>' . self::tag('warn', 'Steuerung startet …') . ' <span class="muted">Die Anlage hat die Rufgruppen noch nicht bestätigt. Bitte in einer Minute neu laden.</span></p>';
+        $o .= '<div class="tf-gruppen">';
+        foreach (['normal' => ['Normal', 'Taste 1: Patienten und alle anderen Anrufer'], 'specialist' => ['ROT', 'Taste 9: Krankenhäuser, Notärzte, Rettungsdienst, Kollegen']] as $g => [$titel, $hilfe]) {
+            $an = count(array_filter($d['telefone'], fn($t) => $t[$g]['jetzt']));
+            $o .= '<section class="card tf-gruppe' . ($g === 'specialist' ? ' tf-rot' : '') . '"><h2>' . $h($titel) . ' ' . self::tag($an ? 'ok' : 'err', $an === 1 ? '1 klingelt' : "$an klingeln")
+                . '</h2><p class="muted">' . $h($hilfe) . '</p><div class="tf-chips">';
+            foreach ($d['telefone'] as $t) {
+                $x = $t[$g];
+                $name = $t['nummer'] . ' ' . $t['name'];
+                if (!$x['zugelassen']) {
+                    $o .= '<span class="tf-chip aus" title="Nicht zugelassen – ein Admin kann das Telefon unten bei den Standards aufnehmen.">' . $h($name) . '</span>';
+                    continue;
+                }
+                $o .= '<form method="post" action="' . $b . '/rufgruppen"><input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"><input type="hidden" name="aktion" value="rufgruppe-schalten">'
+                    . '<input type="hidden" name="gruppe" value="' . $g . '"><input type="hidden" name="nummer" value="' . $h($t['nummer']) . '"><input type="hidden" name="an" value="' . ($x['jetzt'] ? '0' : '1') . '">'
+                    . '<input type="hidden" name="revision" value="' . $h((string)$d['revision']) . '"><button type="submit" class="tf-chip' . ($x['jetzt'] ? ' an' : '') . '" aria-pressed="' . ($x['jetzt'] ? 'true' : 'false')
+                    . '" title="' . ($x['jetzt'] ? 'Klingelt – klicken zum Abmelden' : 'Klingelt nicht – klicken zum Anmelden') . '">' . $h($name) . '</button></form>';
+            }
+            $o .= '</div></section>';
+        }
+        $o .= '</div>';
+        if ($admin) {
+            $zeilen = '';
+            foreach ($d['telefone'] as $t) {
+                $n = $h($t['nummer']);
+                $zeilen .= '<tr><td><strong>' . $n . '</strong> ' . $h($t['name']) . '</td>'
+                    . '<td><input type="checkbox" name="tel[' . $n . '][normal]" value="1"' . ($t['normal']['standard'] ? ' checked' : '') . ' aria-label="Normal Standard ' . $n . '"></td>'
+                    . '<td><input type="number" name="tel[' . $n . '][stufe]" min="0" max="1000" value="' . (int)$t['normal']['stufe'] . '" class="tf-taste" aria-label="Rufstufe ' . $n . '"></td>'
+                    . '<td><input type="checkbox" name="tel[' . $n . '][specialist]" value="1"' . ($t['specialist']['standard'] ? ' checked' : '') . ' aria-label="ROT Standard ' . $n . '"></td></tr>';
+            }
+            $o .= self::fold('standards', 'Standards nach Neustart und Rufstufen', self::tag('ok', 'gespeichert'),
+                '<p class="muted">Angehakte Telefone klingeln nach jedem Neustart der Anlage. Rufstufe: 0 klingelt zuerst, höhere Stufen kommen dazu, wenn niemand abnimmt (alle 20 Sekunden die nächste). '
+                . 'Jede Gruppe braucht mindestens ein Telefon.</p><form method="post" action="' . $b . '/rufgruppen" class="tf-form tf-breit"><input type="hidden" name="kienzle-csrf" value="' . $h($csrf)
+                . '"><input type="hidden" name="aktion" value="rufgruppen-speichern"><input type="hidden" name="stand" value="' . $h((string)$d['stand']) . '">'
+                . '<table class="tf-tabelle"><tr><th>Telefon</th><th>Normal</th><th>Rufstufe</th><th>ROT</th></tr>' . $zeilen . '</table><button class="primary" type="submit">Standards speichern</button></form>');
+        }
+        return $o . '</div>';
+    }
+
     public static function einstellungen(array $cfg, array $status, string $csrf, bool $admin, ?string $leitung, ?array $zugang, string $server, ?string $meldung, ?string $fehler): string {
         $h = 'tf_h';
         $o = '<div class="tf">' . self::kopfzeile('/einstellungen', true) . self::meldungen($meldung, $fehler);
@@ -447,6 +498,7 @@ final class Ansicht {
             // Sprachmenü (Kienzlefon 2.7)
             $kz = $cfg['kienzlefon'];
             $form = self::haken('aktiv', 'Sprachmenü einschalten (Anrufer hören Begrüßung und Menü, statt direkt in der Warteschlange zu landen)', (bool)$kz['aktiv'])
+                . self::haken('rufgruppen', 'Rufgruppen: Telefone in „Normal“ (Taste 1) und „ROT“ (Taste 9) über die Seite „Rufgruppen“ an- und abmelden', (bool)($kz['rufgruppen'] ?? false))
                 . self::auswahl('tts', 'Sprachausgabe der Ansagen', Anlage::SPRACHAUSGABE, (string)$kz['tts'])
                 . '<details class="how"' . ($kz['tts'] === 'google' ? ' open' : '') . '><summary>Google (wahlweise)</summary><p class="muted">Nur die festen Ansagetexte der Praxis gehen an Google, keine Anrufer- oder Patientendaten. '
                 . 'Schlüssel: Google Cloud Console → APIs & Dienste → Anmeldedaten (Text-to-Speech API freigeben).</p>'

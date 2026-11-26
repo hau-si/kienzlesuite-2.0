@@ -22,7 +22,7 @@ final class Anlage {
             'telefon' => ['leitung_ein' => '', 'nummer_ein' => '', 'leitung_aus' => '', 'kennung_aus' => '', 'aus_zaehlt' => true, 'ausland' => false, 'sonderrufnummern' => false],
             'ueberlauf' => ['leitung' => '', 'nummer' => ''], 'kanaele' => ['gesamt' => 4, 'telefon' => 3, 'fax' => 3, 'ueberlauf' => 2],
             'warteschlange' => ['max_wartend' => 5], 'nebenstellen' => [], 'netz' => ['lokal' => '', 'erlaubt' => '', 'extern' => ''],
-            'kienzlefon' => ['aktiv' => false, 'tts' => 'piper', 'google' => ['schluessel' => '', 'stimme' => '', 'tempo' => ''], 'wartemusik' => 'klingelzeichen', 'whisper_genau' => false]];
+            'kienzlefon' => ['aktiv' => false, 'tts' => 'piper', 'google' => ['schluessel' => '', 'stimme' => '', 'tempo' => ''], 'wartemusik' => 'klingelzeichen', 'whisper_genau' => false, 'rufgruppen' => false]];
     }
 
     public static function laden(): array {
@@ -136,8 +136,39 @@ final class Anlage {
         $google = ['schluessel' => $schluessel !== '' ? $k->verschluesseln($schluessel, 'google') : (string)($alt['schluessel'] ?? ''),
             'stimme' => trim((string)($p['google_stimme'] ?? '')) ?: (string)($alt['stimme'] ?? ''), 'tempo' => trim((string)($p['google_tempo'] ?? '')) ?: ($alt['tempo'] ?? '')];
         if (!empty($p['google_entfernen'])) $google['schluessel'] = '';
-        $cfg['kienzlefon'] = ['aktiv' => !empty($p['aktiv']), 'tts' => $tts, 'google' => $google] + $cfg['kienzlefon'];
+        $cfg['kienzlefon'] = ['aktiv' => !empty($p['aktiv']), 'tts' => $tts, 'google' => $google, 'rufgruppen' => !empty($p['aktiv']) && !empty($p['rufgruppen'])] + $cfg['kienzlefon'];
         return $cfg;
+    }
+
+    // ---- Seite „Rufgruppen“: wer bei Taste 1 (Normal) bzw. 9 (ROT) klingelt; Steuerungsdienst von Kienzlefon -------
+    public static function rufgruppenLesen(): array {
+        $r = self::python('rufgruppen-lesen', null);
+        if (($r['ok'] ?? false) !== true) throw new \RuntimeException((string)($r['fehler'] ?? 'Die Rufgruppen ließen sich nicht lesen.'));
+        return $r;
+    }
+
+    /** Ein Telefon jetzt an- oder abmelden (bis zum nächsten Neustart der Anlage). */
+    public static function rufgruppeSchalten(array $p): string {
+        $gruppe = (string)($p['gruppe'] ?? '');
+        $nummer = (string)($p['nummer'] ?? '');
+        if (!in_array($gruppe, ['normal', 'specialist'], true) || !preg_match('/^[0-9]{2,8}$/D', $nummer)) throw new \InvalidArgumentException('Ungültige Angaben.');
+        $an = ($p['an'] ?? '') === '1';
+        $r = self::python('rufgruppen-schalten', ['gruppe' => $gruppe, 'nummer' => $nummer, 'an' => $an, 'revision' => mb_substr((string)($p['revision'] ?? ''), 0, 120)]);
+        if (($r['ok'] ?? false) !== true) throw new \InvalidArgumentException((string)($r['fehler'] ?? 'Die Anlage hat nicht geantwortet.'));
+        return 'Telefon ' . $nummer . ($an ? ' klingelt jetzt' : ' klingelt jetzt nicht mehr') . ' in „' . ($gruppe === 'normal' ? 'Normal' : 'ROT') . '“ (bis zum nächsten Neustart der Anlage).';
+    }
+
+    /** Standards (wer nach einem Neustart klingelt) und Rufstufen für Normal speichern. */
+    public static function rufgruppenSpeichern(array $p): string {
+        $telefone = [];
+        foreach ((array)($p['tel'] ?? []) as $nr => $g) {
+            if (!is_string($nr) && !is_int($nr) || !preg_match('/^[0-9]{2,8}$/D', (string)$nr) || !is_array($g)) continue;
+            $telefone[(string)$nr] = ['normal' => ['standard' => !empty($g['normal']), 'stufe' => max(0, min(1000, (int)($g['stufe'] ?? 0)))],
+                'specialist' => ['standard' => !empty($g['specialist'])]];
+        }
+        $r = self::python('rufgruppen-speichern', ['stand' => mb_substr((string)($p['stand'] ?? ''), 0, 64), 'telefone' => $telefone]);
+        if (($r['ok'] ?? false) !== true) throw new \InvalidArgumentException((string)($r['fehler'] ?? 'Die Angaben sind ungültig.'));
+        return 'Standards gespeichert. Sie gelten sofort für die Telefone, deren Standard sich geändert hat, und nach jedem Neustart der Anlage.';
     }
 
     // ---- Seite „Sprachmenü“: Zeiten, Ansagetexte, Menütasten (in kienzlefon.toml, Prüfung durch Kienzlefon) -------

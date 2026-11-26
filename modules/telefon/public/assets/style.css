@@ -57,3 +57,14 @@ main.modul { max-width: 980px; margin: 0; padding: 32px 40px 48px; }
 .tf-dl dt { font-weight: 600; }
 .tf-dl dd { margin: 0; }
 .tf-dl .tf-dl { margin-top: 0; }
+.tf-gruppen { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.tf-gruppe h2 { display: flex; gap: 8px; align-items: center; margin: 0 0 2px; }
+.tf-rot h2 { color: #b8322a; }
+.tf-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tf-chips form { margin: 0; }
+.tf-chip { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; background: #fff; color: inherit; font: inherit; cursor: pointer; }
+.tf-chip.an { background: #e3f1ee; border-color: #0f6b5f; font-weight: 700; color: #0f4f47; }
+.tf-rot .tf-chip.an { background: #fbeeea; border-color: #b8322a; color: #8a2219; }
+.tf-chip.aus { opacity: .5; cursor: not-allowed; border-style: dashed; }
+.tf-chip:focus-visible { outline: 2px solid #0f6b5f; outline-offset: 2px; }
+.tf-form .tf-tabelle input.tf-taste { width: 5em; }
