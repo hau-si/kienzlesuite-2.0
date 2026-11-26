@@ -22,7 +22,7 @@ final class Anlage {
             'telefon' => ['leitung_ein' => '', 'nummer_ein' => '', 'leitung_aus' => '', 'kennung_aus' => '', 'aus_zaehlt' => true, 'ausland' => false, 'sonderrufnummern' => false],
             'ueberlauf' => ['leitung' => '', 'nummer' => ''], 'kanaele' => ['gesamt' => 4, 'telefon' => 3, 'fax' => 3, 'ueberlauf' => 2],
             'warteschlange' => ['max_wartend' => 5], 'nebenstellen' => [], 'netz' => ['lokal' => '', 'erlaubt' => '', 'extern' => ''],
-            'kienzlefon' => ['aktiv' => false, 'tts' => 'piper', 'google' => ['schluessel' => '', 'stimme' => '', 'tempo' => '']]];
+            'kienzlefon' => ['aktiv' => false, 'tts' => 'piper', 'google' => ['schluessel' => '', 'stimme' => '', 'tempo' => ''], 'wartemusik' => 'klingelzeichen']];
     }
 
     public static function laden(): array {
@@ -133,7 +133,7 @@ final class Anlage {
         $google = ['schluessel' => $schluessel !== '' ? $k->verschluesseln($schluessel, 'google') : (string)($alt['schluessel'] ?? ''),
             'stimme' => trim((string)($p['google_stimme'] ?? '')) ?: (string)($alt['stimme'] ?? ''), 'tempo' => trim((string)($p['google_tempo'] ?? '')) ?: ($alt['tempo'] ?? '')];
         if (!empty($p['google_entfernen'])) $google['schluessel'] = '';
-        $cfg['kienzlefon'] = ['aktiv' => !empty($p['aktiv']), 'tts' => $tts, 'google' => $google];
+        $cfg['kienzlefon'] = ['aktiv' => !empty($p['aktiv']), 'tts' => $tts, 'google' => $google] + $cfg['kienzlefon'];
         return $cfg;
     }
 
@@ -180,6 +180,58 @@ final class Anlage {
         if (!preg_match('/^[a-z][a-z0-9_]{0,63}$/D', $name)) return null;
         $f = self::$data . '/kienzlefon/ansagen-master/' . $name . '.wav';
         return is_file($f) && !is_link($f) ? $f : null;
+    }
+
+    // ---- Wartemusik: Johannes Plachetka (im Modul, MIT) oder eigene Datei; umgewandelt von lib/anlage.py ------------
+    /** Höchstgröße einer hochgeladenen Datei (PHP der Module: post_max_size 8M). */
+    public const WARTEMUSIK_MAX = 7 * 1024 * 1024;
+
+    /** Eingerichtete Musik: ['bereit' => bool, 'quelle' => plachetka|eigene|'', 'dauer' => Sekunden]. */
+    public static function wartemusik(): array {
+        $dir = self::$data . '/kienzlefon/wartemusik';
+        $info = json_decode((string)@file_get_contents("$dir/quelle.json"), true);
+        $bereit = is_file("$dir/wartemusik.wav16") && is_file("$dir/wartemusik.g722");
+        return ['bereit' => $bereit, 'quelle' => $bereit ? (string)($info['quelle'] ?? '') : '', 'dauer' => (int)($info['dauer'] ?? 0)];
+    }
+
+    /** Wahl auf der Seite: klingelzeichen, plachetka, eigene (bereits hochgeladen) oder entfernen. Liefert die Meldung. */
+    public static function wartemusikWaehlen(array $cfg, string $wahl, \KienzleModul $k): string {
+        $stand = self::wartemusik();
+        if ($wahl === 'plachetka' && ($stand['quelle'] !== 'plachetka')) {
+            $r = self::python('wartemusik', ['quelle' => 'plachetka']);
+            if (($r['ok'] ?? false) !== true) throw new \InvalidArgumentException((string)($r['fehler'] ?? 'Die Musik ließ sich nicht einrichten.'));
+        } elseif ($wahl === 'eigene' && $stand['quelle'] !== 'eigene') {
+            throw new \InvalidArgumentException('Bitte zuerst eine eigene Musikdatei hochladen.');
+        } elseif ($wahl === 'entfernen') {
+            self::python('wartemusik-entfernen', null);
+        } elseif (!in_array($wahl, ['klingelzeichen', 'plachetka', 'eigene'], true)) {
+            throw new \InvalidArgumentException('Bitte Klingelzeichen oder Musik wählen.');
+        }
+        $cfg['kienzlefon']['wartemusik'] = in_array($wahl, ['plachetka', 'eigene'], true) ? 'musik' : 'klingelzeichen';
+        $r = self::speichern($cfg, $k);
+        return match ($wahl) { 'klingelzeichen' => 'Anrufer in der Warteschlange hören wieder das Klingelzeichen.', 'entfernen' => 'Wartemusik gelöscht; es klingelt wieder.',
+            default => 'Wartemusik eingeschaltet.' } . (!($r['laeuft'] ?? false) ? ' Hinweis: Die Telefonanlage läuft gerade nicht.' : '');
+    }
+
+    /** Eigene Musikdatei (roh aus dem Anfragekörper): grob am Dateikopf prüfen, umwandeln lassen und einschalten. */
+    public static function wartemusikHochladen(array $cfg, string $bytes, \KienzleModul $k): string {
+        if ($bytes === '') throw new \InvalidArgumentException('Bitte zuerst eine Musikdatei auswählen.');
+        if (strlen($bytes) > self::WARTEMUSIK_MAX) throw new \InvalidArgumentException('Die Datei darf höchstens 7 MB groß sein (als MP3 etwa 3 bis 6 Minuten).');
+        $kopf = substr($bytes, 0, 12);
+        $musik = str_starts_with($kopf, 'ID3') || (strlen($kopf) > 1 && ord($kopf[0]) === 0xFF && (ord($kopf[1]) & 0xE0) === 0xE0)
+            || (str_starts_with($kopf, 'RIFF') && substr($kopf, 8, 4) === 'WAVE') || str_starts_with($kopf, 'OggS') || str_starts_with($kopf, 'fLaC') || substr($kopf, 4, 4) === 'ftyp';
+        if (!$musik) throw new \InvalidArgumentException('Bitte eine Musikdatei wählen (MP3, WAV, OGG, FLAC oder M4A).');
+        $dir = self::$data . '/kienzlefon';
+        if (!is_dir($dir)) mkdir($dir, 0700, true);
+        $tmp = "$dir/.wartemusik-upload." . bin2hex(random_bytes(4));
+        if (file_put_contents($tmp, $bytes) !== strlen($bytes)) { @unlink($tmp); throw new \RuntimeException('Die Datei ließ sich nicht speichern.'); }
+        chmod($tmp, 0600);
+        rename($tmp, "$dir/wartemusik-upload");
+        $r = self::python('wartemusik', ['quelle' => 'eigene']);
+        if (($r['ok'] ?? false) !== true) throw new \InvalidArgumentException((string)($r['fehler'] ?? 'Die Musik ließ sich nicht umwandeln.'));
+        $cfg['kienzlefon']['wartemusik'] = 'musik';
+        self::speichern($cfg, $k);
+        return 'Eigene Wartemusik eingerichtet und eingeschaltet.';
     }
 
     // ---- Ansagen und Piper (optional nachgeladen, lib/ansagen-auftrag über kienzle-telefon-ansagen.path) ------------

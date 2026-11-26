@@ -88,4 +88,10 @@ check(str_contains($html, 'Leitung bearbeiten') && str_contains($html, 'Testpass
 check(!str_contains($html, 'SIP;geheim') && !str_contains($html, $cfg['leitungen'][0]['passwort']), 'Leitungspasswort nie in der Seite');
 $html = Ansicht::einstellungen($cfg, ['laeuft' => false], $k->csrf(), false, null, null, 'x', null, null);
 check(!str_contains($html, 'id="leitungen"') && str_contains($html, 'id="telefone"') && !str_contains($html, 'zugang-zeigen'), 'Mitarbeiter sieht nur Telefone');
+// Eigene Wartemusik: leere, zu große und fremde Dateien werden vor dem Umwandeln abgelehnt.
+wirft(fn() => Anlage::wartemusikHochladen(Anlage::laden(), '', $k), 'Wartemusik leer', 'auswählen');
+wirft(fn() => Anlage::wartemusikHochladen(Anlage::laden(), str_repeat('a', Anlage::WARTEMUSIK_MAX + 1), $k), 'Wartemusik zu groß', '7 MB');
+wirft(fn() => Anlage::wartemusikHochladen(Anlage::laden(), "%PDF-1.7\n" . str_repeat('x', 100), $k), 'Wartemusik kein Audio', 'Musikdatei');
+check(!file_exists("$dir/daten/kienzlefon/wartemusik-upload"), 'Abgelehnte Datei nicht abgelegt');
+check(Anlage::wartemusik() === ['bereit' => false, 'quelle' => '', 'dauer' => 0], 'Keine Wartemusik');
 echo "telefon.php: alles in Ordnung\n";

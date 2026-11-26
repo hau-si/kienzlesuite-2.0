@@ -278,7 +278,10 @@ def check(cfg: dict) -> dict:
         raise Fehler('Google-Sprechtempo: Zahl zwischen 0,25 und 2.')
     if tts == 'google' and not google['schluessel']:
         raise Fehler('Sprachausgabe Google: Bitte den Google-Schlüssel eintragen (Text-to-Speech API).')
-    out['kienzlefon'] = {'aktiv': kz.get('aktiv') is True, 'tts': tts, 'google': google}
+    wartemusik = str(kz.get('wartemusik') or 'klingelzeichen')
+    if wartemusik not in ('klingelzeichen', 'musik'):
+        raise Fehler('Wartemusik: Klingelzeichen oder Musik wählen.')
+    out['kienzlefon'] = {'aktiv': kz.get('aktiv') is True, 'tts': tts, 'google': google, 'wartemusik': wartemusik}
     if out['kienzlefon']['aktiv'] and not tel.get('leitung_ein'):
         raise Fehler('Sprachmenü: zuerst die eingehende Telefonleitung unter „Rufnummern“ wählen.')
     if out['kienzlefon']['aktiv']:
@@ -786,6 +789,8 @@ def render(c: dict) -> dict[str, str]:
 # ---- Kienzlefon (Sprachmenü, Zeiten, Ansagen) ------------------------------------------------------------------
 KZF_SOURCE = PROGRAM / 'kienzlefon'          # unverändert übernommenes Kienzlefon 2.7 (kienzlefon/HERKUNFT.md)
 KZF_DATA = DATA / 'kienzlefon'
+MOH = KZF_DATA / 'wartemusik'                 # Wiedergabeformate der Wartemusik (statt /var/lib/asterisk/moh/kienzlefon-wartemusik)
+PLACHETKA = PROGRAM / 'medien' / 'johannes-plachetka-warteschlange.mp3'
 KZF_CONFIG = KZF_DATA / 'kienzlefon.toml'
 KZF_BIN = PROGRAM / 'lib' / 'kzf-bin'         # Startskripte für die Programme, die der Dialplan von Kienzlefon aufruft
 # Dateien, die Kienzlefon schreibt bzw. ändert (install_asterisk_config), zusätzlich zu den Dateien der Anlage.
@@ -832,8 +837,9 @@ def kienzlefon_toml(c: dict) -> str:
         ('asterisk', 'erste_queue_nebenstelle', int(members[0]) if members else 201), ('asterisk', 'queue_nebenstellen_anzahl', max(1, len(members))),
         ('ansagen_ivr', 'audit_log', str(d / 'ansagen-ivr-audit.jsonl')), ('wahlregeln', 'audit_log', str(d / 'telefonie-audit.jsonl')),
         ('control_api', 'credentials_file', str(d / 'control-identities.json')),
-        # Wartemusik kommt mit dem Einbau der Musik von Johannes Plachetka; bis dahin Klingelzeichen.
-        ('wartemusik', 'installiert', False), ('wartemusik', 'modus', 'klingelzeichen'),
+        # Wartemusik: installiert, sobald das Modul die Wiedergabeformate erzeugt hat; Musik nur dann, sonst Klingelzeichen.
+        ('wartemusik', 'installiert', wartemusik_bereit()),
+        ('wartemusik', 'modus', 'musik' if wartemusik_bereit() and c['kienzlefon'].get('wartemusik') == 'musik' else 'klingelzeichen'),
     ]
     if c.get('praxis'):
         werte.append(('praxis', 'name', c['praxis']))
@@ -886,7 +892,8 @@ def kienzlefon_anwenden(files: dict[str, str], c: dict) -> dict[str, str]:
 
 def pfade_ersetzen(files: dict[str, str]) -> dict[str, str]:
     """Feste Pfade von Kienzlefax/Kienzlefon (Einbindungen, Programmaufrufe) durch die Ordner des Moduls ersetzen."""
-    replace = {'/opt/kienzlefon/venv/bin/': f'{KZF_BIN}/', '/etc/kienzlefon/kienzlefon.toml': str(KZF_CONFIG), '/etc/asterisk/': f'{ETC}/'}
+    replace = {'/var/lib/asterisk/moh/kienzlefon-wartemusik': str(MOH),
+               '/opt/kienzlefon/venv/bin/': f'{KZF_BIN}/', '/etc/kienzlefon/kienzlefon.toml': str(KZF_CONFIG), '/etc/asterisk/': f'{ETC}/'}
     out = {}
     for name, text in files.items():
         for old, new in replace.items():
@@ -1031,6 +1038,68 @@ def pflege(now: float | None = None) -> int:
     return removed
 
 
+# ---- Wartemusik (Johannes Plachetka oder eigene Datei) ----------------------------------------------------------------
+WARTEMUSIK_MAX_SEKUNDEN = 1800
+
+
+def wartemusik_bereit() -> bool:
+    return all((MOH / f'wartemusik.{s}').is_file() for s in ('wav16', 'sln16', 'g722', 'alaw', 'ulaw'))
+
+
+def wartemusik_stand() -> dict:
+    try:
+        info = json.loads((MOH / 'quelle.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        info = {}
+    return {'ok': True, 'bereit': wartemusik_bereit(), 'quelle': info.get('quelle', ''), 'dauer': info.get('dauer', 0)}
+
+
+def _dauer(path: Path) -> float:
+    try:
+        r = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', str(path)],
+                           capture_output=True, text=True, timeout=30, check=False)
+        return float(r.stdout.strip())
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return 0.0
+
+
+def wartemusik_einrichten(job: dict) -> dict:
+    """Musik von Johannes Plachetka oder die hochgeladene Datei (kienzlefon/wartemusik-upload) mit hold_music.install_media aus
+    Kienzlefon umwandeln (Lautheit -23 LUFS, alle Asterisk-Formate). Die hochgeladene Datei wird danach gelöscht."""
+    quelle = job.get('quelle') if isinstance(job, dict) else None
+    if quelle not in ('plachetka', 'eigene'):
+        raise Fehler('Unbekannte Wartemusik.')
+    source = PLACHETKA if quelle == 'plachetka' else KZF_DATA / 'wartemusik-upload'
+    try:
+        if not source.is_file() or source.is_symlink():
+            raise Fehler('Die Datei fehlt. Bitte noch einmal hochladen.')
+        dauer = _dauer(source)
+        if not 3 <= dauer <= WARTEMUSIK_MAX_SEKUNDEN:
+            raise Fehler('Die Datei ist keine lesbare Musikdatei oder kürzer als 3 Sekunden bzw. länger als 30 Minuten.')
+        if str(KZF_SOURCE) not in sys.path:
+            sys.path.insert(0, str(KZF_SOURCE))
+        from kienzlefon.hold_music import HoldMusicError, install_media
+        KZF_DATA.mkdir(mode=0o700, parents=True, exist_ok=True)
+        try:
+            install_media(source, MOH)
+        except HoldMusicError as e:
+            raise Fehler(f'Die Musik ließ sich nicht umwandeln: {str(e)[:200]}') from None
+        write(MOH / 'quelle.json', json.dumps({'quelle': quelle, 'dauer': round(dauer)}) + '\n', 0o644)
+    finally:
+        if quelle == 'eigene':
+            source.unlink(missing_ok=True)
+    return wartemusik_stand()
+
+
+def wartemusik_entfernen() -> dict:
+    if MOH.is_dir():
+        for f in MOH.iterdir():
+            if f.is_file() or f.is_symlink():
+                f.unlink()
+        MOH.rmdir()
+    return wartemusik_stand()
+
+
 # ---- Sprachmenü: Zeiten, Ansagetexte, Menütasten (Seite /telefon/sprachmenue) ---------------------------------------
 ZEITEN = {'oeffnungszeiten': 'Öffnungszeiten', 'telefonzeiten': 'Telefonzeiten', 'apothekenzeiten': 'Apotheken und Pflege',
           'fachstellenzeiten': 'Krankenhaus, Notarzt und Kollegen'}
@@ -1146,6 +1215,12 @@ def main(argv: list[str]) -> int:
         if action == 'sprachmenue-schreiben':
             raw = sys.stdin.read(1_000_000)
             print(json.dumps(sprachmenue_schreiben(json.loads(raw) if raw.strip() else {}), ensure_ascii=False))
+            return 0
+        if action in ('wartemusik', 'wartemusik-entfernen', 'wartemusik-stand'):
+            raw = sys.stdin.read(10_000)
+            job = json.loads(raw) if raw.strip() else {}
+            r = wartemusik_einrichten(job) if action == 'wartemusik' else wartemusik_entfernen() if action == 'wartemusik-entfernen' else wartemusik_stand()
+            print(json.dumps(r, ensure_ascii=False))
             return 0
         if action == 'status':
             print(json.dumps(status(), ensure_ascii=False))

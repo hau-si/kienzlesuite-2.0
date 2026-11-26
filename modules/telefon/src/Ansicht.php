@@ -179,7 +179,30 @@ final class Ansicht {
     }
 
     /** Seite „Sprachmenü“: Zeiten, Ansagetexte und Menütasten als Ausklappzeilen. */
-    public static function sprachmenue(array $d, string $csrf, ?string $meldung, ?string $fehler): string {
+    /** Wartemusik: Klingelzeichen, Musik von Johannes Plachetka oder eigene Datei (Upload per fetch, assets/app.js). */
+    private static function wartemusik(string $csrf, string $modus): string {
+        $h = 'tf_h';
+        $w = Anlage::wartemusik();
+        $wahl = $modus === 'musik' && $w['bereit'] ? $w['quelle'] : 'klingelzeichen';
+        $marke = match ($wahl) { 'plachetka' => self::tag('ok', 'Musik von Johannes Plachetka'), 'eigene' => self::tag('ok', 'eigene Musik'), default => self::tag('opt', 'Klingelzeichen') };
+        $punkt = static fn(string $wert, string $text, bool $an = true) => $an ? '<label class="check"><input type="radio" name="wahl" value="' . $wert . '"' . ($wahl === $wert ? ' checked' : '') . '> ' . $text . '</label>' : '';
+        $o = '<p class="muted">Was Anrufer in der Warteschlange hören. Am Telefon anhören: Nebenstelle 8805 (sobald Musik eingerichtet ist).</p>'
+            . '<form method="post" class="tf-form">' . '<input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"><input type="hidden" name="aktion" value="wartemusik">'
+            . $punkt('klingelzeichen', 'Klingelzeichen')
+            . $punkt('plachetka', 'Wartemelodie von Johannes Plachetka (41 Sekunden, frei nutzbar unter MIT-Lizenz)')
+            . $punkt('eigene', 'Eigene Musik (hochgeladen' . ($w['dauer'] ? ', ' . $h(gmdate($w['dauer'] >= 3600 ? 'G:i:s' : 'i:s', $w['dauer'])) . ' min' : '') . ')', $w['quelle'] === 'eigene')
+            . '<button class="primary" type="submit">Speichern</button></form>';
+        if ($w['bereit']) $o .= '<p class="tf-ansage-zeile">Eingerichtet: <audio controls preload="none" src="' . $h(tf_basis()) . '/wartemusik.wav"></audio></p>';
+        $o .= '<h3>Eigene Musik hochladen</h3><p class="muted">MP3, WAV, OGG, FLAC oder M4A, höchstens 7 MB und 30 Minuten. Die Lautstärke wird angeglichen. '
+            . '<strong>Nur Musik verwenden, für die die Praxis die Rechte hat</strong> (z. B. GEMA-freie Musik); urheberrechtlich geschützte Musik in der Warteschleife ist meldepflichtig.</p>'
+            . '<div class="tf-ansage-zeile"><input type="file" id="wm-datei" accept="audio/*,.mp3,.wav,.ogg,.flac,.m4a"><button type="button" class="secondary" id="wm-los" data-ziel="' . $h(tf_basis()) . '/wartemusik" data-csrf="' . $h($csrf)
+            . '" data-max="' . Anlage::WARTEMUSIK_MAX . '">Hochladen und einschalten</button></div><p class="muted" id="wm-status" role="status"></p>';
+        if ($w['bereit']) $o .= '<form method="post" data-confirm="Eingerichtete Wartemusik löschen? Danach hören Anrufer das Klingelzeichen."><input type="hidden" name="kienzle-csrf" value="' . $h($csrf)
+            . '"><input type="hidden" name="aktion" value="wartemusik"><input type="hidden" name="wahl" value="entfernen"><button class="small danger" type="submit">Wartemusik löschen</button></form>';
+        return self::fold('wartemusik', 'Wartemusik', $marke, $o);
+    }
+
+    public static function sprachmenue(array $d, string $csrf, ?string $meldung, ?string $fehler, string $wartemusik = 'klingelzeichen'): string {
         $h = 'tf_h';
         $o = '<div class="tf">' . self::kopfzeile('/sprachmenue', true) . self::meldungen($meldung, $fehler);
         if (!($d['bereit'] ?? false)) {
@@ -206,6 +229,7 @@ final class Ansicht {
         }
         $gruppen = [];
         foreach ($d['ansagen'] as $a) $gruppen[$a['gruppe']][] = $a;
+        $nachWarteschlange = self::wartemusik($csrf, $wartemusik);
         $nachName = array_column($d['ansagen'], null, 'name');
         $vergeben = [];
         foreach (self::TEXTE as $id => [$titel, $teile]) {
@@ -241,8 +265,9 @@ final class Ansicht {
             }
             $marke = self::tag('ok', count($liste) . ' ' . (count($liste) === 1 ? 'Text' : 'Texte'));
             $o .= self::fold('t-' . $id, $titel, $marke, '<form method="post" class="tf-form tf-breit">' . self::verborgen($csrf, $stand) . $f . '<button class="primary" type="submit">Speichern</button></form>');
+            if ($id === 'warteschlange') { $o .= $nachWarteschlange; $nachWarteschlange = ''; }
         }
-        return $o . '</div>';
+        return $o . $nachWarteschlange . '</div>';
     }
 
     public static function einstellungen(array $cfg, array $status, string $csrf, bool $admin, ?string $leitung, ?array $zugang, string $server, ?string $meldung, ?string $fehler): string {
@@ -325,8 +350,8 @@ final class Ansicht {
                 . self::feld('google_tempo', 'Sprechtempo', (string)($kz['google']['tempo'] ?? ''), 'Leer = 0,93 (0,25 bis 2).') . '</details>';
             $o .= self::fold('sprachmenue', 'Sprachmenü', $kz['aktiv'] ? self::tag('ok', 'an') : self::tag('opt', 'aus'),
                 '<p class="muted">Sprachmenü aus Kienzlefon: Öffnungs- und Telefonzeiten, Begrüßung, Menü (Praxis, Rezept, Überweisung, Termin), Apotheken- und Fachstellenweg. '
-                . 'Erst einschalten, wenn die Ansagen erzeugt sind. Noch in Arbeit: Wartemusik, Aufnahme von Anliegen (Whisper).</p>'
-                . ($kz['aktiv'] ? '<p><a class="button secondary" href="' . $h(tf_basis()) . '/sprachmenue">Zeiten, Ansagetexte und Menütasten bearbeiten →</a></p>' : '')
+                . 'Erst einschalten, wenn die Ansagen erzeugt sind. Noch in Arbeit: Aufnahme von Anliegen (Whisper).</p>'
+                . ($kz['aktiv'] ? '<p><a class="button secondary" href="' . $h(tf_basis()) . '/sprachmenue">Zeiten, Ansagetexte, Menütasten und Wartemusik bearbeiten →</a></p>' : '')
                 . self::formular($csrf, 'sprachmenue-speichern', $form, 'Speichern') . self::ansagen($csrf, (string)$kz['tts']));
         }
 

@@ -7,7 +7,7 @@ Urheber Thomas Kienzle, MIT-Lizenz (`LICENSE`, `THIRD_PARTY_NOTICES.md`). Thomas
 die alte Weboberfläche `webinterface/` (nur als Vorlage für die Seiten des Moduls).
 
 **Nicht übernommen:** die Bash-Installer (Einrichtung übernimmt das Modul), die Demo-Webseite und die SMS-Teile der
-Praxis-App (SMS kommt aus der Basis), die Wartemusik (MIT, Johannes Plachetka; kommt mit dem Einbau der Wartemusik).
+Praxis-App (SMS kommt aus der Basis), die Wartemusik als WAV (die MP3 von Johannes Plachetka liegt unter `../medien/`, MIT).
 Die Tests, die diese Installer aufrufen, lässt `tests/run-all.sh` aus.
 
 **Einbau ohne Änderung am Code:** Kienzlefon setzt wie bisher auf die Kienzlefax-Dateien der Anlage auf

@@ -3,6 +3,7 @@ Nur erfundene Daten (Rufnummern aus dem Bereich 030 123…, Netze 192.0.2.0/24, 
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -282,8 +283,12 @@ class KienzlefonBruecke(unittest.TestCase):
             self.a.check(b)
         with self.assertRaises(self.a.Fehler):
             self.a.check(self.cfg(tts='espeak'))
-        self.assertEqual(self.a.check(beispiel())['kienzlefon'], {'aktiv': False, 'tts': 'piper',
+        self.assertEqual(self.a.check(beispiel())['kienzlefon'], {'aktiv': False, 'tts': 'piper', 'wartemusik': 'klingelzeichen',
                          'google': {'schluessel': '', 'stimme': 'de-DE-Chirp3-HD-Enceladus', 'tempo': 0.93}})
+        b = self.cfg()
+        b['kienzlefon']['wartemusik'] = 'radio'
+        with self.assertRaises(self.a.Fehler):
+            self.a.check(b)
         with self.assertRaises(self.a.Fehler) as e:
             self.a.check(self.cfg(tts='google'))
         self.assertIn('Google-Schlüssel', str(e.exception))
@@ -354,6 +359,45 @@ class KienzlefonBruecke(unittest.TestCase):
         self.a.anwenden(self.cfg(aktiv=False))
         self.assertIn('same => n(accepted),Goto(kfx-phone-queue,s,1)', (etc / 'extensions-kfx-telefonie.conf').read_text())
 
+
+    @unittest.skipUnless(shutil.which('ffmpeg') and shutil.which('ffprobe'), 'ffmpeg fehlt')
+    def test_wartemusik(self):
+        self.a.PLACHETKA = HERE.parent / 'medien' / 'johannes-plachetka-warteschlange.mp3'
+        b = self.cfg()
+        b['kienzlefon']['wartemusik'] = 'musik'
+        self.a.anwenden(b)                                   # Musik gewählt, aber noch nicht umgewandelt → Klingelzeichen
+        toml = (self.tmp / 'kienzlefon' / 'kienzlefon.toml').read_text()
+        self.assertIn('installiert = false', toml)
+        self.assertIn('modus = "klingelzeichen"', toml)
+        r = self.a.wartemusik_einrichten({'quelle': 'plachetka'})
+        self.assertEqual((r['bereit'], r['quelle'], r['dauer']), (True, 'plachetka', 41))
+        moh = self.tmp / 'kienzlefon' / 'wartemusik'
+        self.assertEqual(sorted(p.name for p in moh.iterdir()), ['quelle.json', 'wartemusik.alaw', 'wartemusik.g722', 'wartemusik.sln16', 'wartemusik.ulaw', 'wartemusik.wav16'])
+        self.a.anwenden(b)
+        etc = self.tmp / 'asterisk' / 'etc'
+        toml = (self.tmp / 'kienzlefon' / 'kienzlefon.toml').read_text()
+        self.assertIn('installiert = true', toml)
+        self.assertIn('modus = "musik"', toml)
+        self.assertIn(f'directory={moh}\n', (etc / 'musiconhold-kienzlefon.conf').read_text())
+        self.assertIn('musicclass=kienzlefon-wartemusik', (etc / 'queues-kienzlefon.conf').read_text())
+        for f in etc.iterdir():
+            self.assertNotIn('/var/lib/asterisk/moh', f.read_text(), f.name)
+        # Eigene Datei: unlesbare Daten werden abgelehnt und gelöscht; die bisherige Musik bleibt.
+        up = self.tmp / 'kienzlefon' / 'wartemusik-upload'
+        up.write_bytes(b'keine Musik' * 100)
+        with self.assertRaises(self.a.Fehler):
+            self.a.wartemusik_einrichten({'quelle': 'eigene'})
+        self.assertFalse(up.exists())
+        self.assertTrue(self.a.wartemusik_bereit())
+        # Eigene Datei (5 s Ton als WAV) ersetzt die Musik.
+        subprocess.run(['ffmpeg', '-nostdin', '-loglevel', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=5', '-f', 'wav', str(up)], check=True)
+        self.assertEqual(self.a.wartemusik_einrichten({'quelle': 'eigene'})['quelle'], 'eigene')
+        self.assertFalse(up.exists())
+        with self.assertRaises(self.a.Fehler):
+            self.a.wartemusik_einrichten({'quelle': '../x'})
+        self.assertFalse(self.a.wartemusik_entfernen()['bereit'])
+        self.a.anwenden(b)
+        self.assertIn('modus = "klingelzeichen"', (self.tmp / 'kienzlefon' / 'kienzlefon.toml').read_text())
 
     def test_sprachmenue_seite_lesen_und_schreiben(self):
         self.assertEqual(self.a.sprachmenue_lesen(), {'ok': True, 'bereit': False})

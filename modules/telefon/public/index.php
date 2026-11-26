@@ -43,6 +43,31 @@ try {
         readfile($file);
         exit;
     }
+    if ($rel === '/wartemusik.wav') {
+        if (!$darfSprachmenue) $k->verweigern();
+        $file = Anlage::$data . '/kienzlefon/wartemusik/wartemusik.wav16';
+        if (!is_file($file) || is_link($file)) { http_response_code(404); exit; }
+        header('Content-Type: audio/wav');
+        header('Cache-Control: private, no-cache');
+        header('Content-Length: ' . filesize($file));
+        readfile($file);
+        exit;
+    }
+    if ($rel === '/wartemusik' && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+        // Eigene Wartemusik: Datei roh im Anfragekörper (Module haben keine Formular-Uploads), Antwort als JSON.
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        if (!$darfSprachmenue) { http_response_code(403); echo json_encode(['fehler' => 'Dafür fehlt das Recht.']); exit; }
+        if (!$k->csrfGueltig($_SERVER['HTTP_X_KIENZLE_CSRF'] ?? null)) { http_response_code(403); echo json_encode(['fehler' => 'Sitzung abgelaufen. Bitte die Seite neu laden.']); exit; }
+        try {
+            $bytes = (string)file_get_contents('php://input', false, null, 0, Anlage::WARTEMUSIK_MAX + 1);
+            echo json_encode(['ok' => true, 'meldung' => Anlage::wartemusikHochladen(Anlage::laden(), $bytes, $k)], JSON_UNESCAPED_UNICODE);
+        } catch (InvalidArgumentException | RuntimeException $e) {
+            http_response_code(422);
+            echo json_encode(['fehler' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        }
+        exit;
+    }
     if ($rel === '') $rel = '/';
     if (!in_array($rel, ['/', '/einstellungen', '/sprachmenue'], true)) { http_response_code(404); echo 'Nicht gefunden.'; exit; }
     if ($rel === '/einstellungen' && !$darfNebenstellen) $k->verweigern();
@@ -57,11 +82,11 @@ try {
         if (!$k->csrfGueltig($_POST['kienzle-csrf'] ?? null)) { http_response_code(403); echo 'Sitzung abgelaufen. Bitte die Seite neu laden.'; exit; }
         try {
             $aktion = (string)($_POST['aktion'] ?? '');
-            $nur = ['nebenstelle-speichern', 'sprachmenue-texte'];
+            $nur = ['nebenstelle-speichern', 'sprachmenue-texte', 'wartemusik'];
             if (!$admin && !in_array($aktion, $nur, true)) throw new InvalidArgumentException('Das dürfen nur Admins.');
-            if ($aktion === 'sprachmenue-texte' ? !$darfSprachmenue || $rel !== '/sprachmenue' : !$darfNebenstellen) throw new InvalidArgumentException('Dafür fehlt das Recht.');
+            if (in_array($aktion, ['sprachmenue-texte', 'wartemusik'], true) ? !$darfSprachmenue || $rel !== '/sprachmenue' : !$darfNebenstellen) throw new InvalidArgumentException('Dafür fehlt das Recht.');
             $neu = match ($aktion) {
-                'sprachmenue-texte' => null,
+                'sprachmenue-texte', 'wartemusik' => null,
                 'leitung-speichern' => Anlage::leitungSpeichern($cfg, $_POST, $k),
                 'leitung-loeschen' => Anlage::leitungLoeschen($cfg, (string)($_POST['id'] ?? '')),
                 'zwecke-speichern' => Anlage::zweckeSpeichern($cfg, $_POST),
@@ -78,6 +103,9 @@ try {
             };
             if ($aktion === 'sprachmenue-texte') {
                 $meldung = Anlage::sprachmenueSchreiben($_POST, $k);
+            } elseif ($aktion === 'wartemusik') {
+                $meldung = Anlage::wartemusikWaehlen($cfg, (string)($_POST['wahl'] ?? ''), $k);
+                $cfg = Anlage::laden();
             } elseif (in_array($aktion, ['piper-einrichten', 'piper-entfernen', 'kokoro-einrichten', 'kokoro-entfernen', 'ansagen-erzeugen'], true)) {
                 Anlage::auftrag($aktion === 'ansagen-erzeugen' ? 'erzeugen' : $aktion, !empty($_POST['alle']));
                 $meldung = ['piper-einrichten' => 'Piper wird geladen (etwa 200 MB, einige Minuten). Der Stand steht unter „Sprachmenü“.',
@@ -114,7 +142,8 @@ try {
             $daten = ['bereit' => false];
             $fehler ??= $e->getMessage();
         }
-        $inhalt = Ansicht::sprachmenue($daten, $k->csrf(), $meldung, $fehler);
+        if ($meldung === null && isset($_GET['hochgeladen'])) $meldung = 'Eigene Wartemusik eingerichtet und eingeschaltet.';
+        $inhalt = Ansicht::sprachmenue($daten, $k->csrf(), $meldung, $fehler, (string)($cfg['kienzlefon']['wartemusik'] ?? 'klingelzeichen'));
     } elseif ($rel === '/einstellungen') {
         $leitung = $admin && preg_match('/^[a-z0-9]{1,12}$/D', (string)($_GET['leitung'] ?? '')) ? (string)$_GET['leitung'] : null;
         $server = preg_replace('/:\d+$/', '', (string)($_SERVER['HTTP_HOST'] ?? '')) ?: 'Adresse des Servers';
