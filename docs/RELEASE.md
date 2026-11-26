@@ -1,10 +1,16 @@
 # Basis – Release-Notizen
 
-## 0.22.0-beta.7
+## 0.22.0-beta.8
 
 - **Nachrichten-Ausgang für Module:** Module, die die Verbindung `nachrichten` anmelden, können SMS und E-Mail über die Zugänge der Basis verschicken, **ohne die Zugangsdaten zu kennen** (bisher bekam ein Modul für E-Mail das SMTP-Passwort; SMS gab es für Module gar nicht). Das Modul legt einen Auftrag in `/var/spool/kienzle/nachrichten/<modul>/` ab (PHP: `$k->smsSenden()`, `$k->mailSenden()`, Stand mit `$k->nachricht()`), der neue Dienst `kienzle-nachrichten` (eigener Benutzer `ks-nachrichten`, alle 20 Sekunden) verschickt ihn und meldet das Ergebnis zurück. Fehlschläge werden 30 Minuten lang wiederholt; je Modul höchstens 60 SMS und 120 E-Mails pro Stunde; ins Protokoll kommen nie Empfänger oder Inhalte. Die Zugänge liest nur `ks-nachrichten` (`/etc/kienzle/verbindungen/nachrichten.json`, 0640).
 - Verwaltung → Verbindungen → „Wer nutzt was“ zeigt die Verbindungen mit Namen statt Kennung.
 - Geprüft mit Tests (Verteilung, Dienst mit Ersatz-Versand, Wiederholung, Grenze, PHP-Hilfe). **Nicht geprüft:** echter Versand über seven.io und SMTP/Gmail aus dem Dienst, Anlegen des Benutzers und des Zeitgebers durch `install.sh` auf Ubuntu 26.04.
+
+## 0.22.0-beta.7
+
+- **Windows-Druckerskript** (`install-drucker.ps1` im Starter-Paket und Anleitung unter „Arbeitsplätze“): Bei „Drucker … nicht angelegt“ nennt die Meldung jetzt getrennt den Fehler beim Anlegen des Anschlusses und beim Anlegen des Druckers (vorher verdeckte der zweite den ersten) und prüft, ob die Druckeradresse vom Arbeitsplatz aus antwortet. Häufigste Ursache: Der Drucker fehlt auf dem Server (Verwaltung → Drucker → „Virtuelle Drucker der Module abgleichen“) oder Port 631 ist blockiert.
+- **Umlaute in der PowerShell-Ausgabe** („unverändert“ statt „unverÃ¤ndert“): Die Skripte werden mit UTF-8-Kennung (BOM) ausgeliefert.
+- Nicht auf Windows geprüft.
 
 ## 0.22.0-beta.6
 

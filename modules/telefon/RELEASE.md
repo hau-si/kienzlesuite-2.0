@@ -2,7 +2,7 @@
 
 ## 0.1.0-beta.11
 
-- **SMS an Anrufer** (Seite „Vorgänge“, aufklappbar an jeder Karte „SMS an den Anrufer“): Handynummer aus der Anrufernummer vorbelegt (sonst aus der Akte eintragen), Textvorschlag je Art ohne Gesundheitsangaben (z. B. „Ihr Rezept liegt zur Abholung bereit. Ihre Praxis …“), vor dem Senden änderbar, wahlweise danach als erledigt markieren. Der Stand („wird verschickt“, „verschickt“, „nicht verschickt“ mit Grund) steht an der Karte. Verschickt wird über den Nachrichten-Ausgang der Basis (Verbindung `nachrichten`, braucht Basis 0.22.0-beta.7 und eine SMS-Verbindung unter Verwaltung → Verbindungen); das Modul kennt den SMS-Zugang nicht und merkt sich je Vorgang nur die Auftragskennung.
+- **SMS an Anrufer** (Seite „Vorgänge“, aufklappbar an jeder Karte „SMS an den Anrufer“): Handynummer aus der Anrufernummer vorbelegt (sonst aus der Akte eintragen), Textvorschlag je Art ohne Gesundheitsangaben (z. B. „Ihr Rezept liegt zur Abholung bereit. Ihre Praxis …“), vor dem Senden änderbar, wahlweise danach als erledigt markieren. Der Stand („wird verschickt“, „verschickt“, „nicht verschickt“ mit Grund) steht an der Karte. Verschickt wird über den Nachrichten-Ausgang der Basis (Verbindung `nachrichten`, braucht Basis 0.22.0-beta.8 und eine SMS-Verbindung unter Verwaltung → Verbindungen); das Modul kennt den SMS-Zugang nicht und merkt sich je Vorgang nur die Auftragskennung.
 - Geprüft mit Tests (Nummer, Vorlage, Auftrag, Rechte, Anzeige). **Nicht geprüft:** echter SMS-Versand, VM.
 
 ## 0.1.0-beta.10

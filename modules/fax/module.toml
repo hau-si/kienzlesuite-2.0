@@ -45,6 +45,7 @@ file = "drucker.json"
 label = "Fax senden: Dokument erscheint im Modul Fax."
 command = "printer/vfax"
 formats = ["application/pdf", "application/postscript"]
+paper = "A4"
 share = ["ipp", "samba"]
 max = 10
 

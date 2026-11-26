@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 # Idempotent: nur Fehlendes oder Geändertes wird angefasst, jede Zeile sagt „neu“, „aktualisiert“ oder „unverändert“.
 function Say($state, $what) { Write-Host ('{0,-13} {1}' -f $state, $what) }

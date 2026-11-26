@@ -2292,8 +2292,8 @@ final class Web {
                 . "Add-PrinterDriver -Name \"Microsoft IPP Class Driver\"\n\$url = \"" . $url . "\"\n\$fehler = ''\n"
                 . "# Anschluss und Drucker anlegen, bis zu viermal (direkt nach dem Neustart des Spoolers ist der Anschluss manchmal noch nicht nutzbar)\n"
                 . "for (\$i = 1; \$i -le 4 -and -not (Get-Printer -Name \"" . $name . "\" -ErrorAction SilentlyContinue); \$i++) {\n"
-                . "  if (-not (Get-PrinterPort -Name \$url -ErrorAction SilentlyContinue)) { try { Add-PrinterPort -Name \$url -ErrorAction Stop } catch { \$fehler = \$_.Exception.Message } }\n  Start-Sleep 3\n"
-                . "  try { Add-Printer -Name \"" . $name . "\" -DriverName \"Microsoft IPP Class Driver\" -PortName \$url -ErrorAction Stop } catch { \$fehler = \$_.Exception.Message }\n}\n"
+                . "  if (-not (Get-PrinterPort -Name \$url -ErrorAction SilentlyContinue)) { try { Add-PrinterPort -Name \$url -ErrorAction Stop } catch { \$fehler = 'Anschluss: ' + \$_.Exception.Message } }\n  Start-Sleep 3\n"
+                . "  try { Add-Printer -Name \"" . $name . "\" -DriverName \"Microsoft IPP Class Driver\" -PortName \$url -ErrorAction Stop } catch { \$fehler = (\$fehler + ' | Drucker: ' + \$_.Exception.Message).Trim(' |') }\n}\n"
                 . "if (Get-Printer -Name \"" . $name . "\" -ErrorAction SilentlyContinue) { Get-Printer -Name \"" . $name . "\" | Select-Object Name, DriverName, PortName }\n"
                 . "else { Write-Warning ('Drucker nicht angelegt. Grund: ' + \$fehler) }"
                ;

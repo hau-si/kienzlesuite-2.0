@@ -1,4 +1,4 @@
-param([switch]$NichtWarten)
+﻿param([switch]$NichtWarten)
 # Virtuelle Drucker der Module einrichten (drucker.txt: Name|Adresse|Papier je Zeile). Braucht Administratorrechte.
 $ErrorActionPreference = 'Continue'
 Set-Location $PSScriptRoot
@@ -17,14 +17,19 @@ if ($todo.Count) {
     foreach ($d in $todo) {
         $had = [bool](Get-Printer -Name $d.Name -ErrorAction SilentlyContinue)
         if ($had) { Remove-Printer -Name $d.Name -ErrorAction SilentlyContinue }
-        $fehler = ''
+        $portFehler = ''; $druckerFehler = ''
         for ($i = 1; $i -le 4 -and !(Get-Printer -Name $d.Name -ErrorAction SilentlyContinue); $i++) {
-            if (!(Get-PrinterPort -Name $d.Url -ErrorAction SilentlyContinue)) { try { Add-PrinterPort -Name $d.Url -ErrorAction Stop } catch { $fehler = $_.Exception.Message } }
+            if (!(Get-PrinterPort -Name $d.Url -ErrorAction SilentlyContinue)) { try { Add-PrinterPort -Name $d.Url -ErrorAction Stop } catch { $portFehler = $_.Exception.Message } }
             Start-Sleep 3
-            try { Add-Printer -Name $d.Name -DriverName 'Microsoft IPP Class Driver' -PortName $d.Url -ErrorAction Stop } catch { $fehler = $_.Exception.Message }
+            try { Add-Printer -Name $d.Name -DriverName 'Microsoft IPP Class Driver' -PortName $d.Url -ErrorAction Stop } catch { $druckerFehler = $_.Exception.Message }
         }
+        $fehler = if ($portFehler) { 'Anschluss: ' + $portFehler + ' | Drucker: ' + $druckerFehler } else { $druckerFehler }
         if (Get-Printer -Name $d.Name -ErrorAction SilentlyContinue) { Say ($(if ($had) { 'aktualisiert' } else { 'neu' })) ('Drucker ' + $d.Name) }
-        else { Write-Warning ('Drucker ' + $d.Name + ' nicht angelegt: ' + $fehler + ' (Anleitung auf der Seite „Arbeitsplätze“ der Suite)') }
+        else {
+            $server = ''
+            try { Invoke-WebRequest -Uri $d.Url -UseBasicParsing -TimeoutSec 10 | Out-Null } catch { $server = ' Die Adresse ' + $d.Url + ' antwortet nicht (' + $_.Exception.Message + '): Gibt es den Drucker auf dem Server (Verwaltung → Drucker, ggf. „Virtuelle Drucker der Module abgleichen“) und ist Port 631 in der Firewall frei?' }
+            Write-Warning ('Drucker ' + $d.Name + ' nicht angelegt: ' + $fehler + '.' + $server + ' (Anleitung auf der Seite „Arbeitsplätze“ der Suite)')
+        }
     }
 }
 if (!$NichtWarten) { Read-Host 'Zum Schließen Enter drücken' }
