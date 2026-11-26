@@ -1,5 +1,11 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.18
+
+- **Mehrere Netze:** „Netz der Telefone“ und „Anmelden erlaubt aus“ nehmen jetzt mehrere Netze, getrennt durch Komma (bis zu 8, nur IPv4). Nötig z. B. für Telefone über VPN: Das Telefon meldet sich aus dem VPN-Netz (z. B. 192.168.113.0/24), nennt aber als Kontakt die Adresse seines Heimnetzes (192.168.1.x); beide Netze gehören dann unter „Anmelden erlaubt aus“.
+- **Erklärungen als Tooltips** (Maus über Feld oder Beschriftung) für die Felder im Abschnitt „Netz“, die MAC-Adresse und den Schalter der automatischen Einrichtung.
+- Firewall: Das Netz, aus dem sich die Telefone melden (Port 5060/UDP), muss zusätzlich unter Verwaltung → Firewall zu den Praxisnetzen zählen. Nicht am echten Telefon über VPN geprüft.
+
 ## 0.1.0-beta.17
 
 - **Automatische Einrichtung der Snom-Telefone (D785 u. a.) über die MAC-Adresse:** Admins tragen bei jedem Telefon die MAC-Adresse ein und schalten unter „Einrichtung der Telefone (Snom)“ den Dienst ein. Die Seite zeigt die Adresse `http://<Server>:8780/<Schlüssel>/{mac}.xml`; sie wird einmal im Telefon (Einstellungs-URL) oder im DHCP-Server (Option 66) eingetragen. Das Telefon holt sich Benutzer, Passwort, Server und Anzeigename selbst.

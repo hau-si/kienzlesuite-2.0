@@ -550,6 +550,27 @@ class FaxkennungVorgabe(unittest.TestCase):
             cfg['praxis'] = ''
             self.assertEqual(a.check(cfg)['fax']['name'], 'Fax')
 
+class MehrereNetze(unittest.TestCase):
+    """Netz der Telefone und Anmelden erlaubt: mehrere Netze (z. B. Praxisnetz, VPN und das Netz hinter dem VPN-Telefon)."""
+
+    def test_mehrere_netze(self):
+        with tempfile.TemporaryDirectory() as d:
+            a = load(Path(d))
+            cfg = beispiel()
+            cfg['netz'] = {'lokal': '192.168.111.0/24, 192.168.113.0/24', 'erlaubt': '192.168.111.0/24,192.168.113.0/24;192.168.1.0/24', 'extern': ''}
+            c = a.check(cfg)
+            self.assertEqual(c['netz']['lokal'], '192.168.111.0/24,192.168.113.0/24')
+            self.assertEqual(c['netz']['erlaubt'], '192.168.111.0/24,192.168.113.0/24,192.168.1.0/24')
+            _pjsip, telefone = a.render_pjsip(c)
+            self.assertEqual(telefone.count('local_net='), 2)
+            self.assertIn('permit=192.168.1.0/24\n', telefone)
+            self.assertIn('contact_permit=192.168.113.0/24\n', telefone)
+            cfg['netz']['erlaubt'] = '0.0.0.0/0'
+            self.assertNotIn('permit=', a.render_pjsip(a.check(cfg))[1])
+            for schlecht in ('192.168.111.0/24, quatsch', '::1/128', ','.join(f'10.{i}.0.0/16' for i in range(9))):
+                cfg['netz']['lokal'] = schlecht
+                with self.assertRaises(a.Fehler):
+                    a.check(cfg)
 
 class EinrichtungTelefone(unittest.TestCase):
     """MAC-Adressen der Telefone und Einstellungsdateien für die automatische Einrichtung (Snom)."""

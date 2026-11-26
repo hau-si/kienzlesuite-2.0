@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.9
+
+- **Fehler behoben, Lauschordner auf dem NAS:** Der Ablage-Dienst legte die geholten Dateien mit Rechten 0660 (Gruppe ks-ablage) ab; das Modul ist Besitzer des Ordners, aber nicht in dieser Gruppe, und konnte sie nicht lesen („Permission denied“). Jetzt 0664 (der Ordner mit 2770 schließt andere Benutzer weiterhin aus); schon liegende Dateien werden beim nächsten Lauf (alle 5 Minuten) lesbar gemacht. Test ergänzt.
+
 ## 0.22.0-beta.8
 
 - **Nachrichten-Ausgang für Module:** Module, die die Verbindung `nachrichten` anmelden, können SMS und E-Mail über die Zugänge der Basis verschicken, **ohne die Zugangsdaten zu kennen** (bisher bekam ein Modul für E-Mail das SMTP-Passwort; SMS gab es für Module gar nicht). Das Modul legt einen Auftrag in `/var/spool/kienzle/nachrichten/<modul>/` ab (PHP: `$k->smsSenden()`, `$k->mailSenden()`, Stand mit `$k->nachricht()`), der neue Dienst `kienzle-nachrichten` (eigener Benutzer `ks-nachrichten`, alle 20 Sekunden) verschickt ihn und meldet das Ergebnis zurück. Fehlschläge werden 30 Minuten lang wiederholt; je Modul höchstens 60 SMS und 120 E-Mails pro Stunde; ins Protokoll kommen nie Empfänger oder Inhalte. Die Zugänge liest nur `ks-nachrichten` (`/etc/kienzle/verbindungen/nachrichten.json`, 0640).

@@ -1,10 +1,14 @@
 # Release-Notizen Fax
 
-## 0.1.0-beta.8
+## 0.1.0-beta.9
 
 - **Fehler behoben: Vorschau blieb leer** (bei „Fax senden“ und im Faxeingang). Ghostscript wurde mit `/dev/null` als Eingabe gestartet; `/dev/null` liegt außerhalb der Ordner, die das Modul-PHP öffnen darf (`open_basedir`), deshalb startete Ghostscript auf dem Server gar nicht. Seitenzahl (Ersatzweg) und Zusammenfügen mehrerer Dokumente waren ebenso betroffen. Jetzt nur noch Pipes; Fehler von Ghostscript stehen im Protokoll des Moduls.
 - Die Seitentests laufen jetzt mit derselben `open_basedir`-Sperre wie auf dem Server (der Test schlug mit dem alten Stand fehl).
 - **Nicht auf der VM geprüft.**
+
+## 0.1.0-beta.8
+
+- Lauschordner: Eine für das Modul nicht lesbare Datei wird nicht mehr als „leer“ gemeldet und in den Fehlerordner geschoben, sondern bleibt liegen und wird im Protokoll genannt. (Ursache der Nichtübernahme war ein Rechtefehler im Ablage-Dienst der Basis, siehe Basis 0.22.0-beta.9.)
 
 ## 0.1.0-beta.7
 

@@ -146,16 +146,25 @@ def _int(value, name: str, low: int, high: int, default: int) -> int:
 
 
 def _net(value, name: str) -> str:
-    value = _text(value, name, 43)
+    """Ein oder mehrere IPv4-Netze, getrennt durch Komma oder Leerzeichen (z. B. VPN und Praxisnetz); Rückgabe: normalisiert, mit Komma."""
+    value = _text(value, name, 200)
     if not value:
         return ''
-    try:
-        net = ipaddress.ip_network(value, strict=False)
-    except ValueError:
-        raise Fehler(f'{name}: „{value}“ ist kein Netz (z. B. 192.0.2.0/24).') from None
-    if net.version != 4:
-        raise Fehler(f'{name}: nur IPv4-Netze.')
-    return str(net)
+    out: list[str] = []
+    for part in re.split(r'[,;\s]+', value):
+        if not part:
+            continue
+        try:
+            net = ipaddress.ip_network(part, strict=False)
+        except ValueError:
+            raise Fehler(f'{name}: „{part[:43]}“ ist kein Netz (z. B. 192.0.2.0/24; mehrere mit Komma trennen).') from None
+        if net.version != 4:
+            raise Fehler(f'{name}: nur IPv4-Netze.')
+        if str(net) not in out:
+            out.append(str(net))
+    if len(out) > 8:
+        raise Fehler(f'{name}: höchstens 8 Netze.')
+    return ','.join(out)
 
 
 def did(value) -> str:
@@ -429,8 +438,10 @@ def render_pjsip(c: dict) -> tuple[str, str]:
     """pjsip.conf (Transporte, Leitungen) und pjsip-kfx-telefonie.conf (Telefone) wie Kienzlefax."""
     tls = any(ANBIETER[x['anbieter']].get('tls') for x in c['leitungen'])
     nets = ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16']
-    if c['netz']['lokal'] and not any(ipaddress.ip_network(c['netz']['lokal']).subnet_of(ipaddress.ip_network(n)) for n in nets):
-        nets.append(c['netz']['lokal'])
+    lokal = [n for n in c['netz']['lokal'].split(',') if n]
+    for n in lokal:
+        if not any(ipaddress.ip_network(n).subnet_of(ipaddress.ip_network(g)) for g in nets):
+            nets.append(n)
     ext = c['netz']['extern']
     external = f'external_signaling_address={ext}\nexternal_media_address={ext}\n' if ext else ''
     local = ''.join(f'local_net={n}\n' for n in nets)
@@ -442,15 +453,16 @@ def render_pjsip(c: dict) -> tuple[str, str]:
                 f'verify_client=no\nrequire_client_cert=no\nca_list_file={CA_LIST}\nallow_reload=no\n{external}{local}')
     phone = '; Erzeugt vom Modul telefon (Telefone wie Kienzlefax telefonie-queue.sh).\n'
     if c['nebenstellen'] or c['kienzlefon']['aktiv']:
-        phone += f'\n[transport-kfx-phone]\ntype=transport\nprotocol=udp\nbind=0.0.0.0:{PHONE_PORT}\nlocal_net={c["netz"]["lokal"]}\n'
+        phone += f'\n[transport-kfx-phone]\ntype=transport\nprotocol=udp\nbind=0.0.0.0:{PHONE_PORT}\n' + ''.join(f'local_net={n}\n' for n in lokal)
     carries = fax_line(c)
     for line in c['leitungen']:
         out += render_line(line, line['id'] in carries)
     out += '\n#tryinclude "/etc/asterisk/pjsip-kfx-telefonie.conf"\n'
-    allowed = c['netz']['erlaubt']
+    allowed = [n for n in c['netz']['erlaubt'].split(',') if n]
     for x in c['nebenstellen']:
         n = x['nummer']
-        acl = '' if allowed == '0.0.0.0/0' else (f'deny=0.0.0.0/0.0.0.0\npermit={allowed}\ncontact_deny=0.0.0.0/0.0.0.0\ncontact_permit={allowed}\n')
+        acl = '' if '0.0.0.0/0' in allowed else ('deny=0.0.0.0/0.0.0.0\n' + ''.join(f'permit={a}\n' for a in allowed)
+                                                  + 'contact_deny=0.0.0.0/0.0.0.0\n' + ''.join(f'contact_permit={a}\n' for a in allowed))
         phone += (f'\n[{n}-auth]\ntype=auth\nauth_type=userpass\nusername={n}\npassword={cfg_value(x["passwort"])}\n'
                 f'\n[{n}]\ntype=aor\nmax_contacts=1\nremove_existing=yes\nqualify_frequency=30\n'
                 f'\n[{n}]\ntype=endpoint\ntransport=transport-kfx-phone\ncontext=kfx-phone-local\ndisallow=all\nallow=g722,alaw,ulaw\n'

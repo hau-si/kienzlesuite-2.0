@@ -188,12 +188,15 @@ class Ablage(Umgebung):
         self.assertEqual(jobs['fax/lauschen']['zustand'], 'ok', jobs)
         self.assertEqual(jobs['fax/lauschen']['anzahl'], 1)
         self.assertEqual((d / 'eingang/brief.pdf').read_bytes(), b'%PDF-1.4 brief')
-        self.assertEqual(oct((d / 'eingang/brief.pdf').stat().st_mode & 0o777), '0o660')
+        self.assertEqual(oct((d / 'eingang/brief.pdf').stat().st_mode & 0o777), '0o664')   # Modul liest als Ordnerbesitzer
         self.assertFalse((nas / 'brief.pdf').exists(), 'auf dem NAS gelöscht')
         self.assertTrue((nas / 'notiz.txt').exists() and (nas / 'halb.pdf.part').exists())
         (nas / 'brief.pdf').write_bytes(b'%PDF-1.4 zweiter')                      # gleicher Name: nichts überschreiben
         self.ab.process()
         self.assertEqual(sorted(p.name for p in (d / 'eingang').iterdir()), ['1-brief.pdf', 'brief.pdf'])
+        (d / 'eingang/brief.pdf').chmod(0o660)            # Datei aus früherer Version: wird beim nächsten Lauf lesbar
+        self.ab.process()
+        self.assertEqual(oct((d / 'eingang/brief.pdf').stat().st_mode & 0o777), '0o664')
         self.assertEqual((d / 'eingang/brief.pdf').read_bytes(), b'%PDF-1.4 brief')
 
     def test_lauschordner_sftp_endungen_und_fehler(self):

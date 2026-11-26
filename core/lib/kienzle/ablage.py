@@ -331,6 +331,9 @@ def listen(module_dir: Path, targets: dict[str, dict]) -> dict:
         inbox.mkdir(mode=0o2770, exist_ok=True)
         if inbox.is_symlink():
             raise Fehler('Lauschordner: Eingang ungültig.')
+        for old in inbox.iterdir():          # Dateien früherer Versionen (0660) lesbar machen
+            if old.is_file() and not old.is_symlink() and old.stat().st_mode & 0o004 == 0:
+                os.chmod(old, 0o664)
         with tempfile.TemporaryDirectory(prefix='kienzle-ablage-') as tmp:
             remote = Remote(target, Path(tmp))
             for name in remote.listing(folder):
@@ -349,7 +352,7 @@ def listen(module_dir: Path, targets: dict[str, dict]) -> dict:
                     dest = inbox / f'{n}-{name}'
                     n += 1
                 shutil.copyfile(local, dest)
-                os.chmod(dest, 0o660)
+                os.chmod(dest, 0o664)   # das Modul (Besitzer des Ordners, nicht in der Gruppe ks-ablage) muss lesen können; der Ordner (2770) schließt andere aus
                 try:
                     remote.remove(folder, name)
                 except Fehler:
