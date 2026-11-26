@@ -1,5 +1,13 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.19
+
+- **Fehler behoben: Anrufe auf die Telefonnummer landeten beim Fax (Faxton).** Melden sich Telefon- und Faxleitung beim selben Anbieter-Server an (z. B. zwei voip2gsm-Leitungen), kann Asterisk einen eingehenden Anruf nicht sicher der richtigen Leitung zuordnen und nahm die Faxleitung. Jetzt kennt jede Leitung alle eingetragenen Rufnummern; die gewählte Nummer entscheidet, ob der Anruf zum Telefon, zum Fax oder in den Überlauf geht.
+- **Fehler behoben: Mit Sprachmenü (Kienzlefon) ging kein Anruf nach draußen über voip2gsm** („Everyone is busy/congested“). Kienzlefon wählte die Nummer als „49…“; voip2gsm nimmt nur „0…“ bzw. „00…“ an. Die Anlage setzt dafür jetzt `sip_zielformate` (Format `national`) für jede voip2gsm-Leitung in `kienzlefon.toml`.
+- **Fehler behoben: Faxversand mit „Permission denied“** (Ghostscript/qpdf unter AppArmor): Das Modul meldet `gs` und `qpdf` jetzt bei der Basis an (`apparmor = ["gs", "qpdf"]`); zusammen mit Basis 0.22.0-beta.10 dürfen beide im Austauschordner arbeiten.
+- Nach dem Update werden die Dateien der Anlage automatisch neu erzeugt; nichts neu einzustellen.
+- Geprüft mit Tests (Dialplan, Zielformat über die Wahlprüfung von Kienzlefon). **Nicht geprüft:** echte Anrufe über voip2gsm auf der VM.
+
 ## 0.1.0-beta.18
 
 - **Mehrere Netze:** „Netz der Telefone“ und „Anmelden erlaubt aus“ nehmen jetzt mehrere Netze, getrennt durch Komma (bis zu 8, nur IPv4). Nötig z. B. für Telefone über VPN: Das Telefon meldet sich aus dem VPN-Netz (z. B. 192.168.113.0/24), nennt aber als Kontakt die Adresse seines Heimnetzes (192.168.1.x); beide Netze gehören dann unter „Anmelden erlaubt aus“.

@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.50
+
+- Nur Tests: Startseite-, vBriefversand- und Letterxpress-Test rechnen das Datum in der Zeitzone der Kasse (Europe/Berlin) (scheiterte sonst zwischen 23 und 24 Uhr UTC). Keine Änderung am Programm.
+
 ## 2.3.4-beta.49
 
 - **Hinweis zur Versandart:** „Nur Inland“ ist als empfohlen gekennzeichnet, „Automatisch“ als fehleranfällig (Letterxpress erkennt die Anschrift im PDF nicht immer); die Fehlermeldung „keine lesbare Anschrift“ empfiehlt dasselbe.

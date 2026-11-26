@@ -675,10 +675,18 @@ def render_extensions(c: dict) -> tuple[str, str]:
     out += (CAPACITY.replace('@GESAMT@', str(k['gesamt'])).replace('@TELEFON@', str(k['telefon']))
             .replace('@FAX@', str(k['fax'])).replace('@UEBERLAUF@', str(k['ueberlauf'])))
     by_id = {x['id']: x for x in c['leitungen']}
-    # Eingang je Leitung: Rufnummern verteilen; hat eine Leitung nur ein Ziel, landet jede Nummer dort.
-    for lid, targets in roles(c).items():
+    # Eingang je Leitung: Rufnummern verteilen; hat eine Leitung nur ein Ziel, landet jede andere Nummer dort.
+    # Jede Leitung kennt auch die Rufnummern der anderen Leitungen: Melden sich mehrere Leitungen beim selben
+    # Anbieter-Server an (z. B. voip2gsm mit Telefon- und Faxleitung), kann Asterisk den Anruf nicht sicher der
+    # richtigen Leitung zuordnen; dann entscheidet die gewählte Rufnummer (sonst landeten Telefonanrufe beim Fax).
+    alle = roles(c)
+    for lid, targets in alle.items():
         out += f'\n[{endpoint(lid)}-in]\nexten => _+X.,1,Goto({endpoint(lid)}-in,${{EXTEN:1}},1)\n'
-        for number, target in targets:
+        gesehen = set()
+        for number, target in targets + [t for other, ts in alle.items() if other != lid for t in ts]:
+            if number in gesehen:
+                continue
+            gesehen.add(number)
             out += f'exten => {number},1,Goto({target})\n'
         if len(targets) == 1:
             t = targets[0][1]
@@ -884,7 +892,10 @@ def toml_entfernen(text: str, section: str, key: str) -> str:
 
 def toml_set(text: str, section: str, key: str, value) -> str:
     """Einen Wert in einer TOML-Datei setzen und Kommentare behalten (wie _set_toml_value aus kienzlefon/webadmin.py, auch für Zahlen)."""
-    literal = ('true' if value else 'false') if isinstance(value, bool) else str(value) if isinstance(value, (int, float)) else json.dumps(value, ensure_ascii=False)
+    if isinstance(value, dict):   # Inline-Tabelle: { "a" = "b" } (json.dumps ergäbe „:“, das ist kein TOML)
+        literal = '{ ' + ', '.join(f'{json.dumps(str(k))} = {json.dumps(str(v), ensure_ascii=False)}' for k, v in value.items()) + ' }' if value else '{}'
+    else:
+        literal = ('true' if value else 'false') if isinstance(value, bool) else str(value) if isinstance(value, (int, float)) else json.dumps(value, ensure_ascii=False)
     header = re.search(rf'^\[{re.escape(section)}\]\s*$', text, re.M)
     if header is None:
         return text.rstrip() + f'\n\n[{section}]\n{key} = {literal}\n'
@@ -931,6 +942,9 @@ def kienzlefon_toml(c: dict) -> str:
         ('asterisk', 'hauptausgang_nummer', tel.get('kennung_aus') or '0'), ('asterisk', 'ausgehend_zaehlt_kanalgrenze', bool(tel.get('aus_zaehlt', True))),
         ('asterisk', 'erste_queue_nebenstelle', int(members[0]) if members else 201), ('asterisk', 'queue_nebenstellen_anzahl', max(1, len(members))),
         ('ansagen_ivr', 'audit_log', str(d / 'ansagen-ivr-audit.jsonl')), ('wahlregeln', 'audit_log', str(d / 'telefonie-audit.jsonl')),
+        # Zielnummer je Leitung: Kienzlefon wählt sonst „49…“ (ohne + und 00); voip2gsm nimmt nur 0… bzw. 00… an
+        # (ohne diesen Eintrag scheiterte jeder Anruf nach draußen mit „busy/congested“).
+        ('wahlregeln', 'sip_zielformate', {endpoint(x['id']): 'national' for x in c['leitungen'] if ANBIETER[x['anbieter']].get('national')}),
         ('control_api', 'credentials_file', str(d / 'control-identities.json')),
         # Wartemusik: installiert, sobald das Modul die Wiedergabeformate erzeugt hat; Musik nur dann, sonst Klingelzeichen.
         ('wartemusik', 'installiert', wartemusik_bereit()),

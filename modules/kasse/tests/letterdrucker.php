@@ -1,5 +1,7 @@
 <?php
 declare(strict_types=1);
+// Datumsangaben wie die Kasse (Zeitzone Europe/Berlin); sonst scheitert der Test zwischen 23 und 24 Uhr UTC.
+date_default_timezone_set('Europe/Berlin');
 // Virtueller Drucker „vBriefversand“: Rechnung lesen, Textebene sicherstellen (Texterkennung), sofort per Post senden, unter Vorgänge zeigen. API nachgebildet.
 require dirname(__DIR__) . '/src/bootstrap.php';
 use KienzleKasse\{App, Config, HttpClient, InvoiceExport, PdfText, Problem, Vorgaenge};

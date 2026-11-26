@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.10
+
+- **Fehler behoben: Faxversand scheiterte mit „ghostscript pdf->tiff failed … Permission denied“.** Die AppArmor-Ergänzungen für `gs` und `qpdf` (Ubuntu 26.04) galten nur für den Datenordner eines Moduls, nicht für seine Austauschordner (`[[exchange]]`, z. B. `/var/spool/kienzle/austausch/fax_telefon`), in denen die Telefonanlage die Faxaufträge umwandelt. Jetzt werden sie mit eingetragen.
+- Geprüft mit Tests (`tests/core/test_apparmor.py`). **Nicht geprüft:** echter Faxversand auf der VM.
+
 ## 0.22.0-beta.9
 
 - **Fehler behoben, Lauschordner auf dem NAS:** Der Ablage-Dienst legte die geholten Dateien mit Rechten 0660 (Gruppe ks-ablage) ab; das Modul ist Besitzer des Ordners, aber nicht in dieser Gruppe, und konnte sie nicht lesen („Permission denied“). Jetzt 0664 (der Ordner mit 2770 schließt andere Benutzer weiterhin aus); schon liegende Dateien werden beim nächsten Lauf (alle 5 Minuten) lesbar gemacht. Test ergänzt.
