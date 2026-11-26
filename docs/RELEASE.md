@@ -1,5 +1,17 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.13
+
+- **Neu: Dateifreigaben der Module (`[[fileshare]]`).** Ein Modul kann einen Ordner seines Datenverzeichnisses als Windows-Freigabe zum Ablegen anbieten. Unter Verwaltung → Drucker → „Ordner zum Ablegen“ schaltet ein Admin sie ein (Vorgabe: aus). Zugriff **mit Anmeldung**: Der Admin vergibt beim Einschalten ein Kennwort (Samba-Benutzer `ks-<modul>`, wird beim Ausschalten gelöscht), damit auch Windows 11 24H2 zugreifen kann. Nur aus den Netzen, für die die Firewall „Drucken über Windows-Freigabe (445)“ freigegeben ist; keine Symlinks, keine versteckten Dateien, Dateien gehören dem Modulbenutzer (0600). Erster Nutzer: Fax „Fax-Ausgang“ (Fax 0.1.0-beta.12). Nicht am echten Arbeitsplatz geprüft.
+
+## 0.22.0-beta.12
+
+- **Fehler behoben, Lauschordner:** Dateien mit Umlauten oder ß im Namen (z. B. „Datenschutzerklärung_2.pdf“) wurden vom Ablage-Dienst übersehen, weil er nur ASCII-Namen zuließ; sie blieben für immer auf dem NAS liegen. Jetzt sind Buchstaben aller Sprachen, Ziffern, Leerzeichen, Klammern, Punkt, Komma, Plus und Minus erlaubt (beim Holen auf NFC-Schreibweise gebracht, weil manche NAS Umlaute getrennt melden). Pfad-, Steuer- und Sonderzeichen wie `;` bleiben verboten. Gilt nur für den Lauschordner, Aufträge der Module bleiben streng. Test ergänzt.
+
+## 0.22.0-beta.11
+
+- **Lauschordner fast sofort:** Neuer Dienst `kienzle-ablage-lauschen` (Timer alle 15 Sekunden) prüft nur die Lauschordner auf dem NAS (`kienzle-ablage lauschen`); bisher geschah das nur alle 5 Minuten. Ohne Lauschordner-Anfrage endet er sofort, er überlappt sich nicht mit dem normalen Auftragsdurchlauf (Sperrdatei) und fasst Aufträge nicht an. Fehler stehen weiter in `status.json` (kein Fehlercode im Takt). Der Installer richtet den Timer ein. Test ergänzt.
+
 ## 0.22.0-beta.10
 
 - **Kienzle-Agent (Windows):** Das Paket der Seite „Arbeitsplätze“ richtet jetzt ein Programm für alles ein: Starter für T2med **und** Dienst mit Systemrechten (geplante Aufgabe „Kienzle-Agent“ beim Start des PCs, startet nach Ende oder Aktualisierung neu). Programm in `C:\Program Files\Kienzle`, Einstellungen in `C:\ProgramData\Kienzle` (Benutzer dürfen nur lesen; der eigene Zugang `agent.json` nur System und Administratoren).

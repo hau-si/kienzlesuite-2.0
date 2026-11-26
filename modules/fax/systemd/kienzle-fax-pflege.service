@@ -1,6 +1,7 @@
 # Kienzle-Suite, Modul fax: Ergebnisse abholen, „sofort senden“, Lauschordner, Export auf das NAS, Aufräumen (jede Minute, siehe .timer).
 [Unit]
 Description=Kienzle-Suite Modul fax (Pflege)
+StartLimitIntervalSec=0
 
 [Service]
 Type=oneshot

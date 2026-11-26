@@ -78,6 +78,7 @@ check(str_contains(aufruf($dir, '/telefon/sprachmenue', 'nebenstellen'), '#CODE=
 $o = aufruf($dir, '/telefon/sprachmenue', 'sprachmenue');
 check(str_contains($o, '#CODE=200') && str_contains($o, 'Öffnungszeiten') && str_contains($o, 'name="zeit[oeffnungszeiten][montag]"')
     && str_contains($o, 'name="ansage[greeting_open]"') && str_contains($o, 'name="taste[rezept]"') && str_contains($o, 'Zahlwörter'), 'Sprachmenü-Seite');
+check(substr_count($o, 'data-zeiten-von="oeffnungszeiten"') === 3, 'Zeiten der Praxis übernehmen: Knopf bei Telefonzeiten, Apotheken und Pflege, Krankenhaus');
 check(str_contains(aufruf($dir, '/telefon/', 'sprachmenue'), '/telefon/sprachmenue'), 'Link zum Sprachmenü in der Übersicht');
 preg_match('/name="stand" value="([a-f0-9]{64})"/', $o, $m);
 $o = aufruf($dir, '/telefon/sprachmenue', 'sprachmenue', 'benutzer', ['aktion' => 'sprachmenue-texte', 'kienzle-csrf' => $csrf, 'stand' => $m[1],

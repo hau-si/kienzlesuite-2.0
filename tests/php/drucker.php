@@ -112,4 +112,19 @@ function test_auftraege_und_netz(): void {
     check(str_contains(implode("\n", $env->audit->recent()), 'drucker-arbeitsgruppe PRAXIS'), 'Arbeitsgruppe nicht protokolliert');
 }
 
+function test_dateifreigabe(): void {
+    [$env, $p] = pr_env(['dateifreigaben' => [['key' => 'fax/ablage', 'name' => 'Fax-Ausgang', 'label' => 'Faxe <b>ablegen', 'modul' => 'fax', 'an' => false], ['key' => '../x', 'name' => 'Boese']]]);
+    [$b] = admin_browser($env);
+    $b->web = fn() => $b->defaultWeb(null, null, null, null, $p);
+    $page = $b->get('/verwaltung/drucker')->body;
+    check(str_contains($page, 'Fax-Ausgang') && !str_contains($page, 'Boese') && !str_contains($page, '<b>ablegen') && !str_contains($page, 'checked'), 'Freigabe angeboten, aus');
+    $b->post('/verwaltung/drucker', ['aktion' => 'dateifreigabe', 'key' => 'fax/ablage', 'an' => '1', 'kennwort' => 'geheim-1234']);
+    check(req_p($env) === ['action' => 'dateifreigabe', 'key' => 'fax/ablage', 'an' => true, 'kennwort' => 'geheim-1234'], 'Freigabe einschalten');
+    check(!str_contains(implode("\n", $env->audit->recent()), 'geheim-1234'), 'Kennwort nicht im Protokoll');
+    $b->post('/verwaltung/drucker', ['aktion' => 'dateifreigabe', 'key' => 'fax/ablage']);
+    check(req_p($env) === ['action' => 'dateifreigabe', 'key' => 'fax/ablage', 'an' => false], 'Freigabe ausschalten');
+    check($b->post('/verwaltung/drucker', ['aktion' => 'dateifreigabe', 'key' => 'fax/anderes', 'an' => '1'])->status === 422, 'unbekannte Freigabe');
+    check(str_contains(implode("\n", $env->audit->recent()), 'drucker-dateifreigabe fax/ablage an'), 'Freigabe protokolliert');
+}
+
 run_tests();

@@ -1,5 +1,9 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.19
+
+- **Sprachmenü, Zeitschemata:** Bei „Telefonzeiten“, „Apotheken und Pflege“ und „Krankenhaus, Notarzt und Kollegen“ gibt es den Knopf „Zeiten der Praxis übernehmen“: Er kopiert die Zeiten aus „Öffnungszeiten“ mit einem Klick in alle sieben Tage des Schemas. Gespeichert wird erst mit „Speichern“, davor lassen sich einzelne Tage noch ändern. Das Kopieren läuft im Browser (nicht am echten Gerät geprüft).
+
 ## 0.1.0-beta.18
 
 - **Mehrere Netze:** „Netz der Telefone“ und „Anmelden erlaubt aus“ nehmen jetzt mehrere Netze, getrennt durch Komma (bis zu 8, nur IPv4). Nötig z. B. für Telefone über VPN: Das Telefon meldet sich aus dem VPN-Netz (z. B. 192.168.113.0/24), nennt aber als Kontakt die Adresse seines Heimnetzes (192.168.1.x); beide Netze gehören dann unter „Anmelden erlaubt aus“.

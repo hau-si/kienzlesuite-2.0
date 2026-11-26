@@ -57,3 +57,18 @@ document.addEventListener('submit', (e) => {
     fetch(live.dataset.quelle, {credentials: 'same-origin', cache: 'no-store'}).then(r => r.ok ? r.text() : null).then(t => { if (t !== null) live.innerHTML = t; }).catch(() => {});
   }, 3000);
 })();
+// Zeitschemata: Zeiten der Praxis (Öffnungszeiten) mit einem Klick in ein anderes Schema kopieren; gespeichert wird erst mit „Speichern“.
+document.addEventListener('click', (e) => {
+  const knopf = e.target.closest('button[data-zeiten-von]');
+  if (!knopf) return;
+  const von = knopf.getAttribute('data-zeiten-von');
+  const form = knopf.closest('form');
+  let n = 0;
+  form.querySelectorAll('input[name^="zeit["]').forEach((feld) => {
+    const tag = feld.name.replace(/^zeit\[[^\]]*\]\[/, '').replace(/\]$/, '');
+    const quelle = document.querySelector('input[name="zeit[' + von + '][' + tag + ']"]');
+    if (quelle) { feld.value = quelle.value; n++; }
+  });
+  const status = form.querySelector('[data-zeiten-status]');
+  if (status) status.textContent = n ? 'Übernommen – bitte unten auf „Speichern“ drücken.' : 'Keine Öffnungszeiten gefunden.';
+});

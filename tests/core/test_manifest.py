@@ -208,6 +208,17 @@ class Austausch(Fehler):
         self.assertEqual(m['exchange'], [{'module': 'telefon', 'purpose': 'Faxaufträge', 'path': '/var/spool/kienzle/austausch/beispiel_telefon'}])
         self.assertEqual(manifest.exchange_dir('telefon', 'fax'), '/var/spool/kienzle/austausch/fax_telefon')
 
+    def test_dateifreigabe(self):
+        """[[fileshare]]: Ordner im Datenverzeichnis, den ein Admin als Windows-Freigabe zum Ablegen einschalten kann."""
+        eintrag = '\n[[fileshare]]\nid = "ablage"\nname = "Fax-Ausgang"\nlabel = "Faxe zum Senden ablegen"\npath = "ablage"\n'
+        m = manifest.check_text(self.API2 + eintrag)
+        self.assertEqual(m['fileshares'], [{'id': 'ablage', 'name': 'Fax-Ausgang', 'label': 'Faxe zum Senden ablegen', 'path': '/var/lib/kienzle/beispiel/ablage'}])
+        self.invalid(BEISPIEL + eintrag, 'module.core_api', 'core_api = "2"')
+        self.invalid(self.API2 + eintrag.replace('"ablage"\nname', '"ablage"\nname', 1) + eintrag, 'fileshare[2].id', 'doppelt')
+        self.invalid(self.API2 + eintrag.replace('path = "ablage"', 'path = "../etc"'), 'fileshare[1].path', 'kein gültiger Pfad')
+        self.invalid(self.API2 + eintrag.replace('Fax-Ausgang', 'Fax Ausgang/x'), 'fileshare[1].name', 'ungültig')
+        self.invalid(self.API2 + eintrag.replace('\npath = "ablage"', ''), 'fileshare[1]', '„path“ fehlt')
+
     def test_austausch_regeln(self):
         self.invalid(BEISPIEL + '\n[[exchange]]\nmodule = "telefon"\npurpose = "x"\n', 'module.core_api', 'core_api = "2"')
         self.invalid(self.API2 + '\n[[exchange]]\nmodule = "beispiel"\npurpose = "x"\n', 'exchange[1].module', 'anderes Modul')

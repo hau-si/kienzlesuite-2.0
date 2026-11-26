@@ -13,6 +13,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import os
+import pwd
 import re
 import shutil
 import socket
@@ -44,7 +45,8 @@ def without_systemd() -> bool:
 BIN = {k: E(f'KIENZLE_{k.upper()}', v) for k, v in {'lpadmin': '/usr/sbin/lpadmin', 'lpinfo': '/usr/sbin/lpinfo', 'lpstat': '/usr/bin/lpstat',
                                                      'lp': '/usr/bin/lp', 'cupsenable': '/usr/sbin/cupsenable', 'cupsaccept': '/usr/sbin/cupsaccept',
                                                      'smbcontrol': '/usr/bin/smbcontrol', 'cancel': '/usr/bin/cancel',
-                                                     'testparm': '/usr/bin/testparm', 'ippeveprinter': '/usr/sbin/ippeveprinter', 'runuser': '/usr/sbin/runuser'}.items()}
+                                                     'testparm': '/usr/bin/testparm', 'smbpasswd': '/usr/bin/smbpasswd',
+                                                     'ippeveprinter': '/usr/sbin/ippeveprinter', 'runuser': '/usr/sbin/runuser'}.items()}
 if not Path(BIN['ippeveprinter']).is_file() and Path('/usr/bin/ippeveprinter').is_file():
     BIN['ippeveprinter'] = '/usr/bin/ippeveprinter'
 JOB = re.compile(r'^[A-Za-z0-9_-]{1,40}-\d{1,9}$')
@@ -655,6 +657,71 @@ def sync() -> list[str]:
     return notes
 
 
+DATEN = E('KIENZLE_DRUCKER_DATEN', '/var/lib/kienzle')   # Basis der Modul-Datenordner (Tests: Wegwerfordner)
+FILESHARE_KEY = re.compile(r'^[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$')
+FILESHARE_USER = re.compile(r'^ks-[a-z][a-z0-9-]*$')
+
+
+def fileshares() -> list[dict]:
+    """Dateifreigaben ([[fileshare]]) der installierten Module mit Schalter (standardmäßig aus): key, modul, name, label, path, user, an."""
+    state = _read(STATE / 'dateifreigaben.json', {})
+    try:
+        taken = {q['name'].lower() for q in queues()}
+    except Fehler:
+        taken = set()
+    out = []
+    for m in _read(MODULES, {}).get('modules', []):
+        mid = m['module']['id']
+        user = (m.get('system') or {}).get('user', '')
+        for f in m.get('fileshares') or []:
+            key = f'{mid}/{f["id"]}'
+            path = str(f.get('path', ''))
+            if (not FILESHARE_KEY.match(key) or not NAME.match(str(f.get('name', ''))) or user != f'ks-{mid}' or not FILESHARE_USER.match(user)
+                    or not path.startswith(f'{DATEN}/{mid}/') or '..' in path.split('/') or f['name'].lower() in taken):
+                continue
+            taken.add(f['name'].lower())
+            out.append({'key': key, 'modul': mid, 'name': f['name'], 'label': str(f.get('label', ''))[:80], 'path': path, 'user': user,
+                        'an': bool(state.get(key))})
+    return out
+
+
+def set_fileshare(key: str, on: bool, password: str = '') -> str:
+    known = {f['key']: f for f in fileshares()}
+    f = known.get(key)
+    if f is None:
+        raise Fehler('Freigabe unbekannt.')
+    if on and password and not 8 <= len(password) <= 64:
+        raise Fehler('Das Kennwort muss 8 bis 64 Zeichen lang sein.')
+    if on and ('\n' in password or '\r' in password):
+        raise Fehler('Das Kennwort darf keinen Zeilenumbruch enthalten.')
+    state = _read(STATE / 'dateifreigaben.json', {})
+    if on and not password and not state.get(key):
+        raise Fehler('Zum Einschalten bitte ein Kennwort vergeben.')
+    if on:
+        path = Path(f['path'])
+        path.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if path.is_symlink():
+            raise Fehler('Freigabeordner ungültig.')
+        if E('KIENZLE_DRUCKER_CHOWN', '1') == '1':
+            pw = pwd.getpwnam(f['user'])
+            os.chown(path, pw.pw_uid, pw.pw_gid)
+        os.chmod(path, 0o700)
+        if password:
+            run('smbpasswd', '-a', '-s', f['user'], data=f'{password}\n{password}\n'.encode(), timeout=20)
+    if on:
+        state[key] = True
+    else:
+        state.pop(key, None)
+        if not any(state.get(o['key']) for o in fileshares() if o['user'] == f['user'] and o['key'] != key):
+            try:
+                run('smbpasswd', '-x', f['user'], timeout=20)
+            except Fehler:
+                pass                                    # Konto war nie angelegt
+    _write(STATE / 'dateifreigaben.json', state, 0o644)
+    return (f'Freigabe „{f["name"]}“ eingeschaltet. Anmeldung in Windows mit Benutzer {f["user"]} und dem vergebenen Kennwort; nur aus den Praxisnetzen, '
+            'wenn die Firewall 445 so freigibt.') if on else f'Freigabe „{f["name"]}“ ausgeschaltet, Zugang gelöscht.'
+
+
 def samba() -> bool:
     """Samba-Freigaben genau für die markierten Warteschlangen der Suite. Liefert True, wenn sich etwas änderte."""
     shares = _read(STATE / 'freigaben.json', {})
@@ -667,6 +734,14 @@ def samba() -> bool:
         comment = re.sub(r'[^A-Za-z0-9 ._:()äöüÄÖÜß-]', '', q['description'])[:80]
         parts.append(f'\n[{name}]\n   comment = {comment}\n   printable = yes\n   printer name = {name}\n   path = /var/spool/samba\n'
                      '   guest ok = yes\n   read only = yes\n   browseable = yes\n')
+    for f in fileshares():
+        if not f['an']:
+            continue
+        label = re.sub(r'[^A-Za-z0-9 ._:()äöüÄÖÜß-]', '', f['label'])[:80]
+        parts.append(f'\n[{f["name"]}]\n   comment = {label}\n   path = {f["path"]}\n   guest ok = no\n   valid users = {f["user"]}\n   read only = no\n   browseable = yes\n'
+                     f'   force user = {f["user"]}\n   force group = {f["user"]}\n   create mask = 0600\n   directory mask = 0700\n   follow symlinks = no\n'
+                     '   wide links = no\n   hide dot files = yes\n   veto files = /.*/\n   ea support = no\n   store dos attributes = no\n'
+                     '   map archive = no\n   map hidden = no\n   map system = no\n')
     text = ''.join(parts)
     old = SAMBA.read_text(encoding='utf-8') if SAMBA.is_file() else None
     if old == text:
@@ -748,7 +823,8 @@ def refresh() -> None:
     heal_local()
     try:
         set_status(warteschlangen=[{k: q[k] for k in ('name', 'address', 'state', 'description', 'managed', 'modul', 'share')} for q in queues()],
-                   auftraege=jobs()[:200], netz=network(), fehler='')
+                   auftraege=jobs()[:200], netz=network(), fehler='',
+                   dateifreigaben=[{k: f[k] for k in ('key', 'name', 'label', 'modul', 'an')} for f in fileshares()])
     except Fehler as e:
         set_status(warteschlangen=[], fehler=str(e))
 
@@ -772,6 +848,13 @@ def dispatch(req: dict) -> str:
         return msg
     if a == 'freigabe':
         msg = set_share(name, req.get('freigabe', []))
+        samba()
+        return msg
+    if a == 'dateifreigabe':
+        key = str(req.get('key', ''))
+        if not FILESHARE_KEY.match(key):
+            raise Fehler('Freigabe ungültig.')
+        msg = set_fileshare(key, bool(req.get('an')), str(req.get('kennwort', '')))
         samba()
         return msg
     if a == 'testseite':

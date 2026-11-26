@@ -5,7 +5,7 @@
 [module]
 id = "telefon"
 name = "Telefon"
-version = "0.1.0-beta.18"
+version = "0.1.0-beta.19"
 core_api = "2"
 description = "Telefonanlage: Leitungen der Anbieter, Telefone, Warteschlange, Sprachmenü (Kienzlefon) und Kanalgrenze. Stellt auch die Faxleitung für das Modul Fax bereit; Fax lässt sich erst danach installieren."
 

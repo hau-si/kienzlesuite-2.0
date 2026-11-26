@@ -12,6 +12,7 @@ Module legen Aufträge in ihren Ausgangsordner /var/spool/kienzle/ablage/<modul>
 """
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import ipaddress
 import json
@@ -22,6 +23,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+import unicodedata
 from pathlib import Path
 
 E = os.environ.get
@@ -41,6 +43,9 @@ SHARE = re.compile(r'^[A-Za-z0-9_.$ -]{1,80}$')
 USER = re.compile(r'^[A-Za-z0-9_.@\\-]{1,64}$')
 DIR = re.compile(r'^[A-Za-z0-9_./ {}-]{0,200}$')
 NAME = re.compile(r'^[A-Za-z0-9_][A-Za-z0-9_., -]{0,150}\.[A-Za-z0-9]{1,8}$')
+# Lauschordner: Dateien aus der Praxis heißen oft „Datenschutzerklärung_2.pdf“ oder „Überweisung (neu).pdf“: Buchstaben aller Sprachen sind erlaubt,
+# aber weiterhin keine Pfad- oder Steuerzeichen und nichts, was der NAS-Befehl (quote) ablehnt.
+LISTEN_NAME = re.compile(r'^\w[\w., ()+-]{0,150}\.[A-Za-z0-9]{1,8}$')
 JOB = re.compile(r'^[A-Za-z0-9_-]{8,64}$')
 HOSTKEY = re.compile(r'^\S+ (ssh-ed25519|ecdsa-sha2-nistp256|ecdsa-sha2-nistp384|ecdsa-sha2-nistp521|rsa-sha2-256|rsa-sha2-512|ssh-rsa) [A-Za-z0-9+/=]{40,1000}$')
 
@@ -145,7 +150,8 @@ class Remote:
             r = subprocess.run(args, input='\n'.join(script) + '\n', capture_output=True, text=True, timeout=600)
             failed = r.returncode != 0
         else:
-            args = [SMBCLIENT, f'//{t["host"]}/{t["freigabe"]}', '--option=client min protocol=SMB2', '-m', 'SMB3', '-t', '60', '-c', '; '.join(script)]
+            args = [SMBCLIENT, f'//{t["host"]}/{t["freigabe"]}', '--option=client min protocol=SMB2', '--option=unix charset=UTF-8',
+                    '-m', 'SMB3', '-t', '60', '-c', '; '.join(script)]
             if t.get('gast'):
                 args += ['-U', 'guest%', '-N', '--use-kerberos=off']
             else:
@@ -210,13 +216,13 @@ class Remote:
                 if not m or 'D' in m.group(2):
                     continue
                 name = m.group(1)
-            if NAME.match(name) and not name.endswith('.part') and name not in names:
+            if LISTEN_NAME.match(unicodedata.normalize('NFC', name)) and not name.endswith('.part') and name not in names:
                 names.append(name)
         return sorted(names)
 
     def fetch(self, folder: str, name: str, local: Path) -> None:
         """Eine Datei holen (Prüfsumme über zweites Lesen), dann auf dem NAS löschen."""
-        if not NAME.match(name):
+        if not LISTEN_NAME.match(unicodedata.normalize('NFC', name)):
             raise Fehler('Dateiname ungültig.')
         parts = [p for p in self.t['ordner'].split('/') + folder.split('/') if p]
         cds = self._cds(parts)
@@ -346,10 +352,11 @@ def listen(module_dir: Path, targets: dict[str, dict]) -> dict:
                 remote.fetch(folder, name, local)
                 if local.stat().st_size > MAX_FILE:
                     raise Fehler(f'Lauschordner: „{name}“ ist zu groß.')
-                dest = inbox / name
+                lokal = unicodedata.normalize('NFC', name)      # manche NAS melden Umlaute getrennt (a + Trema)
+                dest = inbox / lokal
                 n = 1
                 while dest.exists():
-                    dest = inbox / f'{n}-{name}'
+                    dest = inbox / f'{n}-{lokal}'
                     n += 1
                 shutil.copyfile(local, dest)
                 os.chmod(dest, 0o664)   # das Modul (Besitzer des Ordners, nicht in der Gruppe ks-ablage) muss lesen können; der Ordner (2770) schließt andere aus
@@ -364,8 +371,55 @@ def listen(module_dir: Path, targets: dict[str, dict]) -> dict:
     return info
 
 
+def _sperre(blocking: bool):
+    """Sperrdatei: Auftragsdurchlauf und schneller Lauschordner-Durchlauf schreiben beide status.json und dürfen sich nicht überlappen."""
+    STATE.mkdir(mode=0o755, parents=True, exist_ok=True)
+    handle = open(STATE / '.sperre', 'a')  # noqa: SIM115
+    try:
+        fcntl.flock(handle, fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB))
+    except OSError:
+        handle.close()
+        return None
+    return handle
+
+
+def lauschen_nur() -> dict:
+    """Nur die Lauschordner prüfen (alle paar Sekunden aus kienzle-ablage-lauschen.timer): neue Dateien erscheinen fast sofort.
+    Läuft gerade der Auftragsdurchlauf, wird ausgesetzt; ohne Lauschordner-Anfrage endet der Lauf sofort."""
+    module_dirs = [p for p in sorted(SPOOL.iterdir()) if p.is_dir() and not p.is_symlink()
+                   and re.fullmatch(r'[a-z][a-z0-9-]{1,28}', p.name) and (p / 'lauschen.anfrage').is_file()] if SPOOL.is_dir() else []
+    if not module_dirs:
+        return {}
+    sperre = _sperre(False)
+    if sperre is None:
+        return {}
+    try:
+        targets = load_targets()
+        try:
+            old = json.loads((STATE / 'status.json').read_text(encoding='utf-8')).get('auftraege', {})
+        except (OSError, ValueError):
+            old = {}
+        neu = {f'{p.name}/lauschen': listen(p, targets) for p in module_dirs}
+        # Nur schreiben, wenn sich etwas Sichtbares geändert hat (sonst alle 15 Sekunden ein neuer Zeitstempel auf der SD-Karte / Platte).
+        if any(old.get(k, {}).get('zustand') != v['zustand'] or v['anzahl'] or old.get(k, {}).get('meldung') != v.get('meldung')
+               or old.get(k, {}).get('zeit', 0) < time.time() - 300 for k, v in neu.items()):
+            _status({**old, **neu})
+        return neu
+    finally:
+        sperre.close()
+
+
 def process() -> dict:
     """Alle Aufträge aller Module abarbeiten. Fehlgeschlagene bleiben liegen und werden später erneut versucht."""
+    sperre = _sperre(True)
+    try:
+        return _abarbeiten()
+    finally:
+        if sperre is not None:
+            sperre.close()
+
+
+def _abarbeiten() -> dict:
     targets = load_targets()
     try:
         old = json.loads((STATE / 'status.json').read_text(encoding='utf-8')).get('auftraege', {})

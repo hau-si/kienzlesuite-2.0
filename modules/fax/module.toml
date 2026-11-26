@@ -5,14 +5,14 @@
 [module]
 id = "fax"
 name = "Fax"
-version = "0.1.0-beta.10"
+version = "0.1.0-beta.12"
 core_api = "2"
 description = "Papierloses Fax: am PC auf einen Faxdrucker drucken, Empfänger wählen, senden; Sendeprotokoll, Fehlerberichte, Faxeingang. Braucht das Modul Telefon (Telefonanlage); eine Praxis nur mit Fax richtet dort nur die Faxleitung ein."
 requires = ["telefon"]
 
 [system]
 packages = ["php-fpm", "php-cli", "php-sqlite3", "php-mbstring", "php-gd", "ghostscript", "tesseract-ocr", "tesseract-ocr-deu"]
-services = ["kienzle-fax-pflege.service", "kienzle-fax-pflege.timer", "kienzle-fax-ocr.service", "kienzle-fax-ocr.timer"]
+services = ["kienzle-fax-pflege.service", "kienzle-fax-pflege.timer", "kienzle-fax-ocr.service", "kienzle-fax-ocr.timer", "kienzle-fax-lauschen.path"]
 user = "ks-fax"
 data = "/var/lib/kienzle/fax"
 
@@ -23,6 +23,14 @@ protocol = "fastcgi"
 entry = "public/index.php"
 einstellungen = "/einstellungen"
 uploads = true
+
+# Ordner „ablage“ als Windows-Freigabe „Fax-Ausgang“ (aus, bis ein Admin sie unter Verwaltung → Drucker einschaltet): Dateien dort hineinziehen,
+# das Modul übernimmt sie sofort in „Fax senden“ (Quelle NAS).
+[[fileshare]]
+id = "ablage"
+name = "Fax-Ausgang"
+label = "Faxe zum Senden hineinziehen (PDF, Bilder)"
+path = "ablage"
 
 [[rights]]
 id = "senden"

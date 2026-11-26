@@ -258,6 +258,9 @@ final class Ansicht {
                     . '" maxlength="200" placeholder="geschlossen" pattern="[0-9:\-, ;]*" inputmode="numeric">';
             }
             $f .= '</div>';
+            if ($s !== 'oeffnungszeiten') {
+                $f .= '<p><button type="button" class="small secondary" data-zeiten-von="oeffnungszeiten" title="Kopiert die Zeiten aus „Öffnungszeiten“ der Praxis in dieses Schema (alle sieben Tage). Es wird noch nichts gespeichert: danach unten auf „Speichern“ drücken, vorher kann man einzelne Tage noch ändern.">Zeiten der Praxis übernehmen</button> <span class="muted" data-zeiten-status></span></p>';
+            }
             $o .= self::fold('z-' . $s, (string)$z['titel'], $marke, '<form method="post" class="tf-form tf-breit">' . self::verborgen($csrf, $stand) . $f . '<button class="primary" type="submit">Speichern</button></form>');
         }
         $gruppen = [];

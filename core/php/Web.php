@@ -2408,6 +2408,21 @@ final class Web {
             . V::input('name', 'Name der Warteschlange (leer = Vorschlag)', 'text', '', 'maxlength="40"')
             . '<button' . $dis . '>Anlegen</button></form>';
         $net = $st['net'];
+        if ($st['fileshares']) {
+            $body .= '<h2>Ordner zum Ablegen (Windows-Freigabe)</h2><p>Module können einen Ordner anbieten, in den Arbeitsplätze Dateien ziehen. Die Anmeldung in Windows '
+                . 'erfolgt mit dem angezeigten Benutzer und einem Kennwort, das Sie hier vergeben (8 bis 64 Zeichen). Erreichbar nur, wenn die Firewall '
+                . '„Drucken über Windows-Freigabe (445)“ für das Praxisnetz freigegeben ist.</p>';
+            foreach ($st['fileshares'] as $f) {
+                $user = 'ks-' . $f['modul'];
+                $body .= '<form method="post" action="/verwaltung/drucker" class="box">' . $this->hidden('dateifreigabe', ['key' => $f['key']])
+                    . '<p><strong>' . V::h($f['name']) . '</strong> – ' . V::h($f['label']) . ' <small>(Modul ' . V::h($f['modul']) . ')</small><br>'
+                    . ($f['on'] ? 'Eingeschaltet: <code>\\\\' . V::h($this->printerHost()) . '\\' . V::h($f['name']) . '</code>, Benutzer <code>' . V::h($user) . '</code>'
+                        : 'Ausgeschaltet. Benutzer für die Anmeldung wird <code>' . V::h($user) . '</code>.') . '</p>'
+                    . V::input('kennwort', $f['on'] ? 'Neues Kennwort (leer = unverändert)' : 'Kennwort', 'password', '', 'autocomplete="new-password" minlength="8" maxlength="64"' . ($f['on'] ? '' : ' required'))
+                    . '<button name="an" value="1"' . $dis . '>' . ($f['on'] ? 'Kennwort ändern' : 'Einschalten') . '</button>'
+                    . ($f['on'] ? ' <button name="an" value="0"' . $dis . '>Ausschalten</button>' : '') . '</form>';
+            }
+        }
         $body .= '<h2>Windows-Netz</h2>';
         $body .= '<p>Arbeitsgruppe: <strong>' . V::h($net['arbeitsgruppe']) . '</strong>. Hinweis: Windows 11 Pro lässt Gastzugriff auf Windows-Freigaben ab 24H2 '
             . 'nicht mehr zu; dort besser über IPP drucken.</p>'
@@ -2489,6 +2504,7 @@ final class Web {
                 'entfernen' => $p->remove($r->field('name', 60)),
                 'testseite' => $p->testPage($r->field('name', 60)),
                 'freigabe' => $p->share($r->field('name', 60), $share),
+                'dateifreigabe' => $p->fileShare($r->field('key', 60), $r->field('an') === '1', $r->field('kennwort', 64)),
                 'abgleichen' => $p->sync(),
                 'abbrechen' => $p->cancelJob($r->field('auftrag', 60)),
                 'alle-abbrechen' => $p->cancelAll($r->field('name', 60)),
@@ -2499,7 +2515,7 @@ final class Web {
             if ($e->http === 422 || $e->http === 409 || $e->http === 404) return $this->printersPage($e->getMessage());
             throw $e;
         }
-        $this->audit->write($admin, 'drucker-' . $a, $a === 'abbrechen' ? $r->field('auftrag', 60) : ($a === 'arbeitsgruppe' ? $r->field('arbeitsgruppe', 20) : $r->field('name', 60)));
+        $this->audit->write($admin, 'drucker-' . $a, $a === 'abbrechen' ? $r->field('auftrag', 60) : ($a === 'arbeitsgruppe' ? $r->field('arbeitsgruppe', 20) : ($a === 'dateifreigabe' ? $r->field('key', 60) . ($r->field('an') === '1' ? ' an' : ' aus') : $r->field('name', 60))));
         $this->flash('Auftrag an den Druckerdienst übergeben.');
         return Response::redirect('/verwaltung/drucker');
     }

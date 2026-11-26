@@ -20,7 +20,7 @@ class Umgebung(unittest.TestCase):
         self.t = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.t)
         (self.t / 'bin').mkdir()
-        for p in ('lpadmin', 'lpstat', 'lpinfo', 'lp', 'cancel', 'testparm', 'systemctl'):
+        for p in ('lpadmin', 'lpstat', 'lpinfo', 'lp', 'cancel', 'testparm', 'systemctl', 'smbpasswd'):
             (self.t / 'bin' / p).symlink_to(FAKE)
         env = {'FAKE_CUPS': self.t / 'cups.json', 'KIENZLE_DRUCKER_STATE': self.t / 'state', 'KIENZLE_DRUCKER_REQUEST': self.t / 'anfrage.json',
                'KIENZLE_DRUCKER_MODULES': self.t / 'modules.json', 'KIENZLE_DRUCKER_PROGRAMME': self.t / 'opt', 'KIENZLE_DRUCKER_BACKENDS': self.t / 'backend',
@@ -28,7 +28,7 @@ class Umgebung(unittest.TestCase):
                'KIENZLE_DRUCKER_CHOWN': '0', 'KIENZLE_DRUCKER_PROBE': 'ja', 'KIENZLE_SMBCONTROL': self.t / 'fehlt',
                'KIENZLE_DRUCKER_SAMBA_NETZ': self.t / 'kienzle-netz.conf', 'KIENZLE_DRUCKER_UNITS': self.t / 'units', 'KIENZLE_DRUCKER_SYSTEMCTL': self.t / 'bin/systemctl',
                'KIENZLE_DRUCKER_DATA': self.t / 'data', 'KIENZLE_DRUCKER_WARTEN': '1', 'KIENZLE_SYSTEMD_RUN': self.t}
-        env.update({f'KIENZLE_{p.upper()}': self.t / 'bin' / p for p in ('lpadmin', 'lpstat', 'lpinfo', 'lp', 'cancel', 'testparm')})
+        env.update({f'KIENZLE_{p.upper()}': self.t / 'bin' / p for p in ('lpadmin', 'lpstat', 'lpinfo', 'lp', 'cancel', 'testparm', 'smbpasswd')})
         p = mock.patch.dict(os.environ, {k: str(v) for k, v in env.items()})
         p.start()
         self.addCleanup(p.stop)
@@ -318,6 +318,79 @@ class Anfragen(Umgebung):
         os.environ['KIENZLE_DRUCKER_UID'] = str(os.getuid() + 1)
         self.assertFalse(self.request({'action': 'entfernen', 'name': 'Bon'})['letzte']['ok'])
         self.assertIn('Bon', self.cups()['queues'])
+
+
+class Dateifreigaben(Umgebung):
+    """[[fileshare]]: Ordner eines Moduls als Windows-Freigabe zum Ablegen (Gast, nur nach Einschalten durch einen Admin)."""
+
+    def modul(self, **ueberschreiben):
+        f = {'id': 'ablage', 'name': 'Fax-Ausgang', 'label': 'Faxe zum Senden ablegen', 'path': str(self.t / 'data/fax/ablage')}
+        f.update(ueberschreiben)
+        return {'module': {'id': 'fax'}, 'system': {'user': 'ks-fax', 'data': str(self.t / 'data/fax')}, 'fileshares': [f]}
+
+    def setUp(self):
+        super().setUp()
+        p = mock.patch.dict(os.environ, {'KIENZLE_DRUCKER_DATEN': str(self.t / 'data')})
+        p.start()
+        self.addCleanup(p.stop)
+        import kienzle.drucker
+        self.d = importlib.reload(kienzle.drucker)
+
+    def test_standardmaessig_aus_und_ein_aus(self):
+        self.registry(self.modul())
+        self.assertEqual([(f['key'], f['an']) for f in self.d.fileshares()], [('fax/ablage', False)])
+        self.d.samba()
+        self.assertNotIn('Fax-Ausgang', self.d.SAMBA.read_text())
+        with self.assertRaises(self.d.Fehler):      # ohne Kennwort geht es nicht an
+            self.d.dispatch({'action': 'dateifreigabe', 'key': 'fax/ablage', 'an': True})
+        with self.assertRaises(self.d.Fehler):
+            self.d.dispatch({'action': 'dateifreigabe', 'key': 'fax/ablage', 'an': True, 'kennwort': 'kurz'})
+        self.assertIn('Benutzer ks-fax', self.d.dispatch({'action': 'dateifreigabe', 'key': 'fax/ablage', 'an': True, 'kennwort': 'geheim-1234'}))
+        self.assertEqual(self.cups()['smbpasswd'], [[['-a', '-s', 'ks-fax'], 'geheim-1234\ngeheim-1234\n']])
+        conf = self.d.SAMBA.read_text()
+        for zeile in ('[Fax-Ausgang]', f'path = {self.t}/data/fax/ablage', 'guest ok = no', 'valid users = ks-fax', 'read only = no', 'force user = ks-fax', 'create mask = 0600',
+                      'veto files = /.*/', 'follow symlinks = no'):
+            self.assertIn(zeile, conf)
+        ordner = self.t / 'data/fax/ablage'
+        self.assertTrue(ordner.is_dir())
+        self.assertEqual(oct(ordner.stat().st_mode & 0o777), '0o700')
+        # eingeschaltet lassen ohne neues Kennwort ist erlaubt (Kennwort bleibt)
+        self.d.dispatch({'action': 'dateifreigabe', 'key': 'fax/ablage', 'an': True})
+        self.assertEqual(len(self.cups()['smbpasswd']), 1)
+        self.assertIn('ausgeschaltet', self.d.dispatch({'action': 'dateifreigabe', 'key': 'fax/ablage', 'an': False}))
+        self.assertEqual(self.cups()['smbpasswd'][-1][0], ['-x', 'ks-fax'])
+        self.assertNotIn('Fax-Ausgang', self.d.SAMBA.read_text())
+
+    def test_ungueltiges_wird_abgelehnt(self):
+        self.registry(self.modul())
+        with self.assertRaises(self.d.Fehler):
+            self.d.dispatch({'action': 'dateifreigabe', 'key': '../x', 'an': True})
+        with self.assertRaises(self.d.Fehler):
+            self.d.dispatch({'action': 'dateifreigabe', 'key': 'fax/gibtsnicht', 'an': True})
+        # Pfad ausserhalb des Datenordners, fremder Benutzer, Name wie ein Drucker: wird nicht angeboten
+        self.registry(self.modul(path='/etc/samba'))
+        self.assertEqual(self.d.fileshares(), [])
+        m = self.modul()
+        m['system']['user'] = 'root'
+        self.registry(m)
+        self.assertEqual(self.d.fileshares(), [])
+        self.registry(self.modul(path=str(self.t / 'data/fax/../../etc')))
+        self.assertEqual(self.d.fileshares(), [])
+
+    def test_modul_entfernt_freigabe_verschwindet(self):
+        self.registry(self.modul())
+        self.d.set_fileshare('fax/ablage', True, 'geheim-1234')
+        self.d.samba()
+        self.assertIn('[Fax-Ausgang]', self.d.SAMBA.read_text())
+        self.registry({'module': {'id': 'fax'}, 'system': {'user': 'ks-fax'}})
+        self.d.samba()
+        self.assertNotIn('Fax-Ausgang', self.d.SAMBA.read_text())
+
+    def test_im_status(self):
+        self.registry(self.modul())
+        self.d.refresh()
+        st = json.loads((self.d.STATE / 'status.json').read_text())
+        self.assertEqual(st['dateifreigaben'], [{'key': 'fax/ablage', 'name': 'Fax-Ausgang', 'label': 'Faxe zum Senden ablegen', 'modul': 'fax', 'an': False}])
 
 
 if __name__ == '__main__':

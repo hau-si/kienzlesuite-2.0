@@ -266,7 +266,7 @@ install -m 0644 "$vorlagen/kienzle-zertifikat.service" "$vorlagen/kienzle-zertif
   "$vorlagen/kienzle-firewall.path" "$vorlagen/kienzle-firewall-anwenden.service" "$vorlagen/kienzle-firewall.service" \
   "$vorlagen/kienzle-update.path" "$vorlagen/kienzle-update-anwenden.service" "$vorlagen/kienzle-update-pruefen.service" \
   "$vorlagen/kienzle-update-pruefen.timer" "$vorlagen/kienzle-update-start.service" \
-  "$vorlagen/kienzle-verbindungen.path" "$vorlagen/kienzle-verbindungen-anwenden.service" "$vorlagen/kienzle-ablage.service" "$vorlagen/kienzle-ablage.timer" \
+  "$vorlagen/kienzle-verbindungen.path" "$vorlagen/kienzle-verbindungen-anwenden.service" "$vorlagen/kienzle-ablage.service" "$vorlagen/kienzle-ablage.timer" "$vorlagen/kienzle-ablage-lauschen.service" "$vorlagen/kienzle-ablage-lauschen.timer" \
   "$vorlagen/kienzle-nachrichten.service" "$vorlagen/kienzle-nachrichten.timer" \
   "$vorlagen/kienzle-sicherung.path" "$vorlagen/kienzle-sicherung-anwenden.service" "$vorlagen/kienzle-sicherung.service" "$vorlagen/kienzle-sicherung.timer" \
   "$vorlagen/kienzle-ueberblick.path" "$vorlagen/kienzle-ueberblick.service" "$vorlagen/kienzle-ueberblick.timer" \
@@ -289,7 +289,7 @@ if [ -z "$nosystemd" ]; then
   systemctl disable --now "php$phpv-fpm.service" >/dev/null 2>&1 || true
   systemctl enable --now kienzle-core-php.service kienzle-zertifikat.timer kienzle-firewall.path
   systemctl enable kienzle-firewall.service kienzle-update-start.service
-  systemctl enable --now kienzle-update.path kienzle-update-pruefen.timer kienzle-verbindungen.path kienzle-ablage.timer kienzle-nachrichten.timer kienzle-sicherung.path kienzle-sicherung.timer kienzle-ueberblick.path kienzle-ueberblick.timer kienzle-drucker.path kienzle-drucker.timer kienzle-servername.path kienzle-neustart.path kienzle-module.path kienzle-module-pruefen.timer
+  systemctl enable --now kienzle-update.path kienzle-update-pruefen.timer kienzle-verbindungen.path kienzle-ablage.timer kienzle-ablage-lauschen.timer kienzle-nachrichten.timer kienzle-sicherung.path kienzle-sicherung.timer kienzle-ueberblick.path kienzle-ueberblick.timer kienzle-drucker.path kienzle-drucker.timer kienzle-servername.path kienzle-neustart.path kienzle-module.path kienzle-module-pruefen.timer
   # Druckserver: CUPS und smbd; nmbd (NetBIOS) und der AD-Dienst werden nicht gebraucht.
   systemctl disable --now nmbd.service samba-ad-dc.service >/dev/null 2>&1 || true
   systemctl enable avahi-daemon.service cups.service smbd.service >/dev/null 2>&1 || true

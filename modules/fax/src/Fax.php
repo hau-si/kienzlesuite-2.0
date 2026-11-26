@@ -836,14 +836,24 @@ final class Fax {
         return $n;
     }
 
+    /** Eine Datei gilt als fertig kopiert, wenn sie seit einer Sekunde weder größer noch neuer geworden ist. */
+    private static function fertigKopiert(string $f): bool {
+        clearstatcache(true, $f);
+        $vorher = [@filesize($f), @filemtime($f)];
+        if (time() - (int)$vorher[1] >= 2) return true;
+        usleep(1_200_000);
+        clearstatcache(true, $f);
+        return $vorher === [@filesize($f), @filemtime($f)];
+    }
+
     /** Dateien aus dem Lauschordner (von ks-ablage geholt) in die Quelle „NAS“ übernehmen; nicht lesbare in lausch-fehler/. */
     public static function lauschHolen(\KienzleModul $k): int {
-        $dir = $k->lauschenEingang();
-        if ($dir === '' || !is_dir($dir)) return 0;
+        $quellen = array_values(array_filter([$k->lauschenEingang(), self::$data . '/ablage'], fn($d) => $d !== '' && is_dir($d)));
         $n = 0;
-        foreach (glob($dir . '/*') ?: [] as $f) {
+        foreach ($quellen as $dir) foreach (glob($dir . '/*') ?: [] as $f) {
             $name = basename($f);
             if (!is_file($f) || is_link($f) || str_starts_with($name, '.')) continue;
+            if (!self::fertigKopiert($f)) continue;   // wird gerade noch geschrieben (Windows-Freigabe „Fax-Ausgang“)
             try {
                 $roh = @file_get_contents($f);
                 if ($roh === false) { error_log('fax: Lauschordner: ' . $name . ' ist nicht lesbar (Rechte); bleibt liegen.'); continue; }

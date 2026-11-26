@@ -71,6 +71,9 @@ elif prog == 'cancel':
         if j['id'] in args or ('-a' in args and j['id'].rsplit('-', 1)[0] == args[-1]):
             j['fertig'] = True
     save()
+elif prog == 'smbpasswd':
+    data.setdefault('smbpasswd', []).append([list(args), sys.stdin.read() if '-s' in args else ''])
+    save()
 elif prog == 'testparm':
     save()
     sys.exit(0)

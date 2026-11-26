@@ -183,21 +183,50 @@ class Ablage(Umgebung):
         (nas / 'notiz.txt').write_bytes(b'nicht gewollt')
         (nas / 'unter').mkdir()
         (nas / 'halb.pdf.part').write_bytes(b'x')
+        (nas / 'Datenschutzerkl\u00e4rung_2.pdf').write_bytes(b'%PDF-1.4 umlaut')                 # Umlaute sind erlaubt
+        (nas / 'Ueberweisung (neu).pdf').write_bytes(b'%PDF-1.4 klammer')
+        (nas / 'Gr\u00fc\u00dfe;rm.pdf').write_bytes(b'x')                                        # Semikolon bleibt verboten
+        (nas / 'a\u0308lter.pdf').write_bytes(b'%PDF-1.4 nfd')                                    # a + Trema (getrennt) wird zu \u00e4
         d = self.lauschen()
         jobs = self.ab.process()
         self.assertEqual(jobs['fax/lauschen']['zustand'], 'ok', jobs)
-        self.assertEqual(jobs['fax/lauschen']['anzahl'], 1)
+        self.assertEqual(jobs['fax/lauschen']['anzahl'], 5 - 1)
+        self.assertEqual(sorted(p.name for p in (d / 'eingang').iterdir()),
+                         ['Datenschutzerkl\u00e4rung_2.pdf', 'Ueberweisung (neu).pdf', 'brief.pdf', '\u00e4lter.pdf'])
+        self.assertEqual((d / 'eingang/Datenschutzerkl\u00e4rung_2.pdf').read_bytes(), b'%PDF-1.4 umlaut')
+        self.assertTrue((nas / 'Gr\u00fc\u00dfe;rm.pdf').exists(), 'Name mit Semikolon wird nicht angefasst')
         self.assertEqual((d / 'eingang/brief.pdf').read_bytes(), b'%PDF-1.4 brief')
         self.assertEqual(oct((d / 'eingang/brief.pdf').stat().st_mode & 0o777), '0o664')   # Modul liest als Ordnerbesitzer
         self.assertFalse((nas / 'brief.pdf').exists(), 'auf dem NAS gelöscht')
         self.assertTrue((nas / 'notiz.txt').exists() and (nas / 'halb.pdf.part').exists())
         (nas / 'brief.pdf').write_bytes(b'%PDF-1.4 zweiter')                      # gleicher Name: nichts überschreiben
         self.ab.process()
-        self.assertEqual(sorted(p.name for p in (d / 'eingang').iterdir()), ['1-brief.pdf', 'brief.pdf'])
+        self.assertEqual(sorted(p.name for p in (d / 'eingang').iterdir()),
+                         ['1-brief.pdf', 'Datenschutzerkl\u00e4rung_2.pdf', 'Ueberweisung (neu).pdf', 'brief.pdf', '\u00e4lter.pdf'])
         (d / 'eingang/brief.pdf').chmod(0o660)            # Datei aus früherer Version: wird beim nächsten Lauf lesbar
         self.ab.process()
         self.assertEqual(oct((d / 'eingang/brief.pdf').stat().st_mode & 0o777), '0o664')
         self.assertEqual((d / 'eingang/brief.pdf').read_bytes(), b'%PDF-1.4 brief')
+
+    def test_lauschen_nur_schnell(self):
+        """Der schnelle Durchlauf (alle 15 Sekunden) holt nur Lauschordner-Dateien, ohne Aufträge anzufassen, und lässt sich nicht überlappen."""
+        self.targets(self.SMB)
+        self.assertEqual(self.ab.lauschen_nur(), {}, 'ohne Anfrage: nichts zu tun')
+        nas = self.t / 'nas/praxis/Kienzle/Ablage/Fax-Ausgang'
+        nas.mkdir(parents=True)
+        (nas / 'schnell.pdf').write_bytes(b'%PDF-1.4 schnell')
+        d = self.lauschen()
+        self.job(ziel='synology')                                    # offener Auftrag: darf der schnelle Lauf nicht berühren
+        sperre = self.ab._sperre(True)
+        self.assertEqual(self.ab.lauschen_nur(), {}, 'läuft der Auftragsdurchlauf, wird ausgesetzt')
+        self.assertFalse((d / 'eingang/schnell.pdf').exists())
+        sperre.close()
+        neu = self.ab.lauschen_nur()
+        self.assertEqual(neu['fax/lauschen']['anzahl'], 1)
+        self.assertEqual((d / 'eingang/schnell.pdf').read_bytes(), b'%PDF-1.4 schnell')
+        status = json.loads((self.ab.STATE / 'status.json').read_text())['auftraege']
+        self.assertEqual(status['fax/lauschen']['anzahl'], 1)
+        self.assertNotIn('kasse/auftrag-0001', status, 'Aufträge bleiben dem normalen Durchlauf überlassen')
 
     def test_lauschordner_sftp_endungen_und_fehler(self):
         self.targets(self.SFTP)
