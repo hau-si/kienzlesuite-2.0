@@ -81,34 +81,58 @@ wirft(fn() => Fax::abbrechen('JOB-../x'), 'Auftrags-ID geprüft');
 
 // Ergebnisse des Workers (nachgestellt) abholen
 mkdir("$dir/austausch/sendeberichte", 0770);
+mkdir("$dir/austausch/sendeberichte/eingang", 0770, true);
 mkdir("$dir/austausch/sendefehler/berichte", 0770, true);
 mkdir("$dir/austausch/sendefehler/eingang", 0770, true);
 mkdir("$dir/austausch/empfang", 0770);
 $ok = ['job_id' => 'JOB-20260101-120000-aaaaaa', 'status' => 'OK', 'finalized_at' => '2026-01-01T12:05:00+00:00', 'recipient' => ['name' => 'Labor Beispiel', 'number' => '49309876543'],
-    'source' => ['filename_original' => 'Befund.pdf'], 'result' => ['faxpages_sent' => 2, 'reason' => 'OK'], 'attempt' => ['current' => 1]];
+    'source' => ['filename_original' => 'Befund.pdf'], 'result' => ['faxpages_sent' => 2, 'reason' => 'OK'], 'attempt' => ['current' => 1], 'options' => ['ecm' => true, 'resolution' => 'fine']];
 file_put_contents("$dir/austausch/sendeberichte/Befund__JOB-20260101-120000-aaaaaa.json", json_encode($ok));
 file_put_contents("$dir/austausch/sendeberichte/Befund__JOB-20260101-120000-aaaaaa__OK.pdf", $pdf);
+file_put_contents("$dir/austausch/sendeberichte/eingang/Befund__JOB-20260101-120000-aaaaaa.pdf", $pdf);   // Original, seit Worker 1.3.20 auch bei Erfolg abgelegt
 $f = ['job_id' => 'JOB-20260101-130000-bbbbbb', 'status' => 'FAILED', 'end_time' => '2026-01-01T13:10:00+00:00', 'recipient' => ['name' => 'Dr. Erika Beispiel', 'number' => '49301112223'],
-    'source' => ['filename_original' => 'Brief.pdf'], 'result' => ['reason' => 'BUSY max attempts reached'], 'attempt' => ['current' => 15]];
+    'source' => ['filename_original' => 'Brief.pdf'], 'result' => ['reason' => 'BUSY max attempts reached'], 'attempt' => ['current' => 15], 'options' => ['ecm' => false, 'resolution' => 'standard']];
 file_put_contents("$dir/austausch/sendefehler/berichte/Brief__JOB-20260101-130000-bbbbbb.json", json_encode($f));
 file_put_contents("$dir/austausch/sendefehler/berichte/Brief__JOB-20260101-130000-bbbbbb__FAILED.pdf", $pdf);
-file_put_contents("$dir/austausch/sendefehler/eingang/Brief.pdf", $pdf);
+file_put_contents("$dir/austausch/sendefehler/eingang/Brief__JOB-20260101-130000-bbbbbb.pdf", $pdf);   // Dateiname trägt seit Worker 1.3.20 immer die Job-ID
 file_put_contents("$dir/austausch/empfang/20260101-140000_49301234500_1767276000123.pdf", $pdf);
 file_put_contents("$dir/austausch/empfang/20260101-150000_unbekannt_1767279600123.pdf", $pdf);   // noch ohne JSON: unvollständig
 file_put_contents("$dir/austausch/empfang/20260101-140000_49301234500_1767276000123.json", json_encode(['empfangen' => '2026-01-01T14:00:00+00:00', 'absender' => '49301234500', 'seiten' => 3, 'status' => 'SUCCESS']));
 $ab = Fax::abholen();
-check($ab === 7, "sieben Dateien abgeholt ($ab)");
-check(is_file("$dir/austausch/empfang/20260101-150000_unbekannt_1767279600123.pdf") && !glob("$dir/austausch/sendeberichte/*"), 'unvollständiger Eingang bleibt, Berichte weg');
+check($ab === 8, "acht Dateien abgeholt ($ab)");
+check(is_file("$dir/austausch/empfang/20260101-150000_unbekannt_1767279600123.pdf"), 'unvollständiger Eingang bleibt');
+check(!glob("$dir/austausch/sendeberichte/*.{pdf,json}", GLOB_BRACE) && !glob("$dir/austausch/sendeberichte/eingang/*"), 'Berichte und Originale aus dem Austauschordner geholt');
 check((fileperms("$dir/daten/protokoll/Befund__JOB-20260101-120000-aaaaaa__OK.pdf") & 0777) === 0600, 'Bericht im Datenordner 0600');
 $p = Fax::berichte('protokoll');
-check(count($p) === 1 && $p[0]['seiten'] === '2' && $p[0]['pdf'] !== '' && $p[0]['name'] === 'Labor Beispiel', 'Sendeprotokoll');
+check(count($p) === 1 && $p[0]['seiten'] === '2' && $p[0]['pdf'] !== '' && $p[0]['name'] === 'Labor Beispiel' && $p[0]['original'] === true, 'Sendeprotokoll, Original vorhanden');
 $fe = Fax::berichte('fehler');
-check(count($fe) === 1 && $fe[0]['versuche'] === 15 && str_contains($fe[0]['grund'], 'BUSY'), 'Fehlerbericht');
-check(count(Fax::quellenZaehler()) === 5 && Fax::quellenZaehler()['sendefehler'] === 1, 'Original zum erneuten Senden');
+check(count($fe) === 1 && $fe[0]['versuche'] === 15 && str_contains($fe[0]['grund'], 'BUSY') && $fe[0]['original'] === true, 'Fehlerbericht, Original vorhanden');
+check(count(Fax::quellenZaehler()) === 5 && Fax::quellenZaehler()['sendefehler'] === 1, 'Original zum erneuten Senden (Quelle „Sendefehler“)');
+
+// Knopf „Erneut senden“ in Fehlerberichte und Sendeprotokoll (jeweils mit demselben Empfänger und denselben Einstellungen)
+$vorQueue = glob("$dir/austausch/queue/JOB-*", GLOB_ONLYDIR) ?: [];
+check(Fax::berichtErneutSenden('fehler', $fe[0]['json'], 'mfa2') === 1, 'Fehlerbericht: erneut senden');
+$neuQueue = array_values(array_diff(glob("$dir/austausch/queue/JOB-*", GLOB_ONLYDIR) ?: [], $vorQueue));
+check(count($neuQueue) === 1, 'genau ein neuer Auftrag in der Queue');
+$job = json_decode((string)file_get_contents($neuQueue[0] . '/job.json'), true);
+check($job['recipient']['number'] === '49301112223' && $job['options']['resolution'] === 'standard' && $job['options']['ecm'] === false, 'erneut gesendet: derselbe Empfänger, dieselben Einstellungen');
+check(Fax::berichte('fehler')[0]['original'] === false, 'Fehlerbericht: Original nach dem Senden verbraucht');
+wirft(fn() => Fax::berichtErneutSenden('fehler', $fe[0]['json'], 'mfa2'), 'kein zweites Mal ohne Original', 'liegt nicht mehr vor');
+
+check(Fax::berichtErneutSenden('protokoll', $p[0]['json'], 'mfa2') === 1, 'Sendeprotokoll: erneut senden');
+check(Fax::berichte('protokoll')[0]['original'] === false, 'Sendeprotokoll: Original nach dem Senden verbraucht');
+wirft(fn() => Fax::berichtErneutSenden('protokoll', $p[0]['json'], 'mfa2'), 'kein zweites Mal ohne Original', 'liegt nicht mehr vor');
+wirft(fn() => Fax::berichtErneutSenden('fehler', '../einstellungen.json', 'mfa2'), 'Bericht-Pfad geprüft');
+
 Fax::fehlerUebernehmen($fe[0]['json']);
 check(Fax::berichte('fehler') === [] && count(Fax::berichte('protokoll')) === 2, 'Fehler ins Protokoll übernommen');
-check(Fax::senden('sendefehler', ['Brief.pdf'], [['name' => 'Dr. Erika Beispiel', 'nummer' => '49301112223', 'merken' => false]], 'standard', false, 'mfa1') === 1, 'erneut senden');
 wirft(fn() => Fax::berichtLoeschen('protokoll', '../einstellungen.json'), 'Bericht-Pfad geprüft');
+
+// Original eines erfolgreich gesendeten Faxes wird nach 7 Tagen entfernt, der Bericht bleibt (Wunsch des Nutzers)
+file_put_contents(Fax::ordner('protokoll-original') . '/Alt__JOB-20260101-090000-cccccc.pdf', $pdf);
+touch(Fax::ordner('protokoll-original') . '/Alt__JOB-20260101-090000-cccccc.pdf', time() - (Fax::PROTOKOLL_ORIGINAL_TAGE + 1) * 86400);
+check(Fax::aufraeumen() >= 1 && Fax::berichte('protokoll') !== [], 'altes Original gelöscht, Sendeprotokoll bleibt');
+check(!is_file(Fax::ordner('protokoll-original') . '/Alt__JOB-20260101-090000-cccccc.pdf'), 'Original wirklich weg');
 
 // Eingang
 $ein = Fax::eingang();

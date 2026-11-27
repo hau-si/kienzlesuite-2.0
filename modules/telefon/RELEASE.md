@@ -1,5 +1,10 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.24
+
+- **Fax-Worker (`kienzlefax-worker.py`) auf 1.3.20:** Bei erfolgreich gesendeten Faxen wird das Original jetzt zusätzlich nach `sendeberichte/eingang/` kopiert (`copy_original_to_ok_in`, analog zum bestehenden `copy_original_to_fail_in` bei Fehlern), damit das Modul Fax erfolgreich gesendete Faxe für begrenzte Zeit erneut senden kann (Wunsch des Nutzers). Einzige bewusste Abweichung vom unveränderten Original-Worker von Dr. Thomas Kienzle, siehe Kommentar im Dateikopf. Zugleich trägt der Dateiname eines zum erneuten Senden aufbewahrten Originals (Erfolg wie Fehler) jetzt immer die Auftrags-ID, nicht nur bei einer Namenskollision, damit das Modul Fax das richtige Original eindeutig findet.
+- Format des Austauschordners entsprechend ergänzt (`modules/telefon/docs/AUSTAUSCH-FAX.md`).
+
 ## 0.1.0-beta.23
 
 - **Sicherheitsupdates für die optionale Sprachausgabe Kokoro** (GitHub-Sicherheitswarnungen): Das Modul lädt Kokoro jetzt mit einer eigenen Paketliste `lib/kokoro/requirements-cpu.lock.txt` – die Liste von Kienzlefon mit neueren Fassungen von `certifi` (2026.10.18), `filelock` (4.2.1), `setuptools` (84.1.0), `transformers` (4.57.6) und dazu `tokenizers` (0.22.2). Die Liste von Thomas bleibt unverändert (übernommener Code); die Modellliste mit den Prüfsummen kommt weiter von dort.

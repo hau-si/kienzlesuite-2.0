@@ -1,12 +1,15 @@
 #!/usr/bin/python3
 # Übernommen aus Kienzlefax 3.5.0 (installer-modular/worker.sh) von Dr. Thomas Kienzle, MIT-Lizenz.
-# Kienzle-Suite, Modul telefon: gestartet von fax-dienst (Umgebung aus dem Datenordner), sonst unverändert.
+# Kienzle-Suite, Modul telefon: gestartet von fax-dienst (Umgebung aus dem Datenordner).
+# Abweichung vom Original (seit 1.3.20, Kienzle-Suite): finalize_ok legt das Original zusätzlich in
+# sendeberichte/eingang/ ab, analog zu copy_original_to_fail_in, damit das Modul Fax erfolgreich gesendete
+# Faxe für begrenzte Zeit erneut senden kann (Wunsch des Nutzers, Modul Fax löscht das Original nach 7 Tagen).
 # -*- coding: utf-8 -*-
 """
 kienzlefax-worker.py — Asterisk-Only Worker (SendFAX)
-Version: 1.3.19
-Stand:  2026-07-07
-Autor:  Dr. Thomas Kienzle
+Version: 1.3.20
+Stand:  2026-11-27
+Autor:  Dr. Thomas Kienzle (Kienzle-Suite: Original-Aufbewahrung bei Erfolg, s. o.)
 
 Changelog (komplett):
 - 1.2.4:
@@ -98,6 +101,10 @@ Changelog (komplett):
     dial_start nach erfolgreicher Provider-Kapazitaetsreservierung erhoeht.
   - Status DEFERRED bei voller externer Kapazitaet wird nach dem normalen Cooldown
     ohne Verbrauch eines Sendeversuchs in die Queue zurueckgestellt.
+- 1.3.20 (Kienzle-Suite, Abweichung vom Original):
+  - finalize_ok legt das Original zusaetzlich unter sendeberichte/eingang/ ab
+    (copy_original_to_ok_in, analog zu copy_original_to_fail_in), damit das Modul Fax
+    erfolgreich gesendete Faxe fuer eine begrenzte Zeit erneut senden kann.
 """
 
 import fcntl
@@ -117,6 +124,7 @@ BASE = Path(os.environ.get("KFX_BASE", "/var/spool/kienzle/austausch/fax_telefon
 QUEUE = BASE / "queue"
 PROC = BASE / "processing"
 ARCH_OK = BASE / "sendeberichte"
+OK_IN = ARCH_OK / "eingang"
 FAIL_IN = BASE / "sendefehler" / "eingang"
 FAIL_OUT = BASE / "sendefehler" / "berichte"
 
@@ -547,7 +555,7 @@ def merge_report_and_doc(report_pdf: Path, doc_pdf: Path, out_pdf: Path) -> None
         raise RuntimeError(f"qpdf merge failed rc={rc} out={so.strip()} err={se.strip()}")
 
 def ensure_dirs() -> None:
-    for p in (QUEUE, PROC, ARCH_OK, FAIL_IN, FAIL_OUT):
+    for p in (QUEUE, PROC, ARCH_OK, OK_IN, FAIL_IN, FAIL_OUT):
         safe_mkdir(p)
 
 def acquire_lock() -> None:
@@ -671,6 +679,8 @@ def find_original_pdf_in_jobdir(jobdir: Path) -> Optional[Path]:
     return None
 
 def copy_original_to_fail_in(jobdir: Path, job: Dict[str, Any]) -> None:
+    # Kienzle-Suite (1.3.20): Dateiname trägt immer die Job-ID (vorher nur bei einer Namenskollision), damit das
+    # Modul Fax das Original eines bestimmten Fehlerberichts eindeutig wiederfindet (Knopf „Erneut senden“).
     safe_mkdir(FAIL_IN)
     src = job.get("source") or {}
     jobid = job.get("job_id") or jobdir.name
@@ -678,11 +688,23 @@ def copy_original_to_fail_in(jobdir: Path, job: Dict[str, Any]) -> None:
     if not orig_path:
         return
     base = sanitize_basename(Path(src.get("filename_original") or "document").stem) or "document"
-    dest = FAIL_IN / f"{base}.pdf"
-    if dest.exists():
-        dest = FAIL_IN / f"{base}__{jobid}.pdf"
+    dest = FAIL_IN / f"{base}__{jobid}.pdf"
     shutil.copy2(str(orig_path), str(dest))
     log(f"fail: original copied -> {dest.name}")
+
+def copy_original_to_ok_in(jobdir: Path, job: Dict[str, Any]) -> None:
+    # Kienzle-Suite (1.3.20): analog zu copy_original_to_fail_in, mit Job-ID im Dateinamen, damit das Modul Fax
+    # das Original eines bestimmten Sendeprotokoll-Eintrags eindeutig wiederfindet (Knopf „Erneut senden“).
+    safe_mkdir(OK_IN)
+    src = job.get("source") or {}
+    jobid = job.get("job_id") or jobdir.name
+    orig_path = find_original_pdf_in_jobdir(jobdir)
+    if not orig_path:
+        return
+    base = sanitize_basename(Path(src.get("filename_original") or "document").stem) or "document"
+    dest = OK_IN / f"{base}__{jobid}.pdf"
+    shutil.copy2(str(orig_path), str(dest))
+    log(f"ok: original copied -> {dest.name}")
 
 def build_report_pdf(job: Dict[str, Any], out_pdf: Path) -> None:
     from reportlab.lib.pagesizes import A4
@@ -992,6 +1014,10 @@ def submit_job(jobdir: Path) -> None:
 
 def finalize_ok(jobdir: Path, job: Dict[str, Any]) -> None:
     safe_mkdir(ARCH_OK)
+    try:
+        copy_original_to_ok_in(jobdir, job)
+    except Exception as e:
+        log(f"ok: copy original failed: {e}")
     src = job.get("source") or {}
     base = sanitize_basename(Path(src.get("filename_original") or "fax").stem)
     jobid = job.get("job_id") or jobdir.name
