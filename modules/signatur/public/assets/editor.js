@@ -246,6 +246,21 @@
   var art = $('ed-art');
   Object.keys(D.arten).forEach(function (k) { art.appendChild(new Option(D.arten[k], k)); });
   $('ed-titel').value = vorlage.titel; art.value = vorlage.art; $('ed-aktiv').checked = vorlage.aktiv; $('ed-kuerzel').value = vorlage.kuerzel || ''; $('ed-gruppen').value = vorlage.gruppen || '';
+  var imp = $('ed-import');
+  if (imp) imp.addEventListener('change', function () {
+    var f = imp.files[0], st = $('ed-import-stand'); if (!f) return;
+    if (f.size > 20000000) { st.textContent = 'Die Datei ist zu groß (höchstens 20 MB).'; return; }
+    st.textContent = 'Wird importiert …';
+    fetch(D.basis + '/editor/import', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/octet-stream', 'X-Kienzle-CSRF': csrf }, body: f })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }, function () { return { ok: false, j: {} }; }); })
+      .then(function (r) {
+        imp.value = '';
+        if (!r.ok || !r.j.ok) { st.textContent = r.j.error || 'Import nicht möglich.'; return; }
+        st.textContent = r.j.titel.length + ' Vorlage(n) importiert: ' + r.j.titel.join(', ') + '. Die Seite wird neu geladen …';
+        geaendert = false; setTimeout(function () { location.reload(); }, 1200);
+      })
+      .catch(function () { st.textContent = 'Die Verbindung wurde unterbrochen.'; });
+  });
   var vs = $('ed-vsuche');
   if (vs) vs.addEventListener('input', function () {
     var q = vs.value.trim().toLowerCase();

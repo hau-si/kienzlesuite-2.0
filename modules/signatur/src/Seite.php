@@ -135,6 +135,69 @@ final class Seite {
         return array_map('intval', $st->fetchAll(\PDO::FETCH_COLUMN));
     }
 
+    public const EXPORT_FORMAT = 'praxisherz-signatur-vorlagen';
+    public const MAX_IMPORT = 20 * 1024 * 1024;
+
+    /**
+     * Vorlagen als JSON-Datei (Wunsch des Nutzers): Titel, Art, Gruppen, Kürzel, Bausteine; Bilder eingebettet (Base64).
+     * Keine Patientendaten, keine Vorgänge. @param list<int> $ids leer = alle
+     */
+    public static function vorlagenExport(array $ids = []): string {
+        $liste = []; $bilder = [];
+        foreach (self::vorlagen() as $v) {
+            if ($ids && !in_array((int)$v['id'], $ids, true)) continue;
+            $bl = self::bloeckeVon($v);
+            foreach ($bl as $b) if (($b['typ'] ?? '') === 'bild' && !empty($b['datei']) && ($pfad = Bausteine::bildPfad((string)$b['datei'])) !== null) $bilder[$b['datei']] = base64_encode((string)file_get_contents($pfad));
+            $liste[] = ['titel' => (string)$v['titel'], 'art' => (string)$v['art'], 'gruppen' => (string)$v['gruppen'], 'kuerzel' => (string)$v['kuerzel'], 'aktiv' => (bool)(int)$v['aktiv'], 'bloecke' => $bl];
+        }
+        if (!$liste) throw new \InvalidArgumentException('Keine Vorlage zum Exportieren.');
+        return json_encode(['format' => self::EXPORT_FORMAT, 'version' => 1, 'erstellt' => date('c'), 'vorlagen' => $liste, 'bilder' => (object)$bilder],
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * Vorlagen aus einer Exportdatei als neue Vorlagen anlegen (nie überschreiben; gleicher Titel → „(Import)“).
+     * Alles wird wie im Editor geprüft; Bilder neu gespeichert. Alles oder nichts. @return list<string> angelegte Titel
+     */
+    public static function vorlagenImport(string $roh): array {
+        if ($roh === '' || strlen($roh) > self::MAX_IMPORT) throw new \InvalidArgumentException('Die Datei ist leer oder größer als 20 MB.');
+        $d = json_decode($roh, true, 64);
+        if (!is_array($d) || ($d['format'] ?? '') !== self::EXPORT_FORMAT || !is_array($d['vorlagen'] ?? null)) throw new \InvalidArgumentException('Das ist keine Exportdatei der Signatur-Vorlagen.');
+        if ((int)($d['version'] ?? 0) !== 1) throw new \InvalidArgumentException('Diese Exportdatei stammt aus einer neueren Fassung. Bitte die Signatur aktualisieren.');
+        if (!$d['vorlagen'] || count($d['vorlagen']) > 200) throw new \InvalidArgumentException('Die Datei enthält keine oder zu viele Vorlagen (höchstens 200).');
+        $bilder = is_array($d['bilder'] ?? null) ? $d['bilder'] : [];
+        $vorhanden = array_map(fn($v) => mb_strtolower((string)$v['titel']), self::vorlagen());
+        $pdo = self::pdo();
+        $pdo->beginTransaction();
+        $titel = [];
+        try {
+            foreach ($d['vorlagen'] as $n => $v) {
+                if (!is_array($v) || !is_array($v['bloecke'] ?? null)) throw new \InvalidArgumentException('Vorlage ' . ($n + 1) . ' ist unvollständig.');
+                $bl = $v['bloecke'];
+                foreach ($bl as &$b) {
+                    if (!is_array($b) || ($b['typ'] ?? '') !== 'bild' || empty($b['datei'])) continue;
+                    $roh64 = $bilder[(string)$b['datei']] ?? null;
+                    $bytes = is_string($roh64) ? base64_decode($roh64, true) : false;
+                    if ($bytes === false) throw new \InvalidArgumentException('Vorlage ' . ($n + 1) . ': ein Bild fehlt in der Datei.');
+                    $b['datei'] = Bausteine::bildSpeichern($bytes);
+                }
+                unset($b);
+                $t = self::zeile($v['titel'] ?? '', 'Titel', 80);
+                $basis = $t;
+                for ($i = 1; in_array(mb_strtolower($t), $vorhanden, true); $i++) $t = mb_substr($basis, 0, 68) . ' (Import' . ($i > 1 ? " $i" : '') . ')';
+                $vorhanden[] = mb_strtolower($t);
+                self::vorlageSpeichern(['art' => (string)($v['art'] ?? ''), 'titel' => $t, 'aktiv' => !empty($v['aktiv']), 'kuerzel' => (string)($v['kuerzel'] ?? ''),
+                    'gruppen' => (string)($v['gruppen'] ?? ''), 'bloecke' => json_encode($bl, JSON_UNESCAPED_UNICODE)]);
+                $titel[] = $t;
+            }
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+        return $titel;
+    }
+
     public static function vorlageSpeichern(array $in): int {
         $id = (int)($in['id'] ?? 0);
         $art = (string)($in['art'] ?? '');

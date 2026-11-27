@@ -406,6 +406,30 @@ check(str_contains($ed2, 'id="ed-vsuche"') && str_contains($ed2, 'class="ed-vgko
 Ansicht::$editorVorlage = '';
 Seite::favorit($vid, false);
 wirft(fn() => Seite::favorit(999999, true), 'Favorit unbekannter Vorlage');
+// Export und Import: Datei mit Bildern, Import legt neue Vorlagen an (Titel mit „(Import)“), alles geprüft
+$bildName = Bausteine::bildSpeichern($png);
+$mitBild = Seite::vorlageSpeichern(['art' => 'aufklaerung', 'titel' => 'Export-Test', 'aktiv' => 1, 'gruppen' => 'Aufklärungen', 'kuerzel' => 'AUFK',
+    'bloecke' => json_encode([['typ' => 'text', 'text' => 'Hallo {{patient}}'], ['typ' => 'bild', 'datei' => $bildName], ['typ' => 'ankreuz', 'text' => 'Ja', 'akte' => 'OK: {{antwort}}']])]);
+$exp = Seite::vorlagenExport([$mitBild]);
+$ed = json_decode($exp, true);
+check($ed['format'] === Seite::EXPORT_FORMAT && count($ed['vorlagen']) === 1 && isset($ed['bilder'][$bildName]) && !str_contains($exp, 'Max Mustermann'), 'Export mit Bild, ohne Patientendaten');
+check(count(json_decode(Seite::vorlagenExport(), true)['vorlagen']) === count(Seite::vorlagen()), 'alle exportieren');
+foreach (glob(Speicher::$data . '/bilder/*') ?: [] as $f) @unlink($f);
+$anz = count(Seite::vorlagen());
+$neuTitel = Seite::vorlagenImport($exp);
+check($neuTitel === ['Export-Test (Import)'] && count(Seite::vorlagen()) === $anz + 1, 'Import legt neue Vorlage an');
+$imp = null; foreach (Seite::vorlagen() as $x) if ($x['titel'] === 'Export-Test (Import)') $imp = $x;
+$ib = Seite::bloeckeVon($imp);
+check($imp['gruppen'] === 'Aufklärungen' && $imp['kuerzel'] === 'AUFK' && Bausteine::bildPfad($ib[1]['datei']) !== null && $ib[2]['akte'] === 'OK: {{antwort}}', 'Import: Gruppen, Kürzel, Bild, Akteneintrag');
+check(Seite::vorlagenImport($exp) === ['Export-Test (Import 2)'], 'zweiter Import: eigener Titel');
+$kaputt = $ed; $kaputt['vorlagen'][] = ['titel' => 'Böse', 'art' => 'sonstige', 'bloecke' => [['typ' => 'text', 'text' => '{{geheim}}']]];
+$anz = count(Seite::vorlagen());
+wirft(fn() => Seite::vorlagenImport(json_encode($kaputt)), 'Import mit ungültigem Baustein');
+check(count(Seite::vorlagen()) === $anz, 'Import: alles oder nichts');
+wirft(fn() => Seite::vorlagenImport('{"format":"anders"}'), 'fremde Datei');
+$ohneBild = $ed; $ohneBild['bilder'] = [];
+wirft(fn() => Seite::vorlagenImport(json_encode($ohneBild)), 'Bild fehlt');
+foreach (glob(Speicher::$data . '/bilder/*') ?: [] as $f) @unlink($f); @rmdir(Speicher::$data . '/bilder');
 
 // Anrede-Platzhalter
 $at = Seite::vorlageSpeichern(['art' => 'sonstige', 'titel' => 'Anrede-Test', 'text' => '{{briefanrede}}|{{anrede}}|{{vorname}}|{{nachname}}', 'aktiv' => 1]);

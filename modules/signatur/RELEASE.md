@@ -1,5 +1,11 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.46
+
+- **Vorlagen exportieren und importieren:** Im Editor unter den Vorlagen „Alle exportieren“ und „Importieren …“, oben am Dokument ein Symbol zum Exportieren der gewählten Vorlage. Die Datei (JSON) enthält Titel, Art, Gruppen, Kürzel und Bausteine samt Bildern, keine Vorgänge und keine Patientendaten.
+- Der Import legt immer neue Vorlagen an (gleicher Titel → „(Import)“), prüft alles wie beim Speichern im Editor und übernimmt nur ganz oder gar nicht. Höchstens 20 MB, roh hochgeladen.
+- Mit Tests und im Browser (ohne Server) geprüft, nicht auf der VM.
+
 ## 0.1.0-beta.45
 
 - **Dokumentliste auf der Startseite:** Suchfeld oben (Namensteile), Filter „Alle“, „★ Favoriten“ und je Gruppe, Zeile „Zuletzt“ mit den zuletzt verwendeten Vorlagen (Klick wählt sie). Stern je Vorlage: Favoriten stehen oben (gilt für die ganze Praxis, wie im Fax). Vorgewählt ist die zuletzt verwendete Vorlage.

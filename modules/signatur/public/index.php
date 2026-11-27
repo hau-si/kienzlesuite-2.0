@@ -102,6 +102,39 @@ try {
             $antwort(['error' => 'Speichern nicht möglich (' . get_class($e) . ').'], 500);
         }
     }
+    if ($rel === '/editor/export') {
+        // Vorlagen als JSON-Datei herunterladen (?id=<id> eine, sonst alle). Recht „vorlagen“.
+        if (!$darfVorlage) $k->verweigern();
+        try {
+            $id = (int)($_GET['id'] ?? 0);
+            $json = Seite::vorlagenExport($id > 0 ? [$id] : []);
+        } catch (InvalidArgumentException $e) { http_response_code(404); echo sg_h($e->getMessage()); exit; }
+        $name = $id > 0 ? preg_replace('/[^A-Za-z0-9ÄÖÜäöüß_-]+/u', '-', (string)(Seite::vorlage($id)['titel'] ?? 'vorlage')) : 'alle';
+        header('Content-Type: application/json; charset=utf-8');
+        header('Content-Disposition: attachment; filename="signatur-vorlagen-' . date('Y-m-d') . '.json"; filename*=UTF-8\'\'' . rawurlencode('signatur-vorlage-' . trim((string)$name, '-') . '-' . date('Y-m-d') . '.json'));
+        header('Cache-Control: no-store');
+        header('X-Content-Type-Options: nosniff');
+        echo $json;
+        exit;
+    }
+    if ($rel === '/editor/import') {
+        // Exportdatei roh hochladen (nicht multipart). Legt nur neue Vorlagen an.
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        $antwort = static function (array $d, int $code = 200): never { http_response_code($code); echo json_encode($d, JSON_UNESCAPED_UNICODE); exit; };
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') $antwort(['error' => 'Nur POST.'], 405);
+        if (!$darfVorlage) $antwort(['error' => 'Keine Berechtigung für Vorlagen.'], 403);
+        if (!$k->csrfGueltig($_SERVER['HTTP_X_KIENZLE_CSRF'] ?? null)) $antwort(['error' => 'Sitzung abgelaufen. Bitte die Seite neu laden.'], 403);
+        try {
+            $titel = Seite::vorlagenImport((string)file_get_contents('php://input', false, null, 0, Seite::MAX_IMPORT + 1));
+            $antwort(['ok' => true, 'titel' => $titel]);
+        } catch (InvalidArgumentException | JsonException $e) {
+            $antwort(['error' => $e->getMessage()], 422);
+        } catch (Throwable $e) {
+            error_log('signatur import: ' . get_class($e));
+            $antwort(['error' => 'Import nicht möglich (' . get_class($e) . ').'], 500);
+        }
+    }
     if ($rel === '/favorit') {
         // Favorit einer Vorlage an/aus (für die ganze Praxis, wie im Fax). JSON {id, an}, Suite-CSRF im Kopf.
         header('Content-Type: application/json; charset=utf-8');

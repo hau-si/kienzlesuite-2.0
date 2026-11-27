@@ -105,9 +105,9 @@ main.modul { max-width: 1400px; }
 /* Kopf: kleines Zahnrad rechts (nur Symbol), Symbol-Knöpfe in der linken Spalte (Archivieren, Löschen rot) */
 .us-zahnrad { padding: 0; width: 42px; }
 .us-zahnrad svg { margin: 0; width: 20px; height: 20px; }
-button.us-symbol { min-height: 30px; width: 32px; padding: 0; background: var(--soft); color: #315f53; border-radius: 8px; }
+button.us-symbol, a.us-symbol { display: inline-grid; place-items: center; min-height: 30px; width: 32px; padding: 0; background: var(--soft); color: #315f53; border-radius: 8px; }
 button.us-symbol.rot { background: #fdecea; color: #b42318; }
-button.us-symbol svg { width: 16px; height: 16px; }
+button.us-symbol svg, a.us-symbol svg { width: 16px; height: 16px; }
 
 /* Editor (Entwurf C): Bausteine | Dokument | Eigenschaften + Vorschau am Pad */
 .ed-grid { display: grid; grid-template-columns: 210px minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
@@ -188,3 +188,5 @@ button.ed-mini.breit { padding: 0 9px; }
 .ed-fav { color: #d99a00; }
 #ed-gruppen { width: 220px; }
 .ed-platzhalter { max-width: 100%; }
+.ed-austausch { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.ed-austausch .button.klein { display: inline-flex; align-items: center; font-size: 13px; font-weight: 600; padding: 6px 10px; min-height: 0; border-radius: 8px; cursor: pointer; background: var(--soft); color: #315f53; text-decoration: none; margin: 0; }

@@ -251,8 +251,13 @@ final class Ansicht {
             $liste .= '</div>';
         }
         $liste .= '<a class="ed-vorlage neu' . ($neu ? ' an' : '') . '" href="' . $h(sg_basis() . '/editor?vorlage=neu') . '">+ Neue Vorlage</a>';
+        // Export/Import (JSON-Datei, Bilder eingebettet; Import legt nur neue Vorlagen an).
+        $liste .= '<div class="ed-austausch"><a class="button klein" href="' . $h(sg_basis() . '/editor/export') . '" download>Alle exportieren</a>'
+            . '<label class="button klein" for="ed-import">Importieren …</label><input type="file" id="ed-import" accept=".json,application/json" hidden></div>'
+            . '<p class="muted klein-text" id="ed-import-stand" role="status" aria-live="polite"></p>';
         $palette = '';
         foreach (Bausteine::TYPEN as $typ => $name) $palette .= '<button type="button" class="ed-baustein" draggable="true" data-typ="' . $h($typ) . '">' . self::GRIFF . $h($name) . '</button>';
+        $export = $wahl ? '<a class="us-symbol" href="' . $h(sg_basis() . '/editor/export?id=' . (int)$wahl['id']) . '" download title="Diese Vorlage exportieren (Datei)" aria-label="Diese Vorlage exportieren">' . self::HERUNTER . '</a>' : '';
         $loeschen = $wahl && (int)$wahl['id'] !== $fest
             ? '<form method="post" class="inline" action="' . $h(sg_basis() . '/editor') . '">' . $csrfFeld . '<input type="hidden" name="aktion" value="vorlage-loeschen"><input type="hidden" name="id" value="' . (int)$wahl['id'] . '">'
                 . '<button type="submit" class="us-symbol rot" title="Vorlage löschen" aria-label="Vorlage löschen" data-bestaetigen="Diese Vorlage löschen? Bestehende Vorgänge behalten ihren Text.">' . self::MUELL . '</button></form>'
@@ -266,7 +271,7 @@ final class Ansicht {
             . '<input id="ed-gruppen" maxlength="200" list="ed-gruppenliste" placeholder="Gruppen, z. B. Aufklärungen" title="Gruppen (mit Komma trennen), z. B. Aufklärungen, Administratives, IGeL" aria-label="Gruppen der Vorlage">'
             . '<datalist id="ed-gruppenliste">' . implode('', array_map(fn($g) => '<option value="' . $h($g) . '">', Seite::alleGruppen($vorlagen))) . '</datalist>'
             . '<label class="check"><input type="checkbox" id="ed-aktiv"> aktiv</label></div>'
-            . '<div class="ed-aktionen"><span class="muted klein-text" id="ed-fassung"></span>' . $loeschen . '<button type="button" class="primary" id="ed-speichern">Speichern</button></div></div>'
+            . '<div class="ed-aktionen"><span class="muted klein-text" id="ed-fassung"></span>' . $export . $loeschen . '<button type="button" class="primary" id="ed-speichern">Speichern</button></div></div>'
             . '<p class="ed-meldung" id="ed-meldung" role="status" aria-live="polite" hidden></p>'
             . '<div class="ed-dokument" id="ed-dokument" aria-label="Dokument"></div></section>'
             . '<aside class="ed-rechts"><section class="card"><h2>Eigenschaften</h2><div id="ed-eigenschaften"><p class="muted">Eine Zeile im Dokument anklicken.</p></div></section>'
@@ -287,6 +292,7 @@ final class Ansicht {
     private const STIFT = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>';
     private const ARCHIV = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18v4H3zM5 8v12h14V8M10 12h4"/></svg>';
     private const EDITOR = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
+    private const HERUNTER = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>';
     private const STERN = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z"/></svg>';
     private const MUELL = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>';
 
