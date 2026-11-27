@@ -402,6 +402,36 @@ def text_mit_antworten(bloecke: list[dict], antworten: dict) -> str:
     return '\n\n'.join(t for t in teile if t).strip()
 
 
+def antwort_kurz(b: dict, w) -> str:
+    """Antwort eines Bausteins als kurzer Text für den Akteneintrag ({{antwort}})."""
+    typ = b.get('typ')
+    if typ == 'ankreuz':
+        return 'ja' if w is True else 'nein'
+    if typ == 'einzel':
+        opt = b.get('optionen', [])
+        return str(opt[w]) if isinstance(w, int) and 0 <= w < len(opt) else '-'
+    if typ == 'mehrfach':
+        opt = b.get('optionen', [])
+        gew = [str(opt[n]) for n in (w or []) if isinstance(n, int) and 0 <= n < len(opt)]
+        return ', '.join(gew) if gew else '-'
+    if typ == 'patientendaten':
+        alt = b.get('werte') or {}
+        return ', '.join(f"{FELDER.get(f, f)} {(w or {}).get(f, alt.get(f, '')) or '-'}" for f in b.get('felder', []))
+    return ''
+
+
+def akte_text(bloecke: list[dict], antworten: dict) -> str:
+    """Eintrag für die T2med-Akte: nur Bausteine mit eigenem Akteneintrag, {{antwort}} = Antwort am Pad (eine Zeile je Baustein)."""
+    zeilen = []
+    for b in bloecke:
+        vorlage = str(b.get('akte') or '').strip()
+        if not vorlage:
+            continue
+        zeile = re.sub(r'\{\{\s*antwort\s*\}\}', lambda _m: antwort_kurz(b, antworten.get(b.get('id'))), vorlage)
+        zeilen.append(ohne_auszeichnung(zeile).replace('\n', ' ').strip())
+    return '\n'.join(z for z in zeilen if z)[:4000]
+
+
 def kontakt_aenderungen(bloecke: list[dict], antworten: dict) -> tuple[dict, dict]:
     """(alt, neu) der am Pad geänderten E-Mail/Telefon-Werte (nur änderbare Felder); neu enthält nur Geändertes."""
     alt, neu = {}, {}

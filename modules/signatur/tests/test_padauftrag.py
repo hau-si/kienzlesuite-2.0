@@ -201,13 +201,13 @@ CREATE TABLE pads (id INTEGER PRIMARY KEY, name TEXT, arbeitsplatz TEXT DEFAULT 
 CREATE TABLE vorgaenge (id INTEGER PRIMARY KEY, titel TEXT, text TEXT, patient TEXT, status TEXT DEFAULT 'wartet', erstellt INTEGER DEFAULT 0,
   unterschrieben INTEGER DEFAULT 0, meldung TEXT DEFAULT '', pad_id INTEGER DEFAULT 0, bloecke TEXT DEFAULT '', antworten TEXT DEFAULT '',
   patient_id TEXT DEFAULT '', kontext TEXT DEFAULT '', kontakt_alt TEXT DEFAULT '', kontakt_neu TEXT DEFAULT '', kontakt_status TEXT DEFAULT '',
-  geburtsdatum TEXT DEFAULT '', praxis TEXT DEFAULT '');
+  geburtsdatum TEXT DEFAULT '', praxis TEXT DEFAULT '', akte TEXT DEFAULT '', kuerzel TEXT DEFAULT '');
 """
 BLOECKE = [
     {'id': 't1', 'typ': 'text', 'text': '# Datenschutz\nIch willige **ausdrücklich** ein, *bitte* lesen.\n- Behandlung'},
     {'id': 'p1', 'typ': 'patientendaten', 'felder': ['email', 'telefon'], 'aenderbar': True, 'werte': {'email': 'alt@example.org', 'telefon': '030 1'}},
-    {'id': 'a1', 'typ': 'ankreuz', 'text': 'Ich bin einverstanden', 'pflicht': True},
-    {'id': 'e1', 'typ': 'einzel', 'frage': 'Befund?', 'optionen': ['Post', 'E-Mail'], 'pflicht': True},
+    {'id': 'a1', 'typ': 'ankreuz', 'text': 'Ich bin einverstanden', 'pflicht': True, 'akte': 'Einwilligung: {{antwort}}'},
+    {'id': 'e1', 'typ': 'einzel', 'frage': 'Befund?', 'optionen': ['Post', 'E-Mail'], 'pflicht': True, 'akte': 'Befund per {{antwort}}'},
     {'id': 'm1', 'typ': 'mehrfach', 'frage': 'Wer darf Auskunft erhalten?', 'optionen': ['Hausarzt', 'Facharzt', 'Angehörige']},
     {'id': 's1', 'typ': 'seite'},
     {'id': 'l1', 'typ': 'liste', 'eintraege': ['eins', 'zwei'], 'nummeriert': True},
@@ -279,6 +279,7 @@ class FormularTest(unittest.TestCase):
         self.assertIn('Ich willige ausdrücklich ein, bitte lesen.', v['text'])
         self.assertEqual(json.loads(v['kontakt_neu']), {'telefon': '', 'email': 'neu@x.de'})
         self.assertEqual(v['kontakt_status'], 'offen')
+        self.assertEqual(v['akte'], 'Einwilligung: ja\nBefund per E-Mail', 'Akteneintrag nur aus Bausteinen mit eigenem Text')
         self.assertTrue(os.path.isfile(os.path.join(self.ordner, '1.pdf')))
 
     def test_pflichtfeld_haelt_auf(self):

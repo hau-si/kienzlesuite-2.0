@@ -151,8 +151,8 @@ final class Ansicht {
                     . '<label for="n-adresse">Anschrift</label><input id="n-adresse" name="adresse" maxlength="200">'
                     . '<label class="check" id="n-kontakt-box" hidden><input type="checkbox" name="kontakt_uebernehmen" value="1"> Geänderte Telefonnummer und E-Mail nach der Unterschrift in T2med übernehmen (Knopf in der Vorgangsliste)</label>'
                     . '</div></details>'
-                    . '<label for="n-leistung">Leistung oder Thema</label><input id="n-leistung" name="leistung" maxlength="120" placeholder="z. B. Ultraschall der Schilddrüse">'
-                    . '<label for="n-betrag">Betrag in Euro</label><input id="n-betrag" name="betrag" inputmode="decimal" maxlength="12" placeholder="z. B. 45,00">'
+                    // Leistung und Betrag nur noch aus der Kasse (Übergabe); eigene Texte gehören in die Vorlage (Editor).
+                    . '<input type="hidden" id="n-leistung" name="leistung" value=""><input type="hidden" id="n-betrag" name="betrag" value="">'
                     . '<label class="check"><input type="checkbox" name="druck_vorher" value="1"> Dokument vor der Unterschrift für den Patienten drucken</label>'
                     . '<label class="check"><input type="checkbox" name="druck_nachher" value="1"> Unterschriebenes Dokument danach drucken</label>'
                     . '<button class="primary" type="submit">Vorgang anlegen und ans Pad senden</button></form>';
@@ -206,9 +206,9 @@ final class Ansicht {
         $fest = Seite::festeVorlageId();
         $daten = [
             'basis' => sg_basis(),
-            'vorlage' => $wahl ? ['id' => (int)$wahl['id'], 'art' => $wahl['art'], 'titel' => $wahl['titel'], 'aktiv' => (bool)(int)$wahl['aktiv'], 'version' => (int)$wahl['version'],
+            'vorlage' => $wahl ? ['id' => (int)$wahl['id'], 'art' => $wahl['art'], 'titel' => $wahl['titel'], 'aktiv' => (bool)(int)$wahl['aktiv'], 'version' => (int)$wahl['version'], 'kuerzel' => (string)$wahl['kuerzel'],
                 'geaendert' => (int)$wahl['geaendert'] > 0 ? date('d.m.Y', (int)$wahl['geaendert']) : '', 'fest' => (int)$wahl['id'] === $fest]
-                : ['id' => 0, 'art' => 'aufklaerung', 'titel' => '', 'aktiv' => true, 'version' => 0, 'geaendert' => '', 'fest' => false],
+                : ['id' => 0, 'art' => 'aufklaerung', 'titel' => '', 'aktiv' => true, 'version' => 0, 'kuerzel' => '', 'geaendert' => '', 'fest' => false],
             'bloecke' => $wahl ? Seite::bloeckeVon($wahl) : [['id' => 'b1', 'typ' => 'text', 'text' => "# Titel\n\nText mit **fett** und *kursiv*."]],
             'arten' => Seite::ARTEN, 'typen' => Bausteine::TYPEN, 'felder' => Bausteine::FELDER, 'platzhalter' => Seite::PLATZHALTER,
         ];
@@ -230,7 +230,8 @@ final class Ansicht {
             . '<aside class="card ed-links"><h2>Bausteine</h2><p class="muted klein-text">Anklicken oder ins Dokument ziehen.</p><div class="ed-palette">' . $palette . '</div>'
             . '<h2 class="ed-abstand">Vorlagen</h2><nav class="ed-vorlagen">' . $liste . '</nav></aside>'
             . '<section class="card ed-mitte"><div class="ed-kopf"><div class="ed-dok"><input id="ed-titel" maxlength="80" placeholder="Titel der Vorlage" aria-label="Titel der Vorlage">'
-            . '<select id="ed-art" aria-label="Dokumentart"></select><label class="check"><input type="checkbox" id="ed-aktiv"> aktiv</label></div>'
+            . '<select id="ed-art" aria-label="Dokumentart"></select><input id="ed-kuerzel" maxlength="12" placeholder="Kürzel" title="Kürzel des Akteneintrags in T2med (z. B. EINW). Leer: kein Akteneintrag, nur das PDF." aria-label="Kürzel des Akteneintrags in T2med">'
+            . '<label class="check"><input type="checkbox" id="ed-aktiv"> aktiv</label></div>'
             . '<div class="ed-aktionen"><span class="muted klein-text" id="ed-fassung"></span>' . $loeschen . '<button type="button" class="primary" id="ed-speichern">Speichern</button></div></div>'
             . '<p class="ed-meldung" id="ed-meldung" role="status" aria-live="polite" hidden></p>'
             . '<div class="ed-dokument" id="ed-dokument" aria-label="Dokument"></div></section>'

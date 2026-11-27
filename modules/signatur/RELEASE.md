@@ -1,5 +1,12 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.44
+
+- **Eintrag in die Akte je Baustein:** Im Editor hat jeder Baustein (außer Trennlinie und Seitenumbruch) ein Feld „Eintrag in die Akte“ mit eigenem, meist kürzerem Text; `{{antwort}}` setzt die Antwort am Pad ein (ja/nein, gewählte Möglichkeit, Werte). Leer = der Baustein erscheint nicht im Eintrag.
+- **Kürzel der Vorlage** (Feld neben der Dokumentart, z. B. „EINW“; ohne Angabe „SIGN“). Nach der Unterschrift geht zuerst das PDF, dann der Eintrag als Freitext mit diesem Kürzel an T2med – direkt (Start aus T2med) oder über die Kasse. Scheitert nur der Eintrag, bleibt das PDF abgelegt und der Vorgang zeigt einen Hinweis.
+- **Neuer Vorgang:** „Leistung oder Thema“ und „Betrag in Euro“ entfallen (Inhalte stehen jetzt in der Vorlage; Werte aus der Kasse kommen weiter mit).
+- Datenbank 11 (`vorlagen.kuerzel`, `vorgaenge.kuerzel|akte`). Mit Tests geprüft, **nicht mit T2med und nicht auf der VM**.
+
 ## 0.1.0-beta.43
 
 - **Bausteine am Pad:** Das Pad zeichnet die Bausteine selbst (`lib/padformular.py`): Ankreuzfelder und Auswahl durch Antippen, Text mit Formatierung, Aufzählungen, Bilder, Trennlinien, Seitenumbrüche. Fragen bleiben mit ihren Möglichkeiten auf einer Seite.

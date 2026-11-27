@@ -28,7 +28,7 @@ class Ablage {
         foreach (self::antworten() as [$vid, $ok, $meldung]) {
             $v = Seite::vorgang($vid);
             if (!$v || $v['ablage'] !== 'an_kasse') continue;
-            if ($ok) self::setzen($vid, 'uebertragen', 'erledigt', '');
+            if ($ok) self::setzen($vid, 'uebertragen', 'erledigt', $meldung !== '' ? 'Kasse: ' . $meldung : '');
             else self::setzen($vid, $v['status'], 'fehler', 'Kasse: ' . $meldung);
             $log[] = "Vorgang $vid: Antwort der Kasse " . ($ok ? 'abgelegt' : 'Fehler');
         }
@@ -45,8 +45,16 @@ class Ablage {
                 } elseif ($v['kontext'] !== '') {
                     $token = Speicher::tokenHolen((string)$v['kontext'], $jetzt);
                     if ($token === null) { self::setzen($vid, 'unterschrieben', 'fehler', 'T2med-Zugang abgelaufen (höchstens 4 Stunden nach dem Aufruf). Bitte die Akte frisch aus T2med öffnen und „Erneut ablegen“ wählen.'); continue; }
-                    $fhir()->dokumentAblegen((string)$v['kontext'], $token, (string)file_get_contents($pdf), (string)$v['titel'], (int)$v['unterschrieben'] ?: $jetzt);
-                    self::setzen($vid, 'uebertragen', 'erledigt', '');
+                    $zeit = (int)$v['unterschrieben'] ?: $jetzt;
+                    $fhir()->dokumentAblegen((string)$v['kontext'], $token, (string)file_get_contents($pdf), (string)$v['titel'], $zeit);
+                    // Akteneintrag erst nach dem PDF; scheitert er, bleibt das PDF abgelegt (kein doppeltes PDF beim erneuten Versuch).
+                    $hinweis = '';
+                    [$kuerzel, $akte] = self::eintrag($v);
+                    if ($akte !== '') {
+                        try { $fhir()->eintragAblegen((string)$v['kontext'], $token, $kuerzel, $akte, $zeit); }
+                        catch (\Throwable $e) { $hinweis = 'PDF abgelegt, Akteneintrag nicht: ' . mb_substr($e->getMessage(), 0, 250); }
+                    }
+                    self::setzen($vid, 'uebertragen', 'erledigt', $hinweis);
                     $log[] = "Vorgang $vid: in T2med abgelegt";
                 } else {
                     self::setzen($vid, 'unterschrieben', 'manuell', '');
@@ -57,6 +65,14 @@ class Ablage {
             }
         }
         return $log;
+    }
+
+    /** @return array{string,string} Kürzel und Text des Akteneintrags (leer = kein Eintrag; Kürzel ohne Angabe „SIGN“). */
+    public static function eintrag(array $v): array {
+        $akte = trim((string)($v['akte'] ?? ''));
+        if ($akte === '') return ['', ''];
+        $kuerzel = (string)($v['kuerzel'] ?? '');
+        return [$kuerzel !== '' ? $kuerzel : 'SIGN', mb_substr((string)$v['titel'] . ":\n" . $akte, 0, 4000)];
     }
 
     /** Nach einem Fehler erneut versuchen (Knopf in der Liste). */
@@ -85,7 +101,8 @@ class Ablage {
         $vid = (int)$v['id'];
         self::schreiben("$ordner/$vid.pdf", $pdf);
         self::schreiben("$ordner/$vid.json", json_encode(['vorgang' => $vid, 'ref' => (string)$v['quelle_ref'], 'titel' => (string)$v['titel'],
-            'zeit' => (int)$v['unterschrieben'] ?: $jetzt, 'erstellt' => $jetzt], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+            'zeit' => (int)$v['unterschrieben'] ?: $jetzt, 'erstellt' => $jetzt] + (($e = self::eintrag($v))[1] !== '' ? ['kuerzel' => $e[0], 'akte' => $e[1]] : []),
+            JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
         return true;
     }
 
@@ -105,7 +122,8 @@ class Ablage {
             @unlink($datei);
             if (!is_array($d) || (int)($d['vorgang'] ?? 0) !== (int)$m[1]) continue;
             $meldung = mb_substr(trim(preg_replace('/[\x00-\x1f\x7f]+/u', ' ', (string)($d['meldung'] ?? '')) ?? ''), 0, 250);
-            $out[] = [(int)$m[1], ($d['ok'] ?? false) === true, $meldung !== '' ? $meldung : 'unbekannter Fehler'];
+            $ok = ($d['ok'] ?? false) === true;
+            $out[] = [(int)$m[1], $ok, $meldung !== '' || $ok ? $meldung : 'unbekannter Fehler'];
         }
         return $out;
     }

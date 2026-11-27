@@ -95,6 +95,7 @@ check(str_contains($liste, 'id="vg-suche"') && str_contains($liste, 'data-suche=
 check(!str_contains($start, 'id="vorlagen"') && !str_contains($liste, 'id="vorlagen"'), 'Vorlagen nur unter Einstellungen');
 $nurVorgang = Ansicht::seite('/', 'tok', [], [], true, false, null, null);
 check(str_contains($nurVorgang, 'keine aktive Vorlage'), 'ohne aktive Vorlage Hinweis');
+check(!str_contains($start, 'Leistung oder Thema') && !str_contains($start, 'Betrag in Euro') && str_contains($start, 'type="hidden" id="n-leistung"'), 'Formular ohne Leistung/Betrag (kommen aus der Kasse)');
 // Archiv: aus der linken Spalte nehmen, bleibt in der Liste (Filter „Archiv“), zurückholen; Kopf mit Reitern und Zahnrad
 check(str_contains($start, 'title="Archivieren (bleibt unter „Vorgänge“)"') && str_contains($start, 'class="us-symbol rot"') && str_contains($start, 'aria-label="Einstellungen"') && str_contains($start, '/editor"'), 'Start: Symbole Archivieren/Löschen, Reiter Editor, Zahnrad');
 Seite::archivieren((int)$xss['id']);
@@ -351,6 +352,11 @@ wirft(fn() => Bausteine::pruefen([['typ' => 'einzel', 'frage' => 'F', 'optionen'
 wirft(fn() => Bausteine::pruefen([['typ' => 'text', 'text' => 'Hallo {{nix}}']]), 'unbekannter Platzhalter im Baustein');
 wirft(fn() => Bausteine::pruefen([['typ' => 'bild', 'datei' => '../../etc/passwd']]), 'Bild mit Pfad');
 wirft(fn() => Bausteine::pruefen([['typ' => 'patientendaten', 'felder' => []]]), 'Patientendaten ohne Feld');
+$ak = Bausteine::pruefen([['typ' => 'ankreuz', 'text' => 'Fotos', 'akte' => 'Fotos für {{patient}}: {{antwort}}'], ['typ' => 'trenner', 'akte' => 'x']]);
+check($ak[0]['akte'] === 'Fotos für {{patient}}: {{antwort}}' && !isset($ak[1]['akte']), 'Akteneintrag je Baustein ({{antwort}} erlaubt, Trenner ohne)');
+wirft(fn() => Bausteine::pruefen([['typ' => 'text', 'text' => 'x', 'akte' => '{{nix}}']]), 'unbekannter Platzhalter im Akteneintrag');
+check(Bausteine::einsetzen($ak, ['patient' => 'Max Mustermann'])[0]['akte'] === 'Fotos für Max Mustermann: {{antwort}}', 'Akteneintrag: Platzhalter eingesetzt, {{antwort}} bleibt fürs Pad');
+wirft(fn() => Seite::vorlageSpeichern(['art' => 'sonstige', 'titel' => 'K', 'kuerzel' => 'mit Leer', 'bloecke' => json_encode($bl)]), 'ungültiges Kürzel');
 $h = Bausteine::html($gp[0]['text']);
 check(str_contains($h, '<h3>Kopf</h3>') && str_contains($h, '<strong>fett</strong>') && str_contains($h, '<em>kursiv</em>') && str_contains($h, '&lt;script&gt;') && !str_contains($h, '<script>')
     && str_contains($h, '<ul><li>eins</li></ul><ol><li>zwei</li></ol>'), 'Formatierung sicher als HTML: ' . $h);
@@ -463,6 +469,23 @@ $auftrag = json_decode((string)file_get_contents("$dir/austausch/an-kasse/$ueber
 check($auftrag['vorgang'] === $ueberKasse && $auftrag['ref'] === 'visit_abc-1' && $auftrag['zeit'] === 1795000000 && (fileperms("$dir/austausch/an-kasse/$ueberKasse.json") & 0777) === 0660, 'Auftrag für die Kasse (0660)');
 check(Seite::vorgang($ohne)['ablage'] === 'manuell' && Seite::vorgang($ohne)['status'] === 'unterschrieben', 'ohne Weg: manuell');
 check(Seite::vorgang($ohnePdf)['ablage'] === '', 'ohne PDF noch warten');
+// Akteneintrag: direkt nach dem PDF als Freitext mit Kürzel; über die Kasse im Auftrag
+$mitAkte = $neuerSignierter('kontext-1');
+Speicher::pdo()->prepare("UPDATE vorgaenge SET akte='Einwilligung: ja', kuerzel='EINW' WHERE id=?")->execute([$mitAkte]);
+$fake->aufrufe = [];
+\KienzleSignatur\Ablage::lauf(fn() => $fake);
+$posts = array_values(array_filter($fake->aufrufe, fn($a) => $a[0] === 'POST'));
+$obs = $posts[1][4]['entry'][0]['resource'] ?? [];
+check(count($posts) === 2 && str_ends_with($posts[0][1], '/DocumentReference') && str_ends_with($posts[1][1], '/r4') && $posts[1][4]['type'] === 'transaction'
+    && $obs['extension'][0]['valueString'] === 'EINW' && $obs['valueString'] === "Anrede-Test:\nEinwilligung: ja" && $obs['identifier'][0]['value'] === 'kontext-1', 'Akteneintrag nach dem PDF');
+check(Seite::vorgang($mitAkte)['ablage'] === 'erledigt' && str_contains(Seite::vorgang($mitAkte)['meldung'], 'Akteneintrag nicht'), 'Eintrag ohne Bestätigung: PDF bleibt abgelegt, Hinweis');
+$kasseAkte = $neuerSignierter('', 'kasse', 'visit_abc-2');
+Speicher::pdo()->prepare("UPDATE vorgaenge SET akte='Befund per Post' WHERE id=?")->execute([$kasseAkte]);
+\KienzleSignatur\Ablage::lauf(fn() => $fake);
+$ka = json_decode((string)file_get_contents("$dir/austausch/an-kasse/$kasseAkte.json"), true);
+check($ka['kuerzel'] === 'SIGN' && $ka['akte'] === "Anrede-Test:\nBefund per Post", 'Auftrag an die Kasse mit Akteneintrag (Kürzel SIGN ohne Angabe)');
+@unlink("$dir/austausch/an-kasse/$kasseAkte.json"); @unlink("$dir/austausch/an-kasse/$kasseAkte.pdf");
+Speicher::pdo()->prepare("UPDATE vorgaenge SET ablage='erledigt' WHERE id=?")->execute([$kasseAkte]);
 mkdir("$dir/austausch/von-kasse", 0770);
 file_put_contents("$dir/austausch/von-kasse/$ueberKasse.json", json_encode(['vorgang' => $ueberKasse, 'ok' => true, 'meldung' => '']));
 \KienzleSignatur\Ablage::lauf(fn() => $fake);

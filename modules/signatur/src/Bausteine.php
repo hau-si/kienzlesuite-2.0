@@ -69,12 +69,20 @@ final class Bausteine {
                     $neu += ['datei' => $datei, 'breite' => max(20, min(100, $breite)), 'text' => Seite::zeile($b['text'] ?? '', "$wo (Bildunterschrift)", 200, false)];
                     break;
             }
+            // Eintrag in die T2med-Akte (optional, kürzer als der Text für den Patienten); {{antwort}} = Antwort am Pad.
+            if (!in_array($typ, ['trenner', 'seite'], true)) {
+                $akte = Seite::zeile($b['akte'] ?? '', "$wo (Eintrag in die Akte)", 300, false);
+                if ($akte !== '') { Seite::pruefePlatzhalter(self::ohneAntwort($akte)); $neu['akte'] = $akte; }
+            }
             foreach (['text', 'frage'] as $f) if (isset($neu[$f])) Seite::pruefePlatzhalter((string)$neu[$f]);
             foreach (['optionen', 'eintraege'] as $f) foreach ($neu[$f] ?? [] as $t) Seite::pruefePlatzhalter((string)$t);
             $out[] = $neu;
         }
         return $out;
     }
+
+    /** {{antwort}} gibt es nur im Akteneintrag; für die Prüfung der übrigen Platzhalter entfernen. */
+    public static function ohneAntwort(string $s): string { return preg_replace('/\{\{\s*antwort\s*\}\}/u', '', $s) ?? $s; }
 
     /** Bisherige Vorlagen (nur Text) als ein Text-Baustein. */
     public static function ausAltemText(string $text): array {
@@ -86,6 +94,7 @@ final class Bausteine {
         foreach ($bloecke as &$b) {
             foreach (['text', 'frage'] as $f) if (isset($b[$f])) $b[$f] = Seite::einsetzen((string)$b[$f], $werte);
             foreach (['optionen', 'eintraege'] as $f) if (isset($b[$f])) $b[$f] = array_map(fn($t) => Seite::einsetzen((string)$t, $werte), $b[$f]);
+            if (isset($b['akte'])) $b['akte'] = Seite::einsetzen((string)$b['akte'], $werte + ['antwort' => '{{antwort}}']);
             if ($b['typ'] === 'patientendaten') $b['werte'] = array_combine($b['felder'], array_map(fn($f) => (string)($werte[$f] ?? ''), $b['felder']));
         }
         return $bloecke;

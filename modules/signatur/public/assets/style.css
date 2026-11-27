@@ -166,3 +166,8 @@ button.ed-mini.breit { padding: 0 9px; }
 .ed-pknoepfe { display: flex; gap: 8px; margin-top: 10px; }
 .ed-pknoepfe span { flex: 1; text-align: center; padding: 6px; border-radius: 6px; background: var(--soft); font-size: 11px; }
 .ed-pknoepfe span.h { background: var(--teal); color: #fff; }
+/* Eintrag in die T2med-Akte je Baustein */
+.ed-akte { margin-top: 14px; border-top: 1px solid var(--line, #dde3ea); padding-top: 8px; }
+.ed-akte summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.ed-akte textarea { display: block; width: 100%; margin: 6px 0; }
+#ed-kuerzel { width: 90px; }

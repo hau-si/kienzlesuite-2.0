@@ -125,6 +125,22 @@ final class FhirClient {
         throw new TransportError($grund . ($detail !== '' ? ' Auskunft von T2med: ' . $detail : ''), false, $code);
     }
 
+    /** Akteneintrag aus Signatur (Freitext mit Kürzel; Text je Baustein in der Vorlage festgelegt) als Transaktion. */
+    public function eintrag(string $context, string $token, string $kuerzel, string $text, int $zeit): void {
+        if (!preg_match('/^[A-Za-z0-9._-]{1,128}$/D', $context)) throw new Problem('Ungültiger T2med-Kontext.');
+        $result = $this->request('POST', '', $token, ['resourceType' => 'Bundle', 'type' => 'transaction', 'entry' => [['request' => ['method' => 'POST', 'url' => 'Observation'], 'resource' => [
+            'resourceType' => 'Observation', 'meta' => ['profile' => ['https://fhir.t2med.de/StructureDefinition/FhirApiObservationFreitext|1.0.0']],
+            'identifier' => [['system' => self::CONTEXT, 'value' => $context]],
+            'extension' => [['url' => 'https://fhir.t2med.de/StructureDefinition/FhirApiFreitextKuerzel', 'valueString' => $kuerzel]],
+            'status' => 'final', 'effectiveDateTime' => date(DATE_ATOM, $zeit), 'valueString' => mb_substr($text, 0, 4000)]]]]);
+        $code = $result['status'];
+        $response = is_array($result['body']) ? ($result['body']['entry'][0]['response'] ?? []) : [];
+        $status = (int)($response['status'] ?? 0);
+        $error = false;
+        foreach ($response['outcome']['issue'] ?? [] as $issue) if (in_array($issue['severity'] ?? '', ['fatal', 'error'], true)) $error = true;
+        if ($code < 200 || $code >= 300 || $status < 200 || $status >= 300 || $error) throw new TransportError('T2med hat den Akteneintrag nicht angenommen (HTTP ' . ($status ?: $code) . ').', false, $status ?: $code);
+    }
+
     /** Akteneintrag als Transaktion (nur dokumentierte Funktionen: kein /metadata, keine Suche nach Observation, kein bedingtes Anlegen). */
     public function write(array $visit, array $payment, string $token): string {
         $request = ['method' => 'POST', 'url' => 'Observation'];

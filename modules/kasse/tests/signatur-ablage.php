@@ -7,12 +7,13 @@ use KienzleKasse\{App, Config, HttpClient, TransportError};
 function check(bool $ok, string $msg): void { if (!$ok) { fwrite(STDERR, "FEHLER: $msg\n"); exit(1); } }
 
 final class AblageHttp extends HttpClient {
-    public array $posts = [];
+    public array $posts = []; public array $eintraege = []; public string $eintragStatus = '201 Created';
     public int $status = 201;
     public ?array $antwort = ['resourceType' => 'OperationOutcome', 'issue' => [['severity' => 'information']]];
     public function request(string $method, string $url, array $headers, ?array $body = null, string $caFile = '', bool $pinCertificate = false): array {
         if (str_contains($url, '/Patient?')) return ['status' => 200, 'body' => ['resourceType' => 'Patient', 'id' => 'patient-1', 'name' => [['given' => ['Max'], 'family' => 'Mustermann']]]];
         if ($method === 'POST' && str_ends_with($url, '/DocumentReference')) { $this->posts[] = [$headers, $body]; return ['status' => $this->status, 'body' => $this->antwort]; }
+        if ($method === 'POST' && str_ends_with($url, '/r4')) { $this->eintraege[] = $body; return ['status' => 200, 'body' => ['resourceType' => 'Bundle', 'type' => 'transaction-response', 'entry' => [['response' => ['status' => $this->eintragStatus]]]]]; }
         throw new TransportError('Unerwarteter Testaufruf ' . $method, false);
     }
 }
@@ -35,9 +36,9 @@ $besuch = function (string $kontext) use ($app): array {
     $x = $app->exchange($f['launch'], null);
     return $app->visit($app->browser($x['cookie']), $x['visit_id']);
 };
-$auftrag = function (int $vid, string $ref, string $pdf = "%PDF-1.4 erfunden") use ($aus): void {
+$auftrag = function (int $vid, string $ref, string $pdf = "%PDF-1.4 erfunden", array $mehr = []) use ($aus): void {
     file_put_contents("$aus/an-kasse/$vid.pdf", $pdf);
-    file_put_contents("$aus/an-kasse/$vid.json", json_encode(['vorgang' => $vid, 'ref' => $ref, 'titel' => 'IGeL-Vertrag', 'zeit' => 1795000000]));
+    file_put_contents("$aus/an-kasse/$vid.json", json_encode(['vorgang' => $vid, 'ref' => $ref, 'titel' => 'IGeL-Vertrag', 'zeit' => 1795000000] + $mehr));
 };
 $antwort = fn(int $vid) => json_decode((string)@file_get_contents("$aus/von-kasse/$vid.json"), true);
 
@@ -81,6 +82,19 @@ $app->signaturAblage($aus);
 check(!$antwort(11)['ok'] && !$antwort(12)['ok'] && str_contains($antwort(12)['meldung'], 'nicht mehr vorhanden') && !$antwort(13)['ok'] && str_contains($antwort(13)['meldung'], 'PDF'), 'ungültige Aufträge abgelehnt');
 check(glob("$aus/an-kasse/*") === [], 'Auftragsordner geleert (keine Endlosschleife des Pfad-Dienstes)');
 check(count($http->posts) === 3, 'nur gültige Aufträge an T2med');
+check($http->eintraege === [], 'ohne Akteneintrag im Auftrag kein Freitext');
+
+// Akteneintrag aus Signatur: nach dem PDF als Freitext mit Kürzel; Ablehnung nur als Hinweis (PDF bleibt abgelegt)
+$http->status = 201; $http->antwort = ['resourceType' => 'OperationOutcome', 'issue' => [['severity' => 'information']]];
+$auftrag(14, $b2['id'], "%PDF-1.4 erfunden", ['kuerzel' => 'EINW', 'akte' => "IGeL-Vertrag:\nEinwilligung: ja"]);
+$app->signaturAblage($aus);
+$obs = $http->eintraege[0]['entry'][0]['resource'] ?? [];
+check($antwort(14) === ['vorgang' => 14, 'ok' => true, 'meldung' => ''] && $obs['resourceType'] === 'Observation' && $obs['extension'][0]['valueString'] === 'EINW'
+    && $obs['valueString'] === "IGeL-Vertrag:\nEinwilligung: ja" && $obs['identifier'][0]['value'] === 'kontext-b', 'Akteneintrag mit Kürzel');
+$http->eintragStatus = '422';
+$auftrag(15, $b2['id'], "%PDF-1.4 erfunden", ['kuerzel' => 'mit Leer', 'akte' => 'x']);
+$app->signaturAblage($aus);
+check($antwort(15)['ok'] === true && str_contains($antwort(15)['meldung'], 'Akteneintrag nicht') && end($http->eintraege)['entry'][0]['resource']['extension'][0]['valueString'] === 'SIGN', 'Ablehnung des Eintrags als Hinweis, ungültiges Kürzel → SIGN');
 
 // Patientenübergabe aus Signatur: einmalig, höchstens 5 Minuten alt, Zugang endet mit dem ursprünglichen Aufruf
 mkdir("$aus/uebergabe-kasse", 0770);

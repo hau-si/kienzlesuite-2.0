@@ -311,6 +311,8 @@ def antworten_speichern(c: sqlite3.Connection, vorgang: sqlite3.Row, bloecke: li
     vid = int(vorgang['id'])
     text = padformular.text_mit_antworten(bloecke, antworten)
     c.execute('UPDATE vorgaenge SET antworten=?, text=? WHERE id=?', (json.dumps(antworten, ensure_ascii=False), text, vid))
+    if 'akte' in vorgang.keys():
+        c.execute('UPDATE vorgaenge SET akte=? WHERE id=?', (padformular.akte_text(bloecke, antworten), vid))
     alt, neu = padformular.kontakt_aenderungen(bloecke, antworten)
     spalten = vorgang.keys()
     if neu and 'kontakt_neu' in spalten:

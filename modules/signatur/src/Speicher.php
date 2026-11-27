@@ -7,7 +7,7 @@ final class Speicher {
     public static string $data = '/var/lib/kienzle/signatur';
     private static ?\PDO $pdo = null;
     private static string $pfad = '';
-    public const VERSION = 10;
+    public const VERSION = 11;
 
     public static function pdo(): \PDO {
         $datei = self::$data . '/signatur.db';
@@ -162,6 +162,11 @@ final class Speicher {
             $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN vorlage_version INTEGER NOT NULL DEFAULT 0');
             $st = $pdo->prepare('UPDATE vorlagen SET bloecke=? WHERE id=?');
             foreach ($pdo->query('SELECT id, text FROM vorlagen')->fetchAll() as $r) $st->execute([json_encode(Bausteine::ausAltemText((string)$r['text']), JSON_UNESCAPED_UNICODE), (int)$r['id']]);
+        }
+        if ($v < 11) {
+            // Akteneintrag je Baustein (Wunsch des Nutzers): Kürzel der Vorlage in T2med; der Vorgang merkt sich Kürzel und Eintragstext.
+            $pdo->exec('ALTER TABLE vorlagen ADD COLUMN kuerzel TEXT NOT NULL DEFAULT ""');
+            foreach (['kuerzel', 'akte'] as $spalte) $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN ' . $spalte . ' TEXT NOT NULL DEFAULT ""');
         }
         $pdo->exec('PRAGMA user_version=' . self::VERSION);
         $pdo->commit();

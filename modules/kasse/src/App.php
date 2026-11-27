@@ -945,7 +945,7 @@ final class App {
                 @unlink($pdfDatei);
             };
             try {
-                $a = is_link($datei) || filesize($datei) > 4096 ? null : json_decode((string)file_get_contents($datei), true);
+                $a = is_link($datei) || filesize($datei) > 65536 ? null : json_decode((string)file_get_contents($datei), true);
                 if (!is_array($a) || (int)($a['vorgang'] ?? 0) !== $vid || !is_string($a['ref'] ?? null) || !preg_match('/^[A-Za-z0-9_-]{1,64}$/D', $a['ref'])) throw new Problem('Auftrag der Signatur ist ungültig.');
                 $pdf = !is_link($pdfDatei) && is_file($pdfDatei) && filesize($pdfDatei) <= 10 * 1024 * 1024 ? (string)file_get_contents($pdfDatei) : '';
                 if (!str_starts_with($pdf, '%PDF-')) throw new Problem('Das PDF fehlt oder ist zu groß.');
@@ -955,9 +955,19 @@ final class App {
                     : $this->db->one("SELECT * FROM visits WHERE patient_id=? AND oauth_cipher<>'' AND expires_at>? AND patient_id NOT IN ('manual','inbox') AND context_id NOT LIKE 'manual-%' AND context_id NOT LIKE 'inbox-%' ORDER BY created_at DESC LIMIT 1", [$visit['patient_id'], $jetzt]);
                 if (!$zugang) throw new Problem('Der T2med-Zugang der Kasse ist abgelaufen (höchstens 4 Stunden). Bitte den Patienten frisch aus T2med in der Kasse öffnen und in Signatur „Erneut in T2med ablegen“ wählen.');
                 $titel = is_string($a['titel'] ?? null) ? $a['titel'] : 'Unterschriebenes Dokument';
-                if ($this->config->get('fhir', 'mode') !== 'mock') $this->fhir->dokument((string)$zugang['context_id'], $this->decrypt($zugang['oauth_cipher']), $pdf, $titel, (int)($a['zeit'] ?? $jetzt));
+                $echt = $this->config->get('fhir', 'mode') !== 'mock';
+                $token = $this->decrypt($zugang['oauth_cipher']);
+                if ($echt) $this->fhir->dokument((string)$zugang['context_id'], $token, $pdf, $titel, (int)($a['zeit'] ?? $jetzt));
+                // Akteneintrag (Text je Baustein aus der Signaturvorlage) erst nach dem PDF; scheitert er, bleibt das PDF abgelegt.
+                $hinweis = '';
+                $akte = is_string($a['akte'] ?? null) ? mb_substr(trim($a['akte']), 0, 4000) : '';
+                $kuerzel = is_string($a['kuerzel'] ?? null) && preg_match('/^[A-Za-z0-9ÄÖÜäöüß_-]{1,12}$/uD', $a['kuerzel']) ? $a['kuerzel'] : 'SIGN';
+                if ($akte !== '' && $echt) {
+                    try { $this->fhir->eintrag((string)$zugang['context_id'], $token, $kuerzel, $akte, (int)($a['zeit'] ?? $jetzt)); }
+                    catch (Problem | TransportError $e) { $hinweis = 'PDF abgelegt, Akteneintrag nicht: ' . $e->getMessage(); }
+                }
                 $this->db->query("UPDATE visits SET signatur_offen=0, oauth_cipher=CASE WHEN completed_at IS NOT NULL THEN '' ELSE oauth_cipher END WHERE id=?", [$visit['id']]);
-                $antwort(true, '');
+                $antwort(true, $hinweis);
                 $log[] = "Vorgang $vid: in T2med abgelegt";
             } catch (Problem | TransportError $e) {
                 $antwort(false, $e->getMessage());

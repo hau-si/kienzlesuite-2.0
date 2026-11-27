@@ -128,6 +128,31 @@ class Fhir {
         self::antwortPruefen($a['status'], $a['body']);
     }
 
+    /** Akteneintrag (Freitext mit Kürzel) als Transaktion – wie die Kasse ihre Zahlungen dokumentiert (nur dokumentierte Funktionen). */
+    public static function eintragRessource(string $kontext, string $kuerzel, string $text, int $zeit): array {
+        return ['resourceType' => 'Bundle', 'type' => 'transaction', 'entry' => [['request' => ['method' => 'POST', 'url' => 'Observation'], 'resource' => [
+            'resourceType' => 'Observation', 'meta' => ['profile' => ['https://fhir.t2med.de/StructureDefinition/FhirApiObservationFreitext|1.0.0']],
+            'identifier' => [['system' => self::KONTEXT, 'value' => $kontext]],
+            'extension' => [['url' => 'https://fhir.t2med.de/StructureDefinition/FhirApiFreitextKuerzel', 'valueString' => $kuerzel]],
+            'status' => 'final', 'effectiveDateTime' => date(DATE_ATOM, $zeit), 'valueString' => mb_substr($text, 0, 4000)]]]];
+    }
+
+    /** Schreibt den Akteneintrag des Vorgangs in die T2med-Akte. Wirft mit verständlicher Meldung. */
+    public function eintragAblegen(string $kontext, string $token, string $kuerzel, string $text, int $zeit): void {
+        if (!preg_match('/^[A-Za-z0-9._-]{1,128}$/D', $kontext)) throw new \InvalidArgumentException('Ungültiger T2med-Kontext.');
+        $basis = rtrim((string)($this->v['base_url'] ?? ''), '/');
+        if ($basis === '') throw new \RuntimeException('T2med ist in der Basis nicht eingerichtet (Verwaltung → Verbindungen).');
+        $a = $this->anfrage($basis, $token, 'POST', self::eintragRessource($kontext, $kuerzel, $text, $zeit), ['Content-Type: application/fhir+json'], '');
+        $body = $a['body'];
+        $antwort = is_array($body) && ($body['resourceType'] ?? '') === 'Bundle' ? ($body['entry'][0]['response'] ?? []) : null;
+        if ($a['status'] >= 200 && $a['status'] < 300 && is_array($antwort)) {
+            $status = (int)($antwort['status'] ?? 0);
+            self::antwortPruefen($status ?: 500, $antwort['outcome'] ?? null);
+            return;
+        }
+        self::antwortPruefen($a['status'] >= 200 && $a['status'] < 300 ? 502 : $a['status'], $body);
+    }
+
     /** 2xx ohne Fehler im OperationOutcome = abgelegt; sonst Ausnahme mit Grund (ohne Patientendaten, höchstens 160 Zeichen von T2med). */
     public static function antwortPruefen(int $status, mixed $body): void {
         $detail = '';
@@ -145,7 +170,7 @@ class Fhir {
         $grund = match (true) {
             $status === 401, $status === 403 => 'T2med lehnt den Zugriff ab (Aufruf älter als 4 Stunden oder API-Schlüssel falsch). Bitte frisch aus der Patientenakte öffnen und erneut ablegen.',
             $status === 413 => 'Das PDF ist für T2med zu groß.',
-            default => 'T2med hat das Dokument nicht angenommen (HTTP ' . $status . ').',
+            default => 'T2med hat den Eintrag nicht angenommen (HTTP ' . $status . ').',
         };
         throw new \RuntimeException($grund . ($detail !== '' ? ' Auskunft von T2med: ' . $detail : ''));
     }

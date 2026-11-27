@@ -210,6 +210,20 @@
       p.appendChild(feld('Bildunterschrift (optional)', eingabe(b.text, function (v) { b.text = v; }, 0, 200)));
     }
     if (b.typ === 'trenner' || b.typ === 'seite') p.appendChild(el('p', 'muted', b.typ === 'seite' ? 'Am Pad beginnt hier eine neue Seite.' : 'Eine waagerechte Linie.'));
+    else {
+      // Eintrag in die T2med-Akte: eigener, meist kürzerer Text; {{antwort}} = Antwort am Pad.
+      var box = el('details', 'ed-akte'); if (b.akte) box.open = true;
+      box.appendChild(el('summary', '', 'Eintrag in die Akte' + (b.akte ? ' ✓' : '')));
+      var at = eingabe(b.akte || '', function (v) { if (v.trim()) b.akte = v; else delete b.akte; }, 2, 300);
+      at.placeholder = b.typ === 'text' || b.typ === 'liste' || b.typ === 'bild' ? 'z. B. Aufklärung über Risiken erfolgt' : 'z. B. Einwilligung Fotos: {{antwort}}';
+      box.appendChild(at);
+      if (['ankreuz', 'einzel', 'mehrfach', 'patientendaten'].indexOf(b.typ) >= 0) {
+        var ab = el('button', 'ed-mini breit', '{{antwort}}'); ab.type = 'button'; ab.title = 'Antwort des Patienten einsetzen (ja/nein, gewählte Möglichkeit, Werte)';
+        ab.addEventListener('click', function () { umschliessen(at, '{{antwort}}', ''); }); box.appendChild(ab);
+      }
+      box.appendChild(el('p', 'muted klein-text', 'Leer: dieser Baustein erscheint nicht im Akteneintrag. Der Eintrag geht nach der Unterschrift mit dem Kürzel der Vorlage an T2med, das PDF immer.'));
+      p.appendChild(box);
+    }
   }
 
   // ---- Vorschau am Pad (rechts unten) ----
@@ -231,15 +245,15 @@
   // ---- Kopf: Titel, Art, aktiv, Fassung, Speichern ----
   var art = $('ed-art');
   Object.keys(D.arten).forEach(function (k) { art.appendChild(new Option(D.arten[k], k)); });
-  $('ed-titel').value = vorlage.titel; art.value = vorlage.art; $('ed-aktiv').checked = vorlage.aktiv;
+  $('ed-titel').value = vorlage.titel; art.value = vorlage.art; $('ed-aktiv').checked = vorlage.aktiv; $('ed-kuerzel').value = vorlage.kuerzel || '';
   if (vorlage.fest) { art.disabled = true; $('ed-aktiv').disabled = true; art.title = 'Der IGeL-Vertrag der Kasse bleibt ein IGeL-Vertrag und immer aktiv.'; }
   function fassung() { $('ed-fassung').textContent = vorlage.version ? 'Fassung ' + vorlage.version + (vorlage.geaendert ? ' vom ' + vorlage.geaendert : '') : 'neu'; }
   fassung();
-  [$('ed-titel'), art, $('ed-aktiv')].forEach(function (e) { e.addEventListener('input', function () { aendern(); vorschau(); }); e.addEventListener('change', aendern); });
+  [$('ed-titel'), art, $('ed-aktiv'), $('ed-kuerzel')].forEach(function (e) { e.addEventListener('input', function () { aendern(); vorschau(); }); e.addEventListener('change', aendern); });
   $('ed-speichern').addEventListener('click', function () {
     var knopf = $('ed-speichern'); knopf.disabled = true; meldung('Wird gespeichert …');
     fetch(D.basis + '/editor/speichern', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Kienzle-CSRF': csrf },
-      body: JSON.stringify({ id: vorlage.id, titel: $('ed-titel').value, art: art.value, aktiv: $('ed-aktiv').checked, bloecke: bloecke }) })
+      body: JSON.stringify({ id: vorlage.id, titel: $('ed-titel').value, art: art.value, aktiv: $('ed-aktiv').checked, kuerzel: $('ed-kuerzel').value.trim(), bloecke: bloecke }) })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (r) {
         knopf.disabled = false;

@@ -92,7 +92,7 @@ try {
             }
             $in = json_decode((string)file_get_contents('php://input', false, null, 0, 300000), true);
             if (!is_array($in)) $antwort(['error' => 'Ungültige Anfrage.'], 400);
-            $id = Seite::vorlageSpeichern(['id' => (int)($in['id'] ?? 0), 'art' => (string)($in['art'] ?? ''), 'titel' => (string)($in['titel'] ?? ''), 'aktiv' => !empty($in['aktiv']), 'bloecke' => $in['bloecke'] ?? null]);
+            $id = Seite::vorlageSpeichern(['id' => (int)($in['id'] ?? 0), 'art' => (string)($in['art'] ?? ''), 'titel' => (string)($in['titel'] ?? ''), 'aktiv' => !empty($in['aktiv']), 'kuerzel' => (string)($in['kuerzel'] ?? ''), 'bloecke' => $in['bloecke'] ?? null]);
             $v = Seite::vorlage($id);
             $antwort(['ok' => true, 'id' => $id, 'version' => (int)$v['version']]);
         } catch (InvalidArgumentException $e) {
