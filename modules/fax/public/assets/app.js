@@ -285,8 +285,8 @@ if (eingangZeilen.length) {
   box.appendChild(img); document.body.appendChild(box);
   let timer = null;
   const setzen = (e) => {
-    const x = e.clientX > window.innerWidth / 2 ? e.clientX - 396 : e.clientX + 18;   // nicht über die Knöpfe rechts
-    const y = Math.min(e.clientY + 14, window.innerHeight - 280);
+    const x = e.clientX > window.innerWidth / 2 ? e.clientX - 516 : e.clientX + 18;   // nicht über die Knöpfe rechts
+    const y = Math.min(e.clientY + 14, window.innerHeight - 380);
     box.style.left = Math.max(8, x) + 'px'; box.style.top = Math.max(8, y) + 'px';
   };
   eingangZeilen.forEach((tr) => {

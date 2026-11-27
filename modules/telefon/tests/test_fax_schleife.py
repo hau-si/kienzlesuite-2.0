@@ -92,6 +92,7 @@ class FaxSchleife(unittest.TestCase):
         j = json.loads(berichte[0].read_text())
         self.assertEqual((j['status'], j['result']['faxstatus']), ('OK', 'SUCCESS'))
         self.assertTrue(list((self.aus / 'sendeberichte').glob('*__OK.pdf')))
+        self.assertTrue(list((self.aus / 'sendeberichte' / 'eingang').glob('*.pdf')), 'Original für erneutes Senden fehlt in sendeberichte/eingang')
         for _ in range(20):
             if list((self.aus / 'empfang').glob('*.json')):
                 break
