@@ -51,6 +51,9 @@ func TestSymbolBild(t *testing.T) {
 		if len(px) != n*n || px[0]>>24 != 0 || px[n/2*n+n/4] == 0 {
 			t.Fatalf("Größe %d: Ecke muss durchsichtig, Fläche gefüllt sein", n)
 		}
+		if px[(n*14/32)*n+n*16/32] != 0xFFFFFFFF || px[(n*4/32)*n+n*16/32] != 0xFF12695D {
+			t.Fatalf("Größe %d: Herz in der Mitte, oben zwischen den Bögen Hintergrund", n)
+		}
 		if px[(n*25/32)*n+n*25/32] != 0xFFD4473A {
 			t.Fatalf("Größe %d: Ampelpunkt fehlt", n)
 		}

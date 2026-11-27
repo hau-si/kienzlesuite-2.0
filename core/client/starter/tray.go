@@ -162,9 +162,10 @@ func SymbolBild(n int, farbe int) []uint32 {
 			if (fx-cx)*(fx-cx)+(fy-cy)*(fy-cy) <= r*r {
 				px[y*n+x] = teal
 			}
-			// „K“: senkrechter Strich und zwei schräge Striche
+			// Herz (wie das Logo von Praxisherz): (X²+Y²-1)³ - X²·Y³ ≤ 0
 			u, w := fx/f, fy/f
-			if u >= 8 && u <= 12 && w >= 7 && w <= 25 || naheLinie(u, w, 12, 16, 22, 7, 2.2) || naheLinie(u, w, 13, 15, 22, 25, 2.2) {
+			hx, hy := (u-15)/7.5, -(w-14)/7.5
+			if q := hx*hx + hy*hy - 1; q*q*q-hx*hx*hy*hy*hy <= 0 {
 				px[y*n+x] = 0xFFFFFFFF
 			}
 			// Punkt unten rechts mit dunklem Rand

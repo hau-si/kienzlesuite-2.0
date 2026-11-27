@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.37
+
+- **Fehler behoben (Nutzer-Meldung): Agent meldete „agent.json fehlt … C:\ProgramData\Praxisherz“.** Lagen im neuen Ordner schon Einstellungen, der Zugang des Agents aber nur im früheren Ordner „Kienzle“ (z. B. Paket nicht bis zum Ende gelaufen), suchte der Agent im neuen. Jetzt gilt der Ordner, in dem der Zugang liegt (Agent 2.3.9).
+- Taskleisten-Symbol und Statusfenster zeigen das Herz statt „K“.
+- Mit Tests geprüft. **Nicht unter Windows geprüft.**
+
 ## 0.22.0-beta.36
 
 - **Windows: `Praxisherz-Setup.exe`** (Einrichten → Arbeitsplätze): eine Datei, Doppelklick, Windows fragt nach Administratorrechten, dann läuft die Einrichtung im eigenen Fenster. Technisch das Starterprogramm mit angehängtem Paket (entpackt in einen Temp-Ordner, der danach gelöscht wird). Das ZIP-Paket gibt es weiter. Ohne kostenpflichtige Code-Signatur warnt Windows beim ersten Start („Weitere Informationen“ → „Trotzdem ausführen“).

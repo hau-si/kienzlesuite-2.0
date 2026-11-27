@@ -503,7 +503,7 @@ func (t *trayZustand) zeichnen() {
 	// Kopf
 	kasten(16, 16, 40, 40, 8, teal)
 	pSelectObject.Call(dc, fett)
-	t.text(dc, "K", rect{t.px(16), t.px(16), t.px(40), t.px(40)}, rgb(255, 255, 255), 1|dtVCenter|dtSingleLine) // DT_CENTER
+	t.text(dc, "♥", rect{t.px(16), t.px(16), t.px(40), t.px(40)}, rgb(255, 255, 255), 1|dtVCenter|dtSingleLine) // DT_CENTER
 	kreis(38, 38, 5, ampel(v.Farbe))
 	t.text(dc, "Praxisherz", rect{t.px(50), t.px(14), t.px(breite - 110), t.px(34)}, dunkel, dtLeft|dtSingleLine|dtVCenter)
 	markeFarbe, markeText := rgb(0xE3, 0xF1, 0xEE), teal
