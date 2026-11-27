@@ -388,6 +388,24 @@ check(str_contains($ed, '<script type="application/json" id="ed-daten">') && !st
 $daten = json_decode(html_entity_decode(preg_replace('#^.*<script type="application/json" id="ed-daten">(.*?)</script>.*$#s', '$1', $ed)), true);
 check(($daten['vorlage']['id'] ?? 0) === $vid && ($daten['vorlage']['version'] ?? 0) === 2 && count($daten['bloecke'] ?? []) === 8, 'Editor-Daten der gewählten Vorlage');
 Ansicht::$editorVorlage = '';
+// Vorlagenliste: Gruppen, Favoriten, zuletzt gewählt, Suche
+check(Seite::gruppenVon(Seite::vorlage($vid)) === ['Administratives'], 'Gruppe aus der Dokumentart vorbelegt');
+check(Seite::gruppenPruefen(' IGeL ,igel, Aufklärungen,, Haut & Haar') === 'IGeL, Aufklärungen, Haut & Haar', 'Gruppen bereinigt, doppelte entfernt');
+wirft(fn() => Seite::gruppenPruefen('<b>'), 'Gruppe mit Sonderzeichen');
+wirft(fn() => Seite::gruppenPruefen('a,b,c,d,e,f,g'), 'zu viele Gruppen');
+Seite::vorlageSpeichern(['id' => $vid, 'art' => 'datenschutz', 'titel' => 'Bausteine', 'aktiv' => 1, 'gruppen' => 'Administratives, Hautarzt', 'bloecke' => json_encode(Seite::bloeckeVon(Seite::vorlage($vid)))]);
+check(Seite::vorlage($vid)['gruppen'] === 'Administratives, Hautarzt' && (int)Seite::vorlage($vid)['version'] === 2, 'Gruppen gespeichert, Fassung bleibt');
+Seite::favorit($vid, true);
+check(Seite::zuletzt()[0] === (int)$vg['vorlage_id'] || Seite::zuletzt() !== [], 'zuletzt gewählte Vorlagen');
+$st = Ansicht::seite('/', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null);
+check(str_contains($st, 'id="dok-suche"') && str_contains($st, 'data-filter="g:hautarzt"') && str_contains($st, 'data-favorit="' . $vid . '" aria-pressed="true"') && str_contains($st, 'class="us-chips us-zuletzt"')
+    && strpos($st, 'data-favorit="' . $vid . '"') < strpos($st, 'data-favorit="', strpos($st, 'data-favorit="' . $vid . '"') + 5), 'Startseite: Suche, Gruppen, Favorit oben, Zuletzt');
+Ansicht::$editorVorlage = (string)$vid;
+$ed2 = Ansicht::seite('/editor', 'tok', [], Seite::vorlagen(), true, true, null, null);
+check(str_contains($ed2, 'id="ed-vsuche"') && str_contains($ed2, 'class="ed-vgkopf">Administratives') && str_contains($ed2, 'id="ed-gruppen"') && str_contains($ed2, '<option value="Hautarzt">'), 'Editor: Suche, Gruppen');
+Ansicht::$editorVorlage = '';
+Seite::favorit($vid, false);
+wirft(fn() => Seite::favorit(999999, true), 'Favorit unbekannter Vorlage');
 
 // Anrede-Platzhalter
 $at = Seite::vorlageSpeichern(['art' => 'sonstige', 'titel' => 'Anrede-Test', 'text' => '{{briefanrede}}|{{anrede}}|{{vorname}}|{{nachname}}', 'aktiv' => 1]);

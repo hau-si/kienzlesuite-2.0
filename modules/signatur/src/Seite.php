@@ -90,6 +90,51 @@ final class Seite {
      * Legt an (id 0) oder ändert. Aus dem Editor kommen Bausteine („bloecke“, JSON), sonst ein Text. Ändern sich Inhalt,
      * Titel oder Art, zählt die Fassung hoch (der Vorgang merkt sich, welche Fassung unterschrieben wurde).
      */
+    /** Vorschläge für Gruppen der Vorlagen (frei erweiterbar). */
+    public const GRUPPEN = ['Aufklärungen', 'Administratives', 'IGeL'];
+
+    public static function gruppeZurArt(string $art): string {
+        return match ($art) { 'igel' => 'IGeL', 'aufklaerung' => 'Aufklärungen', default => 'Administratives' };
+    }
+
+    /** Gruppen (Tags) einer Vorlage: Liste oder Text mit Kommas; höchstens 6, je 30 Zeichen. Ergebnis „A, B“. */
+    public static function gruppenPruefen(mixed $wert): string {
+        $teile = is_array($wert) ? $wert : explode(',', (string)$wert);
+        $out = [];
+        foreach ($teile as $t) {
+            $t = trim(preg_replace('/\s+/u', ' ', (string)$t) ?? '');
+            if ($t === '') continue;
+            if (mb_strlen($t) > 30 || !preg_match('/^[\p{L}\p{N}][\p{L}\p{N} ._&\/+-]*$/uD', $t)) throw new \InvalidArgumentException('Gruppe „' . mb_substr($t, 0, 30) . '“: nur Buchstaben, Ziffern und . _ & / + - (höchstens 30 Zeichen).');
+            $out[mb_strtolower($t)] ??= $t;
+        }
+        if (count($out) > 6) throw new \InvalidArgumentException('Höchstens 6 Gruppen je Vorlage.');
+        return implode(', ', $out);
+    }
+
+    /** @return list<string> */
+    public static function gruppenVon(array $vorlage): array {
+        return array_values(array_filter(array_map('trim', explode(',', (string)($vorlage['gruppen'] ?? ''))), fn($g) => $g !== ''));
+    }
+
+    /** Alle verwendeten Gruppen, die Vorschläge zuerst. @return list<string> */
+    public static function alleGruppen(array $vorlagen): array {
+        $alle = [];
+        foreach (array_merge(self::GRUPPEN, ...array_map([self::class, 'gruppenVon'], $vorlagen ?: [[]])) as $g) $alle[mb_strtolower($g)] ??= $g;
+        return array_values($alle);
+    }
+
+    public static function favorit(int $id, bool $an): void {
+        if (!self::vorlage($id)) throw new \InvalidArgumentException('Vorlage nicht gefunden.');
+        self::pdo()->prepare('UPDATE vorlagen SET favorit=? WHERE id=?')->execute([$an ? 1 : 0, $id]);
+    }
+
+    /** Zuletzt für Vorgänge gewählte aktive Vorlagen (neueste zuerst). @return list<int> */
+    public static function zuletzt(int $anzahl = 4): array {
+        $st = self::pdo()->prepare('SELECT g.vorlage_id FROM vorgaenge g JOIN vorlagen v ON v.id=g.vorlage_id WHERE v.aktiv=1 GROUP BY g.vorlage_id ORDER BY MAX(g.erstellt) DESC, MAX(g.id) DESC LIMIT ?');
+        $st->execute([$anzahl]);
+        return array_map('intval', $st->fetchAll(\PDO::FETCH_COLUMN));
+    }
+
     public static function vorlageSpeichern(array $in): int {
         $id = (int)($in['id'] ?? 0);
         $art = (string)($in['art'] ?? '');
@@ -97,6 +142,7 @@ final class Seite {
         $titel = self::zeile($in['titel'] ?? '', 'Titel', 80);
         $kuerzel = self::zeile($in['kuerzel'] ?? '', 'Kürzel', 12, false);
         if ($kuerzel !== '' && !preg_match('/^[A-Za-z0-9ÄÖÜäöüß_-]{1,12}$/uD', $kuerzel)) throw new \InvalidArgumentException('Das Kürzel für die Akte darf nur Buchstaben, Ziffern, _ und - enthalten (höchstens 12 Zeichen).');
+        $gruppen = array_key_exists('gruppen', $in) ? self::gruppenPruefen($in['gruppen']) : null;
         if (array_key_exists('bloecke', $in)) {
             $bloecke = Bausteine::pruefen($in['bloecke']);
         } else {
@@ -114,12 +160,13 @@ final class Seite {
             if (!$alt) throw new \InvalidArgumentException('Vorlage nicht gefunden.');
             if ($id === self::festeVorlageId()) { $art = 'igel'; $aktiv = 1; }
             if (!array_key_exists('kuerzel', $in)) $kuerzel = (string)$alt['kuerzel'];
+            if ($gruppen !== null) self::pdo()->prepare('UPDATE vorlagen SET gruppen=? WHERE id=?')->execute([$gruppen, $id]);
             $version = (int)$alt['version'] + (json_encode(self::bloeckeVon($alt), JSON_UNESCAPED_UNICODE) !== $json || $alt['titel'] !== $titel || $alt['art'] !== $art || $alt['kuerzel'] !== $kuerzel ? 1 : 0);
             $pdo->prepare('UPDATE vorlagen SET art=?, titel=?, text=?, bloecke=?, version=?, kuerzel=?, aktiv=?, muster=0, geaendert=? WHERE id=?')->execute([$art, $titel, $text, $json, $version, $kuerzel, $aktiv, time(), $id]);
             return $id;
         }
         if ((int)$pdo->query('SELECT COUNT(*) FROM vorlagen')->fetchColumn() >= 100) throw new \InvalidArgumentException('Es sind höchstens 100 Vorlagen möglich.');
-        $pdo->prepare('INSERT INTO vorlagen (art, titel, text, bloecke, version, kuerzel, aktiv, muster, geaendert) VALUES (?, ?, ?, ?, 1, ?, ?, 0, ?)')->execute([$art, $titel, $text, $json, $kuerzel, $aktiv, time()]);
+        $pdo->prepare('INSERT INTO vorlagen (art, titel, text, bloecke, version, kuerzel, gruppen, aktiv, muster, geaendert) VALUES (?, ?, ?, ?, 1, ?, ?, ?, 0, ?)')->execute([$art, $titel, $text, $json, $kuerzel, $gruppen ?? self::gruppeZurArt($art), $aktiv, time()]);
         return (int)$pdo->lastInsertId();
     }
 

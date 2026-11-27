@@ -92,7 +92,7 @@ try {
             }
             $in = json_decode((string)file_get_contents('php://input', false, null, 0, 300000), true);
             if (!is_array($in)) $antwort(['error' => 'Ungültige Anfrage.'], 400);
-            $id = Seite::vorlageSpeichern(['id' => (int)($in['id'] ?? 0), 'art' => (string)($in['art'] ?? ''), 'titel' => (string)($in['titel'] ?? ''), 'aktiv' => !empty($in['aktiv']), 'kuerzel' => (string)($in['kuerzel'] ?? ''), 'bloecke' => $in['bloecke'] ?? null]);
+            $id = Seite::vorlageSpeichern(['id' => (int)($in['id'] ?? 0), 'art' => (string)($in['art'] ?? ''), 'titel' => (string)($in['titel'] ?? ''), 'aktiv' => !empty($in['aktiv']), 'kuerzel' => (string)($in['kuerzel'] ?? ''), 'gruppen' => (string)($in['gruppen'] ?? ''), 'bloecke' => $in['bloecke'] ?? null]);
             $v = Seite::vorlage($id);
             $antwort(['ok' => true, 'id' => $id, 'version' => (int)$v['version']]);
         } catch (InvalidArgumentException $e) {
@@ -101,6 +101,20 @@ try {
             error_log('signatur editor: ' . get_class($e) . ': ' . $e->getMessage());
             $antwort(['error' => 'Speichern nicht möglich (' . get_class($e) . ').'], 500);
         }
+    }
+    if ($rel === '/favorit') {
+        // Favorit einer Vorlage an/aus (für die ganze Praxis, wie im Fax). JSON {id, an}, Suite-CSRF im Kopf.
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') { http_response_code(405); echo '{"error":"Nur POST."}'; exit; }
+        if (!$darfVorgang && !$darfVorlage) { http_response_code(403); echo '{"error":"Keine Berechtigung."}'; exit; }
+        if (!$k->csrfGueltig($_SERVER['HTTP_X_KIENZLE_CSRF'] ?? null)) { http_response_code(403); echo json_encode(['error' => 'Sitzung abgelaufen. Bitte die Seite neu laden.'], JSON_UNESCAPED_UNICODE); exit; }
+        $in = json_decode((string)file_get_contents('php://input', false, null, 0, 1000), true);
+        try {
+            Seite::favorit((int)($in['id'] ?? 0), !empty($in['an']));
+            echo '{"ok":true}';
+        } catch (InvalidArgumentException $e) { http_response_code(404); echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE); }
+        exit;
     }
     if (preg_match('#^/bild/([0-9a-f]{64}\.(png|jpg))$#D', $rel, $m)) {
         // Bilder der Vorlagen (Editor-Vorschau, Ansicht). Nur mit Recht auf Vorgänge oder Vorlagen.

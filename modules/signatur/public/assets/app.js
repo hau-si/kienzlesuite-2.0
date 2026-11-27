@@ -284,4 +284,45 @@
   });
   window.addEventListener('hashchange', oeffneAusAdresse);
   oeffneAusAdresse();
+
+  // Dokumentliste: Suche nach Namensteilen, Gruppenfilter, Favoriten (Stern), zuletzt gewählte (wie im Fax).
+  var dokSuche = document.getElementById('dok-suche'), dokFilter = '';
+  var dokBasis = (location.pathname.match(/^\/[a-z0-9-]{1,31}/) || ['/signatur'])[0];
+  function dokFiltern() {
+    var q = dokSuche ? dokSuche.value.trim().toLowerCase() : '', n = 0;
+    document.querySelectorAll('.us-dokzeile').forEach(function (z) {
+      var ja = (!q || (z.getAttribute('data-name') || '').indexOf(q) >= 0)
+        && (!dokFilter || (dokFilter === 'fav' ? z.getAttribute('data-fav') === '1' : ('|' + (z.getAttribute('data-gruppen') || '') + '|').indexOf('|' + dokFilter.slice(2) + '|') >= 0));
+      z.hidden = !ja; if (ja) n++;
+    });
+    var leer = document.getElementById('dok-leer'); if (leer) leer.hidden = n > 0;
+  }
+  if (dokSuche) dokSuche.addEventListener('input', dokFiltern);
+  document.querySelectorAll('.us-chip[data-filter]').forEach(function (c) {
+    c.addEventListener('click', function () {
+      dokFilter = c.getAttribute('data-filter');
+      document.querySelectorAll('.us-chip[data-filter]').forEach(function (x) { x.classList.toggle('an', x === c); });
+      dokFiltern();
+    });
+  });
+  document.querySelectorAll('.us-chip[data-waehle]').forEach(function (c) {
+    c.addEventListener('click', function () {
+      var r = document.querySelector('input[name="vorlage_id"][value="' + c.getAttribute('data-waehle') + '"]');
+      if (!r) return;
+      if (dokSuche) dokSuche.value = '';
+      dokFilter = ''; document.querySelectorAll('.us-chip[data-filter]').forEach(function (x) { x.classList.toggle('an', x.getAttribute('data-filter') === ''); });
+      dokFiltern(); r.checked = true; r.focus();
+    });
+  });
+  document.querySelectorAll('.us-stern[data-favorit]').forEach(function (s) {
+    s.addEventListener('click', function () {
+      var an = !s.classList.contains('an'), meta = document.querySelector('meta[name="kienzle-csrf"]');
+      fetch(dokBasis + '/favorit', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Kienzle-CSRF': meta ? meta.content : '' },
+        body: JSON.stringify({ id: parseInt(s.getAttribute('data-favorit'), 10), an: an }) })
+        .then(function (r) { if (!r.ok) throw new Error(); s.classList.toggle('an', an); s.setAttribute('aria-pressed', an ? 'true' : 'false');
+          s.title = an ? 'Favorit entfernen' : 'Als Favorit oben anzeigen';
+          var z = s.closest('.us-dokzeile'); if (an) z.setAttribute('data-fav', '1'); else z.removeAttribute('data-fav'); dokFiltern(); })
+        .catch(function () { s.title = 'Speichern nicht möglich. Bitte die Seite neu laden.'; });
+    });
+  });
 })();

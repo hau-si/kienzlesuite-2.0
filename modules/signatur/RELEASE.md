@@ -1,5 +1,12 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.45
+
+- **Dokumentliste auf der Startseite:** Suchfeld oben (Namensteile), Filter „Alle“, „★ Favoriten“ und je Gruppe, Zeile „Zuletzt“ mit den zuletzt verwendeten Vorlagen (Klick wählt sie). Stern je Vorlage: Favoriten stehen oben (gilt für die ganze Praxis, wie im Fax). Vorgewählt ist die zuletzt verwendete Vorlage.
+- **Gruppen (Tags) je Vorlage:** Feld „Gruppen“ im Editor (mit Komma trennen, Vorschläge Aufklärungen, Administratives, IGeL); bestehende Vorlagen bekommen die Gruppe aus ihrer Dokumentart. Die Vorlagenliste im Editor ist nach Gruppen geordnet und durchsuchbar.
+- Editor: Zeilen im Dokument nutzen die volle Breite (Art des Bausteins steht darüber), Titel über die ganze Zeile.
+- Datenbank 12 (`vorlagen.favorit|gruppen`). Mit Tests und im Browser (ohne Server) geprüft, nicht auf der VM.
+
 ## 0.1.0-beta.44
 
 - **Eintrag in die Akte je Baustein:** Im Editor hat jeder Baustein (außer Trennlinie und Seitenumbruch) ein Feld „Eintrag in die Akte“ mit eigenem, meist kürzerem Text; `{{antwort}}` setzt die Antwort am Pad ein (ja/nein, gewählte Möglichkeit, Werte). Leer = der Baustein erscheint nicht im Eintrag.

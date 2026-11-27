@@ -7,7 +7,7 @@ final class Speicher {
     public static string $data = '/var/lib/kienzle/signatur';
     private static ?\PDO $pdo = null;
     private static string $pfad = '';
-    public const VERSION = 11;
+    public const VERSION = 12;
 
     public static function pdo(): \PDO {
         $datei = self::$data . '/signatur.db';
@@ -167,6 +167,13 @@ final class Speicher {
             // Akteneintrag je Baustein (Wunsch des Nutzers): Kürzel der Vorlage in T2med; der Vorgang merkt sich Kürzel und Eintragstext.
             $pdo->exec('ALTER TABLE vorlagen ADD COLUMN kuerzel TEXT NOT NULL DEFAULT ""');
             foreach (['kuerzel', 'akte'] as $spalte) $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN ' . $spalte . ' TEXT NOT NULL DEFAULT ""');
+        }
+        if ($v < 12) {
+            // Vorlagenliste mit Favoriten und Gruppen (Wunsch des Nutzers, wie im Fax); Gruppen aus der Dokumentart vorbelegt.
+            $pdo->exec('ALTER TABLE vorlagen ADD COLUMN favorit INTEGER NOT NULL DEFAULT 0');
+            $pdo->exec('ALTER TABLE vorlagen ADD COLUMN gruppen TEXT NOT NULL DEFAULT ""');
+            $st = $pdo->prepare('UPDATE vorlagen SET gruppen=? WHERE id=?');
+            foreach ($pdo->query('SELECT id, art FROM vorlagen')->fetchAll() as $r) $st->execute([Seite::gruppeZurArt((string)$r['art']), (int)$r['id']]);
         }
         $pdo->exec('PRAGMA user_version=' . self::VERSION);
         $pdo->commit();
