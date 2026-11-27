@@ -1,5 +1,13 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.15
+
+- **Fehler behoben: Kienzle-Agent richtete keine Drucker ein** („Drucker fehlen: vBriefversand, vFax1, vKasse, vTermine“). Anders als das bewährte `install-drucker.ps1` startete der Agent nach dem Einschalten des Windows-Internetdruckens die Druckwarteschlange nicht neu; ohne Neustart kennt Windows die `http://…`-Anschlüsse oft nicht. Der Agent geht jetzt genauso vor wie das Skript: Internetdrucken einschalten, **Spooler neu starten**, Treiber laden, je Drucker bis zu 4 Versuche mit Pausen (nur wenn etwas fehlt).
+- **Ein vorhandener Drucker wird nie gelöscht:** Hat er eine andere Adresse (z. B. früher von Hand mit der IP eingerichtet), wird nur sein Anschluss umgestellt; klappt das nicht, bleibt er unverändert.
+- Die Rückmeldung auf der Seite „Arbeitsplätze“ nennt jetzt die **Windows-Fehlermeldung** und prüft vorher, ob der Servername am PC bekannt und Port 631 erreichbar ist.
+- Nach einem Fehlschlag versucht der Agent die Drucker höchstens alle 10 Minuten erneut (vorher bei jeder Abfrage alle 2 Sekunden). Programmversion 2.0.1; der Agent aktualisiert sich nach dem Update der Basis selbst.
+- Geprüft mit Tests (Go). **Nicht auf einem echten Windows-PC geprüft.**
+
 ## 0.22.0-beta.14
 
 - **Fehler behoben: Faxversand scheiterte mit „ghostscript pdf->tiff failed … Permission denied“.** Die AppArmor-Ergänzungen für `gs` und `qpdf` (Ubuntu 26.04) galten nur für den Datenordner eines Moduls, nicht für seine Austauschordner (`[[exchange]]`, z. B. `/var/spool/kienzle/austausch/fax_telefon`), in denen die Telefonanlage die Faxaufträge umwandelt. Jetzt werden sie mit eingetragen.

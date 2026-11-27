@@ -26,8 +26,11 @@ import (
 	"time"
 )
 
+// DruckerPause: Abstand zwischen zwei Versuchen, fehlende Drucker einzurichten.
+var DruckerPause = 10 * time.Minute
+
 // Version des Programms (scripts/starter-bauen setzt sie nicht; der Server vergleicht die Prüfsumme der Datei).
-const version = "2.0.0"
+const version = "2.0.1"
 
 // AgentConfig steht in agent.json (nur für SYSTEM und Administratoren lesbar).
 type AgentConfig struct {
@@ -82,8 +85,12 @@ type Agent struct {
 	stand     string
 	zustand   string
 	druckerH  string
-	caH       string
-	schemaH   string
+	// Nach einem Fehlschlag die Drucker höchstens alle 10 Minuten erneut versuchen (nicht bei jeder Abfrage).
+	druckerFehlerH string
+	druckerVersuch time.Time
+	druckerText    string
+	caH            string
+	schemaH        string
 }
 
 var (
@@ -314,16 +321,21 @@ func (a *Agent) angleichen(s *Soll) error {
 		}
 	}
 	if h := hashOf(drucker); h != a.druckerH {
-		text, err := a.Plattform.Drucker(drucker)
-		if err != nil {
-			meldungen = append(meldungen, "Drucker: "+err.Error())
-			fehler = true
-		} else {
-			a.druckerH = h
-			if text != "" {
-				meldungen = append(meldungen, text)
+		if h != a.druckerFehlerH || time.Since(a.druckerVersuch) >= DruckerPause {
+			a.druckerVersuch = time.Now()
+			text, err := a.Plattform.Drucker(drucker)
+			if err != nil {
+				a.druckerText, a.druckerFehlerH = err.Error(), h
+			} else {
+				a.druckerText, a.druckerH, a.druckerFehlerH = text, h, ""
 			}
 		}
+		if h != a.druckerH {
+			fehler = true
+		}
+	}
+	if a.druckerText != "" {
+		meldungen = append(meldungen, a.druckerText)
 	}
 	a.zustand = strings.Join(meldungen, "; ")
 	if len(a.zustand) > 280 {

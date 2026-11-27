@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"io"
 	"math/big"
 	"net"
@@ -31,6 +32,7 @@ type testPlattform struct {
 	schemata int
 	drucker  [][]Drucker
 	ca       int
+	fehler   error
 }
 
 func (p *testPlattform) Schemata(map[string]string, string) error {
@@ -43,6 +45,9 @@ func (p *testPlattform) Drucker(l []Drucker) (string, error) {
 	p.mu.Lock()
 	p.drucker = append(p.drucker, l)
 	p.mu.Unlock()
+	if p.fehler != nil {
+		return "", p.fehler
+	}
 	return "Drucker: eingerichtet", nil
 }
 func (p *testPlattform) Zertifizierungsstelle([]byte) error { p.ca++; return nil }
@@ -264,5 +269,44 @@ func TestAnmeldenMitFalschemSchluessel(t *testing.T) {
 func TestProgrammName(t *testing.T) {
 	if programmName("windows", "amd64") != "kienzle-starter-windows-amd64.exe" || programmName("darwin", "arm64") != "kienzle-starter-darwin-arm64" {
 		t.Fatal("Programmname passt nicht zu scripts/starter-bauen")
+	}
+}
+
+func TestDruckerSkriptLoeschtNie(t *testing.T) {
+	if strings.Contains(druckerSkriptText(), "Remove-Printer") {
+		t.Fatal("drucker-agent.ps1 darf vorhandene Drucker nie löschen")
+	}
+	if !strings.Contains(druckerSkriptText(), "Set-Printer -Name $d.name -PortName $d.url") || !strings.Contains(druckerSkriptText(), "Restart-Service Spooler") {
+		t.Fatal("vorhandene Drucker werden umgestellt, nicht neu angelegt")
+	}
+}
+
+func druckerSkriptText() string { b, _ := os.ReadFile("drucker-agent.ps1"); return string(b) }
+
+func TestDruckerFehlerNichtBeiJederAbfrage(t *testing.T) {
+	ts := neuerTestServer(t, []byte("x"))
+	dir := agentOrdner(t, ts)
+	Anmelden(dir, nil)
+	exe := filepath.Join(dir, "kienzle-starter")
+	os.WriteFile(exe, []byte("x"), 0o755)
+	p := &testPlattform{ordner: dir, fehler: errors.New("Drucker: 0 von 1 eingerichtet; fehlen: vFax. Windows meldet: Zugriff verweigert")}
+	a := &Agent{Ordner: dir, Programm: exe, Plattform: p}
+	a.Laden()
+	for i := 0; i < 3; i++ {
+		a.Schritt()
+	}
+	if len(p.drucker) != 1 {
+		t.Fatalf("nach einem Fehlschlag darf der Agent nicht bei jeder Abfrage neu versuchen: %d Versuche", len(p.drucker))
+	}
+	if !strings.Contains(a.zustand, "Windows meldet: Zugriff verweigert") || strings.HasPrefix(a.zustand, "Drucker: Drucker") {
+		t.Fatalf("Rückmeldung: %q", a.zustand)
+	}
+	alt := DruckerPause
+	DruckerPause = 0
+	defer func() { DruckerPause = alt }()
+	p.fehler = nil
+	a.Schritt()
+	if len(p.drucker) != 2 || a.zustand != "Drucker: eingerichtet" {
+		t.Fatalf("nach der Pause neuer Versuch: %d %q", len(p.drucker), a.zustand)
 	}
 }
