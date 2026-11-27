@@ -509,7 +509,8 @@ func (t *trayZustand) zeichnen() {
 	kasten(16, 16, 40, 40, 8, teal)
 	pSelectObject.Call(dc, fett)
 	t.text(dc, "♥", rect{t.px(16), t.px(16), t.px(40), t.px(40)}, rgb(255, 255, 255), 1|dtVCenter|dtSingleLine) // DT_CENTER
-	kreis(38, 38, 5, ampel(v.Farbe))
+	kreis(38, 38, 8, rgb(255, 255, 255))
+	kreis(38, 38, 6.5, ampel(v.Farbe))
 	t.text(dc, "Praxisherz", rect{t.px(50), t.px(14), t.px(breite - 110), t.px(34)}, dunkel, dtLeft|dtSingleLine|dtVCenter)
 	markeFarbe, markeText := rgb(0xE3, 0xF1, 0xEE), teal
 	switch v.Farbe {
@@ -526,7 +527,7 @@ func (t *trayZustand) zeichnen() {
 	y := 70.0
 	for _, z := range v.Zeilen {
 		hz := t.zeilenHoehe(z)
-		kreis(21, y+15, 4.5, ampel(z.Farbe))
+		kreis(21, y+15, 6, ampel(z.Farbe))
 		pSelectObject.Call(dc, normal)
 		t.text(dc, z.Titel, rect{t.px(32), t.px(y), t.px(170), t.px(y + 30)}, dunkel, dtLeft|dtSingleLine|dtVCenter)
 		if hz == 30 {

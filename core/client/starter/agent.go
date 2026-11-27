@@ -31,8 +31,15 @@ import (
 // DruckerPause: Abstand zwischen zwei Versuchen, fehlende Drucker einzurichten.
 var DruckerPause = 10 * time.Minute
 
+// UpdatePause: Nach einer gescheiterten Selbstaktualisierung wird dieselbe Fassung erst nach dieser Zeit erneut geladen.
+// Vorher lud der Agent alle 2 Sekunden neu, und das Symbol stand dauerhaft auf „wird aktualisiert“ (blau).
+var UpdatePause = 10 * time.Minute
+
+// DownloadFrist: so lange darf das Laden des neuen Programms dauern (die üblichen 20 Sekunden reichen bei langsamem Netz nicht).
+var DownloadFrist = 3 * time.Minute
+
 // Version des Programms (scripts/starter-bauen setzt sie nicht; der Server vergleicht die Prüfsumme der Datei).
-const version = "2.3.12" // ab 2.3.7 auch Adressen praxisherz-… (Web::AGENT_NEUE_ADRESSEN)
+const version = "2.3.13" // ab 2.3.7 auch Adressen praxisherz-… (Web::AGENT_NEUE_ADRESSEN)
 
 // AgentConfig steht in agent.json (nur für SYSTEM und Administratoren lesbar).
 type AgentConfig struct {
@@ -102,6 +109,10 @@ type Agent struct {
 	statusRoh      []byte
 	druckerSoll    []Drucker
 	altPruefung    time.Time
+	// Gescheiterte Selbstaktualisierung: Prüfsumme der Fassung und Zeitpunkt des Versuchs (siehe UpdatePause).
+	updateFehlerSoll string
+	updateVersuch    time.Time
+	updateFehler     string
 }
 
 // Status schreibt der Agent nach status.json im Datenordner (für alle Benutzer lesbar, ohne Geheimnisse und Patientendaten);
@@ -126,6 +137,10 @@ type Status struct {
 	// Taskleiste zeigt dann „wird aktualisiert“ (blau) statt „läuft nicht“ (rot), solange dieser Dienst-Prozess lädt,
 	// austauscht und sich beendet. Der neue Prozess startet mit einem frischen, falschen Wert (false).
 	WirdAktualisiert bool `json:"wird_aktualisiert,omitempty"`
+	// AktualisierungSeit: Beginn der laufenden Aktualisierung (Unix-Zeit); das Symbol zeigt nach aktualisierenFrist einen Fehler.
+	AktualisierungSeit int64 `json:"aktualisierung_seit,omitempty"`
+	// AktualisierungFehler: Grund der zuletzt gescheiterten Aktualisierung (ohne Zugangsdaten), leer nach Erfolg.
+	AktualisierungFehler string `json:"aktualisierung_fehler,omitempty"`
 }
 
 // statusSchreiben: bei Änderung sofort, sonst höchstens jede Minute (Lebenszeichen für das Symbol).
@@ -408,14 +423,24 @@ func (a *Agent) angleichen(s *Soll) error {
 	// 1. Programm: neue Fassung laden, Prüfsumme prüfen, austauschen; danach neu starten (die geplante Aufgabe startet neu).
 	if soll, ok := s.Programme[assetName]; ok && len(soll) == 64 {
 		if ist, err := dateiHash(a.Programm); err == nil && ist != soll {
-			if err := a.aktualisieren(soll); err != nil {
-				a.status.WirdAktualisiert = false
-				meldungen = append(meldungen, "Aktualisierung: "+err.Error())
+			if soll == a.updateFehlerSoll && time.Since(a.updateVersuch) < UpdatePause {
+				// Diese Fassung ist eben erst gescheitert: nicht gleich wieder laden, Grund weiter melden.
+				meldungen = append(meldungen, "Aktualisierung: "+a.updateFehler+" (neuer Versuch um "+a.updateVersuch.Add(UpdatePause).Format("15:04")+")")
+				fehler = true
+			} else if err := a.aktualisieren(soll); err != nil {
+				a.status.WirdAktualisiert, a.status.AktualisierungSeit = false, 0
+				a.updateFehlerSoll, a.updateVersuch, a.updateFehler = soll, time.Now(), kuerzen(err.Error(), 160)
+				a.status.AktualisierungFehler = a.updateFehler
+				logError(a.Ordner, fmt.Errorf("Aktualisierung gescheitert: %w", err))
+				meldungen = append(meldungen, "Aktualisierung: "+a.updateFehler)
 				fehler = true
 			} else {
 				return errNeustart
 			}
 		}
+	}
+	if ist, err := dateiHash(a.Programm); err == nil && ist == s.Programme[assetName] {
+		a.status.AktualisierungFehler, a.updateFehlerSoll = "", ""
 	}
 	// 2. client.json (Startermodus) und Zertifizierungsstelle.
 	if pemCA := []byte(s.CA); len(pemCA) > 0 && parseCA(pemCA) != nil {
@@ -502,13 +527,15 @@ func (a *Agent) angleichen(s *Soll) error {
 func (a *Agent) aktualisieren(soll string) error {
 	// Vor dem (unter Umständen etwas dauernden) Laden schon vermerken: Das Symbol in der Taskleiste soll währenddessen
 	// „wird aktualisiert“ zeigen, nicht „läuft nicht“, falls dieser Prozess sich beendet, bevor er wieder antwortet.
-	a.status.WirdAktualisiert = true
+	a.status.WirdAktualisiert, a.status.AktualisierungSeit = true, time.Now().Unix()
 	a.statusSchreiben(nil)
 	req, _ := http.NewRequest(http.MethodGet, a.cfg.ServerURL+"/agent/programm/"+assetName, nil)
 	req.Header.Set("Authorization", "Bearer "+a.ac.Token)
-	resp, err := a.Client.Do(req)
+	laden := *a.Client // gleiche Zertifikatsprüfung, aber längere Frist für die große Datei
+	laden.Timeout = DownloadFrist
+	resp, err := laden.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("Laden fehlgeschlagen: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -527,10 +554,13 @@ func (a *Agent) aktualisieren(soll string) error {
 		return err
 	}
 	alt := a.Programm + ".alt"
-	_ = os.Remove(alt)
+	if err := os.Remove(alt); err != nil && !errors.Is(err, os.ErrNotExist) {
+		// Die frühere Fassung läuft noch (z. B. als Symbol in der Taskleiste) und lässt sich nicht löschen: eigener Name.
+		alt = fmt.Sprintf("%s.alt-%d", a.Programm, time.Now().UnixNano())
+	}
 	if err := os.Rename(a.Programm, alt); err != nil {
 		_ = os.Remove(neu)
-		return err
+		return fmt.Errorf("Programm ließ sich nicht austauschen: %w", err)
 	}
 	if err := os.Rename(neu, a.Programm); err != nil {
 		_ = os.Rename(alt, a.Programm)

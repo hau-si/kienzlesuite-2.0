@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.41
+
+- **Fehler behoben (Nutzer-Meldung): Agent hing nach einem Neustart des PCs über 30 Minuten auf „wird aktualisiert“.** Scheiterte die Selbstaktualisierung (z. B. Laden dauerte länger als 20 Sekunden oder die alte Programmdatei ließ sich nicht austauschen), versuchte der Agent es alle 2 Sekunden erneut. Das Symbol zeigte dadurch dauerhaft den blauen Punkt, und der Grund stand nirgends. Jetzt: Laden darf bis zu 3 Minuten dauern; nach einem Fehlschlag wartet der Agent 10 Minuten bis zum nächsten Versuch; der Grund steht in `starter.log` und als gelbe Zeile „Aktualisierung“ im Statusfenster. Ist die frühere Programmdatei noch belegt, weicht der Agent auf einen eigenen Namen aus (wird beim nächsten Start aufgeräumt). Dauert eine Aktualisierung länger als 6 Minuten, zeigt das Symbol rot „Update hängt“ mit Hinweis statt endlos blau. Agent 2.3.13.
+- Der Farbpunkt am Taskleisten-Symbol und im Statusfenster ist größer und hat einen weißen Rand, damit die Farbe auch klein zu erkennen ist.
+- Mit Tests geprüft. **Nicht unter Windows geprüft.**
+
 ## 0.22.0-beta.40
 
 - **Fehler behoben (Nutzer-Meldung): Drucker einrichten lief nach 3 Minuten in eine Zeitüberschreitung.** Abgleich mit dem bewährten Handskript `install-drucker.ps1`: gleiche Schritte, aber jeder Schritt, der bei einem festhängenden Druckspooler ewig warten kann (Spooler neu starten, Treiber, Anschluss, Drucker anlegen/umstellen), läuft mit eigener Frist. Hängt der Spooler, beendet der Agent ihn hart und startet ihn neu. Internetdrucken (DISM, als Systemdienst oft minutenlang) wird nur einmal eingeschaltet (`internetdrucken.ok`). Agent 2.3.12.

@@ -137,3 +137,24 @@ func TestAnsichtAlteDrucker(t *testing.T) {
 		t.Fatalf("ohne alte Drucker kein Knopf: %+v", v)
 	}
 }
+
+// TestAnsichtUpdateHaengt: Ein Agent, der immer wieder neu lädt, schreibt laufend frische Lebenszeichen. Blau darf trotzdem
+// nur bis aktualisierenFrist ab Beginn der Aktualisierung gelten, danach rot „Update hängt“ mit Hinweis.
+func TestAnsichtUpdateHaengt(t *testing.T) {
+	jetzt := time.Unix(1_800_000_000, 0)
+	s := Status{Zeit: jetzt.Unix(), Verbunden: true, Version: "2.3.12", WirdAktualisiert: true, AktualisierungSeit: jetzt.Unix() - aktualisierenFrist - 60}
+	v := AnsichtBauen(s, true, jetzt)
+	if v.Farbe != Rot || v.Kopf != "Update hängt" || !strings.Contains(v.Zeilen[0].Wert, "PC neu starten") {
+		t.Fatalf("hängendes Update: %+v", v)
+	}
+	s.AktualisierungSeit = jetzt.Unix() - 30
+	if v := AnsichtBauen(s, true, jetzt); v.Farbe != Blau {
+		t.Fatalf("frisch begonnenes Update bleibt blau: %+v", v)
+	}
+	// Gescheitert: Grund als gelbe Zeile, nicht blau.
+	f := Status{Zeit: jetzt.Unix(), Verbunden: true, Version: "2.3.12", AktualisierungFehler: "Prüfsumme stimmt nicht", Aufrufe: 1, Zertifikat: true}
+	v = AnsichtBauen(f, true, jetzt)
+	if v.Farbe != Gelb || v.Zeilen[0].Titel != "Aktualisierung" || !strings.Contains(v.Zeilen[0].Wert, "Prüfsumme") {
+		t.Fatalf("gescheitertes Update: %+v", v)
+	}
+}

@@ -48,6 +48,11 @@ func main() {
 			}
 			exe, _ := os.Executable()
 			_ = os.Remove(exe + ".alt")
+			if reste, _ := filepath.Glob(exe + ".alt-*"); len(reste) > 0 { // Ausweichnamen früherer Aktualisierungen
+				for _, r := range reste {
+					_ = os.Remove(r)
+				}
+			}
 			a := &Agent{Ordner: datenOrdner(), Programm: exe, Plattform: neuePlattform(datenOrdner())}
 			if err := a.Dienst(nil); err != nil {
 				// Neues Programm eingespielt: selbst neu starten. Die geplante Aufgabe startet bei einem Ende mit Fehlercode

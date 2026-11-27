@@ -61,9 +61,20 @@ const aktualisierenFrist = 6 * 60
 func AnsichtBauen(s Status, vorhanden bool, jetzt time.Time) Ansicht {
 	v := Ansicht{Farbe: Gruen, Kopf: "verbunden"}
 	alter := jetzt.Unix() - s.Zeit
-	wirdAktualisiert := vorhanden && s.WirdAktualisiert && alter <= aktualisierenFrist
-	alt := !wirdAktualisiert && (!vorhanden || alter > 180)
+	// Die Frist zählt ab Beginn der Aktualisierung, nicht ab dem letzten Lebenszeichen: sonst bliebe ein Agent, der immer
+	// wieder neu lädt, für immer blau.
+	seit := s.AktualisierungSeit
+	if seit == 0 {
+		seit = s.Zeit
+	}
+	haengt := vorhanden && s.WirdAktualisiert && alter <= 180 && jetzt.Unix()-seit > aktualisierenFrist
+	wirdAktualisiert := vorhanden && s.WirdAktualisiert && !haengt && alter <= aktualisierenFrist
+	alt := !wirdAktualisiert && !haengt && (!vorhanden || alter > 180)
 	switch {
+	case haengt:
+		v.Farbe, v.Kopf = Rot, "Update hängt"
+		v.Zeilen = append(v.Zeilen, Zeile{"Praxisherz-Agent", "Aktualisierung seit " + time.Unix(seit, 0).Format("15:04") +
+			" nicht fertig – PC neu starten; hilft das nicht, Praxisherz-Setup erneut ausführen", Rot})
 	case wirdAktualisiert:
 		v.Farbe, v.Kopf = Blau, "wird aktualisiert …"
 		v.Zeilen = append(v.Zeilen, Zeile{"Praxisherz-Agent", "lädt die neue Fassung und startet gleich neu, bitte kurz warten", Blau})
@@ -73,6 +84,9 @@ func AnsichtBauen(s Status, vorhanden bool, jetzt time.Time) Ansicht {
 	case !s.Verbunden:
 		v.Farbe, v.Kopf = Rot, "keine Verbindung"
 		v.Zeilen = append(v.Zeilen, Zeile{"Verbindung", kuerzen(s.Fehler, 90), Rot})
+	}
+	if vorhanden && s.AktualisierungFehler != "" && !wirdAktualisiert && !alt {
+		v.Zeilen = append(v.Zeilen, Zeile{"Aktualisierung", "gescheitert: " + kuerzen(s.AktualisierungFehler, 100) + " – neuer Versuch in 10 Minuten", Gelb})
 	}
 	if vorhanden {
 		switch {
@@ -168,12 +182,12 @@ func SymbolBild(n int, farbe int) []uint32 {
 			if q := hx*hx + hy*hy - 1; q*q*q-hx*hx*hy*hy*hy <= 0 {
 				px[y*n+x] = 0xFFFFFFFF
 			}
-			// Punkt unten rechts mit dunklem Rand
-			dx, dy := u-25, w-25
-			if dx*dx+dy*dy <= 49 {
-				px[y*n+x] = 0xFF1F2A28
+			// Punkt unten rechts mit weißem Rand (größer als früher, damit die Farbe auch bei 16 Bildpunkten zu sehen ist)
+			dx, dy := u-24.5, w-24.5
+			if dx*dx+dy*dy <= 72 {
+				px[y*n+x] = 0xFFFFFFFF
 			}
-			if dx*dx+dy*dy <= 25 {
+			if dx*dx+dy*dy <= 42 {
 				px[y*n+x] = punkt
 			}
 		}
