@@ -83,7 +83,7 @@ sympy==1.14.0
 termcolor==3.3.0
 thinc==8.3.13
 tokenizers==0.21.4
-torch==2.8.0+cpu
+torch==2.13.0
 tqdm==4.70.1
 transformers==4.51.3
 typer==0.27.2
