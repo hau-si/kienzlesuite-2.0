@@ -82,6 +82,9 @@ $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) 
 Register-ScheduledTask -TaskName $task -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description 'Kienzle-Suite: hält Starter, Zertifikat und Drucker aktuell, öffnet Akten in T2med.' -Force | Out-Null
 Start-ScheduledTask -TaskName $task
 Say 'läuft' 'Kienzle-Agent (Drucker richtet er in den nächsten Minuten selbst ein)'
+# Symbol in der Taskleiste (Statusfenster): startet künftig bei jeder Anmeldung (trägt der Agent ein), jetzt einmal sofort.
+Start-Process -FilePath $exe -ArgumentList '--tray' | Out-Null  # läuft es schon, beendet sich der zweite Start sofort
+Say 'läuft' 'Symbol in der Taskleiste (bei ausgeblendeten Symbolen über den Pfeil neben der Uhr)'
 Write-Host ''
 Write-Host 'Arbeitsplatz eingerichtet. Das Paket kann gelöscht werden; künftig aktualisiert sich alles selbst.'
 Write-Host 'Für „Akte öffnen“: in T2med beim GDT-Gerät „Telefonaufruf“ als Importdatei C:\Kienzle\GDT\AUFRUFi.gdt eintragen.'

@@ -29,6 +29,13 @@ func main() {
 			}
 			fmt.Println("Angemeldet als Arbeitsplatz", ac.Name)
 			return
+		case "--tray":
+			// Symbol in der Taskleiste mit Statusfenster (beim Anmelden gestartet, HKLM\…\Run).
+			if err := tray(datenOrdner()); err != nil {
+				fmt.Fprintln(os.Stderr, "Fehler:", err)
+				os.Exit(1)
+			}
+			return
 		case "--dienst":
 			// Dauerbetrieb (geplante Aufgabe „Kienzle-Agent“ mit Systemrechten). Endet nur nach einer Aktualisierung mit Code 3,
 			// damit die Aufgabe das neue Programm startet.

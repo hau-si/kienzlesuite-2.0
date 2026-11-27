@@ -27,6 +27,7 @@ import (
 
 // Ersatzplattform: merkt sich die Aufrufe.
 type testPlattform struct {
+	symbol   int
 	mu       sync.Mutex
 	ordner   string
 	schemata int
@@ -51,6 +52,7 @@ func (p *testPlattform) Drucker(l []Drucker) (string, error) {
 	return "Drucker: eingerichtet", nil
 }
 func (p *testPlattform) Zertifizierungsstelle([]byte) error { p.ca++; return nil }
+func (p *testPlattform) Symbol(string) error                { p.symbol++; return nil }
 func (p *testPlattform) GDTOrdner() string                  { return filepath.Join(p.ordner, "gdt") }
 
 // testCA erzeugt eine Zertifizierungsstelle und ein Serverzertifikat für 127.0.0.1.

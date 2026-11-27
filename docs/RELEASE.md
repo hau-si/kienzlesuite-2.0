@@ -1,5 +1,12 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.16
+
+- **Neu: Symbol des Kienzle-Agents in der Taskleiste** (Entwurf B). Ein Klick öffnet über der Uhr ein kleines Statusfenster mit einer Ampel je Bereich: Verbindung zur Suite, Drucker (mit fehlenden Druckern und der Windows-Meldung), Aufrufe aus T2med, Zertifikat und „Akte öffnen“. Der Punkt am Symbol zeigt den schlechtesten Zustand (grün, gelb, rot; rot auch, wenn der Agent seit 3 Minuten nichts gemeldet hat). Unten gibt es drei Knöpfe: „Suite öffnen“, „Drucker prüfen“ (der Agent richtet fehlende Drucker sofort neu ein, statt 10 Minuten zu warten) und „Protokoll“ (öffnet `starter.log`).
+- Der Agent schreibt dafür `C:\ProgramData\Kienzle\status.json` (ohne Schlüssel und ohne Patientendaten). Das Symbol läuft als angemeldeter Benutzer und liest nur diese Datei. „Drucker prüfen“ legt eine leere Datei im Ordner `anstoss` ab; nur dort dürfen Benutzer schreiben.
+- Das Symbol startet bei jeder Anmeldung (`HKLM\…\Run`, `kienzle-starter --tray`, nur einmal je Sitzung). Den Eintrag setzt der Agent selbst, also auch auf PCs, die schon eingerichtet sind, sobald er sich nach dem Basis-Update aktualisiert hat. Sichtbar wird es dort nach der nächsten Anmeldung. Das Paket startet es sofort.
+- Programmversion 2.1.0. Geprüft mit Tests (Go, Übersetzung für Windows). **Nicht auf einem echten Windows-PC geprüft**, auch nicht das Aussehen des Fensters.
+
 ## 0.22.0-beta.15
 
 - **Fehler behoben: Kienzle-Agent richtete keine Drucker ein** („Drucker fehlen: vBriefversand, vFax1, vKasse, vTermine“). Anders als das bewährte `install-drucker.ps1` startete der Agent nach dem Einschalten des Windows-Internetdruckens die Druckwarteschlange nicht neu; ohne Neustart kennt Windows die `http://…`-Anschlüsse oft nicht. Der Agent geht jetzt genauso vor wie das Skript: Internetdrucken einschalten, **Spooler neu starten**, Treiber laden, je Drucker bis zu 4 Versuche mit Pausen (nur wenn etwas fehlt).

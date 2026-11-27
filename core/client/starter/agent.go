@@ -30,7 +30,7 @@ import (
 var DruckerPause = 10 * time.Minute
 
 // Version des Programms (scripts/starter-bauen setzt sie nicht; der Server vergleicht die Prüfsumme der Datei).
-const version = "2.0.1"
+const version = "2.1.0"
 
 // AgentConfig steht in agent.json (nur für SYSTEM und Administratoren lesbar).
 type AgentConfig struct {
@@ -72,6 +72,7 @@ type Plattform interface {
 	Drucker(liste []Drucker) (string, error)
 	Zertifizierungsstelle(pem []byte) error
 	GDTOrdner() string
+	Symbol(programm string) error // Symbol in der Taskleiste beim Anmelden starten
 }
 
 // Agent hält Zustand zwischen den Abfragen.
@@ -91,6 +92,59 @@ type Agent struct {
 	druckerText    string
 	caH            string
 	schemaH        string
+	status         Status
+	statusRoh      []byte
+}
+
+// Status schreibt der Agent nach status.json im Datenordner (für alle Benutzer lesbar, ohne Geheimnisse und Patientendaten);
+// das Symbol in der Taskleiste (--tray) zeigt ihn an.
+type Status struct {
+	Zeit       int64    `json:"zeit"`
+	Verbunden  bool     `json:"verbunden"`
+	Fehler     string   `json:"fehler,omitempty"`
+	Name       string   `json:"name,omitempty"`
+	Server     string   `json:"server,omitempty"`
+	Version    string   `json:"version"`
+	DruckerOk  bool     `json:"drucker_ok"`
+	Drucker    []string `json:"drucker,omitempty"`
+	DruckerTxt string   `json:"drucker_text,omitempty"`
+	Aufrufe    int      `json:"aufrufe"`
+	Zertifikat bool     `json:"zertifikat"`
+	AkteZeit   int64    `json:"akte_zeit,omitempty"`
+	AkteOk     bool     `json:"akte_ok,omitempty"`
+}
+
+// statusSchreiben: bei Änderung sofort, sonst höchstens jede Minute (Lebenszeichen für das Symbol).
+func (a *Agent) statusSchreiben(fehler error) {
+	a.status.Version = version
+	a.status.Verbunden = fehler == nil
+	a.status.Fehler = ""
+	if fehler != nil {
+		a.status.Fehler = kuerzen(fehler.Error(), 200)
+	}
+	if a.cfg != nil {
+		a.status.Server = hostOnly(a.cfg.ServerURL)
+	}
+	ohneZeit := a.status
+	ohneZeit.Zeit = 0
+	roh, _ := json.Marshal(ohneZeit)
+	if bytes.Equal(roh, a.statusRoh) && time.Now().Unix()-a.status.Zeit < 60 {
+		return
+	}
+	a.statusRoh = roh
+	a.status.Zeit = time.Now().Unix()
+	data, _ := json.MarshalIndent(a.status, "", "  ")
+	_ = schreibeAtomar(filepath.Join(a.Ordner, "status.json"), data, 0o644)
+}
+
+// anstoss: Datei, die das Symbol in der Taskleiste anlegt („Drucker prüfen“); nur ihr Vorhandensein zählt, nicht ihr Inhalt.
+func (a *Agent) anstoss() {
+	datei := filepath.Join(a.Ordner, "anstoss", "drucker-pruefen")
+	if _, err := os.Lstat(datei); err != nil {
+		return
+	}
+	_ = os.Remove(datei)
+	a.druckerH, a.druckerFehlerH, a.stand = "", "", ""
 }
 
 var (
@@ -200,13 +254,20 @@ func (a *Agent) Schritt() error {
 	var r struct {
 		Auftraege []Auftrag `json:"auftraege"`
 		Stand     string    `json:"stand"`
+		Name      string    `json:"name"`
 		Soll      *Soll     `json:"soll"`
 	}
 	if err := anfrage(a.Client, http.MethodPost, a.cfg.ServerURL+"/agent/abholen", "Bearer "+a.ac.Token, body, &r); err != nil {
 		return err
 	}
+	if r.Name != "" {
+		a.status.Name = r.Name
+	}
 	for _, auf := range r.Auftraege {
 		ok, text := a.ausfuehren(auf)
+		if auf.Typ == "gdt" {
+			a.status.AkteZeit, a.status.AkteOk = time.Now().Unix(), ok
+		}
 		erg, _ := json.Marshal(map[string]any{"auftrag": auf.ID, "ok": ok, "text": text})
 		_ = anfrage(a.Client, http.MethodPost, a.cfg.ServerURL+"/agent/ergebnis", "Bearer "+a.ac.Token, erg, nil)
 	}
@@ -286,6 +347,7 @@ func (a *Agent) angleichen(s *Soll) error {
 				fehler = true
 			} else {
 				a.caH = h
+				a.status.Zertifikat = true
 			}
 		}
 	}
@@ -310,6 +372,7 @@ func (a *Agent) angleichen(s *Soll) error {
 				fehler = true
 			} else {
 				a.schemaH = h
+				a.status.Aufrufe = len(s.Kontexte)
 			}
 		}
 	}
@@ -337,6 +400,11 @@ func (a *Agent) angleichen(s *Soll) error {
 	if a.druckerText != "" {
 		meldungen = append(meldungen, a.druckerText)
 	}
+	a.status.Drucker = a.status.Drucker[:0]
+	for _, d := range drucker {
+		a.status.Drucker = append(a.status.Drucker, d.Name)
+	}
+	a.status.DruckerOk, a.status.DruckerTxt = hashOf(drucker) == a.druckerH, a.druckerText
 	a.zustand = strings.Join(meldungen, "; ")
 	if len(a.zustand) > 280 {
 		a.zustand = a.zustand[:280]
@@ -414,18 +482,24 @@ func schreibeAtomar(pfad string, data []byte, mode os.FileMode) error {
 // Dienst: Endlosschleife. Kehrt nur zurück, wenn ein neues Programm eingespielt wurde (dann startet die Aufgabe neu).
 func (a *Agent) Dienst(stop <-chan struct{}) error {
 	pause := 2 * time.Second
+	if err := a.Plattform.Symbol(a.Programm); err != nil {
+		logError(a.Ordner, err)
+	}
 	for {
 		if a.cfg == nil {
 			if err := a.Laden(); err != nil {
 				logError(a.Ordner, err)
+				a.statusSchreiben(err)
 				pause = 60 * time.Second
 			}
 		}
 		if a.cfg != nil {
+			a.anstoss()
 			err := a.Schritt()
 			if errors.Is(err, errNeustart) {
 				return err
 			}
+			a.statusSchreiben(err)
 			if err != nil {
 				logError(a.Ordner, err)
 				if pause < 60*time.Second {

@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -104,4 +105,19 @@ func (w *windowsPlattform) GDTOrdner() string {
 		_ = versteckt(exec.Command("icacls.exe", ordner, "/grant", "*S-1-5-32-545:(OI)(CI)M")).Run()
 	}
 	return ordner
+}
+
+// Symbol: Symbol in der Taskleiste beim Anmelden jedes Benutzers starten (HKLM\…\Run) und den Ordner „anstoss“ anlegen, in den
+// Benutzer für „Drucker prüfen“ eine leere Datei legen dürfen (sonst ist der Datenordner für Benutzer nur lesbar).
+func (w *windowsPlattform) Symbol(programm string) error {
+	ordner := filepath.Join(w.ordner, "anstoss")
+	if _, err := os.Stat(ordner); err != nil {
+		if err := os.MkdirAll(ordner, 0o775); err != nil {
+			return err
+		}
+		if out, err := versteckt(exec.Command("icacls.exe", ordner, "/grant", "*S-1-5-32-545:(OI)(CI)M")).CombinedOutput(); err != nil {
+			return fmt.Errorf("Rechte für %s: %v %s", ordner, err, strings.TrimSpace(string(out)))
+		}
+	}
+	return reg("add", `HKLM\Software\Microsoft\Windows\CurrentVersion\Run`, "/v", "KienzleSuite", "/t", "REG_SZ", "/d", `"`+programm+`" --tray`, "/f")
 }
