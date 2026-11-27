@@ -341,8 +341,20 @@ func TestDruckerSkriptLoeschtNie(t *testing.T) {
 	if strings.Contains(einrichten, "Remove-Printer") || strings.Count(txt, "Remove-Printer ") != 1 || !strings.Contains(entfernen, "@(Alte | Where-Object { $wunsch -contains $_ })") {
 		t.Fatal("drucker-agent.ps1 darf beim Einrichten nie löschen; entfernen nur alte und bestätigte Drucker")
 	}
-	if !strings.Contains(druckerSkriptText(), "Set-Printer -Name ([string]$d.name) -PortName ([string]$d.url)") || !strings.Contains(druckerSkriptText(), "Restart-Service Spooler") {
+	if !strings.Contains(druckerSkriptText(), "Set-Printer -Name ([string]$n) -PortName ([string]$u)") || !strings.Contains(druckerSkriptText(), "Restart-Service Spooler") {
 		t.Fatal("vorhandene Drucker werden umgestellt, nicht neu angelegt")
+	}
+	// Jeder Schritt, der beim festhängenden Druckspooler ewig warten kann, mit eigener Frist; Internetdrucken nur einmal.
+	txt = druckerSkriptText()
+	for _, muss := range []string{"function MitFrist", "Stop-Process -Name spoolsv", "internetdrucken.ok", "$uhr.Elapsed.TotalSeconds -gt 150"} {
+		if !strings.Contains(txt, muss) {
+			t.Fatalf("drucker-agent.ps1: %q fehlt", muss)
+		}
+	}
+	for _, ohneFrist := range []string{"\n    Restart-Service Spooler -Force -ErrorAction SilentlyContinue\n    try { (Get-Service Spooler).WaitForStatus('Running', '00:00:30') } catch { }\n    Start-Sleep 3\n    Add-PrinterDriver"} {
+		if strings.Contains(txt, ohneFrist) {
+			t.Fatal("Einrichten startet den Spooler ohne Frist neu")
+		}
 	}
 }
 

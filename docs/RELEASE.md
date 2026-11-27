@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.40
+
+- **Fehler behoben (Nutzer-Meldung): Drucker einrichten lief nach 3 Minuten in eine Zeitüberschreitung.** Abgleich mit dem bewährten Handskript `install-drucker.ps1`: gleiche Schritte, aber jeder Schritt, der bei einem festhängenden Druckspooler ewig warten kann (Spooler neu starten, Treiber, Anschluss, Drucker anlegen/umstellen), läuft mit eigener Frist. Hängt der Spooler, beendet der Agent ihn hart und startet ihn neu. Internetdrucken (DISM, als Systemdienst oft minutenlang) wird nur einmal eingeschaltet (`internetdrucken.ok`). Agent 2.3.12.
+- Mit Tests geprüft. **Nicht unter Windows geprüft.**
+
 ## 0.22.0-beta.39
 
 - **Fehler behoben (Nutzer-Meldung): Taskleisten-Symbol hing („reagiert nicht“).** Das Fenster war nicht an einen festen Thread gebunden; Go konnte die Nachrichtenschleife auf einen anderen Thread verlegen, danach kamen keine Fensternachrichten mehr an. Jetzt `runtime.LockOSThread()` (Agent 2.3.11).
