@@ -195,11 +195,12 @@ final class Seite {
             'vorname' => $vorname, 'nachname' => $nachname, 'anrede' => $anrede, 'briefanrede' => $briefanrede,
         ]);
         self::aufraeumen($jetzt);
-        self::pdo()->prepare('INSERT INTO vorgaenge (vorlage_id, art, titel, text, patient, kontext, kontext_bis, status, druck_vorher, druck_nachher, erstellt, erstellt_von, pad_id, quelle, quelle_ref, leistungen, patient_id, kontakt_alt, kontakt_neu, kontakt_status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, "wartet", ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        self::pdo()->prepare('INSERT INTO vorgaenge (vorlage_id, art, titel, text, patient, kontext, kontext_bis, status, druck_vorher, druck_nachher, erstellt, erstellt_von, pad_id, quelle, quelle_ref, leistungen, patient_id, kontakt_alt, kontakt_neu, kontakt_status, geburtsdatum, praxis)
+            VALUES (?, ?, ?, ?, ?, ?, ?, "wartet", ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
             ->execute([(int)$vorlage['id'], $vorlage['art'], $vorlage['titel'], $text, $patient, $kontext, $kontext === '' ? 0 : $jetzt + 4 * 3600,
                 !empty($in['druck_vorher']) ? 1 : 0, !empty($in['druck_nachher']) ? 1 : 0, $jetzt, self::zeile($benutzer, 'Benutzer', 80, false), $padId, $quelle, $quelleRef, $liste ? json_encode($liste, JSON_UNESCAPED_UNICODE) : '',
-                $kontaktStatus !== '' ? $patientId : '', $kontaktStatus !== '' ? json_encode(['telefon' => $telAlt, 'email' => $mailAlt], JSON_UNESCAPED_UNICODE) : '', $kontaktStatus !== '' ? json_encode($kontaktNeu, JSON_UNESCAPED_UNICODE) : '', $kontaktStatus]);
+                $kontaktStatus !== '' ? $patientId : '', $kontaktStatus !== '' ? json_encode(['telefon' => $telAlt, 'email' => $mailAlt], JSON_UNESCAPED_UNICODE) : '', $kontaktStatus !== '' ? json_encode($kontaktNeu, JSON_UNESCAPED_UNICODE) : '', $kontaktStatus,
+                $geburtsdatum, json_encode(array_map('strval', array_intersect_key($praxis, array_flip(['name', 'street', 'city', 'contact']))), JSON_UNESCAPED_UNICODE)]);
         return (int)self::pdo()->lastInsertId();
     }
 
@@ -311,6 +312,23 @@ final class Seite {
         if (!$v) throw new \InvalidArgumentException('Vorgang nicht gefunden.');
         if ($v['status'] === 'am_pad') throw new \InvalidArgumentException('Der Vorgang liegt gerade am Pad. Bitte zuerst abbrechen.');
         self::pdo()->prepare("DELETE FROM vorgaenge WHERE id=? AND status<>'am_pad'")->execute([$id]);
+        self::dateienLoeschen($id);
+    }
+
+    /** Ordner mit Unterschrift (PNG), Unterschriftsdaten (SDB) und PDF je Vorgang; schreibt der Pad-Dienst. */
+    public static function unterschriftenOrdner(): string { return Speicher::$data . '/unterschriften'; }
+
+    /** Pfad des PDFs eines Vorgangs oder null, wenn es (noch) keines gibt. */
+    public static function pdfPfad(int $id): ?string {
+        $p = self::unterschriftenOrdner() . '/' . $id . '.pdf';
+        return $id > 0 && is_file($p) && !is_link($p) ? $p : null;
+    }
+
+    private static function dateienLoeschen(int $id): void {
+        foreach (['png', 'sdb', 'pdf'] as $endung) {
+            $p = self::unterschriftenOrdner() . '/' . $id . '.' . $endung;
+            if (is_file($p) || is_link($p)) @unlink($p);
+        }
     }
 
     public static function abbrechen(int $id): void {
@@ -332,8 +350,12 @@ final class Seite {
     /** Entfernt abgeschlossene Vorgänge nach der Aufbewahrungszeit; Patientendaten sollen nicht länger als nötig liegen. */
     public static function aufraeumen(?int $jetzt = null): int {
         $grenze = ($jetzt ?? time()) - self::AUFBEWAHRUNG_TAGE * 86400;
+        $alt = self::pdo()->prepare('SELECT id FROM vorgaenge WHERE status IN ("uebertragen","abgebrochen") AND erstellt < ?');
+        $alt->execute([$grenze]);
+        $ids = array_map('intval', $alt->fetchAll(\PDO::FETCH_COLUMN));
         $st = self::pdo()->prepare('DELETE FROM vorgaenge WHERE status IN ("uebertragen","abgebrochen") AND erstellt < ?');
         $st->execute([$grenze]);
+        foreach ($ids as $id) self::dateienLoeschen($id);
         return $st->rowCount();
     }
 

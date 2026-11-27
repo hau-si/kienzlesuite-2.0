@@ -1,5 +1,13 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.31
+
+- **Neu: PDF des unterschriebenen Dokuments** (Entwurf C). Kopf mit Praxis links und Patient (mit Geburtsdatum) rechts, Titel, Dokumenttext (mehrseitig mit „Seite x von y“). Unten links ein Kasten „Unterschriftsnachweis“ mit Zeitpunkt, Pad, Vorgang und Prüfsumme der Unterschriftsdaten, rechts die Unterschrift. Echtes Text-PDF (durchsuchbar, wenige KB), erzeugt vom Pad-Dienst direkt nach „OK“ und für schon unterschriebene Vorgänge nachträglich. Es liegt nur im Datenordner (0600).
+- **Neu: „Ansehen“ in der Vorgangsliste:** Unterschriebene Vorgänge öffnen das PDF in einem neuen Fenster („PDF ansehen“), alle anderen zeigen den eingesetzten Text.
+- Vorgänge merken sich Geburtsdatum und Praxisangaben für das PDF (Schema 7).
+- Löschen eines Vorgangs (von Hand oder nach 30 Tagen) entfernt auch Unterschrift, Unterschriftsdaten und PDF. Vorher blieben sie liegen.
+- Geprüft mit Tests (PDF-Aufbau, Text, Seitenumbruch, Nachholen). **Nicht am echten Pad und nicht im Browser auf der VM geprüft.** Das PDF entsteht erst, wenn der Pad-Dienst nach dem Update läuft.
+
 ## 0.1.0-beta.30
 
 - **Fehler behoben: Unterschrift kam am Pad nicht an** („Stiftereignisse 0“, „Noch keine Unterschrift erkannt“ in Dauerschleife). Ursache war die Absicherung des Pad-Dienstes: Er durfte keine Netlink-Abfragen stellen (`RestrictAddressFamilies`), mit denen die signotec-Bibliothek die Netzwerkadressen des Servers ermittelt. Die Tasten kamen trotzdem an, die Stiftpunkte nicht. Jetzt ist `AF_NETLINK` erlaubt, alle anderen Schutzeinstellungen bleiben.

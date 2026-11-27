@@ -85,3 +85,5 @@ main.modul { max-width: 1180px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .us-gewaehlt #n-patient-feld { min-width: 280px; flex: 1; }
 .us-gewaehlt #n-patient-feld input { width: 100%; font-size: 20px; }
+a.button.small { min-height: 0; padding: 4px 10px; font-size: 13px; }
+.us-dokument { white-space: pre-wrap; line-height: 1.55; max-width: 820px; }

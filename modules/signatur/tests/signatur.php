@@ -11,7 +11,7 @@ function wirft(callable $f, string $msg): void { try { $f(); } catch (InvalidArg
 $dir = sys_get_temp_dir() . '/sg-test-' . bin2hex(random_bytes(4));
 mkdir($dir, 0700);
 Speicher::$data = $dir;
-register_shutdown_function(function () use ($dir) { Speicher::zuruecksetzen(); foreach (glob("$dir/*") ?: [] as $f) @unlink($f); @rmdir($dir); });
+register_shutdown_function(function () use ($dir) { Speicher::zuruecksetzen(); foreach (array_merge(glob("$dir/unterschriften/*") ?: [], glob("$dir/*") ?: []) as $f) @unlink($f); @rmdir("$dir/unterschriften"); @rmdir($dir); });
 
 // Erster Start: drei Mustervorlagen, Schemaversion gesetzt
 $vl = Seite::vorlagen();
@@ -214,6 +214,22 @@ Seite::vorgangLoeschen($lv);
 check(Seite::vorgang($lv) === null, 'abgebrochener Vorgang gelöscht');
 wirft(fn() => Seite::vorgangLoeschen($lv), 'schon gelöscht');
 check(str_contains(Ansicht::seite('/vorgaenge', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null), 'value="vorgang-loeschen"'), 'Löschknopf in der Liste');
+// Ansehen: PDF unterschriebener Vorgänge, sonst der Text; Geburtsdatum und Praxis für das PDF; Löschen entfernt die Dateien
+$pv = Seite::vorgangAnlegen($neu + ['pad_id' => $pa, 'geburtsdatum' => '1970-02-01'], 'x', ['name' => 'Praxis Dr. med. Erika Beispiel', 'city' => '12345 Musterstadt', 'fremd' => 'x']);
+$row = Seite::vorgang($pv);
+check($row['geburtsdatum'] === '01.02.1970' && json_decode($row['praxis'], true) === ['name' => 'Praxis Dr. med. Erika Beispiel', 'city' => '12345 Musterstadt'], 'Geburtsdatum und Praxis am Vorgang');
+check(Seite::pdfPfad($pv) === null, 'ohne PDF kein Pfad');
+$dok = Ansicht::dokument(['patient' => '<Max>', 'titel' => 'T', 'text' => "Zeile <b>1</b>", 'status' => 'wartet', 'unterschrieben' => 0]);
+check(str_contains($dok, '&lt;b&gt;1') && str_contains($dok, 'Noch nicht unterschrieben') && !str_contains($dok, '<b>1'), 'Dokumentansicht maskiert den Text');
+check(str_contains(Ansicht::seite('/vorgaenge', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null), '/signatur/ansehen/' . $pv . '"'), 'Ansehen in der Liste');
+\KienzleSignatur\Speicher::pdo()->prepare('UPDATE vorgaenge SET status=\'unterschrieben\', unterschrieben=? WHERE id=?')->execute([time(), $pv]);
+@mkdir($dir . '/unterschriften', 0700);
+foreach (['png', 'sdb', 'pdf'] as $e) file_put_contents("$dir/unterschriften/$pv.$e", 'x');
+check(Seite::pdfPfad($pv) === "$dir/unterschriften/$pv.pdf", 'PDF gefunden');
+check(str_contains(Ansicht::seite('/vorgaenge', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null), 'PDF ansehen'), 'PDF ansehen bei unterschriebenen');
+Seite::vorgangLoeschen($pv);
+check(!is_file("$dir/unterschriften/$pv.png") && !is_file("$dir/unterschriften/$pv.sdb") && !is_file("$dir/unterschriften/$pv.pdf"), 'Löschen entfernt Unterschrift und PDF');
+
 $gelb = Seite::aktuellerVorgang();
 check($gelb !== null && $gelb['status'] !== 'abgebrochen', 'aktueller Vorgang ist offen');
 

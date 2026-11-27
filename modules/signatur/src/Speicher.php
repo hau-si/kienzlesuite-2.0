@@ -7,7 +7,7 @@ final class Speicher {
     public static string $data = '/var/lib/kienzle/signatur';
     private static ?\PDO $pdo = null;
     private static string $pfad = '';
-    public const VERSION = 6;
+    public const VERSION = 7;
 
     public static function pdo(): \PDO {
         $datei = self::$data . '/signatur.db';
@@ -131,6 +131,10 @@ final class Speicher {
             foreach (['vorname', 'nachname', 'geschlecht', 'pid'] as $spalte) $pdo->exec('ALTER TABLE starts ADD COLUMN ' . $spalte . ' TEXT NOT NULL DEFAULT ""');
             $pdo->exec('CREATE TABLE tokens (kontext TEXT PRIMARY KEY, cipher TEXT NOT NULL, bis INTEGER NOT NULL)');
             foreach (['patient_id', 'kontakt_alt', 'kontakt_neu', 'kontakt_status', 'kontakt_meldung'] as $spalte) $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN ' . $spalte . ' TEXT NOT NULL DEFAULT ""');
+        }
+        if ($v < 7) {
+            // Für das PDF (Entwurf C): Geburtsdatum des Patienten und Praxisangaben (Name, Anschrift) zum Zeitpunkt des Anlegens.
+            foreach (['geburtsdatum', 'praxis'] as $spalte) $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN ' . $spalte . ' TEXT NOT NULL DEFAULT ""');
         }
         $pdo->exec('PRAGMA user_version=' . self::VERSION);
         $pdo->commit();

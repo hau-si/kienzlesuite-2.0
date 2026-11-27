@@ -51,11 +51,13 @@ class AblaufTest(unittest.TestCase):
         self.c.execute("INSERT INTO pads (id, name, adresse) VALUES (1, 'Pad Empfang', '192.0.2.10')")
         self.c.execute("INSERT INTO vorgaenge (id, titel, text, patient, status, pad_id) VALUES (1, 'IGeL-Vertrag', 'Text für Max Mustermann.', 'Max Mustermann', 'am_pad', 1)")
         self.c.commit()
+        self.ordner = tempfile.mkdtemp(prefix='sg-pad-')
+        self.addCleanup(lambda: [os.remove(os.path.join(self.ordner, f)) for f in os.listdir(self.ordner)] and None or os.rmdir(self.ordner))
 
     def lauf(self, tasten, **kw):
         v = self.c.execute('SELECT * FROM vorgaenge WHERE id=1').fetchone()
         f = Fake(tasten, **kw)
-        return padauftrag.ablauf(self.c, v, f, '/tmp'), f
+        return padauftrag.ablauf(self.c, v, f, self.ordner), f
 
     def status(self):
         return tuple(self.c.execute('SELECT status, meldung FROM vorgaenge WHERE id=1').fetchone())
@@ -66,6 +68,13 @@ class AblaufTest(unittest.TestCase):
         self.assertEqual(self.status(), ('unterschrieben', ''))
         self.assertIn('danke', f.log)
         self.assertGreater(self.c.execute('SELECT unterschrieben FROM vorgaenge WHERE id=1').fetchone()[0], 0)
+
+    def test_pdf_nach_der_unterschrift(self):
+        erg, _ = self.lauf(['Weiter', 'OK'])
+        self.assertEqual(erg, 'unterschrieben')
+        with open(os.path.join(self.ordner, '1.pdf'), 'rb') as fh:
+            self.assertTrue(fh.read().startswith(b'%PDF-1.4'))
+        self.assertEqual(os.stat(os.path.join(self.ordner, '1.pdf')).st_mode & 0o777, 0o600)
 
     def test_zurueck_loeschen_und_leere_bestaetigung(self):
         erg, f = self.lauf(['Weiter', 'Zurück', 'Weiter', 'Löschen', 'OK'], unterschrieben=False)
@@ -79,7 +88,7 @@ class AblaufTest(unittest.TestCase):
         class Ohne(Fake):
             hinweis = 'Keine Unterschriftsdaten (Rückgabe -5, Größe 0): Testfehler'
         v = self.c.execute('SELECT * FROM vorgaenge WHERE id=1').fetchone()
-        padauftrag.ablauf(self.c, v, Ohne(['Weiter', 'OK'], unterschrieben=False), '/tmp')
+        padauftrag.ablauf(self.c, v, Ohne(['Weiter', 'OK'], unterschrieben=False), self.ordner)
         # danach trennt das Testgerät (Fehler); die Meldung wurde vorher gesetzt, dann vom Fehler überschrieben
         self.assertEqual(self.status()[0], 'fehler')
 
@@ -104,7 +113,7 @@ class AblaufTest(unittest.TestCase):
             return t[0]
         class Still(Fake):
             def ereignis(self, w): return None
-        erg = padauftrag.ablauf(self.c, v, Still([]), '/tmp', jetzt=uhr, leerlauf=600)
+        erg = padauftrag.ablauf(self.c, v, Still([]), self.ordner, jetzt=uhr, leerlauf=600)
         self.assertEqual(erg, 'zurueck')
         self.assertIn('Zeit abgelaufen', self.status()[1])
 

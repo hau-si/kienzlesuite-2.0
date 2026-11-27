@@ -37,10 +37,22 @@ final class Ansicht {
             . $h($padNamen[(int)($v['pad_id'] ?? 0)] ?? '–') . '</td><td>' . $stat . '</td><td class="us-aktionen">' . self::aktionen($v, $csrfFeld, $darfVorgang) . '</td></tr>';
     }
 
+    /** Ansicht eines Vorgangs ohne PDF: eingesetzter Text, wie er am Pad erscheint. */
+    public static function dokument(array $v): string {
+        $h = 'sg_h';
+        $hinweis = in_array($v['status'], ['unterschrieben', 'uebertragen'], true)
+            ? 'Unterschrieben am ' . self::datum((int)$v['unterschrieben']) . '. Das PDF wird gerade erzeugt; bitte gleich erneut öffnen.'
+            : 'Noch nicht unterschrieben (' . (Seite::STATI[$v['status']] ?? $v['status']) . ').';
+        return '<div class="us"><header class="seitenkopf"><div><p class="eyebrow">' . $h($v['patient']) . '</p><h1>' . $h($v['titel']) . '</h1></div></header>'
+            . '<p class="muted">' . $h($hinweis) . '</p><div class="card us-dokument">' . $h($v['text']) . '</div></div>';
+    }
+
     /** Knöpfe zu einem Vorgang je nach Status. */
     private static function aktionen(array $v, string $csrfFeld, bool $darfVorgang): string {
         if (!$darfVorgang) return '';
-        $o = '';
+        // Ansehen: unterschrieben = das PDF, sonst der Dokumenttext (neues Fenster).
+        $o = '<a class="button secondary small" href="' . sg_h(sg_basis() . '/ansehen/' . (int)$v['id']) . '" target="_blank" rel="noopener">'
+            . (in_array($v['status'], ['unterschrieben', 'uebertragen'], true) ? 'PDF ansehen' : 'Ansehen') . '</a> ';
         if (in_array($v['status'], ['wartet', 'fehler'], true) && (int)($v['pad_id'] ?? 0) > 0) $o .= self::knopf($csrfFeld, 'am-pad', (int)$v['id'], 'Zum Pad senden', 'primary small');
         if ($v['status'] === 'am_pad') $o .= self::knopf($csrfFeld, 'vom-pad', (int)$v['id'], 'Vom Pad nehmen', 'small');
         if (in_array($v['kontakt_status'] ?? '', ['offen', 'fehler'], true) && in_array($v['status'], ['unterschrieben', 'uebertragen'], true)) $o .= self::knopf($csrfFeld, 'kontakt-uebernehmen', (int)$v['id'], 'Kontaktdaten in T2med übernehmen', 'primary small', 'Telefon und E-Mail dieses Patienten in T2med ändern? Alle anderen Angaben bleiben unverändert.');
@@ -284,3 +296,4 @@ final class Ansicht {
         return $o;
     }
 }
+

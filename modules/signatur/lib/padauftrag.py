@@ -37,6 +37,20 @@ def status_setzen(c: sqlite3.Connection, vid: int, status: str, meldung: str, nu
     return cur.rowcount == 1
 
 
+def pdf_erzeugen(c: sqlite3.Connection, vid: int, ordner: str) -> bool:
+    """PDF des unterschriebenen Vorgangs (padpdf). Ein Fehler hält die Unterschrift nicht auf; er steht im Protokoll und am Vorgang."""
+    try:
+        import padpdf
+        padpdf.vorgang_pdf(c, vid, ordner)
+        log(f'Vorgang {vid}: PDF erzeugt.')
+        return True
+    except Exception as exc:  # noqa: BLE001
+        log(f'Vorgang {vid}: PDF nicht erzeugt ({exc})')
+        c.execute('UPDATE vorgaenge SET meldung=? WHERE id=?', (f'PDF nicht erzeugt: {exc}'[:300], vid))
+        c.commit()
+        return False
+
+
 class Abbruch(Exception):
     """Der Vorgang wurde auf der Seite abgebrochen oder zurückgenommen: Pad räumen, nichts mehr eintragen."""
 
@@ -105,6 +119,7 @@ def ablauf(c: sqlite3.Connection, vorgang: sqlite3.Row, geraet, ausgabe: str, je
                 continue
             geraet.danke(padseiten.hinweisseite('Vielen Dank'))
             status_setzen(c, vid, 'unterschrieben', '', zeit=int(jetzt()))
+            pdf_erzeugen(c, vid, ausgabe)
             return 'unterschrieben'
 
 

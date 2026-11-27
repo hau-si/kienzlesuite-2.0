@@ -94,6 +94,25 @@ try {
             $antwort(['error' => 'Interner Fehler (' . get_class($e) . '): ' . $e->getMessage()], 500);
         }
     }
+    if (preg_match('#^/ansehen/([1-9][0-9]{0,9})$#D', $rel, $m)) {
+        // Dokument ansehen: unterschrieben = das PDF (im Browser), sonst der eingesetzte Text des Vorgangs.
+        if (!$darfVorgang) $k->verweigern();
+        $v = Seite::vorgang((int)$m[1]);
+        if (!$v) { http_response_code(404); echo 'Vorgang nicht gefunden.'; exit; }
+        header('Cache-Control: no-store');
+        header('X-Content-Type-Options: nosniff');
+        $pdf = Seite::pdfPfad((int)$v['id']);
+        if ($pdf !== null) {
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: inline; filename="' . preg_replace('/[^A-Za-z0-9_-]+/', '-', 'vorgang-' . $v['id'] . '-' . $v['titel']) . '.pdf"');
+            header('Content-Length: ' . filesize($pdf));
+            readfile($pdf);
+            exit;
+        }
+        header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
+        echo $k->rahmen('Signatur', Ansicht::dokument($v), ['roh' => true, 'kopf' => Ansicht::kopf($base, $k->csrf())]);
+        exit;
+    }
     if ($rel === '') $rel = '/';
     if (!in_array($rel, ['/', '/vorgaenge', '/einstellungen'], true)) { http_response_code(404); echo 'Nicht gefunden.'; exit; }
     if ($rel === '/einstellungen' && !$darfVorlage && !$k->istAdmin()) $k->verweigern();
