@@ -1,5 +1,13 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.43
+
+- **Bausteine am Pad:** Das Pad zeichnet die Bausteine selbst (`lib/padformular.py`): Ankreuzfelder und Auswahl durch Antippen, Text mit Formatierung, Aufzählungen, Bilder, Trennlinien, Seitenumbrüche. Fragen bleiben mit ihren Möglichkeiten auf einer Seite.
+- **Pflichtfelder:** „Weiter zur Unterschrift“ geht erst, wenn alle mit * markierten Angaben ausgefüllt sind; sonst springt das Pad zur ersten fehlenden Angabe und zeigt einen Hinweis.
+- **E-Mail und Telefon am Pad ändern:** „Ändern“ öffnet eine Bildschirmtastatur (E-Mail: Buchstaben und „123“, Telefon: Ziffern), die Eingabe wird geprüft. Geänderte Werte stehen im PDF („am Pad geändert“) und werden für T2med vorgemerkt (Knopf „Kontaktdaten in T2med übernehmen“ in der Liste, nur bei Start aus T2med).
+- **Antworten:** gespeichert am Vorgang, im PDF als „[X]“/„( )“.
+- Höchstens 32 Tastflächen je Seite (die Grenze des Pads ist nicht dokumentiert). Mit Tests (Ersatz-Pad) geprüft, **nicht am echten Pad und nicht auf der VM**.
+
 ## 0.1.0-beta.42
 
 - **Neuer Editor (Entwurf C):** links die Bausteine (anklicken oder ins Dokument ziehen) und die Vorlagen, in der Mitte das Dokument als Zeilen (verschieben per Griff oder Pfeil, kopieren, entfernen), rechts die Eigenschaften der gewählten Zeile und eine Vorschau am Pad mit Beispielwerten.

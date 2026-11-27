@@ -6,12 +6,14 @@ Ablauf und Gerät sind getrennt: ablauf() steuert nur über das Gerät (PadGerae
 from __future__ import annotations
 
 import ctypes
+import json
 import os
 import sqlite3
 import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import padformular  # noqa: E402
 import padseiten  # noqa: E402
 
 DATEN = os.environ.get('KIENZLE_SIGNATUR_DATEN', '/var/lib/kienzle/signatur')
@@ -114,7 +116,20 @@ def ablauf(c: sqlite3.Connection, vorgang: sqlite3.Row, geraet, ausgabe: str, je
         vorschau.weg()
 
 
+def _bloecke(vorgang: sqlite3.Row) -> list:
+    """Bausteine des Vorgangs (Editor C), sonst leer (ältere Vorgänge: nur Text)."""
+    if 'bloecke' not in vorgang.keys() or not vorgang['bloecke']:
+        return []
+    try:
+        b = json.loads(vorgang['bloecke'])
+    except ValueError:
+        return []
+    return b if isinstance(b, list) and all(isinstance(x, dict) and isinstance(x.get('id'), str) for x in b) else []
+
+
 def _ablauf(c: sqlite3.Connection, vorgang: sqlite3.Row, geraet, ausgabe: str, jetzt, leerlauf: int, vorschau: Vorschau) -> str:
+    if _bloecke(vorgang):
+        return _formular(c, vorgang, geraet, ausgabe, jetzt, leerlauf, vorschau)
     vid = int(vorgang['id'])
     text_seiten = padseiten.textseiten(vorgang['titel'], vorgang['text'])
     sign = padseiten.unterschriftsseite(vorgang['titel'], vorgang['patient'])
@@ -181,6 +196,130 @@ def _ablauf(c: sqlite3.Connection, vorgang: sqlite3.Row, geraet, ausgabe: str, j
             status_setzen(c, vid, 'unterschrieben', '', zeit=int(jetzt()))
             pdf_erzeugen(c, vid, ausgabe)
             return 'unterschrieben'
+
+
+def _formular(c: sqlite3.Connection, vorgang: sqlite3.Row, geraet, ausgabe: str, jetzt, leerlauf: int, vorschau: Vorschau) -> str:
+    """Bausteine am Pad (Editor C): Ankreuzen und Auswählen durch Antippen, Pflichtfelder vor der Unterschrift, E-Mail/Telefon über
+    die Bildschirmtastatur. Nach „OK“ werden die Antworten gespeichert, der Text des Vorgangs mit Antworten ersetzt (PDF) und
+    geänderte Kontaktdaten für T2med vorgemerkt."""
+    vid = int(vorgang['id'])
+    bloecke = _bloecke(vorgang)
+    bilder = os.path.join(os.path.dirname(os.path.abspath(ausgabe)), 'bilder')
+    form = padformular.seiten(bloecke, bilder)
+    antworten = padformular.antworten_start(bloecke)
+    sign = padseiten.unterschriftsseite(vorgang['titel'], vorgang['patient'])
+    letzte = len(form)              # Index der Unterschriftsseite
+    idx, hinweis, tastatur = 0, '', None   # tastatur: {'id', 'feld', 'wert', 'modus', 'hinweis'}
+    zuletzt = jetzt()
+
+    def zeigen() -> dict:
+        if tastatur is not None:
+            s = padformular.zeichne_tastatur(tastatur['feld'], tastatur['wert'], tastatur['modus'], tastatur['hinweis'])
+            art = 'tastatur'
+        elif idx == letzte:
+            s, art = sign, 'unterschrift'
+        else:
+            s, art = padformular.zeichne_seite(vorgang['titel'], form[idx], idx, len(form), antworten, hinweis), 'text'
+        geraet.zeige(s['bild'])
+        vorschau.seite(s['bild'], min(idx, letzte) + 1, letzte + 1, art)
+        ids = geraet.knoepfe(s['knoepfe'])
+        if tastatur is None and idx == letzte:
+            geraet.unterschrift_starten(sign['feld'])
+        return {ids[n]: n for n in ids}
+
+    namen = zeigen()
+    while True:
+        if c.execute('SELECT status FROM vorgaenge WHERE id=?', (vid,)).fetchone()['status'] != 'am_pad':
+            geraet.raeumen()
+            return 'abgebrochen'
+        if jetzt() - zuletzt > leerlauf:
+            geraet.raeumen()
+            status_setzen(c, vid, 'wartet', 'Am Pad nicht unterschrieben (Zeit abgelaufen).')
+            return 'zurueck'
+        ev = geraet.ereignis(1.0)
+        vorschau.punkte(int((getattr(geraet, 'stift', None) or {}).get('n', 0)))
+        if ev is None:
+            continue
+        art, wert = ev
+        zuletzt = jetzt()
+        if art == EV_DISCONNECT:
+            status_setzen(c, vid, 'fehler', 'Verbindung zum Pad getrennt.')
+            return 'fehler'
+        if art != EV_HOTSPOT or wert not in namen:
+            continue
+        taste = namen[wert]
+        if tastatur is not None:
+            if taste == 'k:Abbrechen':
+                tastatur = None
+            elif taste == 'k:OK':
+                fehler = padformular.pruefe_eingabe(tastatur['feld'], tastatur['wert'])
+                if fehler:
+                    tastatur['hinweis'] = fehler
+                else:
+                    antworten.setdefault(tastatur['id'], {})[tastatur['feld']] = tastatur['wert'].strip()
+                    tastatur = None
+            else:
+                tastatur['wert'], tastatur['modus'] = padformular.tippen(tastatur['wert'], tastatur['modus'], taste)
+                tastatur['hinweis'] = ''
+            namen = zeigen()
+            continue
+        log(f'Vorgang {vid}: Taste {taste} (Seite {idx + 1} von {letzte + 1})')
+        if taste == 'Abbrechen':
+            geraet.raeumen()
+            status_setzen(c, vid, 'wartet', 'Am Pad abgebrochen.')
+            return 'zurueck'
+        if taste.startswith('e:'):
+            _, bid, feld = taste.split(':', 2)
+            tastatur = {'id': bid, 'feld': feld, 'wert': (antworten.get(bid) or {}).get(feld, ''), 'modus': 'tel' if feld == 'telefon' else 'abc', 'hinweis': ''}
+        elif taste.startswith(('a:', 'o:')):
+            padformular.antippen(bloecke, antworten, taste)
+            hinweis = ''
+        elif taste == 'Weiter':
+            if idx == letzte - 1:
+                offen = padformular.fehlend(bloecke, antworten)
+                if offen:
+                    idx = padformular.seite_von(form, offen[0])
+                    hinweis = 'Bitte die mit * markierten Angaben ausfüllen.'
+                    namen = zeigen()
+                    continue
+            idx, hinweis = idx + 1, ''
+        elif taste == 'Zurück':
+            if idx == letzte:
+                geraet.unterschrift_abbrechen()
+            idx, hinweis = max(0, idx - 1), ''
+        elif taste == 'Löschen':
+            geraet.unterschrift_neu()
+            continue
+        elif taste == 'OK':
+            ergebnis = geraet.bestaetigen(ausgabe, vid)
+            if ergebnis is None:
+                h = getattr(geraet, 'hinweis', '') or 'Bitte zuerst im Feld unterschreiben.'
+                c.execute('UPDATE vorgaenge SET meldung=? WHERE id=? AND status="am_pad"', (h[:300], vid))
+                c.commit()
+                continue
+            geraet.danke(padseiten.hinweisseite('Vielen Dank'))
+            antworten_speichern(c, vorgang, bloecke, antworten)
+            status_setzen(c, vid, 'unterschrieben', '', zeit=int(jetzt()))
+            pdf_erzeugen(c, vid, ausgabe)
+            return 'unterschrieben'
+        namen = zeigen()
+
+
+def antworten_speichern(c: sqlite3.Connection, vorgang: sqlite3.Row, bloecke: list, antworten: dict) -> None:
+    """Antworten und Text mit Antworten (für PDF und Ansicht) speichern; am Pad geänderte Kontaktdaten für T2med vormerken
+    (übernommen wird erst auf Knopfdruck in der Liste, nur bei Start aus T2med mit Patienten-ID)."""
+    vid = int(vorgang['id'])
+    text = padformular.text_mit_antworten(bloecke, antworten)
+    c.execute('UPDATE vorgaenge SET antworten=?, text=? WHERE id=?', (json.dumps(antworten, ensure_ascii=False), text, vid))
+    alt, neu = padformular.kontakt_aenderungen(bloecke, antworten)
+    spalten = vorgang.keys()
+    if neu and 'kontakt_neu' in spalten:
+        kann = bool(vorgang['patient_id']) and bool(vorgang['kontext']) if 'patient_id' in spalten else False
+        voll = {'telefon': neu.get('telefon', ''), 'email': neu.get('email', '')}
+        c.execute('UPDATE vorgaenge SET kontakt_alt=?, kontakt_neu=?, kontakt_status=? WHERE id=?',
+                  (json.dumps({'telefon': alt.get('telefon', ''), 'email': alt.get('email', '')}, ensure_ascii=False), json.dumps(voll, ensure_ascii=False),
+                   'offen' if kann else '', vid))
+    c.commit()
 
 
 class PadGeraet:
