@@ -13,14 +13,17 @@ final class Request {
         public readonly array $cookies = [],
         public readonly array $headers = [],
         public readonly string $remote = '',
+        public readonly string $body = '',             // nur für JSON-Schnittstellen (/agent/…, /arbeitsplatz/akte), höchstens 64 KB
     ) {}
 
     public static function fromGlobals(): self {
         $headers = [];
         foreach ($_SERVER as $k => $v) if (str_starts_with($k, 'HTTP_') && is_string($v)) $headers[strtolower(str_replace('_', '-', substr($k, 5)))] = $v;
         $path = (string)parse_url((string)($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
-        return new self(strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')), $path === '' ? '/' : $path,
-            self::strings($_GET), self::strings($_POST), self::strings($_COOKIE), $headers, (string)($_SERVER['REMOTE_ADDR'] ?? ''));
+        $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+        $body = $method === 'POST' && (str_starts_with($path, '/agent/') || $path === '/arbeitsplatz/akte') ? (string)file_get_contents('php://input', false, null, 0, 65536) : '';
+        return new self($method, $path === '' ? '/' : $path,
+            self::strings($_GET), self::strings($_POST), self::strings($_COOKIE), $headers, (string)($_SERVER['REMOTE_ADDR'] ?? ''), $body);
     }
 
     /** Nur Texte und Listen von Texten übernehmen (keine verschachtelten Felder). */

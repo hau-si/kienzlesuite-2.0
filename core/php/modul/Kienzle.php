@@ -70,6 +70,16 @@ final class KienzleModul {
         return $out;
     }
 
+    /**
+     * Arbeitsplatz (PC mit Kienzle-Agent), an dem der Browser gerade sitzt: ['id', 'name', 'online'] oder null, wenn die Basis ihn nicht
+     * kennt. „Akte öffnen“ in T2med: die Seite schickt per fetch POST /arbeitsplatz/akte {modul, csrf, patientennummer} an die Basis
+     * (csrf = die CSRF-Marke dieses Moduls); die Basis baut den GDT-Aufruf und gibt ihn an den Agent dieses PCs.
+     */
+    public function arbeitsplatz(): ?array {
+        $d = json_decode(rawurldecode((string)($this->server['KIENZLE_ARBEITSPLATZ'] ?? '')), true);
+        return is_array($d) && is_string($d['id'] ?? null) && is_string($d['name'] ?? null) ? ['id' => $d['id'], 'name' => $d['name'], 'online' => ($d['online'] ?? false) === true] : null;
+    }
+
     /** Kontodaten und Steuerangaben der Basis (Verwaltung → Praxis): holder, iban, bic, bank_name, tax_id, small_business. */
     public function stammdaten(): array {
         $d = json_decode(rawurldecode((string)($this->server['KIENZLE_PRAXIS'] ?? '')), true);

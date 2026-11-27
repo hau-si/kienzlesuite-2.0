@@ -78,6 +78,7 @@ check(str_contains(aufruf($dir, '/telefon/sprachmenue', 'nebenstellen'), '#CODE=
 $o = aufruf($dir, '/telefon/sprachmenue', 'sprachmenue');
 check(str_contains($o, '#CODE=200') && str_contains($o, 'Öffnungszeiten') && str_contains($o, 'name="zeit[oeffnungszeiten][montag]"')
     && str_contains($o, 'name="ansage[greeting_open]"') && str_contains($o, 'name="taste[rezept]"') && str_contains($o, 'Zahlwörter'), 'Sprachmenü-Seite');
+check(substr_count($o, 'data-zeiten-von="oeffnungszeiten"') === 3, 'Zeiten der Praxis übernehmen: Knopf bei Telefonzeiten, Apotheken und Pflege, Krankenhaus');
 check(str_contains(aufruf($dir, '/telefon/', 'sprachmenue'), '/telefon/sprachmenue'), 'Link zum Sprachmenü in der Übersicht');
 preg_match('/name="stand" value="([a-f0-9]{64})"/', $o, $m);
 $o = aufruf($dir, '/telefon/sprachmenue', 'sprachmenue', 'benutzer', ['aktion' => 'sprachmenue-texte', 'kienzle-csrf' => $csrf, 'stand' => $m[1],
@@ -218,4 +219,16 @@ check(str_contains($o, 'Beim Wählen klingelt zuerst dieses Telefon') && str_con
 $o = aufruf($dir, '/telefon/anrufe', 'anrufe,waehlen', 'benutzer', ['aktion' => 'anrufen', 'kienzle-csrf' => $csrf, 'nummer' => '0301234567']);
 check(str_contains($o, 'class="fehler"'), 'Wählen ohne Anlage meldet Fehler');
 check(str_contains(aufruf($dir, '/telefon/anrufe', 'anrufe', 'benutzer', ['aktion' => 'anrufen', 'kienzle-csrf' => $csrf, 'nummer' => '0301234567']), 'fehlt das Recht'), 'Wählen nur mit Recht');
+// T2med-Telefonverzeichnis, Statistik
+$o = aufruf($dir, '/telefon/patienten/suche?q=muster', 'patienten');
+check(str_contains($o, '"verzeichnis":false') && str_contains($o, '"treffer":[]'), 'Suche ohne Verzeichnis');
+check(str_contains(aufruf($dir, '/telefon/patienten/suche?q=muster', 'anrufe'), '#CODE=403'), 'Suche braucht Recht patienten');
+$o = aufruf($dir, '/telefon/anrufe', 'anrufe,patienten,statistik');
+check(str_contains($o, 'id="tf-suche"') && str_contains($o, '/telefon/statistik') && str_contains($o, 'tf-leiste'), 'Suchfeld oben, Reiter Statistik, Leiste');
+check(!str_contains(aufruf($dir, '/telefon/anrufe', 'anrufe'), 'id="tf-suche"'), 'kein Suchfeld ohne Recht');
+check(str_contains(aufruf($dir, '/telefon/statistik', 'statistik'), 'Noch keine Anrufe') && str_contains(aufruf($dir, '/telefon/statistik', 'anrufe'), '#CODE=403'), 'Statistik-Seite und Recht');
+check(str_contains(aufruf($dir, '/telefon/einstellungen', '', 'admin'), 'T2med-Telefonverzeichnis') && str_contains(aufruf($dir, '/telefon/einstellungen', '', 'admin'), 'kienzle-telefonverzeichnis://'), 'Einstellungen Telefonverzeichnis');
+$o = aufruf($dir, '/telefon/einstellungen', '', 'admin', ['aktion' => 'verzeichnis-speichern', 'kienzle-csrf' => str_repeat('a', 32), 'ortsvorwahl' => '030', 'anrufername' => '1']);
+check(str_contains($o, 'Gespeichert') && str_contains((string)file_get_contents("$dir/daten/t2med/einstellungen.json"), '"030"'), 'Ortsvorwahl speichern');
+check(str_contains(aufruf($dir, '/telefon/einstellungen', 'patienten', 'benutzer', ['aktion' => 'verzeichnis-loeschen', 'kienzle-csrf' => str_repeat('a', 32)]), '#CODE=403') && str_contains(aufruf($dir, '/telefon/einstellungen', 'nebenstellen', 'benutzer', ['aktion' => 'verzeichnis-loeschen', 'kienzle-csrf' => str_repeat('a', 32)]), 'nur Admins'), 'Verzeichnis löschen nur Admin');
 echo "seiten.php (telefon): alles in Ordnung\n";

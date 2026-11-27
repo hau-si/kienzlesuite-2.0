@@ -29,6 +29,7 @@ API = re.compile(r'^[1-9]\d{0,3}$')
 PACKAGE = re.compile(r'^[a-z0-9][a-z0-9+.-]{1,62}$')
 WEB_PATH = re.compile(r'^/[a-z0-9][a-z0-9-]{0,30}$')
 RIGHT = re.compile(r'^[a-z][a-z0-9_]{0,30}$')
+SHARE_NAME = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,30}$')
 PRINTER = re.compile(r'^[A-Za-z0-9_-]{1,40}$')
 REL_PATH = re.compile(r'^[A-Za-z0-9_][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_][A-Za-z0-9_.-]*)*$')
 PORT = re.compile(r'^(\d{1,5})(?:-(\d{1,5}))?$')
@@ -58,7 +59,7 @@ EXCHANGE_BASE = '/var/spool/kienzle/austausch'
 API_2 = '2'
 FORMAT = re.compile(r'^[a-z]+/[a-z0-9.+-]{1,60}$')
 
-LIMITS = {'exchange': 5, 'starters': 5, 'packages': 50, 'services': 20, 'firewall': 20, 'rights': 30, 'printers': 10, 'paths': 20,
+LIMITS = {'exchange': 5, 'starters': 5, 'packages': 50, 'services': 20, 'firewall': 20, 'rights': 30, 'printers': 10, 'paths': 20, 'fileshares': 3,
           'connections': len(CONNECTIONS)}
 
 SCHEMA_SECTIONS = {
@@ -73,11 +74,12 @@ SCHEMA_SECTIONS = {
     'connections': {'id', 'purpose', 'required'},
     'starters': {'schema', 'label'},
     'exchange': {'module', 'purpose'},
+    'fileshare': {'id', 'name', 'label', 'path'},
     'setup': {'overview'},
     'hooks': {*HOOKS, 'apparmor'},
 }
 TABLES = {'module', 'system', 'web', 'backup', 'setup', 'hooks', 'printer_list'}
-ARRAYS = {'firewall', 'rights', 'printers', 'connections', 'starters', 'exchange'}
+ARRAYS = {'firewall', 'rights', 'printers', 'connections', 'starters', 'exchange', 'fileshare'}
 REQUIRED_TABLES = ('module', 'system')
 
 
@@ -205,8 +207,9 @@ class _Checker:
         out['connections'] = self.connections(data.get('connections', []))
         out['starters'] = self.starters(data.get('starters', []), out['web'])
         out['exchange'] = self.exchange(data.get('exchange', []), mid)
-        if (out['exchange'] or out['system']['disables']) and module.get('core_api') == '1':
-            self.error('module.core_api', '[[exchange]] und [system] disables gibt es erst mit core_api = "2".')
+        out['fileshares'] = self.fileshares(data.get('fileshare', []), out['system'])
+        if (out['exchange'] or out['system']['disables'] or out['fileshares']) and module.get('core_api') == '1':
+            self.error('module.core_api', '[[exchange]], [[fileshare]] und [system] disables gibt es erst mit core_api = "2".')
         out['setup'] = self.setup(data.get('setup', {}))
         out['hooks'] = self.hooks(data.get('hooks', {}))
         return None if self.errors else out
@@ -509,6 +512,31 @@ class _Checker:
             if other is not None and mid:
                 seen.add(other)
                 out.append({'module': other, 'purpose': purpose, 'path': exchange_dir(mid, other)})
+        return out
+
+    def fileshares(self, items: list, system: dict) -> list:
+        """Ordner im Datenverzeichnis des Moduls, den ein Admin als Windows-Freigabe zum Ablegen von Dateien einschalten kann (aus), standardmäßig aus."""
+        if len(items) > LIMITS['fileshares']:
+            self.error('fileshare', f'höchstens {LIMITS["fileshares"]} Einträge.')
+            return []
+        out, ids, names = [], set(), set()
+        for n, t in enumerate(items, 1):
+            where = f'fileshare[{n}]'
+            fid = self.pattern(t, 'id', where, ID, 'ablage')
+            name = self.pattern(t, 'name', where, SHARE_NAME, 'Fax-Ausgang')
+            label = self.text(t, 'label', where, limit=80)
+            path = self.rel_path(t['path'], f'{where}.path') if 'path' in t else self.error(where, '„path“ fehlt.')
+            if fid is not None and fid in ids:
+                self.error(f'{where}.id', f'„{fid}“ ist doppelt.')
+                fid = None
+            if name is not None and name.lower() in names:
+                self.error(f'{where}.name', f'„{name}“ ist doppelt.')
+                name = None
+            if None in (fid, name, label, path) or not system.get('data'):
+                continue
+            ids.add(fid)
+            names.add(name.lower())
+            out.append({'id': fid, 'name': name, 'label': label, 'path': f'{system["data"]}/{path}'})
         return out
 
     def setup(self, t: dict) -> dict:

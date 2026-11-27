@@ -17,20 +17,42 @@ final class Ansicht {
     public static bool $rufgruppen = false;
     /** Knopf „Anrufe“ im Seitenkopf zeigen (Recht vorhanden). */
     public static bool $anrufe = false;
+    /** Recht „patienten“: Suchfeld oben auf jeder Seite (Telefonverzeichnis aus T2med, Akte öffnen). */
+    public static bool $patienten = false;
+    /** Recht „statistik“: Reiter „Statistik“ oben. */
+    public static bool $statistik = false;
+    /** CSRF-Marke des Moduls (für „Akte öffnen“ über die Basis und Wählen aus der Suche). */
+    public static string $csrf = '';
+    public static bool $waehlen = false;
+    /** Verbindung „t2med“ der Basis vorhanden? (Einstellungen) */
+    public static array $t2med = ['eingerichtet' => false];
 
     private static function tag(string $art, string $text): string { return '<span class="tag ' . $art . '">' . tf_h($text) . '</span>'; }
 
     private static function kopfzeile(string $route, bool $einstellungen): string {
         $b = tf_h(tf_basis());
-        $titel = ['/einstellungen' => 'Einstellungen', '/sprachmenue' => 'Sprachmenü', '/vorgaenge' => 'Vorgänge', '/rufgruppen' => 'Rufgruppen', '/anrufe' => 'Anrufe'][$route] ?? 'Telefonanlage';
+        $titel = ['/einstellungen' => 'Einstellungen', '/sprachmenue' => 'Sprachmenü', '/vorgaenge' => 'Vorgänge', '/rufgruppen' => 'Rufgruppen', '/anrufe' => 'Anrufe', '/statistik' => 'Statistik'][$route] ?? 'Telefonanlage';
         $link = $route !== '/' ? '<a class="button secondary" href="' . $b . '/">← Übersicht</a>'
+              . (self::$anrufe && $route !== '/anrufe' ? '<a class="button secondary" href="' . $b . '/anrufe">Anrufe</a>' : '')
+              . (self::$statistik ? '<a class="button ' . ($route === '/statistik' ? 'primary' : 'secondary') . '" href="' . $b . '/statistik"' . ($route === '/statistik' ? ' aria-current="page"' : '') . '>Statistik</a>' : '')
             : (self::$vorgaenge !== null ? '<a class="button' . (self::$vorgaenge ? '' : ' secondary') . '" href="' . $b . '/vorgaenge">Vorgänge'
                 . (self::$vorgaenge ? ' (' . self::$vorgaenge . ')' : '') . '</a>' : '')
               . (self::$anrufe ? '<a class="button secondary" href="' . $b . '/anrufe">Anrufe</a>' : '')
+              . (self::$statistik ? '<a class="button secondary" href="' . $b . '/statistik">Statistik</a>' : '')
               . (self::$rufgruppen ? '<a class="button secondary" href="' . $b . '/rufgruppen">Rufgruppen</a>' : '')
               . (self::$sprachmenue ? '<a class="button secondary" href="' . $b . '/sprachmenue">Sprachmenü</a>' : '')
               . ($einstellungen ? '<a class="button secondary" href="' . $b . '/einstellungen">Einstellungen</a>' : '');
-        return '<header class="seitenkopf"><div><p class="eyebrow">Telefon</p><h1>' . $titel . '</h1></div><span class="start-tools">' . $link . '</span></header>';
+        return '<header class="seitenkopf"><div><p class="eyebrow">Telefon</p><h1>' . $titel . '</h1></div><span class="start-tools">' . $link . '</span>' . self::suchfeld() . '</header>'
+            . '<div id="tf-laden" class="tf-laden" hidden role="status"></div>';
+    }
+
+    /** Suchfeld (Entwurf C): Treffer klappen darunter auf; Pfeile und Enter = Akte des markierten Treffers. */
+    private static function suchfeld(): string {
+        if (!self::$patienten) return '';
+        $b = tf_h(tf_basis());
+        return '<div class="tf-suche" data-quelle="' . $b . '/patienten/suche" data-waehlen="' . (self::$waehlen ? $b . '/anrufe/waehlen' : '') . '" data-csrf="' . tf_h(self::$csrf) . '" data-modul="telefon">'
+            . '<input type="search" id="tf-suche" autocomplete="off" maxlength="100" placeholder="Patient suchen: Name, Nummer …" aria-label="Patient suchen">'
+            . '<div class="tf-treffer" hidden role="listbox"></div></div>';
     }
 
     private static function meldungen(?string $meldung, ?string $fehler): string {
@@ -258,6 +280,9 @@ final class Ansicht {
                     . '" maxlength="200" placeholder="geschlossen" pattern="[0-9:\-, ;]*" inputmode="numeric">';
             }
             $f .= '</div>';
+            if ($s !== 'oeffnungszeiten') {
+                $f .= '<p><button type="button" class="small secondary" data-zeiten-von="oeffnungszeiten" title="Kopiert die Zeiten aus „Öffnungszeiten“ der Praxis in dieses Schema (alle sieben Tage). Es wird noch nichts gespeichert: danach unten auf „Speichern“ drücken, vorher kann man einzelne Tage noch ändern.">Zeiten der Praxis übernehmen</button> <span class="muted" data-zeiten-status></span></p>';
+            }
             $o .= self::fold('z-' . $s, (string)$z['titel'], $marke, '<form method="post" class="tf-form tf-breit">' . self::verborgen($csrf, $stand) . $f . '<button class="primary" type="submit">Speichern</button></form>');
         }
         $gruppen = [];
@@ -499,6 +524,13 @@ final class Ansicht {
         $o .= '<form method="post" action="' . $b . '/anrufe" class="tf-inline tf-mein">' . $verborgen . '<input type="hidden" name="aktion" value="mein-telefon"><label>Mein Telefon <select name="nummer">' . $opt
             . '</select></label><button class="small secondary" type="submit">Speichern</button></form></div>';
         if ($waehlen && $mein === '') $o .= '<p class="muted">Zum Wählen zuerst „Mein Telefon“ auswählen: Das Telefon klingelt, nach dem Abheben wird die Nummer gewählt.</p>';
+        if (self::$statistik) {
+            $hs = Statistik::heute();
+            $teile = ['Heute <strong>' . (int)$hs['anrufe'] . '</strong> ' . ((int)$hs['anrufe'] === 1 ? 'Anruf' : 'Anrufe')];
+            foreach ($hs['routen'] as $r => $n) $teile[] = $h($r) . ' ' . (int)$n;
+            if ($hs['warten'] !== null) $teile[] = 'Ø Warten ' . Statistik::dauer($hs['warten']);
+            $o .= '<div class="card tf-leiste"><span>' . implode(' · ', $teile) . '</span><a class="tf-leiste-link" href="' . $b . '/statistik">Statistik ▸</a></div>';
+        }
         return $o . '<div id="tf-anrufe-live" data-quelle="' . $b . '/anrufe/stand">' . self::anrufeStand($stand, $csrf, $waehlen) . '</div></div>';
     }
 
@@ -513,7 +545,7 @@ final class Ansicht {
         $o = '<div class="tf-live"><section class="card"><h2>Warteschlange ' . self::tag($w ? 'warn' : 'ok', $w ? count($w) . ' ' . (count($w) === 1 ? 'wartet' : 'warten') : 'niemand wartet') . '</h2>';
         if ($w) {
             $o .= '<ol class="tf-zeilen">';
-            foreach ($w as $x) $o .= '<li><span>' . ($x['schlange'] !== 'praxis' ? self::tag('err', 'ROT') . ' ' : '') . $rufen($x['wahl'], $x['nummer']) . '</span><span class="muted">' . $h($x['warten']) . '</span></li>';
+            foreach ($w as $x) $o .= '<li><span>' . ($x['schlange'] !== 'praxis' ? self::tag('err', 'ROT') . ' ' : '') . self::anrufer($x['wahl'], $rufen($x['wahl'], $x['nummer'])) . '</span><span class="muted">' . $h($x['warten']) . '</span></li>';
             $o .= '</ol>';
         }
         $o .= '<p class="muted">Im Sprachmenü: ' . (int)$stand['sprachmenue'] . '</p></section><section class="card"><h2>Telefone</h2>';
@@ -521,10 +553,95 @@ final class Ansicht {
         $o .= '<ul class="tf-zeilen">';
         $text = ['frei' => 'frei', 'klingelt' => 'klingelt', 'belegt' => 'im Gespräch', 'aus' => 'nicht angemeldet'];
         foreach ($stand['telefone'] as $t) {
-            $rechts = $t['art'] === 'belegt' && $t['partner'] !== '' ? $h($t['partner']) . ($t['dauer'] !== '' ? ' · ' . $h($t['dauer']) : '') : $h($text[$t['art']]);
+            $rechts = $t['art'] === 'belegt' && $t['partner'] !== '' ? self::anrufer($t['partner'], $h($t['partner'])) . ($t['dauer'] !== '' ? ' · ' . $h($t['dauer']) : '') : $h($text[$t['art']]);
             $o .= '<li class="tf-tel-' . $h($t['art']) . '"><span><span class="tf-punkt" aria-hidden="true"></span>' . $h($t['nummer'] . ' ' . $t['name']) . '</span><span>' . $rechts . '</span></li>';
         }
         return $o . '</ul></section></div>';
+    }
+
+    /** Seite „Statistik“: Kennzahlen, Verlauf der letzten 14 Tage, Anliegen und Wochenmuster (Uhrzeit × Wochentag). */
+    public static function statistik(array $a, string $zeitraum): string {
+        $h = 'tf_h';
+        $b = $h(tf_basis());
+        $o = '<div class="tf">' . self::kopfzeile('/statistik', false);
+        $o .= '<nav class="tf-reiter" aria-label="Zeitraum">';
+        foreach (['woche' => 'Letzte 7 Tage', 'monat' => 'Letzte 30 Tage', 'quartal' => 'Letzte 3 Monate'] as $z => $t) {
+            $o .= '<a class="button small ' . ($z === $zeitraum ? 'primary' : 'secondary') . '" href="' . $b . '/statistik?zeitraum=' . $z . '"' . ($z === $zeitraum ? ' aria-current="page"' : '') . '>' . $t . '</a>';
+        }
+        $o .= '</nav>';
+        if (!$a['daten']) {
+            return $o . '<section class="card"><p class="muted">Noch keine Anrufe erfasst. Die Statistik beginnt mit dem ersten Anruf nach dem Einrichten '
+                . '(Dienst „Anrufstatistik“). Gespeichert werden nur Zeitpunkte, gewählte Anliegen und Wartezeiten – keine Nummern oder Namen.</p></section></div>';
+        }
+        $o .= '<div class="tf-kpi"><div class="card"><span class="muted">Heute</span><strong>' . (int)$a['heute'] . '</strong></div>'
+            . '<div class="card"><span class="muted">Im Zeitraum</span><strong>' . (int)$a['zeitraum'] . '</strong></div>'
+            . '<div class="card"><span class="muted">Angenommen</span><strong>' . ($a['angenommen'] === null ? '–' : (int)$a['angenommen'] . ' %') . '</strong>'
+            . ($a['aufgelegt'] ? '<span class="muted klein">' . (int)$a['aufgelegt'] . ' vorher aufgelegt</span>' : '') . '</div>'
+            . '<div class="card"><span class="muted">Ø Wartezeit</span><strong>' . Statistik::dauer($a['warten']) . '</strong></div></div>';
+        $max = max(1, ...array_values($a['verlauf']));
+        $o .= '<div class="tf-statgrid"><section class="card"><h2>Anrufe je Tag</h2><div class="tf-balken" role="img" aria-label="Anrufe je Tag, letzte 14 Tage">';
+        foreach ($a['verlauf'] as $tag => $n) {
+            $d = new \DateTimeImmutable($tag);
+            $we = (int)$d->format('N') >= 6;
+            $o .= '<div class="tf-bt' . ($we ? ' we' : '') . '" title="' . $h($d->format('d.m.') . ': ' . $n) . '"><span class="tf-bz">' . ($n ?: '') . '</span><span class="tf-b h' . (int)(5 * round(20 * $n / $max)) . '"></span><span class="tf-bl">' . ['', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'][(int)$d->format('N')] . '</span></div>';
+        }
+        $o .= '</div></section><section class="card"><h2>Anliegen</h2>';
+        if (!$a['routen']) $o .= '<p class="muted">Keine Angaben (nur mit eingeschaltetem Sprachmenü).</p>';
+        else {
+            $rmax = max($a['routen']);
+            $o .= '<table class="tf-anliegen">';
+            foreach ($a['routen'] as $r => $n) $o .= '<tr><td>' . $h($r) . '</td><td><span class="tf-rb w' . (int)(5 * round(20 * $n / $rmax)) . '"></span></td><td>' . (int)$n . '</td></tr>';
+            $o .= '</table>';
+        }
+        $o .= '</section></div><section class="card"><h2>Wann rufen die meisten an?</h2><p class="muted">Anrufe je Wochentag und Stunde im Zeitraum (dunkler = mehr).</p>';
+        $mmax = 1;
+        foreach ($a['muster'] as $st) $mmax = max($mmax, ...array_values($st));
+        $o .= '<table class="tf-muster"><tr><th></th>';
+        for ($std = 7; $std <= 18; $std++) $o .= '<th>' . $std . '</th>';
+        $o .= '</tr>';
+        foreach ([1 => 'Mo', 2 => 'Di', 3 => 'Mi', 4 => 'Do', 5 => 'Fr', 6 => 'Sa'] as $wt => $name) {
+            $o .= '<tr><th>' . $name . '</th>';
+            for ($std = 7; $std <= 18; $std++) {
+                $n = (int)($a['muster'][$wt][$std] ?? 0);
+                $stufe = $n === 0 ? 0 : (int)min(4, ceil(4 * $n / $mmax));
+                $o .= '<td class="s' . $stufe . '" title="' . $name . ' ' . $std . ' Uhr: ' . $n . '"></td>';
+            }
+            $o .= '</tr>';
+        }
+        return $o . '</table></section><p class="muted klein">Gespeichert werden nur Zeitpunkte, gewählte Anliegen und Wartezeiten, keine Nummern oder Namen; nach zwei Jahren gelöscht.</p></div>';
+    }
+
+    /** Einstellungen → „T2med-Telefonverzeichnis“ (nur Admins). */
+    private static function verzeichnisFold(string $csrf, array $t2med): string {
+        $h = 'tf_h';
+        $st = Verzeichnis::stand();
+        $e = Verzeichnis::einstellungen();
+        $laeuft = Verzeichnis::laden();
+        $zustand = $st['anzahl'] > 0 ? self::tag('ok', number_format($st['anzahl'], 0, ',', '.') . ' Patienten') : self::tag('opt', 'nicht geladen');
+        $i = '<p class="muted">Namen der Anrufer am Telefon und in „Anrufe“, Patientensuche oben auf jeder Seite, „Akte öffnen“ in T2med am eigenen PC (Kienzle-Agent). '
+            . 'Das Verzeichnis enthält Name, Geburtsdatum, Telefonnummern und Patientennummer und bleibt auf diesem Server.</p>';
+        if (!$t2med['eingerichtet']) $i .= '<p class="fehler">Zuerst in der Basis die Verbindung zu T2med einrichten: Verwaltung → Verbindungen → T2med.</p>';
+        $i .= '<h3>Laden und aktualisieren</h3><ol class="tf-schritte"><li>In T2med unter Drittanbieter einen Eintrag (Programm/URL) anlegen:<br><code>kienzle-telefonverzeichnis://?kontextId=${kontextId}&amp;fhirBasisUrl=${fhirBasisUrl}&amp;oAuthToken=${oAuthToken}</code></li>'
+            . '<li>Der Arbeitsplatz braucht den Kienzle-Agent bzw. Starter (Einrichten → Arbeitsplätze; nach dem Update der Basis kommt der neue Aufruf von selbst).</li>'
+            . '<li>In T2med den Eintrag aufrufen: Die Suite öffnet sich und lädt das Verzeichnis (Fortschritt oben auf der Seite). Bei neuen Patienten oder geänderten Nummern einfach wiederholen.</li></ol>';
+        $i .= '<p>' . ($st['zeit'] > 0 ? 'Zuletzt geladen: ' . $h(date('d.m.Y H:i', $st['zeit'])) . '. ' : '') . ($laeuft ? self::tag('warn', 'Laden läuft (' . (int)$laeuft['anzahl'] . ' bisher)') : '') . '</p>';
+        $form = self::feld('ortsvorwahl', 'Ortsvorwahl der Praxis', $e['ortsvorwahl'], 'Für Telefonnummern ohne Vorwahl in T2med, z. B. 030. Gilt beim nächsten Laden.', 'text', ' maxlength="7" inputmode="tel"')
+            . self::haken('anrufername', 'Name des Anrufers am Telefon anzeigen', $e['anrufername'], 'Bei eingehenden Anrufen zeigt das Telefon „Nachname, Vorname“, wenn die Nummer genau zu einem Patienten passt.');
+        $i .= self::formular($csrf, 'verzeichnis-speichern', $form, 'Speichern', 'tf-form tf-schmal');
+        if ($st['anzahl'] > 0) $i .= '<form method="post" data-confirm="Telefonverzeichnis löschen? Namen und Suche fehlen dann bis zum nächsten Laden aus T2med."><input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '"><input type="hidden" name="aktion" value="verzeichnis-loeschen"><button class="small danger" type="submit">Verzeichnis löschen</button></form>';
+        return self::fold('verzeichnis', 'T2med-Telefonverzeichnis', $zustand, $i);
+    }
+
+    /**
+     * Anrufer mit Namen aus dem Telefonverzeichnis (genau ein Patient) und Knopf „Akte“; unbekannt: Knopf „Im Verzeichnis suchen“.
+     * Ohne Recht „patienten“ nur die Nummer.
+     */
+    private static function anrufer(string $nummer, string $nummerHtml): string {
+        if (!self::$patienten || $nummer === '' || preg_match('/^\d{2,4}$/D', $nummer)) return $nummerHtml;
+        $p = Verzeichnis::nachNummer($nummer);
+        if (!$p) return $nummerHtml . (Verzeichnis::stand()['anzahl'] > 0 ? ' <button type="button" class="link small tf-suchen" data-suche="' . tf_h($nummer) . '">Im Verzeichnis suchen</button>' : '');
+        return '<strong>' . tf_h(Verzeichnis::name($p)) . '</strong> <span class="muted">' . $nummerHtml . '</span>'
+            . ($p['nummer'] !== '' ? ' <button type="button" class="small tf-akte" data-akte="' . tf_h($p['nummer']) . '">Akte</button>' : '');
     }
 
     public static function einstellungen(array $cfg, array $status, string $csrf, bool $admin, ?string $leitung, ?array $zugang, string $server, ?string $meldung, ?string $fehler): string {
@@ -679,6 +796,7 @@ final class Ansicht {
                 'Name oder Adresse, unter der die Anlage aus dem Internet erreichbar ist. Nur nötig, wenn der Anbieter sonst keinen Ton liefert (Telefonanlage hinter einem Router mit Adressumsetzung). Im Praxisnetz allein leer lassen.');
             $o .= self::fold('netz', 'Netz', $nz['lokal'] !== '' ? self::tag('ok', $nz['lokal']) : self::tag('warn', 'offen'), self::formular($csrf, 'netz-speichern', $form, 'Netz speichern')
                 . '<p class="muted">Firewall: Unter Verwaltung → Firewall die Einträge „Telefon: …“ freischalten (Telefone 5060/UDP aus dem Praxisnetz, Anbieter 5070/UDP und Sprache 12000–12999/UDP von überall).</p>');
+            $o .= self::verzeichnisFold($csrf, self::$t2med);
         }
         return $o . '</div>';
     }

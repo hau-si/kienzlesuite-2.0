@@ -60,7 +60,7 @@ Entscheidung des Nutzers: Middleware, App und KI kommen später als **Module**; 
   Tonaufnahme anhören (kurze Frist). Status und Kommentare verschlüsselt neben dem Vorgang. Entfällt: eigene Anmeldung,
   Quellserver/SCP-Abholer, eigener SMS-Worker (Basis), Installer. Offen: SMS-**Empfang** über die FRITZ!Box (bräuchte einen
   Nachrichten-Eingang der Basis), Kontaktformular und IONOS-Sprachbot (brauchen einen Server im Internet).
-- **kienzlefon-t2med (Middleware, PHP/ReactPHP + Go-Importer):** Entscheidung des Nutzers (26.11.2026): Live-Übersicht und Wählen **im Modul telefon** (Seite „Anrufe“, Telefon beta.16); die T2med-Funktionen werden später entschieden (in telefon oder eigenes Modul).
+- **kienzlefon-t2med (Middleware, PHP/ReactPHP + Go-Importer):** Entscheidung des Nutzers (26.11.2026): Live-Übersicht und Wählen **im Modul telefon** (Seite „Anrufe“, Telefon beta.16); T2med-Funktionen im Modul telefon (beta.20): Telefonverzeichnis, Anrufername, Suche, Akte öffnen (über Kienzle-Agent der Basis), Anrufstatistik.
   Funktionen in dieser Reihenfolge: 1. Live-Übersicht (Warteschlange, Gespräche, Nebenstellen) und Wählen per Klick;
   2. Anrufername aus T2med auf dem Telefon und Patientensuche (Telefonverzeichnis über die T2med-Verbindung der Basis statt
   Demo-Schlüssel); 3. Akte öffnen per GDT (Freigabe über die Basis); 4. Anrufstatistik. Umbau: Dienst nur auf 127.0.0.1 hinter

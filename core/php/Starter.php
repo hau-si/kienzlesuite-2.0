@@ -56,6 +56,8 @@ final class Starter {
         $spec = self::SYSTEMS[$system] ?? throw new Problem('Unbekanntes Betriebssystem.', 404);
         if (!$kontexte) throw new Problem('Kein installiertes Modul hat einen Startkontext.', 404);
         $pem = @file_get_contents($this->certificate);
+        $ca = (string)@file_get_contents(dirname($this->certificate) . '/ca.crt');
+        if (!str_contains($ca, 'BEGIN CERTIFICATE') || str_contains($ca, 'PRIVATE KEY')) throw new Problem('Zertifizierungsstelle der Suite nicht lesbar. Bitte den Installer der Basis ausführen.', 503);
         if (!$pem || str_contains($pem, 'PRIVATE KEY') || $this->certificateHash() === '') throw new Problem('Serverzertifikat der Suite nicht lesbar. Bitte den Installer der Basis ausführen.', 503);
         ksort($kontexte);
         $client = ['server_url' => rtrim($serverUrl, '/'), 'launcher_key' => $this->key(), 'certificate_sha256' => $this->certificateHash(), 'kontexte' => $kontexte];
@@ -63,6 +65,8 @@ final class Starter {
             'client.json' => ['data' => json_encode($client, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n", 'mode' => 0600],
             'schemas.txt' => ['data' => implode("\n", array_keys($kontexte)) . "\n", 'mode' => 0644],
             'server.crt' => ['data' => $pem, 'mode' => 0644],
+            // Zertifizierungsstelle der Suite: Prüfung der Verbindung (Agent) und vertrauenswürdig für die Browser des PCs.
+            'ca.crt' => ['data' => (string)@file_get_contents(dirname($this->certificate) . '/ca.crt'), 'mode' => 0644],
             'LIESMICH.txt' => ['data' => self::readme($system, $client['server_url'], array_keys($kontexte), (bool)$drucker), 'mode' => 0644],
         ];
         if ($drucker) {
@@ -129,7 +133,7 @@ final class Starter {
     private static function readme(string $system, string $url, array $schemas, bool $drucker = false): string {
         $nl = $system === 'windows' ? "\r\n" : "\n";
         $steps = match ($system) {
-            'windows' => ["Diese ZIP-Datei mit Rechtsklick → „Alle extrahieren …“ entpacken (nicht direkt aus der ZIP starten).", "Im entpackten Ordner „install-windows.cmd“ doppelklicken. Meldet Windows „Der Computer wurde durch Windows geschützt“: „Weitere Informationen“ → „Trotzdem ausführen“.", "Die Sicherheitswarnung zum Zertifikat mit „Ja“ bestätigen (das Fenster kann hinter anderen liegen).", "„Kienzle-Starter eingerichtet“ erscheint. Der Ordner kann danach gelöscht werden."],
+            'windows' => ["Diese ZIP-Datei mit Rechtsklick → „Alle extrahieren …“ entpacken (nicht direkt aus der ZIP starten).", "Im entpackten Ordner „install-windows.cmd“ doppelklicken. Meldet Windows „Der Computer wurde durch Windows geschützt“: „Weitere Informationen“ → „Trotzdem ausführen“.", "Die Frage nach Administratorrechten mit „Ja“ bestätigen (das Fenster kann hinter anderen liegen).", "„Arbeitsplatz eingerichtet“ erscheint. Der Ordner kann danach gelöscht werden; Starter, Zertifikat und Drucker hält der Kienzle-Agent ab jetzt selbst aktuell."],
             'macos' => ["Die ZIP-Datei doppelklicken (entpackt in „Downloads“).", "Im entpackten Ordner „install-macos.command“ mit Rechtsklick → „Öffnen“ starten und „Öffnen“ bestätigen.", "Für das Zertifikat das Mac-Anmeldepasswort eingeben.", "„Kienzle-Starter eingerichtet“ erscheint. Der Ordner kann danach gelöscht werden."],
             default => ["Die ZIP-Datei entpacken (unzip kienzle-starter-linux.zip -d kienzle-starter).", "Im Terminal im entpackten Ordner:  bash install-linux.sh", "Das Zertifikat server.crt im Browser als vertrauenswürdig importieren."],
         };

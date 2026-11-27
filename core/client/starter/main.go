@@ -15,7 +15,36 @@ import (
 )
 
 func main() {
+	if len(os.Args) == 2 {
+		switch os.Args[1] {
+		case "--version":
+			fmt.Println("kienzle-starter", version, assetName)
+			return
+		case "--anmelden":
+			// Einmal bei der Einrichtung (als Administrator): Agent mit dem Starter-Schlüssel anmelden, agent.json schreiben.
+			ac, err := Anmelden(datenOrdner(), nil)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "Fehler:", err)
+				os.Exit(1)
+			}
+			fmt.Println("Angemeldet als Arbeitsplatz", ac.Name)
+			return
+		case "--dienst":
+			// Dauerbetrieb (geplante Aufgabe „Kienzle-Agent“ mit Systemrechten). Endet nur nach einer Aktualisierung mit Code 3,
+			// damit die Aufgabe das neue Programm startet.
+			exe, _ := os.Executable()
+			_ = os.Remove(exe + ".alt")
+			a := &Agent{Ordner: datenOrdner(), Programm: exe, Plattform: neuePlattform(datenOrdner())}
+			if err := a.Dienst(nil); err != nil {
+				os.Exit(3)
+			}
+			return
+		}
+	}
 	dir := configDir()
+	if _, err := os.Stat(filepath.Join(datenOrdner(), "client.json")); err == nil {
+		dir = datenOrdner() // eingerichtet mit Agent: Einstellungen im gemeinsamen Datenordner
+	}
 	arg := urlArgument(os.Args[1:])
 	if arg == "" {
 		fmt.Fprintln(os.Stderr, "Aufruf: kienzle-starter --url \"kienzle-…://?kontextId=…&fhirBasisUrl=…&oAuthToken=…\"")

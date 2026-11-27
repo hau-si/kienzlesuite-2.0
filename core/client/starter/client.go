@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -25,6 +27,9 @@ type Config struct {
 	LauncherKey string            `json:"launcher_key"`
 	CertSHA256  string            `json:"certificate_sha256"`
 	Contexts    map[string]string `json:"kontexte"`
+	// CA ist die Zertifizierungsstelle der Suite (ca.crt neben client.json). Mit ihr bleibt die Verbindung auch nach einem neuen
+	// Serverzertifikat (z. B. anderer Servername) gültig; der Fingerabdruck oben gilt weiter für ältere Pakete.
+	CA *x509.Certificate `json:"-"`
 }
 
 var (
@@ -59,10 +64,15 @@ func loadConfig(file string) (*Config, error) {
 	if !keyRe.MatchString(c.LauncherKey) {
 		return nil, errors.New("client.json: launcher_key fehlt oder ist ungültig")
 	}
-	if _, err := hex.DecodeString(c.CertSHA256); err != nil || len(c.CertSHA256) != 64 {
-		return nil, errors.New("client.json: certificate_sha256 fehlt oder ist ungültig")
+	if c.CertSHA256 != "" {
+		if _, err := hex.DecodeString(c.CertSHA256); err != nil || len(c.CertSHA256) != 64 {
+			return nil, errors.New("client.json: certificate_sha256 ist ungültig")
+		}
 	}
 	c.CertSHA256 = strings.ToLower(c.CertSHA256)
+	if pem, err := os.ReadFile(filepath.Join(filepath.Dir(file), "ca.crt")); err == nil {
+		c.CA = parseCA(pem)
+	}
 	return &c, nil
 }
 
@@ -123,12 +133,20 @@ func pinnedClient(cfg *Config) *http.Client {
 					return errors.New("der Server hat kein Zertifikat geschickt")
 				}
 				sum := sha256.Sum256(raw[0])
-				if hex.EncodeToString(sum[:]) != cfg.CertSHA256 {
-					return errors.New("das Zertifikat des Servers stimmt nicht mit dem eingerichteten überein")
-				}
 				cert, err := x509.ParseCertificate(raw[0])
 				if err != nil {
 					return err
+				}
+				if hex.EncodeToString(sum[:]) != cfg.CertSHA256 {
+					// Sonst muss das Zertifikat von der Zertifizierungsstelle der Suite stammen (und nur von ihr).
+					if cfg.CA == nil {
+						return errors.New("das Zertifikat des Servers stimmt nicht mit dem eingerichteten überein")
+					}
+					pool := x509.NewCertPool()
+					pool.AddCert(cfg.CA)
+					if _, err := cert.Verify(x509.VerifyOptions{Roots: pool, DNSName: host, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}); err != nil {
+						return errors.New("das Zertifikat des Servers stammt nicht von der Zertifizierungsstelle der Suite")
+					}
 				}
 				now := time.Now()
 				if now.Before(cert.NotBefore) || now.After(cert.NotAfter) {
@@ -143,6 +161,19 @@ func pinnedClient(cfg *Config) *http.Client {
 		DisableKeepAlives: true,
 	}
 	return &http.Client{Transport: tr, Timeout: 20 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+}
+
+// parseCA liest eine PEM-Datei mit genau dem Zertifikat einer Zertifizierungsstelle (sonst nil).
+func parseCA(data []byte) *x509.Certificate {
+	b, _ := pem.Decode(data)
+	if b == nil || b.Type != "CERTIFICATE" {
+		return nil
+	}
+	c, err := x509.ParseCertificate(b.Bytes)
+	if err != nil || !c.IsCA {
+		return nil
+	}
+	return c
 }
 
 func hostOnly(serverURL string) string {

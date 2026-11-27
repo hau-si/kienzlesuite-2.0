@@ -4,7 +4,7 @@ namespace Kienzle\Core;
 
 /** SQLite-Datenbank der Basis. Aufbau nach kienzle-suite-beta (src/Database.php). */
 final class Database {
-    public const VERSION = 4;
+    public const VERSION = 5;
     public readonly \PDO $pdo;
 
     public function __construct(public readonly string $directory) {

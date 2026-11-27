@@ -1,5 +1,15 @@
 # Release-Notizen Fax
 
+## 0.1.0-beta.12
+
+- **Windows-Freigabe „Fax-Ausgang“ für sofortige Faxübernahme:** Das Modul bietet den Ordner `ablage` als Freigabe an (`[[fileshare]]`, Basis 0.22.0-beta.13). Ein Admin schaltet sie unter Verwaltung → Drucker ein; danach genügt es, ein PDF oder Bild auf `\\<Server>\Fax-Ausgang` zu ziehen. Die Pfad-Einheit `kienzle-fax-lauschen.path` überwacht den Ordner, die Datei erscheint in „Fax senden“ (Quelle NAS) nach etwa ein bis zwei Sekunden. Dateien, die noch kopiert werden, werden erst übernommen, wenn sie sich eine Sekunde nicht mehr ändern.
+- Zugriff mit Anmeldung: Benutzer `ks-fax` und das beim Einschalten vergebene Kennwort (in Windows beim Verbinden „andere Anmeldedaten“ wählen und speichern lassen). Nur aus Netzen erreichbar, für die die Firewall „Drucken über Windows-Freigabe (445)“ freigegeben ist. Nicht am echten Arbeitsplatz geprüft.
+
+## 0.1.0-beta.11
+
+- **Neue Datei im Lauschordner sofort übernehmen:** Neue Pfad-Einheit `kienzle-fax-lauschen.path` startet die Pflege, sobald der Ablage-Dienst eine Datei vom NAS in den Eingang legt (bisher bis zu eine Minute Wartezeit). Zusammen mit dem Lauschdienst der Basis (alle 15 Sekunden, Basis 0.22.0-beta.11) erscheint die Datei nach etwa 15 bis 30 Sekunden. Nicht am echten NAS geprüft.
+- Lauschordner: Eine für das Modul nicht lesbare Datei wird nicht mehr als „leer“ gemeldet und in den Fehlerordner geschoben, sondern bleibt liegen und wird im Protokoll genannt. (Ursache der Nichtübernahme war ein Rechtefehler im Ablage-Dienst der Basis, siehe Basis 0.22.0-beta.9.)
+
 ## 0.1.0-beta.10
 
 - **Texterkennung empfangener Faxe:** Ein eigener Dienst (`kienzle-fax-ocr`, jede Minute, niedrige Priorität, höchstens 5 Faxe je Lauf) liest neue Faxe mit Tesseract (Deutsch, 300 dpi, höchstens 30 Seiten). Alles bleibt auf dem Server; der Text liegt als `<fax>.txt` (0600) neben dem Fax und wird mit ihm gelöscht. Neue Pakete: `tesseract-ocr`, `tesseract-ocr-deu`.

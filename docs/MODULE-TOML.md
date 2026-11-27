@@ -1,6 +1,6 @@
 # Modul-Beschreibung `module.toml`
 
-Gilt für `core_api = "1"` (Basis ab 0.2.0) und `core_api = "2"` (Basis ab 0.22.0: zusätzlich `[system] disables` und `[[exchange]]`). Jedes Modul liegt in `modules/<id>/` und bringt dort eine `module.toml` mit.
+Gilt für `core_api = "1"` (Basis ab 0.2.0) und `core_api = "2"` (Basis ab 0.22.0: zusätzlich `[system] disables`, `[[exchange]]` und `[[fileshare]]`). Jedes Modul liegt in `modules/<id>/` und bringt dort eine `module.toml` mit.
 Geprüft wird sie mit
 
 ```
@@ -175,6 +175,20 @@ installiert sind und einander anmelden: `/var/spool/kienzle/austausch/<a>_<b>` (
 - Eigene Dienste des Moduls tragen ihn selbst ein: `ReadWritePaths=… -/var/spool/kienzle/austausch/<a>_<b>` (mit `-`, falls er noch fehlt).
 - Neue Dateien bekommen die Rechte über die Vorgabe-ACL nur, wenn sie mit Gruppenrechten angelegt werden (Modus 0660 bzw. 0770,
   z. B. `chmod` nach `tempnam`). Inhalt und Format des Ordners legen die beiden Module fest.
+
+### `[[fileshare]]` – optional, höchstens 3, nur `core_api = "2"`
+
+Ordner im Datenverzeichnis des Moduls, den ein Admin unter Verwaltung → Drucker als **Windows-Freigabe zum Ablegen** einschalten kann
+(Vorgabe: aus). Beim Einschalten vergibt der Admin ein Kennwort (8 bis 64 Zeichen); angemeldet wird mit dem Samba-Benutzer `ks-<id>`, Gastzugriff gibt es nicht (Windows 11 24H2 verlangt eine Anmeldung). Dateien gehören `ks-<id>` (Modus 0600, Ordner 0700); beim Ausschalten wird der Samba-Zugang gelöscht. Erreichbar
+nur, wenn die Firewall „Drucken über Windows-Freigabe (445)“ für das Netz freigegeben ist. Das Modul überwacht den Ordner selbst
+(z. B. mit einer `.path`-Einheit) und muss unvollständig kopierte Dateien abwarten.
+
+| Schlüssel | Pflicht | Regel |
+|---|---|---|
+| `id` | ja | Kennung, klein geschrieben, innerhalb des Moduls eindeutig |
+| `name` | ja | Freigabename (Buchstaben, Ziffern, `_`, `-`; höchstens 31 Zeichen), darf kein Druckername sein |
+| `label` | ja | Beschreibung für den Admin, höchstens 80 Zeichen |
+| `path` | ja | Ordner relativ zu `[system] data` (z. B. `ablage`); die Basis legt ihn beim Einschalten an |
 
 ### `[setup]` – optional
 

@@ -135,3 +135,27 @@ CREATE TABLE IF NOT EXISTS oidc_pending (
     params TEXT NOT NULL,
     expires_at INTEGER NOT NULL
 );
+-- Arbeitsplätze mit Kienzle-Agent (Starter und Dienst am PC, Basis 0.22.0-beta.10): Kennung je PC, Zugang nur als Hash.
+CREATE TABLE IF NOT EXISTS arbeitsplaetze (
+    id TEXT PRIMARY KEY,                           -- 16 Hex-Zeichen
+    name TEXT NOT NULL,                            -- Anzeige (Vorgabe: Rechnername), vom Admin änderbar
+    rechner TEXT NOT NULL,
+    system TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,               -- SHA-256 des Zugangs des Agents
+    version TEXT NOT NULL DEFAULT '',
+    ip TEXT NOT NULL DEFAULT '',
+    zuletzt INTEGER NOT NULL DEFAULT 0,
+    zustand TEXT NOT NULL DEFAULT '',              -- letzte Rückmeldung des Agents (Drucker, Aktualisierung), ohne Patientendaten
+    erstellt INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS arbeitsplatz_auftraege (
+    id TEXT PRIMARY KEY,
+    platz TEXT NOT NULL REFERENCES arbeitsplaetze(id) ON DELETE CASCADE,
+    typ TEXT NOT NULL,                             -- gdt
+    daten TEXT NOT NULL,                           -- JSON
+    erstellt INTEGER NOT NULL,
+    abgeholt INTEGER NOT NULL DEFAULT 0,
+    erledigt INTEGER NOT NULL DEFAULT 0,
+    ergebnis TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS arbeitsplatz_auftraege_platz ON arbeitsplatz_auftraege(platz, abgeholt);

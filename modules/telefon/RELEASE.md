@@ -1,12 +1,27 @@
 # Release-Notizen Telefon
 
-## 0.1.0-beta.19
+## 0.1.0-beta.21
 
 - **Fehler behoben: Anrufe auf die Telefonnummer landeten beim Fax (Faxton).** Melden sich Telefon- und Faxleitung beim selben Anbieter-Server an (z. B. zwei voip2gsm-Leitungen), kann Asterisk einen eingehenden Anruf nicht sicher der richtigen Leitung zuordnen und nahm die Faxleitung. Jetzt kennt jede Leitung alle eingetragenen Rufnummern; die gewählte Nummer entscheidet, ob der Anruf zum Telefon, zum Fax oder in den Überlauf geht.
 - **Fehler behoben: Mit Sprachmenü (Kienzlefon) ging kein Anruf nach draußen über voip2gsm** („Everyone is busy/congested“). Kienzlefon wählte die Nummer als „49…“; voip2gsm nimmt nur „0…“ bzw. „00…“ an. Die Anlage setzt dafür jetzt `sip_zielformate` (Format `national`) für jede voip2gsm-Leitung in `kienzlefon.toml`.
-- **Fehler behoben: Faxversand mit „Permission denied“** (Ghostscript/qpdf unter AppArmor): Das Modul meldet `gs` und `qpdf` jetzt bei der Basis an (`apparmor = ["gs", "qpdf"]`); zusammen mit Basis 0.22.0-beta.10 dürfen beide im Austauschordner arbeiten.
+- **Fehler behoben: Faxversand mit „Permission denied“** (Ghostscript/qpdf unter AppArmor): Das Modul meldet `gs` und `qpdf` jetzt bei der Basis an (`apparmor = ["gs", "qpdf"]`); zusammen mit Basis 0.22.0-beta.14 dürfen beide im Austauschordner arbeiten.
 - Nach dem Update werden die Dateien der Anlage automatisch neu erzeugt; nichts neu einzustellen.
 - Geprüft mit Tests (Dialplan, Zielformat über die Wahlprüfung von Kienzlefon). **Nicht geprüft:** echte Anrufe über voip2gsm auf der VM.
+
+## 0.1.0-beta.20
+
+- **Telefonverzeichnis aus T2med** (Einstellungen → „T2med-Telefonverzeichnis“): In T2med einen Drittanbieter-Eintrag `kienzle-telefonverzeichnis://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}` anlegen und aufrufen. Die Suite lädt dann alle Patienten (Name, Geburtsdatum, Telefonnummern, Patientennummer) Schritt für Schritt mit Fortschritt oben auf der Seite; die alte Fassung bleibt bis zum Ende gültig. Nur die in der Basis freigegebene FHIR-Adresse wird angefragt; das Token liegt nur verschlüsselt und höchstens 4 Stunden auf dem Server. Datei `<daten>/t2med/patienten.sqlite` (0600). Einstellbar: Ortsvorwahl (für Nummern ohne Vorwahl), Anrufername an/aus, Verzeichnis löschen.
+- **Anrufername am Telefon:** Bei eingehenden Anrufen (Hauptanschluss und Überlauf) zeigt das Telefon „Nachname, Vorname“, wenn die Nummer genau zu einem Patienten passt (`lib/anrufername.agi`, liest nur; Nummernabgleich wie kienzlefon-t2med: 030…, +49…, 0049…, „(0)“).
+- **Suchfeld oben auf jeder Telefon-Seite** (Entwurf C, Recht „patienten“): Name oder Teile davon (Reihenfolge egal, ä = ae), Telefonnummer oder Patientennummer; Treffer mit Geburtsdatum, Nummern zum Anrufen (eigenes Telefon klingelt zuerst) und Knopf **„Akte“**; Pfeiltasten und Enter öffnen die Akte.
+- **„Akte“ öffnet den Patienten in T2med am eigenen PC** über die Basis und den Kienzle-Agent (Basis 0.22.0-beta.10 oder neuer, GDT-Datei `C:\Kienzle\GDT\AUFRUFi.gdt`).
+- **Seite „Anrufe“ (Entwurf B):** Wartende und Gesprächspartner mit Namen aus dem Verzeichnis und Knopf „Akte“, unbekannte Nummern mit „Im Verzeichnis suchen“; oben eine Leiste mit den Zahlen von heute.
+- **Seite „Statistik“** (Reiter oben, Recht „statistik“): Anrufe heute und im Zeitraum (7 Tage, 30 Tage, 3 Monate), Anteil angenommen, Ø Wartezeit, Anrufe je Tag, Anliegen aus dem Sprachmenü, Wochenmuster (Wochentag × Stunde). Erfasst vom neuen Dienst `kienzle-telefon-ereignisse` (AMI-Zugang nur lesen: Statistik-Haken von Kienzlefon und Warteschlange). **Gespeichert werden nur Zeitpunkte, Anliegen und Wartezeiten, keine Nummern oder Namen**; nach zwei Jahren gelöscht.
+- Asterisk-Module `app_userevent`, `func_sha1`, `func_rand` ergänzt; `UUID()` der Statistik-Haken (im Ubuntu-Paket fehlt `func_uuid`) wird durch eine gleich aufgebaute Kennung ersetzt. Neue Pakete: `php-curl`, `php-sqlite3`.
+- Geprüft mit Tests (nachgestelltes T2med mit zwei Seiten, Suche, Nummern gleich in PHP und Python, Statistik, Seiten) und mit echtem Asterisk (Anrufername am Kanal gesetzt, Statistik erfasst, keine Nummer gespeichert); Seiten im Browser gegen den PHP-Testserver. **Nicht geprüft:** mit echtem T2med (Paging, Größe, Demo-Schlüssel), echten Telefonen, auf der VM.
+
+## 0.1.0-beta.19
+
+- **Sprachmenü, Zeitschemata:** Bei „Telefonzeiten“, „Apotheken und Pflege“ und „Krankenhaus, Notarzt und Kollegen“ gibt es den Knopf „Zeiten der Praxis übernehmen“: Er kopiert die Zeiten aus „Öffnungszeiten“ mit einem Klick in alle sieben Tage des Schemas. Gespeichert wird erst mit „Speichern“, davor lassen sich einzelne Tage noch ändern. Das Kopieren läuft im Browser (nicht am echten Gerät geprüft).
 
 ## 0.1.0-beta.18
 

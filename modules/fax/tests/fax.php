@@ -227,6 +227,13 @@ $nas = Fax::quelle('NAS');
 check(count($nas) === 2 && !glob("$dir/lauscheingang/*") && count(glob("$dir/daten/lausch-fehler/*") ?: []) === 1, 'Quelle NAS gefüllt, kaputte Datei beiseite');
 check(in_array('Brief vom Labor.pdf', array_column($nas, 'titel'), true), 'Dateiname als Titel');
 check(Fax::quellenZaehler()['NAS'] === 2, 'Zähler NAS');
+// Windows-Freigabe „Fax-Ausgang“ (Ordner ablage im Datenordner): fertige Datei wird sofort übernommen, eine gerade geschriebene erst nach dem Kopieren
+mkdir("$dir/daten/ablage", 0700);
+file_put_contents("$dir/daten/ablage/Aus Freigabe.pdf", $pdf);
+touch("$dir/daten/ablage/Aus Freigabe.pdf", time() - 10);
+file_put_contents("$dir/daten/ablage/.versteckt.pdf", $pdf);
+check(Fax::lauschHolen($km) === 1 && !is_file("$dir/daten/ablage/Aus Freigabe.pdf") && is_file("$dir/daten/ablage/.versteckt.pdf"), 'Datei aus der Freigabe Fax-Ausgang übernommen, versteckte nicht');
+check(Fax::quellenZaehler()['NAS'] === 3, 'Zähler NAS nach Freigabe');
 // Benachrichtigung bei Faxeingang über den Nachrichten-Ausgang der Basis (nachgestellt): nur Anzahl und Seiten, kein Absender.
 mkdir("$dir/nachrichten", 0770);
 file_put_contents("$verb/fax.json", json_encode(['ablage' => ['ausgang' => "$dir/ausgang", 'eingang' => "$dir/lauscheingang", 'ziele' => [['id' => 'steuerbuero', 'name' => 'NAS Praxis']]],

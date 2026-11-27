@@ -1,7 +1,8 @@
 #!/usr/bin/python3 -IB
 """Netzwerkspeicher der Kienzle-Suite (als ks-ablage, gestartet von systemd).
 
-  kienzle-ablage abarbeiten    Aufträge der Module übertragen (kienzle-ablage.path und stündlich)
+  kienzle-ablage abarbeiten    Aufträge der Module übertragen (kienzle-ablage.timer, alle 5 Minuten)
+  kienzle-ablage lauschen      nur die Lauschordner auf dem NAS prüfen (kienzle-ablage-lauschen.timer, alle 15 Sekunden)
 """
 import sys
 from pathlib import Path
@@ -14,5 +15,8 @@ if __name__ == '__main__':
         jobs = ablage.process()
         failed = [k for k, j in jobs.items() if j['zustand'] == 'fehler']
         sys.exit(1 if failed else 0)
+    if sys.argv[1:] == ['lauschen']:
+        ablage.lauschen_nur()      # Fehler stehen in status.json; kein Fehlercode, damit systemd nicht alle 15 Sekunden „fehlgeschlagen“ meldet
+        sys.exit(0)
     print(__doc__.strip(), file=sys.stderr)
     sys.exit(2)

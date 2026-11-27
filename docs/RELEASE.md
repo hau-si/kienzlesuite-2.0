@@ -1,9 +1,32 @@
 # Basis – Release-Notizen
 
-## 0.22.0-beta.10
+## 0.22.0-beta.14
 
 - **Fehler behoben: Faxversand scheiterte mit „ghostscript pdf->tiff failed … Permission denied“.** Die AppArmor-Ergänzungen für `gs` und `qpdf` (Ubuntu 26.04) galten nur für den Datenordner eines Moduls, nicht für seine Austauschordner (`[[exchange]]`, z. B. `/var/spool/kienzle/austausch/fax_telefon`), in denen die Telefonanlage die Faxaufträge umwandelt. Jetzt werden sie mit eingetragen.
 - Geprüft mit Tests (`tests/core/test_apparmor.py`). **Nicht geprüft:** echter Faxversand auf der VM.
+## 0.22.0-beta.13
+
+- **Neu: Dateifreigaben der Module (`[[fileshare]]`).** Ein Modul kann einen Ordner seines Datenverzeichnisses als Windows-Freigabe zum Ablegen anbieten. Unter Verwaltung → Drucker → „Ordner zum Ablegen“ schaltet ein Admin sie ein (Vorgabe: aus). Zugriff **mit Anmeldung**: Der Admin vergibt beim Einschalten ein Kennwort (Samba-Benutzer `ks-<modul>`, wird beim Ausschalten gelöscht), damit auch Windows 11 24H2 zugreifen kann. Nur aus den Netzen, für die die Firewall „Drucken über Windows-Freigabe (445)“ freigegeben ist; keine Symlinks, keine versteckten Dateien, Dateien gehören dem Modulbenutzer (0600). Erster Nutzer: Fax „Fax-Ausgang“ (Fax 0.1.0-beta.12). Nicht am echten Arbeitsplatz geprüft.
+
+## 0.22.0-beta.12
+
+- **Fehler behoben, Lauschordner:** Dateien mit Umlauten oder ß im Namen (z. B. „Datenschutzerklärung_2.pdf“) wurden vom Ablage-Dienst übersehen, weil er nur ASCII-Namen zuließ; sie blieben für immer auf dem NAS liegen. Jetzt sind Buchstaben aller Sprachen, Ziffern, Leerzeichen, Klammern, Punkt, Komma, Plus und Minus erlaubt (beim Holen auf NFC-Schreibweise gebracht, weil manche NAS Umlaute getrennt melden). Pfad-, Steuer- und Sonderzeichen wie `;` bleiben verboten. Gilt nur für den Lauschordner, Aufträge der Module bleiben streng. Test ergänzt.
+
+## 0.22.0-beta.11
+
+- **Lauschordner fast sofort:** Neuer Dienst `kienzle-ablage-lauschen` (Timer alle 15 Sekunden) prüft nur die Lauschordner auf dem NAS (`kienzle-ablage lauschen`); bisher geschah das nur alle 5 Minuten. Ohne Lauschordner-Anfrage endet er sofort, er überlappt sich nicht mit dem normalen Auftragsdurchlauf (Sperrdatei) und fasst Aufträge nicht an. Fehler stehen weiter in `status.json` (kein Fehlercode im Takt). Der Installer richtet den Timer ein. Test ergänzt.
+
+## 0.22.0-beta.10
+
+- **Kienzle-Agent (Windows):** Das Paket der Seite „Arbeitsplätze“ richtet jetzt ein Programm für alles ein: Starter für T2med **und** Dienst mit Systemrechten (geplante Aufgabe „Kienzle-Agent“ beim Start des PCs, startet nach Ende oder Aktualisierung neu). Programm in `C:\Program Files\Kienzle`, Einstellungen in `C:\ProgramData\Kienzle` (Benutzer dürfen nur lesen; der eigene Zugang `agent.json` nur System und Administratoren).
+- Der Agent meldet sich einmal mit dem Starter-Schlüssel an und bekommt einen **eigenen Zugang je PC** (in der Suite nur als SHA-256). Danach fragt er etwa alle 2 Sekunden `/agent/abholen` und hält den PC selbst aktuell: **Starterprogramm** (lädt neue Fassungen aus der Suite, prüft die Prüfsumme, tauscht sich aus), **Aufrufe aus T2med** (für alle Benutzer, HKLM), `client.json` samt Starter-Schlüssel, **Zertifizierungsstelle** (vertrauenswürdig für den ganzen PC) und **virtuelle Drucker** (wie `install-drucker.ps1`, ohne Rückfragen). Ein Paket ist danach nur noch zur Reparatur nötig.
+- **„Akte öffnen“ in T2med** als Dienst der Basis für alle Module: Die Modulseite schickt `POST /arbeitsplatz/akte {modul, csrf, patientennummer}` (CSRF-Marke des Moduls); die Basis baut den GDT-Satz 6301 (wie kienzlefon-t2med) und gibt ihn an den Agent des PCs, der ihn als `C:\Kienzle\GDT\AUFRUFi.gdt` ablegt. Aufrufe verfallen nach 60 Sekunden. Die Patientennummer kommt nicht ins Protokoll.
+- **Welcher PC?** Der Agent, der gerade von derselben Adresse wie der Browser fragt; ist das nicht eindeutig (Terminalserver), einmal unter Mein Konto → „Mein Arbeitsplatz“ wählen (Cookie). Module sehen den Arbeitsplatz als `KIENZLE_ARBEITSPLATZ` (`$k->arbeitsplatz()`).
+- Seite „Arbeitsplätze“: Liste der eingerichteten PCs (verbunden/zuletzt, Adresse, Version, Rückmeldung zu Druckern und Aktualisierung), umbenennen, entfernen (der Agent verliert den Zugang).
+- Der Starter prüft das Serverzertifikat jetzt auch über die **Zertifizierungsstelle der Suite** (`ca.crt` im Paket), nicht nur über den Fingerabdruck des einzelnen Zertifikats: Nach neuem Servernamen oder Zertifikat bleibt die Verbindung bestehen.
+- Datenbank Version 5 (Tabellen `arbeitsplaetze`, `arbeitsplatz_auftraege`).
+- Sicherheit: Der Agent führt nur feste Aufgaben aus (Datei mit fester Endung in den festen GDT-Ordner, Drucker mit geprüften Namen und Adressen auf dem Server, Programm nur mit passender Prüfsumme); keine Befehle aus der Suite. Fehlversuche an `/agent/…` werden gebremst.
+- Geprüft mit Tests (PHP: Anmelden, Abholen, Sollzustand, GDT, Zuordnung, Seiten; Go: Anmelden, Angleichen, GDT, Selbstaktualisierung, Zertifizierungsstelle; Windows-Teile nur übersetzt und mit `go vet` geprüft). **Nicht geprüft:** auf einem echten Windows-PC (geplante Aufgabe, Registrierung, Zertifikat, Drucker, Austausch des laufenden Programms), mit T2med und auf der VM. macOS und Linux bekommen vorerst nur den Starter ohne Dienst.
 
 ## 0.22.0-beta.9
 
