@@ -34,7 +34,7 @@ SZENEN = [
     ('signatur-software', 'Signatur: Pad-Software von signotec', 'Die Bibliotheken liefern wir nicht mit: ZIP hochladen, danach steht „erledigt“.', 8),
     ('updates', 'Updates mit Sicherung und Rücksprung', 'Kanal stabil oder beta, Schnappschuss vor jedem Update und automatischer Rücksprung bei einem Fehler.', 7),
     ('benutzer', 'Benutzer, Gruppen und Rechte', 'Gruppen sind Rollen mit Rechten je Modul. Sensible Funktionen sehen nur Admins.', 7),
-    ('@ende', 'Praxisherz', 'Open Source: Quelltext, Anleitungen und Releases auf GitHub (hau-si/kienzlesuite-2.0).', 6),
+    ('@ende', 'Praxisherz', 'Open Source: Quelltext, Anleitungen und Releases auf GitHub (hau-si/praxisherz).', 6),
 ]
 
 def schrift(name, px): return ImageFont.truetype(FONT + name, px)

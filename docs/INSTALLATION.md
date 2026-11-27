@@ -18,8 +18,8 @@ Prüfliste für die Test-VM: `docs/VM-TEST.md`.
 
    ```sh
    sudo apt-get install -y git
-   git clone https://github.com/hau-si/kienzlesuite-2.0.git
-   cd kienzlesuite-2.0
+   git clone https://github.com/hau-si/praxisherz.git
+   cd praxisherz
    sudo bash installer/install.sh
    ```
 

@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.33
+
+- **Umzug des Repositorys nach `hau-si/praxisherz` vorbereitet.** Der Web-Updater (Verwaltung → Updates) und die Start-ISO fragen zuerst `hau-si/praxisherz` und, solange es das noch nicht gibt, den früheren Namen `hau-si/kienzlesuite-2.0`. Nach der Umbenennung auf GitHub funktionieren Updates also ohne weiteren Schritt; GitHub leitet zusätzlich den früheren Namen weiter.
+- Anleitungen (Installation, VM-Test) nennen die neue Adresse.
+- Mit Tests geprüft (Rückfall auf den früheren Namen). **Nicht auf der VM und nicht gegen das echte GitHub geprüft.**
+
 ## 0.22.0-beta.32
 
 - **Neue Aufrufadressen aus T2med:** `praxisherz-kasse://`, `praxisherz-signatur://`, `praxisherz-telefonverzeichnis://` (Seite Einrichten → Arbeitsplätze zeigt sie). Die früheren Adressen `kienzle-…://` richtet die Basis an jedem Arbeitsplatz weiter mit ein; bestehende Einträge in T2med funktionieren also weiter und können nach und nach umgestellt werden.

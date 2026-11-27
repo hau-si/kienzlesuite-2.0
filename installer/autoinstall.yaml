@@ -36,6 +36,7 @@ autoinstall:
   updates: security
   late-commands:
     # Praxisherz aus dem Repository holen und beim ersten Start installieren (Netz ist dann sicher verfügbar).
+    # Früherer Repo-Name: GitHub leitet nach der Umbenennung in hau-si/praxisherz weiter; gilt vorher und nachher.
     - curtin in-target -- git clone --depth 1 https://github.com/hau-si/kienzlesuite-2.0.git /opt/kienzle-installer
     - |
       cat > /target/etc/systemd/system/kienzle-erstinstallation.service <<'UNIT'

@@ -11,7 +11,7 @@ Ergebnis je Punkt hier abhaken und in `docs/RELEASE.md` bei der Version vermerke
 
 ## Meilenstein 2 – Anmeldung, Benutzer, Rechte, OTP, Passkeys, Zertifikat (Basis 0.2.0)
 
-1. [ ] `git clone https://github.com/hau-si/kienzlesuite-2.0 && cd kienzlesuite-2.0`
+1. [ ] `git clone https://github.com/hau-si/praxisherz && cd praxisherz`
        `sudo bash installer/install.sh --name kienzle-test.praxis.internal --name <IP der VM> --praxis "Testpraxis"` läuft ohne Fehler;
        am Ende stehen Adresse, Fingerabdruck der CA und ein Einrichtungslink.
 2. [ ] `systemctl status kienzle-core-php nginx` aktiv; `systemctl status php*-fpm` (Distribution) aus.

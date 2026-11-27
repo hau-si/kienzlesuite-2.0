@@ -31,7 +31,7 @@ Code dafür entsteht.
 ## Aufbau
 
 ```
-kienzlesuite-2.0/
+praxisherz/
   core/                 Basis: Webinterface, Benutzer, Firewall, Updates, Backup, Netzwerkspeicher, Zertifikate
   modules/
     kasse/              Kasse (Kartenzahlung, Rechnungseingang); ab Basis 0.16.0 mitgeliefert, Webpfad /kasse

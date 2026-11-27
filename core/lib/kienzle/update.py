@@ -1,7 +1,7 @@
 """Updater Praxisherz (root-Dienst, Aufruf über core/bin/kienzle-update). Konzept: docs/ARCHITEKTUR.md, „Updates“.
 
 Ablauf einer Aktualisierung der Basis:
- 1. Release-Liste der Quelle lesen (GitHub-Releases von hau-si/kienzlesuite-2.0), nur Kanal stabil bzw. beta.
+ 1. Release-Liste der Quelle lesen (GitHub-Releases von hau-si/praxisherz, früher hau-si/kienzlesuite-2.0), nur Kanal stabil bzw. beta.
  2. Manifest, Signatur und Archiv laden; Signatur, Manifest und Archiv prüfen; nur neuere Versionen.
  3. Archiv in einen Arbeitsordner auspacken und jede Datei gegen das Manifest prüfen.
  4. Kein Update, solange ein Modul „beschäftigt“ meldet (hooks.busy).
@@ -40,7 +40,10 @@ CORE = Path(E('KIENZLE_UPDATE_CORE', '/opt/kienzle/core'))
 DATA = Path(E('KIENZLE_UPDATE_DATA', '/var/lib/kienzle/core'))
 SETTINGS = Path(E('KIENZLE_UPDATE_SETTINGS', '/etc/kienzle/core'))
 MODULES = Path(E('KIENZLE_UPDATE_MODULES', '/var/lib/kienzle/core/modules.json'))
-SOURCE = E('KIENZLE_UPDATE_QUELLE', 'github:hau-si/kienzlesuite-2.0')
+SOURCE = E('KIENZLE_UPDATE_QUELLE', 'github:hau-si/praxisherz')
+# Umbenennung des Repositorys (27.11.2026): solange es unter dem neuen Namen noch nicht erreichbar ist, gilt der frühere.
+# Nach der Umbenennung leitet GitHub den früheren Namen ohnehin weiter.
+FRUEHERE_REPOS = {'hau-si/praxisherz': ['hau-si/kienzlesuite-2.0']}
 STOP = E('KIENZLE_UPDATE_STOP', 'systemctl stop kienzle-core-php.service')
 START = E('KIENZLE_UPDATE_START', 'systemctl restart kienzle-core-php.service nginx.service')
 HEALTH = E('KIENZLE_UPDATE_HEALTH', '')            # leer = /_health über den ersten Servernamen
@@ -157,7 +160,15 @@ class GitHub:
         return data
 
     def releases(self) -> list[dict]:
-        raw = self._get(f'https://api.github.com/repos/{self.repo}/releases?per_page=100', MAX_LIST, 'application/vnd.github+json')
+        fehler = None
+        for repo in [self.repo, *FRUEHERE_REPOS.get(self.repo, [])]:
+            try:
+                raw = self._get(f'https://api.github.com/repos/{repo}/releases?per_page=100', MAX_LIST, 'application/vnd.github+json')
+                break
+            except Fehler as e:
+                fehler = fehler or e
+        else:
+            raise fehler or Fehler('Keine Update-Quelle erreichbar.')
         out = []
         for r in json.loads(raw):
             m = self.TAG.match(str(r.get('tag_name', '')))

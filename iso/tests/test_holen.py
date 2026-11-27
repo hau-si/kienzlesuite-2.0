@@ -130,6 +130,21 @@ class Holen(unittest.TestCase):
         with self.assertRaises(holen.Fehler):
             holen.auspacken(buf.getvalue(), Path(self.tmp.name) / 'b')
 
+    def test_neuer_repo_name_zuerst(self):
+        # Nach der Umbenennung (hau-si/praxisherz) gilt der neue Name; der frühere ist nur Rückfall.
+        alt = [self.release('0.21.3', True)]
+        neu = [self.release('0.21.4', True)]
+        self.setze(alt)
+        Schein.routen['/repos/hau-si/praxisherz/releases'] = json.dumps(neu).encode()
+        try:
+            rc, ziel = self.lauf('--kanal', 'stabil')
+            self.assertEqual(rc, 0)
+            self.assertEqual((ziel / 'core' / 'VERSION').read_text(), '0.21.4')
+        finally:
+            del Schein.routen['/repos/hau-si/praxisherz/releases']
+        rc, ziel = self.lauf('--kanal', 'stabil')
+        self.assertEqual((rc, (ziel / 'core' / 'VERSION').read_text()), (0, '0.21.3'))
+
     def test_kein_release_dann_zweig(self):
         self.setze([])
         inhalt = {'installer/install.sh': b'#!/bin/bash\n', 'core/VERSION': b'x'}
