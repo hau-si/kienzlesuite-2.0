@@ -23,8 +23,10 @@ var druckerSkript string
 
 // druckerSkriptFrist: Höchstdauer für das Druckerskript (Einrichten/Prüfen/Entfernen). Ohne Frist blockiert ein
 // hängender Windows-Druckspooler (z. B. bei Remove-Printer auf einen Drucker mit festsitzendem Druckauftrag) den
-// ganzen Dienst-Prozess für immer – er fragt dann die Suite nicht mehr ab und wirkt „aufgehängt“.
-const druckerSkriptFrist = 90 * time.Second
+// ganzen Dienst-Prozess für immer – er fragt dann die Suite nicht mehr ab und wirkt „aufgehängt“. Beim Entfernen
+// wartet das Skript je Drucker bis zu 20 s in einem eigenen Hintergrundauftrag (drucker-agent.ps1); bei mehreren
+// zu entfernenden Druckern braucht das Skript entsprechend länger als bei nur einem, daher die großzügige Frist.
+const druckerSkriptFrist = 180 * time.Second
 
 // windowsPlattform: Aufrufe in HKLM (für alle Benutzer), Zertifizierungsstelle im Speicher des Computers, Drucker per PowerShell.
 // Läuft als SYSTEM (geplante Aufgabe „Kienzle-Agent“).

@@ -342,6 +342,17 @@ func TestDruckerSkriptLoeschtNie(t *testing.T) {
 
 func druckerSkriptText() string { b, _ := os.ReadFile("drucker-agent.ps1"); return string(b) }
 
+func TestDruckerEntfernenRobust(t *testing.T) {
+	txt := druckerSkriptText()
+	entfernen := txt[strings.Index(txt, "if ($Modus -eq 'entfernen')"):strings.Index(txt, "# Erreichbarkeit vorab")]
+	if !strings.Contains(entfernen, "Restart-Service Spooler") {
+		t.Fatal("Entfernen muss den Spooler vorher neu starten (wie install-drucker.ps1, manuell bewährt)")
+	}
+	if !strings.Contains(entfernen, "Start-Job") || !strings.Contains(entfernen, "Wait-Job $job -Timeout") {
+		t.Fatal("jeder Drucker muss einzeln mit eigener Frist entfernt werden, sonst blockiert einer alle anderen")
+	}
+}
+
 func TestDruckerFehlerNichtBeiJederAbfrage(t *testing.T) {
 	ts := neuerTestServer(t, []byte("x"))
 	dir := agentOrdner(t, ts)

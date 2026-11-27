@@ -57,10 +57,29 @@ if ($Modus -eq 'alt') {
 if ($Modus -eq 'entfernen') {
     $wunschRoh = Get-Content -Raw $Entfernen | ConvertFrom-Json
     $wunsch = @($wunschRoh)
+    $ziel = @(Alte | Where-Object { $wunsch -contains $_ })
     $weg = @(); $nicht = @(); $grund = ''
-    foreach ($name in @(Alte | Where-Object { $wunsch -contains $_ })) {
+    if ($ziel.Count) {
+        # Wie install-drucker.ps1 (manuell bewährt, siehe auch „Gelöst“ in AGENTS.md): Spooler vorher neu starten, sonst
+        # hängt das Entfernen oft bei einem feststeckenden Druckauftrag oder ungültigen Handle ("Das Handle ist ungültig").
+        Restart-Service Spooler -Force -ErrorAction SilentlyContinue
+        try { (Get-Service Spooler).WaitForStatus('Running', '00:00:30') } catch { }
+        Start-Sleep 3
+    }
+    foreach ($name in $ziel) {
         $port = (Get-Printer -Name $name -ErrorAction SilentlyContinue).PortName
-        try { Remove-Printer -Name $name -ErrorAction Stop; $weg += $name } catch { $nicht += $name; if (!$grund) { $grund = $_.Exception.Message } }
+        # Je Drucker in einem eigenen Hintergrundauftrag mit eigener Frist: Hängt ausgerechnet dieser eine (z. B. noch ein
+        # Druckauftrag in seiner Warteschlange), sollen die übrigen trotzdem entfernt werden, statt dass alles stehen bleibt.
+        $job = Start-Job -ScriptBlock { param($n) Remove-Printer -Name $n -ErrorAction Stop } -ArgumentList $name
+        if (Wait-Job $job -Timeout 20) {
+            Receive-Job $job -ErrorAction SilentlyContinue | Out-Null
+            if (!(Get-Printer -Name $name -ErrorAction SilentlyContinue)) { $weg += $name } else { $nicht += $name; if (!$grund) { $grund = 'ließ sich nicht entfernen' } }
+        } else {
+            Stop-Job $job -ErrorAction SilentlyContinue
+            $nicht += $name
+            if (!$grund) { $grund = 'Zeitüberschreitung (Druckspooler reagiert nicht)' }
+        }
+        Remove-Job $job -Force -ErrorAction SilentlyContinue
         if ($port -and !(Get-Printer -ErrorAction SilentlyContinue | Where-Object { $_.PortName -eq $port })) { Remove-PrinterPort -Name $port -ErrorAction SilentlyContinue }
     }
     $text = 'Alte Drucker entfernt: ' + $(if ($weg.Count) { $weg -join ', ' } else { 'keine' })

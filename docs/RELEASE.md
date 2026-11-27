@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.26
+
+- **Fehler behoben: „Alte Drucker entfernen“ hängte den Agent trotz Frist weiter auf, Drucker blieben unentfernt** (Nutzer-Meldung: „bei Klick auf alte Drucker entfernen kommt jetzt die Nachfrage, bei Klick auf ja entfernen hängt sich der Agent wieder auf, Drucker sind nicht entfernt“). Die 90-Sekunden-Frist aus beta.23 schützte nur den Dienst-Prozess als Ganzes; `Remove-Printer` selbst konnte weiter unbegrenzt in Windows hängen bleiben, sodass innerhalb der Frist kein einziger Drucker entfernt wurde. Nach dem manuell bewährten Vorgehen (`install-windows.ps1`/„Gelöst“ in AGENTS.md: erst den Druckspooler neu starten, dann Drucker entfernen) startet `drucker-agent.ps1` beim Entfernen jetzt zuerst den Spooler-Dienst neu und entfernt danach jeden Drucker einzeln in einem eigenen Hintergrundauftrag mit eigener 20-Sekunden-Frist: Hängt ausgerechnet einer (z. B. noch ein Druckauftrag in seiner Warteschlange), werden die übrigen trotzdem entfernt, statt dass alles stehen bleibt. Die äußere Frist des Dienstes wurde dafür auf 180 Sekunden angehoben.
+- Programmversion 2.3.5. Geprüft mit Tests und Kreuz-Kompilierung für Windows. **Nicht auf einem echten Windows-PC geprüft** – insbesondere nicht, ob der Spooler-Neustart und die Einzel-Frist je Drucker den konkreten Hänger beheben.
+
 ## 0.22.0-beta.25
 
 - Gestaltungsregel der Module ergänzt (`docs/MODUL-GESTALTUNG.md`): Entfernen als Mülltonne, Klick auf Name oder T2med-Etikett öffnet die Akte, Umschalter für zwei Arbeitsflächen (Kasse: „T2m-Rechnung“ | „IGeL“), der Name hat Vorrang. Nur Dokumentation.
