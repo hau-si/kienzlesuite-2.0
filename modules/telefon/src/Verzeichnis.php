@@ -187,7 +187,7 @@ final class Verzeichnis {
     private static function db(): ?\PDO {
         if (self::$lesen) return self::$lesen;
         if (!is_file(self::datei())) return null;
-        return self::$lesen = new \PDO('sqlite:file:' . self::datei() . '?mode=ro', null, null, [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION, \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC]);
+        return self::$lesen = new \PDO('sqlite:' . self::datei(), null, null, [\PDO::SQLITE_ATTR_OPEN_FLAGS => \PDO::SQLITE_OPEN_READONLY, \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION, \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC]);
     }
 
     public static function zuruecksetzen(): void { self::$lesen = null; }

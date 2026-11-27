@@ -1,5 +1,11 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.25
+
+- **Fehler behoben: „Einstellungen“ und „Statistik“ ließen sich nicht öffnen** („Die Telefon-Seite ist gerade nicht erreichbar“). Statistik und Telefonverzeichnis öffneten ihre Datenbanken über eine `file:…?mode=ro`-Adresse. Die Schutzeinstellung `open_basedir` der Module lehnt solche Adressen ab, sobald die Datenbank existiert. Jetzt wird die Datei normal geöffnet und nur lesend gekennzeichnet (`SQLITE_OPEN_READONLY`).
+- Die Seitentests laufen jetzt mit `open_basedir` wie auf dem Server und mit vorhandenen Datenbanken; so wäre der Fehler aufgefallen.
+- **Nicht auf der VM geprüft.**
+
 ## 0.1.0-beta.24
 
 - **Fax-Worker (`kienzlefax-worker.py`) auf 1.3.20:** Bei erfolgreich gesendeten Faxen wird das Original jetzt zusätzlich nach `sendeberichte/eingang/` kopiert (`copy_original_to_ok_in`, analog zum bestehenden `copy_original_to_fail_in` bei Fehlern), damit das Modul Fax erfolgreich gesendete Faxe für begrenzte Zeit erneut senden kann (Wunsch des Nutzers). Einzige bewusste Abweichung vom unveränderten Original-Worker von Dr. Thomas Kienzle, siehe Kommentar im Dateikopf. Zugleich trägt der Dateiname eines zum erneuten Senden aufbewahrten Originals (Erfolg wie Fehler) jetzt immer die Auftrags-ID, nicht nur bei einer Namenskollision, damit das Modul Fax das richtige Original eindeutig findet.
