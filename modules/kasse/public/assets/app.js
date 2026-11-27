@@ -14,6 +14,8 @@ const exportTried = new Set();
 const printTried = new Set();
 let printTouched = false;
 function message(text='', ok=false) { $('message').textContent = text; $('message').hidden = !text; $('message').classList.toggle('ok', !!ok); }
+// Einfache Symbole der Zahlungsarten (Linien wie die übrigen Symbole der Suite).
+const SYMBOL = {card: '<svg class="pay-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19M6.5 15h4"/></svg>', cash: '<svg class="pay-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/></svg>', later: '<svg class="pay-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10l9-6 9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/></svg>', transfer: '<svg class="pay-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10l9-6 9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/></svg>', post: '<svg class="pay-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5"/></svg>'};
 async function api(action, data={}) {
   const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 75000);
   try {
@@ -132,9 +134,9 @@ function renderInvoices() {
     // Einheitliche Zahlungswahl wie in der freien Eingabe: Chips mit Symbolen + ein Knopf. Die Einzelknöpfe bleiben (versteckt) als Auslöser.
     for (const b of [card, cash, later]) b.hidden = true;
     const chips = element('div', '', 'pay-method'); chips.setAttribute('role', 'radiogroup'); chips.setAttribute('aria-label', 'Zahlungsart');
-    const options = [['card', '💳 Karte (SumUp)'], ['cash', '💶 Bar'], ['later', '🏦 Überweisung']];
+    const options = [['card', 'Karte (SumUp)'], ['cash', 'Bar'], ['later', 'Überweisung']];
     const canPost = !!(state.letter?.enabled && invoice.letter?.postable && !invoice.letter?.locked);
-    if (canPost) options.push(['post', '✉ Per Post']);
+    if (canPost) options.push(['post', 'Per Post']);
     const go = element('button', '', 'primary wide invoice-go');
     const labels = {card: euro(invoice.amount_cents) + ' · Karte', cash: euro(invoice.amount_cents) + ' · Bar', later: 'Überweisung', post: 'Per Post senden'};
     const radios = {};
@@ -143,7 +145,8 @@ function renderInvoices() {
     for (const [value, text] of options) {
       const l = document.createElement('label'), r = document.createElement('input'); r.type = 'radio'; r.name = 'inv-method-' + invoice.id; r.value = value; r.checked = value === chosen;
       r.onchange = () => { chosenMethod.set(invoice.id, value); go.textContent = labels[value]; go.classList.toggle('cash', value !== 'card'); };
-      radios[value] = r; l.append(r, element('span', text)); chips.append(l);
+      const span = element('span', ''); span.innerHTML = SYMBOL[value]; span.append(' ' + text);   // feste Symbole aus diesem Skript, Text als Text
+      radios[value] = r; l.append(r, span); chips.append(l);
     }
     go.textContent = labels[chosen]; go.classList.toggle('cash', chosen !== 'card');
     go.onclick = () => {
@@ -486,6 +489,13 @@ async function load() {
   $('service-date').max=state.today;
   renderVatOption(); renderServices(); renderInvoices(); renderPrintBox(); renderPayment(); markDirty();
   if (window.parent !== window) parent.postMessage('ks-refresh', location.origin);   // Startseite: Rechnungsliste aktualisieren
+  // Patient aus T2med: Die Startseite zeigt ihn oben als Karte (Entwurf B3) und hält ihn, bis er entfernt wird; der Kopf hier entfällt dann.
+  const t2medPatient = state.t2med && !new URL(location.href).searchParams.get('rechnung');
+  document.body.classList.toggle('t2med-patient', t2medPatient);
+  if (window.parent !== window && !new URL(location.href).searchParams.get('rechnung')) {
+    // Abgelaufener T2med-Zugang (4 Stunden) oder freie Eingabe: Die Startseite nimmt diesen Besuch aus der Karte, falls er dort stand.
+    parent.postMessage(t2medPatient ? {typ: 'ks-patient', visit: visitId, name: state.patient.name, geburt: state.patient.birthdate || ''} : {typ: 'ks-patient-aus', visit: visitId}, location.origin);
+  }
 }
 async function poll() {
   if(busy) { timer=setTimeout(poll,2200); return; }

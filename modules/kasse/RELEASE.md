@@ -1,5 +1,15 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.53
+
+- **Neu: Patient aus T2med bleibt oben (Entwurf B3).** Über der Kasse steht eine Karte mit großem Herz-Etikett „T2med“, dem Namen und dem Geburtsdatum. Sie bleibt stehen, auch wenn man eine Rechnung aus der Liste öffnet, zur freien Eingabe, zu „IGeL“, „Vorgänge“ oder „Einstellungen“ wechselt und zurückkommt; sie gilt für diesen Browser-Tab.
+  - **„Zum Patienten“** holt ihn wieder in die Kasse.
+  - **„Entfernen“** nimmt ihn heraus.
+  - Läuft der T2med-Zugang ab (4 Stunden), verschwindet die Karte von selbst. Die doppelte Namenszeile in der Kasse entfällt.
+- **Einfache Symbole auf den Zahlungsknöpfen** (Karte, Bar, Überweisung, Per Post) in der freien Eingabe und bei Rechnungen, als Linien wie die übrigen Symbole der Suite statt Emojis.
+- **Alle Seiten der Kasse sind gleich breit** wie die Startseite. „IGeL“ und „Einstellungen“ waren schmaler.
+- In der Vorschau mit erfundenen Daten geprüft (Ablauf: Patient kommt, Wechsel zu IGeL und zurück, Rechnung, „Zum Patienten“, „Entfernen“). **Nicht auf der VM geprüft.**
+
 ## 2.3.4-beta.52
 
 - **Fehler behoben: Leistungen ließen sich nicht auswählen, die Zahlungsknöpfe lagen falsch,** wenn ein Patient aus T2med kam und für ihn eine offene T2med-Rechnung vorlag. Die Rechnung rutschte dann in die linke Spalte, die Leistungsliste in die schmale rechte und die Zahlung darunter. Jetzt steht die offene Rechnung in einer eigenen Zeile über „Leistungen | Zahlung“.

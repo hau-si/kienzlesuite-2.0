@@ -84,3 +84,7 @@ html:has(body.embed), body.embed { overflow-x: hidden; }
   .embed .free-patient { grid-template-columns: minmax(0, 1fr); grid-auto-flow: row; }
   .embed #services, .embed #groups { max-height: 45vh; }
 }
+
+/* Patient aus T2med: Name und Marke stehen oben auf der Startseite (Karte), hier nicht noch einmal. */
+.embed.t2med-patient .patient { display: none; }
+.pay-ico { flex: none; }
