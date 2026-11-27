@@ -426,6 +426,8 @@ func ampel(f int) uintptr {
 		return rgb(0xD4, 0x47, 0x3A)
 	case Grau:
 		return rgb(0x9A, 0xA5, 0xA2)
+	case Blau:
+		return rgb(0x2E, 0x7D, 0xD1)
 	}
 	return rgb(0x2F, 0xB3, 0x6B)
 }
@@ -472,8 +474,11 @@ func (t *trayZustand) zeichnen() {
 	kreis(38, 38, 5, ampel(v.Farbe))
 	t.text(dc, "Kienzle-Suite", rect{t.px(50), t.px(14), t.px(breite - 110), t.px(34)}, dunkel, dtLeft|dtSingleLine|dtVCenter)
 	markeFarbe, markeText := rgb(0xE3, 0xF1, 0xEE), teal
-	if v.Farbe == Rot {
+	switch v.Farbe {
+	case Rot:
 		markeFarbe, markeText = rgb(0xFB, 0xEE, 0xEA), rgb(0x99, 0x3D, 0x2B)
+	case Blau:
+		markeFarbe, markeText = rgb(0xE4, 0xEE, 0xFA), rgb(0x1F, 0x51, 0x8C)
 	}
 	pSelectObject.Call(dc, klein)
 	kasten(breite-16-110, 16, breite-16, 36, 8, markeFarbe)
