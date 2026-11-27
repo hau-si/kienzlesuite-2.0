@@ -19,21 +19,22 @@ if (!$admin) {
 }
 if (!(Test-Path client.json) -or !(Test-Path schemas.txt) -or !(Test-Path ca.crt)) { throw 'client.json, schemas.txt und ca.crt aus dem Paket fehlen. Bitte das Paket auf dem Server neu laden.' }
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64' -or $env:PROCESSOR_ARCHITEW6432 -eq 'ARM64') { 'arm64' } else { 'amd64' }
-$asset = "kienzle-starter-windows-$arch.exe"
+$asset = "praxisherz-starter-windows-$arch.exe"
 if (!(Test-Path $asset) -or !(Test-Path SHA256SUMS)) { throw "$asset oder SHA256SUMS fehlt im Paket. Bitte das Paket auf dem Server neu laden." }
 $line = Get-Content SHA256SUMS | Where-Object { ($_ -split '\s+')[1] -eq $asset }
 if (!$line -or ((Get-FileHash $asset -Algorithm SHA256).Hash.ToLowerInvariant() -ne ($line -split '\s+')[0])) { throw 'Prüfsumme stimmt nicht.' }
 
 # Laufenden Agent anhalten, damit das Programm ersetzt werden kann.
-$task = 'Kienzle-Agent'
-if (Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue) { Stop-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue }
-Get-Process kienzle-starter -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+$task = 'Praxisherz-Agent'
+$taskAlt = 'Kienzle-Agent'   # Name vor der Umbenennung
+foreach ($t in @($task, $taskAlt)) { if (Get-ScheduledTask -TaskName $t -ErrorAction SilentlyContinue) { Stop-ScheduledTask -TaskName $t -ErrorAction SilentlyContinue } }
+Get-Process praxisherz-starter, kienzle-starter -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
 # Programm: C:\Program Files\Praxisherz (nur Administratoren dürfen ändern). Bis zur Umbenennung hieß der Ordner „Kienzle“.
 $prog = Join-Path $env:ProgramFiles 'Praxisherz'
 $progAlt = Join-Path $env:ProgramFiles 'Kienzle'
 New-Item -ItemType Directory -Force $prog | Out-Null
-$exe = Join-Path $prog 'kienzle-starter.exe'
+$exe = Join-Path $prog 'praxisherz-starter.exe'
 Place $asset $exe 'Programm (Starter und Agent)'
 # Aus dem Browser heruntergeladene Dateien tragen eine Kennzeichnung „aus dem Internet“ (Zone.Identifier), die beim
 # Kopieren erhalten bleibt: Windows würde sonst bei jedem Start des Symbols (bei jeder Anmeldung) erneut fragen, ob das
@@ -47,13 +48,13 @@ New-Item -ItemType Directory -Force $daten | Out-Null
 & icacls.exe $daten /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-32-545:(OI)(CI)RX' | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Dateirechte konnten nicht gesetzt werden.' }
 Place client.json (Join-Path $daten 'client.json') 'Einstellungen und Schlüssel'
-Place ca.crt (Join-Path $daten 'ca.crt') 'Zertifizierungsstelle der Suite (Datei)'
+Place ca.crt (Join-Path $daten 'ca.crt') 'Zertifizierungsstelle von Praxisherz (Datei)'
 if (Test-Path server.crt) { Copy-Item server.crt (Join-Path $daten 'server.crt') -Force }
 
 # Zertifizierungsstelle für alle Benutzer vertrauenswürdig (Browser zeigen dann kein „Nicht sicher“).
 $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2((Join-Path $daten 'ca.crt'))
-if (Get-ChildItem Cert:\LocalMachine\Root | Where-Object { $_.Thumbprint -eq $cert.Thumbprint }) { Say 'unverändert' 'Zertifikat der Suite (vertrauenswürdig)' }
-else { Import-Certificate -FilePath (Join-Path $daten 'ca.crt') -CertStoreLocation Cert:\LocalMachine\Root | Out-Null; Say 'neu' 'Zertifikat der Suite (vertrauenswürdig)' }
+if (Get-ChildItem Cert:\LocalMachine\Root | Where-Object { $_.Thumbprint -eq $cert.Thumbprint }) { Say 'unverändert' 'Zertifikat von Praxisherz (vertrauenswürdig)' }
+else { Import-Certificate -FilePath (Join-Path $daten 'ca.crt') -CertStoreLocation Cert:\LocalMachine\Root | Out-Null; Say 'neu' 'Zertifikat von Praxisherz (vertrauenswürdig)' }
 
 # Aufrufe aus T2med für alle Benutzer (der Agent hält sie später selbst aktuell).
 $command = '"' + $exe + '" --url "%1"'
@@ -74,9 +75,9 @@ foreach ($scheme in (Get-Content schemas.txt | Where-Object { $_ -match '^(praxi
 $alt = Join-Path $env:LOCALAPPDATA 'Kienzle-Starter'
 if (Test-Path $alt) { Remove-Item -Recurse -Force $alt -ErrorAction SilentlyContinue; Say 'entfernt' 'alter Starter dieses Benutzers' }
 
-# Agent bei der Suite anmelden (eigener Zugang für diesen PC, nur für System und Administratoren lesbar).
+# Agent bei Praxisherz anmelden (eigener Zugang für diesen PC, nur für System und Administratoren lesbar).
 $out = & $exe --anmelden 2>&1
-if ($LASTEXITCODE -ne 0) { throw ('Anmelden bei der Suite fehlgeschlagen: ' + ($out -join ' ')) }
+if ($LASTEXITCODE -ne 0) { throw ('Anmelden bei Praxisherz fehlgeschlagen: ' + ($out -join ' ')) }
 & icacls.exe (Join-Path $daten 'agent.json') /inheritance:r /grant:r '*S-1-5-18:F' '*S-1-5-32-544:F' | Out-Null
 Say 'ok' ($out -join ' ')
 
@@ -86,7 +87,8 @@ $action = New-ScheduledTaskAction -Execute $exe -Argument '--dienst'
 $trigger = @((New-ScheduledTaskTrigger -AtStartup), (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5)))
 $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
 $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 9999 -RestartInterval (New-TimeSpan -Minutes 1) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances IgnoreNew
-# Umzug von „Kienzle“ nach „Praxisherz“: alte Ordner entfernen (der Agent ist angehalten, neu angemeldet und läuft gleich aus dem neuen Ordner).
+# Umzug von „Kienzle“ nach „Praxisherz“: alte Aufgabe und alte Ordner entfernen (der Agent ist angehalten, neu angemeldet und läuft gleich aus dem neuen Ordner).
+if (Get-ScheduledTask -TaskName $taskAlt -ErrorAction SilentlyContinue) { Unregister-ScheduledTask -TaskName $taskAlt -Confirm:$false; Say 'entfernt' "alte Aufgabe $taskAlt" }
 foreach ($o in @($progAlt, $datenAlt)) {
     if (Test-Path $o) { Remove-Item -Recurse -Force $o -ErrorAction SilentlyContinue; if (Test-Path $o) { Say 'Hinweis' "$o ließ sich nicht ganz entfernen (später von Hand löschen)" } else { Say 'entfernt' "alter Ordner $o" } }
 }

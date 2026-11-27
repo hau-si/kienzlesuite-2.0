@@ -1,5 +1,9 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.29
+
+- Texte: „die Suite“/„der Suite“ heißt jetzt überall „Praxisherz“. Nur Texte geändert, mit Tests geprüft, nicht auf der VM.
+
 ## 0.1.0-beta.28
 
 - **Neue Aufrufadresse aus T2med: `praxisherz-telefonverzeichnis://…`** (Einstellungen). Die frühere Adresse `kienzle-telefonverzeichnis://…` funktioniert weiter. Braucht Basis 0.22.0-beta.32. Mit Tests geprüft, nicht auf der VM und nicht mit T2med.

@@ -1,6 +1,6 @@
 'use strict';
 const $ = id => document.getElementById(id);
-// Webpfad des Moduls in Praxisherz (z. B. /kasse/) und Marke der Suite für schreibende Anfragen.
+// Webpfad des Moduls in Praxisherz (z. B. /kasse/) und Marke von Praxisherz für schreibende Anfragen.
 const BASE = document.body.dataset.base || '/';
 const SUITE_CSRF = (document.querySelector('meta[name="kienzle-csrf"]') || {}).content || '';
 const euro = cents => new Intl.NumberFormat('de-DE', {style:'currency', currency:'EUR'}).format(cents / 100);
@@ -14,7 +14,7 @@ const exportTried = new Set();
 const printTried = new Set();
 let printTouched = false;
 function message(text='', ok=false) { $('message').textContent = text; $('message').hidden = !text; $('message').classList.toggle('ok', !!ok); }
-// Einfache Symbole der Zahlungsarten (Linien wie die übrigen Symbole der Suite).
+// Einfache Symbole der Zahlungsarten (Linien wie die übrigen Symbole von Praxisherz).
 const SYMBOL = {card: '<svg class="pay-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19M6.5 15h4"/></svg>', cash: '<svg class="pay-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/></svg>', later: '<svg class="pay-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10l9-6 9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/></svg>', transfer: '<svg class="pay-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10l9-6 9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/></svg>', post: '<svg class="pay-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5"/></svg>'};
 async function api(action, data={}) {
   const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 75000);
@@ -713,7 +713,7 @@ document.querySelectorAll('.work-tab').forEach(b => b.onclick = () => {
 async function init() {
   const query = new URL(location.href).searchParams, auto = {invoice: query.get('rechnung'), action: query.get('aktion')};
   if (query.get('neu') || query.get('rechnung') || query.get('eingebettet')) { $('welcome').hidden = true; document.querySelector('.top .brand').hidden = true; }   // eingebettet in der Startseite: gleich die Arbeitsfläche zeigen, nicht die Willkommenskarte
-  // Start aus T2med: #launch=<code>. Musste sich der Benutzer erst an der Suite anmelden, hat die Basis den Code im Tab gemerkt.
+  // Start aus T2med: #launch=<code>. Musste sich der Benutzer erst an Praxisherz anmelden, hat die Basis den Code im Tab gemerkt.
   let hash=location.hash.slice(1);
   try { if(!hash.startsWith('launch=')) hash=(sessionStorage.getItem('kienzle-launch')||'').slice(1); sessionStorage.removeItem('kienzle-launch'); } catch { /* ohne sessionStorage */ }
   const fragment=new URLSearchParams(hash); const ticket=fragment.get('launch');

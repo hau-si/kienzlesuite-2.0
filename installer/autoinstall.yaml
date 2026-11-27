@@ -3,7 +3,7 @@
 # (keine eigene ISO). Anleitung: docs/INSTALLATION.md, Abschnitt „Unbeaufsichtigt“.
 #
 # Vor der Verwendung anpassen (alles in <SPITZEN KLAMMERN>):
-#   - Rechnername, Servername der Suite, Praxisname
+#   - Rechnername, Servername von Praxisherz, Praxisname
 #   - Passwort-Hash des Konsolen-Benutzers: mkpasswd -m yescrypt   (Paket whois)
 #   - optional ein SSH-Schlüssel für die Wartung
 # Die Datei als „user-data“ (z. B. auf einem zweiten Laufwerk mit Bezeichnung CIDATA, daneben eine leere „meta-data“)

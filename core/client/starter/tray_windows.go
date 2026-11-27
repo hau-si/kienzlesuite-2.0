@@ -3,7 +3,7 @@
 package main
 
 // Symbol in der Taskleiste unter Windows (Entwurf B): Klick öffnet ein kleines Statusfenster über der Uhr. Läuft als
-// angemeldeter Benutzer (Start über HKLM\…\Run, „kienzle-starter --tray“), liest nur status.json des Agents und legt für
+// angemeldeter Benutzer (Start über HKLM\…\Run, „praxisherz-starter --tray“), liest nur status.json des Agents und legt für
 // „Drucker prüfen“ eine leere Anstoß-Datei ab. Ohne Zusatzpakete, direkt über user32/shell32/gdi32.
 
 import (
@@ -172,7 +172,7 @@ type trayZustand struct {
 	farbe   int
 	icon    uintptr
 	skala   float64
-	knopf   []rect // Suite öffnen, Drucker prüfen, Protokoll, (Alte Drucker entfernen)
+	knopf   []rect // Praxisherz öffnen, Drucker prüfen, Protokoll, (Alte Drucker entfernen)
 	meldung string
 	frage   bool // Rückfrage offen: Fenster beim Wechsel zur Rückfrage nicht schließen
 }
@@ -381,7 +381,7 @@ func trayProc(hwnd, nachricht, wparam, lparam uintptr) uintptr {
 // der Hintergrund-Thread meldet sein Ergebnis per PostMessage (wmKnopfFertig) zurück.
 func (t *trayZustand) knopfGedrueckt(i int) {
 	switch i {
-	case 0: // Suite öffnen
+	case 0: // Praxisherz öffnen
 		hwnd, ordner := t.hwnd, t.ordner
 		go func() {
 			if cfg, err := loadConfig(filepath.Join(ordner, "client.json")); err == nil {
@@ -409,7 +409,7 @@ func (t *trayZustand) knopfGedrueckt(i int) {
 			return
 		}
 		frage := "Diese Drucker zeigen auf Praxisherz, dort gibt es sie aber nicht mehr:\n\n• " + strings.Join(namen, "\n• ") +
-			"\n\nAusdrucke darauf kommen nirgends an. Jetzt von diesem PC entfernen?\n\nDie aktuellen Drucker der Suite bleiben unverändert."
+			"\n\nAusdrucke darauf kommen nirgends an. Jetzt von diesem PC entfernen?\n\nDie aktuellen Drucker von Praxisherz bleiben unverändert."
 		t.frage = true
 		antwort, _, _ := pMessageBoxW.Call(t.hwnd, uintptr(unsafe.Pointer(w16(frage))), uintptr(unsafe.Pointer(w16("Alte Drucker entfernen"))),
 			0x4|0x20|0x100|0x10000|0x40000) // MB_YESNO, MB_ICONQUESTION, MB_DEFBUTTON2, MB_SETFOREGROUND, MB_TOPMOST
@@ -465,7 +465,7 @@ func ampel(f int) uintptr {
 	return rgb(0x2F, 0xB3, 0x6B)
 }
 
-// zeichnen: Kopf (Symbol, „Praxisherz“, Marke), Unterzeile, Zeilen mit Ampel, Fuß, drei Knöpfe – im Stil der Suite.
+// zeichnen: Kopf (Symbol, „Praxisherz“, Marke), Unterzeile, Zeilen mit Ampel, Fuß, drei Knöpfe – im Stil von Praxisherz.
 func (t *trayZustand) zeichnen() {
 	var ps paintStruct
 	dc, _, _ := pBeginPaint.Call(t.hwnd, uintptr(unsafe.Pointer(&ps)))
@@ -550,7 +550,7 @@ func (t *trayZustand) zeichnen() {
 	for i, k := range []struct {
 		text  string
 		breit float64
-	}{{"Suite öffnen", 112}, {"Drucker prüfen", 118}, {"Protokoll", 84}} {
+	}{{"Praxisherz öffnen", 136}, {"Drucker prüfen", 118}, {"Protokoll", 84}} {
 		farbe, schrift := rgb(0xE3, 0xEB, 0xE8), dunkel
 		if i == 0 {
 			farbe, schrift = teal, rgb(255, 255, 255)

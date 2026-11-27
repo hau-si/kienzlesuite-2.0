@@ -2,7 +2,7 @@
 declare(strict_types=1);
 namespace KienzleKasse;
 
-/** Angaben des Moduls für Einstellungsseite, Einrichtungs-Überblick der Suite und Haken. */
+/** Angaben des Moduls für Einstellungsseite, Einrichtungs-Überblick von Praxisherz und Haken. */
 final class Module {
     public const INVOICE_QUEUE = 'vKasse';
     public const LETTER_QUEUE = 'vBriefversand';
@@ -30,7 +30,7 @@ final class Module {
     }
 
     /**
-     * Einrichtungs-Überblick im Format der Suite (docs/MODULE-TOML.md, [setup] overview): Punkte mit title, state
+     * Einrichtungs-Überblick im Format von Praxisherz (docs/MODULE-TOML.md, [setup] overview): Punkte mit title, state
      * (done/open/error), hint und link (unter dem eigenen Webpfad).
      */
     public static function overview(Config $config): array {
@@ -40,8 +40,8 @@ final class Module {
         $items = [
             ['title' => 'Benötigte Hardware: Bondrucker', 'optional' => true, 'state' => 'open', 'hint' => 'Empfohlen: Epson TM-m30III (Bondrucker für Terminliste und Kasse).', 'link' => $link('s-checklist')],
             ['title' => 'Praxisname und Anschrift für Rechnungen', 'state' => $practice ? 'done' : 'open', 'hint' => 'Einstellungen → Praxis & Rechnungen', 'link' => $link('s-practice')],
-            ['title' => Suite::connected('t2med') ? 'T2med-Verbindung der Suite vorhanden' : 'T2med-Verbindung fehlt', 'state' => Suite::connected('t2med') ? 'done' : 'open',
-                'hint' => 'Verwaltung → Verbindungen der Suite (Adresse, API-Key, Zertifikat); der Link im Bereich „T2med-Anbindung“ führt direkt dorthin', 'link' => $link('s-fhir')],
+            ['title' => Suite::connected('t2med') ? 'T2med-Verbindung von Praxisherz vorhanden' : 'T2med-Verbindung fehlt', 'state' => Suite::connected('t2med') ? 'done' : 'open',
+                'hint' => 'Verwaltung → Verbindungen von Praxisherz (Adresse, API-Key, Zertifikat); der Link im Bereich „T2med-Anbindung“ führt direkt dorthin', 'link' => $link('s-fhir')],
             ['title' => $config->get('fhir', 'mode') === 'live' ? 'T2med-Anbindung live' : 'T2med-Anbindung noch im Testmodus', 'state' => $config->get('fhir', 'mode') === 'live' ? 'done' : 'open',
                 'hint' => 'Einstellungen → Zahlung & T2med', 'link' => $link('s-fhir')],
             ['title' => $config->get('sumup', 'mode') === 'live' ? 'SumUp live verbunden' : 'SumUp: noch Testmodus', 'state' => $config->get('sumup', 'mode') === 'live' ? 'done' : 'open',
@@ -50,7 +50,7 @@ final class Module {
         if ($config->get('invoice_inbox', 'enabled', false)) {
             $q = self::invoicePrinter($config)['queue'];
             $items[] = ['title' => 'Drucker „vKasse“ ' . ($q ? 'bereit' : 'fehlt'), 'state' => $q ? 'done' : 'error',
-                'hint' => $q ? 'In T2med die Rechnung auf diesen Drucker drucken' : 'Verwaltung → Drucker der Suite: virtuelle Drucker abgleichen', 'link' => $link('invoice-printer-help')];
+                'hint' => $q ? 'In T2med die Rechnung auf diesen Drucker drucken' : 'Verwaltung → Drucker von Praxisherz: virtuelle Drucker abgleichen', 'link' => $link('invoice-printer-help')];
         }
         if ($config->get('letterxpress', 'enabled', false)) {
             $q = null;
@@ -58,22 +58,22 @@ final class Module {
                 foreach (Suite::modul()->drucker() as $d) if ($d['name'] === self::LETTER_QUEUE) $q = $d;
             } catch (\Throwable) {}
             $items[] = ['title' => 'Drucker „vBriefversand“ ' . ($q ? 'bereit' : 'fehlt'), 'state' => $q ? 'done' : 'error',
-                'hint' => $q ? 'Rechnungen aus T2med, die darauf gedruckt werden, gehen sofort per Post an Letterxpress (Windows: IPP-Drucker wie „vKasse“ hinzufügen, Papier A4)' : 'Verwaltung → Drucker der Suite: virtuelle Drucker abgleichen', 'link' => $link('letter-printer-help')];
+                'hint' => $q ? 'Rechnungen aus T2med, die darauf gedruckt werden, gehen sofort per Post an Letterxpress (Windows: IPP-Drucker wie „vKasse“ hinzufügen, Papier A4)' : 'Verwaltung → Drucker von Praxisherz: virtuelle Drucker abgleichen', 'link' => $link('letter-printer-help')];
         }
         foreach (['printing' => 'Bondrucker', 'office_printing' => 'Praxisdrucker (A4)'] as $section => $label) {
             if (!$config->get($section, 'enabled', false)) continue;
             $known = Suite::druckerRollen()[$section === 'printing' ? 'bon' : 'buero'] !== '';
-            $items[] = ['title' => $label . ($known ? ' gewählt' : ': Drucker nicht in der Suite eingerichtet'), 'state' => $known ? 'done' : 'error',
-                'hint' => 'Verwaltung → Drucker der Suite: unter „Wofür welcher Drucker?“ zuordnen', 'link' => $link('s-' . $section)];
+            $items[] = ['title' => $label . ($known ? ' gewählt' : ': Drucker nicht in Praxisherz eingerichtet'), 'state' => $known ? 'done' : 'error',
+                'hint' => 'Verwaltung → Drucker von Praxisherz: unter „Wofür welcher Drucker?“ zuordnen', 'link' => $link('s-' . $section)];
         }
         if ($config->get('mail', 'enabled', false) && !Suite::connected('mail')) {
-            $items[] = ['title' => 'E-Mail-Versand: Verbindung fehlt', 'state' => 'error', 'hint' => 'Verwaltung → Verbindungen der Suite', 'link' => $link('s-mail')];
+            $items[] = ['title' => 'E-Mail-Versand: Verbindung fehlt', 'state' => 'error', 'hint' => 'Verwaltung → Verbindungen von Praxisherz', 'link' => $link('s-mail')];
         }
         if ($config->get('letterxpress', 'enabled', false) && !Suite::connected('letterxpress')) {
-            $items[] = ['title' => 'Letterxpress: Verbindung fehlt', 'state' => 'error', 'hint' => 'Verwaltung → Verbindungen der Suite (Benutzername, API-Key)', 'link' => $link('s-letterxpress')];
+            $items[] = ['title' => 'Letterxpress: Verbindung fehlt', 'state' => 'error', 'hint' => 'Verwaltung → Verbindungen von Praxisherz (Benutzername, API-Key)', 'link' => $link('s-letterxpress')];
         }
         if ($config->get('invoice_export', 'enabled', false) && !isset(Suite::targets()[(string)$config->get('invoice_export', 'ziel', '')])) {
-            $items[] = ['title' => 'Ablage: Ziel im Netzwerkspeicher fehlt', 'state' => 'error', 'hint' => 'Verwaltung → Verbindungen der Suite, dann hier wählen', 'link' => $link('s-invoice_export')];
+            $items[] = ['title' => 'Ablage: Ziel im Netzwerkspeicher fehlt', 'state' => 'error', 'hint' => 'Verwaltung → Verbindungen von Praxisherz, dann hier wählen', 'link' => $link('s-invoice_export')];
         }
         $items[] = ['title' => 'Rechnung per Post über Letterxpress versenden', 'state' => $config->get('letterxpress', 'enabled', false) ? 'done' : 'open', 'optional' => true,
             'hint' => 'Einstellungen → Praxis & Rechnungen (Sammelversand aus T2med über den Drucker „vBriefversand“)', 'link' => $link('s-letterxpress')];

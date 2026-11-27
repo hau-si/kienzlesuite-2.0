@@ -56,7 +56,7 @@ def ablage_offen(c) -> bool:
 
 
 def ablage_anstossen(c, jetzt=time.monotonic, starten=None) -> bool:
-    """Startet den Ablage-Lauf (PHP, braucht T2med-Zugang und Verschlüsselung der Suite) höchstens alle ABLAGE_TAKT Sekunden, nie doppelt."""
+    """Startet den Ablage-Lauf (PHP, braucht T2med-Zugang und Verschlüsselung von Praxisherz) höchstens alle ABLAGE_TAKT Sekunden, nie doppelt."""
     proc = ABLAGE['proc']
     if proc is not None and proc.poll() is None:
         return False

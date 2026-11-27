@@ -570,7 +570,7 @@ def test_mail(c: dict) -> str:
 
 
 def send_mail(c: dict | None, to: list[str], subject: str, body: str) -> None:  # noqa: C901
-    """Nachricht der Suite über die zentrale E-Mail-Verbindung (nur Text, keine Patientendaten)."""
+    """Nachricht von Praxisherz über die zentrale E-Mail-Verbindung (nur Text, keine Patientendaten)."""
     from email.message import EmailMessage
     if not c:
         raise Fehler('E-Mail ist nicht eingerichtet.')

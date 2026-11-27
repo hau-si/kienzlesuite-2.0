@@ -50,7 +50,7 @@ def split_names(names: list[str]) -> tuple[list[str], list[str]]:
                 dns.append(name)
             continue
         if not any(ip in ipaddress.ip_network(n) for n in (PRIVATE_V4 if ip.version == 4 else PRIVATE_V6)):
-            raise Fehler(f'{ip} ist keine private Adresse; die Suite ist nur im Praxisnetz erreichbar.')
+            raise Fehler(f'{ip} ist keine private Adresse; Praxisherz ist nur im Praxisnetz erreichbar.')
         if str(ip) not in ips:
             ips.append(str(ip))
     if not dns and not ips:

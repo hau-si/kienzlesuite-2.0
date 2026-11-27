@@ -77,7 +77,7 @@ func AnsichtBauen(s Status, vorhanden bool, jetzt time.Time) Ansicht {
 	if vorhanden {
 		switch {
 		case len(s.Drucker) == 0:
-			v.Zeilen = append(v.Zeilen, Zeile{"Drucker", "keine virtuellen Drucker in der Suite", Grau})
+			v.Zeilen = append(v.Zeilen, Zeile{"Drucker", "keine virtuellen Drucker in Praxisherz", Grau})
 		case s.DruckerOk:
 			v.Zeilen = append(v.Zeilen, Zeile{"Drucker", strings.Join(s.Drucker, ", "), Gruen})
 		default:
@@ -88,7 +88,7 @@ func AnsichtBauen(s Status, vorhanden bool, jetzt time.Time) Ansicht {
 			v.Zeilen = append(v.Zeilen, Zeile{"Drucker", kuerzen(t, 110), Gelb})
 		}
 		if len(s.AltDrucker) > 0 {
-			wert := strings.Join(s.AltDrucker, ", ") + " – gibt es in der Suite nicht mehr"
+			wert := strings.Join(s.AltDrucker, ", ") + " – gibt es in Praxisherz nicht mehr"
 			if s.AltText != "" {
 				wert += " (" + s.AltText + ")"
 			}

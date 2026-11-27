@@ -57,7 +57,7 @@ fi
 
 conf=/etc/kienzle/core/core.json
 if [ -n "$restore" ] && [ -f /var/lib/kienzle/core/core.sqlite ]; then
-  echo 'Auf diesem Server ist die Suite schon eingerichtet. Wiederherstellen nur auf einer frischen VM.'; exit 2
+  echo 'Auf diesem Server ist Praxisherz schon eingerichtet. Wiederherstellen nur auf einer frischen VM.'; exit 2
 fi
 if [ ${#names[@]} -eq 0 ] && [ -z "$restore" ]; then
   if [ -f "$conf" ]; then
@@ -111,7 +111,7 @@ if [ -z "$nosystemd" ] && command -v timedatectl >/dev/null; then
   timedatectl set-ntp true >/dev/null 2>&1 || true
   for _ in $(seq 1 20); do [ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" = yes ] && break; sleep 1; done
   if [ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" = yes ]; then echo "Uhrzeit synchronisiert: $(date '+%d.%m.%Y %H:%M:%S')"
-  else echo "Hinweis: Uhrzeit nicht synchronisiert (Server: $(date '+%d.%m.%Y %H:%M:%S')). Bei der Einrichtung der Authenticator-App bietet die Suite an, die Uhr zu stellen."; fi
+  else echo "Hinweis: Uhrzeit nicht synchronisiert (Server: $(date '+%d.%m.%Y %H:%M:%S')). Bei der Einrichtung der Authenticator-App bietet Praxisherz an, die Uhr zu stellen."; fi
 fi
 echo '== Benutzer und Ordner'
 id ks-core >/dev/null 2>&1 || useradd --system --home-dir /var/lib/kienzle/core --no-create-home --shell /usr/sbin/nologin ks-core
@@ -276,7 +276,7 @@ install -m 0644 "$vorlagen/kienzle-zertifikat.service" "$vorlagen/kienzle-zertif
   /etc/systemd/system/
 chmod 0644 /etc/systemd/system/kienzle-core-php.service
 
-# nginx: nur die Suite. Die Beispielseite der Distribution wird abgeschaltet (nur der mitgelieferte Verweis).
+# nginx: nur Praxisherz. Die Beispielseite der Distribution wird abgeschaltet (nur der mitgelieferte Verweis).
 if [ -L /etc/nginx/sites-enabled/default ] && [ "$(readlink /etc/nginx/sites-enabled/default)" = /etc/nginx/sites-available/default ]; then
   rm -f /etc/nginx/sites-enabled/default
 fi
@@ -303,7 +303,7 @@ if [ -z "$nosystemd" ]; then
   done
   systemctl start avahi-daemon.service cups.service smbd.service >/dev/null 2>&1 || true
   if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q 'Status: active'; then
-    echo 'Hinweis: ufw ist aktiv. Die Firewall der Suite (Verwaltung → Firewall) arbeitet unabhängig davon; bitte nur eine von beiden verwenden.'
+    echo 'Hinweis: ufw ist aktiv. Die Firewall von Praxisherz (Verwaltung → Firewall) arbeitet unabhängig davon; bitte nur eine von beiden verwenden.'
   fi
   systemctl restart kienzle-core-php.service
   # Modul-Dienste (php-fpm) neu starten, sonst liefern sie nach einem Basis-Update noch den alten Rahmen (Seitenleiste) aus dem Zwischenspeicher.

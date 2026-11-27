@@ -1,12 +1,12 @@
 <?php
 declare(strict_types=1);
-// Startseite der Kasse im Rahmen der Suite: links das Kassieren (freie Eingabe / IGeL / GOÄ, eingebettete Kassenansicht), rechts offene T2med-Rechnungen und Tageswerte.
+// Startseite der Kasse im Rahmen von Praxisherz: links das Kassieren (freie Eingabe / IGeL / GOÄ, eingebettete Kassenansicht), rechts offene T2med-Rechnungen und Tageswerte.
 use KienzleKasse\Suite;
 $k = Suite::modul();
 if (!Suite::can('kassieren')) {
     http_response_code(403);
     header('Content-Type: text/plain; charset=utf-8');
-    exit("Für die Kasse fehlt das Recht „Kassieren“. Bitte den Admin fragen (Verwaltung → Benutzer der Suite).\n");
+    exit("Für die Kasse fehlt das Recht „Kassieren“. Bitte den Admin fragen (Verwaltung → Benutzer von Praxisherz).\n");
 }
 header('Cache-Control: no-store');
 header('Referrer-Policy: no-referrer');

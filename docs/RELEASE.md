@@ -1,5 +1,12 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.35
+
+- **Überall „Praxisherz“ statt „Suite“** in Oberfläche, Hinweisen und Anleitungen; die Seite während einer Aktualisierung („Einen Moment bitte“) sagt „Praxisherz wird gerade aktualisiert“. Auf einem Server erscheint das erst nach diesem Update (die Seite kommt sonst noch aus dem alten Stand).
+- **Arbeitsplatz-Paket:** ZIP `praxisherz-starter-<system>.zip`, Programm `praxisherz-starter(.exe)`, Windows-Aufgabe „Praxisherz-Agent“, Autostart-Eintrag „Praxisherz“, Taskleisten-Knopf „Praxisherz öffnen“. Beim nächsten Ausführen des Pakets werden die alte Aufgabe „Kienzle-Agent“ und die alten Ordner entfernt.
+- Agent 2.3.8: Ältere Agenten finden die neue Fassung unter ihrem früheren Namen `kienzle-starter-…` und aktualisieren sich selbst; die Aufgabe wird unter beiden Namen gefunden.
+- Mit Tests geprüft. **Nicht unter Windows/macOS/Linux-Arbeitsplätzen, nicht auf der VM geprüft.**
+
 ## 0.22.0-beta.34
 
 - **Ordner, die man sieht, heißen jetzt „Praxisherz“:**

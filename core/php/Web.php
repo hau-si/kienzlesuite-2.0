@@ -138,7 +138,7 @@ final class Web {
 
     public static string $caFile = '/etc/kienzle/ca/ca.crt';
 
-    /** Anleitung für die Arbeitsplätze: Zertifizierungsstelle und Servername. Ohne Anmeldung erreichbar (vorher vertraut der Browser der Suite noch nicht). */
+    /** Anleitung für die Arbeitsplätze: Zertifizierungsstelle und Servername. Ohne Anmeldung erreichbar (vorher vertraut der Browser von Praxisherz noch nicht). */
     private function workstationHelp(?string $error = null, ?string $notice = null): Response {
         $pem = @file_get_contents(self::$caFile);
         $fp = '';
@@ -157,11 +157,11 @@ final class Web {
             $routerText = '<p>Den Namen <code>' . V::h($name) . '</code> mit der Adresse <code>' . V::h($ip) . '</code> im Router oder einem eigenen DNS-Server eintragen (meist die IT). '
                 . 'Manche Router kennen Geräte im Netz auch automatisch unter ihrem Rechnernamen mit einer eigenen Endung; dann unter Verwaltung → Server genau diesen Namen mit der Endung des Routers wählen.</p>';
         }
-        $lead = '<p class="lead">Pro PC genügt ein Paket: Es richtet den Praxisherz-Agent ein (Starter für T2med, Zertifikat der Suite, virtuelle Drucker, „Akte öffnen“). Unter Windows hält der Agent danach alles selbst aktuell, auch neue Drucker und Module; ein zweites Mal ist das Paket nur zur Reparatur nötig. '
-            . 'Der PC muss außerdem den Namen der Suite kennen (Schritt 2). Klappt etwas nicht, steht unten jeder Schritt auch zum Einrichten von Hand.</p>';
+        $lead = '<p class="lead">Pro PC genügt ein Paket: Es richtet den Praxisherz-Agent ein (Starter für T2med, Zertifikat von Praxisherz, virtuelle Drucker, „Akte öffnen“). Unter Windows hält der Agent danach alles selbst aktuell, auch neue Drucker und Module; ein zweites Mal ist das Paket nur zur Reparatur nötig. '
+            . 'Der PC muss außerdem den Namen von Praxisherz kennen (Schritt 2). Klappt etwas nicht, steht unten jeder Schritt auch zum Einrichten von Hand.</p>';
         $zertifikat = ''
             . '<details class="box" id="zertifikat"><summary><strong>Zertifikat von Hand einrichten</strong></summary>'
-            . '<p>Ohne diesen Schritt zeigt der Browser „Nicht sicher“. Die Datei ist kein Programm, sondern der Ausweis der Suite.</p>'
+            . '<p>Ohne diesen Schritt zeigt der Browser „Nicht sicher“. Die Datei ist kein Programm, sondern der Ausweis von Praxisherz.</p>'
             . '<p class="row-buttons"><a class="button" href="/ca.crt">Zertifikat herunterladen</a></p>'
             . ($fp !== '' ? '<p class="muted">Zum Vergleich – so muss der Fingerabdruck (SHA-256) lauten:<br><code>' . V::h($fp) . '</code></p>' : '')
             . '<details class="how" open><summary>Windows</summary><ol class="steps"><li>Die heruntergeladene Datei <strong>praxisherz-ca.crt</strong> doppelklicken.</li>'
@@ -178,15 +178,15 @@ final class Web {
             . '<details class="how"><summary>Firefox (eigener Zertifikatsspeicher)</summary><ol class="steps"><li>Einstellungen → Datenschutz &amp; Sicherheit → Zertifikate → Zertifikate anzeigen → '
             . 'Zertifizierungsstellen → Importieren → „Dieser CA vertrauen, um Websites zu identifizieren“.</li></ol></details></details>';
         $namen = ''
-            . '<h2 id="name">2. Den Namen der Suite bekannt machen (immer nötig)</h2>'
-            . '<p>Die Suite heißt <strong>' . V::h($name) . '</strong> und hat die Adresse <strong>' . V::h($ip) . '</strong>. Damit der Name funktioniert, gibt es zwei Wege:</p>'
+            . '<h2 id="name">2. Den Namen von Praxisherz bekannt machen (immer nötig)</h2>'
+            . '<p>Praxisherz heißt <strong>' . V::h($name) . '</strong> und hat die Adresse <strong>' . V::h($ip) . '</strong>. Damit der Name funktioniert, gibt es zwei Wege:</p>'
             . '<details class="how" open><summary>Einmal im Router (empfohlen, gilt für alle PCs)</summary>' . $routerText . '</details>'
             . '<details class="how"><summary>Oder auf jedem PC in der Datei hosts</summary><ol class="steps">'
             . '<li>Windows: Startmenü → „Editor“ mit der rechten Maustaste → <strong>Als Administrator ausführen</strong>.</li>'
             . '<li>Datei → Öffnen → <code>C:\Windows\System32\drivers\etc\hosts</code> (unten „Alle Dateien“ wählen).</li>'
             . '<li>Am Ende diese Zeile einfügen und speichern:<br><code>' . V::h($ip . '   ' . $name) . '</code></li>'
             . '<li>Mac: im Terminal <code>sudo nano /etc/hosts</code>, dieselbe Zeile ergänzen, speichern.</li></ol></details>'
-            . '<p>Danach die Suite unter <a href="https://' . V::h($name) . '/">https://' . V::h($name) . '/</a> öffnen.</p>';
+            . '<p>Danach Praxisherz unter <a href="https://' . V::h($name) . '/">https://' . V::h($name) . '/</a> öffnen.</p>';
         // Starter, Pakete und Schlüssel: gehören zu den Arbeitsplätzen (Admins sehen die Pakete direkt hier).
         $paket = '';
         if ($this->modules->starterPath() !== '' || $this->modules->starters()) {
@@ -231,9 +231,9 @@ final class Web {
             . '<label>Name des Servers<span class="name-row">'
             . '<input type="text" name="kurzname" value="' . V::h($short) . '" required maxlength="40" pattern="[A-Za-z0-9][A-Za-z0-9-]*" aria-label="Name">'
             . '<select name="endung" aria-label="Endung">' . $options . '</select></span></label>'
-            . '<p class="muted">Unter diesem Namen öffnen die Arbeitsplätze die Suite, z. B. <strong>' . V::h($address) . '</strong>. '
+            . '<p class="muted">Unter diesem Namen öffnen die Arbeitsplätze Praxisherz, z. B. <strong>' . V::h($address) . '</strong>. '
             . 'Nur Buchstaben, Ziffern und Bindestrich. Wer nicht sicher ist: „praxisherz“ ohne Endung lassen. Ein Name ohne Endung muss im Router bzw. DNS der Praxis bekannt sein (bei der FRITZ!Box meist von selbst, wenn der Server so heißt).</p>'
-            . ($ips ? '<p class="muted">Zusätzlich bleibt die Suite über ' . V::h(implode(', ', $ips)) . ' erreichbar.</p>' : '')
+            . ($ips ? '<p class="muted">Zusätzlich bleibt Praxisherz über ' . V::h(implode(', ', $ips)) . ' erreichbar.</p>' : '')
             . '<details class="how"><summary>Weitere Namen und Fachleute-Einstellungen</summary>'
             . '<label>Weitere Namen oder Adressen (einer je Zeile)<textarea name="weitere" rows="3">' . V::h(implode("\n", $extra)) . '</textarea></label>'
             . '<p class="muted">Erlaubt sind interne Namen (.internal, .local, .lan, .home.arpa, .fritz.box …) und private IP-Adressen. '
@@ -242,7 +242,7 @@ final class Web {
             . V::checkbox('ohne_ip', '1', 'Nicht mehr über die IP-Adresse erreichbar', false) . '</details>'
             . '<button' . ($st['pending'] ? ' disabled' : '') . '>Speichern</button></form>'
             . '<h2>Danach</h2><ol class="steps"><li>Den Namen im Router eintragen – oder auf jedem PC in der Datei hosts: '
-            . '<a href="/hilfe/arbeitsplatz#name">Anleitung</a>.</li><li>Die Suite unter <strong>' . V::h($address) . '</strong> öffnen und dort neu anmelden.</li>'
+            . '<a href="/hilfe/arbeitsplatz#name">Anleitung</a>.</li><li>Praxisherz unter <strong>' . V::h($address) . '</strong> öffnen und dort neu anmelden.</li>'
             . '<li>Falls schon Passkeys eingerichtet sind: unter „Mein Konto“ neu anlegen (sie gelten für den alten Namen).</li></ol>'
             . '<p class="muted">Diese drei Schritte bestätigst du von Hand unter <a href="/verwaltung/einrichtung">Einrichtung</a>; erst dann gilt „Servername festgelegt“ als erledigt.</p>';
         $response = Response::html(V::page('Server', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
@@ -274,7 +274,7 @@ final class Web {
             . '<input type="hidden" name="aktion" value="' . $kind . '">' . $fields . '<button>' . $button . '</button></form>';
         $body = V::error($error) . V::notice($notice) . '<section class="card"><p class="muted">Diese Angaben gelten für alle Module (Rechnungen, Belege, Überweisungs-QR, Bons). </p>'
             . '<details class="fold" open><summary><h2>Name der Praxis</h2></summary>' . $form('name',
-                V::input('praxis', 'Name der Praxis (erscheint auf Belegen, Bons und im Kopf der Suite)', 'text', $this->config->practice, 'maxlength="60" placeholder="Praxis Dr. Beispiel"'), 'Name speichern') . '</details>'
+                V::input('praxis', 'Name der Praxis (erscheint auf Belegen, Bons und im Kopf von Praxisherz)', 'text', $this->config->practice, 'maxlength="60" placeholder="Praxis Dr. Beispiel"'), 'Name speichern') . '</details>'
             . '<details class="fold"><summary><h2>Anschrift</h2></summary>' . $form('anschrift',
                 V::input('street', 'Straße und Hausnummer', 'text', $a['street'], 'maxlength="80" autocomplete="street-address"')
                 . V::input('city', 'PLZ und Ort', 'text', $a['city'], 'maxlength="80"')
@@ -419,7 +419,7 @@ final class Web {
                 . ($created['secret'] !== '' ? '<tr><td>Client-Geheimnis</td><td><code>' . V::h($created['secret']) . '</code><br><small>Wird nur jetzt angezeigt.</small></td></tr>' : '')
                 . '</table></div>';
         }
-        $body .= '<p>Dienste mit eigener Anmeldung (z. B. Oberfläche der Telefonanlage, NAS) können Benutzer über die Suite anmelden '
+        $body .= '<p>Dienste mit eigener Anmeldung (z. B. Oberfläche der Telefonanlage, NAS) können Benutzer über Praxisherz anmelden '
             . '(OpenID Connect). Es gelten dieselben Konten, Authenticator-Apps und Passkeys. Die Arbeitsplätze müssen der '
             . '<a href="/ca.crt">Zertifizierungsstelle</a> vertrauen, der Dienst ebenfalls.</p>'
             . '<p>Anbieter: <code>' . V::h($o->issuer()) . '</code></p>';
@@ -857,7 +857,7 @@ final class Web {
         return [$t, $pending];
     }
 
-    /** Ist der E-Mail-Versand der Suite eingerichtet? Ohne ihn gibt es weder Bestätigung noch „Passwort vergessen“. */
+    /** Ist der E-Mail-Versand von Praxisherz eingerichtet? Ohne ihn gibt es weder Bestätigung noch „Passwort vergessen“. */
     private function mailReady(): bool {
         try { return $this->connections !== null && $this->connections->status()['mail'] !== null; } catch (Problem) { return false; }
     }
@@ -1054,7 +1054,7 @@ final class Web {
 
     // ---- Passkeys -----------------------------------------------------------------------------------------------
     private function passkeysOn(): Passkeys {
-        if (!$this->passkeys) throw new Problem('Passkeys sind nicht verfügbar: Die Suite hat keinen Servernamen (nur IP-Adressen).', 409);
+        if (!$this->passkeys) throw new Problem('Passkeys sind nicht verfügbar: Praxisherz hat keinen Servernamen (nur IP-Adressen).', 409);
         if (!hash_equals($this->passkeys->rpId, strtolower((string)preg_replace('/:443$/', '', $this->req->header('host'))))) {
             throw new Problem('Passkeys funktionieren nur unter ' . $this->passkeys->origin() . '.', 409);
         }
@@ -1523,7 +1523,7 @@ final class Web {
             $ports .= V::checkbox('modules[]', $id, $p['module'] . ': ' . $p['name'] . ' (' . $p['proto'] . ' ' . $p['ports'] . ($p['scope'] === 'any' ? ', von überall' : '') . ')', in_array($id, $c['modules'], true));
         }
         $body .= '<form method="post" action="/verwaltung/firewall" class="box wide">' . $csrf
-            . '<h2>Freigegebene Netze</h2><p>Nur aus diesen Netzen ist die Suite erreichbar. Dieses Gerät: <code>' . V::h($o['client']['ip']) . '</code></p>' . $netBoxes
+            . '<h2>Freigegebene Netze</h2><p>Nur aus diesen Netzen ist Praxisherz erreichbar. Dieses Gerät: <code>' . V::h($o['client']['ip']) . '</code></p>' . $netBoxes
             . V::input('extra', 'Weitere Netze (z. B. VPN), mit Komma getrennt', 'text', (string)($input['extra'] ?? ''), 'placeholder="10.8.0.0/24"')
             . '<h2>Dienste der Basis</h2><p>HTTPS (443) ist immer aus den freigegebenen Netzen offen.</p>'
             . V::checkbox('ssh', '1', 'SSH (Fernwartung)', (bool)$c['ssh']) . V::checkbox('ipp', '1', 'Drucken über IPP (631)', (bool)$c['ipp'])
@@ -1591,7 +1591,7 @@ final class Web {
             $body .= $st['last']['ok'] ? V::notice($st['last']['message']) : V::error('Nicht erfolgreich: ' . $st['last']['message']);
         }
         if (!$st['service']) $body .= '<p class="error">Die Modulverwaltung ist nicht eingerichtet. Bitte den Installer ausführen.</p>';
-        $body .= '<p>Module erweitern die Suite um Programme wie die Kasse. Jedes Modul läuft unter einem eigenen Systembenutzer und sieht nur seine eigenen Daten. '
+        $body .= '<p>Module erweitern Praxisherz um Programme wie die Kasse. Jedes Modul läuft unter einem eigenen Systembenutzer und sieht nur seine eigenen Daten. '
             . 'Nach dem Installieren unter <a href="/verwaltung/benutzer">Benutzer</a> festlegen, wer das Modul nutzen darf.</p>';
         $post = fn(string $aktion, string $label, string $hidden = '', string $class = '', string $extra = '') => '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . $hidden
             . '<input type="hidden" name="aktion" value="' . $aktion . '">' . $extra . '<button' . ($class !== '' ? ' class="' . $class . '"' : '') . $off . '>' . $label . '</button></form>';
@@ -1724,7 +1724,7 @@ final class Web {
                 . (!$a['signed'] ? ' <span class="tag warn">nicht signiert</span>' : '') . '</h3>'
                 . ($a['published'] !== '' ? '<p>Veröffentlicht: ' . V::h($a['published']) . '</p>' : '') . '<pre class="notes">' . V::h($a['notes']) . '</pre>'
                 . '<form method="post" action="/verwaltung/updates">' . $csrf . '<input type="hidden" name="aktion" value="installieren"><input type="hidden" name="version" value="' . V::h($a['version']) . '">'
-                . '<p>Vorher wird ein Schnappschuss der Daten angelegt. Schlägt etwas fehl, springt die Suite automatisch zurück. Die Seite ist einige Minuten nicht erreichbar.</p>'
+                . '<p>Vorher wird ein Schnappschuss der Daten angelegt. Schlägt etwas fehl, springt Praxisherz automatisch zurück. Die Seite ist einige Minuten nicht erreichbar.</p>'
                 . '<button' . ($busy ? ' disabled' : '') . '>Jetzt installieren</button></form></div>';
         }
         $failed = $st['state'] === 'failed' || $st['error'];
@@ -1886,12 +1886,12 @@ final class Web {
             . '<button>Speichern</button></form>' . '</details>'
             . '<details class="fold"' . (($gmail && !$connected) || $pending ? ' open' : '') . '><summary><h3>Gmail-Konto (OAuth, ohne Passwort im Klartext)' . ($connected ? ' <span class="tag ok">✓ eingerichtet</span>' : ' <span class="tag opt">nicht eingerichtet</span>') . '</h3></summary>'
             . ($reconnect ? '<details class="fold"><summary><h3>Erneut einrichten oder anderes Konto verbinden</h3></summary>' : '')
-            . '<p class="muted">Gilt für ein normales Gmail-Konto. Jede Praxis legt dafür einmalig einen eigenen Zugang bei Google an (kostenlos, ca. 10 Minuten). Gesendet wird nur über die Gmail-Schnittstelle mit der Berechtigung „E-Mails senden“; die Suite kann keine Postfächer lesen.</p>'
+            . '<p class="muted">Gilt für ein normales Gmail-Konto. Jede Praxis legt dafür einmalig einen eigenen Zugang bei Google an (kostenlos, ca. 10 Minuten). Gesendet wird nur über die Gmail-Schnittstelle mit der Berechtigung „E-Mails senden“; Praxisherz kann keine Postfächer lesen.</p>'
             . '<ol class="muted"><li>Auf <strong>console.cloud.google.com</strong> mit dem Gmail-Konto anmelden und oben ein <strong>neues Projekt</strong> anlegen (Name z. B. „Praxisherz“).</li>'
             . '<li>Im Suchfeld oben „<strong>Gmail API</strong>“ suchen und <strong>Aktivieren</strong> klicken.</li>'
             . '<li>Im Suchfeld „<strong>Google Auth Platform</strong>“ öffnen und <strong>Erste Schritte</strong> wählen: App-Name (z. B. „Praxisherz“) und deine E-Mail-Adresse als Support-E-Mail eintragen, Zielgruppe <strong>Extern</strong>, Kontakt-E-Mail eintragen, Bedingungen bestätigen.</li>'
             . '<li>Links <strong>Datenzugriff</strong> → „Bereiche hinzufügen oder entfernen“ → in „Bereiche manuell hinzufügen“ <code>https://www.googleapis.com/auth/gmail.send</code> eintragen, hinzufügen, <strong>Speichern</strong>.</li>'
-            . '<li>Für „In Produktion“ verlangt Google vorher unter <strong>Branding</strong>: gültigen App-Namen, Support-E-Mail sowie Adressen für <strong>Startseite der App</strong> und <strong>Datenschutzerklärung</strong> (zwei Webadressen, z. B. die Startseite und die Datenschutzseite der eigenen Praxis-Website). Die Domain dieser Adressen unter „Autorisierte Domains“ eintragen, dann <strong>Speichern</strong>. Die Adressen werden nur auf Googles Zustimmungsseite angezeigt, es muss keine Seite der Suite sein.</li>'
+            . '<li>Für „In Produktion“ verlangt Google vorher unter <strong>Branding</strong>: gültigen App-Namen, Support-E-Mail sowie Adressen für <strong>Startseite der App</strong> und <strong>Datenschutzerklärung</strong> (zwei Webadressen, z. B. die Startseite und die Datenschutzseite der eigenen Praxis-Website). Die Domain dieser Adressen unter „Autorisierte Domains“ eintragen, dann <strong>Speichern</strong>. Die Adressen werden nur auf Googles Zustimmungsseite angezeigt, es muss keine Seite von Praxisherz sein.</li>'
             . '<li>Links <strong>Zielgruppe</strong> → <strong>App veröffentlichen</strong> („In Produktion“ statt „Test“). Im Teststatus läuft die Anmeldung nach 7 Tagen ab. Google verlangt für diesen Bereich eine Überprüfung der App, lässt eine nicht überprüfte App für wenige Nutzer aber zu: Bei der Anmeldung erscheint „Google hat diese App nicht überprüft“ – dort <strong>Erweitert</strong> → „Weiter zu … (unsicher)“ wählen.</li>'
             . '<li>Links <strong>Clients</strong> → <strong>Client erstellen</strong> → Anwendungstyp <strong>Desktop-App</strong>, Namen vergeben, <strong>Erstellen</strong>. Client-ID und Client-Secret kopieren (das Secret wird nur direkt nach dem Erstellen angezeigt) und unten eintragen.</li></ol>'
             . '<p class="muted">Die Bezeichnungen bei Google ändern sich gelegentlich; sinngemäß gesucht werden: Branding/App-Informationen, Zielgruppe, Datenzugriff, Clients. Stimmt etwas nicht mit deiner Ansicht überein, bitte melden.</p>'
@@ -2046,7 +2046,7 @@ final class Web {
     private function restartPage(?string $error = null, ?string $notice = null): Response {
         $art = $this->req->get('art', 10) === 'server' ? 'server' : 'dienste';
         $text = $art === 'server'
-            ? 'Der ganze Server startet neu. Alle Arbeitsplätze verlieren kurz die Verbindung (Drucken, Kasse, Terminzettel); nach etwa ein bis zwei Minuten ist die Suite wieder da und du musst dich neu anmelden.'
+            ? 'Der ganze Server startet neu. Alle Arbeitsplätze verlieren kurz die Verbindung (Drucken, Kasse, Terminzettel); nach etwa ein bis zwei Minuten ist Praxisherz wieder da und du musst dich neu anmelden.'
             : 'Webinterface und alle Module werden neu gestartet. Das dauert wenige Sekunden; laufende Anmeldungen bleiben bestehen, eine Seite lädt eventuell einmal neu.';
         $body = V::error($error) . V::notice($notice) . '<section class="card"><h2>' . ($art === 'server' ? 'Server neu starten' : 'Dienste neu starten') . '</h2><p>' . V::h($text)
             . '</p><p class="muted">Läuft gerade ein Update, eine Sicherung oder eine Zahlung an der Kasse, bitte erst warten.</p>'
@@ -2179,8 +2179,8 @@ final class Web {
         $list = $this->modules->starters();
         $body = V::error($error) . ($notice ? '<p class="notice">' . V::h($notice) . '</p>' : '')
             . '<p>Ein Paket pro Arbeitsplatz richtet den <strong>Praxisherz-Agent</strong> ein: ein Programm, das Module direkt aus T2med öffnet (aktueller Patient wird mitgegeben) und unter Windows als Dienst mit Systemrechten läuft. '
-            . 'Der Agent fragt die Suite alle paar Sekunden und hält Starter, Aufrufe, Zertifikat und virtuelle Drucker selbst aktuell; „Akte öffnen“ legt er als GDT-Datei in <code>C:\Kienzle\GDT</code> ab '
-            . '(in T2med beim GDT-Gerät „Telefonaufruf“ als Importdatei <code>C:\Praxisherz\GDT\AUFRUFi.gdt</code> eintragen; früher <code>C:\Kienzle\GDT</code>, dorthin schreibt der Agent weiter, solange der Ordner besteht). Er führt keine Befehle der Suite aus, nur diese festen Aufgaben. macOS und Linux bekommen vorerst nur den Starter (ohne Dienst).</p>';
+            . 'Der Agent fragt Praxisherz alle paar Sekunden und hält Starter, Aufrufe, Zertifikat und virtuelle Drucker selbst aktuell; „Akte öffnen“ legt er als GDT-Datei in <code>C:\Kienzle\GDT</code> ab '
+            . '(in T2med beim GDT-Gerät „Telefonaufruf“ als Importdatei <code>C:\Praxisherz\GDT\AUFRUFi.gdt</code> eintragen; früher <code>C:\Kienzle\GDT</code>, dorthin schreibt der Agent weiter, solange der Ordner besteht). Er führt keine Befehle von Praxisherz aus, nur diese festen Aufgaben. macOS und Linux bekommen vorerst nur den Starter (ohne Dienst).</p>';
         if (!$list) return $body . '<p class="muted">Kein installiertes Modul bietet einen Startkontext an.</p>';
         $rows = '';
         foreach ($list as $s) $rows .= '<tr><td>' . V::h($this->modules->name($s['modul'])) . '</td><td>' . V::h($s['label']) . '</td><td><code>' . V::h($s['schema'] . '://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}') . '</code>'
@@ -2212,13 +2212,26 @@ final class Web {
 
     private function clientDist(): string { return self::$clientDist !== '' ? self::$clientDist : dirname(__DIR__) . '/client-dist'; }
 
-    /** Programme (Datei → SHA-256) aus client-dist/SHA256SUMS. */
+    /**
+     * Programme (Datei → SHA-256) aus client-dist/SHA256SUMS. Zu praxisherz-starter-… auch der frühere Name kienzle-starter-…:
+     * Agenten vor 2.3.8 suchen ihr Programm unter diesem Namen und holen sich so die neue Fassung.
+     */
     private function agentProgramme(): array {
         $out = [];
         foreach (preg_split('/\r?\n/', (string)@file_get_contents($this->clientDist() . '/SHA256SUMS')) ?: [] as $z) {
-            if (preg_match('/^([0-9a-f]{64})\s+\*?(kienzle-starter-[a-z0-9-]+(?:\.exe)?)$/D', trim($z), $m) && is_file($this->clientDist() . '/' . $m[2])) $out[$m[2]] = $m[1];
+            if (preg_match('/^([0-9a-f]{64})\s+\*?((?:praxisherz|kienzle)-starter-[a-z0-9-]+(?:\.exe)?)$/D', trim($z), $m) && is_file($this->clientDist() . '/' . $m[2])) {
+                $out[$m[2]] = $m[1];
+                if (str_starts_with($m[2], 'praxisherz-')) $out['kienzle-' . substr($m[2], strlen('praxisherz-'))] ??= $m[1];
+            }
         }
         return $out;
+    }
+
+    /** Datei in client-dist zu einem Programmnamen (früherer Name kienzle-starter-… → praxisherz-starter-…, falls nur diese da ist). */
+    private function agentProgrammDatei(string $name): string {
+        $dist = $this->clientDist();
+        if (!is_file($dist . '/' . $name) && str_starts_with($name, 'kienzle-')) return $dist . '/praxisherz-' . substr($name, strlen('kienzle-'));
+        return $dist . '/' . $name;
     }
 
     /** Sollzustand für die Agents: Programme, Startkontexte, Drucker, Zertifizierungsstelle, Ablage der GDT-Datei. */
@@ -2255,8 +2268,8 @@ final class Web {
             $this->ap()->ergebnis($platz, (string)($json['auftrag'] ?? ''), ($json['ok'] ?? false) === true, (string)($json['text'] ?? ''));
             return Response::json(['ok' => true]);
         }
-        if ($r->method === 'GET' && preg_match('#^/agent/programm/(kienzle-starter-[a-z0-9-]+(?:\.exe)?)$#D', $r->path, $m) && isset($this->agentProgramme()[$m[1]])) {
-            return new Response(200, (string)file_get_contents($this->clientDist() . '/' . $m[1]), [['Content-Type', 'application/octet-stream'], ['Cache-Control', 'no-store']]);
+        if ($r->method === 'GET' && preg_match('#^/agent/programm/((?:praxisherz|kienzle)-starter-[a-z0-9-]+(?:\.exe)?)$#D', $r->path, $m) && isset($this->agentProgramme()[$m[1]])) {
+            return new Response(200, (string)file_get_contents($this->agentProgrammDatei($m[1])), [['Content-Type', 'application/octet-stream'], ['Cache-Control', 'no-store']]);
         }
         return Response::json(['error' => 'Unbekannt.'], 404);
     }
@@ -2301,7 +2314,7 @@ final class Web {
         $opt = '<option value="">Automatisch (über die Adresse dieses PCs)</option>';
         foreach ($liste as $p) $opt .= '<option value="' . V::h($p['id']) . '"' . ($p['id'] === $gewaehlt ? ' selected' : '') . '>' . V::h($p['name'] . ($p['online'] ? '' : ' (nicht verbunden)')) . '</option>';
         $tag = $jetzt ? '<span class="tag ok fold-status">' . V::h($jetzt['name']) . '</span>' : '<span class="tag warn fold-status">nicht erkannt</span>';
-        return '<div id="arbeitsplatz">' . $fold('Mein Arbeitsplatz', $tag, '<p class="muted">An welchem PC dieser Browser läuft, z. B. für „Akte öffnen“ in T2med. Meist erkennt die Suite das selbst; '
+        return '<div id="arbeitsplatz">' . $fold('Mein Arbeitsplatz', $tag, '<p class="muted">An welchem PC dieser Browser läuft, z. B. für „Akte öffnen“ in T2med. Meist erkennt Praxisherz das selbst; '
             . 'bei Terminalservern oder mehreren Benutzern an einem PC hier einmal wählen (gilt nur für diesen Browser).</p>'
             . '<form method="post" action="/konto/arbeitsplatz">' . $csrf . '<p><label>Arbeitsplatz <select name="platz">' . $opt . '</select></label></p><button>Speichern</button></form>') . '</div>';
     }
@@ -2375,7 +2388,7 @@ final class Web {
             if ($q['managed']) $actions .= '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('entfernen', ['name' => $q['name']])
                 . '<button class="danger"' . $dis . '>Entfernen</button></form>';
             $rows .= '<tr><td><strong>' . V::h($q['name']) . '</strong><br><small>' . V::h($q['description']) . '</small></td><td>' . V::h($q['address']) . '</td><td>'
-                . V::h($q['state']) . '</td><td>' . ($q['managed'] ? 'Suite' : 'fremd') . '</td><td>' . $actions . '</td></tr>';
+                . V::h($q['state']) . '</td><td>' . ($q['managed'] ? 'Praxisherz' : 'fremd') . '</td><td>' . $actions . '</td></tr>';
         }
         $head = '<table><tr><th>Name</th><th>Adresse</th><th>Zustand</th><th>Von</th><th></th></tr>';
         $body .= '<h2>Drucker</h2><p class="muted">Echte Drucker und Bondrucker, die in der Praxis stehen.</p>' . ($rows !== '' ? $head . $rows . '</table>' : '<p>Noch keine.</p>')

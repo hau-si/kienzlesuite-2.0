@@ -54,7 +54,7 @@ final class App {
                 throw new Problem("Die von t2med übergebene FHIR-Adresse ist nicht freigegeben.\n" .
                     'Von t2med (fhirBasisUrl): ' . self::diagnosticAddress($url) . "\n" .
                     'Im Server erlaubt (launch_urls): ' . implode(', ', $shown) . "\n" .
-                    'Bitte unter Verwaltung → Verbindungen der Suite bei T2med „Erlaubte fhirBasisUrl aus T2med“ prüfen. Gemeint ist die FHIR-Adresse, nicht die Adresse der Zahlungswebseite.');
+                    'Bitte unter Verwaltung → Verbindungen von Praxisherz bei T2med „Erlaubte fhirBasisUrl aus T2med“ prüfen. Gemeint ist die FHIR-Adresse, nicht die Adresse der Zahlungswebseite.');
             }
         }
         $patient = $this->fhir->patient($context, $token);
@@ -72,7 +72,7 @@ final class App {
                 $this->db->query('INSERT INTO visits(id,context_id,patient_id,patient_name,patient_birthdate,patient_address,oauth_cipher,created_at,expires_at,patient_nummer) VALUES(?,?,?,?,?,?,?,?,?,?)', [$id, $context, $patient['id'], $patient['name'], $patient['birthdate'], json_encode($patient['address'] ?? [], JSON_THROW_ON_ERROR), $this->encrypt($token), time(), $expires, (string)($patient['nummer'] ?? '')]);
             }
             $ticket = bin2hex(random_bytes(32));
-            $this->db->query('INSERT INTO launch_tickets(hash,visit_id,expires_at) VALUES(?,?,?)', [hash('sha256', $ticket), $id, time() + 300]);   // 5 Minuten: Zeit für die Anmeldung an der Suite
+            $this->db->query('INSERT INTO launch_tickets(hash,visit_id,expires_at) VALUES(?,?,?)', [hash('sha256', $ticket), $id, time() + 300]);   // 5 Minuten: Zeit für die Anmeldung an Praxisherz
             // Fragment wird weder an nginx übertragen noch in Zugriffslogs gespeichert.
             return ['url' => rtrim($this->config->get('app', 'base_url'), '/') . '/#launch=' . $ticket];
         });

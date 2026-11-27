@@ -14,7 +14,7 @@ Prüfliste für die Test-VM: `docs/VM-TEST.md`.
 ## Installation von Hand
 
 1. Ubuntu Server 26.04 installieren – die normale Variante „Ubuntu Server“, nicht „minimized“ (Sprache Deutsch, Tastatur Deutsch, Zeitzone Europe/Berlin, OpenSSH-Server an).
-2. Anmelden und die Suite holen und installieren – ohne weitere Angaben:
+2. Anmelden und Praxisherz holen und installieren – ohne weitere Angaben:
 
    ```sh
    sudo apt-get install -y git
@@ -27,14 +27,14 @@ Prüfliste für die Test-VM: `docs/VM-TEST.md`.
    ein Admin danach unter **Verwaltung → Server** fest. Wer es gleich richtig haben will, kann beides auch mitgeben:
    `--name praxisherz --name 192.0.2.10 --praxis "Praxis Dr. Beispiel"`.
 3. Am Ende zeigt der Installer
-   - die Adresse(n), unter denen die Suite erreichbar ist (zunächst über die IP),
+   - die Adresse(n), unter denen Praxisherz erreichbar ist (zunächst über die IP),
    - den **Fingerabdruck der Zertifizierungsstelle** (zum Vergleich auf den Arbeitsplätzen),
    - den **einmaligen Einrichtungslink** für den ersten Admin (gilt 24 Stunden).
 4. Auf einem Arbeitsplatz `https://<IP-der-VM>/ca.crt` laden und als **vertrauenswürdige
    Stammzertifizierungsstelle** eintragen (Windows: Doppelklick → Zertifikat installieren → Lokaler Computer →
    „Vertrauenswürdige Stammzertifizierungsstellen“). Fingerabdruck vergleichen.
 5. Einrichtungslink öffnen, Passwort setzen, Authenticator-App einrichten, Wiederherstellungscodes ausdrucken.
-6. **Verwaltung → Server:** Namen festlegen, unter dem die Arbeitsplätze die Suite erreichen (z. B. `praxisherz`,
+6. **Verwaltung → Server:** Namen festlegen, unter dem die Arbeitsplätze Praxisherz erreichen (z. B. `praxisherz`,
    Eintrag im DNS bzw. Router nötig), dazu den Praxisnamen. Das Server-Zertifikat wird dabei neu ausgestellt; die
    Zertifizierungsstelle bleibt. Passkeys funktionieren nur über diesen Namen.
 7. **Verwaltung → Einrichtung** zeigt, was noch fehlt: zweiter Admin, Firewall, Netzwerkspeicher, Sicherung,
@@ -48,7 +48,7 @@ Prüfliste für die Test-VM: `docs/VM-TEST.md`.
 2. Datei als `user-data` zusammen mit einer leeren `meta-data` auf ein kleines zweites Laufwerk mit der Bezeichnung
    `CIDATA` legen (z. B. `cloud-localds seed.iso user-data meta-data`) und beides an die VM hängen.
 3. Von der Standard-ISO starten. **Achtung:** das größte Laufwerk der VM wird ohne Rückfrage gelöscht.
-4. Beim ersten Start läuft der Installer der Suite von selbst. Den Einrichtungslink zeigt danach
+4. Beim ersten Start läuft der Installer von Praxisherz von selbst. Den Einrichtungslink zeigt danach
    `sudo journalctl -u kienzle-erstinstallation` bzw. `sudo kienzle-admin einrichtungslink`.
 
 ## Start-ISO (iso/): einfachster Weg
@@ -73,7 +73,7 @@ davon starten.
 
 ## Was der Installer einrichtet
 
-- nginx und php-fpm (nur die Suite; die Beispielseite der Distribution wird abgeschaltet), eigene Zertifizierungsstelle.
+- nginx und php-fpm (nur Praxisherz; die Beispielseite der Distribution wird abgeschaltet), eigene Zertifizierungsstelle.
 - Dienste der Basis: Firewall, Updates, Verbindungen, Netzwerkspeicher, Sicherung, Einrichtungs-Überblick.
 - **CUPS und Samba als Druckserver** aus festen Vorlagen. Vorher werden die Vorlagen geprüft (`cupsd -t`, `testparm`),
   die ursprünglichen Dateien liegen unter `/etc/kienzle/original/`. Samba hat keine Dateifreigaben, nur SMB 3, kein NetBIOS.
@@ -98,7 +98,7 @@ Mehrfaches Ausführen ist erlaubt; Schlüssel, Zertifizierungsstelle, Daten und 
 
 ## Nach einem Totalausfall
 
-1. Neue VM wie oben, Suite herunterladen.
+1. Neue VM wie oben, Praxisherz herunterladen.
 2. `sudo bash installer/install.sh --wiederherstellen` und die Angaben vom Schlüsselblatt eingeben
    (Ablage, Passwort). Bei SFTP zeigt der Installer den neuen SSH-Schlüssel des Servers; ihn kurz am NAS erlauben.
 3. Servername und Zertifizierungsstelle sind die alten: Die Arbeitsplätze müssen nichts neu einrichten.

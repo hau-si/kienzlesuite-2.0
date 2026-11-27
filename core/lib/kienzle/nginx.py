@@ -1,4 +1,4 @@
-"""nginx-Konfiguration der Suite aus festen Vorlagen erzeugen.
+"""nginx-Konfiguration von Praxisherz aus festen Vorlagen erzeugen.
 
 Eingaben sind nur geprüfte Werte: Servernamen (wie im Zertifikat) und das Modulverzeichnis aus manifest.check_all.
 Grundsätze:

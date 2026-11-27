@@ -3,8 +3,8 @@
 - Nur dieser Dienst ruft lpadmin auf. Weder das Webinterface (ks-core) noch ein Modul ist Mitglied der Gruppe lpadmin.
 - Drucker der Praxis: Bondrucker als RAW über socket://…:9100, A4-Drucker über IPP Everywhere, Suche mit lpinfo.
 - Virtuelle Drucker der Module aus [[printers]]: Backend (0755, läuft damit als Benutzer lp) und PPD (0644) aus dem
-  Programmordner des Moduls, Warteschlange mit Kennung der Suite, Freigabe per IPP und/oder Samba.
-- Entfernt werden nur Warteschlangen mit der Kennung der Suite.
+  Programmordner des Moduls, Warteschlange mit Kennung von Praxisherz, Freigabe per IPP und/oder Samba.
+- Entfernt werden nur Warteschlangen mit der Kennung von Praxisherz.
 - Samba gibt nur die Warteschlangen frei, die hier ausdrücklich dafür markiert sind (/etc/samba/kienzle-drucker.conf).
 Übernommen aus kienzle-suite-beta, src/PrinterAdmin.php (Druckerarten, Suche, URI-Prüfung, Auswertung von lpstat).
 """
@@ -199,7 +199,7 @@ def probe(host: str, port: int) -> bool:
 
 # ---- Abfragen ----------------------------------------------------------------------------------------------------
 def queues() -> list[dict]:
-    """Warteschlangen mit Adresse, Zustand, Beschreibung und ob die Suite sie verwaltet (Kennung in der Beschreibung)."""
+    """Warteschlangen mit Adresse, Zustand, Beschreibung und ob Praxisherz sie verwaltet (Kennung in der Beschreibung)."""
     found: dict[str, dict] = {}
     for line in run('lpstat', '-v', timeout=15, allow_empty=True).splitlines():
         m = re.match(r'^\S+ (?:for|für) ([^:\s]+): (\S+)$', line.strip())
@@ -350,7 +350,7 @@ def add(kind: str, name: str, addr: str, share: list[str]) -> str:
     ensure_cups()
     existing = {q['name'].lower(): q for q in queues()}
     if name.lower() in existing and not existing[name.lower()]['managed']:
-        raise Fehler(f'Es gibt bereits einen Drucker „{name}“, der nicht von der Suite angelegt wurde. Bitte einen anderen Namen wählen.')
+        raise Fehler(f'Es gibt bereits einen Drucker „{name}“, der nicht von Praxisherz angelegt wurde. Bitte einen anderen Namen wählen.')
     if name.lower() in existing and existing[name.lower()]['modul']:
         raise Fehler(f'„{name}“ ist ein virtueller Drucker eines Moduls.')
     args = ['-p', name, '-v', uri, '-m', 'everywhere' if kind == 'office' else 'raw', '-D', f'{MARK} ' + ('Praxisdrucker' if kind == 'office' else 'Bondrucker'),
@@ -404,7 +404,7 @@ def set_share(name: str, share: list[str]) -> str:
     _check_share(share)
     q = {x['name']: x for x in queues()}.get(name)
     if not q or not q['managed']:
-        raise Fehler('Nur Drucker der Suite lassen sich hier freigeben.')
+        raise Fehler('Nur Drucker von Praxisherz lassen sich hier freigeben.')
     if q.get('modul'):
         share = sorted(set(share) | {'ipp'})   # virtuelle Drucker der Module: IPP ist immer an
     run('lpadmin', '-p', name, '-o', f'printer-is-shared={"true" if "ipp" in share else "false"}')
@@ -417,7 +417,7 @@ def remove(name: str) -> str:
     if not q:
         raise Fehler('Drucker nicht gefunden.')
     if not q['managed']:
-        raise Fehler('Dieser Drucker wurde nicht von der Suite angelegt und wird deshalb nicht entfernt.')
+        raise Fehler('Dieser Drucker wurde nicht von Praxisherz angelegt und wird deshalb nicht entfernt.')
     if q['modul']:
         raise Fehler('Virtuelle Drucker der Module verschwinden mit dem Modul.')
     run('lpadmin', '-x', name, timeout=30)
@@ -723,7 +723,7 @@ def set_fileshare(key: str, on: bool, password: str = '') -> str:
 
 
 def samba() -> bool:
-    """Samba-Freigaben genau für die markierten Warteschlangen der Suite. Liefert True, wenn sich etwas änderte."""
+    """Samba-Freigaben genau für die markierten Warteschlangen von Praxisherz. Liefert True, wenn sich etwas änderte."""
     shares = _read(STATE / 'freigaben.json', {})
     known = {q['name']: q for q in queues()}
     parts = ['# Kienzle-Suite: von kienzle-drucker erzeugt, nicht von Hand ändern.\n']
@@ -802,7 +802,7 @@ def set_status(**changes) -> dict:
 
 
 def heal_local() -> None:
-    """Von der Suite angelegte Warteschlangen, deren Adresse einen „.local“-Namen enthält, den der Server nicht auflöst, auf die IP umstellen."""
+    """Von Praxisherz angelegte Warteschlangen, deren Adresse einen „.local“-Namen enthält, den der Server nicht auflöst, auf die IP umstellen."""
     try:
         for q in queues():
             m = re.match(r'^((?:socket|ipp|ipps|lpd)://)([A-Za-z0-9._-]+\.local)(.*)$', q['uri'], re.I)

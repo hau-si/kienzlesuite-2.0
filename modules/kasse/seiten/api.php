@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// JSON-Schnittstelle der Kasse (nur mit Anmeldung der Suite und dem Recht „kassieren“). Den Start aus T2med nimmt
+// JSON-Schnittstelle der Kasse (nur mit Anmeldung von Praxisherz und dem Recht „kassieren“). Den Start aus T2med nimmt
 // seiten/starter.php entgegen (POST /api.php ohne Anmeldung).
 use KienzleKasse\{App, Problem, Suite};
 
@@ -25,7 +25,7 @@ try {
     $vorgang = in_array($action, ['vorgaenge', 'vorgaenge_done', 'vorgaenge_post'], true) && (Suite::can('export') || Suite::can('paid') || Suite::can('periods') || Suite::can('storno'));
     $stornoRecht = $action === 'storno' && Suite::can('storno');   // Stornieren aus der Vorgänge-Liste braucht nur das Recht „Rechnungen stornieren“
     if (!$vorgang && !$stornoRecht && !Suite::can('kassieren')) throw new Problem('Für die Kasse fehlt das Recht „Kassieren“. Bitte den Admin fragen (Verwaltung → Benutzer).', 403);
-    // Marke der Suite für dieses Modul (meta kienzle-csrf der Seite) bei allem außer dem reinen Abfragen des Zustands.
+    // Marke von Praxisherz für dieses Modul (meta kienzle-csrf der Seite) bei allem außer dem reinen Abfragen des Zustands.
     if ($action !== 'state' && !Suite::modul()->csrfGueltig($_SERVER['HTTP_X_KIENZLE_CSRF'] ?? null)) throw new Problem('Sitzung abgelaufen. Bitte Seite neu laden.', 403);
     if ($action === 'demo') {
         // Nur im Testbetrieb (SumUp und T2med im Testmodus): Testpatient ohne T2med öffnen.

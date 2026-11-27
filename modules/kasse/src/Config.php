@@ -114,7 +114,7 @@ final class Config {
             if (!is_bool($this->get('invoice_export', 'app_invoices', false))) throw new \RuntimeException('invoice_export.app_invoices muss true oder false sein.');
             if (!is_bool($this->get('invoice_export', 'letter', false))) throw new \RuntimeException('invoice_export.letter muss true oder false sein.');
             if (!$this->get('invoice_inbox', 'enabled', false) && !$this->get('invoice_export', 'app_invoices', false) && !$this->get('invoice_export', 'letter', false)) throw new \RuntimeException('Ablage der Rechnungs-PDF benötigt den Rechnungseingang oder invoice_export.app_invoices = true.');
-            // Ziel des Netzwerkspeichers der Suite (Verbindung „ablage“); die Zugangsdaten kennt nur die Basis.
+            // Ziel des Netzwerkspeichers von Praxisherz (Verbindung „ablage“); die Zugangsdaten kennt nur die Basis.
             $target = $this->get('invoice_export', 'ziel', '');
             if (!is_string($target) || !preg_match('/^[a-z][a-z0-9-]{1,30}$/D', $target)) throw new \RuntimeException('Für die Ablage zuerst unter Verwaltung → Verbindungen einen Netzwerkspeicher einrichten und hier als Ziel wählen.');
             $dir = $this->get('invoice_export', 'directory', '');

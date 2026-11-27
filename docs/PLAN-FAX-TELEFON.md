@@ -56,7 +56,7 @@ Entscheidung des Nutzers: Middleware, App und KI kommen später als **Module**; 
 
 - **kienzlefon-app (Praxis-App, ca. 17 000 Zeilen PHP):** kein zweites Modul, sonst gäbe es zwei Posteingänge für dieselben Vorgänge.
   Ihre fehlenden Funktionen wandern in die Seite „Vorgänge“ des Moduls telefon (erledigt in Telefon beta.14; SMS-Empfang und Quellserver vorerst nicht, Entscheidung des Nutzers): „In Bearbeitung“ mit Bearbeiter (angemeldeter
-  Benutzer der Suite) und Übernahme, Teilanliegen abhaken, Kommentare, „Dringend“, Papierkorb, Neu-Laden mit Ton, wahlweise
+  Benutzer von Praxisherz) und Übernahme, Teilanliegen abhaken, Kommentare, „Dringend“, Papierkorb, Neu-Laden mit Ton, wahlweise
   Tonaufnahme anhören (kurze Frist). Status und Kommentare verschlüsselt neben dem Vorgang. Entfällt: eigene Anmeldung,
   Quellserver/SCP-Abholer, eigener SMS-Worker (Basis), Installer. Offen: SMS-**Empfang** über die FRITZ!Box (bräuchte einen
   Nachrichten-Eingang der Basis), Kontaktformular und IONOS-Sprachbot (brauchen einen Server im Internet).
@@ -64,7 +64,7 @@ Entscheidung des Nutzers: Middleware, App und KI kommen später als **Module**; 
   Funktionen in dieser Reihenfolge: 1. Live-Übersicht (Warteschlange, Gespräche, Nebenstellen) und Wählen per Klick;
   2. Anrufername aus T2med auf dem Telefon und Patientensuche (Telefonverzeichnis über die T2med-Verbindung der Basis statt
   Demo-Schlüssel); 3. Akte öffnen per GDT (Freigabe über die Basis); 4. Anrufstatistik. Umbau: Dienst nur auf 127.0.0.1 hinter
-  nginx mit Anmeldung der Suite, Pfade im Datenordner, eigener AMI-Benutzer mit wenigen Rechten, den das Modul telefon über den
+  nginx mit Anmeldung von Praxisherz, Pfade im Datenordner, eigener AMI-Benutzer mit wenigen Rechten, den das Modul telefon über den
   Austauschordner bereitstellt, Rufgruppen über den Steuerungsdienst (schon da). `tel:`-Links am Arbeitsplatz über den zentralen
   Starter der Basis statt eines eigenen Python-Clients.
 - **KI-Übergabe:** erst, wenn es den KI-Dienst gibt (Schnittstelle beschrieben in `kienzlefon/docs/SPEZIFIKATION-…-v1.1.md`).
@@ -72,7 +72,7 @@ Entscheidung des Nutzers: Middleware, App und KI kommen später als **Module**; 
 ## Was bei der Übernahme anders ist
 
 - Kein Bash-Installer: Einstellungen in der Weboberfläche, Prüfung in PHP und Python, Asterisk-Dateien erzeugt das Modul.
-- Keine Weboberfläche ohne Anmeldung (Kienzlefax) und kein eigenes Passwort (Kienzlefon): Rechte der Suite.
+- Keine Weboberfläche ohne Anmeldung (Kienzlefax) und kein eigenes Passwort (Kienzlefon): Rechte von Praxisherz.
 - Keine Dateien unter `/etc/asterisk`, `/srv/kienzlefax`, `/srv/scan`: alles im Datenordner bzw. Austauschordner.
 - Asterisk-Protokolle nur Warnungen und Fehler, sieben Tage (Rufnummern sind personenbezogen).
 - Firewall: Ports kommen als Einträge des Moduls und sind zunächst geschlossen.

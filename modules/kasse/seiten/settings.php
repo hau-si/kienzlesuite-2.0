@@ -1,11 +1,11 @@
 <?php
 declare(strict_types=1);
-// Einstellungen und Abrechnung der Kasse. Anmeldung über die Suite; Admins des Moduls sehen alles, Mitarbeiter ihre Bereiche.
+// Einstellungen und Abrechnung der Kasse. Anmeldung über Praxisherz; Admins des Moduls sehen alles, Mitarbeiter ihre Bereiche.
 use KienzleKasse\Suite;
 if (!Suite::settingsRights()) {
     http_response_code(403);
     header('Content-Type: text/plain; charset=utf-8');
-    exit("Für die Einstellungen der Kasse fehlt das Recht. Bitte den Admin fragen (Verwaltung → Benutzer der Suite).\n");
+    exit("Für die Einstellungen der Kasse fehlt das Recht. Bitte den Admin fragen (Verwaltung → Benutzer von Praxisherz).\n");
 }
 header('Cache-Control: no-store');
 header('Referrer-Policy: no-referrer');
@@ -26,7 +26,7 @@ ob_start();
 <div id="sections" hidden></div>
 <section class="card settings-card" id="s-checklist"><details class="fold" id="checklist-fold" open><summary><h2>Einrichtung – Überblick</h2><span class="tag" id="checklist-tag"></span></summary><p class="muted">Diese Schritte sind nur einmal nötig, geordnet nach dem Ort, an dem sie erledigt werden. Ein Klick auf einen Punkt öffnet die passende Einstellung.</p><div id="checklist"></div></details></section>
 <section class="card settings-card" id="s-clients"><h2>Arbeitsplätze: Starter</h2>
-<p>Der Starter, mit dem T2med die Kasse öffnet, wird für alle Module gemeinsam in der Suite eingerichtet: ein Paket je Arbeitsplatz, ein Schlüssel. Das Zertifikat der Suite vorher einmal einrichten.</p>
+<p>Der Starter, mit dem T2med die Kasse öffnet, wird für alle Module gemeinsam in Praxisherz eingerichtet: ein Paket je Arbeitsplatz, ein Schlüssel. Das Zertifikat von Praxisherz vorher einmal einrichten.</p>
 <p class="row-buttons"><a class="button primary" href="/hilfe/arbeitsplatz#paket" target="_top">Paket für Arbeitsplätze</a> <a class="button secondary" href="/hilfe/arbeitsplatz" target="_top">Arbeitsplatz einrichten</a></p>
 </section>
 <section class="card settings-card" id="invoice-printer-help" hidden><h2>Drucker „vKasse“</h2>
@@ -40,7 +40,7 @@ ob_start();
 <div class="row-buttons"><button id="inbox-load" class="secondary" type="button">Aktualisieren</button></div>
 <div id="inbox-box"><p class="muted">Wird geladen …</p></div></section>
 <section class="card settings-card" id="s-audit"><h2>Sicherheitsprotokoll</h2>
-<p class="muted">Änderungen an dieser Einstellungsseite mit Zeit, Adresse des Geräts und Benutzer – nie mit Passwörtern oder Werten. Anmeldungen protokolliert die Suite (Verwaltung → Protokoll).</p>
+<p class="muted">Änderungen an dieser Einstellungsseite mit Zeit, Adresse des Geräts und Benutzer – nie mit Passwörtern oder Werten. Anmeldungen protokolliert Praxisherz (Verwaltung → Protokoll).</p>
 <div class="row-buttons"><button id="audit-load" class="secondary" type="button">Letzte Vorgänge anzeigen</button></div>
 <pre id="audit-list" class="audit-list" hidden></pre></section>
 <p class="settings-foot"><a href="<?= $base ?>">Zur Kasse</a> · <a href="/">Zu Praxisherz</a></p>

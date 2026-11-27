@@ -1,4 +1,4 @@
-/* Terminzettel im Rahmen der Suite: Seitenleiste, Hintergrund, Karten und Knöpfe kommen von core.css; hier nur die Teile der Einstellungsseite. */
+/* Terminzettel im Rahmen von Praxisherz: Seitenleiste, Hintergrund, Karten und Knöpfe kommen von core.css; hier nur die Teile der Einstellungsseite. */
 main.modul { max-width: 1260px; margin: 0; padding: 32px 40px 48px; }
 .seitenkopf { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
 .seitenkopf h1 { margin: 6px 0 0; }

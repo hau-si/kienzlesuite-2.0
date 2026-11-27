@@ -6,7 +6,7 @@ if (!Suite::can('kassieren')) {
     http_response_code(403);
     header('Content-Type: text/html; charset=utf-8');
     $settings = Suite::settingsRights() ? '<p><a href="' . ks_h(ks_url('settings.php')) . '">Zu den freigegebenen Bereichen der Kasse</a></p>' : '';
-    exit('<!doctype html><html lang="de"><meta charset="utf-8"><title>Kasse</title><link rel="stylesheet" href="' . ks_h(ks_url('assets/style.css')) . '"><main><section class="card"><h1>Kasse</h1><p>Für die Kasse fehlt das Recht „Kassieren“. Bitte den Admin fragen (Verwaltung → Benutzer der Suite).</p>' . $settings . '<p><a href="/">Zu Praxisherz</a></p></section></main></html>');
+    exit('<!doctype html><html lang="de"><meta charset="utf-8"><title>Kasse</title><link rel="stylesheet" href="' . ks_h(ks_url('assets/style.css')) . '"><main><section class="card"><h1>Kasse</h1><p>Für die Kasse fehlt das Recht „Kassieren“. Bitte den Admin fragen (Verwaltung → Benutzer von Praxisherz).</p>' . $settings . '<p><a href="/">Zu Praxisherz</a></p></section></main></html>');
 }
 try { $demo = ks_app()->config->get('sumup', 'mode') === 'mock' && ks_app()->config->get('fhir', 'mode') === 'mock'; } catch (\Throwable) { $demo = false; }
 header('Cache-Control: no-store');
@@ -22,7 +22,7 @@ $signatur = '';
 foreach (Suite::modul()->menue()['ids'] as $href => $modulId) if ($modulId === 'signatur') $signatur = $href;
 $modus = isset($_GET['rechnung']) ? 'embed rechnung' : (isset($_GET['neu']) ? 'embed frei' : (isset($_GET['eingebettet']) ? 'embed' : ''));
 $k = Suite::modul();
-// Aufruf aus T2med und die Kassenansicht selbst: im Rahmen der Suite mit Seitenleiste. Eingebettet in der Startseite (iframe, embed) bleibt sie schlank.
+// Aufruf aus T2med und die Kassenansicht selbst: im Rahmen von Praxisherz mit Seitenleiste. Eingebettet in der Startseite (iframe, embed) bleibt sie schlank.
 $rahmen = $modus === '' && method_exists($k, 'rahmen');
 $ssl = $base . 'assets/';
 $skripte = '<script src="' . $ssl . 'tipfit.js?v=' . $version . '" defer></script><script src="' . $ssl . 'goae-calc.js?v=' . $version . '" defer></script><script src="' . $ssl . 'app.js?v=' . $version . '" defer></script>';
@@ -108,7 +108,7 @@ if ($rahmen) {
 <div class="actions"><a id="receipt-open" target="_blank" rel="noopener noreferrer">Originalbeleg öffnen</a><button id="receipt-copy" type="button" class="text-button">Link kopieren</button></div></div>
 <form id="receipt-email-form"><label for="receipt-email">E-Mail-Adresse</label><input id="receipt-email" type="email" autocomplete="off" maxlength="254" required placeholder="name@beispiel.de">
 <p class="muted">Adresse prüfen. Der Zahlungsbeleg wird als PDF-Anhang direkt an diese Adresse gesendet.</p><button id="receipt-email-send" type="submit" class="secondary">PDF per E-Mail senden</button></form>
-<p id="receipt-mail-unconfigured" class="muted" hidden>E-Mail-Versand ist noch nicht eingerichtet (Verwaltung → Verbindungen der Suite und Einstellungen der Kasse).</p></div></div>
+<p id="receipt-mail-unconfigured" class="muted" hidden>E-Mail-Versand ist noch nicht eingerichtet (Verwaltung → Verbindungen von Praxisherz und Einstellungen der Kasse).</p></div></div>
 <div id="mock-controls" class="mock-controls" hidden><span class="eyebrow">TERMINAL SIMULIEREN</span><div class="actions"><button id="mock-success" class="secondary">Zahlung erfolgreich</button><button id="mock-fail" class="secondary">Zahlung abgelehnt</button></div></div>
 <label id="mock-fhir-label" class="mock-option" hidden><input type="checkbox" id="mock-fhir-fail"> t2med-Fehler simulieren</label>
 </section></div>

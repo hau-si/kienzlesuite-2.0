@@ -21,7 +21,7 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 
 ![Anmeldung](docs/screenshots/anmelden.png)
 
-**Übersicht und Menü:** Die Seitenleiste der Suite führt zu den Anwendungen und zur Verwaltung; oben steht „Mein Konto“ mit dem Anmeldenamen. Die Anwendungen lassen sich per Ziehen sortieren, die Gruppen einklappen (gemerkt im Browser). Auch die Seiten der Module erscheinen im selben Rahmen.
+**Übersicht und Menü:** Die Seitenleiste von Praxisherz führt zu den Anwendungen und zur Verwaltung; oben steht „Mein Konto“ mit dem Anmeldenamen. Die Anwendungen lassen sich per Ziehen sortieren, die Gruppen einklappen (gemerkt im Browser). Auch die Seiten der Module erscheinen im selben Rahmen.
 
 ![Start](docs/screenshots/start.png)
 
@@ -51,7 +51,7 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 
 ![Kasse](docs/screenshots/kasse-start.png)
 
-**Kasse – Einstellungen:** Die Einrichtung steht als Ausklappzeilen im Stil der Suite, Rotes zuerst; am Zahnrad der Startseite zeigt eine rote Zahl, wie viel noch offen ist.
+**Kasse – Einstellungen:** Die Einrichtung steht als Ausklappzeilen im Stil von Praxisherz, Rotes zuerst; am Zahnrad der Startseite zeigt eine rote Zahl, wie viel noch offen ist.
 
 ![Kasse-Einstellungen](docs/screenshots/kasse-einstellungen.png)
 

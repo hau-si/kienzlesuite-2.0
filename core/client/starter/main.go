@@ -1,4 +1,4 @@
-// kienzle-starter: gemeinsamer Arbeitsplatz-Starter Praxisherz.
+// praxisherz-starter: gemeinsamer Arbeitsplatz-Starter von Praxisherz.
 //
 // T2med ruft ihn über ein URL-Schema auf, z. B. praxisherz-kasse://?kontextId=…&fhirBasisUrl=…&oAuthToken=… oder
 // praxisherz-signatur://… (frühere Adressen kienzle-… gelten weiter). Der Starter sucht das Schema in client.json, schickt den Kontext per HTTPS an die dort
@@ -18,7 +18,7 @@ func main() {
 	if len(os.Args) == 2 {
 		switch os.Args[1] {
 		case "--version":
-			fmt.Println("kienzle-starter", version, assetName)
+			fmt.Println("praxisherz-starter", version, assetName)
 			return
 		case "--anmelden":
 			// Einmal bei der Einrichtung (als Administrator): Agent mit dem Starter-Schlüssel anmelden, agent.json schreiben.
@@ -60,7 +60,7 @@ func main() {
 	}
 	arg := urlArgument(os.Args[1:])
 	if arg == "" {
-		fmt.Fprintln(os.Stderr, "Aufruf: kienzle-starter --url \"kienzle-…://?kontextId=…&fhirBasisUrl=…&oAuthToken=…\"")
+		fmt.Fprintln(os.Stderr, "Aufruf: praxisherz-starter --url \"praxisherz-…://?kontextId=…&fhirBasisUrl=…&oAuthToken=…\"")
 		os.Exit(2)
 	}
 	cfg, err := loadConfig(filepath.Join(dir, "client.json"))

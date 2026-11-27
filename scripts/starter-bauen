@@ -12,12 +12,12 @@ build() { # Betriebssystem Architektur Dateiname [GOARM]
   [ "$1" = windows ] && flags='-s -w -H=windowsgui'
   GOOS=$1 GOARCH=$2 GOARM=${4:-} CGO_ENABLED=0 go build -trimpath -ldflags "$flags" -o "$out/$3" .
 }
-build windows amd64 kienzle-starter-windows-amd64.exe
-build windows arm64 kienzle-starter-windows-arm64.exe
-build darwin amd64 kienzle-starter-darwin-amd64
-build darwin arm64 kienzle-starter-darwin-arm64
-build linux amd64 kienzle-starter-linux-amd64
-build linux arm64 kienzle-starter-linux-arm64
-build linux arm kienzle-starter-linux-arm 7
-(cd "$out" && sha256sum kienzle-starter-* > SHA256SUMS)
+build windows amd64 praxisherz-starter-windows-amd64.exe
+build windows arm64 praxisherz-starter-windows-arm64.exe
+build darwin amd64 praxisherz-starter-darwin-amd64
+build darwin arm64 praxisherz-starter-darwin-arm64
+build linux amd64 praxisherz-starter-linux-amd64
+build linux arm64 praxisherz-starter-linux-arm64
+build linux arm praxisherz-starter-linux-arm 7
+(cd "$out" && sha256sum praxisherz-starter-* > SHA256SUMS)
 echo "Starter gebaut: $(ls "$out" | wc -l) Dateien in core/client-dist"

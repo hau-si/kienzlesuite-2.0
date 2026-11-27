@@ -89,7 +89,7 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
 6. [ ] `systemctl list-timers kienzle-sicherung.timer` zeigt den nächsten Lauf; am nächsten Morgen steht die Sicherung in der Liste.
 7. [ ] Totalausfall: neue VM, `sudo bash installer/install.sh --wiederherstellen`, Angaben vom Blatt: Anmeldung mit den alten
        Zugangsdaten, Arbeitsplätze vertrauen dem Zertifikat weiter (gleiche CA).
-8. [ ] Am NAS schreibgeschützte Schnappschüsse einrichten und in der Suite bestätigen: keine Warnung mehr.
+8. [ ] Am NAS schreibgeschützte Schnappschüsse einrichten und in Praxisherz bestätigen: keine Warnung mehr.
 
 ## Meilenstein 7 – Installer (Basis 0.7.0)
 
@@ -102,7 +102,7 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
 6. [ ] `/etc/apt/apt.conf.d/52kienzle-unattended` vorhanden; `unattended-upgrade --dry-run` läuft.
 7. [ ] Verwaltung → Einrichtung: Punkte stimmen mit dem Zustand überein; „Erledigt“ für die Zertifizierungsstelle.
 8. [ ] autoinstall: zweite VM mit `installer/autoinstall.yaml` (angepasst) und Standard-ISO, nach dem ersten Start
-       ist die Suite erreichbar, Link über `journalctl -u kienzle-erstinstallation`.
+       ist Praxisherz erreichbar, Link über `journalctl -u kienzle-erstinstallation`.
 9. [ ] `--admin-reset NAME` und `--kanal beta` ausprobieren.
 
 ## Meilenstein 8 – Drucker (Basis 0.8.0)
@@ -114,15 +114,15 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
        und druckt von Windows. Ohne Freigabe nicht sichtbar.
 5. [ ] Freigabe „IPP“: Drucker auf einem Mac über `ipp://praxisherz/printers/<Name>` hinzufügen und drucken.
 6. [ ] Beispielmodul installieren: „Beispiel-Drucker“ erscheint (Modul), lässt sich nicht entfernen; Modul entfernen: Drucker weg.
-7. [ ] `id ks-core` zeigt keine Gruppe `lpadmin`; ein von Hand angelegter Drucker lässt sich in der Suite nicht entfernen.
+7. [ ] `id ks-core` zeigt keine Gruppe `lpadmin`; ein von Hand angelegter Drucker lässt sich in Praxisherz nicht entfernen.
 
 ## Meilenstein 9 – Anmeldung für Dienste (Basis 0.11.0)
 
 1. [ ] Verwaltung → Dienste: Testdienst anlegen (z. B. Synology DSM „SSO-Client“ oder ein OIDC-Testprogramm), Weiterleitung eintragen.
-2. [ ] Im Dienst Discovery-Adresse, Client-ID und Geheimnis eintragen; der Dienst vertraut der Zertifizierungsstelle der Suite.
-3. [ ] Anmelden im Dienst führt zur Suite, nach Passwort+OTP bzw. Passkey zurück; Benutzername stimmt.
+2. [ ] Im Dienst Discovery-Adresse, Client-ID und Geheimnis eintragen; der Dienst vertraut der Zertifizierungsstelle von Praxisherz.
+3. [ ] Anmelden im Dienst führt zu Praxisherz, nach Passwort+OTP bzw. Passkey zurück; Benutzername stimmt.
 4. [ ] Dienst auf „nur Admins“ stellen: Mitarbeiter wird abgewiesen.
-5. [ ] Abmelden im Dienst meldet auch in der Suite ab (wenn der Dienst das unterstützt).
+5. [ ] Abmelden im Dienst meldet auch in Praxisherz ab (wenn der Dienst das unterstützt).
 
 ## Basis 0.12.0 – Erstinstallation und Servername
 
@@ -142,15 +142,15 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
 4. [ ] Verwaltung → Benutzer: einem Mitarbeiter das Recht „Kasse: Kartenzahlung …“ geben; sich als dieser anmelden:
        Start zeigt „Kasse“, `/kasse/` öffnet die Kasse, „Testpatient öffnen (Testmodus)“ funktioniert, Mock-Zahlung gelingt.
 5. [ ] Als Admin des Moduls: `/kasse/settings.php` (Einstellungen). Praxisdaten speichern verlangt einmal die Bestätigung
-       der Suite und kehrt danach zurück. Einrichtungs-Überblick der Suite zeigt die Punkte der Kasse.
+       von Praxisherz und kehrt danach zurück. Einrichtungs-Überblick Praxisherz zeigt die Punkte der Kasse.
 6. [ ] Verwaltung → Verbindungen: T2med eintragen (Adresse, API-Key, erlaubte fhirBasisUrl aus T2med). In der Kasse „T2med-Anbindung“
-       auf Live: kein Fehler; „T2med-Verbindung der Suite vorhanden“ im Überblick.
+       auf Live: kein Fehler; „T2med-Verbindung von Praxisherz vorhanden“ im Überblick.
 7. [ ] Verwaltung → Drucker: „vKasse“ erscheint als Drucker des Moduls. Am Windows-PC als IPP-Drucker hinzufügen
        (`http://<server>:631/printers/vKasse`, Papier A4), aus T2med eine Testrechnung (Testpatient) drucken:
        erscheint im Rechnungseingang der Kasse.
-8. [ ] Kassen-PC: Zertifikat der Suite einrichten (Arbeitsplatz einrichten), in der Kasse unter Einstellungen → Arbeitsplätze das
+8. [ ] Kassen-PC: Zertifikat von Praxisherz einrichten (Arbeitsplatz einrichten), in der Kasse unter Einstellungen → Arbeitsplätze das
        Paket für Windows laden (Bestätigung), installieren. In T2med den Button „Kartenzahlung“ anlegen (Anleitung in der Kasse).
-       Klick beim Patienten: Browser öffnet die Suite, nach der Anmeldung (falls nötig) die Kasse mit dem Patienten.
+       Klick beim Patienten: Browser öffnet Praxisherz, nach der Anmeldung (falls nötig) die Kasse mit dem Patienten.
 9. [ ] Verwaltung → Module → Kasse → Entfernen ohne Häkchen: Kasse weg, `/var/lib/kienzle/kasse` bleibt; erneut installieren:
        Einstellungen und Leistungen sind wieder da.
 

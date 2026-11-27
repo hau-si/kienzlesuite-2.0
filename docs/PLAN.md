@@ -8,7 +8,7 @@ noch nicht. Die Tests `tests/firewall.php`, `tests/updater.php`, `tests/security
 `tests/firewall-apply.sh` dieses Stands laufen grün (PHP 8.3, geprüft am 22.11.2026).
 Dateipfade unten ohne Präfix beziehen sich auf diesen Stand.
 
-Der Code steht unter MIT (© Dr. Thomas Kienzle und Mitwirkende). Die Suite 2.0 übernimmt diese Lizenz (`LICENSE`),
+Der Code steht unter MIT (© Dr. Thomas Kienzle und Mitwirkende). Praxisherz 2.0 übernimmt diese Lizenz (`LICENSE`),
 übernommene Dateien bleiben damit unter demselben Hinweis.
 
 ## Grundentscheidungen
@@ -472,7 +472,7 @@ Danach ist die Basis bereit für das SumUp- und das Terminzettel-Modul (Schritt 
   - Bei Installation und Update des Moduls legt der Dienst Backend und PPD aus dem Modulordner an (root, 0755 bzw. 0644).
   - Die Warteschlange wird angelegt und je nach Angabe per Samba und/oder IPP freigegeben.
   - Beim Entfernen des Moduls wird beides wieder entfernt.
-  - Entfernt werden nur Warteschlangen mit der Kennung der Suite.
+  - Entfernt werden nur Warteschlangen mit der Kennung von Praxisherz.
 - **Für Module:** Auswahlliste der Warteschlangen im Webinterface des Moduls über eine Abfrage an die Basis,
   Drucken mit `lp` als Modul-Benutzer.
 

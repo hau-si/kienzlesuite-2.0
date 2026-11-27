@@ -177,9 +177,9 @@ ein (leeres Ziel schaltet aus). `ks-ablage` holt neue Dateien mit den genannten 
 `$k->lauschenEingang()`, prüft sie durch zweites Lesen und löscht sie erst danach auf dem NAS. Das Modul liest und löscht die Dateien dort
 selbst. Dateien mit gleichem Namen werden nicht überschrieben (Vorsatz `1-`, `2-` …).
 
-## Seiten im Rahmen der Suite
+## Seiten im Rahmen von Praxisherz
 
-Ein PHP-Modul kann eine Seite in den Rahmen der Suite setzen (Seitenleiste, Kopf, Praxisname): Inhalt mit `ob_start()` sammeln und
+Ein PHP-Modul kann eine Seite in den Rahmen von Praxisherz setzen (Seitenleiste, Kopf, Praxisname): Inhalt mit `ob_start()` sammeln und
 `echo $k->rahmen('Titel', $inhalt, ['roh' => true, 'kopf' => '<link …><script …>', 'body' => ' data-x="…"']);` ausgeben.
 `roh` lässt den Inhalt unverändert (sonst setzt die Basis Überschrift und Karten), `kopf` hängt Stylesheets und Skripte des Moduls an
 (Inhalt der Seite bekommt `<main class="modul">`). Das Menü kommt mit der ohnehin laufenden Anmelde-Prüfung (Kopfzeile `X-Kienzle-Menue`),

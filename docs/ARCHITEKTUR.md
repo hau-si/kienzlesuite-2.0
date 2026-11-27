@@ -190,7 +190,7 @@ Ablauf für den Herausgeber: `docs/RELEASE-ABLAUF.md`.
 
 ## Sicherheitskonzept
 
-Die Suite verarbeitet Gesundheitsdaten (Art. 9 DSGVO): Namen, Geburtsdaten, Rechnungen mit Leistungen, Faxe,
+Praxisherz verarbeitet Gesundheitsdaten (Art. 9 DSGVO): Namen, Geburtsdaten, Rechnungen mit Leistungen, Faxe,
 Anrufe und Transkripte, dazu Zugangsdaten zu Zahlungs- und Postdiensten. Kienzlezeit verarbeitet Beschäftigtendaten
 (Arbeitszeiten, Urlaub, Krankheit, Auslagen mit Bankverbindung für GiroCodes); diese sind nur für Admins von Kienzlezeit
 sichtbar, nicht für Admins anderer Module.
@@ -201,7 +201,7 @@ Grundsatz: **so wenig Daten wie möglich, so wenig Rechte wie möglich, nichts a
 - Kein Dienst aus dem Internet erreichbar. Zugriff nur aus dem Praxisnetz und optional aus dem VPN.
 - Firewall standardmäßig zu; Module melden ihre Ports an, der Admin schaltet sie frei. Schutz vor Aussperren
   (das anfragende Gerät muss freigegeben sein).
-- Geräte im Praxisnetz, die die Suite ansprechen (RFID-Terminals von Kienzlezeit, Drucker), bekommen nur ihren
+- Geräte im Praxisnetz, die Praxisherz ansprechen (RFID-Terminals von Kienzlezeit, Drucker), bekommen nur ihren
   Endpunkt frei; Terminals sprechen HTTPS mit Zertifikatsprüfung, HTTP nur als bewusst gewählte Ausnahme.
 - Ausgehend nur, was ein Modul braucht (SumUp-API, Letterxpress, Paketquellen); optional als Freigabeliste.
 - TLS für alles, auch intern. Die Starter auf den Arbeitsplätzen prüfen das Zertifikat fest (kein Vertrauen auf Zuruf).
@@ -270,7 +270,7 @@ Grundsatz: **so wenig Daten wie möglich, so wenig Rechte wie möglich, nichts a
   `--read-data`) erkennt Beschädigung oder Manipulation. Seit 0.16.4 prüft restic Daten zusätzlich vor dem Hochladen.
 - Inkrementell mit Deduplizierung und Kompression: viele Versionen bei wenig Platz.
 - Seit Jahren verbreitet, quelloffen, reproduzierbare Programmdateien, in Ubuntu enthalten, auch für Windows und
-  macOS verfügbar (Notfall-Wiederherstellung ohne die Suite).
+  macOS verfügbar (Notfall-Wiederherstellung ohne Praxisherz).
 - Es gibt kein formales Sicherheitsaudit; eine Durchsicht der Kryptografie durch Filippo Valsorda (2017) fand
   das Design gut, mit der Anmerkung, dass die Kombination AES-CTR + Poly1305-AES ungewöhnlich ist.
 
@@ -319,7 +319,7 @@ Löschen der Sicherung durch einen Angreifer wird durch die NAS-Schnappschüsse 
 
 ## Hinweise zur Integration von Kienzlezeit
 
-- Kienzlezeit richtet heute Apache mit `mod_php` und einen eigenen HTTPS-VirtualHost auf Port 443 ein. In der Suite
+- Kienzlezeit richtet heute Apache mit `mod_php` und einen eigenen HTTPS-VirtualHost auf Port 443 ein. In Praxisherz
   gehört Port 443 der Basis; Kienzlezeit läuft dahinter als Modul (eigener Pfad, PHP-FPM, eigener Systembenutzer).
 - Die M5Dial-Terminals brauchen einen festen, erreichbaren Endpunkt (`rfid-scan.php`); der Pfad muss beim Umzug
   gleich bleiben oder die Firmware-Einstellung angepasst werden.

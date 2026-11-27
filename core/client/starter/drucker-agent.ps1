@@ -11,7 +11,7 @@ try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch { }  # Umlaute i
 $roh = Get-Content -Raw $Liste | ConvertFrom-Json
 $list = @($roh | Where-Object { $_.name -match '^[A-Za-z0-9_-]{1,40}$' -and $_.url -match '^http://[^\s/]+:631/printers/' })
 
-# Adressen des Servers: Name aus der Suite und seine IP-Adressen (IPv4 zuerst; IPv6 ohne Zonenangabe wie „%18“).
+# Adressen des Servers: Name aus Praxisherz und seine IP-Adressen (IPv4 zuerst; IPv6 ohne Zonenangabe wie „%18“).
 # Kennt der PC den Namen nicht, nimmt das Skript die IP-Adresse, unter der der Agent den Server erreicht (-ServerIp), und richtet
 # die Drucker mit dieser Adresse ein (wie früher von Hand mit http://<IP>:631/printers/<Name>).
 $hosts = @(); $ips = @(); $perIp = $false
@@ -105,7 +105,7 @@ if ($list.Count) {
             $c.Close()
             if ($verbunden) { break }
         }
-        if (!$verbunden) { $erreichbar = 'Port ' + $u.Port + ' auf ' + $ips[0].IPAddressToString + ' nicht erreichbar (Firewall der Suite?)' }
+        if (!$verbunden) { $erreichbar = 'Port ' + $u.Port + ' auf ' + $ips[0].IPAddressToString + ' nicht erreichbar (Firewall von Praxisherz?)' }
     }
 }
 # Wie install-drucker.ps1 (manuell bewährt): nur wenn etwas fehlt oder umzustellen ist, Internetdrucken einschalten,

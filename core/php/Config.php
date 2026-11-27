@@ -10,7 +10,7 @@ final class Config {
     public const FILE = '/etc/kienzle/core/core.json';
     private const HOST = '/^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/D';
 
-    /** @param list<string> $hostnames Namen und Adressen, unter denen die Suite erreichbar ist (wie im Zertifikat). */
+    /** @param list<string> $hostnames Namen und Adressen, unter denen Praxisherz erreichbar ist (wie im Zertifikat). */
     private function __construct(
         public readonly array $hostnames,
         public readonly string $dataDir,

@@ -3,7 +3,7 @@ declare(strict_types=1);
 namespace KienzleKasse;
 
 /**
- * Legt die Original-PDF einer Rechnung im Netzwerkspeicher der Suite ab (z. B. für die Steuerberatung).
+ * Legt die Original-PDF einer Rechnung im Netzwerkspeicher von Praxisherz ab (z. B. für die Steuerberatung).
  * Das Modul kennt die Zugangsdaten nicht: Es übergibt einen Auftrag an die Basis (KienzleModul::ablegen); der Dienst
  * ks-ablage überträgt ihn, prüft die Datei und versucht es bei Fehlern erneut (docs/MODUL-SCHNITTSTELLE.md).
  * Dateiname ohne Patientendaten. Übernommen aus kienzle-suite-beta (vorher direkt per smbclient).
@@ -34,7 +34,7 @@ class InvoiceExport {
 
     public function target(): string { return (string)$this->config->get('invoice_export', 'ziel', ''); }
 
-    /** Auftrag an den Netzwerkspeicher der Suite; liefert den Pfad unter dem Ziel. */
+    /** Auftrag an den Netzwerkspeicher von Praxisherz; liefert den Pfad unter dem Ziel. */
     public function export(array $invoice, string $pdf, bool|string $paid): string {
         if (!$this->enabled()) throw new Problem('Ablage im Netzwerkordner ist deaktiviert.', 409);
         if (!str_starts_with($pdf, '%PDF-')) throw new Problem('Original-PDF der Rechnung fehlt.', 409);

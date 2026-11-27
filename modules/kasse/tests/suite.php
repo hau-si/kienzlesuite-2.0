@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Kasse in der Suite: Adressen unter /kasse/, Rechte und CSRF-Marke der Suite, Starter ohne Anmeldung (/api.php),
+// Kasse in Praxisherz: Adressen unter /kasse/, Rechte und CSRF-Marke von Praxisherz, Starter ohne Anmeldung (/api.php),
 // Ablage über den Netzwerkspeicher der Basis, Einrichtungs-Überblick, Haken und virtueller Drucker. Nur Beispieldaten.
 require __DIR__ . '/lib.php';
 use KienzleKasse\{App, Config, Database, InvoiceExport, Module, Problem, Settings, Suite};
@@ -24,7 +24,7 @@ try {
 
     (new Database(Suite::$data))->migrate();   // wie der Haken install
 
-    // Grundwerte: einmal erzeugt, 0600, und Basis-Konfiguration aus den Verbindungen der Suite.
+    // Grundwerte: einmal erzeugt, 0600, und Basis-Konfiguration aus den Verbindungen von Praxisherz.
     $g = Suite::grundwerte();
     check(preg_match('/^[a-f0-9]{64}$/D', $g['launcher_key']) === 1 && (fileperms(Suite::$data . '/grundwerte.json') & 0777) === 0600, 'Grundwerte falsch angelegt');
     Suite::ensureGrundwerte();
@@ -33,7 +33,7 @@ try {
     check($base->get('app', 'base_url') === 'https://kasse.example.org' && $base->get('app', 'state_dir') === Suite::$data, 'Adresse oder Datenordner falsch');
     check($base->get('fhir', 'launch_urls') === ['https://t2med.example.org/aps/fhir/api/r4'] && $base->get('invoice_export', 'ziel') === 'steuerbuero', 'Verbindungen nicht übernommen');
     check($base->get('letterxpress', 'username') === 'praxis-test' && $base->get('letterxpress', 'api_key') === 'lxp-geheim' && $base->get('letterxpress', 'mode') === 'live', 'Letterxpress nicht aus der Verbindung übernommen');
-    check($base->get('printing', 'transport') === 'cups', 'Bondrucker nicht über die Suite');
+    check($base->get('printing', 'transport') === 'cups', 'Bondrucker nicht über Praxisherz');
     $_SERVER['HTTP_HOST'] = 'evil"name'; check(Suite::host() === 'localhost', 'Unsicherer Servername übernommen'); $_SERVER['HTTP_HOST'] = 'kasse.example.org';
 
     // Ablage: Auftrag an den Netzwerkspeicher der Basis, ohne Zugangsdaten, ohne Patientendaten im Namen.
@@ -49,11 +49,11 @@ try {
     $v['invoice_export']['ziel'] = 'gibtsnicht';
     try { (new InvoiceExport(new Config($v)))->check(); throw new RuntimeException('Unbekanntes Ziel geprüft'); } catch (Problem $e) { check($e->http === 409, 'Falscher Fehler bei unbekanntem Ziel'); }
 
-    // Einrichtungs-Überblick: Format der Suite (state done/open/error, Links unter /kasse).
+    // Einrichtungs-Überblick: Format von Praxisherz (state done/open/error, Links unter /kasse).
     $items = Module::overview(Settings::effective($base));
     check($items !== [] && count($items) <= 30, 'Überblick leer');
     foreach ($items as $i) check(in_array($i['state'], ['done', 'open', 'error'], true) && str_starts_with($i['link'], '/kasse/') && mb_strlen($i['title']) <= 120, 'Überblick-Punkt ungültig: ' . json_encode($i));
-    check(in_array('T2med-Verbindung der Suite vorhanden', array_column($items, 'title'), true), 'T2med-Verbindung nicht erkannt');
+    check(in_array('T2med-Verbindung von Praxisherz vorhanden', array_column($items, 'title'), true), 'T2med-Verbindung nicht erkannt');
 
     // Seiten: Kasse nur mit Recht „kassieren“, Einstellungen nur mit Rechten, unbekannte Adressen 404, Dateien aus assets.
     [$code, $html] = page($root, admin_server(['REQUEST_URI' => '/kasse/']));
@@ -62,7 +62,7 @@ try {
     [$code, $html] = page($root, $server);
     check($code === 200 && str_contains($html, 'data-base="/kasse/"') && str_contains($html, 'name="kienzle-csrf" content="' . TEST_CSRF . '"') && str_contains($html, '/kasse/assets/app.js'), 'Kasse nicht unter /kasse/');
     check(str_contains($html, 'Testpatient öffnen') && !preg_match('/id="demo"[^>]*hidden/', $html), 'Testpatient im Testmodus nicht angeboten');
-    check(str_contains($html, 'class="seitenkopf"') && str_contains($html, 'data-signatur=') && !str_contains($html, 'class="top"'), 'Kassenansicht (Aufruf aus T2med) nicht im Rahmen der Suite');
+    check(str_contains($html, 'class="seitenkopf"') && str_contains($html, 'data-signatur=') && !str_contains($html, 'class="top"'), 'Kassenansicht (Aufruf aus T2med) nicht im Rahmen von Praxisherz');
     [$code, $emb] = page($root, admin_server(['REQUEST_URI' => '/kasse/kassieren?neu=1']), '', [], ['neu' => '1']);
     [$code, $emb2] = page($root, admin_server(['REQUEST_URI' => '/kasse/kassieren?eingebettet=1']), '', [], ['eingebettet' => '1']);
     check($code === 200 && str_contains($emb2, 'class="embed"') && !str_contains($emb2, 'class="seitenkopf"'), 'Aufruf aus T2med: Kassenansicht eingebettet in der Startseite');
@@ -95,10 +95,10 @@ try {
     [$code, $help] = page($root, ['REQUEST_URI' => '/kasse/hilfe/t2med'] + $server);
     check($code === 200 && str_contains($help, '/kasse/hilfe/bilder/t2med-1-suche.png') && !str_contains($help, '<script'), 'Anleitung T2med fehlt');
 
-    // Kasse-API: Recht und CSRF-Marke der Suite.
+    // Kasse-API: Recht und CSRF-Marke von Praxisherz.
     $post = ['REQUEST_METHOD' => 'POST', 'REQUEST_URI' => '/kasse/api.php', 'CONTENT_TYPE' => 'application/json', 'HTTP_ORIGIN' => 'https://kasse.example.org', 'HTTP_SEC_FETCH_SITE' => 'same-origin'];
     [$code, $out] = page($root, $post + $server, json_encode(['action' => 'demo']));
-    check($code === 403, 'Testpatient ohne CSRF-Marke der Suite: ' . $out);
+    check($code === 403, 'Testpatient ohne CSRF-Marke von Praxisherz: ' . $out);
     [$code, $out] = page($root, $post + ['HTTP_X_KIENZLE_CSRF' => TEST_CSRF] + $server, json_encode(['action' => 'demo']));
     $demo = json_decode($out, true);
     check($code === 200 && preg_match('~^https://kasse\.example\.org/kasse/#launch=[0-9a-f]{64}$~D', (string)($demo['url'] ?? '')) === 1, 'Testpatient: falscher Startlink ' . $out);
@@ -165,7 +165,7 @@ try {
     [$code, $out] = page($root, $post + ['HTTP_X_KIENZLE_CSRF' => TEST_CSRF] + $server, json_encode(['action' => 'day_stats']));
     check($code === 200 && ($out !== '') && isset(json_decode($out, true)['total_cents']), 'Tageswerte fehlen: ' . $out);
 
-    // Starter (POST /starter/kasse ohne Anmeldung der Suite): nur mit Prüfung durch die Basis, nur „launch“, Startlink auf „/“ mit Modulkennung.
+    // Starter (POST /starter/kasse ohne Anmeldung von Praxisherz): nur mit Prüfung durch die Basis, nur „launch“, Startlink auf „/“ mit Modulkennung.
     $starter = ['REQUEST_METHOD' => 'POST', 'REQUEST_URI' => '/starter/kasse', 'CONTENT_TYPE' => 'application/json', 'KIENZLE_OEFFENTLICH' => 'starter',
         'KIENZLE_PFAD' => '/kasse', 'HTTP_HOST' => 'kasse.example.org'];
     $launch = json_encode(['action' => 'launch', 'context_id' => 'kontext-1', 'fhir_base_url' => '', 'oauth_token' => '']);
@@ -178,7 +178,7 @@ try {
     check($code === 401, 'Starter ohne Prüfung durch die Basis');
     [$code] = page($root, $starter, $launch);
     check($code === 401, 'Starter ohne Merkmal der Basis');
-    // Der Startcode gilt 5 Minuten und nur einmal; Austausch nur mit Anmeldung an der Suite.
+    // Der Startcode gilt 5 Minuten und nur einmal; Austausch nur mit Anmeldung an Praxisherz.
     $ticket = substr(explode('&m=', (string)$r['url'])[0], -64);
     $db = new Database(Suite::$data);
     $left = (int)$db->one('SELECT expires_at FROM launch_tickets WHERE hash=?', [hash('sha256', $ticket)])['expires_at'] - time();
@@ -221,7 +221,7 @@ try {
     check($rc === 0 && is_array($ov['items'] ?? null) && $ov['items'] !== [], 'Haken setup-overview: ' . $out);
     [, $rc] = $hook('backup-snapshot');
     check($rc === 0 && is_file("$fresh/sicherung/payments.sqlite"), 'Haken backup-snapshot');
-    echo "OK: Kasse in der Suite: Adressen, Rechte, CSRF, Starter, Ablage, Überblick, Drucker und Haken.\n";
+    echo "OK: Kasse in Praxisherz: Adressen, Rechte, CSRF, Starter, Ablage, Überblick, Drucker und Haken.\n";
 } finally {
     foreach ($dirs as $dir) rmtree($dir);
 }

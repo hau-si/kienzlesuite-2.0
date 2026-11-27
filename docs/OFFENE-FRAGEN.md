@@ -50,7 +50,7 @@ Wo eine Entscheidung nötig war, steht dabei, was umgesetzt wurde; das lässt si
 14. **Samba-Gastzugriff auf Drucker:** Arbeitsplätze drucken ohne Anmeldung (nur aus freigegebenen Netzen). Soll das
     Drucken über Samba ein Konto verlangen?
 15. **Arbeitsgruppe:** `WORKGROUP` fest. Nutzen die Praxen eine andere Arbeitsgruppe oder eine Domäne?
-16. **autoinstall** holt die Suite per `git clone` aus dem öffentlichen Repository. Bei privatem Repository bräuchte es
+16. **autoinstall** holt Praxisherz per `git clone` aus dem öffentlichen Repository. Bei privatem Repository bräuchte es
     einen Token oder das Release-Archiv; welcher Weg?
 
 ## Aus M8 (Drucker)

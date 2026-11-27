@@ -623,7 +623,7 @@ final class Ansicht {
         if (!$t2med['eingerichtet']) $i .= '<p class="fehler">Zuerst in der Basis die Verbindung zu T2med einrichten: Verwaltung → Verbindungen → T2med.</p>';
         $i .= '<h3>Laden und aktualisieren</h3><ol class="tf-schritte"><li>In T2med unter Drittanbieter einen Eintrag (Programm/URL) anlegen:<br><code>praxisherz-telefonverzeichnis://?kontextId=${kontextId}&amp;fhirBasisUrl=${fhirBasisUrl}&amp;oAuthToken=${oAuthToken}</code></li>'
             . '<li>Der Arbeitsplatz braucht den Praxisherz-Agent bzw. Starter (Einrichten → Arbeitsplätze; nach dem Update der Basis kommt der neue Aufruf von selbst).</li>'
-            . '<li>In T2med den Eintrag aufrufen: Die Suite öffnet sich und lädt das Verzeichnis (Fortschritt oben auf der Seite). Bei neuen Patienten oder geänderten Nummern einfach wiederholen.</li></ol>';
+            . '<li>In T2med den Eintrag aufrufen: Praxisherz öffnet sich und lädt das Verzeichnis (Fortschritt oben auf der Seite). Bei neuen Patienten oder geänderten Nummern einfach wiederholen.</li></ol>';
         if ($t2med['eingerichtet'] && ($t2med['ohne_schluessel'] ?? false)) $i .= '<p class="fehler">' . $h(T2med::OHNE_SCHLUESSEL) . '</p>';
         $i .= '<p>' . ($st['zeit'] > 0 ? 'Zuletzt geladen: ' . $h(date('d.m.Y H:i', $st['zeit'])) . '. ' : '') . ($laeuft ? self::tag('warn', 'Laden läuft (' . (int)$laeuft['anzahl'] . ' bisher)') : '') . '</p>';
         $form = self::feld('ortsvorwahl', 'Ortsvorwahl der Praxis', $e['ortsvorwahl'], 'Für Telefonnummern ohne Vorwahl in T2med, z. B. 030. Gilt beim nächsten Laden.', 'text', ' maxlength="7" inputmode="tel"')

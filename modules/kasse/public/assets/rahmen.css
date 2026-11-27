@@ -1,4 +1,4 @@
-/* Kasse-Einstellungen im Rahmen der Suite: Seitenleiste, Hintergrund und Kopf kommen von core.css; hier nur Angleichungen an die Seitenstile der Kasse. */
+/* Kasse-Einstellungen im Rahmen von Praxisherz: Seitenleiste, Hintergrund und Kopf kommen von core.css; hier nur Angleichungen an die Seitenstile der Kasse. */
 main.modul { max-width: 1240px; margin: 0; padding: 32px 40px 48px; }
 main.modul .settings-main, main.modul .settings-card { max-width: none; }
 .seitenkopf { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
@@ -66,7 +66,7 @@ main.modul { max-width: 1400px; }
 .vorgaenge td.num, .vorgaenge th.num { text-align: right; white-space: nowrap; }
 .vorgaenge tr.vg-storno td { color: #7a2e2e; }
 
-/* Die Seitenleiste der Suite darf nicht von den Kassenstilen verändert werden (sonst ist sie höher als in anderen Modulen: Scrollbalken und Sprung beim Seitenwechsel). */
+/* Die Seitenleiste Praxisherz darf nicht von den Kassenstilen verändert werden (sonst ist sie höher als in anderen Modulen: Scrollbalken und Sprung beim Seitenwechsel). */
 aside.side .brand { justify-content: flex-start; gap: 12px; }
 aside.side .brand strong { font-size: 17px; letter-spacing: -.4px; }
 aside.side .brand span:not(.mark) { margin-top: 0; }
@@ -75,7 +75,7 @@ aside.side .brand .mark span { margin-top: 0; }
 /* Tooltips in Themenblöcken nicht am Blockrand abschneiden. */
 .setup-group { overflow: visible; }
 
-/* Kassenansicht (Aufruf aus T2med) im Rahmen der Suite: schmale Spalte wie bisher */
+/* Kassenansicht (Aufruf aus T2med) im Rahmen von Praxisherz: schmale Spalte wie bisher */
 main.modul:has(#welcome) { max-width: 780px; }
 
 /* Alle Seiten der Kasse gleich breit wie die Startseite (IGeL, Einstellungen, Vorgänge; Wunsch der Praxis). */

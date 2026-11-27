@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.62
+
+- Texte: „die Suite“/„der Suite“ heißt jetzt überall „Praxisherz“. Nur Texte geändert, mit Tests geprüft, nicht auf der VM.
+
 ## 2.3.4-beta.61
 
 - Testdatei beim Verbindungstest der Ablage heißt jetzt `praxisherz-kasse-verbindungstest.txt`. Mit Tests geprüft, nicht auf der VM.

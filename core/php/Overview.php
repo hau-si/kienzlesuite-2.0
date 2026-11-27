@@ -11,10 +11,10 @@ final class Overview {
     public static string $state = '/var/lib/kienzle/ueberblick';
     public const MANUAL = ['ca' => 'Zertifizierungsstelle auf allen Arbeitsplätzen eingerichtet', 'codes' => 'Wiederherstellungscodes der Admins ausgedruckt und verwahrt',
         'name' => 'Servername auf den Arbeitsplätzen bekannt (Router/DNS oder hosts-Datei)',
-        'anmeldung' => 'Suite unter dem neuen Namen geöffnet und neu angemeldet', 'passkeys' => 'Passkeys unter dem neuen Namen neu angelegt (oder keine vorhanden)',
+        'anmeldung' => 'Praxisherz unter dem neuen Namen geöffnet und neu angemeldet', 'passkeys' => 'Passkeys unter dem neuen Namen neu angelegt (oder keine vorhanden)',
         'drucker' => 'Virtuelle Drucker der Module auf den Arbeitsplätzen eingerichtet',
         'starter' => 'Arbeitsplatz-Starter der Module auf den Arbeitsplätzen neu installiert (Verknüpfungen enthalten den Servernamen)',
-        'dienste' => 'Dienste mit Anmeldung über die Suite (OIDC) auf den neuen Namen umgestellt'];
+        'dienste' => 'Dienste mit Anmeldung über Praxisherz (OIDC) auf den neuen Namen umgestellt'];
     /** Gruppen der Basis-Liste in der Reihenfolge der Anzeige. */
     public const GROUPS = ['zugang' => 'Zugang und Konten', 'name' => 'Servername und Arbeitsplätze', 'sicherung' => 'Datensicherung', 'betrieb' => 'Schutz und Updates'];
     private const AGAIN = 'ueberblick_erneut';
@@ -108,7 +108,7 @@ final class Overview {
         'Servername festgelegt' => ['web', false, 'name'],
         'Servername auf den Arbeitsplätzen' => ['pc', false, 'name'],
         'Zertifizierungsstelle auf allen Arbeitsplätzen' => ['pc', false, 'name'],
-        'Suite unter dem neuen Namen' => ['pc', false, 'name'],
+        'Praxisherz unter dem neuen Namen' => ['pc', false, 'name'],
         'Passkeys unter dem neuen Namen' => ['pc', true, 'name'],
         'Virtuelle Drucker der Module' => ['pc', false, 'name'],
         'Arbeitsplatz-Starter' => ['pc', false, 'name'],
@@ -160,7 +160,7 @@ final class Overview {
         $out[] = self::item('Wiederherstellungscodes für jeden Admin', $admins && count($codes) === count($admins) ? 'done' : 'open', 'Unter „Mein Konto“ neu erzeugen', '/konto');
         $out[] = self::item(self::MANUAL['codes'], isset($manual['codes']) ? 'done' : 'open', 'Auf Papier ausdrucken und sicher verwahren; danach hier bestätigen', '/verwaltung/einrichtung', 'codes');
         $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['ca'], isset($manual['ca']) ? 'done' : 'open', 'Datei ca.crt als vertrauenswürdige Stammzertifizierungsstelle eintragen – Anleitung für Windows, Mac, iPhone und Android', '/hilfe/arbeitsplatz#zertifikat', 'ca');
-        $out[] = self::item(self::MANUAL['anmeldung'], isset($manual['anmeldung']) ? 'done' : 'open', 'Suite unter dem Namen aus „Server“ öffnen, dort neu anmelden', '/verwaltung/server', 'anmeldung');
+        $out[] = self::item(self::MANUAL['anmeldung'], isset($manual['anmeldung']) ? 'done' : 'open', 'Praxisherz unter dem Namen aus „Server“ öffnen, dort neu anmelden', '/verwaltung/server', 'anmeldung');
         $out[] = self::item(self::MANUAL['passkeys'], isset($manual['passkeys']) ? 'done' : 'open', 'Unter „Mein Konto“ neu anlegen; sie gelten nur für den Namen, unter dem sie angelegt wurden', '/konto', 'passkeys');
         $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['name'], isset($manual['name']) ? 'done' : 'open', 'Einmal im Router bzw. DNS eintragen – oder auf jedem PC in der Datei hosts', '/hilfe/arbeitsplatz#name', 'name');
         if (array_filter($this->modules->all(), fn($m) => !empty($m['printers']))) {

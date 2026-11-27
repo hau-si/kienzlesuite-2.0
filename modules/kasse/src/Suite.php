@@ -45,7 +45,7 @@ final class Suite {
         return preg_match('#^/[a-z0-9-]{1,31}$#D', $p) ? $p : self::PATH;
     }
 
-    /** Servername der Anfrage (nginx lässt nur die Namen der Suite durch); ohne Anfrage „localhost“. */
+    /** Servername der Anfrage (nginx lässt nur die Namen von Praxisherz durch); ohne Anfrage „localhost“. */
     public static function host(): string {
         $h = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
         $h = (string)preg_replace('/:443$/', '', $h);

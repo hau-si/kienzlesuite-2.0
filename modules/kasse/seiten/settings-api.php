@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// JSON-Schnittstelle der Einstellungsseite (Anmeldung über die Suite, CSRF-Marke der Suite per Kopfzeile).
+// JSON-Schnittstelle der Einstellungsseite (Anmeldung über Praxisherz, CSRF-Marke von Praxisherz per Kopfzeile).
 use KienzleKasse\{App, Problem, SettingsPage};
 
 header('Content-Type: application/json; charset=utf-8');

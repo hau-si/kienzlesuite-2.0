@@ -59,7 +59,7 @@ final class Ansicht {
         if ($d['meldung']) $o .= '<p class="ok" role="status">' . fx_h($d['meldung']) . '</p>';
         if ($d['fehler']) $o .= '<p class="fehler" role="alert">' . fx_h($d['fehler']) . '</p>';
         if (!$d['telefon'] && in_array($route, ['/', '/eingang'], true)) {
-            $o .= '<p class="fehler">Das Modul <strong>Telefon</strong> fehlt oder ist noch nicht verbunden. Ohne es kann die Suite keine Faxe senden oder empfangen (Verwaltung → Module).</p>';
+            $o .= '<p class="fehler">Das Modul <strong>Telefon</strong> fehlt oder ist noch nicht verbunden. Ohne es kann Praxisherz keine Faxe senden oder empfangen (Verwaltung → Module).</p>';
         }
         return $o . match ($route) {
             '/' => self::senden($d), '/eingang' => self::eingang($d), '/protokoll' => self::berichte($d, 'protokoll'), '/fehler' => self::berichte($d, 'fehler'),
@@ -280,7 +280,7 @@ final class Ansicht {
 
         $o .= '<section class="card"><h2>Netzwerkspeicher (NAS)</h2>';
         if (!$d['nasZiele']) {
-            $o .= '<p class="muted">Dafür braucht die Suite einen Netzwerkspeicher: Verwaltung → Verbindungen → Netzwerkspeicher einrichten und für das Modul Fax freigeben. Danach lässt sich hier der Export und ein Lauschordner einstellen.</p></section>';
+            $o .= '<p class="muted">Dafür braucht Praxisherz einen Netzwerkspeicher: Verwaltung → Verbindungen → Netzwerkspeicher einrichten und für das Modul Fax freigeben. Danach lässt sich hier der Export und ein Lauschordner einstellen.</p></section>';
         } else {
             $opt = static function (array $ziele, string $gewaehlt): string {
                 $r = '<option value="">– aus –</option>';

@@ -15,7 +15,7 @@ $_SERVER += ['KIENZLE_BENUTZER' => 'anna', 'KIENZLE_NAME' => 'Anna Beispiel', 'K
     'KIENZLE_MENUE' => $menu, 'KIENZLE_PRAXIS' => rawurlencode(json_encode(['name' => 'Praxis Dr. Beispiel', 'street' => 'Musterweg 1', 'city' => '12345 Musterstadt']))];
 putenv('KIENZLE_DATEN=' . $daten . '/' . $modul);
 putenv('KIENZLE_SUITE_HILFE=' . $root . '/core/php/modul/Kienzle.php');
-// Die Terminzettel-Hilfe nimmt den Pfad der Suite-Hilfe nur in der CLI aus der Umgebung: hier (php -S) von Hand setzen.
+// Die Terminzettel-Hilfe nimmt den Pfad von Praxisherz-Hilfe nur in der CLI aus der Umgebung: hier (php -S) von Hand setzen.
 require_once $root . '/modules/' . $modul . '/src/bootstrap.php';
 if ($modul === 'terminzettel') KienzleTerminzettel\Seite::$helper = $root . '/core/php/modul/Kienzle.php';
 require $root . '/modules/' . $modul . '/public/index.php';

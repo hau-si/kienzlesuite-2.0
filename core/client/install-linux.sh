@@ -6,7 +6,7 @@ target="${XDG_DATA_HOME:-$HOME/.local/share}/praxisherz-starter"
 applications="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 test -f client.json && test -f server.crt && test -f schemas.txt || { echo 'client.json, schemas.txt und server.crt aus dem Paket fehlen.'; exit 1; }
 command -v xdg-mime >/dev/null || { echo 'Bitte xdg-utils installieren.'; exit 1; }
-asset="kienzle-starter-linux-$arch"
+asset="praxisherz-starter-linux-$arch"
 test -f "$asset" && test -f SHA256SUMS || { echo "$asset oder SHA256SUMS fehlt im Paket. Bitte das Paket auf dem Server neu laden."; exit 1; }
 expected=$(awk -v name="$asset" '$2==name {print $1}' SHA256SUMS)
 actual=$(sha256sum "$asset"); actual=${actual%% *}
@@ -20,7 +20,7 @@ place() { # Quelle Ziel Modus Beschriftung
   install -m "$3" "$1" "$2"
   printf '%-13s %s\n' "$([ $had = yes ] && echo aktualisiert || echo neu)" "$4"
 }
-place "$asset" "$target/kienzle-starter" 700 Starterprogramm
+place "$asset" "$target/praxisherz-starter" 700 Starterprogramm
 place client.json "$target/client.json" 600 'Einstellungen und Schlüssel'
 place server.crt "$target/server.crt" 644 'Zertifikat (Datei)'
 escaped=${target//\\/\\\\}; escaped=${escaped//\"/\\\"}; escaped=${escaped//\$/\\\$}; escaped=${escaped//\`/\\\`}; escaped=${escaped//%/%%}
@@ -36,7 +36,7 @@ cat > "$applications/praxisherz-starter.desktop" <<EOT
 [Desktop Entry]
 Type=Application
 Name=Praxisherz-Starter
-Exec="$escaped/kienzle-starter" --url %u
+Exec="$escaped/praxisherz-starter" --url %u
 Terminal=false
 NoDisplay=true
 MimeType=$mime
@@ -51,7 +51,7 @@ if [ -f drucker.txt ] && grep -q '|' drucker.txt && command -v lpadmin >/dev/nul
     cups="ipp://${url#http://}"
     if lpstat -v "$name" 2>/dev/null | grep -qF "$cups"; then printf '%-13s %s\n' unverändert "Drucker $name"; continue; fi
     if sudo lpadmin -p "$name" -E -v "$cups" -m everywhere; then printf '%-13s %s\n' neu "Drucker $name"
-    else echo "Drucker $name nicht eingerichtet (Anleitung: Seite „Arbeitsplätze“ der Suite)."; fi
+    else echo "Drucker $name nicht eingerichtet (Anleitung: Seite „Arbeitsplätze“ von Praxisherz)."; fi
   done < drucker.txt
 fi
 echo 'Arbeitsplatz eingerichtet. Das Paket kann gelöscht werden.'

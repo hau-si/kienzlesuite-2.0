@@ -1,6 +1,6 @@
 'use strict';
 const $ = id => document.getElementById(id);
-// Webpfad des Moduls in Praxisherz (z. B. /kasse/). Anmeldung und Rechte kommen von der Suite.
+// Webpfad des Moduls in Praxisherz (z. B. /kasse/). Anmeldung und Rechte kommen von Praxisherz.
 const BASE = document.body.dataset.base || '/';
 let csrf = '';
 const TESTS = {sumup: ['sumup', 'Verbindung zu SumUp prüfen'], printing: ['receipt_printer', 'Testbon drucken'],
@@ -61,7 +61,7 @@ async function rawApi(action, data = {}) {
   const response = await fetch(BASE + 'settings-api.php', {method: 'POST', credentials: 'same-origin',
     headers: {'Content-Type': 'application/json', 'X-Kienzle-Csrf': csrf}, body: JSON.stringify({action, ...data})});
   const result = await response.json().catch(() => ({}));
-  // Heikle Änderung: erst mit Passwort und Code bei der Suite bestätigen, danach kommt der Browser hierher zurück.
+  // Heikle Änderung: erst mit Passwort und Code bei Praxisherz bestätigen, danach kommt der Browser hierher zurück.
   if (response.status === 403 && result.bestaetigen) { location.href = result.bestaetigen; throw new Error(result.error); }
   if (response.status === 401) { location.href = '/anmelden?weiter=' + encodeURIComponent(location.pathname); throw new Error(result.error || 'Bitte anmelden.'); }
   if (!response.ok) throw new Error(result.error || 'Fehler ' + response.status);
@@ -149,10 +149,10 @@ function render(data) {
     }
     form.append(buttons);
     if (section.id === 'fhir') {
-      // Die T2med-Verbindung gehört der Suite: Stand zeigen und direkt zur Einrichtung verlinken.
+      // Die T2med-Verbindung gehört von Praxisherz: Stand zeigen und direkt zur Einrichtung verlinken.
       const ok = !!(data.connections && data.connections.t2med);
-      const note = el('p', ok ? 'Die T2med-Verbindung der Suite ist eingerichtet. ' : 'Die T2med-Verbindung der Suite ist noch nicht eingerichtet. ', ok ? 'notice' : 'inline-error');
-      note.append(el('a', ok ? 'Verbindung prüfen (Verwaltung → Verbindungen)' : 'Jetzt in der Suite einrichten (Verwaltung → Verbindungen)', null, {href: '/verwaltung/verbindungen'}));
+      const note = el('p', ok ? 'Die T2med-Verbindung Praxisherz ist eingerichtet. ' : 'Die T2med-Verbindung Praxisherz ist noch nicht eingerichtet. ', ok ? 'notice' : 'inline-error');
+      note.append(el('a', ok ? 'Verbindung prüfen (Verwaltung → Verbindungen)' : 'Jetzt in Praxisherz einrichten (Verwaltung → Verbindungen)', null, {href: '/verwaltung/verbindungen'}));
       form.prepend(note);
       form.append(t2medSetupHelp());
     }
@@ -171,7 +171,7 @@ function render(data) {
   layoutTabs(data);
 }
 
-// ---- Virtuelle Drucker „vKasse“ und „vBriefversand“ (legt die Suite aus module.toml an) ---------------
+// ---- Virtuelle Drucker „vKasse“ und „vBriefversand“ (legt Praxisherz aus module.toml an) ---------------
 const PRINTERS = {
   invoice: {box: 'invoice-printer', queue: 'vKasse', ppd: 'vKasse-PDF.ppd', use: 'In T2med die Rechnung auf diesen Drucker drucken – sie erscheint dann beim Patienten zum Kassieren.'},
   letter: {box: 'letter-printer', queue: 'vBriefversand', ppd: 'vBriefversand-PDF.ppd', use: 'Für den Sammelversand in T2med vorübergehend den Rechnungsdrucker auf diesen Drucker umstellen: jede gedruckte Rechnung geht sofort per Post an Letterxpress (und erscheint unter Vorgänge). Danach wieder zurückstellen.'},
@@ -184,7 +184,7 @@ function renderPrinterHelp(cfg, info) {
   if (!info.enabled) return;
   printerFold(cfg.box, !!(info.queue && info.queue.ours));
   if (!info.queue) {
-    box.append(el('p', 'Der Drucker „' + cfg.queue + '“ fehlt in der Suite. Unter Verwaltung → Drucker „Virtuelle Drucker abgleichen“ wählen; legt die Suite ihn dann nicht an, das Modul unter Verwaltung → Module neu installieren.', 'inline-error'));
+    box.append(el('p', 'Der Drucker „' + cfg.queue + '“ fehlt in Praxisherz. Unter Verwaltung → Drucker „Virtuelle Drucker abgleichen“ wählen; legt Praxisherz ihn dann nicht an, das Modul unter Verwaltung → Module neu installieren.', 'inline-error'));
     return;
   }
   if (!info.queue.ours) { box.append(el('p', 'Ein anderer Drucker heißt bereits „' + cfg.queue + '“. Bitte diesen umbenennen oder entfernen.', 'inline-error')); return; }
@@ -309,7 +309,7 @@ function t2medSetupHelp() {
   ol.append(el('li', 'Auf Plus klicken, oben rechts mit dem Häkchen speichern und in der Liste davor auf „aktualisieren“ (Pfeile) klicken.'));
   ol.append(el('li', 'Dann „Funktionsleisten verwalten“: Konfiguration anlegen oder bearbeiten (Name, Benutzer, Benutzergruppe, Station), „Aktion hinzufügen“, die Aktion unter der vergebenen Bezeichnung suchen, Farbe und Kürzel oder Icon wählen und bestätigen.'));
   ol.append(el('li', 'Der Starter-Aufruf funktioniert erst, wenn auf dem Arbeitsplatz das Starter-Paket installiert ist (Suite: Verwaltung → Arbeitsplätze).'));
-  ol.append(el('li', 'Die FHIR-Adresse, die T2med beim Aufruf mitgibt, muss in der Suite unter Verwaltung → Verbindungen → T2med bei „Erlaubte fhirBasisUrl aus T2med“ stehen (die Adresse des FHIR-Servers gilt immer als erlaubt). Bei einer Fehlermeldung zeigt die Seite die tatsächlichen Werte.'));
+  ol.append(el('li', 'Die FHIR-Adresse, die T2med beim Aufruf mitgibt, muss in Praxisherz unter Verwaltung → Verbindungen → T2med bei „Erlaubte fhirBasisUrl aus T2med“ stehen (die Adresse des FHIR-Servers gilt immer als erlaubt). Bei einer Fehlermeldung zeigt die Seite die tatsächlichen Werte.'));
   const guide = el('li'); guide.append('Mit Bildern: ', el('a', 'Anleitung „T2med einrichten“', null, {href: GUIDE_URL, target: '_blank', rel: 'noopener'})); ol.append(guide);
   d.append(ol); return d;
 }
@@ -319,13 +319,13 @@ const PLACES = {web: 'In diesem Webfenster', pc: 'Auf den Kassen-PCs', t2med: 'I
 function renderChecklist(data) {
   const invoiceQueue = !!(data.invoice_printer && data.invoice_printer.queue);
   const letterQueue = !!(data.letter_printer && data.letter_printer.queue && data.letter_printer.enabled);
-  // Punkte der Kasse kommen vom Server (dieselben wie im Einrichtungs-Überblick der Suite), schon in der nötigen Reihenfolge.
+  // Punkte der Kasse kommen vom Server (dieselben wie im Einrichtungs-Überblick von Praxisherz), schon in der nötigen Reihenfolge.
   const own = (data.setup || []).map(i => ({optional: !!i.optional, ort: /Starter/.test(i.title) ? 'pc' : 'web', done: i.state === 'done', error: i.state === 'error', label: i.title, card: (i.link || '').split('#')[1] || 's-checklist', detail: i.hint}));
   const web = own.filter(i => i.ort === 'web'), pc = own.filter(i => i.ort === 'pc');
   const items = [
     ...web,
-    {ort: 'pc', info: true, label: 'Zertifikat der Suite einrichten (einmal je PC, siehe Arbeitsplatz einrichten der Suite)', card: 's-clients', href: '/hilfe/arbeitsplatz', hrefLabel: 'Anleitung'},
-    {ort: 'pc', info: true, label: 'Starter auf den Kassen-PCs installieren (ein Paket für alle Module)', card: 's-clients', href: '/hilfe/arbeitsplatz#paket', hrefLabel: 'Seite „Arbeitsplätze“ der Suite'},
+    {ort: 'pc', info: true, label: 'Zertifikat von Praxisherz einrichten (einmal je PC, siehe Arbeitsplatz einrichten von Praxisherz)', card: 's-clients', href: '/hilfe/arbeitsplatz', hrefLabel: 'Anleitung'},
+    {ort: 'pc', info: true, label: 'Starter auf den Kassen-PCs installieren (ein Paket für alle Module)', card: 's-clients', href: '/hilfe/arbeitsplatz#paket', hrefLabel: 'Seite „Arbeitsplätze“ von Praxisherz'},
     ...pc,
     ...(invoiceQueue ? [{ort: 'pc', info: true, label: 'Drucker „vKasse“ am Arbeitsplatz installieren (Windows: IPP-Drucker hinzufügen, Papier A4)', card: 'invoice-printer-help', detail: (data.invoice_printer && data.invoice_printer.url) || ''}] : []),
     ...(letterQueue ? [{ort: 'pc', info: true, label: 'Drucker „vBriefversand“ am Arbeitsplatz installieren (für den Sammelversand per Post; wie „vKasse“, Papier A4)', card: 'letter-printer-help', detail: (data.letter_printer && data.letter_printer.url) || ''}] : []),

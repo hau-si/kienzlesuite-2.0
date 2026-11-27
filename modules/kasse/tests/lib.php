@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Gemeinsame Hilfen der Tests: Kasse wie in der Suite, mit der echten Hilfsdatei der Basis (core/php/modul/Kienzle.php)
+// Gemeinsame Hilfen der Tests: Kasse wie in Praxisherz, mit der echten Hilfsdatei der Basis (core/php/modul/Kienzle.php)
 // und Ordnern im Temp-Verzeichnis statt /etc/kienzle und /var/lib/kienzle. Nur Beispieldaten.
 require_once dirname(__DIR__) . '/src/bootstrap.php';
 require_once dirname(__DIR__, 3) . '/core/php/modul/Kienzle.php';
@@ -22,7 +22,7 @@ function staff_server(array $rights): array {
 
 /**
  * Suite-Umgebung anlegen. $verbindungen wie /etc/kienzle/verbindungen/module/kasse.json („ablage.ausgang“ wird ersetzt),
- * $drucker: Warteschlangen der Suite. Liefert den Ordner; Daten des Moduls in <ordner>/daten.
+ * $drucker: Warteschlangen von Praxisherz. Liefert den Ordner; Daten des Moduls in <ordner>/daten.
  */
 function suite(array $server, array $verbindungen = [], array $drucker = [], ?string $data = null): string {
     $root = sys_get_temp_dir() . '/ks-suite-' . bin2hex(random_bytes(5));

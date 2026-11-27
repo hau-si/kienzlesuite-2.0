@@ -6,7 +6,7 @@ require __DIR__ . '/lib.php';
 use Kienzle\Core\{Config, Modules, PasswordPolicy, Passwords, Secrets, Totp, Users};
 
 function test_totp_rfc6238_testwerte(): void {
-    // RFC 6238, Anhang B (8 Stellen; die Suite nutzt 6 Stellen mit demselben Verfahren).
+    // RFC 6238, Anhang B (8 Stellen; Praxisherz nutzt 6 Stellen mit demselben Verfahren).
     $vectors = [59 => ['94287082', '46119246', '90693936'], 1111111109 => ['07081804', '68084774', '25091201'], 1111111111 => ['14050471', '67062674', '99943326'],
         1234567890 => ['89005924', '91819424', '93441116'], 2000000000 => ['69279037', '90698825', '38618901'], 20000000000 => ['65353130', '77737706', '47863826']];
     foreach ($vectors as $t => [$sha1, $sha256, $sha512]) {

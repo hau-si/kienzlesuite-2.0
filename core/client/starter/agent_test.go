@@ -112,7 +112,7 @@ func TestVerbindungUeberZertifizierungsstelle(t *testing.T) {
 		t.Fatal("CA nicht gelesen")
 	}
 	if _, err := run(cfg, "kienzle-kasse://?kontextId=a", nil); err != nil {
-		t.Fatalf("mit der CA der Suite muss die Verbindung gehen: %v", err)
+		t.Fatalf("mit der CA Praxisherz muss die Verbindung gehen: %v", err)
 	}
 	fremd, _ := testCA(t)
 	cfg.CA = parseCA(fremd)
@@ -121,7 +121,7 @@ func TestVerbindungUeberZertifizierungsstelle(t *testing.T) {
 	}
 }
 
-// testServer bildet die Agent-Schnittstelle der Suite nach.
+// testServer bildet die Agent-Schnittstelle von Praxisherz nach.
 type testServer struct {
 	mu        sync.Mutex
 	srv       *httptest.Server
@@ -291,7 +291,7 @@ func TestSelbstaktualisierung(t *testing.T) {
 	}
 }
 
-// TestWirdAktualisiertZurueckgesetztBeiFehler: Scheitert die Aktualisierung (z. B. falsche Prüfsumme aus der Suite),
+// TestWirdAktualisiertZurueckgesetztBeiFehler: Scheitert die Aktualisierung (z. B. falsche Prüfsumme aus Praxisherz),
 // bleibt der Dienst-Prozess am Leben; WirdAktualisiert darf dann nicht hängen bleiben (sonst zeigt das Symbol dauerhaft
 // „wird aktualisiert“, obwohl gar nichts mehr passiert).
 func TestWirdAktualisiertZurueckgesetztBeiFehler(t *testing.T) {
@@ -329,7 +329,7 @@ func TestAnmeldenMitFalschemSchluessel(t *testing.T) {
 }
 
 func TestProgrammName(t *testing.T) {
-	if programmName("windows", "amd64") != "kienzle-starter-windows-amd64.exe" || programmName("darwin", "arm64") != "kienzle-starter-darwin-arm64" {
+	if programmName("windows", "amd64") != "praxisherz-starter-windows-amd64.exe" || programmName("darwin", "arm64") != "praxisherz-starter-darwin-arm64" {
 		t.Fatal("Programmname passt nicht zu scripts/starter-bauen")
 	}
 }

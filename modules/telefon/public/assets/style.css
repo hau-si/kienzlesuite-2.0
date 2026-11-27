@@ -1,4 +1,4 @@
-/* Modul Telefon im Rahmen der Suite: Karten, Knöpfe und Marken kommen aus core.css; hier nur die Teile dieser Seiten. */
+/* Modul Telefon im Rahmen von Praxisherz: Karten, Knöpfe und Marken kommen aus core.css; hier nur die Teile dieser Seiten. */
 main.modul { max-width: 980px; margin: 0; padding: 32px 40px 48px; }
 .seitenkopf { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
 .seitenkopf h1 { margin: 6px 0 0; }

@@ -1,5 +1,9 @@
 # Release-Notizen Fax
 
+## 0.1.0-beta.15
+
+- Texte: „die Suite“/„der Suite“ heißt jetzt überall „Praxisherz“. Nur Texte geändert, mit Tests geprüft, nicht auf der VM.
+
 ## 0.1.0-beta.14
 
 - **Neuer Name: „Praxisherz – freie Software für die Arztpraxis“** (vorher Kienzle-Suite) in Texten, Hinweisen und Dienstbeschreibungen. Mit Tests geprüft, nicht auf der VM.

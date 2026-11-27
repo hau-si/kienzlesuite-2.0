@@ -277,7 +277,7 @@ def key_section(ziel: dict) -> str:
             out += f'<p>Fingerabdruck des NAS ({h(target["host"])}): <code>{h(ablage.fingerprint(target["hostkey"]))}</code></p>'
     fp = _fingerprint_cert(CA_CERT)
     if fp:
-        out += f'<h2>Zertifizierungsstelle der Suite</h2><p>Fingerabdruck (SHA-256): <code style="font-size:10pt;word-break:break-all">{fp}</code></p>'
+        out += f'<h2>Zertifizierungsstelle von Praxisherz</h2><p>Fingerabdruck (SHA-256): <code style="font-size:10pt;word-break:break-all">{fp}</code></p>'
     return out
 
 
@@ -297,7 +297,7 @@ def sheet(password: str, ziel: dict, repo_id: str, practice: str) -> str:
             + key_section(ziel) +
             '<h2>Nach einem Totalausfall</h2><ol><li>Neue VM mit Ubuntu Server 26.04 anlegen, Praxisherz herunterladen.</li>'
             '<li><code>sudo bash installer/install.sh --wiederherstellen</code> und die Angaben von diesem Blatt eingeben.</li></ol>'
-            '<h2>Von Hand (ohne Suite)</h2><p>Auf einem Rechner mit restic: <code>restic -r &lt;Ablage&gt; snapshots</code>, Passwort von oben eingeben, '
+            '<h2>Von Hand (ohne Praxisherz)</h2><p>Auf einem Rechner mit restic: <code>restic -r &lt;Ablage&gt; snapshots</code>, Passwort von oben eingeben, '
             'dann <code>restic -r &lt;Ablage&gt; restore latest --target /tmp/wiederhergestellt</code>. Die Datenbanken liegen unter '
             '<code>var/lib/kienzle/sicherung/stand/</code>.</p></body></html>')
 
@@ -647,7 +647,7 @@ def full_restore(ziel: dict, password: str, ssh_key: str | None = None) -> list[
     else:
         z = check_target(ziel)
     if (DATA / 'core' / 'core.sqlite').exists():
-        raise Fehler('Auf diesem Server gibt es schon Daten der Suite. Wiederherstellen nur auf einer frischen Installation.')
+        raise Fehler('Auf diesem Server gibt es schon Daten von Praxisherz. Wiederherstellen nur auf einer frischen Installation.')
     ETC.mkdir(mode=0o700, parents=True, exist_ok=True)
     if ssh_key:
         install_ssh_key(ssh_key)

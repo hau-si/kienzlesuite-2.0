@@ -82,7 +82,7 @@ def apply(names: list[str], practice: str | None, new_ca: bool = False) -> str:
     names = check_names(names)
     out = outside(names)
     if out and not new_ca:
-        raise Fehler(f'{", ".join(out)} liegt außerhalb der Namen, für die die Zertifizierungsstelle der Suite Zertifikate ausstellen darf '
+        raise Fehler(f'{", ".join(out)} liegt außerhalb der Namen, für die die Zertifizierungsstelle von Praxisherz Zertifikate ausstellen darf '
                      '(z. B. *.internal, *.local, *.lan, *.home.arpa, *.fritz.box). Anderen Namen wählen – oder „neue Zertifizierungsstelle“ '
                      'ankreuzen; dann müssen alle Arbeitsplätze sie neu einspielen.')
     if practice is not None and (len(practice) > 60 or re.search(r'[\x00-\x1f<>]', practice)):
@@ -100,7 +100,7 @@ def apply(names: list[str], practice: str | None, new_ca: bool = False) -> str:
         _run('kienzle-web', 'neu')
         reason = (cert.stderr if web is None else web.stderr).strip().splitlines()
         raise Fehler('Nicht übernommen: ' + (reason[-1][:200] if reason else 'unbekannter Fehler') + '. Der vorige Stand ist wieder aktiv.')
-    return ('Gespeichert. Die Suite ist jetzt erreichbar unter: ' + ', '.join(f'https://{n}/' for n in names)
+    return ('Gespeichert. Praxisherz ist jetzt erreichbar unter: ' + ', '.join(f'https://{n}/' for n in names)
             + ('. NEUE Zertifizierungsstelle: bitte auf allen Arbeitsplätzen /ca.crt neu einspielen.' if out and new_ca else ''))
 
 

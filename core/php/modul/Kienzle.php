@@ -27,7 +27,7 @@ final class KienzleModul {
     /** @return list<string> */
     public function rechte(): array { return array_values(array_filter(explode(',', (string)($this->server['KIENZLE_RECHTE'] ?? '')))); }
     public function recht(string $recht): bool { return $this->istAdmin() || in_array($recht, $this->rechte(), true); }
-    /** Menü der Suite für die Seitenleiste: apps (Pfad => Name), ids (Pfad => Modul-ID), admin (Basis-Admin), login. Leer, wenn die Basis nichts mitgeliefert hat. */
+    /** Menü von Praxisherz für die Seitenleiste: apps (Pfad => Name), ids (Pfad => Modul-ID), admin (Basis-Admin), login. Leer, wenn die Basis nichts mitgeliefert hat. */
     public function menue(): array {
         $d = json_decode(rawurldecode((string)($this->server['KIENZLE_MENUE'] ?? '')), true);
         $apps = [];
@@ -46,7 +46,7 @@ final class KienzleModul {
     }
 
     /**
-     * Seite im Rahmen der Suite (Seitenleiste, Kopf, Praxisname) mit dem Inhalt des Moduls. $extra: 'kopf' (Stylesheets/Skripte des Moduls),
+     * Seite im Rahmen von Praxisherz (Seitenleiste, Kopf, Praxisname) mit dem Inhalt des Moduls. $extra: 'kopf' (Stylesheets/Skripte des Moduls),
      * 'roh' (Inhalt unverändert statt Überschrift und Karten). Ohne die Basis-Klasse gibt es nur den Inhalt zurück.
      */
     public function rahmen(string $titel, string $inhalt, array $extra = []): string {
@@ -241,7 +241,7 @@ final class KienzleModul {
 
     // ---- Drucken (Druckerverwaltung der Basis, Verwaltung → Drucker) ------------------------------------------------
 
-    /** Warteschlangen der Suite zur Auswahl im Modul: Liste aus name, description, state. */
+    /** Warteschlangen von Praxisherz zur Auswahl im Modul: Liste aus name, description, state. */
     public function drucker(): array {
         $s = json_decode((string)@file_get_contents($this->drucker), true);
         $out = [];
@@ -257,7 +257,7 @@ final class KienzleModul {
      * $optionen: CUPS-Optionen „name=wert“ (z. B. media=A4, sides=two-sided-long-edge, raw).
      */
     public function drucken(string $drucker, string $daten, string $titel, array $optionen = []): string {
-        if (!in_array($drucker, array_column($this->drucker(), 'name'), true)) throw new RuntimeException('Drucker „' . $drucker . '“ ist in der Suite nicht eingerichtet.');
+        if (!in_array($drucker, array_column($this->drucker(), 'name'), true)) throw new RuntimeException('Drucker „' . $drucker . '“ ist in Praxisherz nicht eingerichtet.');
         $args = ['/usr/bin/lp', '-d', $drucker, '-t', mb_substr((string)preg_replace('/[^A-Za-z0-9 ._\/-]/', '', $titel), 0, 60) ?: 'Praxisherz'];
         foreach ($optionen as $o) {
             if (!is_string($o) || !preg_match('/^[a-z][a-z0-9-]{0,40}(=[A-Za-z0-9_.,-]{1,60})?$/D', $o)) throw new RuntimeException('Druckoption ungültig.');

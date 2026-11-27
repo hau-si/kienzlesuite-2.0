@@ -26,7 +26,7 @@ SZENEN = [
     ('weg-der-rechnung', 'Der Weg einer Rechnung', 'Verbindungsklick, Rechnung drucken oder IGeL-Modul: alle Wege enden im Kassieren und, wenn gewünscht, als PDF im Netzwerkordner.', 10),
     ('kasse-igel', 'Kasse: IGeL ohne T2med-Rechnung', 'Leistungen aus der Liste wählen, Name und Geburtsdatum sind optional; die GOÄ-Ziffern kommen aus dem amtlichen Verzeichnis.', 9),
     ('kasse-goae', 'IGeL: Endpreis eintragen, Faktor wird errechnet', 'Ziffer wählen, gewünschten Endbetrag angeben: Die Kasse rechnet den Faktor nach § 5 GOÄ und warnt über dem Schwellenwert.', 10),
-    ('kasse-ablage', 'Kasse: PDF im Netzwerkordner', 'Jede gedruckte oder bezahlte Rechnung landet als PDF im Ordner, zum Beispiel Rechnungen/2026. Fehlende Ordner legt die Suite selbst an.', 8),
+    ('kasse-ablage', 'Kasse: PDF im Netzwerkordner', 'Jede gedruckte oder bezahlte Rechnung landet als PDF im Ordner, zum Beispiel Rechnungen/2026. Fehlende Ordner legt Praxisherz selbst an.', 8),
     ('kasse-einstellungen', 'Kasse: Einstellungen', 'Einrichtung als Ausklappzeilen, Rotes zuerst. Nur Admins sehen Schlüssel und Zugangsdaten.', 7),
     ('terminzettel', 'Terminzettel: groß, lesbar, mit QR-Code', 'Der Zettel aus T2med ist klein und ohne QR-Code. Hier steht er groß auf dem Bondrucker, mit Kalender-QR je Termin.', 10),
     ('signatur-vorgaenge', 'Signatur: Vorgang anlegen', 'IGeL-Vertrag, Aufklärung oder Datenschutz am Unterschriftenpad; der Patient wird aus T2med übernommen.', 8),

@@ -1,13 +1,13 @@
 package main
 
 // Praxisherz-Agent: derselbe Starter läuft mit --dienst dauerhaft (Windows: geplante Aufgabe mit Systemrechten beim Start des PCs).
-// Er fragt die Suite etwa alle zwei Sekunden nach Aufträgen und hält den PC auf dem Sollzustand der Suite:
-//   - Starterprogramm (Selbstaktualisierung, Prüfsumme aus der Suite),
+// Er fragt Praxisherz etwa alle zwei Sekunden nach Aufträgen und hält den PC auf dem Sollzustand von Praxisherz:
+//   - Starterprogramm (Selbstaktualisierung, Prüfsumme aus Praxisherz),
 //   - Aufrufe aus T2med (URL-Schemata) und client.json für den Startermodus,
-//   - Zertifizierungsstelle der Suite (vertrauenswürdig für alle Benutzer),
+//   - Zertifizierungsstelle von Praxisherz (vertrauenswürdig für alle Benutzer),
 //   - virtuelle Drucker der Module.
 // Aufträge gibt es nur in festen Arten; zurzeit „gdt“ (Akte in T2med öffnen: Datei in den festen GDT-Ordner schreiben).
-// Der Agent startet keine Befehle aus der Suite und schreibt nur in seine eigenen Ordner.
+// Der Agent startet keine Befehle aus Praxisherz und schreibt nur in seine eigenen Ordner.
 
 import (
 	"bytes"
@@ -32,7 +32,7 @@ import (
 var DruckerPause = 10 * time.Minute
 
 // Version des Programms (scripts/starter-bauen setzt sie nicht; der Server vergleicht die Prüfsumme der Datei).
-const version = "2.3.7" // ab 2.3.7 auch Adressen praxisherz-… (Web::AGENT_NEUE_ADRESSEN)
+const version = "2.3.8" // ab 2.3.7 auch Adressen praxisherz-… (Web::AGENT_NEUE_ADRESSEN)
 
 // AgentConfig steht in agent.json (nur für SYSTEM und Administratoren lesbar).
 type AgentConfig struct {
@@ -41,7 +41,7 @@ type AgentConfig struct {
 	Name  string `json:"name"`
 }
 
-// Soll ist der Sollzustand aus der Suite.
+// Soll ist der Sollzustand aus Praxisherz.
 type Soll struct {
 	ServerURL   string            `json:"server_url"`
 	LauncherKey string            `json:"launcher_key"`
@@ -61,7 +61,7 @@ type Drucker struct {
 	Papier string `json:"papier"`
 }
 
-// Auftrag aus der Suite.
+// Auftrag aus Praxisherz.
 type Auftrag struct {
 	ID    string          `json:"id"`
 	Typ   string          `json:"typ"`
@@ -229,12 +229,12 @@ var (
 	errNeustart = errors.New("neues Programm eingespielt")
 )
 
-// programmName wie in scripts/starter-bauen (kienzle-starter-windows-amd64.exe …).
+// programmName wie in scripts/starter-bauen (praxisherz-starter-windows-amd64.exe …; bis Agent 2.3.7 kienzle-starter-…).
 func programmName(goos, goarch string) string {
 	if goos == "windows" {
-		return "kienzle-starter-windows-" + goarch + ".exe"
+		return "praxisherz-starter-windows-" + goarch + ".exe"
 	}
-	return "kienzle-starter-" + goos + "-" + goarch
+	return "praxisherz-starter-" + goos + "-" + goarch
 }
 
 func systemName() string {

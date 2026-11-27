@@ -148,7 +148,7 @@ final class View {
 
     /** Ganze Seite. $nav: null = ohne Menü (Anmeldung), sonst ['login', 'admin' => bool, 'csrf', 'pfad', Zähler]. $eyebrow: Gruppe über dem Titel. */
     /**
-     * $extra für Modulseiten im Rahmen der Suite: 'kopf' = zusätzliche Tags im Kopf (Stylesheets, Skripte des Moduls), 'roh' = Inhalt unverändert
+     * $extra für Modulseiten im Rahmen von Praxisherz: 'kopf' = zusätzliche Tags im Kopf (Stylesheets, Skripte des Moduls), 'roh' = Inhalt unverändert
      * (ohne Überschrift und Karten), 'body' = zusätzliche Attribute am body.
      */
     public static function page(string $title, string $body, ?array $nav = null, string $practice = '', ?string $eyebrow = null, array $extra = []): string {

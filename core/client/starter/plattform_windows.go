@@ -23,7 +23,7 @@ var druckerSkript string
 
 // druckerSkriptFrist: Höchstdauer für das Druckerskript (Einrichten/Prüfen/Entfernen). Ohne Frist blockiert ein
 // hängender Windows-Druckspooler (z. B. bei Remove-Printer auf einen Drucker mit festsitzendem Druckauftrag) den
-// ganzen Dienst-Prozess für immer – er fragt dann die Suite nicht mehr ab und wirkt „aufgehängt“. Beim Entfernen
+// ganzen Dienst-Prozess für immer – er fragt dann Praxisherz nicht mehr ab und wirkt „aufgehängt“. Beim Entfernen
 // wartet das Skript je Drucker bis zu 20 s in einem eigenen Hintergrundauftrag (drucker-agent.ps1); bei mehreren
 // zu entfernenden Druckern braucht das Skript entsprechend länger als bei nur einem, daher die großzügige Frist.
 const druckerSkriptFrist = 180 * time.Second
@@ -177,9 +177,10 @@ func (w *windowsPlattform) Symbol(programm string) error {
 			return fmt.Errorf("Rechte für %s: %v %s", ordner, err, strings.TrimSpace(string(out)))
 		}
 	}
-	if err := reg("add", `HKLM\Software\Microsoft\Windows\CurrentVersion\Run`, "/v", "KienzleSuite", "/t", "REG_SZ", "/d", `"`+programm+`" --tray`, "/f"); err != nil {
+	if err := reg("add", `HKLM\Software\Microsoft\Windows\CurrentVersion\Run`, "/v", "Praxisherz", "/t", "REG_SZ", "/d", `"`+programm+`" --tray`, "/f"); err != nil {
 		return err
 	}
+	_ = reg("delete", `HKLM\Software\Microsoft\Windows\CurrentVersion\Run`, "/v", "KienzleSuite", "/f") // Eintrag vor der Umbenennung
 	return aufgabeSichern()
 }
 
@@ -209,10 +210,12 @@ func neuStarten(exe string) {
 
 // aufgabeSichern: Die geplante Aufgabe startet zusätzlich alle 5 Minuten (läuft der Agent, beendet sich der zweite Start sofort).
 // Ältere Einrichtungen hatten nur „beim Systemstart“; dort blieb der Agent nach der ersten Aktualisierung stehen.
-const aufgabeSkript = `$t = Get-ScheduledTask -TaskName 'Kienzle-Agent' -ErrorAction Stop
+// Seit der Umbenennung heißt sie „Praxisherz-Agent“; auf PCs von vorher (bis das Paket neu läuft) noch „Kienzle-Agent“.
+const aufgabeSkript = `$n = if (Get-ScheduledTask -TaskName 'Praxisherz-Agent' -ErrorAction SilentlyContinue) { 'Praxisherz-Agent' } else { 'Kienzle-Agent' }
+$t = Get-ScheduledTask -TaskName $n -ErrorAction Stop
 if (!(@($t.Triggers) | Where-Object { $_.Repetition -and $_.Repetition.Interval })) {
     $neu = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5)
-    Set-ScheduledTask -TaskName 'Kienzle-Agent' -Trigger (@($t.Triggers) + $neu) -ErrorAction Stop | Out-Null
+    Set-ScheduledTask -TaskName $n -Trigger (@($t.Triggers) + $neu) -ErrorAction Stop | Out-Null
     Write-Output 'ergänzt'
 }`
 
