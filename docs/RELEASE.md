@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.39
+
+- **Fehler behoben (Nutzer-Meldung): Taskleisten-Symbol hing („reagiert nicht“).** Das Fenster war nicht an einen festen Thread gebunden; Go konnte die Nachrichtenschleife auf einen anderen Thread verlegen, danach kamen keine Fensternachrichten mehr an. Jetzt `runtime.LockOSThread()` (Agent 2.3.11).
+- Mit Tests geprüft. **Nicht unter Windows geprüft.**
+
 ## 0.22.0-beta.38
 
 - **Fehler behoben: Beim Setup blieb das PowerShell-Fenster leer** und schloss sich bei einem Fehler sofort. Das Setup startet die Einrichtung jetzt mit sichtbarem Fenster; bei einem Fehler bleibt es offen („FEHLER: …“), das Protokoll steht in `%TEMP%\praxisherz-einrichtung.log` (Agent 2.3.10).

@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -190,6 +191,10 @@ func (t *trayZustand) px(v float64) int32 { return int32(v*t.skala + 0.5) }
 
 // tray: Symbol und Fenster; kehrt erst beim Abmelden zurück. Nur eine Instanz je Benutzersitzung.
 func tray(ordner string) error {
+	// Fenster, Symbol und Nachrichtenschleife gehören unter Windows zu genau einem Thread. Ohne LockOSThread kann Go diese
+	// Goroutine auf einen anderen Thread verlegen (z. B. nach einem Dateizugriff); GetMessage bekommt dann keine Nachrichten
+	// des Fensters mehr, und Windows meldet „Keine Rückmeldung“ (Nutzer-Meldung: Symbol hängt komplett).
+	runtime.LockOSThread()
 	pSetProcessDPIAware.Call()
 	m, _, err := pCreateMutexW.Call(0, 0, uintptr(unsafe.Pointer(w16(`Local\KienzleAgentSymbol`))))
 	if m != 0 && err == syscall.Errno(183) { // ERROR_ALREADY_EXISTS
