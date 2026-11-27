@@ -110,7 +110,7 @@ button.us-symbol.rot { background: #fdecea; color: #b42318; }
 button.us-symbol svg { width: 16px; height: 16px; }
 
 /* Editor (Entwurf C): Bausteine | Dokument | Eigenschaften + Vorschau am Pad */
-.ed-grid { display: grid; grid-template-columns: 240px minmax(0, 1fr) 380px; gap: 18px; align-items: start; }
+.ed-grid { display: grid; grid-template-columns: 210px minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
 @media (max-width: 1100px) { .ed-grid { grid-template-columns: 1fr; } }
 .ed-links h2, .ed-rechts h2 { font-size: 16px; margin: 0 0 8px; }
 .ed-abstand { margin-top: 20px !important; }
@@ -126,20 +126,20 @@ button.ed-baustein:hover { border-color: var(--teal); filter: none; }
 .ed-vorlage.neu { color: var(--teal); }
 .ed-kopf { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
 .ed-dok { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; flex: 1; }
-.ed-dok input#ed-titel { flex: 1 1 220px; font-size: 18px; font-weight: 650; }
+.ed-dok input#ed-titel { flex: 1 1 100%; font-size: 18px; font-weight: 650; }
 .ed-dok select { width: auto; }
 .ed-aktionen { display: flex; gap: 8px; align-items: center; }
 #ed-speichern.ed-ungespeichert::after { content: " •"; }
 .ed-meldung.ok { color: var(--ok); } .ed-meldung.fehler { color: var(--error); }
-.ed-zeile { display: grid; grid-template-columns: 18px 128px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 10px 12px; margin: 8px 0; border: 1px solid var(--line); border-radius: 12px; background: #fbfcfb; cursor: pointer; }
+.ed-zeile { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; grid-template-areas: 'griff typ knoepfe' 'griff inhalt inhalt'; gap: 4px 10px; align-items: start; padding: 10px 12px; margin: 8px 0; border: 1px solid var(--line); border-radius: 12px; background: #fbfcfb; cursor: pointer; }
 .ed-zeile.an { border-color: var(--teal); box-shadow: 0 0 0 2px #a3d0c2; background: #fff; }
 .ed-zeile.ziel, .ed-ende.ziel { border-color: var(--teal); border-style: dashed; background: #f2f9f7; }
-.ed-griff { color: #a6b5b0; cursor: grab; user-select: none; line-height: 1.4; }
-.ed-typ { font-size: 10.5px; font-weight: 750; letter-spacing: .4px; overflow-wrap: anywhere; color: var(--teal); text-transform: uppercase; padding-top: 3px; }
-.ed-inhalt { font-size: 14px; overflow-wrap: anywhere; }
+.ed-griff { grid-area: griff; color: #a6b5b0; cursor: grab; user-select: none; line-height: 1.4; }
+.ed-typ { grid-area: typ; font-size: 10.5px; font-weight: 750; letter-spacing: .4px; overflow-wrap: anywhere; color: var(--teal); text-transform: uppercase; padding-top: 3px; }
+.ed-inhalt { grid-area: inhalt; font-size: 14px; overflow-wrap: anywhere; }
 .ed-inhalt p, .ed-inhalt h3, .ed-inhalt ul, .ed-inhalt ol { margin: 0 0 4px; }
 .ed-inhalt h3 { font-size: 16px; }
-.ed-zknoepfe { display: flex; gap: 4px; }
+.ed-zknoepfe { grid-area: knoepfe; display: flex; gap: 4px; }
 button.ed-mini { min-height: 28px; min-width: 28px; padding: 0 7px; font-size: 13px; background: var(--soft); color: #315f53; border-radius: 7px; }
 button.ed-mini.rot { background: #fdecea; color: #b42318; }
 button.ed-mini.breit { padding: 0 9px; }
@@ -171,3 +171,20 @@ button.ed-mini.breit { padding: 0 9px; }
 .ed-akte summary { cursor: pointer; font-weight: 600; font-size: 14px; }
 .ed-akte textarea { display: block; width: 100%; margin: 6px 0; }
 #ed-kuerzel { width: 90px; }
+/* Dokumentliste: Suche, Gruppen, Favoriten, zuletzt gewählte */
+.us-dokwerkzeug { display: grid; gap: 8px; margin-bottom: 8px; }
+.us-dokwerkzeug input[type=search] { width: 100%; }
+.us-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.us-chip { border: 1px solid #d5dde3; background: #fff; border-radius: 999px; padding: 4px 12px; font-size: 14px; cursor: pointer; color: inherit; }
+.us-chip.an { background: var(--teal, #0f766e); border-color: var(--teal, #0f766e); color: #fff; }
+.us-zuletzt .us-chip { background: #f4f7f6; }
+.us-dokzeile { display: flex; align-items: center; border-bottom: 1px solid #edf0ee; }
+.us-dokzeile .us-dok { flex: 1; border-bottom: 0 !important; }
+.us-stern { background: none; border: 0; padding: 8px; color: #9aa6ae; cursor: pointer; }
+.us-stern.an { color: #d99a00; }
+.us-stern.an svg { fill: currentColor; }
+#ed-vsuche { width: 100%; margin-bottom: 6px; }
+.ed-vgkopf { margin: 10px 0 2px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #6b7780; font-weight: 600; }
+.ed-fav { color: #d99a00; }
+#ed-gruppen { width: 220px; }
+.ed-platzhalter { max-width: 100%; }

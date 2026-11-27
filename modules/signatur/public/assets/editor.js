@@ -245,15 +245,24 @@
   // ---- Kopf: Titel, Art, aktiv, Fassung, Speichern ----
   var art = $('ed-art');
   Object.keys(D.arten).forEach(function (k) { art.appendChild(new Option(D.arten[k], k)); });
-  $('ed-titel').value = vorlage.titel; art.value = vorlage.art; $('ed-aktiv').checked = vorlage.aktiv; $('ed-kuerzel').value = vorlage.kuerzel || '';
+  $('ed-titel').value = vorlage.titel; art.value = vorlage.art; $('ed-aktiv').checked = vorlage.aktiv; $('ed-kuerzel').value = vorlage.kuerzel || ''; $('ed-gruppen').value = vorlage.gruppen || '';
+  var vs = $('ed-vsuche');
+  if (vs) vs.addEventListener('input', function () {
+    var q = vs.value.trim().toLowerCase();
+    document.querySelectorAll('.ed-vgruppe').forEach(function (g) {
+      var sichtbar = 0;
+      g.querySelectorAll('.ed-vorlage').forEach(function (a) { var ja = !q || (a.getAttribute('data-name') || '').indexOf(q) >= 0; a.hidden = !ja; if (ja) sichtbar++; });
+      g.hidden = !sichtbar;
+    });
+  });
   if (vorlage.fest) { art.disabled = true; $('ed-aktiv').disabled = true; art.title = 'Der IGeL-Vertrag der Kasse bleibt ein IGeL-Vertrag und immer aktiv.'; }
   function fassung() { $('ed-fassung').textContent = vorlage.version ? 'Fassung ' + vorlage.version + (vorlage.geaendert ? ' vom ' + vorlage.geaendert : '') : 'neu'; }
   fassung();
-  [$('ed-titel'), art, $('ed-aktiv'), $('ed-kuerzel')].forEach(function (e) { e.addEventListener('input', function () { aendern(); vorschau(); }); e.addEventListener('change', aendern); });
+  [$('ed-titel'), art, $('ed-aktiv'), $('ed-kuerzel'), $('ed-gruppen')].forEach(function (e) { e.addEventListener('input', function () { aendern(); vorschau(); }); e.addEventListener('change', aendern); });
   $('ed-speichern').addEventListener('click', function () {
     var knopf = $('ed-speichern'); knopf.disabled = true; meldung('Wird gespeichert …');
     fetch(D.basis + '/editor/speichern', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Kienzle-CSRF': csrf },
-      body: JSON.stringify({ id: vorlage.id, titel: $('ed-titel').value, art: art.value, aktiv: $('ed-aktiv').checked, kuerzel: $('ed-kuerzel').value.trim(), bloecke: bloecke }) })
+      body: JSON.stringify({ id: vorlage.id, titel: $('ed-titel').value, art: art.value, aktiv: $('ed-aktiv').checked, kuerzel: $('ed-kuerzel').value.trim(), gruppen: $('ed-gruppen').value, bloecke: bloecke }) })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (r) {
         knopf.disabled = false;

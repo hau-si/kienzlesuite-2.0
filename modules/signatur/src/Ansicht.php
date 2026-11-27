@@ -123,8 +123,29 @@ final class Ansicht {
 
         $aktive = array_values(array_filter($vorlagen, fn($v) => (int)$v['aktiv']));
         if ($darfVorgang) {
+            // Dokumentliste (Wunsch des Nutzers, wie im Fax): Suche nach Namensteilen, Favoriten oben, zuletzt gewählte, Gruppen als Filter.
+            usort($aktive, fn($x, $y) => ((int)$y['favorit'] <=> (int)$x['favorit']) ?: strcasecmp((string)$x['titel'], (string)$y['titel']));
+            $zuletzt = Seite::zuletzt();
+            $vorwahl = $zuletzt[0] ?? (int)($aktive[0]['id'] ?? 0);
             $opt = '';
-            foreach ($aktive as $i => $v) $opt .= '<label class="us-dok"><input type="radio" name="vorlage_id" value="' . (int)$v['id'] . '" data-art="' . $h($v['art']) . '"' . ($i === 0 ? ' checked' : '') . '><span><strong>' . $h($v['titel']) . '</strong><span class="muted klein-text">' . $h(Seite::ARTEN[$v['art']] ?? $v['art']) . '</span></span></label>';
+            foreach ($aktive as $v) {
+                $gr = Seite::gruppenVon($v);
+                $fav = (int)$v['favorit'] === 1;
+                $opt .= '<div class="us-dokzeile" data-name="' . $h(mb_strtolower((string)$v['titel'])) . '" data-gruppen="' . $h(mb_strtolower(implode('|', $gr))) . '"' . ($fav ? ' data-fav="1"' : '') . '>'
+                    . '<label class="us-dok"><input type="radio" name="vorlage_id" value="' . (int)$v['id'] . '" data-art="' . $h($v['art']) . '"' . ((int)$v['id'] === $vorwahl ? ' checked' : '') . '><span><strong>' . $h($v['titel']) . '</strong>'
+                    . '<span class="muted klein-text">' . $h($gr ? implode(' · ', $gr) : (Seite::ARTEN[$v['art']] ?? $v['art'])) . '</span></span></label>'
+                    . '<button type="button" class="us-stern' . ($fav ? ' an' : '') . '" data-favorit="' . (int)$v['id'] . '" aria-pressed="' . ($fav ? 'true' : 'false') . '" title="' . ($fav ? 'Favorit entfernen' : 'Als Favorit oben anzeigen') . '" aria-label="Favorit: ' . $h($v['titel']) . '">' . self::STERN . '</button></div>';
+            }
+            $namen = array_column($aktive, 'titel', 'id');
+            $zl = '';
+            foreach ($zuletzt as $zid) if (isset($namen[$zid])) $zl .= '<button type="button" class="us-chip" data-waehle="' . $zid . '">' . $h($namen[$zid]) . '</button>';
+            $chips = '<button type="button" class="us-chip an" data-filter="">Alle</button><button type="button" class="us-chip" data-filter="fav">★ Favoriten</button>';
+            $benutzt = [];
+            foreach ($aktive as $v) foreach (Seite::gruppenVon($v) as $g) $benutzt[mb_strtolower($g)] ??= $g;
+            foreach (Seite::alleGruppen($aktive) as $g) if (isset($benutzt[mb_strtolower($g)])) $chips .= '<button type="button" class="us-chip" data-filter="g:' . $h(mb_strtolower($g)) . '">' . $h($g) . '</button>';
+            $werkzeug = '<div class="us-dokwerkzeug"><input type="search" id="dok-suche" placeholder="Vorlage suchen …" aria-label="Vorlage suchen" autocomplete="off">'
+                . '<div class="us-chips" role="group" aria-label="Gruppe">' . $chips . '</div>'
+                . ($zl !== '' ? '<div class="us-chips us-zuletzt"><span class="muted klein-text">Zuletzt:</span>' . $zl . '</div>' : '') . '</div>';
             $padOpt = '';
             $aktivePads = array_values(array_filter($pads, fn($p) => (int)$p['aktiv']));
             if (count($aktivePads) > 1) {
@@ -137,7 +158,7 @@ final class Ansicht {
                 $rechts .= '<p class="muted">Es gibt keine aktive Vorlage. Bitte unter Einstellungen eine Vorlage anlegen oder aktivieren.</p>';
             } else {
                 $rechts .= '<form method="post" class="us-form" id="n-form" autocomplete="off">' . $csrfFeld . '<input type="hidden" name="aktion" value="neu"><input type="hidden" name="kontext" id="n-kontext" value=""><input type="hidden" name="leistungen_json" id="n-leistungen" value=""><input type="hidden" name="quelle" id="n-quelle" value=""><input type="hidden" name="quelle_ref" id="n-quelle-ref" value="">'
-                    . '<div class="us-dokliste" role="radiogroup" aria-label="Dokument">' . $opt . '</div>'
+                    . $werkzeug . '<div class="us-dokliste" role="radiogroup" aria-label="Dokument">' . $opt . '</div><p class="muted" id="dok-leer" hidden>Keine passende Vorlage.</p>'
                     . $padOpt
                     . '<div id="n-liste" class="us-liste" hidden><strong>Leistungen aus der Kasse</strong><ul id="n-liste-eintraege"></ul><p class="muted" id="n-liste-summe"></p></div>'
                     . '<details class="fold us-kontakt" id="n-kontakt"><summary>Weitere Patientendaten (für Platzhalter im Dokument)</summary><div class="us-body">'
@@ -212,11 +233,22 @@ final class Ansicht {
             'bloecke' => $wahl ? Seite::bloeckeVon($wahl) : [['id' => 'b1', 'typ' => 'text', 'text' => "# Titel\n\nText mit **fett** und *kursiv*."]],
             'arten' => Seite::ARTEN, 'typen' => Bausteine::TYPEN, 'felder' => Bausteine::FELDER, 'platzhalter' => Seite::PLATZHALTER,
         ];
-        $liste = '';
-        foreach ($vorlagen as $v) {
-            $an = $wahl && (int)$v['id'] === (int)$wahl['id'];
-            $liste .= '<a class="ed-vorlage' . ($an ? ' an' : '') . ((int)$v['aktiv'] ? '' : ' aus') . '" href="' . $h(sg_basis() . '/editor?vorlage=' . (int)$v['id']) . '"' . ($an ? ' aria-current="page"' : '') . '>'
-                . $h($v['titel']) . '<small>' . $h(Seite::ARTEN[$v['art']] ?? $v['art']) . ((int)$v['aktiv'] ? '' : ' · aus') . '</small></a>';
+        $daten['vorlage']['gruppen'] = $wahl ? (string)$wahl['gruppen'] : '';
+        $daten['gruppen'] = Seite::alleGruppen($vorlagen);
+        // Vorlagen nach der ersten Gruppe, Favoriten zuerst; Suche nach Namensteilen (editor.js).
+        $nachGruppe = [];
+        foreach ($vorlagen as $v) $nachGruppe[Seite::gruppenVon($v)[0] ?? 'Ohne Gruppe'][] = $v;
+        uksort($nachGruppe, fn($a, $b) => $a === 'Ohne Gruppe' ? 1 : ($b === 'Ohne Gruppe' ? -1 : strcasecmp($a, $b)));
+        $liste = '<input type="search" id="ed-vsuche" placeholder="Vorlage suchen …" aria-label="Vorlage suchen" autocomplete="off">';
+        foreach ($nachGruppe as $gruppe => $vs) {
+            usort($vs, fn($x, $y) => ((int)$y['favorit'] <=> (int)$x['favorit']) ?: strcasecmp((string)$x['titel'], (string)$y['titel']));
+            $liste .= '<div class="ed-vgruppe"><p class="ed-vgkopf">' . $h($gruppe) . '</p>';
+            foreach ($vs as $v) {
+                $an = $wahl && (int)$v['id'] === (int)$wahl['id'];
+                $liste .= '<a class="ed-vorlage' . ($an ? ' an' : '') . ((int)$v['aktiv'] ? '' : ' aus') . '" data-name="' . $h(mb_strtolower((string)$v['titel'])) . '" href="' . $h(sg_basis() . '/editor?vorlage=' . (int)$v['id']) . '"' . ($an ? ' aria-current="page"' : '') . '>'
+                    . '<span>' . ((int)$v['favorit'] ? '<span class="ed-fav" title="Favorit">★</span> ' : '') . $h($v['titel']) . '</span><small>' . $h(Seite::ARTEN[$v['art']] ?? $v['art']) . ((int)$v['aktiv'] ? '' : ' · aus') . '</small></a>';
+            }
+            $liste .= '</div>';
         }
         $liste .= '<a class="ed-vorlage neu' . ($neu ? ' an' : '') . '" href="' . $h(sg_basis() . '/editor?vorlage=neu') . '">+ Neue Vorlage</a>';
         $palette = '';
@@ -231,6 +263,8 @@ final class Ansicht {
             . '<h2 class="ed-abstand">Vorlagen</h2><nav class="ed-vorlagen">' . $liste . '</nav></aside>'
             . '<section class="card ed-mitte"><div class="ed-kopf"><div class="ed-dok"><input id="ed-titel" maxlength="80" placeholder="Titel der Vorlage" aria-label="Titel der Vorlage">'
             . '<select id="ed-art" aria-label="Dokumentart"></select><input id="ed-kuerzel" maxlength="12" placeholder="Kürzel" title="Kürzel des Akteneintrags in T2med (z. B. EINW). Leer: kein Akteneintrag, nur das PDF." aria-label="Kürzel des Akteneintrags in T2med">'
+            . '<input id="ed-gruppen" maxlength="200" list="ed-gruppenliste" placeholder="Gruppen, z. B. Aufklärungen" title="Gruppen (mit Komma trennen), z. B. Aufklärungen, Administratives, IGeL" aria-label="Gruppen der Vorlage">'
+            . '<datalist id="ed-gruppenliste">' . implode('', array_map(fn($g) => '<option value="' . $h($g) . '">', Seite::alleGruppen($vorlagen))) . '</datalist>'
             . '<label class="check"><input type="checkbox" id="ed-aktiv"> aktiv</label></div>'
             . '<div class="ed-aktionen"><span class="muted klein-text" id="ed-fassung"></span>' . $loeschen . '<button type="button" class="primary" id="ed-speichern">Speichern</button></div></div>'
             . '<p class="ed-meldung" id="ed-meldung" role="status" aria-live="polite" hidden></p>'
@@ -253,6 +287,7 @@ final class Ansicht {
     private const STIFT = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>';
     private const ARCHIV = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18v4H3zM5 8v12h14V8M10 12h4"/></svg>';
     private const EDITOR = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
+    private const STERN = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z"/></svg>';
     private const MUELL = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>';
 
     /** Bereich „Unterschriftenpads“ nur für Admins: eingerichtete Pads als feste Zeilen (Stift, Mülleimer), darunter Anlegen und Suche im Netz. */
