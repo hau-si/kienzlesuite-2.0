@@ -1,6 +1,7 @@
 // Signatur: Aufklappbereiche per Adresse öffnen (#vorlagen) und Löschen bestätigen. Keine Inline-Skripte (CSP).
 (function () {
   'use strict';
+  var ANFANG = location.hash || '';   // vor dem Aufräumen der Adresse merken (Start aus T2med oder Übergabe der Kasse)
   function oeffneAusAdresse() {
     var id = (location.hash || '').replace(/^#/, '');
     if (!/^[a-z-]{1,30}$/.test(id)) return;
@@ -31,18 +32,26 @@
     var box = document.getElementById('n-kontakt');
     if (box && etwas) box.open = true;
   }
-  // Patient ist vorgewählt (aus T2med oder der Kasse): Kasten oben zeigen, Patientenfeld im Formular ausblenden.
+  // Patient ist vorgewählt (aus T2med oder der Kasse): Patientenkarte oben füllen (Entwurf B3), Namensfeld ausblenden.
+  var RUECKWEG = /^\/[a-z0-9-]{1,31}\/$/;
   function patientZeigen(quelle, d) {
     var kasten = document.getElementById('n-gewaehlt'), feld = document.getElementById('n-patient-feld'), name = document.getElementById('n-patient');
     if (!kasten || !feld || !name || !name.value) return;
     document.getElementById('n-gewaehlt-anzeige').hidden = false; document.getElementById('n-gewaehlt-weg').hidden = false;
-    document.getElementById('n-gewaehlt-quelle').textContent = quelle === 'kasse' ? 'PATIENT AUS DER KASSE' : 'PATIENT AUS T2MED';
+    var t2med = quelle === 't2med' || d.t2med === true;
+    document.getElementById('n-gewaehlt-marke').classList.toggle('neutral', !t2med);
+    document.getElementById('n-gewaehlt-quelle').textContent = t2med ? 'T2med' : (quelle === 'kasse' ? 'Kasse' : 'Patient');
     document.getElementById('n-gewaehlt-name').textContent = name.value;
     var geb = String(d.geburtsdatum || ''), m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(geb);
-    document.getElementById('n-gewaehlt-info').textContent = geb ? 'Geboren am ' + (m ? m[3] + '.' + m[2] + '.' + m[1] : geb) : '';
+    document.getElementById('n-gewaehlt-info').textContent = geb ? 'geb. ' + (m ? m[3] + '.' + m[2] + '.' + m[1] : geb) : '';
+    var zk = document.getElementById('n-zur-kasse');
+    if (zk) { var weg = quelle === 'kasse' && RUECKWEG.test(String(d.zurueck || '')); zk.hidden = !weg; if (weg) zk.href = d.zurueck; }
     feld.hidden = true;
-    kasten.scrollIntoView({ block: 'nearest' });
   }
+  // Der Patient bleibt im Tab erhalten (Seitenwechsel, neuer Vorgang, Wechsel zur Kasse und zurück), bis „Entfernen“.
+  var SP = 'sg-patient', ZURUECK = 'sg-zurueck';
+  function merken(quelle, d) { try { sessionStorage.setItem(SP, JSON.stringify({ quelle: quelle, d: d })); } catch (e) { /* ohne sessionStorage */ } }
+  function gemerkt() { try { var g = JSON.parse(sessionStorage.getItem(SP) || 'null'); return g && g.d && (g.quelle === 'kasse' || g.quelle === 't2med') ? g : null; } catch (e) { return null; } }
   (function () {
     var weg = document.getElementById('n-gewaehlt-weg');
     if (!weg) return;
@@ -54,7 +63,10 @@
       var l = document.getElementById('n-liste'); if (l) l.hidden = true;
       var kb = document.getElementById('n-kontakt-box'); if (kb) kb.hidden = true;
       Array.prototype.forEach.call(form.querySelectorAll('p.notice, p.error'), function (p) { p.remove(); });
-      document.getElementById('n-gewaehlt-anzeige').hidden = true; document.getElementById('n-gewaehlt-weg').hidden = true; document.getElementById('n-gewaehlt-quelle').textContent = 'PATIENT'; document.getElementById('n-patient-feld').hidden = false;
+      document.getElementById('n-gewaehlt-anzeige').hidden = true; document.getElementById('n-gewaehlt-weg').hidden = true; document.getElementById('n-gewaehlt-quelle').textContent = 'Patient'; document.getElementById('n-patient-feld').hidden = false;
+      document.getElementById('n-gewaehlt-marke').classList.add('neutral');
+      var zk = document.getElementById('n-zur-kasse'); if (zk) zk.hidden = true;
+      try { sessionStorage.removeItem(SP); sessionStorage.removeItem(ZURUECK); } catch (e) { /* ohne sessionStorage */ }
       document.getElementById('n-patient').focus();
     });
   })();
@@ -69,6 +81,14 @@
     t.value = t.value.slice(0, von) + w + t.value.slice(bis);
     t.focus(); t.selectionStart = t.selectionEnd = von + w.length;
   });
+  function t2medUebernehmen(j) {
+    var feld = document.getElementById('n-patient'); if (!feld) return;
+    feld.value = String(j.patient || '').slice(0, 80);
+    var k = document.getElementById('n-kontext');
+    if (k) k.value = j.kontext || '';
+    kontaktFuellen(j);
+    patientZeigen('t2med', j);
+  }
   // Start aus T2med: #launch=<Code> einlösen (einmalig) und den Patienten in „Neuer Vorgang“ eintragen.
   (function () {
     var m = /^#launch=([0-9a-f]{64})$/.exec(location.hash || '');
@@ -83,61 +103,93 @@
         var hinweis = document.createElement('p');
         hinweis.className = a.ok ? 'notice' : 'error';
         if (a.ok) {
-          feld.value = a.j.patient || '';
-          var k = document.getElementById('n-kontext');
-          if (k) k.value = a.j.kontext || '';
-          kontaktFuellen(a.j);
+          t2medUebernehmen(a.j);
+          merken('t2med', a.j);
           hinweis.textContent = 'Patient aus T2med übernommen: ' + (a.j.patient || '');
         } else {
           hinweis.textContent = a.j.error || 'Der Start aus T2med ist fehlgeschlagen.';
         }
         feld.form.insertBefore(hinweis, feld.form.firstChild);
-        if (a.ok) patientZeigen('t2med', a.j);
       })
       .catch(function () { /* ohne Netz bleibt die Startseite wie gewohnt */ });
   })();
-  // Übergabe aus der Kasse: #uebergabe=<base64url-JSON> mit Patient, Verweis und Leistungsliste in „Neuer Vorgang“ eintragen.
-  // Das Fragment geht nie an den Server; geprüft wird die Liste beim Anlegen noch einmal auf dem Server.
+  // Übergabe aus der Kasse: Patient, Verweis und Leistungsliste in „Neuer Vorgang“ eintragen. Liefert false, wenn die Liste fehlt.
+  function kasseUebernehmen(d) {
+    var feld = document.getElementById('n-patient'); if (!feld) return false;
+    var liste = Array.isArray(d.leistungen) ? d.leistungen.slice(0, 40).map(function (z) {
+      return { code: String(z.code || '').slice(0, 12), label: String(z.label || '').slice(0, 120), cent: Math.max(0, Math.round(Number(z.cent) || 0)) };
+    }).filter(function (z) { return z.label; }) : [];
+    if (!liste.length) return false;
+    feld.value = String(d.patient || '').slice(0, 80);
+    kontaktFuellen(d);
+    document.getElementById('n-leistungen').value = JSON.stringify(liste);
+    document.getElementById('n-quelle').value = 'kasse';
+    document.getElementById('n-quelle-ref').value = /^[A-Za-z0-9._-]{1,64}$/.test(String(d.ref || '')) ? String(d.ref) : '';
+    var euro = function (c) { return (c / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; };
+    var ul = document.getElementById('n-liste-eintraege'), summe = 0;
+    ul.textContent = '';
+    liste.forEach(function (z) {
+      var li = document.createElement('li');
+      li.textContent = (z.code ? 'GOÄ ' + z.code + ': ' : '') + z.label + ' – ' + euro(z.cent);
+      ul.appendChild(li); summe += z.cent;
+    });
+    document.getElementById('n-liste-summe').textContent = liste.length + ' Leistung(en), zusammen ' + euro(summe) + '. Summe und Leistungen gehen aus der Kasse in das Dokument.';
+    document.getElementById('n-liste').hidden = false;
+    var l = document.getElementById('n-leistung'), b = document.getElementById('n-betrag');
+    if (l) { l.value = liste.map(function (z) { return z.label; }).join(', ').slice(0, 120); l.readOnly = true; }
+    if (b) { b.value = (summe / 100).toFixed(2).replace('.', ','); b.readOnly = true; }
+    // Aus der Kasse (IGeL): den IGeL-Vertrag vorwählen.
+    var igel = document.querySelector('input[name="vorlage_id"][data-art="igel"]'); if (igel) igel.checked = true;
+    patientZeigen('kasse', d);
+    return true;
+  }
+  // #uebergabe=<base64url-JSON> aus der Kasse. Das Fragment geht nie an den Server; geprüft wird die Liste beim Anlegen noch einmal.
   (function () {
     var m = /^#uebergabe=([A-Za-z0-9_-]{1,12000})$/.exec(location.hash || '');
     var feld = document.getElementById('n-patient');
     if (!m || !feld) return;
     history.replaceState(null, '', location.pathname + location.search);
-    var hinweis = document.createElement('p');
+    var hinweis = document.createElement('p'), d = null;
     try {
       var b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
       var roh = atob(b64 + '==='.slice((b64.length + 3) % 4));
-      var d = JSON.parse(new TextDecoder().decode(Uint8Array.from(roh, function (c) { return c.charCodeAt(0); })));
-      var liste = Array.isArray(d.leistungen) ? d.leistungen.slice(0, 40).map(function (z) {
-        return { code: String(z.code || '').slice(0, 12), label: String(z.label || '').slice(0, 120), cent: Math.max(0, Math.round(Number(z.cent) || 0)) };
-      }).filter(function (z) { return z.label; }) : [];
-      if (!liste.length) throw new Error('leer');
-      feld.value = String(d.patient || '').slice(0, 80);
-      kontaktFuellen(d);
-      document.getElementById('n-leistungen').value = JSON.stringify(liste);
-      document.getElementById('n-quelle').value = 'kasse';
-      document.getElementById('n-quelle-ref').value = /^[A-Za-z0-9._-]{1,64}$/.test(String(d.ref || '')) ? String(d.ref) : '';
-      var euro = function (c) { return (c / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; };
-      var ul = document.getElementById('n-liste-eintraege'), summe = 0;
-      ul.textContent = '';
-      liste.forEach(function (z) {
-        var li = document.createElement('li');
-        li.textContent = (z.code ? 'GOÄ ' + z.code + ': ' : '') + z.label + ' – ' + euro(z.cent);
-        ul.appendChild(li); summe += z.cent;
-      });
-      document.getElementById('n-liste-summe').textContent = liste.length + ' Leistung(en), zusammen ' + euro(summe) + '. Summe und Leistungen gehen aus der Kasse in das Dokument.';
-      document.getElementById('n-liste').hidden = false;
-      var l = document.getElementById('n-leistung'), b = document.getElementById('n-betrag');
-      if (l) { l.value = liste.map(function (z) { return z.label; }).join(', ').slice(0, 120); l.readOnly = true; }
-      if (b) { b.value = (summe / 100).toFixed(2).replace('.', ','); b.readOnly = true; }
+      d = JSON.parse(new TextDecoder().decode(Uint8Array.from(roh, function (c) { return c.charCodeAt(0); })));
+      if (!kasseUebernehmen(d)) throw new Error('leer');
+      merken('kasse', d);
       hinweis.className = 'notice';
-      hinweis.textContent = 'Aus der Kasse übernommen: ' + feld.value + ' mit ' + liste.length + ' Leistung(en). Bitte das Dokument wählen und den Vorgang anlegen.';
+      hinweis.textContent = 'Aus der Kasse übernommen: ' + feld.value + '. Bitte das Dokument wählen und den Vorgang anlegen; nach der Unterschrift geht es zurück zur Kasse zum Bezahlen.';
     } catch (e) {
       hinweis.className = 'error';
       hinweis.textContent = 'Die Übergabe aus der Kasse konnte nicht gelesen werden. Bitte in der Kasse erneut „Zur Unterschrift“ wählen.';
     }
     feld.form.insertBefore(hinweis, feld.form.firstChild);
-    if (hinweis.className === 'notice') patientZeigen('kasse', d); else feld.form.scrollIntoView({ block: 'nearest' });
+  })();
+  // Gemerkten Patienten wieder eintragen (ohne neuen Aufruf aus T2med oder der Kasse).
+  (function () {
+    if (/^#(launch|uebergabe)=/.test(ANFANG) || !document.getElementById('n-patient')) return;
+    var g = gemerkt(); if (!g) return;
+    if (g.quelle === 'kasse') kasseUebernehmen(g.d); else t2medUebernehmen(g.d);
+  })();
+  // Vorgang aus der Kasse angelegt: nach der Unterschrift zurück zur Kasse (dort wird bezahlt, der Patient steht noch oben).
+  (function () {
+    var form = document.getElementById('n-form');
+    if (form) form.addEventListener('submit', function () {
+      var g = gemerkt(), ref = (document.getElementById('n-quelle-ref') || {}).value || '';
+      if (g && g.quelle === 'kasse' && ref && RUECKWEG.test(String(g.d.zurueck || ''))) {
+        try { sessionStorage.setItem(ZURUECK, JSON.stringify({ ref: ref, zurueck: g.d.zurueck, zeit: Date.now() })); } catch (e) { /* ohne sessionStorage */ }
+      }
+    });
+    var z = null; try { z = JSON.parse(sessionStorage.getItem(ZURUECK) || 'null'); } catch (e) { z = null; }
+    if (!z || !RUECKWEG.test(String(z.zurueck || '')) || Date.now() - z.zeit > 2 * 3600 * 1000) { try { sessionStorage.removeItem(ZURUECK); } catch (e) { /* */ } return; }
+    var karte = null;
+    Array.prototype.forEach.call(document.querySelectorAll('.us-vz[data-ref]'), function (k) { if (!karte && k.getAttribute('data-ref') === z.ref) karte = k; });
+    if (!karte || !/^(unterschrieben|uebertragen)$/.test(karte.getAttribute('data-status') || '')) return;
+    try { sessionStorage.removeItem(ZURUECK); } catch (e) { /* */ }
+    var hinweis = document.createElement('p');
+    hinweis.className = 'ok'; hinweis.setAttribute('role', 'status');
+    hinweis.textContent = 'Unterschrieben. Zurück zur Kasse zum Bezahlen …';
+    var us = document.querySelector('.us'); if (us) us.insertBefore(hinweis, us.children[1] || null);
+    setTimeout(function () { location.href = z.zurueck; }, 2000);
   })();
   // Vorgangsliste: Suche und Filter wirken sofort im Browser.
   var tabelle = document.getElementById('vg-tabelle');

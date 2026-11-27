@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.20
+
+- **Neu: Gestaltungsregel für Module** (`docs/MODUL-GESTALTUNG.md`): Patient oben als Karte, Vorgänge links, der Patient bleibt im Tab erhalten (auch beim Wechsel zwischen Modulen), Wechsel zwischen Modulen im selben Tab, alle Seiten 1400 px breit, Liniensymbole statt Emojis.
+- **Neu: Patientenkarte als Bauteil** in `core.css` (`.patient-karte`, `.pk-marke` mit Herz „T2med“ oder neutral, `.pk-text`, `.pk-knoepfe`, `.pk-knopf`, `.pk-weg`), zuerst genutzt von Kasse und Signatur. `core.css?v=38`.
+- Nur Oberfläche, mit Tests und in der Vorschau geprüft. **Nicht auf der VM geprüft.** Vor Kasse und Signatur aktualisieren, sonst fehlt der Karte die Gestaltung.
+
 ## 0.22.0-beta.19
 
 - **Fehler behoben: Agent richtete keine Drucker ein** („0 von 1 eingerichtet“ bei vier Druckern, „keine MSFT_Printer-Objekte … Name gleich …“). Windows PowerShell 5.1 reichte die Druckerliste als ein einziges Objekt weiter; dadurch standen alle vier Namen in einem Eintrag. Das Skript liest die Liste jetzt über eine Variable. Derselbe Fehler steckte im Entfernen alter Drucker.

@@ -90,7 +90,7 @@ $liste = Ansicht::seite('/vorgaenge', 'tok', Seite::vorgaenge(), Seite::vorlagen
 $einst = Ansicht::seite('/einstellungen', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null);
 $start = Ansicht::seite('/', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null, null, null, [], Seite::aktuellerVorgang());
 check(!str_contains($liste, '<script>x') && str_contains($liste, '&lt;script&gt;x') && !str_contains($einst, '<b>Titel</b>') && str_contains($einst, '&lt;b&gt;Titel'), 'Ausgabe maskiert');
-check(str_contains($start, 'name="kienzle-csrf" value="tok"') && str_contains($start, 'Dokument wählen') && str_contains($start, 'us-links') && str_contains($start, 'name="vorlage_id"') && str_contains($start, 'Anderen Patienten wählen') && str_contains($einst, 'id="vorlagen"'), 'Start und Einstellungen');
+check(str_contains($start, 'name="kienzle-csrf" value="tok"') && str_contains($start, 'Dokument wählen') && str_contains($start, 'us-links') && str_contains($start, 'name="vorlage_id"') && str_contains($start, 'class="patient-karte us-gewaehlt"') && str_contains($start, 'id="n-zur-kasse"') && str_contains($einst, 'id="vorlagen"'), 'Start und Einstellungen');
 check(str_contains($liste, 'id="vg-suche"') && str_contains($liste, 'data-suche="') && str_contains($liste, 'id="vg-art"'), 'Liste mit Suche und Filtern');
 check(!str_contains($start, 'id="vorlagen"') && !str_contains($liste, 'id="vorlagen"'), 'Vorlagen nur unter Einstellungen');
 $nurVorgang = Ansicht::seite('/', 'tok', [], [], true, false, null, null);
@@ -214,6 +214,13 @@ Seite::vorgangLoeschen($lv);
 check(Seite::vorgang($lv) === null, 'abgebrochener Vorgang gelöscht');
 wirft(fn() => Seite::vorgangLoeschen($lv), 'schon gelöscht');
 check(str_contains(Ansicht::seite('/vorgaenge', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null), 'value="vorgang-loeschen"'), 'Löschknopf in der Liste');
+// Neuer Vorgang gleich ans Pad; ist das Pad belegt, wartet er
+$g1 = Seite::vorgangAnlegen($neu + ['pad_id' => $pa], 'x');
+check(Seite::gleichAnsPad($g1) === 'Vorgang angelegt und an das Pad geschickt.' && Seite::vorgang($g1)['status'] === 'am_pad', 'gleich am Pad');
+$g2 = Seite::vorgangAnlegen($neu + ['pad_id' => $pa], 'x');
+check(str_contains(Seite::gleichAnsPad($g2), 'anderer Vorgang') && Seite::vorgang($g2)['status'] === 'wartet', 'Pad belegt: wartet');
+Seite::abbrechen($g1); Seite::abbrechen($g2);
+
 // Ansehen: PDF unterschriebener Vorgänge, sonst der Text; Geburtsdatum und Praxis für das PDF; Löschen entfernt die Dateien
 $pv = Seite::vorgangAnlegen($neu + ['pad_id' => $pa, 'geburtsdatum' => '1970-02-01'], 'x', ['name' => 'Praxis Dr. med. Erika Beispiel', 'city' => '12345 Musterstadt', 'fremd' => 'x']);
 $row = Seite::vorgang($pv);

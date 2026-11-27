@@ -1,5 +1,11 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.54
+
+- **Wechsel zu Signatur im selben Tab:** „Zur Unterschrift“ öffnet Signatur jetzt im selben Tab statt in einem neuen. Der Patient bleibt oben erhalten, und Signatur springt nach der Unterschrift hierher zurück zum Bezahlen. Die gewählten Leistungen stehen dann noch da.
+- Die Patientenkarte nutzt das neue Bauteil der Basis (ab Basis 0.22.0-beta.20, `docs/MODUL-GESTALTUNG.md`).
+- **Nicht auf der VM geprüft.**
+
 ## 2.3.4-beta.53
 
 - **Neu: Patient aus T2med bleibt oben (Entwurf B3).** Über der Kasse steht eine Karte mit großem Herz-Etikett „T2med“, dem Namen und dem Geburtsdatum. Sie bleibt stehen, auch wenn man eine Rechnung aus der Liste öffnet, zur freien Eingabe, zu „IGeL“, „Vorgänge“ oder „Einstellungen“ wechselt und zurückkommt; sie gilt für diesen Browser-Tab.

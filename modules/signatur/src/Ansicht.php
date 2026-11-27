@@ -92,7 +92,7 @@ final class Ansicht {
         $links = '<aside class="card us-links"><div class="us-kopf"><h2>Vorgänge</h2><a class="muted klein-text" href="' . $h(sg_basis()) . '/vorgaenge">Alle</a></div>';
         if (!$offene) $links .= '<p class="muted">Keine Vorgänge in den letzten Tagen. Rechts einen neuen anlegen.</p>';
         foreach (array_slice($offene, 0, 30) as $v) {
-            $links .= '<div class="us-vz' . ($v['status'] === 'am_pad' ? ' am-pad' : '') . '"><div class="us-vz-kopf"><div><strong>' . $h($v['patient']) . '</strong><div class="muted klein-text">' . $h($v['titel']) . ' · ' . $h(self::datum((int)$v['erstellt'])) . '</div></div>'
+            $links .= '<div class="us-vz' . ($v['status'] === 'am_pad' ? ' am-pad' : '') . '" data-status="' . $h($v['status']) . '"' . ($v['quelle'] === 'kasse' ? ' data-ref="' . $h((string)$v['quelle_ref']) . '"' : '') . '><div class="us-vz-kopf"><div><strong>' . $h($v['patient']) . '</strong><div class="muted klein-text">' . $h($v['titel']) . ' · ' . $h(self::datum((int)$v['erstellt'])) . '</div></div>'
                 . '<span class="us-status s-' . $h($v['status']) . '">' . $h(Seite::STATI[$v['status']] ?? $v['status']) . '</span></div>'
                 . ($v['meldung'] !== '' ? '<div class="muted klein-text">' . $h($v['meldung']) . '</div>' : '')
                 . '<div class="aktionen">' . self::aktionen($v, $csrfFeld, $darfVorgang) . '</div></div>';
@@ -100,15 +100,17 @@ final class Ansicht {
         $links .= '</aside>';
         // Patient aus T2med oder der Kasse: Kasten oben rechts (JS blendet ihn ein und das Patientenfeld im Formular aus).
         $rechts = '';
-        if ($darfVorgang) $rechts .= '<section class="card us-gewaehlt" id="n-gewaehlt"><div class="us-patient"><div><div class="eyebrow muted" id="n-gewaehlt-quelle">PATIENT</div>'
-            . '<div id="n-gewaehlt-anzeige" hidden><strong class="us-name" id="n-gewaehlt-name"></strong><div class="muted" id="n-gewaehlt-info"></div></div>'
+        // Patientenkarte (Entwurf B3, Bauteil der Basis, docs/MODUL-GESTALTUNG.md): ohne Patient mit Namensfeld, sonst Name groß,
+        // Etikett „T2med“ mit Herz (bei Patienten aus T2med) und die Knöpfe „Zur Kasse“ (Übergabe aus der Kasse) und „Entfernen“.
+        if ($darfVorgang) $rechts .= '<section class="patient-karte us-gewaehlt" id="n-gewaehlt"><div class="pk-marke neutral" id="n-gewaehlt-marke"><svg class="pk-herz" viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 5 6.4 5c2 0 3.4 1.1 4.1 2.3h3C14.2 6.1 15.6 5 17.6 5 21 5 23.1 8.4 21.6 11.8 19.5 16.4 12 21 12 21z"/></svg><svg class="pk-person" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg><span id="n-gewaehlt-quelle">Patient</span></div>'
+            . '<div class="pk-text"><div id="n-gewaehlt-anzeige" class="us-pk-anzeige" hidden><strong id="n-gewaehlt-name"></strong><span id="n-gewaehlt-info"></span></div>'
             . '<div id="n-patient-feld"><label for="n-patient" class="sr-only">Patient</label><input id="n-patient" name="patient" form="n-form" maxlength="80" required placeholder="Name des Patienten, z. B. Max Mustermann"></div></div>'
-            . '<button type="button" class="small" id="n-gewaehlt-weg" hidden>Anderen Patienten wählen</button></div></section>';
+            . '<div class="pk-knoepfe"><a class="button primary pk-knopf" id="n-zur-kasse" href="#" hidden><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg> Zur Kasse</a><button type="button" class="pk-knopf pk-weg" id="n-gewaehlt-weg" hidden><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg> Entfernen</button></div></section>';
 
         $aktive = array_values(array_filter($vorlagen, fn($v) => (int)$v['aktiv']));
         if ($darfVorgang) {
             $opt = '';
-            foreach ($aktive as $i => $v) $opt .= '<label class="us-dok"><input type="radio" name="vorlage_id" value="' . (int)$v['id'] . '"' . ($i === 0 ? ' checked' : '') . '><span><strong>' . $h($v['titel']) . '</strong><span class="muted klein-text">' . $h(Seite::ARTEN[$v['art']] ?? $v['art']) . '</span></span></label>';
+            foreach ($aktive as $i => $v) $opt .= '<label class="us-dok"><input type="radio" name="vorlage_id" value="' . (int)$v['id'] . '" data-art="' . $h($v['art']) . '"' . ($i === 0 ? ' checked' : '') . '><span><strong>' . $h($v['titel']) . '</strong><span class="muted klein-text">' . $h(Seite::ARTEN[$v['art']] ?? $v['art']) . '</span></span></label>';
             $padOpt = '';
             $aktivePads = array_values(array_filter($pads, fn($p) => (int)$p['aktiv']));
             if (count($aktivePads) > 1) {
@@ -139,7 +141,7 @@ final class Ansicht {
                     . '<label for="n-betrag">Betrag in Euro</label><input id="n-betrag" name="betrag" inputmode="decimal" maxlength="12" placeholder="z. B. 45,00">'
                     . '<label class="check"><input type="checkbox" name="druck_vorher" value="1"> Dokument vor der Unterschrift für den Patienten drucken</label>'
                     . '<label class="check"><input type="checkbox" name="druck_nachher" value="1"> Unterschriebenes Dokument danach drucken</label>'
-                    . '<button class="primary" type="submit">Vorgang anlegen</button></form>';
+                    . '<button class="primary" type="submit">Vorgang anlegen und ans Pad senden</button></form>';
             }
             $rechts .= '</section>';
         }

@@ -65,13 +65,16 @@ async function signaturSenden() {
   // Kontaktdaten frisch aus T2med; ohne sie öffnet Signatur trotzdem, die Felder bleiben dann zum Ausfüllen leer.
   let kontakt = {};
   try { kontakt = await api('patient_kontakt'); } catch (e) { kontakt = {}; }
-  const roh = JSON.stringify({patient: state.patient.name, geburtsdatum: kontakt.geburtsdatum || state.patient.birthdate || '', vorname: kontakt.vorname || '', nachname: kontakt.nachname || '', geschlecht: kontakt.geschlecht || '', telefon: kontakt.telefon || '', email: kontakt.email || '', adresse: kontakt.adresse || '', ref: visitId || '', leistungen: liste});
+  const roh = JSON.stringify({patient: state.patient.name, geburtsdatum: kontakt.geburtsdatum || state.patient.birthdate || '', vorname: kontakt.vorname || '', nachname: kontakt.nachname || '', geschlecht: kontakt.geschlecht || '', telefon: kontakt.telefon || '', email: kontakt.email || '', adresse: kontakt.adresse || '', ref: visitId || '', leistungen: liste, zurueck: BASE, t2med: !!state.t2med});
   const bytes = new TextEncoder().encode(roh); let bin = ''; bytes.forEach(b => { bin += String.fromCharCode(b); });
   const kodiert = btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   if (kodiert.length > 12000) { alert('Die Liste ist für die Übergabe zu lang. Bitte weniger Positionen wählen.'); return; }
   // T2med-Zugang dieses Besuchs für die Ablage des unterschriebenen PDFs vormerken (bleibt auch nach dem Kassieren, höchstens 4 Stunden).
   try { await api('signatur_offen'); } catch (e) { /* ohne T2med wird das PDF nur in Signatur abgelegt */ }
-  window.open(SIGNATUR + '#uebergabe=' + kodiert, '_blank', 'noopener');
+  // Auswahl für den Rückweg merken (nach der Unterschrift wird hier bezahlt).
+  try { sessionStorage.setItem('ks-auswahl-' + visitId, JSON.stringify({services: [...selected], groups: [...selectedGroups], reasons, manual: $('manual').value, date: $('service-date').value})); } catch { /* ohne sessionStorage */ }
+  // Im selben Tab (nicht in einem neuen): So bleibt der Patient oben erhalten, und Signatur springt nach der Unterschrift hierher zurück.
+  (window.top || window).location.href = SIGNATUR + '#uebergabe=' + kodiert;
   const note = $('sign-note'); note.hidden = false; note.textContent = 'In Signatur geöffnet. Dort Dokument wählen und den Vorgang anlegen; danach hier wie gewohnt kassieren.' + (kontakt.hinweis ? ' ' + kontakt.hinweis : '');
 }
 $('sign-send').addEventListener('click', signaturSenden);
@@ -700,6 +703,8 @@ async function init() {
   }
   if(visitId) {
     const saved=sessionStorage.getItem('ks-start-'+visitId);
+    const auswahl=sessionStorage.getItem('ks-auswahl-'+visitId);
+    if(auswahl && !saved) { try { const a=JSON.parse(auswahl); selected=new Set(a.services||[]); selectedGroups=new Set(a.groups||[]); reasons=a.reasons||{}; $('manual').value=a.manual||''; if(a.date) $('service-date').value=a.date; } catch { /* alte Auswahl verwerfen */ } sessionStorage.removeItem('ks-auswahl-'+visitId); }
     if(saved) { try { startRequest=JSON.parse(saved); selected=new Set(startRequest.services); selectedGroups=new Set(startRequest.groups || []); reasons=startRequest.reasons || {}; $('service-date').value=startRequest.service_date || ''; $('manual').value=startRequest.manual_amount; if(startRequest.method==='cash') document.querySelector('input[name="pay-method"][value="cash"]').checked=true; } catch { sessionStorage.removeItem('ks-start-'+visitId); } }
     await load();
     if(auto.invoice && auto.action) autoAction(auto.invoice, auto.action);

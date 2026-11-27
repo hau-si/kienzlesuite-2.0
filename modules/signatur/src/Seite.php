@@ -292,6 +292,21 @@ final class Seite {
         self::pdo()->prepare('UPDATE vorgaenge SET status="am_pad", meldung="" WHERE id=? AND status IN ("wartet","fehler")')->execute([$id]);
     }
 
+    /**
+     * Neuer Vorgang gleich ans Pad (ein Klick weniger): mit zugeordnetem, aktivem und freiem Pad sofort „am Pad“, sonst wartet er.
+     * @return string Meldung für die Seite
+     */
+    public static function gleichAnsPad(int $id): string {
+        $v = self::vorgang($id);
+        if (!$v || (int)$v['pad_id'] <= 0) return 'Vorgang angelegt. Er wartet auf die Unterschrift (kein Pad eingerichtet).';
+        try {
+            self::amPadZeigen($id);
+            return 'Vorgang angelegt und an das Pad geschickt.';
+        } catch (\InvalidArgumentException $e) {
+            return 'Vorgang angelegt. ' . $e->getMessage() . ' Er wartet und lässt sich später mit „Zum Pad senden“ schicken.';
+        }
+    }
+
     /** Nimmt einen Vorgang vom Pad zurück (der Pad-Dienst räumt das Display). */
     public static function vomPadNehmen(int $id): void {
         $v = self::vorgang($id);

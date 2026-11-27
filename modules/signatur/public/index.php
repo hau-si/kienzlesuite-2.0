@@ -114,8 +114,8 @@ try {
         try {
             $aktion = (string)($_POST['aktion'] ?? '');
             if ($aktion === 'neu' && $darfVorgang) {
-                Seite::vorgangAnlegen($_POST, $k->benutzer(), $k->praxis(), (string)($_POST['kontext'] ?? ''));
-                $meldung = 'Vorgang angelegt. Er wartet auf die Unterschrift.';
+                $neu = Seite::vorgangAnlegen($_POST, $k->benutzer(), $k->praxis(), (string)($_POST['kontext'] ?? ''));
+                $meldung = Seite::gleichAnsPad($neu);
             } elseif ($aktion === 'am-pad' && $darfVorgang) {
                 Seite::amPadZeigen((int)($_POST['id'] ?? 0));
                 $meldung = 'Der Vorgang erscheint jetzt am Pad.';

@@ -62,7 +62,7 @@ main.modul { max-width: 940px; margin: 0; padding: 32px 40px 48px; }
 .us-platz { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 2px 0 6px; }
 .us-platz button { font-family: ui-monospace, monospace; }
 
-.us-gewaehlt { border-left: 4px solid var(--teal, #12695d); }
+.us-gewaehlt { border-left: 0; }
 .us-gewaehlt .us-patient { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 
 .button.mit-icon { display: inline-flex; align-items: center; gap: 8px; }
@@ -87,3 +87,10 @@ main.modul { max-width: 1180px; }
 .us-gewaehlt #n-patient-feld input { width: 100%; font-size: 20px; }
 a.button.small { min-height: 0; padding: 4px 10px; font-size: 13px; }
 .us-dokument { white-space: pre-wrap; line-height: 1.55; max-width: 820px; }
+
+/* Gleiche Seitenbreite wie die Kasse (Gestaltungsregel der Module). */
+main.modul { max-width: 1400px; }
+/* Patientenkarte: Grundlage in core.css; ohne Patient trägt sie das Namensfeld. */
+.us-gewaehlt #n-patient-feld input { margin: 0; }
+.us-pk-anzeige { display: flex; flex-direction: column; }
+.us-pk-anzeige[hidden] { display: none; }

@@ -1,5 +1,18 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.33
+
+- **Patientenkarte oben (Entwurf B3, wie in der Kasse):**
+  - Etikett mit Herz „T2med“ bei Patienten aus T2med, sonst neutral; Name groß.
+  - Knopf **„Zur Kasse“** bei Übergaben aus der Kasse.
+  - Knopf **„Entfernen“** statt „Anderen Patienten wählen“.
+  - Ohne Patient trägt die Karte das Namensfeld.
+- **Der Patient bleibt erhalten** (in diesem Browser-Tab): beim Wechsel zu „Alle Vorgänge“ oder „Einstellungen“, nach dem Anlegen eines Vorgangs und beim Wechsel zur Kasse und zurück, bis „Entfernen“.
+- **Zurück zur Kasse nach der Unterschrift:** Ein Vorgang aus der Kasse springt nach der Unterschrift von selbst zur Kasse zurück, damit gleich bezahlt werden kann (IGeL mit Unterschrift). Bei Übergaben aus der Kasse ist der IGeL-Vertrag vorgewählt.
+- **Ein Klick weniger:** „Vorgang anlegen und ans Pad senden“ schickt den neuen Vorgang gleich ans Pad, wenn es frei ist; sonst wartet er wie bisher.
+- Seiten so breit wie die Kasse (1400 px).
+- In der Vorschau und mit Tests geprüft. **Nicht am Pad und nicht auf der VM geprüft.**
+
 ## 0.1.0-beta.32
 
 - **Neu: Unterschriebenes PDF in die T2med-Akte.** Kurz nach „OK“ am Pad legt die Signatur das PDF als Anhang (`DocumentReference`, Profil „Anhang“) in der Akte des Patienten ab:
