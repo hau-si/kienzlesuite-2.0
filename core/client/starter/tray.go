@@ -107,7 +107,7 @@ func AnsichtBauen(s Status, vorhanden bool, jetzt time.Time) Ansicht {
 		}
 		switch {
 		case s.AkteZeit == 0:
-			v.Zeilen = append(v.Zeilen, Zeile{"Akte öffnen", "bereit (C:\\Kienzle\\GDT)", Gruen})
+			v.Zeilen = append(v.Zeilen, Zeile{"Akte öffnen", "bereit (C:\\Praxisherz\\GDT)", Gruen})
 		case s.AkteOk:
 			v.Zeilen = append(v.Zeilen, Zeile{"Akte öffnen", "zuletzt " + time.Unix(s.AkteZeit, 0).Format("15:04"), Gruen})
 		default:

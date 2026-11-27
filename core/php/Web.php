@@ -164,11 +164,11 @@ final class Web {
             . '<p>Ohne diesen Schritt zeigt der Browser „Nicht sicher“. Die Datei ist kein Programm, sondern der Ausweis der Suite.</p>'
             . '<p class="row-buttons"><a class="button" href="/ca.crt">Zertifikat herunterladen</a></p>'
             . ($fp !== '' ? '<p class="muted">Zum Vergleich – so muss der Fingerabdruck (SHA-256) lauten:<br><code>' . V::h($fp) . '</code></p>' : '')
-            . '<details class="how" open><summary>Windows</summary><ol class="steps"><li>Die heruntergeladene Datei <strong>kienzle-suite-ca.crt</strong> doppelklicken.</li>'
+            . '<details class="how" open><summary>Windows</summary><ol class="steps"><li>Die heruntergeladene Datei <strong>praxisherz-ca.crt</strong> doppelklicken.</li>'
             . '<li>„Zertifikat installieren …“ → <strong>Lokaler Computer</strong> → Weiter (Admin-Bestätigung).</li>'
             . '<li>„Alle Zertifikate in folgendem Speicher speichern“ → Durchsuchen → <strong>Vertrauenswürdige Stammzertifizierungsstellen</strong> → OK → Weiter → Fertig stellen.</li>'
             . '<li>Browser ganz schließen und neu öffnen.</li></ol>'
-            . '<p class="muted">Schneller für IT: PowerShell als Administrator: <code>Import-Certificate -FilePath "$HOME\Downloads\kienzle-suite-ca.crt" -CertStoreLocation Cert:\LocalMachine\Root</code></p></details>'
+            . '<p class="muted">Schneller für IT: PowerShell als Administrator: <code>Import-Certificate -FilePath "$HOME\Downloads\praxisherz-ca.crt" -CertStoreLocation Cert:\LocalMachine\Root</code></p></details>'
             . '<details class="how"><summary>Mac</summary><ol class="steps"><li>Datei doppelklicken – die Schlüsselbundverwaltung öffnet sich, Schlüsselbund <strong>System</strong> wählen.</li>'
             . '<li>Das Zertifikat „Praxisherz …“ doppelklicken → Vertrauen → „Bei Verwendung dieses Zertifikats“: <strong>Immer vertrauen</strong>.</li></ol></details>'
             . '<details class="how"><summary>iPhone und iPad</summary><ol class="steps"><li>Diese Seite in Safari öffnen und das Zertifikat laden → „Zulassen“.</li>'
@@ -2180,7 +2180,7 @@ final class Web {
         $body = V::error($error) . ($notice ? '<p class="notice">' . V::h($notice) . '</p>' : '')
             . '<p>Ein Paket pro Arbeitsplatz richtet den <strong>Praxisherz-Agent</strong> ein: ein Programm, das Module direkt aus T2med öffnet (aktueller Patient wird mitgegeben) und unter Windows als Dienst mit Systemrechten läuft. '
             . 'Der Agent fragt die Suite alle paar Sekunden und hält Starter, Aufrufe, Zertifikat und virtuelle Drucker selbst aktuell; „Akte öffnen“ legt er als GDT-Datei in <code>C:\Kienzle\GDT</code> ab '
-            . '(in T2med beim GDT-Gerät „Telefonaufruf“ als Importdatei <code>C:\Kienzle\GDT\AUFRUFi.gdt</code> eintragen). Er führt keine Befehle der Suite aus, nur diese festen Aufgaben. macOS und Linux bekommen vorerst nur den Starter (ohne Dienst).</p>';
+            . '(in T2med beim GDT-Gerät „Telefonaufruf“ als Importdatei <code>C:\Praxisherz\GDT\AUFRUFi.gdt</code> eintragen; früher <code>C:\Kienzle\GDT</code>, dorthin schreibt der Agent weiter, solange der Ordner besteht). Er führt keine Befehle der Suite aus, nur diese festen Aufgaben. macOS und Linux bekommen vorerst nur den Starter (ohne Dienst).</p>';
         if (!$list) return $body . '<p class="muted">Kein installiertes Modul bietet einen Startkontext an.</p>';
         $rows = '';
         foreach ($list as $s) $rows .= '<tr><td>' . V::h($this->modules->name($s['modul'])) . '</td><td>' . V::h($s['label']) . '</td><td><code>' . V::h($s['schema'] . '://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}') . '</code>'
@@ -2225,7 +2225,7 @@ final class Web {
     private function agentSoll(string $version = ''): array {
         $alt = $version !== '' && preg_match('/^[0-9]+(\.[0-9]+)*$/D', $version) && version_compare($version, self::AGENT_NEUE_ADRESSEN, '<');
         return ['server_url' => $this->serverUrl(), 'launcher_key' => $this->st()->key(), 'programme' => $this->agentProgramme(), 'kontexte' => $this->starterKontexte($alt), 'drucker' => $this->starterDrucker(),
-            'ca' => (string)@file_get_contents(self::$caFile), 'gdt' => ['ordner' => 'C:\\Kienzle\\GDT']];
+            'ca' => (string)@file_get_contents(self::$caFile), 'gdt' => ['ordner' => 'C:\\Praxisherz\\GDT']];
     }
 
     /** Schnittstelle der Agents (ohne Sitzung; Starter-Schlüssel bzw. eigener Zugang je PC; Fehlversuche gebremst). */
@@ -2640,9 +2640,9 @@ final class Web {
                 . '<form method="post" action="/verwaltung/sicherung" class="box wide">' . $this->hidden('einrichten')
                 . '<label class="check"><input type="radio" name="art" value="ziel" checked> Netzwerkspeicher aus „Verbindungen“ (SFTP empfohlen)</label>'
                 . ($opts !== '' ? '<label>Ziel<select name="id">' . $opts . '</select></label>' : '<p class="error">Noch kein Ziel unter <a href="/verwaltung/verbindungen">Verbindungen</a> eingetragen.</p>')
-                . V::input('ordner', 'Unterordner auf dem Ziel', 'text', 'kienzle-sicherung')
+                . V::input('ordner', 'Unterordner auf dem Ziel', 'text', 'praxisherz-sicherung')
                 . '<label class="check"><input type="radio" name="art" value="rest"> restic-REST-Server (z. B. im Nur-Anfügen-Modus auf dem NAS)</label>'
-                . V::input('url', 'Adresse', 'url', '', 'placeholder="https://nas.example.org:8000/kienzle"') . V::input('benutzer', 'Benutzer (REST)', 'text')
+                . V::input('url', 'Adresse', 'url', '', 'placeholder="https://nas.example.org:8000/praxisherz"') . V::input('benutzer', 'Benutzer (REST)', 'text')
                 . V::input('passwort', 'Passwort (REST)', 'password', '', 'autocomplete="new-password"')
                 . '<label class="check"><input type="radio" name="art" value="lokal"> Ordner auf diesem Server (z. B. eingehängte USB-Platte)</label>'
                 . V::input('pfad', 'Ordner', 'text', '', 'placeholder="/media/sicherung"')

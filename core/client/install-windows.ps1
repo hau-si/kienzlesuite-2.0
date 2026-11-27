@@ -29,8 +29,9 @@ $task = 'Kienzle-Agent'
 if (Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue) { Stop-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue }
 Get-Process kienzle-starter -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
-# Programm: C:\Program Files\Kienzle (nur Administratoren dürfen ändern).
-$prog = Join-Path $env:ProgramFiles 'Kienzle'
+# Programm: C:\Program Files\Praxisherz (nur Administratoren dürfen ändern). Bis zur Umbenennung hieß der Ordner „Kienzle“.
+$prog = Join-Path $env:ProgramFiles 'Praxisherz'
+$progAlt = Join-Path $env:ProgramFiles 'Kienzle'
 New-Item -ItemType Directory -Force $prog | Out-Null
 $exe = Join-Path $prog 'kienzle-starter.exe'
 Place $asset $exe 'Programm (Starter und Agent)'
@@ -39,8 +40,9 @@ Place $asset $exe 'Programm (Starter und Agent)'
 # unsignierte Programm ausgeführt werden darf. Einmal entfernen reicht; harmlos, wenn die Kennzeichnung schon fehlt.
 Unblock-File $exe -ErrorAction SilentlyContinue
 
-# Daten: C:\ProgramData\Kienzle. Benutzer dürfen nur lesen (der Agent läuft mit Systemrechten und führt dort ein Skript aus).
-$daten = Join-Path $env:ProgramData 'Kienzle'
+# Daten: C:\ProgramData\Praxisherz (früher „Kienzle“). Benutzer dürfen nur lesen (der Agent läuft mit Systemrechten und führt dort ein Skript aus).
+$daten = Join-Path $env:ProgramData 'Praxisherz'
+$datenAlt = Join-Path $env:ProgramData 'Kienzle'
 New-Item -ItemType Directory -Force $daten | Out-Null
 & icacls.exe $daten /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-32-545:(OI)(CI)RX' | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Dateirechte konnten nicht gesetzt werden.' }
@@ -84,6 +86,10 @@ $action = New-ScheduledTaskAction -Execute $exe -Argument '--dienst'
 $trigger = @((New-ScheduledTaskTrigger -AtStartup), (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5)))
 $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
 $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 9999 -RestartInterval (New-TimeSpan -Minutes 1) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances IgnoreNew
+# Umzug von „Kienzle“ nach „Praxisherz“: alte Ordner entfernen (der Agent ist angehalten, neu angemeldet und läuft gleich aus dem neuen Ordner).
+foreach ($o in @($progAlt, $datenAlt)) {
+    if (Test-Path $o) { Remove-Item -Recurse -Force $o -ErrorAction SilentlyContinue; if (Test-Path $o) { Say 'Hinweis' "$o ließ sich nicht ganz entfernen (später von Hand löschen)" } else { Say 'entfernt' "alter Ordner $o" } }
+}
 Register-ScheduledTask -TaskName $task -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description 'Praxisherz: hält Starter, Zertifikat und Drucker aktuell, öffnet Akten in T2med.' -Force | Out-Null
 Start-ScheduledTask -TaskName $task
 Say 'läuft' 'Praxisherz-Agent (Drucker richtet er in den nächsten Minuten selbst ein)'
@@ -92,5 +98,6 @@ Start-Process -FilePath $exe -ArgumentList '--tray' | Out-Null  # läuft es scho
 Say 'läuft' 'Symbol in der Taskleiste (bei ausgeblendeten Symbolen über den Pfeil neben der Uhr)'
 Write-Host ''
 Write-Host 'Arbeitsplatz eingerichtet. Das Paket kann gelöscht werden; künftig aktualisiert sich alles selbst.'
-Write-Host 'Für „Akte öffnen“: in T2med beim GDT-Gerät „Telefonaufruf“ als Importdatei C:\Kienzle\GDT\AUFRUFi.gdt eintragen.'
+Write-Host 'Für „Akte öffnen“: in T2med beim GDT-Gerät „Telefonaufruf“ als Importdatei C:\Praxisherz\GDT\AUFRUFi.gdt eintragen.'
+if (Test-Path 'C:\Kienzle\GDT') { Write-Host 'Bisher stand dort C:\Kienzle\GDT\AUFRUFi.gdt. Bitte in T2med umstellen; bis dahin schreibt der Agent die Datei in beide Ordner. Danach den Ordner C:\Kienzle löschen.' }
 Read-Host 'Zum Schließen Enter drücken'

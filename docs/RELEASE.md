@@ -1,5 +1,17 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.34
+
+- **Ordner, die man sieht, heißen jetzt „Praxisherz“:**
+  - „Akte öffnen“: GDT-Datei in `C:\Praxisherz\GDT\AUFRUFi.gdt` (in T2med beim GDT-Gerät „Telefonaufruf“ umstellen). Solange `C:\Kienzle\GDT` besteht, schreibt der Agent die Datei zusätzlich dorthin; nach dem Umstellen in T2med den Ordner `C:\Kienzle` löschen.
+  - Windows: Programm in `C:\Program Files\Praxisherz`, Daten in `C:\ProgramData\Praxisherz`. Beim nächsten Ausführen des Pakets zieht der PC um und entfernt die alten Ordner „Kienzle“. Bis dahin läuft der Agent aus den alten Ordnern weiter.
+  - macOS: `~/Applications/Praxisherz-Starter.app` und `~/Library/Application Support/Praxisherz-Starter` (alte „Kienzle-Starter“ werden entfernt); Linux: `~/.local/share/praxisherz-starter`.
+  - NAS: Vorbelegung des Sicherungsordners `praxisherz-sicherung` (bestehende Ziele behalten ihren Ordner), Testdatei `praxisherz-verbindungstest-….txt`, Beispieladresse `…/praxisherz`.
+  - Downloads: Zertifikat `praxisherz-ca.crt`, Einstellungs-Export `praxisherz-einstellungen-….kse` (ältere `kienzle-einstellungen-….kse` lassen sich weiter einspielen).
+- Agent/Starter: wählt den Datenordner „Praxisherz“, sonst den früheren „Kienzle“ (PCs von vorher).
+- Unverändert (intern): geplante Aufgabe „Kienzle-Agent“, Programmname `kienzle-starter.exe`, Ordner und Dienste auf dem Server.
+- Mit Tests geprüft. **Nicht unter Windows/macOS, nicht auf der VM und nicht mit T2med geprüft.**
+
 ## 0.22.0-beta.33
 
 - **Umzug des Repositorys nach `hau-si/praxisherz` vorbereitet.** Der Web-Updater (Verwaltung → Updates) und die Start-ISO fragen zuerst `hau-si/praxisherz` und, solange es das noch nicht gibt, den früheren Namen `hau-si/kienzlesuite-2.0`. Nach der Umbenennung auf GitHub funktionieren Updates also ohne weiteren Schritt; GitHub leitet zusätzlich den früheren Namen weiter.

@@ -50,7 +50,7 @@ final class Backup {
     }
 
     private function exportInfo(mixed $e): ?array {
-        if (!is_array($e) || !preg_match('/^kienzle-einstellungen-\d{8}-\d{6}\.kse$/D', (string)($e['datei'] ?? '')) || !is_file(self::$state . '/export/' . $e['datei'])) return null;
+        if (!is_array($e) || !preg_match('/^(?:praxisherz|kienzle)-einstellungen-\d{8}-\d{6}\.kse$/D', (string)($e['datei'] ?? '')) || !is_file(self::$state . '/export/' . $e['datei'])) return null;
         return ['datei' => (string)$e['datei'], 'zeit' => (int)($e['zeit'] ?? 0), 'groesse' => (int)($e['groesse'] ?? 0), 'dateien' => (int)($e['dateien'] ?? 0),
             'mit_sicherungspasswort' => ($e['mit_sicherungspasswort'] ?? false) === true];
     }
@@ -82,7 +82,7 @@ final class Backup {
     public function setup(array $in, string $practice): void {
         $art = (string)($in['art'] ?? '');
         $ziel = match ($art) {
-            'ziel' => ['art' => 'ziel', 'id' => (string)($in['id'] ?? ''), 'ordner' => trim((string)($in['ordner'] ?? '')) ?: 'kienzle-sicherung'],
+            'ziel' => ['art' => 'ziel', 'id' => (string)($in['id'] ?? ''), 'ordner' => trim((string)($in['ordner'] ?? '')) ?: 'praxisherz-sicherung'],
             'rest' => ['art' => 'rest', 'url' => trim((string)($in['url'] ?? '')), 'benutzer' => trim((string)($in['benutzer'] ?? '')), 'passwort' => (string)($in['passwort'] ?? '')],
             'lokal' => ['art' => 'lokal', 'pfad' => trim((string)($in['pfad'] ?? ''))],
             default => throw new Problem('Bitte ein Ziel wählen.', 422),

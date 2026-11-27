@@ -374,6 +374,13 @@ func (a *Agent) ausfuehren(auf Auftrag) (bool, string) {
 		if err := schreibeAtomar(filepath.Join(ordner, d.Datei), []byte(d.Inhalt), 0o664); err != nil {
 			return false, "GDT-Datei nicht geschrieben"
 		}
+		if f, ok := a.Plattform.(gdtFrueher); ok {
+			if alt := f.GDTOrdnerFrueher(); alt != "" && alt != ordner {
+				if st, err := os.Stat(alt); err == nil && st.IsDir() {
+					_ = schreibeAtomar(filepath.Join(alt, d.Datei), []byte(d.Inhalt), 0o664)
+				}
+			}
+		}
 		return true, "geschrieben"
 	}
 	return false, "unbekannte Auftragsart"

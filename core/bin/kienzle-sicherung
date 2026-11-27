@@ -64,7 +64,7 @@ def interactive() -> tuple[dict, str]:
         else:
             t['freigabe'] = ask('Freigabe')
             t['passwort'] = getpass.getpass('Passwort der Freigabe: ')
-        ziel = {'art': 'ziel', 'direkt': t, 'ordner': ask('Unterordner der Sicherung', 'kienzle-sicherung')}
+        ziel = {'art': 'ziel', 'direkt': t, 'ordner': ask('Unterordner der Sicherung', 'praxisherz-sicherung')}
     else:
         raise s.Fehler('Unbekannte Auswahl.')
     return ziel, getpass.getpass('Passwort vom Schlüsselblatt: ').replace(' ', '')

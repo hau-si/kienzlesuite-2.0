@@ -9,9 +9,13 @@ expected=$(awk -v name="$asset" '$2==name {print $1}' SHA256SUMS)
 actual=$(shasum -a 256 "$asset"); actual=${actual%% *}
 test -n "$expected" && test "$expected" = "$actual" || { echo 'Prüfsumme stimmt nicht.'; exit 1; }
 umask 077
-target="$HOME/Library/Application Support/Kienzle-Starter"
-app="$HOME/Applications/Kienzle-Starter.app"
+target="$HOME/Library/Application Support/Praxisherz-Starter"
+app="$HOME/Applications/Praxisherz-Starter.app"
 mkdir -p "$target" "$HOME/Applications"
+# Vor der Umbenennung hießen Ordner und App „Kienzle-Starter“: entfernen, damit nur noch eine App die Aufrufe annimmt.
+for alt in "$HOME/Library/Application Support/Kienzle-Starter" "$HOME/Applications/Kienzle-Starter.app"; do
+  if [ -e "$alt" ]; then rm -r -- "$alt" && printf '%-13s %s\n' entfernt "$alt"; fi
+done
 # Idempotent: jede Zeile sagt „neu“, „aktualisiert“ oder „unverändert“.
 place() { # Quelle Ziel Modus Beschriftung
   if [ -f "$2" ] && cmp -s "$1" "$2"; then printf '%-13s %s\n' unverändert "$4"; return; fi
@@ -29,7 +33,7 @@ on run
     display dialog "Der Praxisherz-Starter wird aus T2med gestartet." buttons {"OK"} default button "OK"
 end run
 on open location theURL
-    set starterPath to (POSIX path of (path to home folder)) & "Library/Application Support/Kienzle-Starter/kienzle-starter"
+    set starterPath to (POSIX path of (path to home folder)) & "Library/Application Support/Praxisherz-Starter/kienzle-starter"
     do shell script (quoted form of starterPath) & " --url " & (quoted form of theURL) & " >/dev/null 2>&1 &"
 end open location
 APPLESCRIPT
@@ -44,7 +48,7 @@ while IFS= read -r s; do
   case "$s" in praxisherz-[a-z0-9-]*|kienzle-[a-z0-9-]*) /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:$i string $s" "$plist"; i=$((i+1)); echo "Eingerichtet: $s";; esac
 done < schemas.txt
 test "$i" -gt 0 || { echo 'schemas.txt enthält keine Einträge.'; exit 1; }
-/usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier de.kienzle.starter' "$plist" 2>/dev/null || /usr/libexec/PlistBuddy -c 'Add :CFBundleIdentifier string de.kienzle.starter' "$plist"
+/usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier de.praxisherz.starter' "$plist" 2>/dev/null || /usr/libexec/PlistBuddy -c 'Add :CFBundleIdentifier string de.praxisherz.starter' "$plist"
 /usr/libexec/PlistBuddy -c 'Add :LSUIElement bool true' "$plist" 2>/dev/null || true
 codesign --force --deep --sign - "$app"
 '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister' -f "$app"

@@ -238,7 +238,7 @@ class Remote:
         self.command(self._cds(parts) + [('rm ' if self.t['art'] == 'sftp' else 'del ') + quote(name)])
 
     def probe(self, folder: str) -> None:
-        name = f'kienzle-verbindungstest-{secrets.token_hex(6)}.txt'
+        name = f'praxisherz-verbindungstest-{secrets.token_hex(6)}.txt'
         src = self.work / 'probe'
         src.write_text(secrets.token_hex(16))
         cds = self._cds(self.mkdirs(folder))

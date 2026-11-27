@@ -28,6 +28,7 @@ import (
 
 // Ersatzplattform: merkt sich die Aufrufe.
 type testPlattform struct {
+	frueher     string // früherer GDT-Ordner (wie C:\Kienzle\GDT unter Windows)
 	symbol      int
 	alt         []string
 	altAbfragen int
@@ -77,6 +78,7 @@ func (p *testPlattform) DruckerEntfernen(_ []Drucker, namen []string) (string, e
 func (p *testPlattform) Zertifizierungsstelle([]byte) error { p.ca++; return nil }
 func (p *testPlattform) Symbol(string) error                { p.symbol++; return nil }
 func (p *testPlattform) GDTOrdner() string                  { return filepath.Join(p.ordner, "gdt") }
+func (p *testPlattform) GDTOrdnerFrueher() string           { return p.frueher }
 
 // testCA erzeugt eine Zertifizierungsstelle und ein Serverzertifikat für 127.0.0.1.
 func testCA(t *testing.T) (caPEM []byte, server tls.Certificate) {
@@ -228,7 +230,8 @@ func TestGDTAuftrag(t *testing.T) {
 	}
 	exe := filepath.Join(dir, "kienzle-starter")
 	os.WriteFile(exe, []byte("x"), 0o755)
-	p := &testPlattform{ordner: dir}
+	p := &testPlattform{ordner: dir, frueher: filepath.Join(dir, "gdt-frueher")}
+	os.MkdirAll(p.frueher, 0o755)
 	a := &Agent{Ordner: dir, Programm: exe, Plattform: p}
 	a.Laden()
 	gdt := "01380006301\r\n014300012345\r\n"
@@ -243,6 +246,9 @@ func TestGDTAuftrag(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(filepath.Join(dir, "gdt", "AUFRUFi.gdt")); string(b) != gdt {
 		t.Fatalf("GDT-Datei: %q", b)
+	}
+	if b, _ := os.ReadFile(filepath.Join(p.frueher, "AUFRUFi.gdt")); string(b) != gdt {
+		t.Fatalf("GDT-Datei im früheren Ordner (bis T2med umgestellt ist): %q", b)
 	}
 	if len(ts.ergebnis) != 4 || ts.ergebnis[0]["ok"] != true || ts.ergebnis[1]["ok"] != false || ts.ergebnis[2]["ok"] != false || ts.ergebnis[3]["ok"] != false {
 		t.Fatalf("Ergebnisse: %+v", ts.ergebnis)

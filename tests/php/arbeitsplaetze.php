@@ -60,7 +60,7 @@ function test_agent(): void {
     check($r['auftraege'] === [] && $r['name'] === 'EMPFANG-PCscript' && $r['soll']['kontexte'] === ['kienzle-kasse' => '/starter/kasse'], 'erste Abfrage mit Sollzustand; älterer Agent nur mit früherer Adresse: ' . json_encode($r['soll']['kontexte'] ?? null));
     $neu = json_decode(ap_req($b, 'POST', '/agent/abholen', ['version' => Web::AGENT_NEUE_ADRESSEN], $auth)->body, true);
     check($neu['soll']['kontexte'] === ['kienzle-kasse' => '/starter/kasse', 'praxisherz-kasse' => '/starter/kasse'] && $neu['stand'] !== $r['stand'], 'neuer Agent mit neuer und früherer Adresse: ' . json_encode($neu['soll']['kontexte'] ?? null));
-    check($r['soll']['programme'] === ['kienzle-starter-windows-amd64.exe' => hash('sha256', 'MZ-Testprogramm')] && $r['soll']['gdt']['ordner'] === 'C:\\Kienzle\\GDT', 'Programme nur mit Datei, GDT-Ordner fest');
+    check($r['soll']['programme'] === ['kienzle-starter-windows-amd64.exe' => hash('sha256', 'MZ-Testprogramm')] && $r['soll']['gdt']['ordner'] === 'C:\\Praxisherz\\GDT', 'Programme nur mit Datei, GDT-Ordner fest');
     $r2 = json_decode(ap_req($b, 'POST', '/agent/abholen', ['version' => '1.0.0', 'stand' => $r['stand']], $auth)->body, true);
     check(!isset($r2['soll']) && $r2['stand'] === $r['stand'], 'Sollzustand nur bei Änderung');
     $prog = ap_req($b, 'GET', '/agent/programm/kienzle-starter-windows-amd64.exe', [], $auth);

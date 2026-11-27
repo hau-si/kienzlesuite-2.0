@@ -137,7 +137,7 @@ def render(hostnames: list[str], registry: dict) -> str:
            '    location = /_health {', '        allow 127.0.0.1;', '        allow ::1;', '        deny all;'] + _fastcgi_common() + [
            f'        fastcgi_param SCRIPT_FILENAME {CORE_ROOT}/public/index.php;', f'        fastcgi_pass unix:{CORE_SOCKET};', '    }', '',
            '    location = /ca.crt {', f'        alias {CA_DIR}/ca.crt;', '        default_type application/x-x509-ca-cert;',
-           '        add_header Content-Disposition "attachment; filename=kienzle-suite-ca.crt" always;', '    }', '',
+           '        add_header Content-Disposition "attachment; filename=praxisherz-ca.crt" always;', '    }', '',
            '    location ^~ /assets/ {', f'        alias {CORE_ROOT}/public/assets/;', '        add_header X-Content-Type-Options nosniff always;', '    }', '']
     for m in registry.get('modules', []):
         if m.get('web'):

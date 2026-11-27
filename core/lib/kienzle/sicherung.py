@@ -148,7 +148,7 @@ def check_target(ziel: dict) -> dict:
     if art == 'rest':
         url = str(ziel.get('url', ''))
         if not REST.match(url):
-            raise Fehler('REST-Server: nur https-Adressen, z. B. https://nas.example.org:8000/kienzle')
+            raise Fehler('REST-Server: nur https-Adressen, z. B. https://nas.example.org:8000/praxisherz')
         user, pw = str(ziel.get('benutzer', '')), str(ziel.get('passwort', ''))
         if (user and not ablage.USER.match(user)) or re.search(r'[\x00-\x1f]', pw) or len(pw) > 200:
             raise Fehler('Zugangsdaten des REST-Servers ungültig.')
@@ -758,7 +758,7 @@ def export_settings(password: str, with_backup_password: bool = False, with_user
         shutil.chown(out_dir, 'root', 'ks-core')
     for old in out_dir.glob('*.kse'):
         old.unlink()
-    name = time.strftime('kienzle-einstellungen-%Y%m%d-%H%M%S.kse')
+    name = time.strftime('praxisherz-einstellungen-%Y%m%d-%H%M%S.kse')
     target = out_dir / name
     r = subprocess.run([TRESOR, 'verschluesseln', str(target)], input=password.encode() + b'\n' + buf.getvalue(), capture_output=True, timeout=300)
     if r.returncode != 0:

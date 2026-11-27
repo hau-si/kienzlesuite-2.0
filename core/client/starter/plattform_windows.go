@@ -34,12 +34,14 @@ type windowsPlattform struct{ ordner string }
 
 func neuePlattform(ordner string) Plattform { return &windowsPlattform{ordner: ordner} }
 
-// datenOrdner: C:\ProgramData\Kienzle (client.json, ca.crt, agent.json).
+// datenOrdner: C:\ProgramData\Praxisherz (client.json, ca.crt, agent.json); auf PCs von vor der Umbenennung
+// C:\ProgramData\Kienzle, bis das Paket neu ausgeführt wird.
 func datenOrdner() string {
-	if p := os.Getenv("ProgramData"); p != "" {
-		return filepath.Join(p, "Kienzle")
+	p := os.Getenv("ProgramData")
+	if p == "" {
+		p = `C:\ProgramData`
 	}
-	return `C:\ProgramData\Kienzle`
+	return ordnerWahl(filepath.Join(p, "Praxisherz"), filepath.Join(p, "Kienzle"), "client.json")
 }
 
 func versteckt(cmd *exec.Cmd) *exec.Cmd {
@@ -150,9 +152,12 @@ func (w *windowsPlattform) druckerSkript(liste []Drucker, extra ...string) (stri
 	return text, nil
 }
 
-// GDTOrdner: fester Ordner C:\Kienzle\GDT; Benutzer dürfen darin ändern (T2med liest und löscht die Datei).
+// GDTOrdnerFrueher: Ordner vor der Umbenennung; der Agent schreibt zusätzlich hinein, solange es ihn gibt.
+func (w *windowsPlattform) GDTOrdnerFrueher() string { return `C:\Kienzle\GDT` }
+
+// GDTOrdner: fester Ordner C:\Praxisherz\GDT; Benutzer dürfen darin ändern (T2med liest und löscht die Datei).
 func (w *windowsPlattform) GDTOrdner() string {
-	ordner := `C:\Kienzle\GDT`
+	ordner := `C:\Praxisherz\GDT`
 	if _, err := os.Stat(ordner); err != nil {
 		_ = os.MkdirAll(ordner, 0o775)
 		_ = versteckt(exec.Command("icacls.exe", ordner, "/grant", "*S-1-5-32-545:(OI)(CI)M")).Run()

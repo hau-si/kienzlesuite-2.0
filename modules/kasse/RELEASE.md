@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.61
+
+- Testdatei beim Verbindungstest der Ablage heißt jetzt `praxisherz-kasse-verbindungstest.txt`. Mit Tests geprüft, nicht auf der VM.
+
 ## 2.3.4-beta.60
 
 - **Neue Aufrufadresse aus T2med: `praxisherz-kasse://…`** (Einstellungen, Anleitung). Die frühere Adresse `kienzle-kasse://…` funktioniert weiter. Braucht Basis 0.22.0-beta.32. Mit Tests geprüft, nicht auf der VM und nicht mit T2med.

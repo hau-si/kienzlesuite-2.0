@@ -2,7 +2,7 @@
 set -euo pipefail
 cd -- "$(dirname -- "$0")"
 case "$(uname -m)" in x86_64) arch=amd64;; aarch64|arm64) arch=arm64;; armv7l|armv6l) arch=arm;; *) echo 'Nicht unterstützte Architektur.'; exit 1;; esac
-target="${XDG_DATA_HOME:-$HOME/.local/share}/kienzle-starter"
+target="${XDG_DATA_HOME:-$HOME/.local/share}/praxisherz-starter"
 applications="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 test -f client.json && test -f server.crt && test -f schemas.txt || { echo 'client.json, schemas.txt und server.crt aus dem Paket fehlen.'; exit 1; }
 command -v xdg-mime >/dev/null || { echo 'Bitte xdg-utils installieren.'; exit 1; }
@@ -28,7 +28,11 @@ schemes=$(grep -E '^(praxisherz|kienzle)-[a-z0-9-]+$' schemas.txt || true)
 test -n "$schemes" || { echo 'schemas.txt enthält keine Einträge.'; exit 1; }
 mime=''
 for s in $schemes; do mime="${mime}x-scheme-handler/$s;"; done
-cat > "$applications/kienzle-starter.desktop" <<EOT
+# Vor der Umbenennung: Ordner und Eintrag „kienzle-starter“ entfernen.
+for alt in "${XDG_DATA_HOME:-$HOME/.local/share}/kienzle-starter" "$applications/kienzle-starter.desktop"; do
+  if [ -e "$alt" ]; then rm -r -- "$alt" && printf '%-13s %s\n' entfernt "$alt"; fi
+done
+cat > "$applications/praxisherz-starter.desktop" <<EOT
 [Desktop Entry]
 Type=Application
 Name=Praxisherz-Starter
@@ -37,9 +41,9 @@ Terminal=false
 NoDisplay=true
 MimeType=$mime
 EOT
-chmod 644 "$applications/kienzle-starter.desktop"
+chmod 644 "$applications/praxisherz-starter.desktop"
 if command -v update-desktop-database >/dev/null; then update-desktop-database "$applications"; fi
-for s in $schemes; do xdg-mime default kienzle-starter.desktop "x-scheme-handler/$s"; echo "Eingerichtet: $s"; done
+for s in $schemes; do xdg-mime default praxisherz-starter.desktop "x-scheme-handler/$s"; echo "Eingerichtet: $s"; done
 # Virtuelle Drucker (drucker.txt: Name|Adresse|Papier je Zeile) über CUPS einrichten
 if [ -f drucker.txt ] && grep -q '|' drucker.txt && command -v lpadmin >/dev/null; then
   while IFS='|' read -r name url _; do
