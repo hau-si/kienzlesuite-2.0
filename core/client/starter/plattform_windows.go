@@ -113,10 +113,16 @@ func (w *windowsPlattform) druckerSkript(liste []Drucker, extra ...string) (stri
 		return "", err
 	}
 	skript := filepath.Join(w.ordner, "drucker-agent.ps1")
-	if err := os.WriteFile(skript, []byte(druckerSkript), 0o644); err != nil {
+	// Mit BOM: Windows PowerShell 5.1 liest Skripte ohne BOM als ANSI (dann werden Umlaute verfälscht, „unverÃ¤ndert“).
+	if err := os.WriteFile(skript, skriptMitBOM(druckerSkript), 0o644); err != nil {
 		return "", err
 	}
 	args := append([]string{"-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", skript, "-Liste", datei}, extra...)
+	if cfg, err := loadConfig(filepath.Join(w.ordner, "client.json")); err == nil {
+		if ip := serverIPv4(cfg.ServerURL); ip != "" {
+			args = append(args, "-ServerIp", ip)
+		}
+	}
 	out, err := versteckt(exec.Command("powershell.exe", args...)).CombinedOutput()
 	text := strings.TrimSpace(strings.ToValidUTF8(string(out), "?"))
 	if i := strings.LastIndex(text, "\n"); i >= 0 {

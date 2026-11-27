@@ -399,3 +399,23 @@ func TestDruckerSkriptPasstAusdruck(t *testing.T) {
 		}
 	}
 }
+
+func TestSkriptMitBOMUndServerIP(t *testing.T) {
+	b := skriptMitBOM("Write-Output 'unverändert'")
+	if len(b) < 3 || b[0] != 0xEF || b[1] != 0xBB || b[2] != 0xBF || string(b[3:]) != "Write-Output 'unverändert'" {
+		t.Fatal("BOM fehlt")
+	}
+	if len(skriptMitBOM(string(b))) != len(b) {
+		t.Fatal("BOM doppelt")
+	}
+	if serverIPv4("https://192.0.2.10/") != "192.0.2.10" || serverIPv4("https://localhost:8443") != "127.0.0.1" || serverIPv4("https://[2001:db8::1]/") != "" || serverIPv4("::") != "" {
+		t.Fatal("Server-IP")
+	}
+	txt := druckerSkriptText()
+	if !strings.Contains(txt, "$roh = Get-Content -Raw $Liste | ConvertFrom-Json\n$list = @($roh |") || !strings.Contains(txt, "$wunsch = @($wunschRoh)") {
+		t.Fatal("JSON-Liste muss über eine Variable laufen (PowerShell 5.1 gibt Arrays sonst als ein Objekt weiter)")
+	}
+	if !strings.Contains(txt, "[string]$ServerIp = ''") || !strings.Contains(txt, "$perIp = $true") {
+		t.Fatal("Server-IP als Ersatz für den unbekannten Namen fehlt")
+	}
+}

@@ -1,4 +1,4 @@
-param([Parameter(Mandatory = $true)][string]$Liste, [ValidateSet('einrichten', 'alt', 'entfernen')][string]$Modus = 'einrichten', [string]$Entfernen = '')
+param([Parameter(Mandatory = $true)][string]$Liste, [ValidateSet('einrichten', 'alt', 'entfernen')][string]$Modus = 'einrichten', [string]$Entfernen = '', [string]$ServerIp = '')
 # Kienzle-Agent: virtuelle Drucker der Module einrichten (läuft als SYSTEM, ohne Rückfragen).
 # Beim Einrichten wird nie ein Drucker gelöscht: Hat er eine andere Adresse, wird nur sein Anschluss umgestellt; klappt das nicht,
 # bleibt er unverändert (er druckt dann weiter wie bisher). Fehlende Drucker werden angelegt.
@@ -7,13 +7,25 @@ param([Parameter(Mandatory = $true)][string]$Liste, [ValidateSet('einrichten', '
 # Letzte Zeile der Ausgabe = Zusammenfassung für die Seite „Arbeitsplätze“ (bei „alt“: JSON-Liste der Namen).
 $ErrorActionPreference = 'Continue'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch { }  # Umlaute in Namen und Windows-Meldungen
-$list = @(Get-Content -Raw $Liste | ConvertFrom-Json | Where-Object { $_.name -match '^[A-Za-z0-9_-]{1,40}$' -and $_.url -match '^http://[^\s/]+:631/printers/' })
+# Erst in eine Variable: Windows PowerShell gibt ein JSON-Array sonst als EIN Objekt weiter (dann stünden alle Namen in einem).
+$roh = Get-Content -Raw $Liste | ConvertFrom-Json
+$list = @($roh | Where-Object { $_.name -match '^[A-Za-z0-9_-]{1,40}$' -and $_.url -match '^http://[^\s/]+:631/printers/' })
 
 # Adressen des Servers: Name aus der Suite und seine IP-Adressen (IPv4 zuerst; IPv6 ohne Zonenangabe wie „%18“).
-$hosts = @(); $ips = @()
+# Kennt der PC den Namen nicht, nimmt das Skript die IP-Adresse, unter der der Agent den Server erreicht (-ServerIp), und richtet
+# die Drucker mit dieser Adresse ein (wie früher von Hand mit http://<IP>:631/printers/<Name>).
+$hosts = @(); $ips = @(); $perIp = $false
 if ($list.Count) {
-    $hosts = @(([Uri]$list[0].url).Host.ToLower())
-    try { $ips = @([System.Net.Dns]::GetHostAddresses(([Uri]$list[0].url).Host) | Sort-Object { $_.AddressFamily -ne 'InterNetwork' }) } catch { }
+    $servername = ([Uri]$list[0].url).Host
+    $hosts = @($servername.ToLower())
+    try { $ips = @([System.Net.Dns]::GetHostAddresses($servername) | Sort-Object { $_.AddressFamily -ne 'InterNetwork' }) } catch { }
+    if (!$ips.Count -and $ServerIp -match '^\d{1,3}(\.\d{1,3}){3}$') {
+        try { $ips = @([System.Net.IPAddress]::Parse($ServerIp)) } catch { }
+        if ($ips.Count) {
+            $perIp = $true
+            $list = @($list | ForEach-Object { [pscustomobject]@{ name = $_.name; url = ($_.url -replace ('^http://' + [regex]::Escape($servername) + ':'), ('http://' + $ServerIp + ':')) } })
+        }
+    }
     $hosts += @($ips | ForEach-Object { ($_.IPAddressToString -replace '%.*$', '').ToLower() })
 }
 # Passt: Der Anschluss zeigt auf dieselbe Warteschlange dieses Servers, mit Namen oder IP-Adresse (z. B. früher von Hand mit
@@ -43,7 +55,8 @@ if ($Modus -eq 'alt') {
     exit 0
 }
 if ($Modus -eq 'entfernen') {
-    $wunsch = @(Get-Content -Raw $Entfernen | ConvertFrom-Json)
+    $wunschRoh = Get-Content -Raw $Entfernen | ConvertFrom-Json
+    $wunsch = @($wunschRoh)
     $weg = @(); $nicht = @(); $grund = ''
     foreach ($name in @(Alte | Where-Object { $wunsch -contains $_ })) {
         $port = (Get-Printer -Name $name -ErrorAction SilentlyContinue).PortName
@@ -112,6 +125,7 @@ foreach ($d in $todo) {
     if (Get-Printer -Name $d.name -ErrorAction SilentlyContinue) { $ok++ } else { $fehlt += $d.name }
 }
 $text = 'Drucker: ' + $ok + ' von ' + $list.Count + ' eingerichtet'
+if ($perIp) { $text += ' (Servername am PC unbekannt, Drucker über die IP-Adresse ' + $ServerIp + ')' }
 if ($alt.Count) { $text += '; unverändert mit alter Adresse: ' + ($alt -join ', ') }
 if ($fehlt.Count -or $alt.Count) {
     if ($fehlt.Count) { $text += '; fehlen: ' + ($fehlt -join ', ') }

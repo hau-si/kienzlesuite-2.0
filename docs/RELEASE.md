@@ -1,5 +1,12 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.19
+
+- **Fehler behoben: Agent richtete keine Drucker ein** („0 von 1 eingerichtet“ bei vier Druckern, „keine MSFT_Printer-Objekte … Name gleich …“). Windows PowerShell 5.1 reichte die Druckerliste als ein einziges Objekt weiter; dadurch standen alle vier Namen in einem Eintrag. Das Skript liest die Liste jetzt über eine Variable. Derselbe Fehler steckte im Entfernen alter Drucker.
+- **Servername am PC unbekannt:** Der Agent übergibt jetzt die IP-Adresse, unter der er den Server erreicht. Kennt der PC den Namen nicht, richtet das Skript die Drucker mit dieser IP-Adresse ein, wie das bewährte Handskript. Vorhandene Drucker mit dieser Adresse gelten als eingerichtet.
+- **Umlaute in der Rückmeldung** („unverÃ¤ndert“): Das Skript wird mit UTF-8-Kennung (BOM) geschrieben.
+- Programmversion 2.3.1. Geprüft mit Tests (Go). **Nicht auf einem echten Windows-PC geprüft.**
+
 ## 0.22.0-beta.18
 
 - **Fehler behoben: Agent blieb nach seiner Aktualisierung stehen** (Arbeitsplatz „zuletzt …“, alte Version). Die geplante Aufgabe startet ein Programm, das mit Fehlercode endet, nicht neu. Der Agent startet sich nach der Aktualisierung jetzt selbst neu. Zusätzlich startet die Aufgabe alle 5 Minuten; das trägt der Agent bei bestehenden Einrichtungen selbst nach. Ein benannter Mutex sorgt dafür, dass je PC nur ein Agent läuft.

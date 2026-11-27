@@ -17,7 +17,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -30,7 +32,7 @@ import (
 var DruckerPause = 10 * time.Minute
 
 // Version des Programms (scripts/starter-bauen setzt sie nicht; der Server vergleicht die Prüfsumme der Datei).
-const version = "2.3.0"
+const version = "2.3.1"
 
 // AgentConfig steht in agent.json (nur für SYSTEM und Administratoren lesbar).
 type AgentConfig struct {
@@ -584,4 +586,37 @@ func (a *Agent) Dienst(stop <-chan struct{}) error {
 		case <-time.After(pause):
 		}
 	}
+}
+
+// skriptMitBOM: UTF-8-Kennung vor dem Skript (Windows PowerShell 5.1 liest sonst ANSI).
+func skriptMitBOM(s string) []byte {
+	if strings.HasPrefix(s, "\ufeff") {
+		return []byte(s)
+	}
+	return append([]byte{0xEF, 0xBB, 0xBF}, s...)
+}
+
+// serverIPv4: IPv4-Adresse des Servers aus der Adresse in client.json (direkt oder über die Namensauflösung des PCs); "" wenn keine.
+// Das Druckerskript nimmt sie, wenn der PC den Servernamen der Drucker nicht kennt.
+func serverIPv4(serverURL string) string {
+	u, err := url.Parse(serverURL)
+	if err != nil || u.Hostname() == "" {
+		return ""
+	}
+	if ip := net.ParseIP(u.Hostname()); ip != nil {
+		if v4 := ip.To4(); v4 != nil {
+			return v4.String()
+		}
+		return ""
+	}
+	adressen, err := net.LookupIP(u.Hostname())
+	if err != nil {
+		return ""
+	}
+	for _, ip := range adressen {
+		if v4 := ip.To4(); v4 != nil {
+			return v4.String()
+		}
+	}
+	return ""
 }
