@@ -624,6 +624,9 @@ final class Ansicht {
         $i .= '<h3>Laden und aktualisieren</h3><ol class="tf-schritte"><li>In T2med unter Drittanbieter einen Eintrag (Programm/URL) anlegen:<br><code>kienzle-telefonverzeichnis://?kontextId=${kontextId}&amp;fhirBasisUrl=${fhirBasisUrl}&amp;oAuthToken=${oAuthToken}</code></li>'
             . '<li>Der Arbeitsplatz braucht den Kienzle-Agent bzw. Starter (Einrichten → Arbeitsplätze; nach dem Update der Basis kommt der neue Aufruf von selbst).</li>'
             . '<li>In T2med den Eintrag aufrufen: Die Suite öffnet sich und lädt das Verzeichnis (Fortschritt oben auf der Seite). Bei neuen Patienten oder geänderten Nummern einfach wiederholen.</li></ol>';
+        if ($t2med['demo'] ?? false) $i .= '<p class="tf-hinweis-text">Demo-Zugang: In der Basis ist kein eigener T2med-API-Schlüssel hinterlegt. Damit der öffentliche Demo-Schlüssel nicht gesperrt wird, lädt die Suite je Aufruf höchstens '
+            . Verzeichnis::DEMO_SEITEN . ' Seiten (also nur die ersten Patienten). Für die Praxis den eigenen Schlüssel unter Verwaltung → Verbindungen → T2med eintragen.</p>';
+        elseif ($st['begrenzt']) $i .= '<p class="muted">Das letzte Laden war mit dem Demo-Schlüssel begrenzt; jetzt mit eigenem Schlüssel einmal neu aus T2med laden.</p>';
         $i .= '<p>' . ($st['zeit'] > 0 ? 'Zuletzt geladen: ' . $h(date('d.m.Y H:i', $st['zeit'])) . '. ' : '') . ($laeuft ? self::tag('warn', 'Laden läuft (' . (int)$laeuft['anzahl'] . ' bisher)') : '') . '</p>';
         $form = self::feld('ortsvorwahl', 'Ortsvorwahl der Praxis', $e['ortsvorwahl'], 'Für Telefonnummern ohne Vorwahl in T2med, z. B. 030. Gilt beim nächsten Laden.', 'text', ' maxlength="7" inputmode="tel"')
             . self::haken('anrufername', 'Name des Anrufers am Telefon anzeigen', $e['anrufername'], 'Bei eingehenden Anrufen zeigt das Telefon „Nachname, Vorname“, wenn die Nummer genau zu einem Patienten passt.');

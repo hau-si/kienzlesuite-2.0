@@ -16,6 +16,9 @@ class T2med {
     /** @param array<string,mixed> $v Verbindung „t2med“ der Basis */
     public function __construct(private array $v, private string $caDatei = '') {}
 
+    /** Mit dem öffentlichen Demo-Schlüssel (kein eigener Schlüssel in der Basis)? T2med sperrt ihn bei zu vielen Anfragen. */
+    public function demo(): bool { return trim((string)($this->v['api_key'] ?? '')) === ''; }
+
     /** Die von T2med übergebene Adresse ist nur erlaubt, wenn sie in der Basis hinterlegt ist (kein Token an fremde Server). */
     public function erlaubt(string $url): bool {
         $basis = rtrim((string)($this->v['base_url'] ?? ''), '/');

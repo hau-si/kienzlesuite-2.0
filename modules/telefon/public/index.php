@@ -331,7 +331,8 @@ try {
     } elseif ($rel === '/einstellungen') {
         $leitung = $admin && preg_match('/^[a-z0-9]{1,12}$/D', (string)($_GET['leitung'] ?? '')) ? (string)$_GET['leitung'] : null;
         $server = preg_replace('/:\d+$/', '', (string)($_SERVER['HTTP_HOST'] ?? '')) ?: 'Adresse des Servers';
-        Ansicht::$t2med = ['eingerichtet' => trim((string)(($k->verbindung('t2med') ?? [])['base_url'] ?? '')) !== ''];
+        $tv = $k->verbindung('t2med') ?? [];
+        Ansicht::$t2med = ['eingerichtet' => trim((string)($tv['base_url'] ?? '')) !== '', 'demo' => trim((string)($tv['base_url'] ?? '')) !== '' && trim((string)($tv['api_key'] ?? '')) === ''];
         $inhalt = Ansicht::einstellungen($cfg, $status, $k->csrf(), $admin, $leitung, $zugang, (string)$server, $meldung, $fehler);
     } else {
         Ansicht::$anrufe = $darfAnrufe;

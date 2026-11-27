@@ -164,7 +164,11 @@ document.addEventListener('click', (e) => {
     zeige('Telefonverzeichnis wird aus T2med geladen …');
     const schritt = () => post(basis + '/verzeichnis/schritt', {code: m[1]}, {'X-Kienzle-CSRF': csrf}).then((r) => {
       if (!r.ok) { zeige(r.j.fehler || ('Laden abgebrochen (HTTP ' + r.status + ').'), true); return; }
-      if (r.j.fertig) { zeige('Fertig: ' + r.j.anzahl.toLocaleString('de-DE') + ' Patienten im Telefonverzeichnis.'); return; }
+      if (r.j.fertig) {
+        zeige('Fertig: ' + r.j.anzahl.toLocaleString('de-DE') + ' Patienten im Telefonverzeichnis.'
+          + (r.j.begrenzt ? ' Demo-Zugang: nur die ersten Seiten geladen, damit der Demo-Schlüssel nicht gesperrt wird.' : ''));
+        return;
+      }
       zeige('Telefonverzeichnis wird aus T2med geladen … ' + r.j.anzahl.toLocaleString('de-DE') + ' Patienten bisher. Bitte die Seite offen lassen.');
       schritt();
     }).catch(() => zeige('Keine Verbindung zum Server; Laden unterbrochen. Bitte erneut aus T2med starten.', true));

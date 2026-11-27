@@ -61,6 +61,38 @@ check($t->aufrufe[0] === ["$basis/Patient", 'geheimes-token'], 'Token an T2med')
 Verzeichnis::zuruecksetzen();
 check(Verzeichnis::stand()['anzahl'] === 4, 'Stand');
 
+check(Verzeichnis::stand()['begrenzt'] === false, 'zwei Seiten: nicht begrenzt');
+
+// Demo-Schlüssel: höchstens DEMO_SEITEN Anfragen je Laden; mit eigenem Schlüssel alles
+$viele = static function (array $v) use ($basis, $p): TestT2med {
+    $t = new TestT2med($v + ['base_url' => $basis]);
+    for ($i = 1; $i <= 6; $i++) {
+        $url = $i === 1 ? "$basis/Patient" : "$basis/Patient?page=$i";
+        $t->seiten[$url] = ['resourceType' => 'Bundle', 'entry' => [$p("d$i", (string)(9000 + $i), 'Max', 'Muster' . $i, '1970-01-01', [])]]
+            + ($i < 6 ? ['link' => [['relation' => 'next', 'url' => "$basis/Patient?page=" . ($i + 1)]]] : []);
+    }
+    return $t;
+};
+$demo = $viele([]);
+check($demo->demo() && !$viele(['api_key' => 'eigener-schluessel'])->demo(), 'Demo erkannt');
+$s1 = Verzeichnis::starten(['context_id' => 'k2', 'oauth_token' => 'tok', 'fhir_base_url' => $basis], $demo, $k, 'kienzle.example.org');
+preg_match('/launch=([0-9a-f]{64})/', $s1['url'], $mm);
+$r = Verzeichnis::schritt($mm[1], $demo, $k);
+check($r['fertig'] && $r['begrenzt'] && $r['anzahl'] === Verzeichnis::DEMO_SEITEN && count($demo->aufrufe) === Verzeichnis::DEMO_SEITEN, 'Demo: nur ' . Verzeichnis::DEMO_SEITEN . ' Anfragen: ' . json_encode($r) . ' ' . count($demo->aufrufe));
+Verzeichnis::zuruecksetzen();
+check(Verzeichnis::stand()['begrenzt'] === true, 'Stand merkt die Begrenzung');
+$voll = $viele(['api_key' => 'eigener-schluessel']);
+$s2 = Verzeichnis::starten(['context_id' => 'k3', 'oauth_token' => 'tok', 'fhir_base_url' => $basis], $voll, $k, 'kienzle.example.org');
+preg_match('/launch=([0-9a-f]{64})/', $s2['url'], $mm);
+$r = Verzeichnis::schritt($mm[1], $voll, $k);
+check($r['fertig'] && !$r['begrenzt'] && $r['anzahl'] === 6 && count($voll->aufrufe) === 6, 'eigener Schlüssel: alle Seiten');
+Verzeichnis::zuruecksetzen();
+// wieder das Verzeichnis der Suchtests laden
+$s3 = Verzeichnis::starten(['context_id' => 'k4', 'oauth_token' => 'tok', 'fhir_base_url' => $basis], $t, $k, 'kienzle.example.org');
+preg_match('/launch=([0-9a-f]{64})/', $s3['url'], $mm);
+Verzeichnis::schritt($mm[1], $t, $k);
+Verzeichnis::zuruecksetzen();
+
 // Suche
 $namen = fn(array $l) => array_map(fn($x) => Verzeichnis::name($x), $l);
 check($namen(Verzeichnis::suchen('muster ma')) === ['Mustermann, Maria', 'Mustermann, Max'], 'Namensteile, Reihenfolge egal');

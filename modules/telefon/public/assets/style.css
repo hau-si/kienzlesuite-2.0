@@ -142,3 +142,4 @@ ol.tf-zeilen li > span:first-child { margin-right: auto; }
 .tf-muster { width: auto; }
 .tf-muster tr > th:first-child { width: 28px; text-align: left; }
 .tf-muster td, .tf-muster th { border: 0; padding: 0; }
+.tf-hinweis-text { background: #fff6e0; border-radius: 9px; padding: 8px 12px; }

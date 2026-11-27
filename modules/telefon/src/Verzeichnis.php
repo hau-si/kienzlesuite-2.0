@@ -12,6 +12,8 @@ namespace KienzleTelefon;
 final class Verzeichnis {
     public const GUELTIG = 4 * 3600;      // T2med-Kontext gilt höchstens 4 Stunden
     public const MAX_PATIENTEN = 200000;
+    /** Mit dem Demo-Schlüssel von T2med höchstens so viele Seiten (= Anfragen) je Laden; der Schlüssel wird sonst gesperrt. */
+    public const DEMO_SEITEN = 3;
 
     private static function ordner(): string {
         $d = Anlage::$data . '/t2med';
@@ -131,13 +133,16 @@ final class Verzeichnis {
         $pdo = self::neueDb($neu);
         $start = time();
         try {
+            $begrenzt = false;
             for ($i = 0; $i < $maxSeiten && $a['naechste'] !== '' && time() - $start < $sekunden; $i++) {
+                if ($t2med->demo() && $a['seiten'] >= self::DEMO_SEITEN) { $a['naechste'] = ''; $begrenzt = true; break; }
                 $bundle = $t2med->seite((string)$a['naechste'], $token);
                 $liste = T2med::patienten($bundle);
                 self::einfuegen($pdo, $liste, self::einstellungen()['ortsvorwahl']);
                 $a['anzahl'] += count($liste);
                 $a['seiten']++;
                 $a['naechste'] = T2med::naechste($bundle, (string)$a['basis']) ?? '';
+                if ($t2med->demo() && $a['seiten'] >= self::DEMO_SEITEN && $a['naechste'] !== '') { $a['naechste'] = ''; $begrenzt = true; }
                 if ($a['anzahl'] > self::MAX_PATIENTEN || $a['seiten'] > 20000) throw new \RuntimeException('Zu viele Patienten oder Seiten; Laden abgebrochen.');
             }
         } catch (\RuntimeException $e) {
@@ -149,10 +154,11 @@ final class Verzeichnis {
             $anzahl = (int)$pdo->query('SELECT COUNT(*) FROM patienten')->fetchColumn();
             $pdo->prepare('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)')->execute(['stand', (string)time()]);
             $pdo->prepare('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)')->execute(['anzahl', (string)$anzahl]);
+            $pdo->prepare('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)')->execute(['begrenzt', $begrenzt ? '1' : '0']);
             $pdo = null;
             rename($neu, self::datei());
             @unlink(self::auftragDatei());
-            return ['fertig' => true, 'anzahl' => $anzahl, 'seiten' => (int)$a['seiten']];
+            return ['fertig' => true, 'anzahl' => $anzahl, 'seiten' => (int)$a['seiten'], 'begrenzt' => $begrenzt];
         }
         $pdo = null;
         self::auftragSchreiben($a);
@@ -189,9 +195,9 @@ final class Verzeichnis {
     /** Stand des Verzeichnisses: anzahl, zeit (0 = keins). */
     public static function stand(): array {
         $db = self::db();
-        if (!$db) return ['anzahl' => 0, 'zeit' => 0];
+        if (!$db) return ['anzahl' => 0, 'zeit' => 0, 'begrenzt' => false];
         $m = $db->query('SELECT k, v FROM meta')->fetchAll(\PDO::FETCH_KEY_PAIR);
-        return ['anzahl' => (int)($m['anzahl'] ?? 0), 'zeit' => (int)($m['stand'] ?? 0)];
+        return ['anzahl' => (int)($m['anzahl'] ?? 0), 'zeit' => (int)($m['stand'] ?? 0), 'begrenzt' => ($m['begrenzt'] ?? '0') === '1'];
     }
 
     public static function loeschen(): void { self::zuruecksetzen(); @unlink(self::datei()); self::abbrechen(); }

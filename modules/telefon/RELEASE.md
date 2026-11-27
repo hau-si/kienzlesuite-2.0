@@ -1,5 +1,10 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.22
+
+- **Schutz des T2med-Demo-Schlüssels:** Ist in der Basis kein eigener T2med-API-Schlüssel hinterlegt (öffentlicher Demo-Schlüssel), lädt das Telefonverzeichnis je Aufruf höchstens 3 Seiten, also höchstens 3 Anfragen an T2med. So wird der Demo-Schlüssel nicht wegen zu vieler Anfragen gesperrt. Die Einstellungen und die Meldung nach dem Laden weisen darauf hin; mit eigenem Schlüssel wird wie bisher alles geladen.
+- Geprüft mit Tests (nachgestelltes T2med mit 6 Seiten: Demo 3 Anfragen, eigener Schlüssel alle). **Nicht mit echtem T2med geprüft.**
+
 ## 0.1.0-beta.21
 
 - **Fehler behoben: Anrufe auf die Telefonnummer landeten beim Fax (Faxton).** Melden sich Telefon- und Faxleitung beim selben Anbieter-Server an (z. B. zwei voip2gsm-Leitungen), kann Asterisk einen eingehenden Anruf nicht sicher der richtigen Leitung zuordnen und nahm die Faxleitung. Jetzt kennt jede Leitung alle eingetragenen Rufnummern; die gewählte Nummer entscheidet, ob der Anruf zum Telefon, zum Fax oder in den Überlauf geht.
