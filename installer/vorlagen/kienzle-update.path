@@ -1,6 +1,6 @@
-# DocLibre: Update-Anfrage des Webinterfaces abarbeiten (Anfragedatei von ks-core).
+# Praxisherz: Update-Anfrage des Webinterfaces abarbeiten (Anfragedatei von ks-core).
 [Unit]
-Description=DocLibre Update-Anfragen
+Description=Praxisherz Update-Anfragen
 
 [Path]
 PathExists=/var/lib/kienzle/core/anfragen/update.json

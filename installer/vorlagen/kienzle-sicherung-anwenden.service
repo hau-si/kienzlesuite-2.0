@@ -1,6 +1,6 @@
-# DocLibre: Sicherung einrichten, sofort sichern, prüfen, wiederherstellen (root; Passwort nur root lesbar).
+# Praxisherz: Sicherung einrichten, sofort sichern, prüfen, wiederherstellen (root; Passwort nur root lesbar).
 [Unit]
-Description=DocLibre Sicherung anwenden
+Description=Praxisherz Sicherung anwenden
 After=network-online.target
 
 [Service]

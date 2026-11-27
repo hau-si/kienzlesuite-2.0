@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS oidc_pending (
     params TEXT NOT NULL,
     expires_at INTEGER NOT NULL
 );
--- Arbeitsplätze mit DocLibre-Agent (Starter und Dienst am PC, Basis 0.22.0-beta.10): Kennung je PC, Zugang nur als Hash.
+-- Arbeitsplätze mit Praxisherz-Agent (Starter und Dienst am PC, Basis 0.22.0-beta.10): Kennung je PC, Zugang nur als Hash.
 CREATE TABLE IF NOT EXISTS arbeitsplaetze (
     id TEXT PRIMARY KEY,                           -- 16 Hex-Zeichen
     name TEXT NOT NULL,                            -- Anzeige (Vorgabe: Rechnername), vom Admin änderbar

@@ -12,8 +12,8 @@ function pr_env(array $status = []): array {
     Printers::$state = $env->dir . '/drucker'; mkdir(Printers::$state);
     Printers::$unit = $env->dir . '/kienzle-drucker.path'; touch(Printers::$unit);
     file_put_contents(Printers::$state . '/status.json', json_encode($status + ['warteschlangen' => [
-        ['name' => 'Bon', 'address' => '192.0.2.80', 'state' => 'bereit', 'description' => 'DocLibre Bondrucker', 'managed' => true, 'modul' => '', 'share' => ['samba']],
-        ['name' => 'Beispiel-Drucker', 'address' => 'auf diesem Server', 'state' => 'bereit', 'description' => 'DocLibre Modul beispiel: x', 'managed' => true, 'modul' => 'beispiel', 'share' => []],
+        ['name' => 'Bon', 'address' => '192.0.2.80', 'state' => 'bereit', 'description' => 'Praxisherz Bondrucker', 'managed' => true, 'modul' => '', 'share' => ['samba']],
+        ['name' => 'Beispiel-Drucker', 'address' => 'auf diesem Server', 'state' => 'bereit', 'description' => 'Praxisherz Modul beispiel: x', 'managed' => true, 'modul' => 'beispiel', 'share' => []],
         ['name' => 'Fremd', 'address' => '192.0.2.7', 'state' => 'bereit', 'description' => 'Von <b>Hand', 'managed' => false, 'modul' => '', 'share' => []],
         ['name' => '../boese', 'address' => '', 'state' => '', 'description' => '', 'managed' => true]],
         'auftraege' => [['id' => 'Bon-12', 'drucker' => 'Bon', 'benutzer' => 'ks-kasse', 'groesse' => 2048, 'zeit' => 'Sun 22 Nov'], ['id' => 'x; rm', 'drucker' => 'Bon']],
@@ -82,7 +82,7 @@ function test_seite(): void {
 
 function test_modul_drucken(): void {
     $dir = tmpdir();
-    file_put_contents("$dir/status.json", json_encode(['warteschlangen' => [['name' => 'A4', 'description' => 'DocLibre Praxisdrucker', 'state' => 'bereit'], ['name' => 'x y']]]));
+    file_put_contents("$dir/status.json", json_encode(['warteschlangen' => [['name' => 'A4', 'description' => 'Praxisherz Praxisdrucker', 'state' => 'bereit'], ['name' => 'x y']]]));
     $calls = [];
     $k = new KienzleModul('kasse', ['X' => '1'], drucker: "$dir/status.json", lp: function (array $args, string $data) use (&$calls) {
         $calls[] = [$args, strlen($data)];

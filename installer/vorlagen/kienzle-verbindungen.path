@@ -1,6 +1,6 @@
-# DocLibre: Änderungen an zentralen Verbindungen übernehmen (Anfragedatei von ks-core).
+# Praxisherz: Änderungen an zentralen Verbindungen übernehmen (Anfragedatei von ks-core).
 [Unit]
-Description=DocLibre Verbindungen
+Description=Praxisherz Verbindungen
 
 [Path]
 PathExists=/var/lib/kienzle/core/anfragen/verbindungen.json

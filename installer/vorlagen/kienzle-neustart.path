@@ -1,6 +1,6 @@
-# DocLibre: Neustart von Diensten oder Server aus dem Menü (Anfragedatei von ks-core).
+# Praxisherz: Neustart von Diensten oder Server aus dem Menü (Anfragedatei von ks-core).
 [Unit]
-Description=DocLibre Neustart (Anfragen)
+Description=Praxisherz Neustart (Anfragen)
 
 [Path]
 PathExists=/var/lib/kienzle/core/anfragen/neustart.json

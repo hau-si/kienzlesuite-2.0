@@ -1,6 +1,6 @@
 ﻿$ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
-# DocLibre-Agent einrichten (einmal je PC; erneutes Ausführen repariert). Danach hält der Agent Starter, Aufrufe aus T2med,
+# Praxisherz-Agent einrichten (einmal je PC; erneutes Ausführen repariert). Danach hält der Agent Starter, Aufrufe aus T2med,
 # Zertifikat und virtuelle Drucker selbst aktuell. Jede Zeile sagt „neu“, „aktualisiert“ oder „unverändert“.
 function Say($state, $what) { Write-Host ('{0,-13} {1}' -f $state, $what) }
 function Same($a, $b) { (Test-Path $b) -and ((Get-FileHash $a -Algorithm SHA256).Hash -eq (Get-FileHash $b -Algorithm SHA256).Hash) }
@@ -84,9 +84,9 @@ $action = New-ScheduledTaskAction -Execute $exe -Argument '--dienst'
 $trigger = @((New-ScheduledTaskTrigger -AtStartup), (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5)))
 $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
 $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 9999 -RestartInterval (New-TimeSpan -Minutes 1) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances IgnoreNew
-Register-ScheduledTask -TaskName $task -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description 'DocLibre: hält Starter, Zertifikat und Drucker aktuell, öffnet Akten in T2med.' -Force | Out-Null
+Register-ScheduledTask -TaskName $task -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description 'Praxisherz: hält Starter, Zertifikat und Drucker aktuell, öffnet Akten in T2med.' -Force | Out-Null
 Start-ScheduledTask -TaskName $task
-Say 'läuft' 'DocLibre-Agent (Drucker richtet er in den nächsten Minuten selbst ein)'
+Say 'läuft' 'Praxisherz-Agent (Drucker richtet er in den nächsten Minuten selbst ein)'
 # Symbol in der Taskleiste (Statusfenster): startet künftig bei jeder Anmeldung (trägt der Agent ein), jetzt einmal sofort.
 Start-Process -FilePath $exe -ArgumentList '--tray' | Out-Null  # läuft es schon, beendet sich der zweite Start sofort
 Say 'läuft' 'Symbol in der Taskleiste (bei ausgeblendeten Symbolen über den Pfeil neben der Uhr)'

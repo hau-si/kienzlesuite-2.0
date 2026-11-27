@@ -26,7 +26,7 @@ source_file=$(mktemp -t kienzle-starter)
 trap 'rm -f "$source_file"' EXIT
 cat > "$source_file" <<'APPLESCRIPT'
 on run
-    display dialog "Der DocLibre-Starter wird aus T2med gestartet." buttons {"OK"} default button "OK"
+    display dialog "Der Praxisherz-Starter wird aus T2med gestartet." buttons {"OK"} default button "OK"
 end run
 on open location theURL
     set starterPath to (POSIX path of (path to home folder)) & "Library/Application Support/Kienzle-Starter/kienzle-starter"

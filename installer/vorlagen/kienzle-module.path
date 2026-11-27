@@ -1,6 +1,6 @@
-# DocLibre: Aufträge der Seite „Module“ übernehmen (Anfragedatei von ks-core).
+# Praxisherz: Aufträge der Seite „Module“ übernehmen (Anfragedatei von ks-core).
 [Unit]
-Description=DocLibre Module (Anfragen)
+Description=Praxisherz Module (Anfragen)
 
 [Path]
 PathExists=/var/lib/kienzle/core/anfragen/module.json

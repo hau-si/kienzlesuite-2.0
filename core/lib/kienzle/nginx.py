@@ -57,7 +57,7 @@ def _fastcgi_common() -> list[str]:
 WARTUNG = ("'<!doctype html><html lang=\"de\"><head><meta charset=\"utf-8\"><meta http-equiv=\"refresh\" content=\"3\">"
            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Einen Moment bitte</title></head>"
            "<body style=\"font-family:sans-serif;max-width:32em;margin:4em auto;padding:0 1em\"><h1>Einen Moment bitte</h1>"
-           "<p>DocLibre wird gerade aktualisiert oder neu gestartet. Diese Seite lädt sich automatisch neu.</p></body></html>'")
+           "<p>Praxisherz wird gerade aktualisiert oder neu gestartet. Diese Seite lädt sich automatisch neu.</p></body></html>'")
 
 
 def _module(m: dict) -> list[str]:
@@ -110,7 +110,7 @@ def _starter_kontext(m: dict) -> list[str]:
 
 def render(hostnames: list[str], registry: dict) -> str:
     names = server_names(hostnames)
-    out = ['# DocLibre – erzeugt von kienzle-web. Nicht von Hand ändern: Änderungen gehen beim nächsten Erzeugen verloren.',
+    out = ['# Praxisherz – erzeugt von kienzle-web. Nicht von Hand ändern: Änderungen gehen beim nächsten Erzeugen verloren.',
            '', 'server {', '    listen 443 ssl default_server;', '    listen [::]:443 ssl default_server;', '    server_tokens off;',
            f'    ssl_certificate {CA_DIR}/server.crt;', f'    ssl_certificate_key {CA_DIR}/server.key;',
            '    # Unbekannte Namen: keine Seite. Den Handshake nicht abweisen – ohne SNI (Aufruf über die IP) bräche sonst jede',

@@ -1,6 +1,6 @@
-# DocLibre: Aufträge der Seite „Sicherung“ übernehmen (Anfragedatei von ks-core).
+# Praxisherz: Aufträge der Seite „Sicherung“ übernehmen (Anfragedatei von ks-core).
 [Unit]
-Description=DocLibre Sicherung (Anfragen)
+Description=Praxisherz Sicherung (Anfragen)
 
 [Path]
 PathExists=/var/lib/kienzle/core/anfragen/sicherung.json

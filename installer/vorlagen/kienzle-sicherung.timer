@@ -1,5 +1,5 @@
 [Unit]
-Description=DocLibre Sicherung täglich nachts
+Description=Praxisherz Sicherung täglich nachts
 
 [Timer]
 OnCalendar=*-*-* 02:30

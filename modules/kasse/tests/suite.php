@@ -20,7 +20,7 @@ try {
     $t2med = ['t2med' => ['base_url' => 'https://t2med.example.org/aps/fhir/api/r4', 'launch_urls' => [], 'api_key' => 'k-beispiel', 'ca_pem' => '', 'pin' => ''],
         'letterxpress' => ['username' => 'praxis-test', 'api_key' => 'lxp-geheim', 'modus' => 'live'],
         'ablage' => ['ausgang' => '', 'ziele' => [['id' => 'steuerbuero', 'name' => 'Steuerbüro']]]];
-    $dirs[] = $root = suite(admin_server(), $t2med, [['name' => 'vKasse', 'description' => 'DocLibre', 'state' => 'bereit'], ['name' => 'Praxisdrucker', 'description' => '', 'state' => 'bereit']]);
+    $dirs[] = $root = suite(admin_server(), $t2med, [['name' => 'vKasse', 'description' => 'Praxisherz', 'state' => 'bereit'], ['name' => 'Praxisdrucker', 'description' => '', 'state' => 'bereit']]);
 
     (new Database(Suite::$data))->migrate();   // wie der Haken install
 

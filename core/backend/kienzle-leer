@@ -1,6 +1,6 @@
 #!/bin/sh
-# DocLibre: CUPS-Backend für virtuelle Drucker ohne eigenes Backend. Die Arbeit erledigen die Filter
+# Praxisherz: CUPS-Backend für virtuelle Drucker ohne eigenes Backend. Die Arbeit erledigen die Filter
 # des Moduls; die Ausgabe wird verworfen. Ohne Argumente meldet sich das Backend für lpinfo.
-if [ $# -eq 0 ]; then echo 'direct kienzle-leer "Unknown" "DocLibre: Ausgabe verwerfen"'; exit 0; fi
+if [ $# -eq 0 ]; then echo 'direct kienzle-leer "Unknown" "Praxisherz: Ausgabe verwerfen"'; exit 0; fi
 if [ $# -ge 6 ]; then cat -- "$6" >/dev/null; else cat >/dev/null; fi
 exit 0

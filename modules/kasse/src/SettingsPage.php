@@ -32,7 +32,7 @@ final class SettingsPage {
     /** $csrf: Kopfzeile X-Kienzle-Csrf bzw. X-CSRF-Token des Browsers (Marke der Suite für dieses Modul). */
     public function handle(string $action, array $input, ?string $csrf): array {
         $k = Suite::modul();
-        if ($k->benutzer() === '') throw new Problem('Bitte über DocLibre anmelden.', 401);
+        if ($k->benutzer() === '') throw new Problem('Bitte über Praxisherz anmelden.', 401);
         $admin = Suite::isAdmin();
         $rights = Suite::rights();
         if ($action === 'status') return ['logged_in' => true, 'csrf' => $k->csrf(), 'role' => $admin ? 'admin' : 'staff', 'user' => $k->name() ?: $k->benutzer()];
@@ -119,14 +119,14 @@ final class SettingsPage {
             case 'receipt_printer':
                 if (!$config->get('printing', 'enabled', false)) throw new Problem('Bondrucker ist nicht aktiviert.', 409);
                 // ESC/POS-Text: Initialisieren, Text, Vorschub, Schnitt.
-                (new ReceiptPrinter($config))->send("\x1b@DocLibre Kasse Testdruck\n" . date('d.m.Y H:i') . "\n\n\n\n\x1dVB\x00");
+                (new ReceiptPrinter($config))->send("\x1b@Praxisherz Kasse Testdruck\n" . date('d.m.Y H:i') . "\n\n\n\n\x1dVB\x00");
                 return 'Testbon an den Bondrucker übergeben.';
             case 'office_printer':
                 $office = new OfficePrinter($config);
                 if (!$office->enabled()) throw new Problem('Praxisdrucker ist nicht aktiviert.', 409);
                 $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="210mm" height="297mm" viewBox="0 0 210 297"><rect width="210" height="297" fill="white"/>'
-                    . '<text x="20" y="30" font-family="DejaVu Sans" font-size="8">DocLibre Kasse Testseite</text><text x="20" y="42" font-family="DejaVu Sans" font-size="4">' . date('d.m.Y H:i') . '</text></svg>';
-                return 'Testseite übergeben: Auftrag ' . $office->send(ReceiptPdf::convert($svg), 'DocLibre Kasse Testseite') . '.';
+                    . '<text x="20" y="30" font-family="DejaVu Sans" font-size="8">Praxisherz Kasse Testseite</text><text x="20" y="42" font-family="DejaVu Sans" font-size="4">' . date('d.m.Y H:i') . '</text></svg>';
+                return 'Testseite übergeben: Auftrag ' . $office->send(ReceiptPdf::convert($svg), 'Praxisherz Kasse Testseite') . '.';
             case 'export':
                 return (new InvoiceExport($config))->check();
             case 'letterxpress':

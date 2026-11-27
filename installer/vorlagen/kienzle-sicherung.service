@@ -1,6 +1,6 @@
-# DocLibre: nächtliche Sicherung (sonntags zusätzlich aufräumen und prüfen, monatlich Probe-Wiederherstellung).
+# Praxisherz: nächtliche Sicherung (sonntags zusätzlich aufräumen und prüfen, monatlich Probe-Wiederherstellung).
 [Unit]
-Description=DocLibre Sicherung
+Description=Praxisherz Sicherung
 After=network-online.target
 Wants=network-online.target
 

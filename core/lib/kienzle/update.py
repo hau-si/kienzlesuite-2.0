@@ -1,4 +1,4 @@
-"""Updater DocLibre (root-Dienst, Aufruf über core/bin/kienzle-update). Konzept: docs/ARCHITEKTUR.md, „Updates“.
+"""Updater Praxisherz (root-Dienst, Aufruf über core/bin/kienzle-update). Konzept: docs/ARCHITEKTUR.md, „Updates“.
 
 Ablauf einer Aktualisierung der Basis:
  1. Release-Liste der Quelle lesen (GitHub-Releases von hau-si/kienzlesuite-2.0), nur Kanal stabil bzw. beta.

@@ -1,5 +1,5 @@
 [Unit]
-Description=DocLibre Server-Zertifikat täglich prüfen
+Description=Praxisherz Server-Zertifikat täglich prüfen
 
 [Timer]
 OnCalendar=daily

@@ -1,7 +1,7 @@
-# DocLibre, Modul kasse: unterschriebene PDFs aus Signatur in die T2med-Akte schreiben (mit dem T2med-Zugang der Kasse)
+# Praxisherz, Modul kasse: unterschriebene PDFs aus Signatur in die T2med-Akte schreiben (mit dem T2med-Zugang der Kasse)
 # und das Ergebnis an Signatur zurückmelden. Läuft kurz, ausgelöst von kienzle-kasse-signatur.path.
 [Unit]
-Description=DocLibre Modul kasse (Unterschriften in T2med ablegen)
+Description=Praxisherz Modul kasse (Unterschriften in T2med ablegen)
 
 [Service]
 Type=oneshot

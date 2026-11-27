@@ -1,6 +1,6 @@
-# DocLibre: „Neu prüfen“ auf der Seite Einrichtung.
+# Praxisherz: „Neu prüfen“ auf der Seite Einrichtung.
 [Unit]
-Description=DocLibre Einrichtungs-Überblick (Anfragen)
+Description=Praxisherz Einrichtungs-Überblick (Anfragen)
 
 [Path]
 PathExists=/var/lib/kienzle/core/anfragen/ueberblick.json

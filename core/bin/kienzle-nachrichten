@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -IB
-"""Nachrichten-Ausgang DocLibre (als ks-nachrichten, gestartet von systemd).
+"""Nachrichten-Ausgang Praxisherz (als ks-nachrichten, gestartet von systemd).
 
   kienzle-nachrichten abarbeiten    SMS und E-Mails der Module verschicken (kienzle-nachrichten.timer, alle 20 Sekunden)
 """

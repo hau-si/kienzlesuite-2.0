@@ -1,7 +1,7 @@
-# DocLibre: Drucker suchen, anlegen, entfernen, freigeben (root; einziger Aufrufer von lpadmin).
+# Praxisherz: Drucker suchen, anlegen, entfernen, freigeben (root; einziger Aufrufer von lpadmin).
 # Ohne ProtectSystem: Der Dienst schreibt Einheiten der virtuellen Drucker und die Samba-Einstellungen.
 [Unit]
-Description=DocLibre Drucker anwenden
+Description=Praxisherz Drucker anwenden
 After=cups.service
 
 [Service]

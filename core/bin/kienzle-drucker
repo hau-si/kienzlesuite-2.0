@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -IB
-"""Druckerverwaltung DocLibre (nur root, gestartet von systemd).
+"""Druckerverwaltung Praxisherz (nur root, gestartet von systemd).
 
   kienzle-drucker anwenden     Anfrage des Webinterfaces verarbeiten (kienzle-drucker.path)
   kienzle-drucker abgleichen   Virtuelle Drucker an die installierten Module angleichen (nach kienzle-web schreiben)

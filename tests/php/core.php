@@ -35,8 +35,8 @@ function test_totp_base32_und_uri(): void {
     check(Totp::base32Decode('mzxw 6ytb-oi') === 'foobar', 'Base32 tolerant lesen');
     $s = Totp::generateSecret();
     check(strlen($s) === 32 && Totp::base32Encode(Totp::base32Decode($s)) === $s, 'Geheimnis nicht 160 Bit');
-    $uri = Totp::uri($s, 'anna', 'DocLibre Praxis Beispiel');
-    check(str_starts_with($uri, 'otpauth://totp/DocLibre%20Praxis%20Beispiel:anna?secret=' . $s) && str_contains($uri, 'digits=6') && str_contains($uri, 'period=30'), 'otpauth-URI falsch: ' . $uri);
+    $uri = Totp::uri($s, 'anna', 'Praxisherz Praxis Beispiel');
+    check(str_starts_with($uri, 'otpauth://totp/Praxisherz%20Praxis%20Beispiel:anna?secret=' . $s) && str_contains($uri, 'digits=6') && str_contains($uri, 'period=30'), 'otpauth-URI falsch: ' . $uri);
 }
 
 function test_verschluesselung_an_zweck_gebunden(): void {

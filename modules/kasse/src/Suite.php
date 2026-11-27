@@ -3,7 +3,7 @@ declare(strict_types=1);
 namespace KienzleKasse;
 
 /**
- * Anbindung an DocLibre 2.0 (docs/MODUL-SCHNITTSTELLE.md der Basis):
+ * Anbindung an Praxisherz 2.0 (docs/MODUL-SCHNITTSTELLE.md der Basis):
  * - Anmeldung, Rolle und Rechte kommen von der Basis (nginx → KIENZLE_* in $_SERVER), keine eigene Anmeldung.
  * - T2med (FHIR), E-Mail und Netzwerkspeicher sind zentrale Verbindungen der Basis; das Modul liest nur seine eigene Datei.
  * - Grundwerte (Starter-Schlüssel, Schlüssel der Einstellungen) liegen im eigenen Datenordner (grundwerte.json, 0600),
@@ -25,7 +25,7 @@ final class Suite {
     public static function modul(): \KienzleModul {
         if (self::$modul === null) {
             if (!class_exists('KienzleModul', false)) {
-                if (!is_file(self::$helper)) throw new \RuntimeException('DocLibre nicht gefunden (' . self::$helper . ').');
+                if (!is_file(self::$helper)) throw new \RuntimeException('Praxisherz nicht gefunden (' . self::$helper . ').');
                 require_once self::$helper;
             }
             self::$modul = new \KienzleModul(self::ID);

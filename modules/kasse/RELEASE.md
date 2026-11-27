@@ -1,9 +1,10 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
-## 2.3.4-beta.58
+## 2.3.4-beta.59
 
-- **Neuer Name: „DocLibre – freie Software für die Arztpraxis“** (vorher Kienzle-Suite; Wunsch von T2med nach einem unterscheidbaren Namen).
-- Nur Texte geändert, in der Kassenansicht das Herz-Symbol oben links. Mit Tests geprüft, nicht auf der VM.
+- **Neuer Name: „Praxisherz – freie Software für die Arztpraxis“** (vorher Kienzle-Suite; Wunsch von T2med nach einem unterscheidbaren Namen).
+- Nur Texte geändert, in der Kassenansicht das Herz-Symbol oben links. Ersetzt 2.3.4-beta.58 (Zwischenstand mit anderem Namen, bitte nicht verwenden).
+- Mit Tests geprüft, nicht auf der VM.
 
 ## 2.3.4-beta.57
 

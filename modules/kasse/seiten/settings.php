@@ -43,7 +43,7 @@ ob_start();
 <p class="muted">Änderungen an dieser Einstellungsseite mit Zeit, Adresse des Geräts und Benutzer – nie mit Passwörtern oder Werten. Anmeldungen protokolliert die Suite (Verwaltung → Protokoll).</p>
 <div class="row-buttons"><button id="audit-load" class="secondary" type="button">Letzte Vorgänge anzeigen</button></div>
 <pre id="audit-list" class="audit-list" hidden></pre></section>
-<p class="settings-foot"><a href="<?= $base ?>">Zur Kasse</a> · <a href="/">Zu DocLibre</a></p>
+<p class="settings-foot"><a href="<?= $base ?>">Zur Kasse</a> · <a href="/">Zu Praxisherz</a></p>
 </div>
 <?php
 $inhalt = (string)ob_get_clean();
@@ -51,7 +51,7 @@ $kopf = '<link rel="stylesheet" href="' . $base . 'assets/style.css?v=' . $versi
     . '<script src="' . $base . 'assets/goae-calc.js?v=' . $version . '" defer></script><script src="' . $base . 'assets/settings.js?v=' . $version . '" defer></script>';
 $k = Suite::modul();
 if (!method_exists($k, 'rahmen')) {   // ältere Basis ohne Rahmen: eigenständige Seite wie früher
-    echo '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Kasse · Einstellungen · DocLibre</title>' . $kopf . '</head><body data-base="' . $base . '"><main class="settings-main">' . $inhalt . '</main></body></html>';
+    echo '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Kasse · Einstellungen · Praxisherz</title>' . $kopf . '</head><body data-base="' . $base . '"><main class="settings-main">' . $inhalt . '</main></body></html>';
     return;
 }
 echo $k->rahmen('Kasse – Einstellungen', $inhalt, ['roh' => true, 'kopf' => $kopf, 'body' => ' data-base="' . $base . '"']);

@@ -1,6 +1,6 @@
-# DocLibre: Verbindungen speichern, prüfen und an die Module verteilen (root, Zugangsdaten bleiben root-eigen).
+# Praxisherz: Verbindungen speichern, prüfen und an die Module verteilen (root, Zugangsdaten bleiben root-eigen).
 [Unit]
-Description=DocLibre Verbindungen anwenden
+Description=Praxisherz Verbindungen anwenden
 After=network-online.target
 
 [Service]

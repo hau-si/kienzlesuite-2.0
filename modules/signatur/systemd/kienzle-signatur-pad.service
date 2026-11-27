@@ -1,6 +1,6 @@
-# DocLibre, Modul signatur: Pad-Dienst (zeigt Vorgänge am Unterschriftenpad und nimmt Unterschriften auf).
+# Praxisherz, Modul signatur: Pad-Dienst (zeigt Vorgänge am Unterschriftenpad und nimmt Unterschriften auf).
 [Unit]
-Description=DocLibre Modul signatur (Unterschriftenpad)
+Description=Praxisherz Modul signatur (Unterschriftenpad)
 After=network.target
 
 [Service]

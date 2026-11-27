@@ -289,13 +289,13 @@ def sheet(password: str, ziel: dict, repo_id: str, practice: str) -> str:
              'lokal': f'Ordner {ziel.get("pfad")}'}[ziel['art']]
     return ('<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Schlüsselblatt</title>'
             '<style>body{font:12pt/1.5 sans-serif;max-width:42rem;margin:2rem auto}code{font-size:14pt}td{padding:.3rem .6rem;vertical-align:top}</style></head><body>'
-            f'<h1>Schlüsselblatt für den Admin – DocLibre</h1><p>{h(practice)} · erstellt {time.strftime("%d.%m.%Y %H:%M")}</p>'
+            f'<h1>Schlüsselblatt für den Admin – Praxisherz</h1><p>{h(practice)} · erstellt {time.strftime("%d.%m.%Y %H:%M")}</p>'
             '<p><strong>Im Praxistresor aufbewahren.</strong> Ohne dieses Passwort lässt sich die Sicherung nicht lesen – auch nicht vom Hersteller. '
             'Wer dieses Blatt hat, kann die Sicherung lesen.</p>'
             f'<table><tr><td>Passwort</td><td><code>{h(password)}</code></td></tr><tr><td>Ablage</td><td>{h(where)}</td></tr>'
             f'<tr><td>Repository-ID</td><td><code>{h(repo_id)}</code></td></tr><tr><td>Programm</td><td>restic (https://restic.net)</td></tr></table>'
             + key_section(ziel) +
-            '<h2>Nach einem Totalausfall</h2><ol><li>Neue VM mit Ubuntu Server 26.04 anlegen, DocLibre herunterladen.</li>'
+            '<h2>Nach einem Totalausfall</h2><ol><li>Neue VM mit Ubuntu Server 26.04 anlegen, Praxisherz herunterladen.</li>'
             '<li><code>sudo bash installer/install.sh --wiederherstellen</code> und die Angaben von diesem Blatt eingeben.</li></ol>'
             '<h2>Von Hand (ohne Suite)</h2><p>Auf einem Rechner mit restic: <code>restic -r &lt;Ablage&gt; snapshots</code>, Passwort von oben eingeben, '
             'dann <code>restic -r &lt;Ablage&gt; restore latest --target /tmp/wiederhergestellt</code>. Die Datenbanken liegen unter '
@@ -353,7 +353,7 @@ def set_schedule(z: dict) -> str:
         raise Fehler('Zeitplan ungültig (Uhrzeit HH:MM, Wochentag 0–6, Tag 1–28).')
     clean = {'haeufigkeit': z['haeufigkeit'], 'uhrzeit': z['uhrzeit'], 'wochentag': z.get('wochentag', 6), 'tag': z.get('tag', 1)}
     _write(ETC / 'einstellungen.json', {**settings(), 'zeitplan': clean}, 0o600)
-    _write(TIMER_DROPIN, f'# DocLibre: Zeitplan der Sicherung (Verwaltung → Sicherung)\n[Timer]\nOnCalendar=\nOnCalendar={calendar(clean)}\n', 0o644)
+    _write(TIMER_DROPIN, f'# Praxisherz: Zeitplan der Sicherung (Verwaltung → Sicherung)\n[Timer]\nOnCalendar=\nOnCalendar={calendar(clean)}\n', 0o644)
     if Path(SYSTEMCTL).is_file():
         subprocess.run([SYSTEMCTL, 'daemon-reload'], capture_output=True, timeout=60)
         subprocess.run([SYSTEMCTL, 'restart', 'kienzle-sicherung.timer'], capture_output=True, timeout=60)
@@ -378,10 +378,10 @@ def notify(problems: list[str]) -> None:
     from . import verbindungen
     conf = KIENZLE_ETC / 'core' / 'core.json'
     host = (json.loads(conf.read_text(encoding='utf-8')).get('hostnames') or ['?'])[0] if conf.is_file() else '?'
-    body = ('Bei der Datensicherung DocLibre ist ein Fehler aufgetreten:\n\n' + '\n'.join('- ' + p for p in problems)
+    body = ('Bei der Datensicherung Praxisherz ist ein Fehler aufgetreten:\n\n' + '\n'.join('- ' + p for p in problems)
             + f'\n\nDetails: https://{host}/verwaltung/sicherung\n\nDiese Nachricht wurde automatisch verschickt.\n')
     try:
-        verbindungen.send_mail(verbindungen.load().get('mail'), to, 'DocLibre: Fehler bei der Datensicherung', body)
+        verbindungen.send_mail(verbindungen.load().get('mail'), to, 'Praxisherz: Fehler bei der Datensicherung', body)
         set_status(letzte_mail={'ok': True, 'zeit': int(time.time())})
     except (verbindungen.Fehler, OSError, ValueError) as e:
         set_status(letzte_mail={'ok': False, 'zeit': int(time.time()), 'meldung': _clean(str(e))})

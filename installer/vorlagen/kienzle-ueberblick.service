@@ -1,6 +1,6 @@
-# DocLibre: Einrichtungs-Überblicke der Module einsammeln (Haken laufen als Modul-Benutzer).
+# Praxisherz: Einrichtungs-Überblicke der Module einsammeln (Haken laufen als Modul-Benutzer).
 [Unit]
-Description=DocLibre Einrichtungs-Überblick
+Description=Praxisherz Einrichtungs-Überblick
 
 [Service]
 Type=oneshot

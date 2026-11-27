@@ -31,7 +31,7 @@ for s in $schemes; do mime="${mime}x-scheme-handler/$s;"; done
 cat > "$applications/kienzle-starter.desktop" <<EOT
 [Desktop Entry]
 Type=Application
-Name=DocLibre-Starter
+Name=Praxisherz-Starter
 Exec="$escaped/kienzle-starter" --url %u
 Terminal=false
 NoDisplay=true

@@ -1,9 +1,10 @@
 # Terminzettel – Release-Notizen
 
-## 1.3.0-beta.20
+## 1.3.0-beta.21
 
-- **Neuer Name: „DocLibre – freie Software für die Arztpraxis“** (vorher Kienzle-Suite; Wunsch von T2med nach einem unterscheidbaren Namen).
-- Nur Texte geändert. Mit Tests geprüft, nicht auf der VM.
+- **Neuer Name: „Praxisherz – freie Software für die Arztpraxis“** (vorher Kienzle-Suite; Wunsch von T2med nach einem unterscheidbaren Namen).
+- Nur Texte geändert. Ersetzt 1.3.0-beta.20 (Zwischenstand mit anderem Namen, bitte nicht verwenden).
+- Mit Tests geprüft, nicht auf der VM.
 
 ## 1.3.0-beta.19
 

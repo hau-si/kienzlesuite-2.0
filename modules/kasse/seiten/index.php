@@ -6,7 +6,7 @@ if (!Suite::can('kassieren')) {
     http_response_code(403);
     header('Content-Type: text/html; charset=utf-8');
     $settings = Suite::settingsRights() ? '<p><a href="' . ks_h(ks_url('settings.php')) . '">Zu den freigegebenen Bereichen der Kasse</a></p>' : '';
-    exit('<!doctype html><html lang="de"><meta charset="utf-8"><title>Kasse</title><link rel="stylesheet" href="' . ks_h(ks_url('assets/style.css')) . '"><main><section class="card"><h1>Kasse</h1><p>Für die Kasse fehlt das Recht „Kassieren“. Bitte den Admin fragen (Verwaltung → Benutzer der Suite).</p>' . $settings . '<p><a href="/">Zu DocLibre</a></p></section></main></html>');
+    exit('<!doctype html><html lang="de"><meta charset="utf-8"><title>Kasse</title><link rel="stylesheet" href="' . ks_h(ks_url('assets/style.css')) . '"><main><section class="card"><h1>Kasse</h1><p>Für die Kasse fehlt das Recht „Kassieren“. Bitte den Admin fragen (Verwaltung → Benutzer der Suite).</p>' . $settings . '<p><a href="/">Zu Praxisherz</a></p></section></main></html>');
 }
 try { $demo = ks_app()->config->get('sumup', 'mode') === 'mock' && ks_app()->config->get('fhir', 'mode') === 'mock'; } catch (\Throwable) { $demo = false; }
 header('Cache-Control: no-store');
@@ -32,13 +32,13 @@ if ($rahmen) {
 ?>
 <!doctype html>
 <html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="kienzle-csrf" content="<?= $csrf ?>"><title>Kasse · DocLibre</title><link rel="stylesheet" href="<?= $base ?>assets/style.css?v=<?= $version ?>"><link rel="stylesheet" href="<?= $base ?>assets/embed.css?v=<?= $version ?>"><?= $skripte ?></head>
+<meta name="kienzle-csrf" content="<?= $csrf ?>"><title>Kasse · Praxisherz</title><link rel="stylesheet" href="<?= $base ?>assets/style.css?v=<?= $version ?>"><link rel="stylesheet" href="<?= $base ?>assets/embed.css?v=<?= $version ?>"><?= $skripte ?></head>
 <body class="<?= $modus ?>" data-base="<?= $base ?>" data-signatur="<?= ks_h($signatur) ?>"><main>
 <?php } ?>
 <?php if ($rahmen) { ?>
 <header class="seitenkopf"><div><p class="eyebrow">Kasse</p></div><span class="start-tools"><span id="mode" class="badge" hidden>TESTMODUS</span><a class="button secondary" href="<?= $base ?>">← Zur Kasse</a></span></header>
 <?php } else { ?>
-<header class="top"><a class="brand" href="/"><span class="mark" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 57C10 41 5 29 5 20 5 12 11 6 19 6c5 0 10 3 13 8 3-5 8-8 13-8 8 0 14 6 14 14 0 9-5 21-27 37z" fill="#fff"/><path d="M13 31h11l4-8 7 16 4-8h12" fill="none" stroke="#12695d" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><strong>Kasse</strong><span>DocLibre · T2med</span></div></a><span id="mode" class="badge" hidden>TESTMODUS</span></header>
+<header class="top"><a class="brand" href="/"><span class="mark" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 57C10 41 5 29 5 20 5 12 11 6 19 6c5 0 10 3 13 8 3-5 8-8 13-8 8 0 14 6 14 14 0 9-5 21-27 37z" fill="#fff"/><path d="M13 31h11l4-8 7 16 4-8h12" fill="none" stroke="#12695d" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><strong>Kasse</strong><span>Praxisherz · T2med</span></div></a><span id="mode" class="badge" hidden>TESTMODUS</span></header>
 <?php } ?>
 <section id="welcome" class="card"><h1>Kartenzahlung</h1><p>Bitte diese Seite aus der Patientenakte in T2med öffnen.</p><form id="manual-form" class="manual-form" autocomplete="off"><h2>Manuelle Kartenzahlung</h2><p class="muted small">Ohne Patientenakte: Betreff und Betrag werden an SumUp übergeben und die Zahlung startet am Kartenterminal. Keine Patientendaten eintragen.</p><label for="manual-label">Betreff</label><input id="manual-label" maxlength="80" required placeholder="z. B. Selbstzahler-Leistung"><label for="manual-amount">Betrag in Euro</label><input id="manual-amount" inputmode="decimal" maxlength="12" required placeholder="z. B. 25,00"><button class="primary wide" type="submit">Kartenzahlung starten</button></form><a class="button secondary wide settings-link" href="<?= $base ?>settings.php">⚙ Einstellungen der Kasse</a><button id="demo" class="secondary"<?= $demo ? '' : ' hidden' ?>>Testpatient öffnen (Testmodus)</button></section>
 <div id="workspace" hidden>
@@ -113,7 +113,7 @@ if ($rahmen) {
 <label id="mock-fhir-label" class="mock-option" hidden><input type="checkbox" id="mock-fhir-fail"> t2med-Fehler simulieren</label>
 </section></div>
 <p id="message" class="message" role="alert" hidden></p>
-<footer><a href="<?= $base ?>settings.php">Einstellungen</a> · <a href="/">DocLibre</a></footer>
+<footer><a href="<?= $base ?>settings.php">Einstellungen</a> · <a href="/">Praxisherz</a></footer>
 <?php
 if ($rahmen) {
     $inhalt = (string)ob_get_clean();

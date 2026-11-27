@@ -1,6 +1,6 @@
-# DocLibre: Wurde eine Aktualisierung unterbrochen (Absturz, Stromausfall), beim Start auf den vorherigen Stand zurück.
+# Praxisherz: Wurde eine Aktualisierung unterbrochen (Absturz, Stromausfall), beim Start auf den vorherigen Stand zurück.
 [Unit]
-Description=DocLibre unterbrochene Aktualisierung zurücknehmen
+Description=Praxisherz unterbrochene Aktualisierung zurücknehmen
 After=network-online.target kienzle-core-php.service nginx.service
 Wants=network-online.target
 

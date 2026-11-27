@@ -1,6 +1,6 @@
 'use strict';
 const $ = id => document.getElementById(id);
-// Webpfad des Moduls in DocLibre (z. B. /kasse/) und Marke der Suite für schreibende Anfragen.
+// Webpfad des Moduls in Praxisherz (z. B. /kasse/) und Marke der Suite für schreibende Anfragen.
 const BASE = document.body.dataset.base || '/';
 const SUITE_CSRF = (document.querySelector('meta[name="kienzle-csrf"]') || {}).content || '';
 const euro = cents => new Intl.NumberFormat('de-DE', {style:'currency', currency:'EUR'}).format(cents / 100);

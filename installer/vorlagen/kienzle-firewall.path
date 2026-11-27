@@ -1,6 +1,6 @@
-# DocLibre: Firewall-Anfrage des Webinterfaces abarbeiten (Anfragedatei von ks-core).
+# Praxisherz: Firewall-Anfrage des Webinterfaces abarbeiten (Anfragedatei von ks-core).
 [Unit]
-Description=DocLibre Firewall-Anfragen
+Description=Praxisherz Firewall-Anfragen
 
 [Path]
 PathExists=/var/lib/kienzle/core/anfragen/firewall.json

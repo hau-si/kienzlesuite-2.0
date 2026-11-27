@@ -207,7 +207,7 @@ func tray(ordner string) error {
 	wc := wndClassEx{WndProc: syscall.NewCallback(trayProc), Instance: inst, Cursor: cursor, ClassName: w16("KienzleAgentSymbol")}
 	wc.Size = uint32(unsafe.Sizeof(wc))
 	pRegisterClassExW.Call(uintptr(unsafe.Pointer(&wc)))
-	tz.hwnd, _, _ = pCreateWindowExW.Call(wsExToolwin|wsExTopmost, uintptr(unsafe.Pointer(wc.ClassName)), uintptr(unsafe.Pointer(w16("DocLibre"))),
+	tz.hwnd, _, _ = pCreateWindowExW.Call(wsExToolwin|wsExTopmost, uintptr(unsafe.Pointer(wc.ClassName)), uintptr(unsafe.Pointer(w16("Praxisherz"))),
 		wsPopup, 0, 0, uintptr(tz.px(360)), uintptr(tz.px(300)), 0, 0, inst, 0)
 	ecke := uint32(2) // abgerundete Ecken (Windows 11)
 	pDwmSetWindowAttribute.Call(tz.hwnd, 33, uintptr(unsafe.Pointer(&ecke)), 4)
@@ -408,7 +408,7 @@ func (t *trayZustand) knopfGedrueckt(i int) {
 		if len(namen) == 0 {
 			return
 		}
-		frage := "Diese Drucker zeigen auf DocLibre, dort gibt es sie aber nicht mehr:\n\n• " + strings.Join(namen, "\n• ") +
+		frage := "Diese Drucker zeigen auf Praxisherz, dort gibt es sie aber nicht mehr:\n\n• " + strings.Join(namen, "\n• ") +
 			"\n\nAusdrucke darauf kommen nirgends an. Jetzt von diesem PC entfernen?\n\nDie aktuellen Drucker der Suite bleiben unverändert."
 		t.frage = true
 		antwort, _, _ := pMessageBoxW.Call(t.hwnd, uintptr(unsafe.Pointer(w16(frage))), uintptr(unsafe.Pointer(w16("Alte Drucker entfernen"))),
@@ -465,7 +465,7 @@ func ampel(f int) uintptr {
 	return rgb(0x2F, 0xB3, 0x6B)
 }
 
-// zeichnen: Kopf (Symbol, „DocLibre“, Marke), Unterzeile, Zeilen mit Ampel, Fuß, drei Knöpfe – im Stil der Suite.
+// zeichnen: Kopf (Symbol, „Praxisherz“, Marke), Unterzeile, Zeilen mit Ampel, Fuß, drei Knöpfe – im Stil der Suite.
 func (t *trayZustand) zeichnen() {
 	var ps paintStruct
 	dc, _, _ := pBeginPaint.Call(t.hwnd, uintptr(unsafe.Pointer(&ps)))
@@ -505,7 +505,7 @@ func (t *trayZustand) zeichnen() {
 	pSelectObject.Call(dc, fett)
 	t.text(dc, "K", rect{t.px(16), t.px(16), t.px(40), t.px(40)}, rgb(255, 255, 255), 1|dtVCenter|dtSingleLine) // DT_CENTER
 	kreis(38, 38, 5, ampel(v.Farbe))
-	t.text(dc, "DocLibre", rect{t.px(50), t.px(14), t.px(breite - 110), t.px(34)}, dunkel, dtLeft|dtSingleLine|dtVCenter)
+	t.text(dc, "Praxisherz", rect{t.px(50), t.px(14), t.px(breite - 110), t.px(34)}, dunkel, dtLeft|dtSingleLine|dtVCenter)
 	markeFarbe, markeText := rgb(0xE3, 0xF1, 0xEE), teal
 	switch v.Farbe {
 	case Rot:

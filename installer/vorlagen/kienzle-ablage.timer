@@ -1,5 +1,5 @@
 [Unit]
-Description=DocLibre Netzwerkspeicher alle 5 Minuten (Wiederholung fehlgeschlagener Übertragungen)
+Description=Praxisherz Netzwerkspeicher alle 5 Minuten (Wiederholung fehlgeschlagener Übertragungen)
 
 [Timer]
 OnBootSec=2min

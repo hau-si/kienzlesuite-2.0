@@ -157,7 +157,7 @@ final class Web {
             $routerText = '<p>Den Namen <code>' . V::h($name) . '</code> mit der Adresse <code>' . V::h($ip) . '</code> im Router oder einem eigenen DNS-Server eintragen (meist die IT). '
                 . 'Manche Router kennen Geräte im Netz auch automatisch unter ihrem Rechnernamen mit einer eigenen Endung; dann unter Verwaltung → Server genau diesen Namen mit der Endung des Routers wählen.</p>';
         }
-        $lead = '<p class="lead">Pro PC genügt ein Paket: Es richtet den DocLibre-Agent ein (Starter für T2med, Zertifikat der Suite, virtuelle Drucker, „Akte öffnen“). Unter Windows hält der Agent danach alles selbst aktuell, auch neue Drucker und Module; ein zweites Mal ist das Paket nur zur Reparatur nötig. '
+        $lead = '<p class="lead">Pro PC genügt ein Paket: Es richtet den Praxisherz-Agent ein (Starter für T2med, Zertifikat der Suite, virtuelle Drucker, „Akte öffnen“). Unter Windows hält der Agent danach alles selbst aktuell, auch neue Drucker und Module; ein zweites Mal ist das Paket nur zur Reparatur nötig. '
             . 'Der PC muss außerdem den Namen der Suite kennen (Schritt 2). Klappt etwas nicht, steht unten jeder Schritt auch zum Einrichten von Hand.</p>';
         $zertifikat = ''
             . '<details class="box" id="zertifikat"><summary><strong>Zertifikat von Hand einrichten</strong></summary>'
@@ -170,9 +170,9 @@ final class Web {
             . '<li>Browser ganz schließen und neu öffnen.</li></ol>'
             . '<p class="muted">Schneller für IT: PowerShell als Administrator: <code>Import-Certificate -FilePath "$HOME\Downloads\kienzle-suite-ca.crt" -CertStoreLocation Cert:\LocalMachine\Root</code></p></details>'
             . '<details class="how"><summary>Mac</summary><ol class="steps"><li>Datei doppelklicken – die Schlüsselbundverwaltung öffnet sich, Schlüsselbund <strong>System</strong> wählen.</li>'
-            . '<li>Das Zertifikat „DocLibre …“ doppelklicken → Vertrauen → „Bei Verwendung dieses Zertifikats“: <strong>Immer vertrauen</strong>.</li></ol></details>'
+            . '<li>Das Zertifikat „Praxisherz …“ doppelklicken → Vertrauen → „Bei Verwendung dieses Zertifikats“: <strong>Immer vertrauen</strong>.</li></ol></details>'
             . '<details class="how"><summary>iPhone und iPad</summary><ol class="steps"><li>Diese Seite in Safari öffnen und das Zertifikat laden → „Zulassen“.</li>'
-            . '<li>Einstellungen → Profil geladen → Installieren.</li><li>Einstellungen → Allgemein → Info → Zertifikatsvertrauenseinstellungen → „DocLibre …“ einschalten.</li></ol></details>'
+            . '<li>Einstellungen → Profil geladen → Installieren.</li><li>Einstellungen → Allgemein → Info → Zertifikatsvertrauenseinstellungen → „Praxisherz …“ einschalten.</li></ol></details>'
             . '<details class="how"><summary>Android</summary><ol class="steps"><li>Zertifikat laden.</li><li>Einstellungen → Sicherheit → Weitere Einstellungen → Verschlüsselung und Anmeldedaten → '
             . 'Zertifikat installieren → <strong>CA-Zertifikat</strong> (Namen der Menüs je nach Hersteller etwas anders).</li></ol></details>'
             . '<details class="how"><summary>Firefox (eigener Zertifikatsspeicher)</summary><ol class="steps"><li>Einstellungen → Datenschutz &amp; Sicherheit → Zertifikate → Zertifikate anzeigen → '
@@ -385,7 +385,7 @@ final class Web {
 
     private function oidcLogoutPage(Request $r): Response {
         $target = $this->oidc->logoutTarget($r->get('client_id', 100) ?: $this->oidc->clientFromIdToken($r->get('id_token_hint', 4000)), $r->get('post_logout_redirect_uri', 300));
-        $body = '<p>Bei DocLibre abmelden? Damit endet die Anmeldung für alle Module und Dienste auf diesem Gerät.</p>'
+        $body = '<p>Bei Praxisherz abmelden? Damit endet die Anmeldung für alle Module und Dienste auf diesem Gerät.</p>'
             . '<form method="post" action="/oidc/abmelden" class="box">' . V::csrf($this->session['csrf'])
             . '<input type="hidden" name="ziel" value="' . V::h($target ?? '') . '"><input type="hidden" name="state" value="' . V::h($r->get('state', 500)) . '">'
             . '<button>Abmelden</button></form>';
@@ -620,7 +620,7 @@ final class Web {
         try {
             if (!$this->smsReady($uid)) throw new Problem('SMS-Codes sind nicht eingerichtet.', 409);
             $code = $this->auth->smsCodeIssue($this->session);
-            $this->con()->sendSms($this->phoneOf($uid), 'DocLibre: Ihr Code lautet ' . $code . ' (10 Minuten gültig). Niemandem weitergeben.');
+            $this->con()->sendSms($this->phoneOf($uid), 'Praxisherz: Ihr Code lautet ' . $code . ' (10 Minuten gültig). Niemandem weitergeben.');
         } catch (Problem $e) {
             return $this->codePage($e->getMessage());
         }
@@ -880,7 +880,7 @@ final class Web {
             // Immer dieselbe Antwort, damit sich nicht erraten lässt, welche Adressen es gibt. Admin-Konten (App-Pflicht) nur über die Konsole.
             if ($user && (int)$user['active'] === 1 && !$this->users->needsOtp($user)) {
                 $url = 'https://' . $this->config->hostnames[0] . '/einrichten?t=' . $this->users->setupToken((int)$user['id']);
-                $this->con()->sendMail($this->users->email((int)$user['id']), 'DocLibre: Passwort neu festlegen',
+                $this->con()->sendMail($this->users->email((int)$user['id']), 'Praxisherz: Passwort neu festlegen',
                     "Hallo " . ($user['display'] ?: $user['login']) . ",\n\nüber diesen Link legst du ein neues Passwort fest (3 Tage gültig, nur einmal verwendbar):\n\n" . $url
                     . "\n\nWar das nicht deine Anfrage, kannst du diese Nachricht ignorieren. Dein Passwort bleibt, solange du den Link nicht verwendest.\n");
                 $this->audit->write($user['login'], 'passwort-link-per-mail');
@@ -904,8 +904,8 @@ final class Web {
             } else {
                 if (!$this->mailReady()) throw new Problem('Der E-Mail-Versand ist nicht eingerichtet (Verwaltung → Verbindungen). Ohne ihn lässt sich die Adresse nicht bestätigen.', 409);
                 $code = $this->users->emailStart($uid, $address);
-                $this->con()->sendMail($address, 'DocLibre: E-Mail-Adresse bestätigen', "Hallo " . ($user['display'] ?: $user['login']) . ",\n\ndein Bestätigungscode für diese Adresse (1 Stunde gültig):\n\n" . $code
-                    . "\n\nGib ihn in DocLibre unter „Mein Konto → E-Mail-Adresse“ ein. Du musst dazu angemeldet sein.\n\nWar das nicht deine Anfrage, kannst du diese Nachricht ignorieren.\n");
+                $this->con()->sendMail($address, 'Praxisherz: E-Mail-Adresse bestätigen', "Hallo " . ($user['display'] ?: $user['login']) . ",\n\ndein Bestätigungscode für diese Adresse (1 Stunde gültig):\n\n" . $code
+                    . "\n\nGib ihn in Praxisherz unter „Mein Konto → E-Mail-Adresse“ ein. Du musst dazu angemeldet sein.\n\nWar das nicht deine Anfrage, kannst du diese Nachricht ignorieren.\n");
                 $notice = 'Bestätigungscode an ' . $address . ' geschickt. Gib ihn unten ein, dann gilt die Adresse.';
             }
         } catch (Problem $e) {
@@ -1887,9 +1887,9 @@ final class Web {
             . '<details class="fold"' . (($gmail && !$connected) || $pending ? ' open' : '') . '><summary><h3>Gmail-Konto (OAuth, ohne Passwort im Klartext)' . ($connected ? ' <span class="tag ok">✓ eingerichtet</span>' : ' <span class="tag opt">nicht eingerichtet</span>') . '</h3></summary>'
             . ($reconnect ? '<details class="fold"><summary><h3>Erneut einrichten oder anderes Konto verbinden</h3></summary>' : '')
             . '<p class="muted">Gilt für ein normales Gmail-Konto. Jede Praxis legt dafür einmalig einen eigenen Zugang bei Google an (kostenlos, ca. 10 Minuten). Gesendet wird nur über die Gmail-Schnittstelle mit der Berechtigung „E-Mails senden“; die Suite kann keine Postfächer lesen.</p>'
-            . '<ol class="muted"><li>Auf <strong>console.cloud.google.com</strong> mit dem Gmail-Konto anmelden und oben ein <strong>neues Projekt</strong> anlegen (Name z. B. „DocLibre“).</li>'
+            . '<ol class="muted"><li>Auf <strong>console.cloud.google.com</strong> mit dem Gmail-Konto anmelden und oben ein <strong>neues Projekt</strong> anlegen (Name z. B. „Praxisherz“).</li>'
             . '<li>Im Suchfeld oben „<strong>Gmail API</strong>“ suchen und <strong>Aktivieren</strong> klicken.</li>'
-            . '<li>Im Suchfeld „<strong>Google Auth Platform</strong>“ öffnen und <strong>Erste Schritte</strong> wählen: App-Name (z. B. „DocLibre“) und deine E-Mail-Adresse als Support-E-Mail eintragen, Zielgruppe <strong>Extern</strong>, Kontakt-E-Mail eintragen, Bedingungen bestätigen.</li>'
+            . '<li>Im Suchfeld „<strong>Google Auth Platform</strong>“ öffnen und <strong>Erste Schritte</strong> wählen: App-Name (z. B. „Praxisherz“) und deine E-Mail-Adresse als Support-E-Mail eintragen, Zielgruppe <strong>Extern</strong>, Kontakt-E-Mail eintragen, Bedingungen bestätigen.</li>'
             . '<li>Links <strong>Datenzugriff</strong> → „Bereiche hinzufügen oder entfernen“ → in „Bereiche manuell hinzufügen“ <code>https://www.googleapis.com/auth/gmail.send</code> eintragen, hinzufügen, <strong>Speichern</strong>.</li>'
             . '<li>Für „In Produktion“ verlangt Google vorher unter <strong>Branding</strong>: gültigen App-Namen, Support-E-Mail sowie Adressen für <strong>Startseite der App</strong> und <strong>Datenschutzerklärung</strong> (zwei Webadressen, z. B. die Startseite und die Datenschutzseite der eigenen Praxis-Website). Die Domain dieser Adressen unter „Autorisierte Domains“ eintragen, dann <strong>Speichern</strong>. Die Adressen werden nur auf Googles Zustimmungsseite angezeigt, es muss keine Seite der Suite sein.</li>'
             . '<li>Links <strong>Zielgruppe</strong> → <strong>App veröffentlichen</strong> („In Produktion“ statt „Test“). Im Teststatus läuft die Anmeldung nach 7 Tagen ab. Google verlangt für diesen Bereich eine Überprüfung der App, lässt eine nicht überprüfte App für wenige Nutzer aber zu: Bei der Anmeldung erscheint „Google hat diese App nicht überprüft“ – dort <strong>Erweitert</strong> → „Weiter zu … (unsicher)“ wählen.</li>'
@@ -1916,7 +1916,7 @@ final class Web {
         $sms = $st['sms'] ?? [];
         $body .= '<section><h2>SMS (seven.io)</h2><p class="muted">Für Einmalcodes als Ersatz bei der Admin-Anmeldung und später für Nachrichten der kienzlefon-App. Schlüssel unter seven.io → Entwickler → API-Schlüssel anlegen.</p>'
             . '<form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('sms')
-            . $this->tipInput('api_key', 'API-Schlüssel von seven.io', 'Bei seven.io unter Entwickler → API-Schlüssel → „API-Key anlegen“: Label z. B. „DocLibre“, Umgebung Live (Sandbox verschickt nichts), Gültig bis Unbegrenzt, Zugriff auf Subaccounts aus. Berechtigungen nur „sms“ (Versand) und „balance“ (Schlüssel prüfen); alle anderen aus.', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($sms['schluessel_gesetzt'] ?? false))) . '"')
+            . $this->tipInput('api_key', 'API-Schlüssel von seven.io', 'Bei seven.io unter Entwickler → API-Schlüssel → „API-Key anlegen“: Label z. B. „Praxisherz“, Umgebung Live (Sandbox verschickt nichts), Gültig bis Unbegrenzt, Zugriff auf Subaccounts aus. Berechtigungen nur „sms“ (Versand) und „balance“ (Schlüssel prüfen); alle anderen aus.', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($sms['schluessel_gesetzt'] ?? false))) . '"')
             . $this->tipInput('absender', 'Absendername (optional, höchstens 11 Zeichen)', 'Erscheint beim Empfänger als Absender, z. B. „Praxis“. Nur Buchstaben und Ziffern, keine Leerzeichen; leer = Standard von seven.io.', 'text', (string)($sms['absender'] ?? ''), 'maxlength="16" placeholder="Praxis"')
             . '<button>Speichern</button></form>'
             . ($sms ? $this->testLine($st['tests'], 'sms') . '<div class="actions"><form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'sms']) . '<button>Schlüssel prüfen</button></form> '
@@ -1974,7 +1974,7 @@ final class Web {
             . $f('host', 'Server (Name oder IP)', 'Adresse des NAS im Praxisnetz, am besten die feste IP-Adresse (z. B. 192.0.2.20), weil Namen mit „.local“ auf dem Server oft nicht auflösbar sind.', 'text', '', 'required placeholder="192.0.2.20"')
             . $f('freigabe', 'Freigabe', 'Name des freigegebenen Ordners auf dem NAS (bei Synology: Name unter „Gemeinsamer Ordner“), z. B. „praxis“.', 'text', '', 'placeholder="praxis"', 'smb')
             . $f('port', 'Port', 'Port des SFTP-Dienstes. Meist 22; bei Synology 22, wenn nicht geändert.', 'number', '22', 'min="1" max="65535"', 'sftp')
-            . $f('ordner', 'Basisordner', 'Ordner auf dem Ziel, unter dem die Module ihre Dateien ablegen, z. B. „DocLibre“ (wird angelegt, wenn möglich). Ohne Platzhalter und ohne „..“.', 'text', '', 'placeholder="Kienzle"')
+            . $f('ordner', 'Basisordner', 'Ordner auf dem Ziel, unter dem die Module ihre Dateien ablegen, z. B. „Praxisherz“ (wird angelegt, wenn möglich). Ohne Platzhalter und ohne „..“.', 'text', '', 'placeholder="Kienzle"')
             . $f('benutzer', 'Benutzer', 'Anmeldename am NAS. Besser ein eigener Benutzer nur für diese Ablage, der nur diesen Ordner schreiben darf.', 'text', '', 'autocomplete="off"')
             . $f('passwort', 'Passwort', 'Passwort des NAS-Benutzers für SMB. Wird nach dem Speichern nie wieder angezeigt; leer lassen = unverändert. SFTP braucht kein Passwort, sondern den Schlüssel unten.', 'password', '', 'autocomplete="new-password"', 'smb')
             . $f('domaene', 'Domäne (optional)', 'Nur bei einer Windows-Domäne nötig, sonst leer lassen.', 'text', '', '', 'smb')
@@ -2168,7 +2168,7 @@ final class Web {
         $st = $this->st();
         $list = $this->modules->starters();
         $body = V::error($error) . ($notice ? '<p class="notice">' . V::h($notice) . '</p>' : '')
-            . '<p>Ein Paket pro Arbeitsplatz richtet den <strong>DocLibre-Agent</strong> ein: ein Programm, das Module direkt aus T2med öffnet (aktueller Patient wird mitgegeben) und unter Windows als Dienst mit Systemrechten läuft. '
+            . '<p>Ein Paket pro Arbeitsplatz richtet den <strong>Praxisherz-Agent</strong> ein: ein Programm, das Module direkt aus T2med öffnet (aktueller Patient wird mitgegeben) und unter Windows als Dienst mit Systemrechten läuft. '
             . 'Der Agent fragt die Suite alle paar Sekunden und hält Starter, Aufrufe, Zertifikat und virtuelle Drucker selbst aktuell; „Akte öffnen“ legt er als GDT-Datei in <code>C:\Kienzle\GDT</code> ab '
             . '(in T2med beim GDT-Gerät „Telefonaufruf“ als Importdatei <code>C:\Kienzle\GDT\AUFRUFi.gdt</code> eintragen). Er führt keine Befehle der Suite aus, nur diese festen Aufgaben. macOS und Linux bekommen vorerst nur den Starter (ohne Dienst).</p>';
         if (!$list) return $body . '<p class="muted">Kein installiertes Modul bietet einen Startkontext an.</p>';
@@ -2192,7 +2192,7 @@ final class Web {
         return $body;
     }
 
-    // --- DocLibre-Agent (ein Programm am PC: Starter für T2med und Dienst mit Systemrechten) ------------------------
+    // --- Praxisherz-Agent (ein Programm am PC: Starter für T2med und Dienst mit Systemrechten) ------------------------
 
     private ?Arbeitsplaetze $ap = null;
     public static string $clientDist = '';             // Ordner der Programme (Tests); leer = <Basis>/client-dist
@@ -2804,7 +2804,7 @@ final class Web {
             'pfad' => $this->req?->path ?? '', 'einrichtung' => $admin ? $this->openSteps() : 0, 'offenLogo' => $admin && $this->openSteps() > 0, 'offen' => $admin ? $this->openPaths() : []];
     }
 
-    private function issuer(): string { return $this->config->practice !== '' ? 'DocLibre ' . $this->config->practice : 'DocLibre'; }
+    private function issuer(): string { return $this->config->practice !== '' ? 'Praxisherz ' . $this->config->practice : 'Praxisherz'; }
 
     /** Nur eigene, einfache Pfade als Weiterleitungsziel (keine fremden Adressen, kein „//“). */
     private function next(string $target): string {

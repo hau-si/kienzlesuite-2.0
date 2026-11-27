@@ -60,7 +60,7 @@ if ($a && $a[0] === 'entschluesseln' && count($a) === 3) {
     $pw = password_from_stdin();
     $in = fopen($a[1], 'rb') ?: fail('Datei nicht lesbar.');
     $line = (string)fgets($in, 4096);
-    if (!str_starts_with($line, MAGIC)) fail('Keine Export-Datei DocLibre.', 3);
+    if (!str_starts_with($line, MAGIC)) fail('Keine Export-Datei Praxisherz.', 3);
     $h = json_decode(substr($line, strlen(MAGIC)), true);
     if (!is_array($h) || ($h['kdf'] ?? '') !== 'argon2id13' || !preg_match('/^[0-9a-f]{32}$/', (string)($h['salt'] ?? '')) || !preg_match('/^[0-9a-f]{48}$/', (string)($h['header'] ?? ''))) {
         fail('Datei ungültig (Kopf).', 3);

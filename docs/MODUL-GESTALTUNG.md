@@ -1,6 +1,6 @@
 # Gestaltung der Module
 
-Gemeinsame Regeln für die Oberfläche aller Module DocLibre. Sie gelten zusätzlich zu den Grundbausteinen der Basis
+Gemeinsame Regeln für die Oberfläche aller Module Praxisherz. Sie gelten zusätzlich zu den Grundbausteinen der Basis
 (`core/public/assets/core.css`: Karten, `details.fold`, `tag ok/warn/err`, `mark-icon`) und zur Modul-Schnittstelle
 (`docs/MODUL-SCHNITTSTELLE.md`). Neue Gestaltungen zeigt man zuerst als drei Entwürfe; was der Nutzer wählt, kommt hierher.
 
@@ -18,7 +18,7 @@ Gilt für Module, die mit einem Patienten arbeiten (Kasse, Signatur und künftig
     - **„Zur Kasse“** bzw. ein anderes Modul führt in das Modul, aus dem der Patient kam.
     - **Entfernen** als Mülltonnen-Symbol (Titel „Patient entfernen“) nimmt ihn heraus.
   - Ein Klick auf Name oder T2med-Etikett öffnet die Akte in T2med (`POST /arbeitsplatz/akte` mit der Patientennummer, GDT über den
-    DocLibre-Agent), wenn die Patientennummer bekannt ist.
+    Praxisherz-Agent), wenn die Patientennummer bekannt ist.
   - Hat ein Modul zwei Arbeitsflächen für den Patienten (Kasse: offene T2med-Rechnung und IGeL-Liste), stehen kompakte Umschalter in der
     Karte („T2m-Rechnung“ mit Herz, „IGeL“ mit Igel). Die Mitte wechselt, das Bezahl- bzw. Abschlussfeld bleibt rechts an derselben Stelle.
   - Der Name hat Vorrang: Er wird nicht gekürzt, Knöpfe rücken notfalls in eine zweite Zeile.

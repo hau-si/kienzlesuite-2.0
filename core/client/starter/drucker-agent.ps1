@@ -1,5 +1,5 @@
 param([Parameter(Mandatory = $true)][string]$Liste, [ValidateSet('einrichten', 'alt', 'entfernen')][string]$Modus = 'einrichten', [string]$Entfernen = '', [string]$ServerIp = '')
-# DocLibre-Agent: virtuelle Drucker der Module einrichten (läuft als SYSTEM, ohne Rückfragen).
+# Praxisherz-Agent: virtuelle Drucker der Module einrichten (läuft als SYSTEM, ohne Rückfragen).
 # Beim Einrichten wird nie ein Drucker gelöscht: Hat er eine andere Adresse, wird nur sein Anschluss umgestellt; klappt das nicht,
 # bleibt er unverändert (er druckt dann weiter wie bisher). Fehlende Drucker werden angelegt.
 # „alt“: Drucker, die auf diesen Server zeigen, deren Warteschlange es dort aber nicht mehr gibt (z. B. „Terminzettel“ vor der

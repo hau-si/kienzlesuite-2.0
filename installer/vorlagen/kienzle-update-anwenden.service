@@ -1,7 +1,7 @@
-# DocLibre: signiertes Release prüfen und installieren, bei Fehler zurückspringen.
+# Praxisherz: signiertes Release prüfen und installieren, bei Fehler zurückspringen.
 # Läuft als root ohne Sandbox: Der Installer richtet Pakete, Dienste und nginx ein.
 [Unit]
-Description=DocLibre Update anwenden
+Description=Praxisherz Update anwenden
 After=network-online.target
 Wants=network-online.target
 

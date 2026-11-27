@@ -1,4 +1,4 @@
-// kienzle-starter: gemeinsamer Arbeitsplatz-Starter DocLibre.
+// kienzle-starter: gemeinsamer Arbeitsplatz-Starter Praxisherz.
 //
 // T2med ruft ihn über ein URL-Schema auf, z. B. kienzle-kasse://?kontextId=…&fhirBasisUrl=…&oAuthToken=… oder
 // kienzle-signatur://…. Der Starter sucht das Schema in client.json, schickt den Kontext per HTTPS an die dort
@@ -37,7 +37,7 @@ func main() {
 			}
 			return
 		case "--dienst":
-			// Dauerbetrieb (geplante Aufgabe „DocLibre-Agent“ mit Systemrechten). Nur ein Agent je PC: ein zweiter Start wartet
+			// Dauerbetrieb (geplante Aufgabe „Praxisherz-Agent“ mit Systemrechten). Nur ein Agent je PC: ein zweiter Start wartet
 			// höchstens eine Minute, bis der erste endet (nach einer Aktualisierung), sonst beendet er sich.
 			if !einzigerDienst() {
 				return

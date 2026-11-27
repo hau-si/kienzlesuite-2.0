@@ -1,6 +1,6 @@
-# DocLibre: bestätigte Firewall-Regeln beim Start laden, bevor das Netz hochkommt.
+# Praxisherz: bestätigte Firewall-Regeln beim Start laden, bevor das Netz hochkommt.
 [Unit]
-Description=DocLibre Firewall laden
+Description=Praxisherz Firewall laden
 DefaultDependencies=no
 After=local-fs.target
 Before=network-pre.target

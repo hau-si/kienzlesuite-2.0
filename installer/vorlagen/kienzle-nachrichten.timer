@@ -1,5 +1,5 @@
 [Unit]
-Description=DocLibre Nachrichten-Ausgang alle 20 Sekunden
+Description=Praxisherz Nachrichten-Ausgang alle 20 Sekunden
 
 [Timer]
 OnBootSec=1min

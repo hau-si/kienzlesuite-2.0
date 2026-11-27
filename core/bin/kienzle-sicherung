@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -IB
-"""Datensicherung DocLibre mit restic (nur root, gestartet von systemd).
+"""Datensicherung Praxisherz mit restic (nur root, gestartet von systemd).
 
   kienzle-sicherung anwenden    Anfrage des Webinterfaces verarbeiten (kienzle-sicherung.path)
   kienzle-sicherung taeglich    Nächtlicher Lauf (kienzle-sicherung.timer): sichern, sonntags aufräumen und prüfen

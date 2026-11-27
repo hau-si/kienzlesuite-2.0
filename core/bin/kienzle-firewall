@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -IB
-"""Firewall DocLibre (nur root, gestartet von systemd).
+"""Firewall Praxisherz (nur root, gestartet von systemd).
 
   kienzle-firewall anwenden    Anfrage des Webinterfaces verarbeiten (kienzle-firewall.path)
   kienzle-firewall laden       bestätigte Regeln beim Start laden (kienzle-firewall.service)

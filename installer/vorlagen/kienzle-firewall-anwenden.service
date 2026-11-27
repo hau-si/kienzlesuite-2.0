@@ -1,6 +1,6 @@
-# DocLibre: Firewall-Anfrage prüfen, Regeln laden, auf Bestätigung warten (sonst Rücksprung).
+# Praxisherz: Firewall-Anfrage prüfen, Regeln laden, auf Bestätigung warten (sonst Rücksprung).
 [Unit]
-Description=DocLibre Firewall anwenden
+Description=Praxisherz Firewall anwenden
 
 [Service]
 Type=oneshot

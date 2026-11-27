@@ -1,1 +1,1 @@
-"""Gemeinsame Python-Bibliothek DocLibre (Basis)."""
+"""Gemeinsame Python-Bibliothek Praxisherz (Basis)."""

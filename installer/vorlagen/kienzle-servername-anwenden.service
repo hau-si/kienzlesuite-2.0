@@ -1,6 +1,6 @@
-# DocLibre: Servernamen übernehmen – core.json, Server-Zertifikat, nginx (root).
+# Praxisherz: Servernamen übernehmen – core.json, Server-Zertifikat, nginx (root).
 [Unit]
-Description=DocLibre Servername anwenden
+Description=Praxisherz Servername anwenden
 
 [Service]
 Type=oneshot

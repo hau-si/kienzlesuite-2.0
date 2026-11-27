@@ -1,6 +1,6 @@
-# DocLibre: Angebot an Modulen stündlich prüfen; neue Versionen installiert die Basis nachts.
+# Praxisherz: Angebot an Modulen stündlich prüfen; neue Versionen installiert die Basis nachts.
 [Unit]
-Description=DocLibre Module stündlich prüfen
+Description=Praxisherz Module stündlich prüfen
 
 [Timer]
 OnCalendar=hourly

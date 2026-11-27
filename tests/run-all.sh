@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Alle Tests DocLibre. Muss vor jedem Commit grün sein (AGENTS.md).
+# Alle Tests Praxisherz. Muss vor jedem Commit grün sein (AGENTS.md).
 #   bash tests/run-all.sh
 set -euo pipefail
 cd -- "$(dirname -- "$0")/.."

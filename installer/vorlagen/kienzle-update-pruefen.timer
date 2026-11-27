@@ -1,5 +1,5 @@
 [Unit]
-Description=DocLibre stündlich nach Updates sehen
+Description=Praxisherz stündlich nach Updates sehen
 
 [Timer]
 OnCalendar=hourly

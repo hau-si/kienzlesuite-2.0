@@ -1,6 +1,6 @@
-# DocLibre: Server-Zertifikat erneuern (60 Tage vor Ablauf oder bei geänderten Namen), danach nginx neu laden.
+# Praxisherz: Server-Zertifikat erneuern (60 Tage vor Ablauf oder bei geänderten Namen), danach nginx neu laden.
 [Unit]
-Description=DocLibre Server-Zertifikat prüfen und erneuern
+Description=Praxisherz Server-Zertifikat prüfen und erneuern
 
 [Service]
 Type=oneshot

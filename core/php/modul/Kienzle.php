@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 /**
- * Hilfen für PHP-Module DocLibre (docs/MODUL-SCHNITTSTELLE.md). Ein Modul bindet diese Datei ein:
+ * Hilfen für PHP-Module Praxisherz (docs/MODUL-SCHNITTSTELLE.md). Ein Modul bindet diese Datei ein:
  *   require '/opt/kienzle/core/current/php/modul/Kienzle.php';
  *   $k = new KienzleModul('kasse');
  *   $k->recht('paid') or $k->verweigern();
@@ -71,7 +71,7 @@ final class KienzleModul {
     }
 
     /**
-     * Arbeitsplatz (PC mit DocLibre-Agent), an dem der Browser gerade sitzt: ['id', 'name', 'online'] oder null, wenn die Basis ihn nicht
+     * Arbeitsplatz (PC mit Praxisherz-Agent), an dem der Browser gerade sitzt: ['id', 'name', 'online'] oder null, wenn die Basis ihn nicht
      * kennt. „Akte öffnen“ in T2med: die Seite schickt per fetch POST /arbeitsplatz/akte {modul, csrf, patientennummer} an die Basis
      * (csrf = die CSRF-Marke dieses Moduls); die Basis baut den GDT-Aufruf und gibt ihn an den Agent dieses PCs.
      */
@@ -258,7 +258,7 @@ final class KienzleModul {
      */
     public function drucken(string $drucker, string $daten, string $titel, array $optionen = []): string {
         if (!in_array($drucker, array_column($this->drucker(), 'name'), true)) throw new RuntimeException('Drucker „' . $drucker . '“ ist in der Suite nicht eingerichtet.');
-        $args = ['/usr/bin/lp', '-d', $drucker, '-t', mb_substr((string)preg_replace('/[^A-Za-z0-9 ._\/-]/', '', $titel), 0, 60) ?: 'DocLibre'];
+        $args = ['/usr/bin/lp', '-d', $drucker, '-t', mb_substr((string)preg_replace('/[^A-Za-z0-9 ._\/-]/', '', $titel), 0, 60) ?: 'Praxisherz'];
         foreach ($optionen as $o) {
             if (!is_string($o) || !preg_match('/^[a-z][a-z0-9-]{0,40}(=[A-Za-z0-9_.,-]{1,60})?$/D', $o)) throw new RuntimeException('Druckoption ungültig.');
             array_push($args, '-o', $o);

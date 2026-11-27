@@ -1,11 +1,11 @@
 # Kasse: Kartenzahlung am SumUp Solo aus T2med, T2med-Rechnungseingang, GOÄ-Leistungen, Barzahlung, Belege,
 # Rechnung per Post (Letterxpress), Ablage für die Steuerberatung. Auf Grundlage von kienzle-sumup (Branch
-# rechnungseingang, 1.4.1-rechnung.57) von Dr. Thomas Kienzle, für DocLibre 2.0 umgebaut.
+# rechnungseingang, 1.4.1-rechnung.57) von Dr. Thomas Kienzle, für Praxisherz 2.0 umgebaut.
 
 [module]
 id = "kasse"
 name = "Kasse"
-version = "2.3.4-beta.58"
+version = "2.3.4-beta.59"
 core_api = "2"
 description = "Kartenzahlung am SumUp Solo aus T2med, T2med-Rechnungseingang über den Drucker „vKasse“, GOÄ-Leistungen, Barzahlung, Belege per E-Mail, Druck und Post."
 

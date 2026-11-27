@@ -1,4 +1,4 @@
-# DocLibre 2.0
+# Praxisherz – freie Software für die Arztpraxis
 
 Praxis-Appliance für Hausarztpraxen mit T2med: **eine Basis**, einmal auf einer VM installiert, und **Module**, die
 einzeln dazukommen – Kasse (SumUp), Terminzettel, Signatur, später Fax, Telefon und Kienzlezeit. Verwaltung komplett im
