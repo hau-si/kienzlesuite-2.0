@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.20
+
+- **Fehler behoben: Symbol in der Taskleiste blieb nach einer Selbstaktualisierung des Agents hängen** (roter Punkt, lässt sich nicht mehr anklicken), obwohl der Agent selbst (Dienst) nach der Aktualisierung einwandfrei lief (Arbeitsplatz „verbunden“, Drucker eingerichtet). Ursache: Nur der Hintergrunddienst startet sich nach einer Aktualisierung selbst neu (beta.18); das Symbol in der Taskleiste ist ein zweiter, unabhängiger Prozess, der nur beim Anmelden startet und sonst unbegrenzt mit dem alten Programmstand weiterlief. Das Symbol erkennt jetzt an `status.json` (andere Programmversion als die eigene), dass der Dienst sich inzwischen aktualisiert hat, und startet sich selbst mit der neuen Fassung neu – ohne Zutun des Benutzers, in der Regel binnen weniger Sekunden nach der Aktualisierung des Dienstes.
+- Wer gerade ein hängendes, rotes und nicht anklickbares Symbol hat: einmal abmelden und wieder anmelden (oder den PC neu starten) behebt es sofort; ab dieser Fassung tritt es nicht mehr auf.
+- Programmversion 2.3.2. Geprüft mit Tests (Go, neuer Test `TestAgentAktualisiert`) und Kreuz-Kompilierung für Windows. **Nicht auf einem echten Windows-PC geprüft** (wie der übrige Agent).
+
 ## 0.22.0-beta.19
 
 - **Fehler behoben: Agent richtete keine Drucker ein** („0 von 1 eingerichtet“ bei vier Druckern, „keine MSFT_Printer-Objekte … Name gleich …“). Windows PowerShell 5.1 reichte die Druckerliste als ein einziges Objekt weiter; dadurch standen alle vier Namen in einem Eintrag. Das Skript liest die Liste jetzt über eine Variable. Derselbe Fehler steckte im Entfernen alter Drucker.

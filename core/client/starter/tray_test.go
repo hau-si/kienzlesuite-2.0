@@ -86,6 +86,21 @@ func TestStatusUndAnstoss(t *testing.T) {
 	}
 }
 
+func TestAgentAktualisiert(t *testing.T) {
+	if AgentAktualisiert(Status{}, false, "2.3.1") {
+		t.Fatal("ohne status.json nicht neu starten")
+	}
+	if AgentAktualisiert(Status{Version: "2.3.1"}, true, "2.3.1") {
+		t.Fatal("gleiche Version: nicht neu starten")
+	}
+	if !AgentAktualisiert(Status{Version: "2.3.2"}, true, "2.3.1") {
+		t.Fatal("Dienst schon aktualisiert (neuere Version): Symbol muss sich neu starten")
+	}
+	if AgentAktualisiert(Status{Version: ""}, true, "2.3.1") {
+		t.Fatal("leere Version (altes/unvollständiges status.json): nicht neu starten")
+	}
+}
+
 func TestAnsichtAlteDrucker(t *testing.T) {
 	jetzt := time.Unix(1_800_000_000, 0)
 	s := Status{Zeit: jetzt.Unix(), Verbunden: true, Drucker: []string{"vTermine"}, DruckerOk: true, Aufrufe: 1, Zertifikat: true,

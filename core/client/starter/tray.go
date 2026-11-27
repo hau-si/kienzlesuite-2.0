@@ -119,6 +119,13 @@ func AnsichtBauen(s Status, vorhanden bool, jetzt time.Time) Ansicht {
 	return v
 }
 
+// AgentAktualisiert meldet, ob sich der Agent (Dienst) seit dem Start dieses Symbol-Prozesses bereits selbst
+// aktualisiert hat: status.json nennt dann eine andere Programmversion als die dieses laufenden Prozesses. Das Symbol
+// startet sich in dem Fall neu (tray_windows.go), statt auf dem alten Stand stehen zu bleiben.
+func AgentAktualisiert(s Status, vorhanden bool, eigeneVersion string) bool {
+	return vorhanden && s.Version != "" && s.Version != eigeneVersion
+}
+
 func kuerzen(s string, n int) string {
 	r := []rune(strings.TrimSpace(s))
 	if len(r) <= n {
