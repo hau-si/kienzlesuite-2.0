@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.29
+
+- Verwaltung → Verbindungen → T2med: Hinweise auf den T2med-Demo-Schlüssel entfernt. Jede Praxis trägt ihren eigenen API-Schlüssel ein; ohne Schlüssel verbinden sich die Module nicht mit T2med.
+- Mit Tests geprüft. **Nicht auf der VM geprüft.**
+
 ## 0.22.0-beta.28
 
 - Modul-Schnittstelle: neuer Abschnitt **„Patientenübergabe zwischen Modulen“** (`docs/MODUL-SCHNITTSTELLE.md`). Ein Patient mit T2med-Zugang geht über den gemeinsamen Austauschordner an ein anderes Modul (Datei `uebergabe-<ziel>/<code>.json`, höchstens 5 Minuten, einmalig, im selben Tab). Nur Dokumentation.

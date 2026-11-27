@@ -7,7 +7,8 @@ namespace KienzleKasse;
  * überlagern die Grundwerte aus der Suite (Suite::baseConfig: Vorgaben, Schlüssel, zentrale Verbindungen).
  */
 final class Settings {
-    public const T2MED_DEMO_API_KEY = '7QwA7931lJSQfMKuTH4MQXLn4YEiNhE5tggnYKlY4HE';
+    /** Fehlt der T2med-API-Schlüssel, gibt es keinen Ersatz (der Schlüssel gehört der Praxis und steht nie im Quelltext). */
+    public const T2MED_OHNE_SCHLUESSEL = 'Kein T2med-API-Schlüssel eingetragen. Bitte unter Verwaltung → Verbindungen → T2med den API-Schlüssel der Praxis eintragen.';
     private const ROW = 'config_overrides';
 
     /** Felder je Abschnitt: Typ, Beschriftung, Auswahl, Hilfetext. */
@@ -173,6 +174,7 @@ final class Settings {
         if ($section === 'fhir' && ($values['mode'] ?? '') === 'live' && !Suite::connected('t2med')) {
             throw new Problem('Für den Live-Betrieb zuerst unter Verwaltung → Verbindungen die T2med-Verbindung einrichten.', 422);
         }
+        if ($section === 'fhir' && ($values['mode'] ?? '') === 'live' && (string)(Suite::modul()->verbindung('t2med')['api_key'] ?? '') === '') throw new Problem(self::T2MED_OHNE_SCHLUESSEL, 422);
         if ($section === 'mail' && ($values['enabled'] ?? false) && !Suite::connected('mail')) {
             throw new Problem('Für den E-Mail-Versand zuerst unter Verwaltung → Verbindungen den E-Mail-Versand einrichten.', 422);
         }

@@ -9,6 +9,7 @@ final class FhirClient {
     public function __construct(private Config $config, private HttpClient $http) {}
 
     private function request(string $method, string $path, string $token, ?array $body = null, bool $patient = false): array {
+        if ((string)$this->config->get('fhir', 'api_key', '') === '') throw new TransportError(Settings::T2MED_OHNE_SCHLUESSEL, false);
         $headers = ['Accept: application/fhir+json', 'Content-Type: application/fhir+json',
             'Authorization: Bearer ' . $token, 'X-API-Key: ' . $this->config->get('fhir', 'api_key'),
             'X-TreatWarningAsError: true', 'Prefer: return=OperationOutcome', 'User-Agent: kienzle-kasse/' . trim(file_get_contents(dirname(__DIR__) . '/VERSION'))];
@@ -94,37 +95,6 @@ final class FhirClient {
             'extension' => [['url' => 'https://fhir.t2med.de/StructureDefinition/FhirApiFreitextKuerzel', 'valueString' => $this->config->get('fhir', 'entry_code', 'ZAHLUNG')]],
             'status' => 'final', 'effectiveDateTime' => $paid->format(DATE_ATOM), 'valueString' => $text];
     }
-    public function supportsConditionalCreate(string $token): bool {
-        try {
-            $result = $this->request('GET', '/metadata', $token);
-            if ($result['status'] !== 200 || ($result['body']['resourceType'] ?? '') !== 'CapabilityStatement') return false;
-            foreach ($result['body']['rest'] ?? [] as $rest) {
-                if (($rest['mode'] ?? '') !== 'server') continue;
-                foreach ($rest['resource'] ?? [] as $resource) {
-                    if (($resource['type'] ?? '') === 'Observation' && ($resource['conditionalCreate'] ?? false) === true) return true;
-                }
-            }
-        } catch (TransportError) { /* Gewöhnliches POST bleibt nutzbar. Unklare Wiederholungen bleiben gesperrt. */ }
-        return false;
-    }
-    public function findPayment(array $visit, array $payment, string $token): ?string {
-        $result = $this->request('GET', '/Observation?' . http_build_query(['identifier' => self::PAYMENT . '|' . $payment['id']]), $token);
-        if ($result['status'] !== 200 || ($result['body']['resourceType'] ?? '') !== 'Bundle') throw new TransportError('Der vorhandene Akteneintrag konnte nicht geprüft werden.');
-        $found = [];
-        foreach ($result['body']['entry'] ?? [] as $entry) {
-            $resource = $entry['resource'] ?? [];
-            if (($resource['resourceType'] ?? '') !== 'Observation') continue;
-            $matching = false; $context = false;
-            foreach ($resource['identifier'] ?? [] as $id) {
-                if (($id['system'] ?? '') === self::PAYMENT && ($id['value'] ?? '') === $payment['id']) $matching = true;
-                if (($id['system'] ?? '') === self::CONTEXT && ($id['value'] ?? '') === $visit['context_id']) $context = true;
-            }
-            if ($matching && $context && !empty($resource['id']) && ($resource['valueString'] ?? null) === $this->resource($visit, $payment)['valueString']) $found[] = 'Observation/' . $resource['id'];
-        }
-        if (count($found) > 1) throw new TransportError('Mehrere passende Akteneinträge gefunden. Bitte in t2med prüfen.');
-        // Ein leeres Ergebnis ist KEIN Beweis, dass ein vorheriger POST nicht noch verarbeitet wird.
-        return $found[0] ?? null;
-    }
     public const ANHANG = 'https://fhir.t2med.de/StructureDefinition/FhirApiDocumentReferenceAnhang|1.0.0';
 
     /** Unterschriebenes PDF aus Signatur als DocumentReference (Profil „Anhang“) in die Akte des Kontexts (Integrationsleitfaden 1.10). */
@@ -155,9 +125,9 @@ final class FhirClient {
         throw new TransportError($grund . ($detail !== '' ? ' Auskunft von T2med: ' . $detail : ''), false, $code);
     }
 
-    public function write(array $visit, array $payment, string $token, bool $conditional): string {
+    /** Akteneintrag als Transaktion (nur dokumentierte Funktionen: kein /metadata, keine Suche nach Observation, kein bedingtes Anlegen). */
+    public function write(array $visit, array $payment, string $token): string {
         $request = ['method' => 'POST', 'url' => 'Observation'];
-        if ($conditional) $request['ifNoneExist'] = http_build_query(['identifier' => self::PAYMENT . '|' . $payment['id']]);
         $result = $this->request('POST', '', $token, ['resourceType' => 'Bundle', 'type' => 'transaction',
             'entry' => [['request' => $request, 'resource' => $this->resource($visit, $payment)]]]);
         $code = $result['status'];

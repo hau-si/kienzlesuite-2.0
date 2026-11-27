@@ -1,5 +1,12 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.57
+
+- **Kein Demo-Schlüssel mehr (Vorgabe von T2med).** Fehlt der T2med-API-Schlüssel unter Verwaltung → Verbindungen → T2med, verbindet sich die Kasse nicht mit T2med und meldet das klar. Live-Betrieb lässt sich ohne Schlüssel nicht einschalten.
+- **Nur noch dokumentierte T2med-Funktionen.** Die Kasse fragt nicht mehr `GET /metadata` ab, sucht nicht mehr nach vorhandenen Zahlungseinträgen (`GET /Observation`) und legt nicht mehr bedingt an (`ifNoneExist`).
+- Ist ein Schreibversuch in die Akte ungeklärt (z. B. Antwort verloren), schreibt die Kasse erst nach Rückfrage erneut: „Akte geprüft – erneut schreiben“. Vorher bitte in der T2med-Akte nachsehen, ob der Zahlungseintrag schon da ist.
+- Mit Tests geprüft. **Nicht auf der VM und nicht mit echtem T2med geprüft.**
+
 ## 2.3.4-beta.56
 
 - **Neu: Patientenübergabe aus Signatur.** Wurde ein Patient direkt aus T2med in der Signatur geöffnet, führt dort „Zur Kasse“ in die Kasse. Die Kasse übernimmt den T2med-Zugang der Signatur, legt einen Besuch an wie beim Aufruf aus T2med (Patientenkarte oben, Aktenaufruf) und schreibt die Zahlung in die Akte. Der Zugang endet spätestens 4 Stunden nach dem ursprünglichen Aufruf.

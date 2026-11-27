@@ -164,7 +164,6 @@ final class Suite {
         $v['fhir']['launch_urls'] = $t ? array_values(array_map(static fn($u) => rtrim((string)$u, '/'), (array)($t['launch_urls'] ?? []))) : [];
         if ($t && !$v['fhir']['launch_urls'] && $v['fhir']['base_url'] !== '') $v['fhir']['launch_urls'] = [$v['fhir']['base_url']];
         $v['fhir']['api_key'] = $t ? (string)($t['api_key'] ?? '') : '';
-        if ($t && $v['fhir']['api_key'] === '') $v['fhir']['api_key'] = Settings::T2MED_DEMO_API_KEY;   // wie im alten Tool: leer = T2med-Demo-Schlüssel
         $v['fhir']['ca_file'] = $t ? self::caFile((string)($t['ca_pem'] ?? '')) : '';
         $v['fhir']['pin_certificate'] = $t && !empty($t['pin']) && $v['fhir']['ca_file'] !== '';
         $m = $k->verbindung('mail');

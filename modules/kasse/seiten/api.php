@@ -104,7 +104,7 @@ try {
             'discard' => $app->discard($visit, App::string($input, 'payment_id', 32)),
             'reader_status' => $app->readerAction($visit, App::string($input, 'payment_id', 32)),
             'reader_cancel' => $app->readerAction($visit, App::string($input, 'payment_id', 32), true),
-            'document' => $app->document($visit, App::string($input, 'payment_id', 32)),
+            'document' => $app->document($visit, App::string($input, 'payment_id', 32), ($input['bestaetigt'] ?? false) === true),
             'receipt_share' => $app->receiptShare($visit, App::string($input, 'payment_id', 32)),
             'patient_kontakt' => $app->patientKontakt($visit),
             'signatur_offen' => $app->signaturOffen($visit),

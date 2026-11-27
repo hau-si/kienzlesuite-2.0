@@ -1,5 +1,10 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.26
+
+- **Kein Demo-Schlüssel mehr (Vorgabe von T2med).** Ohne T2med-API-Schlüssel in der Basis lädt das Telefonverzeichnis nicht und meldet das klar; die Begrenzung für den Demo-Schlüssel entfällt.
+- Mit Tests geprüft. **Nicht auf der VM und nicht mit echtem T2med geprüft.**
+
 ## 0.1.0-beta.25
 
 - **Fehler behoben: „Einstellungen“ und „Statistik“ ließen sich nicht öffnen** („Die Telefon-Seite ist gerade nicht erreichbar“). Statistik und Telefonverzeichnis öffneten ihre Datenbanken über eine `file:…?mode=ro`-Adresse. Die Schutzeinstellung `open_basedir` der Module lehnt solche Adressen ab, sobald die Datenbank existiert. Jetzt wird die Datei normal geöffnet und nur lesend gekennzeichnet (`SQLITE_OPEN_READONLY`).

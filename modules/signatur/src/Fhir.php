@@ -8,8 +8,8 @@ namespace KienzleSignatur;
  */
 class Fhir {
     public const KONTEXT = 'https://fhir.t2med.de/identifier/kontext';
-    /** Öffentlicher Demo-Schlüssel von T2med (github.com/T2med/fhir-demoapplication); gilt wie in der Kasse, wenn in der Basis kein Schlüssel hinterlegt ist. */
-    public const DEMO_SCHLUESSEL = '7QwA7931lJSQfMKuTH4MQXLn4YEiNhE5tggnYKlY4HE';
+    /** Ohne API-Schlüssel der Praxis gibt es keinen Ersatz (der Schlüssel steht nie im Quelltext). */
+    public const OHNE_SCHLUESSEL = 'Kein T2med-API-Schlüssel eingetragen. Bitte unter Verwaltung → Verbindungen → T2med den API-Schlüssel der Praxis eintragen.';
 
     /** @param array<string,mixed> $v Verbindung „t2med“ der Basis */
     public function __construct(private array $v, private string $caDatei = '') {}
@@ -153,7 +153,7 @@ class Fhir {
     /** @return array{status:int,body:mixed} */
     protected function anfrage(string $url, string $token, string $methode = 'GET', ?array $body = null, array $mehr = [], string $profil = 'https://fhir.t2med.de/StructureDefinition/FhirApiPatient|1.0.0'): array {
         $key = (string)($this->v['api_key'] ?? '');
-        if ($key === '') $key = self::DEMO_SCHLUESSEL;
+        if ($key === '') throw new \RuntimeException(self::OHNE_SCHLUESSEL);
         $kopf = array_merge(['Accept: application/fhir+json', 'Authorization: Bearer ' . $token, 'X-API-Key: ' . $key],
             $profil !== '' ? ['X-FHIR-Profile: ' . $profil] : [], ['X-TreatWarningAsError: true', 'Prefer: return=OperationOutcome', 'User-Agent: kienzle-signatur'], $mehr);
         $roh = ''; $zuGross = false;

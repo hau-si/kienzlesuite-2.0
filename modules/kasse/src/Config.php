@@ -52,7 +52,7 @@ final class Config {
         if ($this->get('fhir', 'mode') === 'live') {
             $fhir = parse_url((string)$this->get('fhir', 'base_url'));
             if (!$fhir || ($fhir['scheme'] ?? '') !== 'https' || empty($fhir['host']) || isset($fhir['user']) || isset($fhir['query']) || isset($fhir['fragment'])) throw new \RuntimeException('FHIR benötigt eine feste HTTPS-Basisadresse.');
-            if (!$this->get('fhir', 'api_key') || !is_array($this->get('fhir', 'launch_urls')) || !$this->get('fhir', 'launch_urls')) throw new \RuntimeException('FHIR-Schlüssel oder erlaubte Aufrufadressen fehlen.');
+            if (!is_array($this->get('fhir', 'launch_urls')) || !$this->get('fhir', 'launch_urls')) throw new \RuntimeException('Erlaubte Aufrufadressen für T2med fehlen.');
         }
         $pin = $this->get('fhir', 'pin_certificate', false);
         if (!is_bool($pin)) throw new \RuntimeException('fhir.pin_certificate muss true oder false sein.');

@@ -1,5 +1,10 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.36
+
+- **Kein Demo-Schlüssel mehr (Vorgabe von T2med).** Ohne T2med-API-Schlüssel in der Basis (Verwaltung → Verbindungen → T2med) gibt es keine Verbindung zu T2med; die Signatur meldet das klar.
+- Mit Tests geprüft. **Nicht auf der VM und nicht mit echtem T2med geprüft.**
+
 ## 0.1.0-beta.35
 
 - **Neu: „Zur Kasse“ auch bei Patienten direkt aus T2med.** Der Knopf in der Patientenkarte gibt den Patienten samt T2med-Zugang an die Kasse weiter: über den gemeinsamen Ordner, einmalig, höchstens 5 Minuten, im selben Tab. Dort kann gleich kassiert werden, und die Zahlung geht in die Akte. Voraussetzung: Kasse ist installiert und für den Benutzer sichtbar, der Aufruf aus T2med ist höchstens 4 Stunden alt.

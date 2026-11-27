@@ -12,8 +12,6 @@ namespace KienzleTelefon;
 final class Verzeichnis {
     public const GUELTIG = 4 * 3600;      // T2med-Kontext gilt höchstens 4 Stunden
     public const MAX_PATIENTEN = 200000;
-    /** Mit dem Demo-Schlüssel von T2med höchstens so viele Seiten (= Anfragen) je Laden; der Schlüssel wird sonst gesperrt. */
-    public const DEMO_SEITEN = 3;
 
     private static function ordner(): string {
         $d = Anlage::$data . '/t2med';
@@ -78,6 +76,7 @@ final class Verzeichnis {
         $url = rtrim((string)($eingabe['fhir_base_url'] ?? ''), '/');
         if (!preg_match('/^[A-Za-z0-9._-]{1,128}$/D', $kontext)) throw new \InvalidArgumentException('Ungültiger T2med-Kontext.');
         if ($token === '' || strlen($token) > 16000 || preg_match('/\s|\$\{/', $token)) throw new \InvalidArgumentException('T2med hat kein gültiges Zugriffstoken übergeben.');
+        if ($t2med->ohneSchluessel()) throw new \InvalidArgumentException(T2med::OHNE_SCHLUESSEL);
         if (!$t2med->erlaubt($url)) throw new \InvalidArgumentException('Die von T2med übergebene FHIR-Adresse ist in der Suite nicht freigegeben (Verwaltung → Verbindungen → T2med).');
         if (!preg_match('/^[A-Za-z0-9.-]{1,100}(:\d{1,5})?$/D', $host)) throw new \InvalidArgumentException('Ungültiger Servername.');
         $code = bin2hex(random_bytes(32));
@@ -135,14 +134,12 @@ final class Verzeichnis {
         try {
             $begrenzt = false;
             for ($i = 0; $i < $maxSeiten && $a['naechste'] !== '' && time() - $start < $sekunden; $i++) {
-                if ($t2med->demo() && $a['seiten'] >= self::DEMO_SEITEN) { $a['naechste'] = ''; $begrenzt = true; break; }
                 $bundle = $t2med->seite((string)$a['naechste'], $token);
                 $liste = T2med::patienten($bundle);
                 self::einfuegen($pdo, $liste, self::einstellungen()['ortsvorwahl']);
                 $a['anzahl'] += count($liste);
                 $a['seiten']++;
                 $a['naechste'] = T2med::naechste($bundle, (string)$a['basis']) ?? '';
-                if ($t2med->demo() && $a['seiten'] >= self::DEMO_SEITEN && $a['naechste'] !== '') { $a['naechste'] = ''; $begrenzt = true; }
                 if ($a['anzahl'] > self::MAX_PATIENTEN || $a['seiten'] > 20000) throw new \RuntimeException('Zu viele Patienten oder Seiten; Laden abgebrochen.');
             }
         } catch (\RuntimeException $e) {

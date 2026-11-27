@@ -35,7 +35,7 @@ $basis = 'https://t2med.example.org/aps/fhir/api/r4';
 $p = static fn(string $id, string $nr, string $vor, string $nach, string $geb, array $tel, array $extra = []) => ['resource' => ['resourceType' => 'Patient', 'id' => $id,
     'identifier' => $nr === '' ? [] : [['system' => T2med::PATIENTENNUMMER, 'value' => $nr]], 'name' => [['use' => 'official', 'family' => $nach, 'given' => [$vor]]] + $extra,
     'birthDate' => $geb, 'telecom' => array_map(fn($t) => ['system' => 'phone', 'value' => $t], $tel)]];
-$t = new TestT2med(['base_url' => $basis, 'launch_urls' => []]);
+$t = new TestT2med(['base_url' => $basis, 'launch_urls' => [], 'api_key' => 'test-schluessel']);
 $t->seiten["$basis/Patient"] = ['resourceType' => 'Bundle', 'link' => [['relation' => 'next', 'url' => "$basis/Patient?page=2"]], 'entry' => [
     $p('p1', '4711', 'Max', 'Mustermann', '1970-01-01', ['030 1234567', '0170 1234567']),
     $p('p2', '4712', 'Maria', 'Mustermann', '1975-03-12', ['030 1234567']),
@@ -63,7 +63,7 @@ check(Verzeichnis::stand()['anzahl'] === 4, 'Stand');
 
 check(Verzeichnis::stand()['begrenzt'] === false, 'zwei Seiten: nicht begrenzt');
 
-// Demo-Schlüssel: höchstens DEMO_SEITEN Anfragen je Laden; mit eigenem Schlüssel alles
+// Ohne API-Schlüssel: kein Ersatzschlüssel, klare Meldung; mit Schlüssel alle Seiten
 $viele = static function (array $v) use ($basis, $p): TestT2med {
     $t = new TestT2med($v + ['base_url' => $basis]);
     for ($i = 1; $i <= 6; $i++) {
@@ -73,14 +73,11 @@ $viele = static function (array $v) use ($basis, $p): TestT2med {
     }
     return $t;
 };
-$demo = $viele([]);
-check($demo->demo() && !$viele(['api_key' => 'eigener-schluessel'])->demo(), 'Demo erkannt');
-$s1 = Verzeichnis::starten(['context_id' => 'k2', 'oauth_token' => 'tok', 'fhir_base_url' => $basis], $demo, $k, 'kienzle.example.org');
-preg_match('/launch=([0-9a-f]{64})/', $s1['url'], $mm);
-$r = Verzeichnis::schritt($mm[1], $demo, $k);
-check($r['fertig'] && $r['begrenzt'] && $r['anzahl'] === Verzeichnis::DEMO_SEITEN && count($demo->aufrufe) === Verzeichnis::DEMO_SEITEN, 'Demo: nur ' . Verzeichnis::DEMO_SEITEN . ' Anfragen: ' . json_encode($r) . ' ' . count($demo->aufrufe));
-Verzeichnis::zuruecksetzen();
-check(Verzeichnis::stand()['begrenzt'] === true, 'Stand merkt die Begrenzung');
+$ohne = $viele([]);
+check($ohne->ohneSchluessel() && !$viele(['api_key' => 'eigener-schluessel'])->ohneSchluessel(), 'fehlender Schlüssel erkannt');
+try { Verzeichnis::starten(['context_id' => 'k2', 'oauth_token' => 'tok', 'fhir_base_url' => $basis], $ohne, $k, 'kienzle.example.org'); check(false, 'ohne Schlüssel gestartet'); }
+catch (InvalidArgumentException $e) { check($e->getMessage() === T2med::OHNE_SCHLUESSEL && $ohne->aufrufe === [], 'ohne Schlüssel klare Meldung, keine Anfrage'); }
+check(!defined(T2med::class . '::DEMO_SCHLUESSEL'), 'kein Demo-Schlüssel im Quelltext');
 $voll = $viele(['api_key' => 'eigener-schluessel']);
 $s2 = Verzeichnis::starten(['context_id' => 'k3', 'oauth_token' => 'tok', 'fhir_base_url' => $basis], $voll, $k, 'kienzle.example.org');
 preg_match('/launch=([0-9a-f]{64})/', $s2['url'], $mm);

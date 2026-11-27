@@ -38,7 +38,7 @@ Oberfläche, Hilfetexte, Dokumentation und Commit-Nachrichten auf Deutsch.
 
 ## Hinweise für neue Sitzungen (Stand 26.11.2026)
 
-**Stand:** Basis 0.22.0-beta.28, Kasse (`kasse`) 2.3.4-beta.56, Terminzettel 1.3.0-beta.19, Signatur 0.1.0-beta.35, Telefon 0.1.0-beta.25, Fax 0.1.0-beta.13; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
+**Stand:** Basis 0.22.0-beta.29, Kasse (`kasse`) 2.3.4-beta.57, Terminzettel 1.3.0-beta.19, Signatur 0.1.0-beta.36, Telefon 0.1.0-beta.26, Fax 0.1.0-beta.13; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
 (Basis 0.19.1). Der Nutzer testet auf einer echten Ubuntu-26.04-VM (Aktualisierung dort: `cd ~/kienzlesuite-2.0 && git pull && sudo bash installer/install.sh`,
 oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nicht ins Repository.
 
@@ -53,6 +53,13 @@ oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nich
 - Nie echte Daten (Namen, Adressen, IBAN, Praxisbilder) in Repository, Tests oder Bildern; nur erfundene Beispiele (`example.org`, 192.0.2.0/24, „Max Mustermann“, „Dr. med. Erika Beispiel“).
 - Keine `rm -rf *`-artigen Befehle (die Sicherheitsprüfung blockiert sie); gezielt löschen.
 - „MFA“ in Gruppen heißt Medizinische Fachangestellte (nicht Multi-Faktor).
+
+### Vorgaben von T2med (E-Mail an den Nutzer, 27.11.2026)
+
+- **Kein T2med-API-Schlüssel im Repository**, auch kein Demo-Schlüssel als Vorgabe. Jede Praxis trägt ihren Schlüssel unter Verwaltung → Verbindungen → T2med ein; fehlt er, melden Kasse, Signatur und Telefon das klar (`OHNE_SCHLUESSEL`). Seit Kasse beta.57, Signatur beta.36, Telefon beta.26 entfernt (steht noch in der Git-Geschichte).
+- **Nur dokumentierte FHIR-Funktionen** (fhir.t2med.de/funktionsumfang, Integrationsleitfaden): kein `GET /metadata`, kein Lesen/Suchen von Observation, kein `ifNoneExist`. Ungeklärte Akteneinträge der Kasse schreibt erst die Bestätigung der Mitarbeiterin erneut (`App::document(…, $bestaetigt)`).
+- Patientensuche nur einzeln (dokumentiert: `identifier`, `family`/`given`/`birthdate`; Telefonnummer ist **kein** dokumentierter Suchparameter). Das Massenladen des Telefonverzeichnisses (`GET /Patient` mit Seiten) ist nicht dokumentiert und muss ersetzt werden (Telefon vorerst zurückgestellt, Wunsch des Nutzers).
+- Neuer Produktname nötig (Verwechslung mit Produkten von Dr. Kienzle); „T2-Suite“ wurde wegen Nähe zu „T2med“ als riskant eingeschätzt. Telefon und Fax mit Thomas Kienzle abstimmen (schriftliches OK liegt dem Nutzer vor). Freigabe später über API@t2med.de mit Anlage 2, nur fertige Module.
 
 ### Werkzeuge für Bilder und Video
 

@@ -1124,8 +1124,12 @@ final class App {
             return ['reader_payment' => $current, 'message' => $message];
         }));
     }
-    public function document(array $visit, string $id): array {
-        return $this->db->locked('payment-' . $id, function () use ($visit, $id): array {
+    /**
+     * Zahlung in die Akte schreiben. Ist ein früherer Versuch ungeklärt (writing/unknown), schreibt die Kasse erst nach Bestätigung
+     * erneut ($bestaetigt): T2med erlaubt keine Suche nach vorhandenen Einträgen, die Mitarbeiterin prüft die Akte selbst.
+     */
+    public function document(array $visit, string $id, bool $bestaetigt = false): array {
+        return $this->db->locked('payment-' . $id, function () use ($visit, $id, $bestaetigt): array {
             $p = $this->payment($visit, $id);
             if ($p['doc_status'] === 'written') return $this->publicPayment($p);
             if ($p['payment_status'] !== 'successful') throw new Problem('Die Zahlung ist noch nicht als erfolgreich bestätigt.', 409);
@@ -1133,19 +1137,9 @@ final class App {
             if (self::isManual($visit)) return $this->finish($p, 'manuell');
             if ($this->config->get('fhir', 'mode') === 'live' && $p['invoice_json'] && json_decode($p['invoice_json'], true, 32, JSON_THROW_ON_ERROR)['mock']) throw new Problem('Ein Testbeleg darf nicht in eine echte Patientenakte geschrieben werden.', 409);
             $token = $this->decrypt($visit['oauth_cipher']);
-            $conditional = false;
-            if ($this->config->get('fhir', 'mode') === 'live') {
-                $conditional = $this->fhir->supportsConditionalCreate($token);
-                if (in_array($p['doc_status'], ['writing', 'unknown'], true)) {
-                    try {
-                        $found = $this->fhir->findPayment($visit, $p, $token);
-                        if ($found) return $this->finish($p, $found);
-                    } catch (TransportError) { /* Nur ein garantiert bedingtes POST darf noch schreiben. */ }
-                    if (!$conditional) {
-                        $this->db->query("UPDATE payments SET doc_status='unknown',error_message=? WHERE id=?", ['Der letzte Schreibversuch ist ungeklärt. Bitte Akte prüfen. Erneutes Klicken prüft zunächst auf den vorhandenen Eintrag.', $id]);
-                        return $this->publicPayment($this->payment($visit, $id));
-                    }
-                }
+            if ($this->config->get('fhir', 'mode') === 'live' && in_array($p['doc_status'], ['writing', 'unknown'], true) && !$bestaetigt) {
+                $this->db->query("UPDATE payments SET doc_status='unknown',error_message=? WHERE id=?", ['Der letzte Schreibversuch ist ungeklärt. Bitte in der T2med-Akte nachsehen, ob der Eintrag schon da ist. Nur wenn nicht: erneut schreiben.', $id]);
+                return $this->publicPayment($this->payment($visit, $id));
             }
             $this->db->query("UPDATE payments SET doc_status='writing',error_message='' WHERE id=?", [$id]);
             try {
@@ -1153,7 +1147,7 @@ final class App {
                     if ($visit['mock_document_fail']) throw new TransportError('Simulierter t2med-Fehler. Testfehler ausschalten und erneut klicken.', false, 503);
                     $this->db->query('INSERT OR IGNORE INTO mock_records(payment_id,resource_json,created_at) VALUES(?,?,?)', [$id, json_encode($this->fhir->resource($visit, $p), JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE), time()]);
                     $resource = 'MockObservation/' . $id;
-                } else $resource = $this->fhir->write($visit, $p, $token, $conditional);
+                } else $resource = $this->fhir->write($visit, $p, $token);
                 return $this->finish($p, $resource);
             } catch (TransportError $e) {
                 $this->db->query('UPDATE payments SET doc_status=?,error_message=? WHERE id=?', [$e->ambiguous ? 'unknown' : 'failed', $e->getMessage(), $id]);

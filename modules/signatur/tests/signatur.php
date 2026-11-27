@@ -313,14 +313,16 @@ check($kl['text'] === 'Tel … Mail … Geb … Adr …', 'Ohne Kontaktdaten ble
 wirft(fn() => Seite::vorgangAnlegen(['vorlage_id' => $kt, 'pad_id' => $padT, 'patient' => 'K', 'email' => 'kein-mail'], 'x', $praxis), 'ungültige E-Mail');
 wirft(fn() => Seite::vorgangAnlegen(['vorlage_id' => $kt, 'pad_id' => $padT, 'patient' => 'K', 'telefon' => 'abc<script>'], 'x', $praxis), 'ungültiges Telefon');
 
-// API-Schlüssel: leer = Demo-Schlüssel wie in der Kasse; 403 mit Hinweis
+// API-Schlüssel: leer = klare Meldung, kein Ersatzschlüssel; 403 mit Hinweis
 $kopfTest = new class(['base_url' => 'https://t2med.example.org/aps/fhir/api/r4', 'api_key' => '']) extends Fhir {
     public array $kopf = []; public int $status = 403;
     protected function anfrage(string $url, string $token, string $methode = 'GET', ?array $body = null, array $mehr = [], string $profil = ''): array { return ['status' => $this->status, 'body' => null]; }
 };
 try { $kopfTest->patient('k1', 'tok'); check(false, '403 ohne Fehler'); } catch (RuntimeException $e) { check(str_contains($e->getMessage(), 'HTTP 403') && str_contains($e->getMessage(), 'API-Schlüssel'), '403 mit Hinweis auf den API-Schlüssel'); }
 $rm = new ReflectionMethod(Fhir::class, 'anfrage');
-check(Fhir::DEMO_SCHLUESSEL !== '' && str_contains((string)file_get_contents(dirname(__DIR__) . '/src/Fhir.php'), "if (\$key === '') \$key = self::DEMO_SCHLUESSEL;"), 'Leerer Schlüssel nutzt den Demo-Schlüssel');
+$ohne = new Fhir(['base_url' => 'https://t2med.example.org/aps/fhir/api/r4', 'api_key' => '']);
+try { $ohne->patient('k1', 'tok'); check(false, 'ohne Schlüssel kein Fehler'); } catch (RuntimeException $e) { check($e->getMessage() === Fhir::OHNE_SCHLUESSEL, 'ohne Schlüssel klare Meldung'); }
+check(!defined(Fhir::class . '::DEMO_SCHLUESSEL'), 'kein Demo-Schlüssel im Quelltext');
 
 // Anrede-Platzhalter
 $at = Seite::vorlageSpeichern(['art' => 'sonstige', 'titel' => 'Anrede-Test', 'text' => '{{briefanrede}}|{{anrede}}|{{vorname}}|{{nachname}}', 'aktiv' => 1]);

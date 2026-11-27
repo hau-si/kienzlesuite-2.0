@@ -429,7 +429,7 @@ function renderPayment() {
     title=p.method==='cash' ? 'Barzahlung erfasst' : p.method==='transfer' ? 'Überweisung bestätigt' : 'Zahlung erfolgreich'; symbol='✓';
     description=state.manual ? 'Mit „Vorgang abschließen“ ist die manuelle Zahlung erledigt. In T2med wird nichts dokumentiert.' : 'Mit „Dokumentation in der Akte“ wird die Zahlung in t2med dokumentiert und der Vorgang abgeschlossen.';
     $('document').hidden=false;
-    $('document').textContent=p.doc_status==='unknown' || p.doc_status==='writing' ? 'Dokumentation prüfen / erneut versuchen' : state.manual ? 'Vorgang abschließen' : 'Dokumentation in der Akte';
+    $('document').textContent=p.doc_status==='unknown' || p.doc_status==='writing' ? 'Akte geprüft – erneut schreiben' : state.manual ? 'Vorgang abschließen' : 'Dokumentation in der Akte';
     $('mock-fhir-label').hidden=!state.mock;
     $('mock-fhir-fail').checked=state.mock_document_fail;
   } else if(p.payment_status==='transfer_open') {
@@ -682,7 +682,9 @@ function sendReceiptEmail() {
 }
 $('receipt-email-form').onsubmit=e=>{ e.preventDefault(); sendReceiptEmail(); };
 $('document').onclick=()=>run(async()=>{
-  state.payment=await api('document',{payment_id:state.payment.id}); renderPayment();
+  const unklar=state.payment.doc_status==='unknown' || state.payment.doc_status==='writing';
+  if(unklar && !confirm('Der letzte Schreibversuch ist ungeklärt. Bitte zuerst in der T2med-Akte nachsehen.\n\nNur wenn der Zahlungseintrag dort fehlt: jetzt erneut schreiben?')) return;
+  state.payment=await api('document',{payment_id:state.payment.id,bestaetigt:unklar}); renderPayment();
   if(state.payment.doc_status==='written') { state.completed=true; setTimeout(()=>window.close(),900); }
 });
 $('mock-success').onclick=()=>run(async()=>{ await api('mock',{payment_id:state.payment.id,status:'successful'}); await load(); });

@@ -10,14 +10,14 @@ namespace KienzleTelefon;
  */
 class T2med {
     public const PATIENTENNUMMER = 'https://fhir.t2med.de/identifier/patientennummer';
-    /** Öffentlicher Demo-Schlüssel von T2med (github.com/T2med/fhir-demoapplication), wie in Kasse und Signatur, wenn die Basis keinen hat. */
-    public const DEMO_SCHLUESSEL = '7QwA7931lJSQfMKuTH4MQXLn4YEiNhE5tggnYKlY4HE';
+    /** Ohne API-Schlüssel der Praxis gibt es keinen Ersatz (der Schlüssel steht nie im Quelltext). */
+    public const OHNE_SCHLUESSEL = 'Kein T2med-API-Schlüssel eingetragen. Bitte unter Verwaltung → Verbindungen → T2med den API-Schlüssel der Praxis eintragen.';
 
     /** @param array<string,mixed> $v Verbindung „t2med“ der Basis */
     public function __construct(private array $v, private string $caDatei = '') {}
 
-    /** Mit dem öffentlichen Demo-Schlüssel (kein eigener Schlüssel in der Basis)? T2med sperrt ihn bei zu vielen Anfragen. */
-    public function demo(): bool { return trim((string)($this->v['api_key'] ?? '')) === ''; }
+    /** Fehlt der API-Schlüssel der Praxis in der Basis? */
+    public function ohneSchluessel(): bool { return trim((string)($this->v['api_key'] ?? '')) === ''; }
 
     /** Die von T2med übergebene Adresse ist nur erlaubt, wenn sie in der Basis hinterlegt ist (kein Token an fremde Server). */
     public function erlaubt(string $url): bool {
@@ -83,7 +83,7 @@ class T2med {
     /** @return array{status:int,body:mixed} */
     protected function anfrage(string $url, string $token): array {
         $key = (string)($this->v['api_key'] ?? '');
-        if ($key === '') $key = self::DEMO_SCHLUESSEL;
+        if ($key === '') throw new \RuntimeException(self::OHNE_SCHLUESSEL);
         $kopf = ['Accept: application/fhir+json', 'Authorization: Bearer ' . $token, 'X-API-Key: ' . $key, 'X-FHIR-Profile: https://fhir.t2med.de/StructureDefinition/FhirApiPatient|1.0.0',
             'X-TreatWarningAsError: true', 'User-Agent: kienzle-telefon'];
         $roh = ''; $zuGross = false;
