@@ -1,10 +1,49 @@
-param([Parameter(Mandatory = $true)][string]$Liste)
+param([Parameter(Mandatory = $true)][string]$Liste, [ValidateSet('einrichten', 'alt', 'entfernen')][string]$Modus = 'einrichten', [string]$Entfernen = '')
 # Kienzle-Agent: virtuelle Drucker der Module einrichten (läuft als SYSTEM, ohne Rückfragen).
-# Ein vorhandener Drucker wird nie gelöscht: Hat er eine andere Adresse, wird nur sein Anschluss umgestellt; klappt das nicht,
+# Beim Einrichten wird nie ein Drucker gelöscht: Hat er eine andere Adresse, wird nur sein Anschluss umgestellt; klappt das nicht,
 # bleibt er unverändert (er druckt dann weiter wie bisher). Fehlende Drucker werden angelegt.
-# Letzte Zeile der Ausgabe = Zusammenfassung für die Seite „Arbeitsplätze“.
+# „alt“: Drucker, die auf diesen Server zeigen, deren Warteschlange es dort aber nicht mehr gibt (z. B. „Terminzettel“ vor der
+# Umbenennung in vTermine). „entfernen“: nur solche alten Drucker löschen, und nur die, die am PC bestätigt wurden (Symbol in der Taskleiste).
+# Letzte Zeile der Ausgabe = Zusammenfassung für die Seite „Arbeitsplätze“ (bei „alt“: JSON-Liste der Namen).
 $ErrorActionPreference = 'Continue'
+try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch { }  # Umlaute in Namen und Windows-Meldungen
 $list = @(Get-Content -Raw $Liste | ConvertFrom-Json | Where-Object { $_.name -match '^[A-Za-z0-9_-]{1,40}$' -and $_.url -match '^http://[^\s/]+:631/printers/' })
+
+function Alte {
+    if (!$list.Count) { return @() }
+    $u = [Uri]$list[0].url
+    $hosts = @($u.Host.ToLower())
+    try { $hosts += @([System.Net.Dns]::GetHostAddresses($u.Host) | ForEach-Object { $_.IPAddressToString.ToLower() }) } catch { }
+    $queues = @($list | ForEach-Object { ([Uri]$_.url).Segments[-1].Trim('/').ToLower() })
+    $namen = @($list | ForEach-Object { $_.name.ToLower() })
+    @(Get-Printer -ErrorAction SilentlyContinue | Where-Object {
+        if ($_.PortName -notmatch '^(?i)(https?|ipp)://([^/:]+)(:\d+)?/printers/([^/?#]+)') { return $false }
+        $h = $Matches[2].ToLower(); $q = [Uri]::UnescapeDataString($Matches[4]).ToLower()
+        ($hosts -contains $h) -and ($queues -notcontains $q) -and ($namen -notcontains $_.Name.ToLower())
+    } | ForEach-Object { $_.Name })
+}
+
+if ($Modus -eq 'alt') {
+    # Nicht-ASCII als \uXXXX, damit Namen mit Umlauten unabhängig von der Codepage genau ankommen.
+    $j = ConvertTo-Json -Compress -InputObject @(Alte)
+    Write-Output ([regex]::Replace($j, '[^\x00-\x7F]', { param($m) '\u{0:x4}' -f [int][char]$m.Value }))
+    exit 0
+}
+if ($Modus -eq 'entfernen') {
+    $wunsch = @(Get-Content -Raw $Entfernen | ConvertFrom-Json)
+    $weg = @(); $nicht = @(); $grund = ''
+    foreach ($name in @(Alte | Where-Object { $wunsch -contains $_ })) {
+        $port = (Get-Printer -Name $name -ErrorAction SilentlyContinue).PortName
+        try { Remove-Printer -Name $name -ErrorAction Stop; $weg += $name } catch { $nicht += $name; if (!$grund) { $grund = $_.Exception.Message } }
+        if ($port -and !(Get-Printer -ErrorAction SilentlyContinue | Where-Object { $_.PortName -eq $port })) { Remove-PrinterPort -Name $port -ErrorAction SilentlyContinue }
+    }
+    $text = 'Alte Drucker entfernt: ' + $(if ($weg.Count) { $weg -join ', ' } else { 'keine' })
+    if ($nicht.Count) { $text += '; nicht entfernt: ' + ($nicht -join ', ') + '. Windows meldet: ' + (($grund -replace '\s+', ' ').Trim()) }
+    if ($text.Length -gt 280) { $text = $text.Substring(0, 280) }
+    Write-Output $text
+    if ($nicht.Count) { exit 1 }
+    exit 0
+}
 $fehlt = @(); $alt = @(); $ok = 0; $grund = ''
 # Erreichbarkeit vorab prüfen (als SYSTEM gelten dieselbe Namensauflösung und Firewall wie für alle Benutzer).
 $erreichbar = ''

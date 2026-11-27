@@ -1,5 +1,12 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.17
+
+- **Neu: Alte Kienzle-Drucker entfernen, nach Rückfrage.** Der Kienzle-Agent sucht höchstens alle 10 Minuten (und nach „Drucker prüfen“) nach Druckern, die auf die Suite zeigen (Servername oder dessen IP-Adresse), deren Warteschlange es dort aber nicht mehr gibt, z. B. „Terminzettel“ oder „SumUp-Rechnung“ von früher. Das Symbol in der Taskleiste zeigt sie gelb unter „Alte Drucker“ und bietet „Alte Drucker entfernen …“ an. Gelöscht wird erst nach „Ja“ in der Rückfrage (Vorgabe ist „Nein“), und nur Drucker, die der Agent unmittelbar davor erneut als alt erkennt. Der freie Anschluss wird mit entfernt.
+- Beim Einrichten löscht der Agent weiterhin nie einen Drucker. Die aktuellen Drucker der Suite und fremde Drucker bleiben unberührt.
+- Umlaute in Druckernamen und Windows-Meldungen kommen jetzt unverfälscht an (Ausgabe des Skripts in UTF-8).
+- Programmversion 2.2.0. Geprüft mit Tests (Go). **Nicht auf einem echten Windows-PC geprüft.**
+
 ## 0.22.0-beta.16
 
 - **Neu: Symbol des Kienzle-Agents in der Taskleiste** (Entwurf B). Ein Klick öffnet über der Uhr ein kleines Statusfenster mit einer Ampel je Bereich: Verbindung zur Suite, Drucker (mit fehlenden Druckern und der Windows-Meldung), Aufrufe aus T2med, Zertifikat und „Akte öffnen“. Der Punkt am Symbol zeigt den schlechtesten Zustand (grün, gelb, rot; rot auch, wenn der Agent seit 3 Minuten nichts gemeldet hat). Unten gibt es drei Knöpfe: „Suite öffnen“, „Drucker prüfen“ (der Agent richtet fehlende Drucker sofort neu ein, statt 10 Minuten zu warten) und „Protokoll“ (öffnet `starter.log`).

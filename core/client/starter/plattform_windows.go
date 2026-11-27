@@ -77,6 +77,34 @@ func (w *windowsPlattform) Drucker(liste []Drucker) (string, error) {
 	if len(liste) == 0 {
 		return "", nil
 	}
+	return w.druckerSkript(liste)
+}
+
+func (w *windowsPlattform) AlteDrucker(liste []Drucker) ([]string, error) {
+	text, err := w.druckerSkript(liste, "-Modus", "alt")
+	if err != nil {
+		return nil, err
+	}
+	var namen []string
+	if err := json.Unmarshal([]byte(text), &namen); err != nil {
+		return nil, fmt.Errorf("alte Drucker: unerwartete Antwort")
+	}
+	return namen, nil
+}
+
+func (w *windowsPlattform) DruckerEntfernen(liste []Drucker, namen []string) (string, error) {
+	data, _ := json.Marshal(namen)
+	datei := filepath.Join(w.ordner, "drucker-entfernen.json")
+	if err := os.WriteFile(datei, data, 0o644); err != nil {
+		return "", err
+	}
+	defer os.Remove(datei)
+	return w.druckerSkript(liste, "-Modus", "entfernen", "-Entfernen", datei)
+}
+
+// druckerSkript schreibt Liste und Skript in den Datenordner (nur für System und Administratoren beschreibbar) und gibt die letzte
+// Zeile der Ausgabe zurück.
+func (w *windowsPlattform) druckerSkript(liste []Drucker, extra ...string) (string, error) {
 	data, _ := json.Marshal(liste)
 	datei := filepath.Join(w.ordner, "drucker.json")
 	if err := os.WriteFile(datei, data, 0o644); err != nil {
@@ -86,8 +114,9 @@ func (w *windowsPlattform) Drucker(liste []Drucker) (string, error) {
 	if err := os.WriteFile(skript, []byte(druckerSkript), 0o644); err != nil {
 		return "", err
 	}
-	out, err := versteckt(exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", skript, "-Liste", datei)).CombinedOutput()
-	text := strings.TrimSpace(string(out))
+	args := append([]string{"-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", skript, "-Liste", datei}, extra...)
+	out, err := versteckt(exec.Command("powershell.exe", args...)).CombinedOutput()
+	text := strings.TrimSpace(strings.ToValidUTF8(string(out), "?"))
 	if i := strings.LastIndex(text, "\n"); i >= 0 {
 		text = strings.TrimSpace(text[i+1:])
 	}

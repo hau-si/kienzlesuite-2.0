@@ -30,7 +30,7 @@ import (
 var DruckerPause = 10 * time.Minute
 
 // Version des Programms (scripts/starter-bauen setzt sie nicht; der Server vergleicht die Prüfsumme der Datei).
-const version = "2.1.0"
+const version = "2.2.0"
 
 // AgentConfig steht in agent.json (nur für SYSTEM und Administratoren lesbar).
 type AgentConfig struct {
@@ -73,6 +73,10 @@ type Plattform interface {
 	Zertifizierungsstelle(pem []byte) error
 	GDTOrdner() string
 	Symbol(programm string) error // Symbol in der Taskleiste beim Anmelden starten
+	// AlteDrucker: Drucker, die auf diesen Server zeigen, deren Warteschlange es nicht mehr gibt.
+	AlteDrucker(liste []Drucker) ([]string, error)
+	// DruckerEntfernen löscht nur Drucker, die (erneut geprüft) alt sind und am PC bestätigt wurden.
+	DruckerEntfernen(liste []Drucker, namen []string) (string, error)
 }
 
 // Agent hält Zustand zwischen den Abfragen.
@@ -94,6 +98,8 @@ type Agent struct {
 	schemaH        string
 	status         Status
 	statusRoh      []byte
+	druckerSoll    []Drucker
+	altPruefung    time.Time
 }
 
 // Status schreibt der Agent nach status.json im Datenordner (für alle Benutzer lesbar, ohne Geheimnisse und Patientendaten);
@@ -112,6 +118,8 @@ type Status struct {
 	Zertifikat bool     `json:"zertifikat"`
 	AkteZeit   int64    `json:"akte_zeit,omitempty"`
 	AkteOk     bool     `json:"akte_ok,omitempty"`
+	AltDrucker []string `json:"alt_drucker,omitempty"` // alte Kienzle-Drucker, Entfernen nach Rückfrage im Symbol
+	AltText    string   `json:"alt_text,omitempty"`
 }
 
 // statusSchreiben: bei Änderung sofort, sonst höchstens jede Minute (Lebenszeichen für das Symbol).
@@ -145,6 +153,65 @@ func (a *Agent) anstoss() {
 	}
 	_ = os.Remove(datei)
 	a.druckerH, a.druckerFehlerH, a.stand = "", "", ""
+	a.altPruefung = time.Time{}
+}
+
+// altNameRe: Druckernamen, wie Windows sie erlaubt und wie sie bei alten Einrichtungen vorkommen (z. B. „SumUp-Rechnung“).
+var altNameRe = regexp.MustCompile(`^[\p{L}\p{N} _.,()&+-]{1,80}$`)
+
+// alteDrucker: höchstens alle 10 Minuten (und nach „Drucker prüfen“) nach alten Druckern suchen; liegt eine Bestätigung aus dem
+// Symbol vor (anstoss/drucker-entfernen, je Zeile ein Name), genau diese entfernen, sofern sie noch als alt erkannt werden.
+func (a *Agent) alteDrucker() {
+	if len(a.druckerSoll) == 0 {
+		a.status.AltDrucker = nil
+		return
+	}
+	datei := filepath.Join(a.Ordner, "anstoss", "drucker-entfernen")
+	if st, err := os.Lstat(datei); err == nil {
+		var roh []byte
+		if st.Mode().IsRegular() && st.Size() <= 4096 {
+			roh, _ = os.ReadFile(datei)
+		}
+		_ = os.Remove(datei)
+		var namen []string
+		for _, n := range strings.Split(string(roh), "\n") {
+			n = strings.TrimSpace(n)
+			if altNameRe.MatchString(n) && enthaelt(a.status.AltDrucker, n) && !enthaelt(namen, n) && len(namen) < 20 {
+				namen = append(namen, n)
+			}
+		}
+		if len(namen) > 0 {
+			text, err := a.Plattform.DruckerEntfernen(a.druckerSoll, namen)
+			if err != nil {
+				text = err.Error()
+			}
+			a.status.AltText = kuerzen(text, 280)
+			a.altPruefung = time.Time{}
+		}
+	}
+	if !a.altPruefung.IsZero() && time.Since(a.altPruefung) < DruckerPause {
+		return
+	}
+	a.altPruefung = time.Now()
+	alt, err := a.Plattform.AlteDrucker(a.druckerSoll)
+	if err != nil {
+		return
+	}
+	a.status.AltDrucker = a.status.AltDrucker[:0]
+	for _, n := range alt {
+		if altNameRe.MatchString(n) && len(a.status.AltDrucker) < 20 {
+			a.status.AltDrucker = append(a.status.AltDrucker, n)
+		}
+	}
+}
+
+func enthaelt(liste []string, s string) bool {
+	for _, x := range liste {
+		if x == s {
+			return true
+		}
+	}
+	return false
 }
 
 var (
@@ -400,6 +467,7 @@ func (a *Agent) angleichen(s *Soll) error {
 	if a.druckerText != "" {
 		meldungen = append(meldungen, a.druckerText)
 	}
+	a.druckerSoll = drucker
 	a.status.Drucker = a.status.Drucker[:0]
 	for _, d := range drucker {
 		a.status.Drucker = append(a.status.Drucker, d.Name)
@@ -499,6 +567,7 @@ func (a *Agent) Dienst(stop <-chan struct{}) error {
 			if errors.Is(err, errNeustart) {
 				return err
 			}
+			a.alteDrucker()
 			a.statusSchreiben(err)
 			if err != nil {
 				logError(a.Ordner, err)

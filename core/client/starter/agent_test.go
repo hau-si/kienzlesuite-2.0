@@ -27,13 +27,16 @@ import (
 
 // Ersatzplattform: merkt sich die Aufrufe.
 type testPlattform struct {
-	symbol   int
-	mu       sync.Mutex
-	ordner   string
-	schemata int
-	drucker  [][]Drucker
-	ca       int
-	fehler   error
+	symbol      int
+	alt         []string
+	altAbfragen int
+	entfernt    []string
+	mu          sync.Mutex
+	ordner      string
+	schemata    int
+	drucker     [][]Drucker
+	ca          int
+	fehler      error
 }
 
 func (p *testPlattform) Schemata(map[string]string, string) error {
@@ -50,6 +53,25 @@ func (p *testPlattform) Drucker(l []Drucker) (string, error) {
 		return "", p.fehler
 	}
 	return "Drucker: eingerichtet", nil
+}
+func (p *testPlattform) AlteDrucker([]Drucker) ([]string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.altAbfragen++
+	return p.alt, nil
+}
+func (p *testPlattform) DruckerEntfernen(_ []Drucker, namen []string) (string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.entfernt = append(p.entfernt, namen...)
+	rest := []string{}
+	for _, n := range p.alt {
+		if !enthaelt(namen, n) {
+			rest = append(rest, n)
+		}
+	}
+	p.alt = rest
+	return "Alte Drucker entfernt: " + strings.Join(namen, ", "), nil
 }
 func (p *testPlattform) Zertifizierungsstelle([]byte) error { p.ca++; return nil }
 func (p *testPlattform) Symbol(string) error                { p.symbol++; return nil }
@@ -275,8 +297,11 @@ func TestProgrammName(t *testing.T) {
 }
 
 func TestDruckerSkriptLoeschtNie(t *testing.T) {
-	if strings.Contains(druckerSkriptText(), "Remove-Printer") {
-		t.Fatal("drucker-agent.ps1 darf vorhandene Drucker nie löschen")
+	txt := druckerSkriptText()
+	einrichten := txt[strings.Index(txt, "# Erreichbarkeit vorab"):]
+	entfernen := txt[strings.Index(txt, "if ($Modus -eq 'entfernen')"):strings.Index(txt, "# Erreichbarkeit vorab")]
+	if strings.Contains(einrichten, "Remove-Printer") || strings.Count(txt, "Remove-Printer ") != 1 || !strings.Contains(entfernen, "@(Alte | Where-Object { $wunsch -contains $_ })") {
+		t.Fatal("drucker-agent.ps1 darf beim Einrichten nie löschen; entfernen nur alte und bestätigte Drucker")
 	}
 	if !strings.Contains(druckerSkriptText(), "Set-Printer -Name $d.name -PortName $d.url") || !strings.Contains(druckerSkriptText(), "Restart-Service Spooler") {
 		t.Fatal("vorhandene Drucker werden umgestellt, nicht neu angelegt")
@@ -310,5 +335,36 @@ func TestDruckerFehlerNichtBeiJederAbfrage(t *testing.T) {
 	a.Schritt()
 	if len(p.drucker) != 2 || a.zustand != "Drucker: eingerichtet" {
 		t.Fatalf("nach der Pause neuer Versuch: %d %q", len(p.drucker), a.zustand)
+	}
+}
+
+func TestAlteDruckerNurNachBestaetigung(t *testing.T) {
+	ts := neuerTestServer(t, []byte("x"))
+	dir := agentOrdner(t, ts)
+	Anmelden(dir, nil)
+	exe := filepath.Join(dir, "kienzle-starter")
+	os.WriteFile(exe, []byte("x"), 0o755)
+	p := &testPlattform{ordner: dir, alt: []string{"Terminzettel", "SumUp-Rechnung"}}
+	a := &Agent{Ordner: dir, Programm: exe, Plattform: p}
+	a.Laden()
+	if err := a.Schritt(); err != nil {
+		t.Fatal(err)
+	}
+	a.alteDrucker()
+	a.alteDrucker()
+	if p.altAbfragen != 1 || len(a.status.AltDrucker) != 2 || len(p.entfernt) != 0 {
+		t.Fatalf("erkennen ohne zu löschen, höchstens alle 10 Minuten: %d %v %v", p.altAbfragen, a.status.AltDrucker, p.entfernt)
+	}
+	os.MkdirAll(filepath.Join(dir, "anstoss"), 0o755)
+	os.WriteFile(filepath.Join(dir, "anstoss", "drucker-entfernen"), []byte("Terminzettel\nvKasse\n..\\..\\x\nTerminzettel\n"), 0o644)
+	a.alteDrucker()
+	if strings.Join(p.entfernt, ",") != "Terminzettel" {
+		t.Fatalf("nur bestätigte und als alt erkannte Drucker entfernen: %v", p.entfernt)
+	}
+	if strings.Join(a.status.AltDrucker, ",") != "SumUp-Rechnung" || !strings.Contains(a.status.AltText, "Terminzettel") || p.altAbfragen != 2 {
+		t.Fatalf("nach dem Entfernen neu prüfen: %v %q", a.status.AltDrucker, a.status.AltText)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "anstoss", "drucker-entfernen")); err == nil {
+		t.Fatal("Bestätigung muss danach weg sein")
 	}
 }

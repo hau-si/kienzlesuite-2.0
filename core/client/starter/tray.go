@@ -35,6 +35,8 @@ type Ansicht struct {
 	Zeilen  []Zeile
 	Fuss    string // Version · zuletzt
 	Tooltip string
+	// Entfernen: alte Kienzle-Drucker; das Fenster bietet dann „Alte Drucker entfernen …“ mit Rückfrage an.
+	Entfernen []string
 }
 
 // StatusLesen liest status.json; ok=false, wenn es (noch) keine gibt.
@@ -71,6 +73,14 @@ func AnsichtBauen(s Status, vorhanden bool, jetzt time.Time) Ansicht {
 				t = "werden eingerichtet …"
 			}
 			v.Zeilen = append(v.Zeilen, Zeile{"Drucker", kuerzen(t, 110), Gelb})
+		}
+		if len(s.AltDrucker) > 0 {
+			wert := strings.Join(s.AltDrucker, ", ") + " – gibt es in der Suite nicht mehr"
+			if s.AltText != "" {
+				wert += " (" + s.AltText + ")"
+			}
+			v.Zeilen = append(v.Zeilen, Zeile{"Alte Drucker", kuerzen(wert, 110), Gelb})
+			v.Entfernen = append([]string(nil), s.AltDrucker...)
 		}
 		if s.Aufrufe > 0 {
 			v.Zeilen = append(v.Zeilen, Zeile{"Aufrufe aus T2med", fmt.Sprintf("%d eingerichtet", s.Aufrufe), Gruen})

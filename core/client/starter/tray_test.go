@@ -85,3 +85,17 @@ func TestStatusUndAnstoss(t *testing.T) {
 		t.Fatal("Anstoß-Datei muss danach weg sein")
 	}
 }
+
+func TestAnsichtAlteDrucker(t *testing.T) {
+	jetzt := time.Unix(1_800_000_000, 0)
+	s := Status{Zeit: jetzt.Unix(), Verbunden: true, Drucker: []string{"vTermine"}, DruckerOk: true, Aufrufe: 1, Zertifikat: true,
+		AltDrucker: []string{"Terminzettel", "SumUp-Rechnung"}}
+	v := AnsichtBauen(s, true, jetzt)
+	if v.Farbe != Gelb || len(v.Entfernen) != 2 || v.Zeilen[1].Titel != "Alte Drucker" || !strings.Contains(v.Zeilen[1].Wert, "SumUp-Rechnung") {
+		t.Fatalf("alte Drucker gelb mit Knopf: %+v", v)
+	}
+	s.AltDrucker = nil
+	if v := AnsichtBauen(s, true, jetzt); v.Farbe != Gruen || len(v.Entfernen) != 0 {
+		t.Fatalf("ohne alte Drucker kein Knopf: %+v", v)
+	}
+}

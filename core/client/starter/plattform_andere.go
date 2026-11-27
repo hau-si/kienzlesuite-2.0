@@ -15,11 +15,13 @@ func neuePlattform(ordner string) Plattform { return &anderePlattform{ordner: or
 
 func datenOrdner() string { return configDir() }
 
-func (p *anderePlattform) Schemata(map[string]string, string) error { return nil }
-func (p *anderePlattform) Zertifizierungsstelle([]byte) error       { return nil }
-func (p *anderePlattform) Drucker([]Drucker) (string, error)        { return "", nil }
-func (p *anderePlattform) Symbol(string) error                      { return nil }
-func (p *anderePlattform) GDTOrdner() string                        { return filepath.Join(p.ordner, "gdt") }
+func (p *anderePlattform) Schemata(map[string]string, string) error             { return nil }
+func (p *anderePlattform) Zertifizierungsstelle([]byte) error                   { return nil }
+func (p *anderePlattform) Drucker([]Drucker) (string, error)                    { return "", nil }
+func (p *anderePlattform) Symbol(string) error                                  { return nil }
+func (p *anderePlattform) AlteDrucker([]Drucker) ([]string, error)              { return nil, nil }
+func (p *anderePlattform) DruckerEntfernen([]Drucker, []string) (string, error) { return "", nil }
+func (p *anderePlattform) GDTOrdner() string                                    { return filepath.Join(p.ordner, "gdt") }
 
 // tray: Das Symbol in der Taskleiste gibt es nur unter Windows.
 func tray(string) error { return errors.New("Symbol in der Taskleiste nur unter Windows") }

@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 	"unsafe"
@@ -45,6 +46,7 @@ var (
 	pIsWindowVisible        = user32.NewProc("IsWindowVisible")
 	pSetProcessDPIAware     = user32.NewProc("SetProcessDPIAware")
 	pRegisterWindowMessageW = user32.NewProc("RegisterWindowMessageW")
+	pMessageBoxW            = user32.NewProc("MessageBoxW")
 	pGetDC                  = user32.NewProc("GetDC")
 	pReleaseDC              = user32.NewProc("ReleaseDC")
 	pShellNotifyIconW       = shell32.NewProc("Shell_NotifyIconW")
@@ -163,8 +165,9 @@ type trayZustand struct {
 	farbe   int
 	icon    uintptr
 	skala   float64
-	knopf   []rect // Suite öffnen, Drucker prüfen, Protokoll
+	knopf   []rect // Suite öffnen, Drucker prüfen, Protokoll, (Alte Drucker entfernen)
 	meldung string
+	frage   bool // Rückfrage offen: Fenster beim Wechsel zur Rückfrage nicht schließen
 }
 
 var (
@@ -276,6 +279,9 @@ func (t *trayZustand) zeilenHoehe(z Zeile) float64 {
 // groesse setzt Größe und Lage über der Uhr (rechts unten im Arbeitsbereich).
 func (t *trayZustand) groesse() (w, h int32) {
 	hoehe := 16.0 + 46 + 8 + 26 + 16 + 34 + 16
+	if len(t.ansicht.Entfernen) > 0 {
+		hoehe += 40
+	}
 	for _, z := range t.ansicht.Zeilen {
 		hoehe += t.zeilenHoehe(z)
 	}
@@ -307,7 +313,7 @@ func trayProc(hwnd, nachricht, wparam, lparam uintptr) uintptr {
 		}
 		return 0
 	case wmActivate:
-		if wparam&0xFFFF == 0 { // inaktiv: wie ein Windows-Flyout schließen
+		if wparam&0xFFFF == 0 && !t.frage { // inaktiv: wie ein Windows-Flyout schließen
 			pShowWindow.Call(hwnd, swHide)
 		}
 		return 0
@@ -350,6 +356,27 @@ func (t *trayZustand) knopfGedrueckt(i int) {
 	case 2: // Protokoll
 		_ = exec.Command("notepad.exe", filepath.Join(t.ordner, "starter.log")).Start()
 		pShowWindow.Call(t.hwnd, swHide)
+	case 3: // Alte Drucker entfernen – nur nach Rückfrage; der Agent prüft vor dem Löschen erneut, ob sie alt sind
+		namen := t.ansicht.Entfernen
+		if len(namen) == 0 {
+			return
+		}
+		frage := "Diese Drucker zeigen auf die Kienzle-Suite, dort gibt es sie aber nicht mehr:\n\n• " + strings.Join(namen, "\n• ") +
+			"\n\nAusdrucke darauf kommen nirgends an. Jetzt von diesem PC entfernen?\n\nDie aktuellen Drucker der Suite bleiben unverändert."
+		t.frage = true
+		antwort, _, _ := pMessageBoxW.Call(t.hwnd, uintptr(unsafe.Pointer(w16(frage))), uintptr(unsafe.Pointer(w16("Alte Drucker entfernen"))),
+			0x4|0x20|0x100|0x10000|0x40000) // MB_YESNO, MB_ICONQUESTION, MB_DEFBUTTON2, MB_SETFOREGROUND, MB_TOPMOST
+		t.frage = false
+		if antwort != 6 { // IDYES
+			return
+		}
+		_ = os.MkdirAll(filepath.Join(t.ordner, "anstoss"), 0o775)
+		if err := os.WriteFile(filepath.Join(t.ordner, "anstoss", "drucker-entfernen"), []byte(strings.Join(namen, "\n")), 0o664); err != nil {
+			t.meldung = "Entfernen nicht möglich (Paket erneut ausführen)"
+		} else {
+			t.meldung = "Alte Drucker werden entfernt …"
+		}
+		pInvalidateRect.Call(t.hwnd, 0, 1)
 	}
 }
 
@@ -473,5 +500,12 @@ func (t *trayZustand) zeichnen() {
 		t.text(dc, k.text, r, schrift, 1|dtVCenter|dtSingleLine)
 		t.knopf = append(t.knopf, r)
 		x += k.breit + 8
+	}
+	if len(v.Entfernen) > 0 {
+		y += 40
+		kasten(16, y, breite-16, y+32, 8, rgb(0xFB, 0xF3, 0xDC))
+		r := rect{t.px(16), t.px(y), t.px(breite - 16), t.px(y + 32)}
+		t.text(dc, "Alte Drucker entfernen …", r, rgb(0x7A, 0x5A, 0x00), 1|dtVCenter|dtSingleLine)
+		t.knopf = append(t.knopf, r)
 	}
 }
