@@ -23,6 +23,7 @@ var (
 	kernel32 = syscall.NewLazyDLL("kernel32.dll")
 	dwmapi   = syscall.NewLazyDLL("dwmapi.dll")
 
+	pPostMessageW           = user32.NewProc("PostMessageW")
 	pRegisterClassExW       = user32.NewProc("RegisterClassExW")
 	pCreateWindowExW        = user32.NewProc("CreateWindowExW")
 	pDefWindowProcW         = user32.NewProc("DefWindowProcW")
@@ -77,6 +78,9 @@ const (
 	wmRButtonUp   = 0x0205
 	wmApp         = 0x8000
 	wmTray        = wmApp + 1
+	// wmKnopfFertig: eigene Nachricht, mit der ein Hintergrund-Thread (Datei schreiben, Programm starten) dem Fenster
+	// das Ergebnis meldet, ohne selbst Win32-Aufrufe zu machen (die sind nur vom Fenster-Thread aus sicher).
+	wmKnopfFertig = wmApp + 2
 	wsPopup       = 0x80000000
 	wsExToolwin   = 0x00000080
 	wsExTopmost   = 0x00000008
@@ -354,6 +358,15 @@ func trayProc(hwnd, nachricht, wparam, lparam uintptr) uintptr {
 	case wmPaint:
 		t.zeichnen()
 		return 0
+	case wmKnopfFertig:
+		if lparam == 1 && wparam == 0 { // Drucker prüfen: Anstoß ließ sich nicht schreiben
+			t.meldung = "Anstoß nicht möglich (Paket erneut ausführen)"
+		}
+		if lparam == 3 && wparam == 0 { // Alte Drucker entfernen: Anstoß ließ sich nicht schreiben
+			t.meldung = "Entfernen nicht möglich (Paket erneut ausführen)"
+		}
+		pInvalidateRect.Call(hwnd, 0, 1)
+		return 0
 	case wmDestroy:
 		return 0
 	}
@@ -361,25 +374,36 @@ func trayProc(hwnd, nachricht, wparam, lparam uintptr) uintptr {
 	return r
 }
 
+// knopfGedrueckt reagiert auf einen Klick. Jede Aktion, die eine Datei schreibt oder ein Programm startet, macht das in
+// einem eigenen Hintergrund-Thread (go func): CreateProcess/WriteFile können kurz nach dem Hochfahren spürbar hängen
+// (z. B. durch den Virenscanner), und das darf nie die Nachrichtenschleife des Fensters blockieren – sonst wirkt das
+// ganze Fenster „komplett aufgehängt“, bis der Scan fertig ist. Win32-Aufrufe macht nur der Fenster-Thread selbst;
+// der Hintergrund-Thread meldet sein Ergebnis per PostMessage (wmKnopfFertig) zurück.
 func (t *trayZustand) knopfGedrueckt(i int) {
 	switch i {
 	case 0: // Suite öffnen
-		if cfg, err := loadConfig(filepath.Join(t.ordner, "client.json")); err == nil {
-			_ = openBrowser(cfg.ServerURL + "/")
-		}
-		pShowWindow.Call(t.hwnd, swHide)
+		hwnd, ordner := t.hwnd, t.ordner
+		go func() {
+			if cfg, err := loadConfig(filepath.Join(ordner, "client.json")); err == nil {
+				_ = openBrowser(cfg.ServerURL + "/")
+			}
+		}()
+		pShowWindow.Call(hwnd, swHide)
 	case 1: // Drucker prüfen: leere Anstoß-Datei, der Agent prüft bei der nächsten Abfrage
-		_ = os.MkdirAll(filepath.Join(t.ordner, "anstoss"), 0o775)
-		if err := os.WriteFile(filepath.Join(t.ordner, "anstoss", "drucker-pruefen"), nil, 0o664); err != nil {
-			t.meldung = "Anstoß nicht möglich (Paket erneut ausführen)"
-		} else {
-			t.meldung = "Drucker werden geprüft …"
-		}
+		t.meldung = "Drucker werden geprüft …"
 		pInvalidateRect.Call(t.hwnd, 0, 1)
+		hwnd, ordner := t.hwnd, t.ordner
+		go func() {
+			_ = os.MkdirAll(filepath.Join(ordner, "anstoss"), 0o775)
+			err := os.WriteFile(filepath.Join(ordner, "anstoss", "drucker-pruefen"), nil, 0o664)
+			pPostMessageW.Call(hwnd, wmKnopfFertig, boolUintptr(err == nil), 1)
+		}()
 	case 2: // Protokoll
-		_ = exec.Command("notepad.exe", filepath.Join(t.ordner, "starter.log")).Start()
-		pShowWindow.Call(t.hwnd, swHide)
-	case 3: // Alte Drucker entfernen – nur nach Rückfrage; der Agent prüft vor dem Löschen erneut, ob sie alt sind
+		hwnd, ordner := t.hwnd, t.ordner
+		go func() { _ = exec.Command("notepad.exe", filepath.Join(ordner, "starter.log")).Start() }()
+		pShowWindow.Call(hwnd, swHide)
+	case 3: // Alte Drucker entfernen – nur nach Rückfrage; der Agent prüft vor dem Löschen erneut, ob sie alt sind.
+		// Die Rückfrage selbst (MessageBox) ist bewusst modal: Das soll hier auf eine Antwort warten.
 		namen := t.ansicht.Entfernen
 		if len(namen) == 0 {
 			return
@@ -393,14 +417,23 @@ func (t *trayZustand) knopfGedrueckt(i int) {
 		if antwort != 6 { // IDYES
 			return
 		}
-		_ = os.MkdirAll(filepath.Join(t.ordner, "anstoss"), 0o775)
-		if err := os.WriteFile(filepath.Join(t.ordner, "anstoss", "drucker-entfernen"), []byte(strings.Join(namen, "\n")), 0o664); err != nil {
-			t.meldung = "Entfernen nicht möglich (Paket erneut ausführen)"
-		} else {
-			t.meldung = "Alte Drucker werden entfernt …"
-		}
+		t.meldung = "Alte Drucker werden entfernt …"
 		pInvalidateRect.Call(t.hwnd, 0, 1)
+		hwnd, ordner := t.hwnd, t.ordner
+		go func() {
+			_ = os.MkdirAll(filepath.Join(ordner, "anstoss"), 0o775)
+			err := os.WriteFile(filepath.Join(ordner, "anstoss", "drucker-entfernen"), []byte(strings.Join(namen, "\n")), 0o664)
+			pPostMessageW.Call(hwnd, wmKnopfFertig, boolUintptr(err == nil), 3)
+		}()
 	}
+}
+
+// boolUintptr: true→1, false→0 (Ergebnis einer Hintergrundaktion als Win32-Nachrichtenparameter).
+func boolUintptr(ok bool) uintptr {
+	if ok {
+		return 1
+	}
+	return 0
 }
 
 func (t *trayZustand) font(groesse float64, fett bool) uintptr {
