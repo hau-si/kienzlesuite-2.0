@@ -34,6 +34,10 @@ $prog = Join-Path $env:ProgramFiles 'Kienzle'
 New-Item -ItemType Directory -Force $prog | Out-Null
 $exe = Join-Path $prog 'kienzle-starter.exe'
 Place $asset $exe 'Programm (Starter und Agent)'
+# Aus dem Browser heruntergeladene Dateien tragen eine Kennzeichnung „aus dem Internet“ (Zone.Identifier), die beim
+# Kopieren erhalten bleibt: Windows würde sonst bei jedem Start des Symbols (bei jeder Anmeldung) erneut fragen, ob das
+# unsignierte Programm ausgeführt werden darf. Einmal entfernen reicht; harmlos, wenn die Kennzeichnung schon fehlt.
+Unblock-File $exe -ErrorAction SilentlyContinue
 
 # Daten: C:\ProgramData\Kienzle. Benutzer dürfen nur lesen (der Agent läuft mit Systemrechten und führt dort ein Skript aus).
 $daten = Join-Path $env:ProgramData 'Kienzle'

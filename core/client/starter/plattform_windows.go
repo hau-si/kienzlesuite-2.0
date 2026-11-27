@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	_ "embed"
 	"encoding/json"
 	"errors"
@@ -13,11 +14,17 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
 //go:embed drucker-agent.ps1
 var druckerSkript string
+
+// druckerSkriptFrist: Höchstdauer für das Druckerskript (Einrichten/Prüfen/Entfernen). Ohne Frist blockiert ein
+// hängender Windows-Druckspooler (z. B. bei Remove-Printer auf einen Drucker mit festsitzendem Druckauftrag) den
+// ganzen Dienst-Prozess für immer – er fragt dann die Suite nicht mehr ab und wirkt „aufgehängt“.
+const druckerSkriptFrist = 90 * time.Second
 
 // windowsPlattform: Aufrufe in HKLM (für alle Benutzer), Zertifizierungsstelle im Speicher des Computers, Drucker per PowerShell.
 // Läuft als SYSTEM (geplante Aufgabe „Kienzle-Agent“).
@@ -123,7 +130,14 @@ func (w *windowsPlattform) druckerSkript(liste []Drucker, extra ...string) (stri
 			args = append(args, "-ServerIp", ip)
 		}
 	}
-	out, err := versteckt(exec.Command("powershell.exe", args...)).CombinedOutput()
+	ctx, abbrechen := context.WithTimeout(context.Background(), druckerSkriptFrist)
+	defer abbrechen()
+	cmd := versteckt(exec.CommandContext(ctx, "powershell.exe", args...))
+	cmd.WaitDelay = 5 * time.Second // falls das Beenden allein nicht reicht, nicht trotzdem ewig auf die Ausgabe warten
+	out, err := cmd.CombinedOutput()
+	if ctx.Err() == context.DeadlineExceeded {
+		return "", fmt.Errorf("Zeitüberschreitung nach %s (Windows-Druckerverwaltung antwortet nicht; Druckspooler-Dienst neu starten)", druckerSkriptFrist)
+	}
 	text := strings.TrimSpace(strings.ToValidUTF8(string(out), "?"))
 	if i := strings.LastIndex(text, "\n"); i >= 0 {
 		text = strings.TrimSpace(text[i+1:])

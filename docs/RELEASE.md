@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.23
+
+- **Fehler behoben: Der Agent konnte sich beim Entfernen alter Drucker für immer aufhängen** (Nutzer-Meldung: „bei Klick auf Alte Drucker entfernen hängt sich der Agent auf“). Das Druckerskript (Einrichten, Prüfen auf alte Drucker, Entfernen) rief PowerShell bisher ohne jede Frist auf; bleibt dort `Remove-Printer` oder der Windows-Druckspooler hängen (z. B. bei einem festsitzenden Druckauftrag auf dem zu entfernenden Drucker – ein bereits bekanntes Verhalten dieses Druckspoolers, siehe „Gelöst“ weiter unten in dieser Datei), blockierte das den ganzen Dienst-Prozess unbegrenzt: Er fragte die Suite nicht mehr ab, status.json blieb stehen, der Arbeitsplatz wirkte insgesamt hängen geblieben. Das Druckerskript bekommt jetzt eine Frist von 90 Sekunden; läuft sie ab, wird der PowerShell-Prozess beendet und der Agent macht normal weiter (Fehlermeldung „Zeitüberschreitung … Windows-Druckerverwaltung antwortet nicht; Druckspooler-Dienst neu starten“ auf der Seite „Arbeitsplätze“). Betrifft alle drei Aufrufarten (Einrichten, Prüfen, Entfernen).
+- **Fehler behoben: Windows fragte bei jeder Anmeldung erneut, ob das Programm ausgeführt werden darf** (Nutzer-Meldung). Ursache: Das aus dem heruntergeladenen Paket kopierte `kienzle-starter.exe` behielt die Kennzeichnung „Datei stammt von einem anderen Computer“ (Zone.Identifier), die Windows beim Programmstart über die Taskleiste (`HKLM…\Run`, Symbol bei jeder Anmeldung) jedes Mal neu abfragt. `install-windows.ps1` entfernt die Kennzeichnung jetzt einmalig nach dem Einspielen (`Unblock-File`); dazu muss das Installationspaket einmal erneut ausgeführt werden (neues Paket von der Seite „Arbeitsplätze“ laden).
+- Programmversion 2.3.4. Geprüft mit Kreuz-Kompilierung für Windows; beides lässt sich in dieser Sitzung nicht automatisiert testen (kein Windows vorhanden, wie der übrige Agent, und `install-windows.ps1` hat ohnehin keine Tests). **Nicht auf einem echten Windows-PC geprüft** – insbesondere nicht, ob 90 Sekunden im Einzelfall für das Druckerskript reichen.
+
 ## 0.22.0-beta.22
 
 - **Neu: Gestaltungsregel für Module** (`docs/MODUL-GESTALTUNG.md`): Patient oben als Karte, Vorgänge links, der Patient bleibt im Tab erhalten (auch beim Wechsel zwischen Modulen), Wechsel zwischen Modulen im selben Tab, alle Seiten 1400 px breit, Liniensymbole statt Emojis.
