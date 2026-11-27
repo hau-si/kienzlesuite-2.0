@@ -77,6 +77,42 @@ try {
         }
         exit;
     }
+    if ($rel === '/editor/speichern' || $rel === '/editor/bild') {
+        // Editor (Bausteine): Speichern als JSON, Bilder roh (nicht multipart, file_uploads ist aus). Recht „vorlagen“, Suite-CSRF im Kopf.
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        $antwort = static function (array $d, int $code = 200): never { http_response_code($code); echo json_encode($d, JSON_UNESCAPED_UNICODE); exit; };
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') $antwort(['error' => 'Nur POST.'], 405);
+        if (!$darfVorlage) $antwort(['error' => 'Keine Berechtigung für Vorlagen.'], 403);
+        if (!$k->csrfGueltig($_SERVER['HTTP_X_KIENZLE_CSRF'] ?? null)) $antwort(['error' => 'Sitzung abgelaufen. Bitte die Seite neu laden.'], 403);
+        try {
+            if ($rel === '/editor/bild') {
+                $bytes = (string)file_get_contents('php://input', false, null, 0, \KienzleSignatur\Bausteine::MAX_BILD + 1);
+                $antwort(['ok' => true, 'datei' => \KienzleSignatur\Bausteine::bildSpeichern($bytes)]);
+            }
+            $in = json_decode((string)file_get_contents('php://input', false, null, 0, 300000), true);
+            if (!is_array($in)) $antwort(['error' => 'Ungültige Anfrage.'], 400);
+            $id = Seite::vorlageSpeichern(['id' => (int)($in['id'] ?? 0), 'art' => (string)($in['art'] ?? ''), 'titel' => (string)($in['titel'] ?? ''), 'aktiv' => !empty($in['aktiv']), 'bloecke' => $in['bloecke'] ?? null]);
+            $v = Seite::vorlage($id);
+            $antwort(['ok' => true, 'id' => $id, 'version' => (int)$v['version']]);
+        } catch (InvalidArgumentException $e) {
+            $antwort(['error' => $e->getMessage()], 422);
+        } catch (Throwable $e) {
+            error_log('signatur editor: ' . get_class($e) . ': ' . $e->getMessage());
+            $antwort(['error' => 'Speichern nicht möglich (' . get_class($e) . ').'], 500);
+        }
+    }
+    if (preg_match('#^/bild/([0-9a-f]{64}\.(png|jpg))$#D', $rel, $m)) {
+        // Bilder der Vorlagen (Editor-Vorschau, Ansicht). Nur mit Recht auf Vorgänge oder Vorlagen.
+        if (!$darfVorgang && !$darfVorlage) $k->verweigern();
+        $datei = \KienzleSignatur\Bausteine::bildPfad($m[1]);
+        if ($datei === null) { http_response_code(404); exit; }
+        header('Content-Type: ' . ($m[2] === 'png' ? 'image/png' : 'image/jpeg'));
+        header('Cache-Control: private, max-age=86400');
+        header('X-Content-Type-Options: nosniff');
+        readfile($datei);
+        exit;
+    }
     if ($rel === '/pad-hochladen') {
         // Roher Upload (nicht multipart): Für die PHP-Instanz der Module ist file_uploads aus.
         header('Content-Type: application/json; charset=utf-8');
@@ -200,6 +236,7 @@ try {
         }
     }
     if ($k->istAdmin() && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') Ansicht::$padBearbeiten = (int)($_GET['pad'] ?? 0);
+    Ansicht::$editorVorlage = (string)($_GET['vorlage'] ?? '');
     Seite::aufraeumen();
     header('Content-Type: text/html; charset=utf-8');
     header('Cache-Control: no-store');

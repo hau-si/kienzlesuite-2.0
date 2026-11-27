@@ -80,24 +80,43 @@ final class Seite {
         return $st->fetch() ?: null;
     }
 
-    /** Legt an (id 0) oder ändert. Eine geänderte Mustervorlage gilt danach als von der Praxis geprüft. */
+    /** Bausteine einer Vorlage; ältere Vorlagen (nur Text) als ein Text-Baustein. */
+    public static function bloeckeVon(array $vorlage): array {
+        $b = json_decode((string)($vorlage['bloecke'] ?? ''), true);
+        return is_array($b) && $b ? $b : Bausteine::ausAltemText((string)$vorlage['text']);
+    }
+
+    /**
+     * Legt an (id 0) oder ändert. Aus dem Editor kommen Bausteine („bloecke“, JSON), sonst ein Text. Ändern sich Inhalt,
+     * Titel oder Art, zählt die Fassung hoch (der Vorgang merkt sich, welche Fassung unterschrieben wurde).
+     */
     public static function vorlageSpeichern(array $in): int {
         $id = (int)($in['id'] ?? 0);
         $art = (string)($in['art'] ?? '');
         if (!isset(self::ARTEN[$art])) throw new \InvalidArgumentException('Unbekannte Dokumentart.');
         $titel = self::zeile($in['titel'] ?? '', 'Titel', 80);
-        $text = self::text($in['text'] ?? '', 'Text');
-        self::pruefePlatzhalter($text);
+        if (array_key_exists('bloecke', $in)) {
+            $bloecke = Bausteine::pruefen($in['bloecke']);
+        } else {
+            $text = self::text($in['text'] ?? '', 'Text');
+            self::pruefePlatzhalter($text);
+            $bloecke = Bausteine::ausAltemText($text);
+        }
+        $text = Bausteine::alsText($bloecke);
+        if (mb_strlen($text) > self::MAX_TEXT) throw new \InvalidArgumentException('Die Vorlage ist zu lang.');
+        $json = json_encode($bloecke, JSON_UNESCAPED_UNICODE);
         $aktiv = !empty($in['aktiv']) ? 1 : 0;
         $pdo = self::pdo();
         if ($id > 0) {
-            if (!self::vorlage($id)) throw new \InvalidArgumentException('Vorlage nicht gefunden.');
+            $alt = self::vorlage($id);
+            if (!$alt) throw new \InvalidArgumentException('Vorlage nicht gefunden.');
             if ($id === self::festeVorlageId()) { $art = 'igel'; $aktiv = 1; }
-            $pdo->prepare('UPDATE vorlagen SET art=?, titel=?, text=?, aktiv=?, muster=0, geaendert=? WHERE id=?')->execute([$art, $titel, $text, $aktiv, time(), $id]);
+            $version = (int)$alt['version'] + (json_encode(self::bloeckeVon($alt), JSON_UNESCAPED_UNICODE) !== $json || $alt['titel'] !== $titel || $alt['art'] !== $art ? 1 : 0);
+            $pdo->prepare('UPDATE vorlagen SET art=?, titel=?, text=?, bloecke=?, version=?, aktiv=?, muster=0, geaendert=? WHERE id=?')->execute([$art, $titel, $text, $json, $version, $aktiv, time(), $id]);
             return $id;
         }
         if ((int)$pdo->query('SELECT COUNT(*) FROM vorlagen')->fetchColumn() >= 100) throw new \InvalidArgumentException('Es sind höchstens 100 Vorlagen möglich.');
-        $pdo->prepare('INSERT INTO vorlagen (art, titel, text, aktiv, muster, geaendert) VALUES (?, ?, ?, ?, 0, ?)')->execute([$art, $titel, $text, $aktiv, time()]);
+        $pdo->prepare('INSERT INTO vorlagen (art, titel, text, bloecke, version, aktiv, muster, geaendert) VALUES (?, ?, ?, ?, 1, ?, 0, ?)')->execute([$art, $titel, $text, $json, $aktiv, time()]);
         return (int)$pdo->lastInsertId();
     }
 
@@ -189,18 +208,22 @@ final class Seite {
             $padId = (int)($in['pad_id'] ?? 0);
             if (!in_array($padId, array_map(fn($p) => (int)$p['id'], $aktivePads), true)) throw new \InvalidArgumentException('Bitte das Pad wählen, an dem unterschrieben wird.');
         }
-        $text = self::einsetzen((string)$vorlage['text'], [
+        $werte = [
             'patient' => $patient, 'datum' => date('d.m.Y', $jetzt), 'praxis' => (string)($praxis['name'] ?? ''), 'leistung' => $leistung, 'leistungen' => $leistungenText, 'betrag' => $betrag,
             'geburtsdatum' => $geburtsdatum, 'telefon' => $telefon, 'email' => $email, 'adresse' => $adresse,
             'vorname' => $vorname, 'nachname' => $nachname, 'anrede' => $anrede, 'briefanrede' => $briefanrede,
-        ]);
+        ];
+        // Bausteine mit eingesetzten Platzhaltern fest am Vorgang (der Patient unterschreibt genau diese Fassung).
+        $bloecke = Bausteine::einsetzen(self::bloeckeVon($vorlage), $werte);
+        $text = Bausteine::alsText($bloecke);
         self::aufraeumen($jetzt);
-        self::pdo()->prepare('INSERT INTO vorgaenge (vorlage_id, art, titel, text, patient, kontext, kontext_bis, status, druck_vorher, druck_nachher, erstellt, erstellt_von, pad_id, quelle, quelle_ref, leistungen, patient_id, kontakt_alt, kontakt_neu, kontakt_status, geburtsdatum, praxis)
-            VALUES (?, ?, ?, ?, ?, ?, ?, "wartet", ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        self::pdo()->prepare('INSERT INTO vorgaenge (vorlage_id, art, titel, text, patient, kontext, kontext_bis, status, druck_vorher, druck_nachher, erstellt, erstellt_von, pad_id, quelle, quelle_ref, leistungen, patient_id, kontakt_alt, kontakt_neu, kontakt_status, geburtsdatum, praxis, bloecke, vorlage_version)
+            VALUES (?, ?, ?, ?, ?, ?, ?, "wartet", ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
             ->execute([(int)$vorlage['id'], $vorlage['art'], $vorlage['titel'], $text, $patient, $kontext, $kontext === '' ? 0 : $jetzt + 4 * 3600,
                 !empty($in['druck_vorher']) ? 1 : 0, !empty($in['druck_nachher']) ? 1 : 0, $jetzt, self::zeile($benutzer, 'Benutzer', 80, false), $padId, $quelle, $quelleRef, $liste ? json_encode($liste, JSON_UNESCAPED_UNICODE) : '',
                 $kontaktStatus !== '' ? $patientId : '', $kontaktStatus !== '' ? json_encode(['telefon' => $telAlt, 'email' => $mailAlt], JSON_UNESCAPED_UNICODE) : '', $kontaktStatus !== '' ? json_encode($kontaktNeu, JSON_UNESCAPED_UNICODE) : '', $kontaktStatus,
-                $geburtsdatum, json_encode(array_map('strval', array_intersect_key($praxis, array_flip(['name', 'street', 'city', 'contact']))), JSON_UNESCAPED_UNICODE)]);
+                $geburtsdatum, json_encode(array_map('strval', array_intersect_key($praxis, array_flip(['name', 'street', 'city', 'contact']))), JSON_UNESCAPED_UNICODE),
+                json_encode($bloecke, JSON_UNESCAPED_UNICODE), (int)($vorlage['version'] ?? 1)]);
         return (int)self::pdo()->lastInsertId();
     }
 

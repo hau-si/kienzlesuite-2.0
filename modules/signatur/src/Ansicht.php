@@ -7,7 +7,7 @@ final class Ansicht {
     public static function kopf(string $base, string $csrf): string {
         $v = static fn(string $f): string => '?v=' . substr((string)@md5_file(dirname(__DIR__) . '/public/assets/' . $f), 0, 8);
         return '<meta name="kienzle-csrf" content="' . sg_h($csrf) . '"><link rel="stylesheet" href="' . sg_h($base) . '/assets/style.css' . $v('style.css') . '">'
-            . '<script src="' . sg_h($base) . '/assets/app.js' . $v('app.js') . '" defer></script>';
+            . '<script src="' . sg_h($base) . '/assets/app.js' . $v('app.js') . '" defer></script><script src="' . sg_h($base) . '/assets/editor.js' . $v('editor.js') . '" defer></script>';
     }
 
     private static function datum(int $t): string { return $t > 0 ? date('d.m.Y H:i', $t) : '–'; }
@@ -40,7 +40,7 @@ final class Ansicht {
             $stat .= '<div class="muted klein-text">' . ($v['kontakt_status'] === 'geschrieben' ? 'In T2med übernommen: ' : 'Für T2med vorgemerkt: ') . $h($was) . ($v['kontakt_status'] === 'fehler' ? ' – ' . $h((string)$v['kontakt_meldung']) : '') . '</div>';
         }
         $suche = mb_strtolower($v['patient'] . ' ' . $v['titel'] . ' ' . (Seite::ARTEN[$v['art']] ?? $v['art']));
-        return '<tr data-art="' . $h($v['art']) . '" data-status="' . $h($v['status']) . '" data-archiv="' . ((int)($v['archiviert'] ?? 0) ? '1' : '0') . '" data-suche="' . $h($suche) . '"><td>' . $h(self::datum((int)$v['erstellt'])) . '</td><td>' . $h($v['patient']) . '</td><td>' . $h($v['titel']) . '</td><td>'
+        return '<tr data-art="' . $h($v['art']) . '" data-status="' . $h($v['status']) . '" data-archiv="' . ((int)($v['archiviert'] ?? 0) ? '1' : '0') . '" data-suche="' . $h($suche) . '"><td>' . $h(self::datum((int)$v['erstellt'])) . '</td><td>' . $h($v['patient']) . '</td><td>' . $h($v['titel']) . ((int)($v['vorlage_version'] ?? 0) > 0 ? '<div class="muted klein-text">Fassung ' . (int)$v['vorlage_version'] . '</div>' : '') . '</td><td>'
             . $h($padNamen[(int)($v['pad_id'] ?? 0)] ?? '–') . '</td><td>' . $stat . '</td><td class="us-aktionen">' . self::aktionen($v, $csrfFeld, $darfVorgang) . '</td></tr>';
     }
 
@@ -88,7 +88,7 @@ final class Ansicht {
         foreach ($pads as $p) $padNamen[(int)$p['id']] = $p['name'];
 
         if ($route === '/vorgaenge') return $o . self::vorgangsliste($csrfFeld, $vorgaenge, $padNamen, $darfVorgang) . '</div>';
-        if ($route === '/editor') return $o . ($darfVorlage ? self::vorlagen($csrfFeld, $vorlagen, $bearbeite) : '') . '</div>';
+        if ($route === '/editor') return $o . ($darfVorlage ? self::editor($csrfFeld, $vorlagen) : '') . '</div>';
         if ($route === '/einstellungen') {
             if ($admin) $o .= self::pads($csrfFeld, $pads) . self::pad($csrfFeld, $pad);
             else $o .= '<section class="card"><p class="muted">Vorlagen bearbeiten Sie unter „Editor“. Pads richtet ein Admin ein.</p></section>';
@@ -186,6 +186,61 @@ final class Ansicht {
     private static function knopf(string $csrfFeld, string $aktion, int $id, string $text, string $klasse, string $frage = ''): string {
         return '<form method="post" class="inline">' . $csrfFeld . '<input type="hidden" name="aktion" value="' . $aktion . '"><input type="hidden" name="id" value="' . $id . '"><button class="' . $klasse . '" type="submit"' . ($frage !== '' ? ' data-bestaetigen="' . sg_h($frage) . '"' : '') . '>' . $text . '</button></form> ';
     }
+
+    /** Gewählte Vorlage im Editor (?vorlage=<id> oder „neu“); von public/index.php gesetzt. */
+    public static string $editorVorlage = '';
+
+    /**
+     * Editor (Entwurf C): links Bausteine und Vorlagen, Mitte das Dokument als Zeilen, rechts Eigenschaften der gewählten
+     * Zeile und Vorschau am Pad. Die Daten stehen als JSON in der Seite (kein ausführbares Skript); editor.js baut daraus die
+     * Oberfläche und speichert per fetch an /editor/speichern.
+     */
+    private static function editor(string $csrfFeld, array $vorlagen): string {
+        $h = 'sg_h';
+        $neu = self::$editorVorlage === 'neu';
+        $wahl = null;
+        if (!$neu) {
+            foreach ($vorlagen as $v) if ((string)$v['id'] === self::$editorVorlage) $wahl = $v;
+            $wahl ??= $vorlagen[0] ?? null;
+        }
+        $fest = Seite::festeVorlageId();
+        $daten = [
+            'basis' => sg_basis(),
+            'vorlage' => $wahl ? ['id' => (int)$wahl['id'], 'art' => $wahl['art'], 'titel' => $wahl['titel'], 'aktiv' => (bool)(int)$wahl['aktiv'], 'version' => (int)$wahl['version'],
+                'geaendert' => (int)$wahl['geaendert'] > 0 ? date('d.m.Y', (int)$wahl['geaendert']) : '', 'fest' => (int)$wahl['id'] === $fest]
+                : ['id' => 0, 'art' => 'aufklaerung', 'titel' => '', 'aktiv' => true, 'version' => 0, 'geaendert' => '', 'fest' => false],
+            'bloecke' => $wahl ? Seite::bloeckeVon($wahl) : [['id' => 'b1', 'typ' => 'text', 'text' => "# Titel\n\nText mit **fett** und *kursiv*."]],
+            'arten' => Seite::ARTEN, 'typen' => Bausteine::TYPEN, 'felder' => Bausteine::FELDER, 'platzhalter' => Seite::PLATZHALTER,
+        ];
+        $liste = '';
+        foreach ($vorlagen as $v) {
+            $an = $wahl && (int)$v['id'] === (int)$wahl['id'];
+            $liste .= '<a class="ed-vorlage' . ($an ? ' an' : '') . ((int)$v['aktiv'] ? '' : ' aus') . '" href="' . $h(sg_basis() . '/editor?vorlage=' . (int)$v['id']) . '"' . ($an ? ' aria-current="page"' : '') . '>'
+                . $h($v['titel']) . '<small>' . $h(Seite::ARTEN[$v['art']] ?? $v['art']) . ((int)$v['aktiv'] ? '' : ' · aus') . '</small></a>';
+        }
+        $liste .= '<a class="ed-vorlage neu' . ($neu ? ' an' : '') . '" href="' . $h(sg_basis() . '/editor?vorlage=neu') . '">+ Neue Vorlage</a>';
+        $palette = '';
+        foreach (Bausteine::TYPEN as $typ => $name) $palette .= '<button type="button" class="ed-baustein" draggable="true" data-typ="' . $h($typ) . '">' . self::GRIFF . $h($name) . '</button>';
+        $loeschen = $wahl && (int)$wahl['id'] !== $fest
+            ? '<form method="post" class="inline" action="' . $h(sg_basis() . '/editor') . '">' . $csrfFeld . '<input type="hidden" name="aktion" value="vorlage-loeschen"><input type="hidden" name="id" value="' . (int)$wahl['id'] . '">'
+                . '<button type="submit" class="us-symbol rot" title="Vorlage löschen" aria-label="Vorlage löschen" data-bestaetigen="Diese Vorlage löschen? Bestehende Vorgänge behalten ihren Text.">' . self::MUELL . '</button></form>'
+            : '';
+        return '<script type="application/json" id="ed-daten">' . json_encode($daten, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . '</script>'
+            . '<div class="ed-grid">'
+            . '<aside class="card ed-links"><h2>Bausteine</h2><p class="muted klein-text">Anklicken oder ins Dokument ziehen.</p><div class="ed-palette">' . $palette . '</div>'
+            . '<h2 class="ed-abstand">Vorlagen</h2><nav class="ed-vorlagen">' . $liste . '</nav></aside>'
+            . '<section class="card ed-mitte"><div class="ed-kopf"><div class="ed-dok"><input id="ed-titel" maxlength="80" placeholder="Titel der Vorlage" aria-label="Titel der Vorlage">'
+            . '<select id="ed-art" aria-label="Dokumentart"></select><label class="check"><input type="checkbox" id="ed-aktiv"> aktiv</label></div>'
+            . '<div class="ed-aktionen"><span class="muted klein-text" id="ed-fassung"></span>' . $loeschen . '<button type="button" class="primary" id="ed-speichern">Speichern</button></div></div>'
+            . '<p class="ed-meldung" id="ed-meldung" role="status" aria-live="polite" hidden></p>'
+            . '<div class="ed-dokument" id="ed-dokument" aria-label="Dokument"></div></section>'
+            . '<aside class="ed-rechts"><section class="card"><h2>Eigenschaften</h2><div id="ed-eigenschaften"><p class="muted">Eine Zeile im Dokument anklicken.</p></div></section>'
+            . '<section class="card"><h2>Vorschau am Pad</h2><div class="ed-pad"><div class="ed-padscreen" id="ed-vorschau"></div></div>'
+            . '<p class="muted klein-text">Beispielwerte für die Platzhalter. Tippt der Patient bei E-Mail oder Telefon auf „Ändern“, erscheint am Pad eine Tastatur.</p></section></aside>'
+            . '</div>';
+    }
+
+    private const GRIFF = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01"/></svg>';
 
     /** Ergebnis der Netzwerksuche (Adressen) und das Pad, das gerade bearbeitet wird (id); von public/index.php gesetzt. */
     public static ?array $padSuche = null;

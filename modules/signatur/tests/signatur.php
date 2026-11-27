@@ -3,7 +3,7 @@ declare(strict_types=1);
 // Modul signatur: Datenbank, Vorlagen, Platzhalter, Vorgänge, Aufbewahrung, Ansicht. Nur erfundene Daten.
 require dirname(__DIR__, 3) . '/core/php/modul/Kienzle.php';
 require dirname(__DIR__) . '/src/bootstrap.php';
-use KienzleSignatur\{Ansicht, Fhir, Pad, Seite, Speicher, Start};
+use KienzleSignatur\{Ansicht, Bausteine, Fhir, Pad, Seite, Speicher, Start};
 
 function check(bool $ok, string $msg): void { if (!$ok) { fwrite(STDERR, "FEHLER: $msg\n"); exit(1); } }
 function wirft(callable $f, string $msg): void { try { $f(); } catch (InvalidArgumentException) { return; } fwrite(STDERR, "FEHLER: $msg\n"); exit(1); }
@@ -90,7 +90,7 @@ $liste = Ansicht::seite('/vorgaenge', 'tok', Seite::vorgaenge(), Seite::vorlagen
 $einst = Ansicht::seite('/editor', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null);
 $start = Ansicht::seite('/', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null, null, null, [], Seite::aktuellerVorgang());
 check(!str_contains($liste, '<script>x') && str_contains($liste, '&lt;script&gt;x') && !str_contains($einst, '<b>Titel</b>') && str_contains($einst, '&lt;b&gt;Titel'), 'Ausgabe maskiert');
-check(str_contains($start, 'name="kienzle-csrf" value="tok"') && str_contains($start, 'Dokument wählen') && str_contains($start, 'us-links') && str_contains($start, 'name="vorlage_id"') && str_contains($start, 'class="patient-karte us-gewaehlt"') && str_contains($start, 'id="n-zur-kasse"') && str_contains($einst, 'id="vorlagen"'), 'Start und Einstellungen');
+check(str_contains($start, 'name="kienzle-csrf" value="tok"') && str_contains($start, 'Dokument wählen') && str_contains($start, 'us-links') && str_contains($start, 'name="vorlage_id"') && str_contains($start, 'class="patient-karte us-gewaehlt"') && str_contains($start, 'id="n-zur-kasse"') && str_contains($einst, 'id="ed-daten"'), 'Start und Einstellungen');
 check(str_contains($liste, 'id="vg-suche"') && str_contains($liste, 'data-suche="') && str_contains($liste, 'id="vg-art"'), 'Liste mit Suche und Filtern');
 check(!str_contains($start, 'id="vorlagen"') && !str_contains($liste, 'id="vorlagen"'), 'Vorlagen nur unter Einstellungen');
 $nurVorgang = Ansicht::seite('/', 'tok', [], [], true, false, null, null);
@@ -104,7 +104,7 @@ check(!str_contains($startA, '&lt;script&gt;x') && str_contains($listeA, 'data-a
 Seite::archivieren((int)$xss['id'], false);
 check(!(int)Seite::vorgang((int)$xss['id'])['archiviert'], 'zurückgeholt');
 $nurVorlage = Ansicht::seite('/editor', 'tok', [], Seite::vorlagen(), false, true, null, null);
-check(!str_contains($nurVorlage, '<h2>Neuer Vorgang</h2>') && str_contains($nurVorlage, 'id="vorlagen"'), 'ohne Vorgangsrecht kein Formular');
+check(!str_contains($nurVorlage, '<h2>Neuer Vorgang</h2>') && str_contains($nurVorlage, 'id="ed-daten"') && !str_contains($nurVorlage, 'href="/signatur/"'), 'ohne Vorgangsrecht kein Formular');
 check(str_contains(Ansicht::kopf('/signatur', 'tok'), '/signatur/assets/app.js'), 'Kopf bindet Skript ein');
 
 // Pad-Software: Upload der signotec-ZIP (Prüfung, feste Dateinamen, nur ELF x86-64)
@@ -331,6 +331,57 @@ $rm = new ReflectionMethod(Fhir::class, 'anfrage');
 $ohne = new Fhir(['base_url' => 'https://t2med.example.org/aps/fhir/api/r4', 'api_key' => '']);
 try { $ohne->patient('k1', 'tok'); check(false, 'ohne Schlüssel kein Fehler'); } catch (RuntimeException $e) { check($e->getMessage() === Fhir::OHNE_SCHLUESSEL, 'ohne Schlüssel klare Meldung'); }
 check(!defined(Fhir::class . '::DEMO_SCHLUESSEL'), 'kein Demo-Schlüssel im Quelltext');
+
+// Editor C: Bausteine prüfen, Klartext, sichere Formatierung, Fassungen, fester Stand am Vorgang, Bilder
+$bl = [
+    ['typ' => 'text', 'text' => "# Kopf\n**fett** und *kursiv* <script>x</script>\n- eins\n1. zwei"],
+    ['typ' => 'patientendaten', 'felder' => ['email', 'telefon', 'boese'], 'aenderbar' => 1],
+    ['typ' => 'ankreuz', 'text' => 'SMS an {{telefon}}', 'pflicht' => 1],
+    ['typ' => 'einzel', 'frage' => 'Befund?', 'optionen' => ['Post', '', 'E-Mail'], 'pflicht' => 1],
+    ['typ' => 'mehrfach', 'frage' => 'Wer?', 'optionen' => ['A', 'B']],
+    ['typ' => 'liste', 'eintraege' => ['x', 'y'], 'nummeriert' => 1],
+    ['typ' => 'trenner'], ['typ' => 'seite'],
+];
+$gp = Bausteine::pruefen(json_encode($bl));
+check(count($gp) === 8 && $gp[1]['felder'] === ['email', 'telefon'] && $gp[3]['optionen'] === ['Post', 'E-Mail'] && $gp[2]['pflicht'] === true && !$gp[4]['pflicht'], 'Bausteine vereinheitlicht');
+check(count(array_unique(array_column($gp, 'id'))) === 8, 'jede Zeile hat eine eigene Kennung');
+wirft(fn() => Bausteine::pruefen('[]'), 'leere Vorlage');
+wirft(fn() => Bausteine::pruefen([['typ' => 'skript']]), 'unbekannte Art');
+wirft(fn() => Bausteine::pruefen([['typ' => 'einzel', 'frage' => 'F', 'optionen' => ['nur eine']]]), 'Auswahl mit einer Möglichkeit');
+wirft(fn() => Bausteine::pruefen([['typ' => 'text', 'text' => 'Hallo {{nix}}']]), 'unbekannter Platzhalter im Baustein');
+wirft(fn() => Bausteine::pruefen([['typ' => 'bild', 'datei' => '../../etc/passwd']]), 'Bild mit Pfad');
+wirft(fn() => Bausteine::pruefen([['typ' => 'patientendaten', 'felder' => []]]), 'Patientendaten ohne Feld');
+$h = Bausteine::html($gp[0]['text']);
+check(str_contains($h, '<h3>Kopf</h3>') && str_contains($h, '<strong>fett</strong>') && str_contains($h, '<em>kursiv</em>') && str_contains($h, '&lt;script&gt;') && !str_contains($h, '<script>')
+    && str_contains($h, '<ul><li>eins</li></ul><ol><li>zwei</li></ol>'), 'Formatierung sicher als HTML: ' . $h);
+$txt = Bausteine::alsText(Bausteine::einsetzen($gp, ['telefon' => '030 1', 'email' => 'm@example.org']));
+check(str_contains($txt, "Kopf\nfett und kursiv") && str_contains($txt, '[ ] SMS an 030 1 *') && str_contains($txt, "( ) Post") && str_contains($txt, 'E-Mail: m@example.org') && str_contains($txt, '1. x'), 'Klartext für Pad und PDF: ' . $txt);
+$vid = Seite::vorlageSpeichern(['art' => 'datenschutz', 'titel' => 'Bausteine', 'aktiv' => 1, 'bloecke' => json_encode($bl)]);
+check((int)Seite::vorlage($vid)['version'] === 1, 'neue Vorlage: Fassung 1');
+Seite::vorlageSpeichern(['id' => $vid, 'art' => 'datenschutz', 'titel' => 'Bausteine', 'aktiv' => 1, 'bloecke' => json_encode(Seite::bloeckeVon(Seite::vorlage($vid)))]);
+check((int)Seite::vorlage($vid)['version'] === 1, 'unverändert gespeichert: gleiche Fassung');
+$geaendert = Seite::bloeckeVon(Seite::vorlage($vid)); $geaendert[2]['text'] = 'SMS bitte';
+Seite::vorlageSpeichern(['id' => $vid, 'art' => 'datenschutz', 'titel' => 'Bausteine', 'aktiv' => 1, 'bloecke' => json_encode($geaendert)]);
+check((int)Seite::vorlage($vid)['version'] === 2, 'geändert: Fassung 2');
+$vg = Seite::vorgang(Seite::vorgangAnlegen(['vorlage_id' => $vid, 'patient' => 'Max Mustermann', 'telefon' => '030 99', 'email' => 'max@example.org', 'pad_id' => (int)(Seite::pads(true)[0]['id'] ?? 0)], 'x', $praxis));
+$vb = json_decode($vg['bloecke'], true);
+check((int)$vg['vorlage_version'] === 2 && $vb[1]['werte'] === ['email' => 'max@example.org', 'telefon' => '030 99'] && str_contains($vg['text'], '[ ] SMS bitte *'), 'Vorgang: Fassung und fester Stand der Bausteine');
+check(Seite::vorgang(Seite::vorgangAnlegen(['vorlage_id' => (int)Seite::vorlagen(true)[0]['id'], 'patient' => 'K', 'pad_id' => (int)(Seite::pads(true)[0]['id'] ?? 0)], 'x', $praxis))['bloecke'] !== '', 'alte Textvorlage als Text-Baustein');
+// Bilder: nur PNG/JPEG, Name = Prüfsumme, im Datenordner
+$png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==');
+$bn = Bausteine::bildSpeichern($png);
+check(preg_match('/^[0-9a-f]{64}\.png$/D', $bn) === 1 && Bausteine::bildPfad($bn) !== null && Bausteine::bildPfad('../x.png') === null, 'Bild gespeichert');
+wirft(fn() => Bausteine::bildSpeichern('<svg onload=x>'), 'kein PNG/JPEG');
+check(Bausteine::pruefen([['typ' => 'bild', 'datei' => $bn, 'breite' => 500]])[0]['breite'] === 100, 'Bildbreite begrenzt');
+foreach (glob(Speicher::$data . '/bilder/*') ?: [] as $f) @unlink($f); @rmdir(Speicher::$data . '/bilder');
+// Editor-Seite: Daten als JSON ohne ausführbares Skript, Palette, Vorlagenliste
+Ansicht::$editorVorlage = (string)$vid;
+$ed = Ansicht::seite('/editor', 'tok', [], Seite::vorlagen(), true, true, null, null);
+check(str_contains($ed, '<script type="application/json" id="ed-daten">') && !str_contains($ed, '<script>x') && str_contains($ed, 'data-typ="mehrfach"') && str_contains($ed, 'id="ed-speichern"')
+    && str_contains($ed, 'editor?vorlage=neu'), 'Editor-Seite');
+$daten = json_decode(html_entity_decode(preg_replace('#^.*<script type="application/json" id="ed-daten">(.*?)</script>.*$#s', '$1', $ed)), true);
+check(($daten['vorlage']['id'] ?? 0) === $vid && ($daten['vorlage']['version'] ?? 0) === 2 && count($daten['bloecke'] ?? []) === 8, 'Editor-Daten der gewählten Vorlage');
+Ansicht::$editorVorlage = '';
 
 // Anrede-Platzhalter
 $at = Seite::vorlageSpeichern(['art' => 'sonstige', 'titel' => 'Anrede-Test', 'text' => '{{briefanrede}}|{{anrede}}|{{vorname}}|{{nachname}}', 'aktiv' => 1]);

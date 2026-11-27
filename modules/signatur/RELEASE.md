@@ -1,5 +1,13 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.42
+
+- **Neuer Editor (Entwurf C):** links die Bausteine (anklicken oder ins Dokument ziehen) und die Vorlagen, in der Mitte das Dokument als Zeilen (verschieben per Griff oder Pfeil, kopieren, entfernen), rechts die Eigenschaften der gewählten Zeile und eine Vorschau am Pad mit Beispielwerten.
+- Bausteine: **Text** mit Formatierung (fett, kursiv, unterstrichen, Aufzählung, nummerierte Liste, Überschrift, Platzhalter), **Patientendaten** (E-Mail/Telefon, „am Pad änderbar“), **Ankreuzfeld**, **Einzel-** und **Mehrfachauswahl** (je mit „Pflichtfeld“), **Aufzählung**, **Bild** (PNG/JPEG bis 3 MB, Breite wählbar), **Trennlinie**, **Seitenumbruch**.
+- **Fassungen:** Jede inhaltliche Änderung einer Vorlage zählt die Fassung hoch; der Vorgang merkt sich die unterschriebene Fassung (klein in der Liste „Vorgänge“) und den festen Stand der Bausteine.
+- Bestehende Vorlagen werden zu einem Text-Baustein (Datenbank 10). Bis der Pad-Dienst die Bausteine selbst zeichnet (nächster Schritt), zeigt das Pad sie als Text mit „[ ]“ und „( )“.
+- Mit Tests und im Browser (Editor, ohne Server) geprüft, nicht auf der VM.
+
 ## 0.1.0-beta.41
 
 - **Kopf wie in der Kasse:** Reiter **Start · Vorgänge · Editor**, rechts ein kleines Zahnrad für die Einstellungen. Die Vorlagen stehen jetzt unter „Editor“ (der neue Baustein-Editor folgt), die Einstellungen enthalten die Pads.

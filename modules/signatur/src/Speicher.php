@@ -7,7 +7,7 @@ final class Speicher {
     public static string $data = '/var/lib/kienzle/signatur';
     private static ?\PDO $pdo = null;
     private static string $pfad = '';
-    public const VERSION = 9;
+    public const VERSION = 10;
 
     public static function pdo(): \PDO {
         $datei = self::$data . '/signatur.db';
@@ -153,6 +153,15 @@ final class Speicher {
         if ($v < 9) {
             // Archiv (Startseite: Vorgang aus der linken Spalte nehmen, bleibt unter „Vorgänge“ mit Filter „Archiv“).
             $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN archiviert INTEGER NOT NULL DEFAULT 0');
+        }
+        if ($v < 10) {
+            // Baustein-Editor (Editor C): Bausteine als JSON, Fassung je Vorlage; der Vorgang merkt sich Fassung, Bausteine und Antworten.
+            $pdo->exec('ALTER TABLE vorlagen ADD COLUMN bloecke TEXT NOT NULL DEFAULT ""');
+            $pdo->exec('ALTER TABLE vorlagen ADD COLUMN version INTEGER NOT NULL DEFAULT 1');
+            foreach (['bloecke', 'antworten'] as $spalte) $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN ' . $spalte . ' TEXT NOT NULL DEFAULT ""');
+            $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN vorlage_version INTEGER NOT NULL DEFAULT 0');
+            $st = $pdo->prepare('UPDATE vorlagen SET bloecke=? WHERE id=?');
+            foreach ($pdo->query('SELECT id, text FROM vorlagen')->fetchAll() as $r) $st->execute([json_encode(Bausteine::ausAltemText((string)$r['text']), JSON_UNESCAPED_UNICODE), (int)$r['id']]);
         }
         $pdo->exec('PRAGMA user_version=' . self::VERSION);
         $pdo->commit();
