@@ -12,7 +12,7 @@ final class Starter {
     public const CERTIFICATE = '/etc/kienzle/ca/server.crt';
 
     public const SYSTEMS = [
-        'windows' => ['label' => 'Windows', 'scripts' => ['install-windows.cmd', 'install-windows.ps1', 'install-drucker.ps1'], 'assets' => ['praxisherz-starter-windows-amd64.exe', 'praxisherz-starter-windows-arm64.exe']],
+        'windows' => ['label' => 'Windows', 'scripts' => ['install-windows.cmd', 'install-windows.ps1', 'install-drucker.ps1', 'deinstallieren.ps1'], 'assets' => ['praxisherz-starter-windows-amd64.exe', 'praxisherz-starter-windows-arm64.exe']],
         'macos' => ['label' => 'macOS', 'scripts' => ['install-macos.command'], 'assets' => ['praxisherz-starter-darwin-amd64', 'praxisherz-starter-darwin-arm64']],
         'linux' => ['label' => 'Linux', 'scripts' => ['install-linux.sh'], 'assets' => ['praxisherz-starter-linux-amd64', 'praxisherz-starter-linux-arm64', 'praxisherz-starter-linux-arm']],
     ];

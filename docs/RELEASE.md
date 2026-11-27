@@ -1,5 +1,12 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.36
+
+- **Windows: `Praxisherz-Setup.exe`** (Einrichten → Arbeitsplätze): eine Datei, Doppelklick, Windows fragt nach Administratorrechten, dann läuft die Einrichtung im eigenen Fenster. Technisch das Starterprogramm mit angehängtem Paket (entpackt in einen Temp-Ordner, der danach gelöscht wird). Das ZIP-Paket gibt es weiter. Ohne kostenpflichtige Code-Signatur warnt Windows beim ersten Start („Weitere Informationen“ → „Trotzdem ausführen“).
+- **Deinstallieren:** Die Einrichtung trägt „Praxisherz-Agent“ unter Windows-Einstellungen → Apps ein. „Deinstallieren“ entfernt Aufgabe, Symbol, Autostart, Aufrufe aus T2med, Zertifikat und Ordner; die virtuellen Drucker nur nach Rückfrage (j/n). Den Eintrag des PCs auf dem Server löscht ein Admin unter Arbeitsplätze.
+- Agent/Starter 2.3.8 mit Setup-Modus (`setup.go`, `setup_windows.go`).
+- Mit Tests geprüft (Setup-Datei, Entpacken mit Pfadprüfung). **Nicht unter Windows geprüft.**
+
 ## 0.22.0-beta.35
 
 - **Überall „Praxisherz“ statt „Suite“** in Oberfläche, Hinweisen und Anleitungen; die Seite während einer Aktualisierung („Einen Moment bitte“) sagt „Praxisherz wird gerade aktualisiert“. Auf einem Server erscheint das erst nach diesem Update (die Seite kommt sonst noch aus dem alten Stand).

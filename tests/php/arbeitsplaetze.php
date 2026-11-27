@@ -48,6 +48,13 @@ function test_agent(): void {
     mkdir(Web::$clientDist);
     file_put_contents(Web::$clientDist . '/praxisherz-starter-windows-amd64.exe', 'MZ-Testprogramm');
     file_put_contents(Web::$clientDist . '/SHA256SUMS', hash('sha256', 'MZ-Testprogramm') . "  praxisherz-starter-windows-amd64.exe\n" . str_repeat('a', 64) . "  praxisherz-starter-gibtsnicht.exe\n");
+    // Selbstentpackendes Setup: Programm + angehängtes Paket mit Einrichtungs- und Deinstallationsskript
+    $setup = $b->get('/verwaltung/arbeitsplaetze/' . Web::SETUP_DATEI);
+    check($setup->status === 200 && str_starts_with($setup->body, 'MZ-Testprogramm' . "PK\x03\x04") && str_contains($setup->body, 'install-windows.ps1')
+        && str_contains($setup->body, 'deinstallieren.ps1') && str_contains($setup->body, 'client.json') && str_contains((string)$setup->header('Content-Disposition'), 'Praxisherz-Setup.exe'), 'Setup-Datei');
+    $hilfe = $b->get('/hilfe/arbeitsplatz')->body;
+    check(str_contains($hilfe, '/verwaltung/arbeitsplaetze/Praxisherz-Setup.exe') && str_contains($hilfe, 'Deinstallieren'), 'Setup auf der Seite angeboten');
+    check((new Browser($env))->get('/verwaltung/arbeitsplaetze/' . Web::SETUP_DATEI)->status !== 200, 'Setup nur für Admins');
     $k = $st->key();
     check(ap_req($b, 'POST', '/agent/anmelden', ['rechner' => 'EMPFANG-PC'], ['authorization' => 'Bearer falsch'])->status === 401, 'Anmelden mit falschem Schlüssel');
     $r = ap_req($b, 'POST', '/agent/anmelden', ['rechner' => 'EMPFANG-PC<script>', 'system' => 'windows'], ['authorization' => 'Bearer ' . $k]);

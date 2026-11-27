@@ -15,6 +15,10 @@ import (
 )
 
 func main() {
+	// Praxisherz-Setup.exe (Programm mit angehängtem Paket) per Doppelklick: PC einrichten.
+	if len(os.Args) == 1 && setupStart() {
+		return
+	}
 	if len(os.Args) == 2 {
 		switch os.Args[1] {
 		case "--version":

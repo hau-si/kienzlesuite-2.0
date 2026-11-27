@@ -94,6 +94,16 @@ foreach ($o in @($progAlt, $datenAlt)) {
 }
 Register-ScheduledTask -TaskName $task -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description 'Praxisherz: hält Starter, Zertifikat und Drucker aktuell, öffnet Akten in T2med.' -Force | Out-Null
 Start-ScheduledTask -TaskName $task
+# Eintrag unter Einstellungen → Apps mit „Deinstallieren“ (Skript liegt beim Programm).
+Copy-Item deinstallieren.ps1 (Join-Path $prog 'deinstallieren.ps1') -Force
+$ver = try { ((& $exe --version) -split '\s+')[1] } catch { '' }
+$un = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Praxisherz-Agent'
+New-Item -Force $un | Out-Null
+$werte = @{ DisplayName = 'Praxisherz-Agent'; DisplayVersion = [string]$ver; Publisher = 'Praxisherz'; DisplayIcon = $exe; InstallLocation = $prog
+    UninstallString = ('powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' + (Join-Path $prog 'deinstallieren.ps1') + '"') }
+foreach ($k in $werte.Keys) { New-ItemProperty $un -Name $k -Value $werte[$k] -PropertyType String -Force | Out-Null }
+foreach ($k in @('NoModify', 'NoRepair')) { New-ItemProperty $un -Name $k -Value 1 -PropertyType DWord -Force | Out-Null }
+Say 'ok' 'Eintrag unter Einstellungen → Apps (dort auch „Deinstallieren“)'
 Say 'läuft' 'Praxisherz-Agent (Drucker richtet er in den nächsten Minuten selbst ein)'
 # Symbol in der Taskleiste (Statusfenster): startet künftig bei jeder Anmeldung (trägt der Agent ein), jetzt einmal sofort.
 Start-Process -FilePath $exe -ArgumentList '--tray' | Out-Null  # läuft es schon, beendet sich der zweite Start sofort

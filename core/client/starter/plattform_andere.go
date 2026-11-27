@@ -15,6 +15,9 @@ func neuePlattform(ordner string) Plattform { return &anderePlattform{ordner: or
 
 func datenOrdner() string { return configDir() }
 
+// setupStart: Das Setup mit angehängtem Paket gibt es nur für Windows.
+func setupStart() bool { return false }
+
 func (p *anderePlattform) Schemata(map[string]string, string) error             { return nil }
 func (p *anderePlattform) Zertifizierungsstelle([]byte) error                   { return nil }
 func (p *anderePlattform) Drucker([]Drucker) (string, error)                    { return "", nil }

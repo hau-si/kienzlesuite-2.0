@@ -1167,6 +1167,7 @@ final class Web {
         if ($r->path === '/verwaltung/sso') return $get ? $this->ssoPage() : $this->ssoAction($r, $admin);
         if ($r->path === '/verwaltung/arbeitsplaetze') return $get ? Response::redirect('/hilfe/arbeitsplatz#paket') : $this->starterAction($r, $admin);
         if ($get && preg_match('#^/verwaltung/arbeitsplaetze/(windows|macos|linux)\.zip$#D', $r->path, $m)) return $this->starterPaket($m[1], $admin);
+        if ($get && $r->path === '/verwaltung/arbeitsplaetze/' . self::SETUP_DATEI) return $this->starterSetup($admin);
         if ($r->path === '/verwaltung/drucker') return $get ? $this->printersPage() : $this->printersAction($r, $admin);
         if ($r->path === '/verwaltung/einrichtung') return $get ? $this->overviewPage() : $this->overviewAction($r, $admin);
         if ($r->path === '/verwaltung/sicherung') return $get ? $this->backupPage() : $this->backupAction($r, $admin);
@@ -2188,6 +2189,12 @@ final class Web {
         $body .= '<h3>Startkontexte</h3><p class="muted">Diese Adresse in T2med als Eintrag „Programm/URL“ je Kontext anlegen. Bestehende Einträge mit „kienzle-…“ funktionieren weiter; beim nächsten Bearbeiten in T2med bitte auf die neue Adresse umstellen.</p>'
             . '<table><thead><tr><th>Modul</th><th>Kontext</th><th>Adresse in T2med</th></tr></thead><tbody>' . $rows . '</tbody></table>';
         $body .= '<h3>Paket laden</h3><p>Das Paket enthält Starterprogramm, Zertifikat, Starter-Schlüssel, die virtuellen Drucker der Module und das Einrichtungsskript. Schlägt die Druckereinrichtung fehl, gilt die Anleitung oben (Abschnitt „Virtuelle Drucker“). Nur für Admins, nach der Einrichtung löschen.</p><p class="row-buttons">';
+        if (is_file($this->clientDist() . '/' . self::SETUP_PROGRAMM)) {
+            $body .= '<a class="button primary" href="/verwaltung/arbeitsplaetze/' . self::SETUP_DATEI . '">Windows: ' . self::SETUP_DATEI . '</a></p>'
+                . '<p class="muted small">Herunterladen und doppelklicken, Windows fragt nach Administratorrechten; danach läuft die Einrichtung im eigenen Fenster. '
+                . 'Weil das Programm nicht kostenpflichtig signiert ist, warnt Windows beim ersten Start („Der Computer wurde durch Windows geschützt“): '
+                . '„Weitere Informationen“ → „Trotzdem ausführen“. Entfernen: Windows-Einstellungen → Apps → „Praxisherz-Agent“ → Deinstallieren.</p><p class="row-buttons">Als ZIP: ';
+        }
         foreach (Starter::SYSTEMS as $key => $spec) {
             $body .= '<a class="button" href="/verwaltung/arbeitsplaetze/' . $key . '.zip">' . V::h($spec['label']) . '</a> ';
             if (!$st->hasPrograms($key)) $missing[] = $spec['label'];
@@ -2360,6 +2367,21 @@ final class Web {
         $this->audit->write($admin, 'starter-schluessel-erneuert', '');
         $this->flash('Neuer Starter-Schlüssel erzeugt. Die Pakete bitte neu laden und die Arbeitsplätze neu einrichten.');
         return Response::redirect('/hilfe/arbeitsplatz#paket');
+    }
+
+    public const SETUP_DATEI = 'Praxisherz-Setup.exe';
+    private const SETUP_PROGRAMM = 'praxisherz-starter-windows-amd64.exe';
+
+    /** Selbstentpackendes Setup für Windows: Starterprogramm mit angehängtem Paket (ZIP); per Doppelklick richtet es den PC ein. */
+    private function starterSetup(string $admin): Response {
+        $exe = $this->clientDist() . '/' . self::SETUP_PROGRAMM;
+        if (!is_file($exe)) return Response::html(V::page('Arbeitsplätze', V::error('Auf dem Server liegen keine Starterprogramme für Windows. Bitte das ZIP-Paket nehmen.'), $this->nav()), 404);
+        $files = $this->st()->files('windows', $this->starterKontexte(), $this->serverUrl(), $this->starterDrucker());
+        $out = (string)file_get_contents($exe);
+        Starter::zip($files, function (string $b) use (&$out) { $out .= $b; });
+        $this->audit->write($admin, 'starter-paket-geladen', 'windows-setup');
+        return (new Response(200, $out, [['Content-Type', 'application/vnd.microsoft.portable-executable']]))
+            ->with('Content-Disposition', 'attachment; filename="' . self::SETUP_DATEI . '"')->with('Cache-Control', 'no-store');
     }
 
     private function starterPaket(string $system, string $admin): Response {
