@@ -1,5 +1,12 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.23
+
+- **Sicherheitsupdates für die optionale Sprachausgabe Kokoro** (GitHub-Sicherheitswarnungen): Das Modul lädt Kokoro jetzt mit einer eigenen Paketliste `lib/kokoro/requirements-cpu.lock.txt` – die Liste von Kienzlefon mit neueren Fassungen von `certifi` (2026.10.18), `filelock` (4.2.1), `setuptools` (84.1.0), `transformers` (4.57.6) und dazu `tokenizers` (0.22.2). Die Liste von Thomas bleibt unverändert (übernommener Code); die Modellliste mit den Prüfsummen kommt weiter von dort.
+- Verbleibende Hinweise zu `transformers` betreffen nur das Laden fremder, manipulierter Modelle oder Konfigurationen; Kokoro lädt ausschließlich feste Modelle mit geprüften Prüfsummen. Ein Wechsel auf `transformers` 5 würde sie beheben, ist aber ein großer Versionssprung und erst nach einem echten Test sinnvoll.
+- Wer Kokoro schon eingerichtet hat: unter „Sprachmenü“ Kokoro einmal neu laden, dann entsteht eine neue Umgebung mit den aktualisierten Paketen. Piper (Standard) und Whisper waren nicht betroffen.
+- Geprüft mit Tests (Paketliste, Aufruf des Installers mit der Liste des Moduls) und einer Abhängigkeitsprüfung mit pip (Auflösung ohne Konflikt). **Nicht geprüft:** echte Kokoro-Installation und Ansagen mit den neuen Paketen (PyTorch-Quelle aus der Sitzung nicht erreichbar), VM.
+
 ## 0.1.0-beta.22
 
 - **Schutz des T2med-Demo-Schlüssels:** Ist in der Basis kein eigener T2med-API-Schlüssel hinterlegt (öffentlicher Demo-Schlüssel), lädt das Telefonverzeichnis je Aufruf höchstens 3 Seiten, also höchstens 3 Anfragen an T2med. So wird der Demo-Schlüssel nicht wegen zu vieler Anfragen gesperrt. Die Einstellungen und die Meldung nach dem Laden weisen darauf hin; mit eigenem Schlüssel wird wie bisher alles geladen.
