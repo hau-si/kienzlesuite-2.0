@@ -1,5 +1,14 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.32
+
+- **Neue Aufrufadressen aus T2med:** `praxisherz-kasse://`, `praxisherz-signatur://`, `praxisherz-telefonverzeichnis://` (Seite Einrichten → Arbeitsplätze zeigt sie). Die früheren Adressen `kienzle-…://` richtet die Basis an jedem Arbeitsplatz weiter mit ein; bestehende Einträge in T2med funktionieren also weiter und können nach und nach umgestellt werden.
+- Agent/Starter 2.3.7 kennt beide Schreibweisen. Ältere Agenten bekommen nur die früheren Adressen, bis sie sich selbst aktualisiert haben (sie würden die neuen sonst ablehnen).
+- `module.toml`: Startschemata heißen jetzt `praxisherz-<name>`; `kienzle-<name>` gilt weiter, beide zählen als dasselbe Schema.
+- **Neuer Servername bei Neuinstallation:** Vorschlag `praxisherz` **ohne Endung** (Verwaltung → Server: neue Wahl „ohne Endung“, die anderen Endungen bleiben wählbar), Rechnername der Start-ISO `praxisherz`. Der Name muss im Router/DNS der Praxis bekannt sein (FRITZ!Box meist von selbst). Bestehende Server behalten ihren Namen; ein späterer Wechsel auf einen Namen ohne Endung braucht eine neue Zertifizierungsstelle (Häkchen auf der Seite Server).
+- Reihenfolge beim Update: erst die Basis, dann die Module (eine ältere Basis lehnt Module mit `praxisherz-…`-Adressen ab).
+- Mit Tests geprüft. **Nicht auf der VM, nicht unter Windows und nicht mit T2med geprüft.**
+
 ## 0.22.0-beta.31
 
 - **Neuer Name: „Praxisherz – freie Software für die Arztpraxis“** (vorher Kienzle-Suite; Wunsch von T2med nach einem unterscheidbaren Namen).

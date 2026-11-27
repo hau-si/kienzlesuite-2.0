@@ -17,7 +17,7 @@ func testConfig(t *testing.T, srv *httptest.Server) *Config {
 	t.Helper()
 	sum := sha256.Sum256(srv.Certificate().Raw)
 	return &Config{ServerURL: srv.URL, LauncherKey: "0123456789abcdef0123456789abcdef", CertSHA256: hex.EncodeToString(sum[:]),
-		Contexts: map[string]string{"kienzle-kasse": "/starter/kasse", "kienzle-signatur": "/starter/signatur"}}
+		Contexts: map[string]string{"kienzle-kasse": "/starter/kasse", "kienzle-signatur": "/starter/signatur", "praxisherz-signatur": "/starter/signatur"}}
 }
 
 func TestStartMitSchemaUndPfad(t *testing.T) {
@@ -131,5 +131,27 @@ func TestPinnedClientMitRichtigemFingerabdruck(t *testing.T) {
 	defer srv.Close()
 	if _, err := run(testConfig(t, srv), "kienzle-kasse://?kontextId=a", nil); err != nil {
 		t.Fatalf("richtiger Fingerabdruck muss gehen: %v", err)
+	}
+}
+
+// Neue Adresse praxisherz-… und frühere kienzle-… führen zum selben Modul; fremde Präfixe bleiben abgelehnt.
+func TestNeueUndFruehereAdresse(t *testing.T) {
+	var pfade []string
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pfade = append(pfade, r.URL.Path)
+		w.Write([]byte(`{"url":"https://` + r.Host + `/#launch=` + strings.Repeat("b", 64) + `"}`))
+	}))
+	defer srv.Close()
+	cfg := testConfig(t, srv)
+	for _, u := range []string{"praxisherz-signatur://?kontextId=a", "kienzle-signatur://?kontextId=a"} {
+		if _, err := run(cfg, u, srv.Client()); err != nil {
+			t.Fatalf("%s: %v", u, err)
+		}
+	}
+	if len(pfade) != 2 || pfade[0] != "/starter/signatur" || pfade[1] != "/starter/signatur" {
+		t.Fatalf("Pfade: %v", pfade)
+	}
+	if _, err := run(cfg, "fremd-signatur://?kontextId=a", srv.Client()); err == nil {
+		t.Fatal("fremdes Schema angenommen")
 	}
 }

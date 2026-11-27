@@ -24,7 +24,7 @@ place "$asset" "$target/kienzle-starter" 700 Starterprogramm
 place client.json "$target/client.json" 600 'Einstellungen und Schlüssel'
 place server.crt "$target/server.crt" 644 'Zertifikat (Datei)'
 escaped=${target//\\/\\\\}; escaped=${escaped//\"/\\\"}; escaped=${escaped//\$/\\\$}; escaped=${escaped//\`/\\\`}; escaped=${escaped//%/%%}
-schemes=$(grep -E '^kienzle-[a-z0-9-]+$' schemas.txt || true)
+schemes=$(grep -E '^(praxisherz|kienzle)-[a-z0-9-]+$' schemas.txt || true)
 test -n "$schemes" || { echo 'schemas.txt enthält keine Einträge.'; exit 1; }
 mime=''
 for s in $schemes; do mime="${mime}x-scheme-handler/$s;"; done

@@ -3,7 +3,7 @@ declare(strict_types=1);
 namespace KienzleSignatur;
 
 /**
- * Patient aus T2med lesen (FHIR), nur für den Start aus T2med (kienzle-signatur://…). Verbindungsdaten liefert die Basis
+ * Patient aus T2med lesen (FHIR), nur für den Start aus T2med (praxisherz-signatur://…, früher kienzle-signatur://). Verbindungsdaten liefert die Basis
  * (Verwaltung → Verbindungen → T2med). Keine Weiterleitungen, nur HTTPS; Fehlermeldungen enthalten keine Zugangsdaten.
  */
 class Fhir {

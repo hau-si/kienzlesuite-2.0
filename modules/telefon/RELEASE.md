@@ -1,5 +1,9 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.28
+
+- **Neue Aufrufadresse aus T2med: `praxisherz-telefonverzeichnis://…`** (Einstellungen). Die frühere Adresse `kienzle-telefonverzeichnis://…` funktioniert weiter. Braucht Basis 0.22.0-beta.32. Mit Tests geprüft, nicht auf der VM und nicht mit T2med.
+
 ## 0.1.0-beta.27
 
 - **Neuer Name: „Praxisherz – freie Software für die Arztpraxis“** (vorher Kienzle-Suite) in Texten, Hinweisen und Dienstbeschreibungen; der Agent heißt „Praxisherz-Agent“. Programmteile von Thomas Kienzle (Kienzlefon) unverändert. Mit Tests geprüft, nicht auf der VM.

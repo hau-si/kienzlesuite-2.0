@@ -97,7 +97,7 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
 2. [ ] Zweiter Lauf des Installers: keine Änderung an Schlüsseln, CA, Daten; `cupsd.conf`/`smb.conf` unverändert.
 3. [ ] `systemctl status cups smbd` aktiv, `nmbd` aus. `ss -ltn` zeigt 631 und 445; ohne Firewall-Freigabe von einem
        Arbeitsplatz aus nicht erreichbar, mit Freigabe erreichbar.
-4. [ ] Von Windows `\\kienzle.praxis.internal\` öffnen: nur Drucker, keine Ordner; Gastzugriff auf Drucker geht.
+4. [ ] Von Windows `\\praxisherz\` öffnen: nur Drucker, keine Ordner; Gastzugriff auf Drucker geht.
 5. [ ] `http://localhost:631/admin` vom Arbeitsplatz aus verweigert.
 6. [ ] `/etc/apt/apt.conf.d/52kienzle-unattended` vorhanden; `unattended-upgrade --dry-run` läuft.
 7. [ ] Verwaltung → Einrichtung: Punkte stimmen mit dem Zustand überein; „Erledigt“ für die Zertifizierungsstelle.
@@ -110,9 +110,9 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
 1. [ ] Verwaltung → Drucker → „Netzwerk und USB durchsuchen“: Bondrucker und A4-Drucker erscheinen mit passender Art.
 2. [ ] Bondrucker übernehmen, Testseite: Bon kommt mit Schnitt.
 3. [ ] A4-Drucker (IPP Everywhere) anlegen, Testseite: A4-Seite.
-4. [ ] Freigabe „Windows“ für den A4-Drucker, Firewall „Windows-Freigabe 445“ an: Drucker erscheint unter `\\kienzle.praxis.internal\`
+4. [ ] Freigabe „Windows“ für den A4-Drucker, Firewall „Windows-Freigabe 445“ an: Drucker erscheint unter `\\praxisherz\`
        und druckt von Windows. Ohne Freigabe nicht sichtbar.
-5. [ ] Freigabe „IPP“: Drucker auf einem Mac über `ipp://kienzle.praxis.internal/printers/<Name>` hinzufügen und drucken.
+5. [ ] Freigabe „IPP“: Drucker auf einem Mac über `ipp://praxisherz/printers/<Name>` hinzufügen und drucken.
 6. [ ] Beispielmodul installieren: „Beispiel-Drucker“ erscheint (Modul), lässt sich nicht entfernen; Modul entfernen: Drucker weg.
 7. [ ] `id ks-core` zeigt keine Gruppe `lpadmin`; ein von Hand angelegter Drucker lässt sich in der Suite nicht entfernen.
 
@@ -127,7 +127,7 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
 ## Basis 0.12.0 – Erstinstallation und Servername
 
 1. [ ] Frische VM: `sudo bash installer/install.sh` ohne Angaben; Ausgabe nennt die IP, Einrichtungslink über die IP funktioniert.
-2. [ ] Verwaltung → Server: Namen `kienzle.praxis.internal` (Eintrag im DNS/Router bzw. hosts-Datei) und Praxisname setzen;
+2. [ ] Verwaltung → Server: Namen `praxisherz` (Eintrag im DNS/Router bzw. hosts-Datei) und Praxisname setzen;
        danach unter dem Namen erreichbar, ohne Zertifikatswarnung.
 3. [ ] Passkey unter dem Namen anlegen und damit anmelden.
 4. [ ] Ungültigen Namen eingeben: Fehlermeldung, nichts geändert.

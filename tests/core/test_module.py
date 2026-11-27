@@ -296,7 +296,7 @@ class Modulverwaltung(unittest.TestCase):
 
     def test_kasse_modul_gueltig(self):
         m = manifest.check_folder(ROOT / 'modules' / 'kasse')
-        self.assertEqual([x['schema'] for x in m['starters']], ['kienzle-kasse'])
+        self.assertEqual([x['schema'] for x in m['starters']], ['praxisherz-kasse'])
         self.assertEqual(m['web']['path'], '/kasse')
         self.assertIn('kassieren', [r['id'] for r in m['rights']])
         self.assertEqual((ROOT / 'modules' / 'kasse' / 'VERSION').read_text().strip(), m['module']['version'])

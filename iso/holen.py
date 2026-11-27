@@ -173,7 +173,7 @@ def main(argv: list[str]) -> int:
     p.add_argument('--zweig', choices=('main', 'beta'), default='')
     p.add_argument('--ziel', default='/opt/kienzle-installer')
     p.add_argument('--schluessel', default=str(SCHLUESSEL))
-    p.add_argument('--name', default='suite')
+    p.add_argument('--name', default='praxisherz')
     p.add_argument('--praxis', default='')
     p.add_argument('--ohne-installer', action='store_true', help='nur holen (Tests)')
     a = p.parse_args(argv)

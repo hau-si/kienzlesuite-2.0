@@ -114,7 +114,7 @@ final class Speicher {
             $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN pad_id INTEGER NOT NULL DEFAULT 0');
         }
         if ($v < 3) {
-            // Startcodes aus T2med (kienzle-signatur://): einmalig, 5 Minuten gültig; enthalten den Patienten für die Startseite.
+            // Startcodes aus T2med (praxisherz-signatur://): einmalig, 5 Minuten gültig; enthalten den Patienten für die Startseite.
             $pdo->exec('CREATE TABLE starts (
                 hash TEXT PRIMARY KEY,
                 patient TEXT NOT NULL,

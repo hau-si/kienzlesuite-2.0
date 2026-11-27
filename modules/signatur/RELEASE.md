@@ -1,5 +1,9 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.39
+
+- **Neue Aufrufadresse aus T2med: `praxisherz-signatur://…`**. Die frühere Adresse `kienzle-signatur://…` funktioniert weiter. Braucht Basis 0.22.0-beta.32. Mit Tests geprüft, nicht auf der VM und nicht mit T2med.
+
 ## 0.1.0-beta.38
 
 - **Neuer Name: „Praxisherz – freie Software für die Arztpraxis“** (vorher Kienzle-Suite; Wunsch von T2med nach einem unterscheidbaren Namen).

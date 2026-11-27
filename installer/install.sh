@@ -2,7 +2,7 @@
 # Praxisherz: Installer der Basis für Ubuntu Server 26.04 LTS.
 #
 #   sudo bash installer/install.sh                         (Erstinstallation; Name und Praxis danach im Webinterface)
-#   sudo bash installer/install.sh --name kienzle.praxis.internal [--name 192.0.2.10] [--praxis "Praxis Dr. Muster"]
+#   sudo bash installer/install.sh --name praxisherz [--name 192.0.2.10] [--praxis "Praxis Dr. Muster"]
 #   sudo bash installer/install.sh --wiederherstellen     (neue VM nach Totalausfall: alles aus der Sicherung holen)
 #   sudo bash installer/install.sh --admin-reset NAME     (Admin-Zugang an der Konsole zurücksetzen, wie kienzle-admin)
 #   sudo bash installer/install.sh --kanal beta           (Update-Kanal festlegen: stabil oder beta)

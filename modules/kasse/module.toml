@@ -5,7 +5,7 @@
 [module]
 id = "kasse"
 name = "Kasse"
-version = "2.3.4-beta.59"
+version = "2.3.4-beta.60"
 core_api = "2"
 description = "Kartenzahlung am SumUp Solo aus T2med, T2med-Rechnungseingang über den Drucker „vKasse“, GOÄ-Leistungen, Barzahlung, Belege per E-Mail, Druck und Post."
 
@@ -24,7 +24,7 @@ einstellungen = "/settings.php"
 
 # Startkontext für den zentralen Arbeitsplatz-Starter der Basis (Verwaltung → Arbeitsplätze): POST https://<server>/starter/kasse
 [[starters]]
-schema = "kienzle-kasse"
+schema = "praxisherz-kasse"
 label = "Kasse"
 
 [[rights]]

@@ -32,7 +32,7 @@ import (
 var DruckerPause = 10 * time.Minute
 
 // Version des Programms (scripts/starter-bauen setzt sie nicht; der Server vergleicht die Prüfsumme der Datei).
-const version = "2.3.6"
+const version = "2.3.7" // ab 2.3.7 auch Adressen praxisherz-… (Web::AGENT_NEUE_ADRESSEN)
 
 // AgentConfig steht in agent.json (nur für SYSTEM und Administratoren lesbar).
 type AgentConfig struct {

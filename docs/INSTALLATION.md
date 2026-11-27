@@ -7,7 +7,7 @@ Prüfliste für die Test-VM: `docs/VM-TEST.md`.
 
 - VM mit **Ubuntu Server 26.04 LTS** (aktuelles Abbild, derzeit 26.04.1), frisch installiert.
 - Mindestens 2 CPU-Kerne, 4 GB Arbeitsspeicher, 100 GB Speicher (der Installer warnt, wenn weniger da ist).
-- Feste IP-Adresse im Praxisnetz und ein Name im DNS der Praxis bzw. im Router, z. B. `kienzle.praxis.internal`.
+- Feste IP-Adresse im Praxisnetz und ein Name im DNS der Praxis bzw. im Router, z. B. `praxisherz`.
   Passkeys funktionieren nur über einen Namen, nicht über eine IP-Adresse.
 - Internetzugang für Pakete und Updates.
 
@@ -25,7 +25,7 @@ Prüfliste für die Test-VM: `docs/VM-TEST.md`.
 
    Der Installer nimmt die IP-Adresse(n) und den Rechnernamen der VM. Den endgültigen Namen und den Praxisnamen legt
    ein Admin danach unter **Verwaltung → Server** fest. Wer es gleich richtig haben will, kann beides auch mitgeben:
-   `--name kienzle.praxis.internal --name 192.0.2.10 --praxis "Praxis Dr. Beispiel"`.
+   `--name praxisherz --name 192.0.2.10 --praxis "Praxis Dr. Beispiel"`.
 3. Am Ende zeigt der Installer
    - die Adresse(n), unter denen die Suite erreichbar ist (zunächst über die IP),
    - den **Fingerabdruck der Zertifizierungsstelle** (zum Vergleich auf den Arbeitsplätzen),
@@ -34,7 +34,7 @@ Prüfliste für die Test-VM: `docs/VM-TEST.md`.
    Stammzertifizierungsstelle** eintragen (Windows: Doppelklick → Zertifikat installieren → Lokaler Computer →
    „Vertrauenswürdige Stammzertifizierungsstellen“). Fingerabdruck vergleichen.
 5. Einrichtungslink öffnen, Passwort setzen, Authenticator-App einrichten, Wiederherstellungscodes ausdrucken.
-6. **Verwaltung → Server:** Namen festlegen, unter dem die Arbeitsplätze die Suite erreichen (z. B. `kienzle.praxis.internal`,
+6. **Verwaltung → Server:** Namen festlegen, unter dem die Arbeitsplätze die Suite erreichen (z. B. `praxisherz`,
    Eintrag im DNS bzw. Router nötig), dazu den Praxisnamen. Das Server-Zertifikat wird dabei neu ausgestellt; die
    Zertifizierungsstelle bleibt. Passkeys funktionieren nur über diesen Namen.
 7. **Verwaltung → Einrichtung** zeigt, was noch fehlt: zweiter Admin, Firewall, Netzwerkspeicher, Sicherung,

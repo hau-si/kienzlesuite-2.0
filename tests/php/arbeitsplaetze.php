@@ -10,7 +10,7 @@ function st_env(): array {
     $env = new Env();
     $mods = [];
     foreach ($env->modules->all() as $id => $m) {
-        if ($id === 'kasse') $m['starters'] = [['schema' => 'kienzle-kasse', 'label' => 'Kasse']];
+        if ($id === 'kasse') $m['starters'] = [['schema' => 'praxisherz-kasse', 'label' => 'Kasse']];
         $mods[] = $m;
     }
     $env->modules = Modules::fromArray($mods);
@@ -57,9 +57,11 @@ function test_agent(): void {
     $auth = ['authorization' => 'Bearer ' . $a['token']];
     check(ap_req($b, 'POST', '/agent/abholen', [], ['authorization' => 'Bearer ' . str_repeat('0', 64)])->status === 401, 'unbekannter Agent');
     $r = json_decode(ap_req($b, 'POST', '/agent/abholen', ['version' => '1.0.0'], $auth)->body, true);
-    check($r['auftraege'] === [] && $r['name'] === 'EMPFANG-PCscript' && isset($r['soll']['kontexte']['kienzle-kasse']), 'erste Abfrage mit Sollzustand');
+    check($r['auftraege'] === [] && $r['name'] === 'EMPFANG-PCscript' && $r['soll']['kontexte'] === ['kienzle-kasse' => '/starter/kasse'], 'erste Abfrage mit Sollzustand; älterer Agent nur mit früherer Adresse: ' . json_encode($r['soll']['kontexte'] ?? null));
+    $neu = json_decode(ap_req($b, 'POST', '/agent/abholen', ['version' => Web::AGENT_NEUE_ADRESSEN], $auth)->body, true);
+    check($neu['soll']['kontexte'] === ['kienzle-kasse' => '/starter/kasse', 'praxisherz-kasse' => '/starter/kasse'] && $neu['stand'] !== $r['stand'], 'neuer Agent mit neuer und früherer Adresse: ' . json_encode($neu['soll']['kontexte'] ?? null));
     check($r['soll']['programme'] === ['kienzle-starter-windows-amd64.exe' => hash('sha256', 'MZ-Testprogramm')] && $r['soll']['gdt']['ordner'] === 'C:\\Kienzle\\GDT', 'Programme nur mit Datei, GDT-Ordner fest');
-    $r2 = json_decode(ap_req($b, 'POST', '/agent/abholen', ['stand' => $r['stand']], $auth)->body, true);
+    $r2 = json_decode(ap_req($b, 'POST', '/agent/abholen', ['version' => '1.0.0', 'stand' => $r['stand']], $auth)->body, true);
     check(!isset($r2['soll']) && $r2['stand'] === $r['stand'], 'Sollzustand nur bei Änderung');
     $prog = ap_req($b, 'GET', '/agent/programm/kienzle-starter-windows-amd64.exe', [], $auth);
     check($prog->status === 200 && $prog->body === 'MZ-Testprogramm', 'Programm laden');

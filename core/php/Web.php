@@ -147,7 +147,7 @@ final class Web {
             $fp = implode(':', str_split(strtoupper(hash('sha256', $der)), 2));
         }
         $ips = array_values(array_filter($this->config->hostnames, fn($n) => filter_var($n, FILTER_VALIDATE_IP)));
-        $name = array_values(array_filter($this->config->hostnames, fn($n) => !filter_var($n, FILTER_VALIDATE_IP)))[0] ?? 'kienzle.praxis.internal';
+        $name = array_values(array_filter($this->config->hostnames, fn($n) => !filter_var($n, FILTER_VALIDATE_IP)))[0] ?? 'praxisherz';
         $ip = $ips[0] ?? '192.0.2.10';
         if (str_ends_with($name, '.fritz.box')) {
             $routerText = '<p>Der Name <code>' . V::h($name) . '</code> endet auf „.fritz.box“: Eine FRITZ!Box kennt Geräte im Netz automatisch unter ihrem Rechnernamen. '
@@ -205,17 +205,17 @@ final class Web {
     }
 
     /** Endungen für den Servernamen, die die Zertifizierungsstelle erlaubt (verständlich beschriftet). */
-    private const SUFFIXES = ['.praxis.internal' => '.praxis.internal (empfohlen)', '.fritz.box' => '.fritz.box (FRITZ!Box)', '.local' => '.local', '.lan' => '.lan'];
+    private const SUFFIXES = ['' => 'ohne Endung (empfohlen)', '.praxis.internal' => '.praxis.internal', '.fritz.box' => '.fritz.box (FRITZ!Box)', '.local' => '.local', '.lan' => '.lan'];
 
     private function serverPage(?string $error = null): Response {
         $st = $this->srv()->status();
         $ips = array_values(array_filter($st['names'], fn($n) => filter_var($n, FILTER_VALIDATE_IP)));
         $dns = array_values(array_filter($st['names'], fn($n) => !filter_var($n, FILTER_VALIDATE_IP)));
         // Erster Name mit bekannter Endung → Feld „Name“ und Auswahl der Endung; alles andere steht unter „Weitere Namen“.
-        [$short, $suffix, $extra] = ['kienzle', '.praxis.internal', []];
+        [$short, $suffix, $extra] = ['praxisherz', '', []];
         foreach ($dns as $i => $n) {
             foreach (self::SUFFIXES as $suf => $_) {
-                if (str_ends_with($n, $suf) && strlen($n) > strlen($suf)) { [$short, $suffix] = [substr($n, 0, -strlen($suf)), $suf]; unset($dns[$i]); break 2; }
+                if ($suf === '' ? !str_contains($n, '.') : (str_ends_with($n, $suf) && strlen($n) > strlen($suf))) { [$short, $suffix] = [substr($n, 0, -strlen($suf)), $suf]; unset($dns[$i]); break 2; }
             }
         }
         $extra = array_values($dns);
@@ -232,7 +232,7 @@ final class Web {
             . '<input type="text" name="kurzname" value="' . V::h($short) . '" required maxlength="40" pattern="[A-Za-z0-9][A-Za-z0-9-]*" aria-label="Name">'
             . '<select name="endung" aria-label="Endung">' . $options . '</select></span></label>'
             . '<p class="muted">Unter diesem Namen öffnen die Arbeitsplätze die Suite, z. B. <strong>' . V::h($address) . '</strong>. '
-            . 'Nur Buchstaben, Ziffern und Bindestrich. Wer nicht sicher ist: „kienzle“ und „.praxis.internal“ lassen.</p>'
+            . 'Nur Buchstaben, Ziffern und Bindestrich. Wer nicht sicher ist: „praxisherz“ ohne Endung lassen. Ein Name ohne Endung muss im Router bzw. DNS der Praxis bekannt sein (bei der FRITZ!Box meist von selbst, wenn der Server so heißt).</p>'
             . ($ips ? '<p class="muted">Zusätzlich bleibt die Suite über ' . V::h(implode(', ', $ips)) . ' erreichbar.</p>' : '')
             . '<details class="how"><summary>Weitere Namen und Fachleute-Einstellungen</summary>'
             . '<label>Weitere Namen oder Adressen (einer je Zeile)<textarea name="weitere" rows="3">' . V::h(implode("\n", $extra)) . '</textarea></label>'
@@ -345,7 +345,7 @@ final class Web {
         $suffix = $r->field('endung', 30);
         $names = '';
         try {
-            if (!preg_match('/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/D', $short)) throw new Problem('Name des Servers: nur Buchstaben, Ziffern und Bindestrich, z. B. kienzle.', 422);
+            if (!preg_match('/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/D', $short)) throw new Problem('Name des Servers: nur Buchstaben, Ziffern und Bindestrich, z. B. praxisherz.', 422);
             if (!isset(self::SUFFIXES[$suffix])) throw new Problem('Bitte eine Endung wählen.', 422);
             $ips = $r->field('ohne_ip') === '1' ? [] : array_filter($this->config->hostnames, fn($n) => filter_var($n, FILTER_VALIDATE_IP));
             $names = implode("\n", array_merge([$short . $suffix], preg_split('/\R/', trim($r->field('weitere', 3000))) ?: [], $ips));
@@ -1856,7 +1856,7 @@ final class Web {
             . '<button>Speichern</button></form>'
             . '<div class="box wide"><h3>Eintrag in T2med (Drittanbieter-Zugriffe verwalten → Neue URL hinzufügen)</h3>'
             . '<p>Als Adresse genau so eintragen, mit den Platzhaltern, und eine Bezeichnung wie „Kartenzahlung“ vergeben:</p>'
-            . '<p><code class="secret">kienzle-kasse://?kontextId=${kontextId}&amp;fhirBasisUrl=${fhirBasisUrl}&amp;oAuthToken=${oAuthToken}</code></p>'
+            . '<p><code class="secret">praxisherz-kasse://?kontextId=${kontextId}&amp;fhirBasisUrl=${fhirBasisUrl}&amp;oAuthToken=${oAuthToken}</code></p>'
             . '<p class="muted small">Ausführliche Anleitung mit Bildern: in der Kasse unter Einstellungen → Zahlung &amp; T2med. Der Starter muss auf dem Arbeitsplatz installiert sein.</p></div>'
             . ($t2 ? '<p>Zertifikat: ' . (($t2['zertifikat'] ?? '') !== '' ? '<code>' . V::h((string)$t2['zertifikat']) . '</code>' . ($t2['pin'] ? ' (fest hinterlegt)' : '') : '<strong>nicht hinterlegt</strong> (nur öffentlich beglaubigte Zertifikate werden angenommen)') . '</p>'
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('zertifikat-holen') . '<button>Zertifikat des Servers abrufen</button></form> '
@@ -2144,10 +2144,20 @@ final class Web {
         return 'https://' . $name;
     }
 
-    /** @return array<string,string> Schema → Pfad auf dem Server */
-    private function starterKontexte(): array {
+    /** Ab dieser Agent-Version kennt der Starter Adressen mit „praxisherz-“; ältere bekommen nur „kienzle-“, bis sie sich aktualisiert haben. */
+    public const AGENT_NEUE_ADRESSEN = '2.3.7';
+
+    /**
+     * @return array<string,string> Schema → Pfad auf dem Server. Zu jeder neuen Adresse (praxisherz-…) auch die alte (kienzle-…), damit
+     * bestehende Einträge in T2med weiter funktionieren. $nurAlte: nur kienzle-… (für ältere Agents, die praxisherz-… ablehnen würden).
+     */
+    private function starterKontexte(bool $nurAlte = false): array {
         $out = [];
-        foreach ($this->modules->starters() as $s) $out[$s['schema']] = '/starter/' . $s['modul'];
+        foreach ($this->modules->starters() as $s) {
+            $pfad = '/starter/' . $s['modul'];
+            if ($s['alt'] !== '') $out[$s['alt']] = $pfad;
+            if (!$nurAlte || str_starts_with($s['schema'], 'kienzle-')) $out[$s['schema']] = $pfad;
+        }
         return $out;
     }
 
@@ -2173,8 +2183,9 @@ final class Web {
             . '(in T2med beim GDT-Gerät „Telefonaufruf“ als Importdatei <code>C:\Kienzle\GDT\AUFRUFi.gdt</code> eintragen). Er führt keine Befehle der Suite aus, nur diese festen Aufgaben. macOS und Linux bekommen vorerst nur den Starter (ohne Dienst).</p>';
         if (!$list) return $body . '<p class="muted">Kein installiertes Modul bietet einen Startkontext an.</p>';
         $rows = '';
-        foreach ($list as $s) $rows .= '<tr><td>' . V::h($this->modules->name($s['modul'])) . '</td><td>' . V::h($s['label']) . '</td><td><code>' . V::h($s['schema'] . '://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}') . '</code></td></tr>';
-        $body .= '<h3>Startkontexte</h3><p class="muted">Diese Adresse in T2med als Eintrag „Programm/URL“ je Kontext anlegen.</p>'
+        foreach ($list as $s) $rows .= '<tr><td>' . V::h($this->modules->name($s['modul'])) . '</td><td>' . V::h($s['label']) . '</td><td><code>' . V::h($s['schema'] . '://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}') . '</code>'
+            . ($s['alt'] !== '' ? '<br><small class="muted">Frühere Adresse <code>' . V::h($s['alt']) . '://…</code> funktioniert weiter.</small>' : '') . '</td></tr>';
+        $body .= '<h3>Startkontexte</h3><p class="muted">Diese Adresse in T2med als Eintrag „Programm/URL“ je Kontext anlegen. Bestehende Einträge mit „kienzle-…“ funktionieren weiter; beim nächsten Bearbeiten in T2med bitte auf die neue Adresse umstellen.</p>'
             . '<table><thead><tr><th>Modul</th><th>Kontext</th><th>Adresse in T2med</th></tr></thead><tbody>' . $rows . '</tbody></table>';
         $body .= '<h3>Paket laden</h3><p>Das Paket enthält Starterprogramm, Zertifikat, Starter-Schlüssel, die virtuellen Drucker der Module und das Einrichtungsskript. Schlägt die Druckereinrichtung fehl, gilt die Anleitung oben (Abschnitt „Virtuelle Drucker“). Nur für Admins, nach der Einrichtung löschen.</p><p class="row-buttons">';
         foreach (Starter::SYSTEMS as $key => $spec) {
@@ -2211,8 +2222,9 @@ final class Web {
     }
 
     /** Sollzustand für die Agents: Programme, Startkontexte, Drucker, Zertifizierungsstelle, Ablage der GDT-Datei. */
-    private function agentSoll(): array {
-        return ['server_url' => $this->serverUrl(), 'launcher_key' => $this->st()->key(), 'programme' => $this->agentProgramme(), 'kontexte' => $this->starterKontexte(), 'drucker' => $this->starterDrucker(),
+    private function agentSoll(string $version = ''): array {
+        $alt = $version !== '' && preg_match('/^[0-9]+(\.[0-9]+)*$/D', $version) && version_compare($version, self::AGENT_NEUE_ADRESSEN, '<');
+        return ['server_url' => $this->serverUrl(), 'launcher_key' => $this->st()->key(), 'programme' => $this->agentProgramme(), 'kontexte' => $this->starterKontexte($alt), 'drucker' => $this->starterDrucker(),
             'ca' => (string)@file_get_contents(self::$caFile), 'gdt' => ['ordner' => 'C:\\Kienzle\\GDT']];
     }
 
@@ -2233,7 +2245,7 @@ final class Web {
         if (!$platz) return $fail(401, 'Arbeitsplatz unbekannt oder entfernt. Bitte das Paket auf diesem PC neu einrichten.');
         if ($r->path === '/agent/abholen' && $r->method === 'POST') {
             $auftraege = $this->ap()->abholen($platz, $r->remote, (string)($json['version'] ?? ''), (string)($json['zustand'] ?? ''));
-            $soll = $this->agentSoll();
+            $soll = $this->agentSoll((string)($json['version'] ?? ''));
             $stand = hash('sha256', (string)json_encode($soll));
             $out = ['auftraege' => $auftraege, 'stand' => $stand, 'name' => $platz['name']];
             if (($json['stand'] ?? '') !== $stand) $out['soll'] = $soll;

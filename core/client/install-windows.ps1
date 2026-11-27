@@ -55,7 +55,7 @@ else { Import-Certificate -FilePath (Join-Path $daten 'ca.crt') -CertStoreLocati
 
 # Aufrufe aus T2med für alle Benutzer (der Agent hält sie später selbst aktuell).
 $command = '"' + $exe + '" --url "%1"'
-foreach ($scheme in (Get-Content schemas.txt | Where-Object { $_ -match '^kienzle-[a-z0-9-]+$' })) {
+foreach ($scheme in (Get-Content schemas.txt | Where-Object { $_ -match '^(praxisherz|kienzle)-[a-z0-9-]+$' })) {
     $reg = "HKLM:\Software\Classes\$scheme"
     $current = try { (Get-ItemProperty "$reg\shell\open\command" -ErrorAction Stop).'(default)' } catch { $null }
     if ($current -ne $command) {

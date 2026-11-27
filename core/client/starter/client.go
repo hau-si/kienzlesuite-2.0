@@ -33,7 +33,7 @@ type Config struct {
 }
 
 var (
-	schemeRe = regexp.MustCompile(`^kienzle-[a-z0-9-]{1,30}$`)
+	schemeRe = regexp.MustCompile(`^(praxisherz|kienzle)-[a-z0-9-]{1,30}$`) // kienzle-… = frühere Adressen in T2med
 	pathRe   = regexp.MustCompile(`^/[A-Za-z0-9._/-]{1,80}$`)
 	keyRe    = regexp.MustCompile(`^[A-Za-z0-9._~+/=-]{16,200}$`)
 )

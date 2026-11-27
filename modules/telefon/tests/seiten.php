@@ -229,7 +229,7 @@ $o = aufruf($dir, '/telefon/anrufe', 'anrufe,patienten,statistik');
 check(str_contains($o, 'id="tf-suche"') && str_contains($o, '/telefon/statistik') && str_contains($o, 'tf-leiste'), 'Suchfeld oben, Reiter Statistik, Leiste');
 check(!str_contains(aufruf($dir, '/telefon/anrufe', 'anrufe'), 'id="tf-suche"'), 'kein Suchfeld ohne Recht');
 check(str_contains(aufruf($dir, '/telefon/statistik', 'statistik'), 'Noch keine Anrufe') && str_contains(aufruf($dir, '/telefon/statistik', 'anrufe'), '#CODE=403'), 'Statistik-Seite und Recht');
-check(str_contains(aufruf($dir, '/telefon/einstellungen', '', 'admin'), 'T2med-Telefonverzeichnis') && str_contains(aufruf($dir, '/telefon/einstellungen', '', 'admin'), 'kienzle-telefonverzeichnis://'), 'Einstellungen Telefonverzeichnis');
+check(str_contains(aufruf($dir, '/telefon/einstellungen', '', 'admin'), 'T2med-Telefonverzeichnis') && str_contains(aufruf($dir, '/telefon/einstellungen', '', 'admin'), 'praxisherz-telefonverzeichnis://'), 'Einstellungen Telefonverzeichnis');
 $o = aufruf($dir, '/telefon/einstellungen', '', 'admin', ['aktion' => 'verzeichnis-speichern', 'kienzle-csrf' => str_repeat('a', 32), 'ortsvorwahl' => '030', 'anrufername' => '1']);
 check(str_contains($o, 'Gespeichert') && str_contains((string)file_get_contents("$dir/daten/t2med/einstellungen.json"), '"030"'), 'Ortsvorwahl speichern');
 check(str_contains(aufruf($dir, '/telefon/einstellungen', 'patienten', 'benutzer', ['aktion' => 'verzeichnis-loeschen', 'kienzle-csrf' => str_repeat('a', 32)]), '#CODE=403') && str_contains(aufruf($dir, '/telefon/einstellungen', 'nebenstellen', 'benutzer', ['aktion' => 'verzeichnis-loeschen', 'kienzle-csrf' => str_repeat('a', 32)]), 'nur Admins'), 'Verzeichnis löschen nur Admin');

@@ -70,14 +70,14 @@ var (
 )
 
 const (
-	wmDestroy     = 0x0002
-	wmActivate    = 0x0006
-	wmPaint       = 0x000F
-	wmTimer       = 0x0113
-	wmLButtonUp   = 0x0202
-	wmRButtonUp   = 0x0205
-	wmApp         = 0x8000
-	wmTray        = wmApp + 1
+	wmDestroy   = 0x0002
+	wmActivate  = 0x0006
+	wmPaint     = 0x000F
+	wmTimer     = 0x0113
+	wmLButtonUp = 0x0202
+	wmRButtonUp = 0x0205
+	wmApp       = 0x8000
+	wmTray      = wmApp + 1
 	// wmKnopfFertig: eigene Nachricht, mit der ein Hintergrund-Thread (Datei schreiben, Programm starten) dem Fenster
 	// das Ergebnis meldet, ohne selbst Win32-Aufrufe zu machen (die sind nur vom Fenster-Thread aus sicher).
 	wmKnopfFertig = wmApp + 2

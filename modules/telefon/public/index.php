@@ -27,7 +27,7 @@ function tf_t2med(KienzleModul $k): T2med {
 }
 
 if (($_SERVER['KIENZLE_OEFFENTLICH'] ?? '') === 'starter') {
-    // POST /starter/telefon: Aufruf „kienzle-telefonverzeichnis://…“ aus T2med über den Starter (Schlüssel prüft die Basis).
+    // POST /starter/telefon: Aufruf „praxisherz-telefonverzeichnis://…“ aus T2med über den Starter (Schlüssel prüft die Basis).
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store');
     header('Referrer-Policy: no-referrer');

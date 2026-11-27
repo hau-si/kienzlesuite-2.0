@@ -41,7 +41,7 @@ plist="$app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c 'Add :CFBundleURLTypes:0:CFBundleURLSchemes array' "$plist"
 i=0
 while IFS= read -r s; do
-  case "$s" in kienzle-[a-z0-9-]*) /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:$i string $s" "$plist"; i=$((i+1)); echo "Eingerichtet: $s";; esac
+  case "$s" in praxisherz-[a-z0-9-]*|kienzle-[a-z0-9-]*) /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:$i string $s" "$plist"; i=$((i+1)); echo "Eingerichtet: $s";; esac
 done < schemas.txt
 test "$i" -gt 0 || { echo 'schemas.txt enthält keine Einträge.'; exit 1; }
 /usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier de.kienzle.starter' "$plist" 2>/dev/null || /usr/libexec/PlistBuddy -c 'Add :CFBundleIdentifier string de.kienzle.starter' "$plist"

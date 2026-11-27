@@ -12,7 +12,7 @@ function test_server(): void {
     Server::$unit = $env->dir . '/kienzle-servername.path'; touch(Server::$unit);
     [$b] = admin_browser($env);
     $p = $b->get('/verwaltung/server');
-    check($p->status === 200 && str_contains($p->body, 'name="kurzname" value="kienzle"') && !str_contains($p->body, 'name="praxis"'), 'Seite Server (ohne Praxisname)');
+    check($p->status === 200 && str_contains($p->body, 'name="kurzname" value="praxisherz"') && str_contains($p->body, '<option value="" selected>ohne Endung (empfohlen)') && !str_contains($p->body, 'name="praxis"'), 'Seite Server (ohne Praxisname)');
     check(str_contains($p->body, 'kienzle.example.org</textarea>') && str_contains($p->body, 'über 192.0.2.5 erreichbar'), 'weitere Namen oder IP fehlen');
     $r = $b->post('/verwaltung/server', ['aktion' => 'speichern', 'kurzname' => ' Kienzle ', 'endung' => '.praxis.internal', 'weitere' => '']);
     check($r->status === 303, 'Speichern');
@@ -20,6 +20,9 @@ function test_server(): void {
     check(json_decode((string)file_get_contents($f), true) === ['namen' => ['kienzle.praxis.internal', '192.0.2.5'], 'praxis' => 'Praxis Beispiel'], 'Anfrage (Praxisname bleibt unverändert): ' . file_get_contents($f));
     $ok = ['aktion' => 'speichern', 'kurzname' => 'kienzle', 'endung' => '.fritz.box', 'weitere' => ''];
     check($b->post('/verwaltung/server', $ok)->status === 422, 'zweite Anfrage, solange die erste wartet');
+    unlink($f);
+    check($b->post('/verwaltung/server', ['aktion' => 'speichern', 'kurzname' => 'praxisherz', 'endung' => '', 'weitere' => ''])->status === 303
+        && json_decode((string)file_get_contents($f), true)['namen'] === ['praxisherz', '192.0.2.5'], 'Name ohne Endung: ' . @file_get_contents($f));
     unlink($f);
     $seite = $b->get('/verwaltung/praxis')->body;
     check(str_contains($seite, 'name="praxis" value="Praxis Beispiel"') && str_contains($seite, 'Name der Praxis <span class="tag ok">✓ eingetragen</span>'), 'Praxisname steht unter Praxis');

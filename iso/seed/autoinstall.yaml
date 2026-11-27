@@ -16,7 +16,7 @@ autoinstall:
   source:
     id: ubuntu-server
   identity:
-    hostname: suite
+    hostname: praxisherz
     username: praxisadmin
   ssh:
     install-server: true

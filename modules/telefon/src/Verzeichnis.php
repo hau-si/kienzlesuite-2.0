@@ -4,7 +4,7 @@ namespace KienzleTelefon;
 
 /**
  * Telefonverzeichnis aus T2med: Patienten mit Nummer, Name, Geburtsdatum und Telefonnummern in <daten>/t2med/patienten.sqlite (0600).
- * Geladen wird es über den Aufruf „kienzle-telefonverzeichnis://…“ aus T2med (zentraler Starter der Basis): Der Starter legt einen
+ * Geladen wird es über den Aufruf „praxisherz-telefonverzeichnis://…“ aus T2med (zentraler Starter der Basis): Der Starter legt einen
  * Ladeauftrag an (Token verschlüsselt), die Seite holt die Patienten danach schrittweise (je Anfrage einige Seiten, mit Fortschritt).
  * Erst wenn alles geladen ist, ersetzt die neue Datei die alte. Genutzt für: Suche, Namen in „Anrufe“, Anrufername am Telefon
  * (lib/anrufername.agi liest dieselbe Datei).

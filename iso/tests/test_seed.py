@@ -21,7 +21,7 @@ class Seed(unittest.TestCase):
         self.assertEqual(a['version'], 1)
         self.assertEqual(sorted(a['interactive-sections']), ['identity', 'network', 'storage'])
         self.assertEqual(a['keyboard']['layout'], 'de')
-        self.assertEqual(a['identity']['hostname'], 'suite')
+        self.assertEqual(a['identity']['hostname'], 'praxisherz')
         self.assertTrue(a['ssh']['install-server'])
         for c in a['late-commands']:
             if isinstance(c, str) and '\n' in c:
