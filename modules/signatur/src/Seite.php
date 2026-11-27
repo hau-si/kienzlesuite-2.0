@@ -90,6 +90,92 @@ final class Seite {
      * Legt an (id 0) oder ändert. Aus dem Editor kommen Bausteine („bloecke“, JSON), sonst ein Text. Ändern sich Inhalt,
      * Titel oder Art, zählt die Fassung hoch (der Vorgang merkt sich, welche Fassung unterschrieben wurde).
      */
+    // ---- Einstellungen, Einwilligungen mit Ablauf, IGeL-Zuordnung ----
+
+    public const MONATE_STANDARD = 24;
+    /** Sprachen der Vorlagen (DeepL-Kürzel in Kleinbuchstaben). */
+    public const SPRACHEN = ['de' => 'Deutsch', 'en' => 'Englisch', 'tr' => 'Türkisch', 'ru' => 'Russisch', 'uk' => 'Ukrainisch', 'pl' => 'Polnisch',
+        'fr' => 'Französisch', 'it' => 'Italienisch', 'es' => 'Spanisch', 'ro' => 'Rumänisch', 'el' => 'Griechisch'];
+
+    public static function einstellung(string $name, string $vorgabe = ''): string {
+        $st = self::pdo()->prepare('SELECT wert FROM einstellungen WHERE schluessel=?');
+        $st->execute([$name]);
+        $w = $st->fetchColumn();
+        return $w === false ? $vorgabe : (string)$w;
+    }
+
+    public static function einstellungSetzen(string $name, string $wert): void {
+        self::pdo()->prepare('INSERT INTO einstellungen (schluessel, wert) VALUES (?, ?) ON CONFLICT(schluessel) DO UPDATE SET wert=excluded.wert')->execute([$name, $wert]);
+    }
+
+    /** Wie lange Einwilligungen gelten (zentral für alle Vorlagen mit Ablauf), in Monaten. */
+    public static function einwilligungMonate(): int {
+        $m = (int)self::einstellung('einwilligung_monate', (string)self::MONATE_STANDARD);
+        return $m >= 1 && $m <= 120 ? $m : self::MONATE_STANDARD;
+    }
+
+    public static function einwilligungMonateSetzen(mixed $wert): void {
+        $m = filter_var($wert, FILTER_VALIDATE_INT);
+        if ($m === false || $m < 1 || $m > 120) throw new \InvalidArgumentException('Gültigkeit: bitte 1 bis 120 Monate.');
+        self::einstellungSetzen('einwilligung_monate', (string)$m);
+    }
+
+    /** Schlüssel des Patienten für Einwilligungen: T2med-ID, sonst Prüfsumme aus Name und Geburtsdatum (ohne Geburtsdatum keiner). */
+    public static function patientSchluessel(string $patientId, string $name, string $geburtsdatum): string {
+        if ($patientId !== '') return 'p:' . $patientId;
+        $name = mb_strtolower(trim(preg_replace('/\s+/u', ' ', $name) ?? ''));
+        $geb = trim($geburtsdatum);
+        return $name !== '' && $geb !== '' ? 'h:' . hash('sha256', $name . '|' . $geb) : '';
+    }
+
+    /** Unterschriebene Einwilligung merken (einmal je Vorgang; Ablage::lauf ruft es für jeden unterschriebenen Vorgang). */
+    public static function einwilligungMerken(array $v, ?int $jetzt = null): void {
+        if (!(int)($v['ablauf'] ?? 0) || ($v['patient_schluessel'] ?? '') === '' || !(int)$v['unterschrieben']) return;
+        $vorlage = self::vorlage((int)$v['vorlage_id']);
+        $original = $vorlage && (int)$vorlage['original'] > 0 ? (int)$vorlage['original'] : (int)$v['vorlage_id'];
+        $bis = (new \DateTimeImmutable('@' . (int)$v['unterschrieben']))->modify('+' . self::einwilligungMonate() . ' months')->getTimestamp();
+        self::pdo()->prepare('INSERT OR IGNORE INTO einwilligungen (vorgang_id, schluessel, vorlage_id, original, titel, unterschrieben, bis) VALUES (?, ?, ?, ?, ?, ?, ?)')
+            ->execute([(int)$v['id'], $v['patient_schluessel'], (int)$v['vorlage_id'], $original, (string)$v['titel'], (int)$v['unterschrieben'], $bis]);
+    }
+
+    /** Letzte Einwilligung je Vorlage (Sprachfassungen zählen zum Original) eines Patienten. @return list<array{vorlage_id:int,titel:string,unterschrieben:int,bis:int,gueltig:bool}> */
+    public static function einwilligungen(string $schluessel, ?int $jetzt = null): array {
+        if ($schluessel === '') return [];
+        $jetzt ??= time();
+        $st = self::pdo()->prepare('SELECT original, titel, MAX(unterschrieben) AS unterschrieben, MAX(bis) AS bis FROM einwilligungen WHERE schluessel=? GROUP BY original ORDER BY unterschrieben DESC');
+        $st->execute([$schluessel]);
+        return array_map(fn($r) => ['vorlage_id' => (int)$r['original'], 'titel' => (string)$r['titel'], 'unterschrieben' => (int)$r['unterschrieben'], 'bis' => (int)$r['bis'], 'gueltig' => (int)$r['bis'] > $jetzt], $st->fetchAll());
+    }
+
+    /** IGeL-Leistungen einer Vorlage (GOÄ-Ziffern oder Namen, mit Komma getrennt). */
+    public static function leistungenListe(mixed $wert): string {
+        $out = [];
+        foreach (explode(',', (string)$wert) as $t) {
+            $t = trim(preg_replace('/\s+/u', ' ', $t) ?? '');
+            if ($t === '') continue;
+            if (mb_strlen($t) > 80 || preg_match('/[\x00-\x1f\x7f<>]/u', $t)) throw new \InvalidArgumentException('IGeL-Leistung „' . mb_substr($t, 0, 30) . '“ ist ungültig (höchstens 80 Zeichen).');
+            $out[mb_strtolower($t)] ??= $t;
+        }
+        if (count($out) > 40) throw new \InvalidArgumentException('Höchstens 40 IGeL-Leistungen je Vorlage.');
+        return implode(', ', $out);
+    }
+
+    /**
+     * Passende Vorlage für Leistungen aus der Kasse: die erste aktive Vorlage, deren IGeL-Liste eine GOÄ-Ziffer oder einen Namen
+     * der Leistungen enthält; sonst der Standard (fester IGeL-Vertrag). @param list<array{code:string,label:string}> $leistungen
+     */
+    public static function vorlageFuerLeistungen(array $leistungen): int {
+        $codes = []; $namen = [];
+        foreach ($leistungen as $l) { if (($l['code'] ?? '') !== '') $codes[] = mb_strtolower((string)$l['code']); $namen[] = mb_strtolower((string)($l['label'] ?? '')); }
+        foreach (self::vorlagen(true) as $v) {
+            if ((string)$v['sprache'] !== 'de') continue;
+            foreach (array_filter(array_map('trim', explode(',', mb_strtolower((string)$v['leistungen'])))) as $e) {
+                if (in_array($e, $codes, true) || in_array($e, $namen, true)) return (int)$v['id'];
+            }
+        }
+        return self::festeVorlageId();
+    }
+
     /** Vorschläge für Gruppen der Vorlagen (frei erweiterbar). */
     public const GRUPPEN = ['Aufklärungen', 'Administratives', 'IGeL'];
 
@@ -148,7 +234,8 @@ final class Seite {
             if ($ids && !in_array((int)$v['id'], $ids, true)) continue;
             $bl = self::bloeckeVon($v);
             foreach ($bl as $b) if (($b['typ'] ?? '') === 'bild' && !empty($b['datei']) && ($pfad = Bausteine::bildPfad((string)$b['datei'])) !== null) $bilder[$b['datei']] = base64_encode((string)file_get_contents($pfad));
-            $liste[] = ['titel' => (string)$v['titel'], 'art' => (string)$v['art'], 'gruppen' => (string)$v['gruppen'], 'kuerzel' => (string)$v['kuerzel'], 'aktiv' => (bool)(int)$v['aktiv'], 'bloecke' => $bl];
+            $liste[] = ['titel' => (string)$v['titel'], 'art' => (string)$v['art'], 'gruppen' => (string)$v['gruppen'], 'kuerzel' => (string)$v['kuerzel'], 'aktiv' => (bool)(int)$v['aktiv'],
+                'leistungen' => (string)$v['leistungen'], 'ablauf' => (bool)(int)$v['ablauf'], 'zweite' => (string)$v['zweite'], 'sprache' => (string)$v['sprache'], 'bloecke' => $bl];
         }
         if (!$liste) throw new \InvalidArgumentException('Keine Vorlage zum Exportieren.');
         return json_encode(['format' => self::EXPORT_FORMAT, 'version' => 1, 'erstellt' => date('c'), 'vorlagen' => $liste, 'bilder' => (object)$bilder],
@@ -187,7 +274,9 @@ final class Seite {
                 for ($i = 1; in_array(mb_strtolower($t), $vorhanden, true); $i++) $t = mb_substr($basis, 0, 68) . ' (Import' . ($i > 1 ? " $i" : '') . ')';
                 $vorhanden[] = mb_strtolower($t);
                 self::vorlageSpeichern(['art' => (string)($v['art'] ?? ''), 'titel' => $t, 'aktiv' => !empty($v['aktiv']), 'kuerzel' => (string)($v['kuerzel'] ?? ''),
-                    'gruppen' => (string)($v['gruppen'] ?? ''), 'bloecke' => json_encode($bl, JSON_UNESCAPED_UNICODE)]);
+                    'gruppen' => (string)($v['gruppen'] ?? ''), 'bloecke' => json_encode($bl, JSON_UNESCAPED_UNICODE),
+                    'leistungen' => (string)($v['leistungen'] ?? ''), 'ablauf' => !empty($v['ablauf']), 'zweite' => (string)($v['zweite'] ?? ''),
+                    'sprache' => isset(self::SPRACHEN[$v['sprache'] ?? '']) ? $v['sprache'] : 'de']);
                 $titel[] = $t;
             }
             $pdo->commit();
@@ -206,6 +295,10 @@ final class Seite {
         $kuerzel = self::zeile($in['kuerzel'] ?? '', 'Kürzel', 12, false);
         if ($kuerzel !== '' && !preg_match('/^[A-Za-z0-9ÄÖÜäöüß_-]{1,12}$/uD', $kuerzel)) throw new \InvalidArgumentException('Das Kürzel für die Akte darf nur Buchstaben, Ziffern, _ und - enthalten (höchstens 12 Zeichen).');
         $gruppen = array_key_exists('gruppen', $in) ? self::gruppenPruefen($in['gruppen']) : null;
+        $extra = [];
+        if (array_key_exists('leistungen', $in)) $extra['leistungen'] = self::leistungenListe($in['leistungen']);
+        if (array_key_exists('ablauf', $in)) $extra['ablauf'] = !empty($in['ablauf']) ? 1 : 0;
+        if (array_key_exists('zweite', $in)) $extra['zweite'] = self::zeile($in['zweite'], 'Zweite Unterschrift', 60, false);
         if (array_key_exists('bloecke', $in)) {
             $bloecke = Bausteine::pruefen($in['bloecke']);
         } else {
@@ -224,13 +317,18 @@ final class Seite {
             if ($id === self::festeVorlageId()) { $art = 'igel'; $aktiv = 1; }
             if (!array_key_exists('kuerzel', $in)) $kuerzel = (string)$alt['kuerzel'];
             if ($gruppen !== null) self::pdo()->prepare('UPDATE vorlagen SET gruppen=? WHERE id=?')->execute([$gruppen, $id]);
+            if (isset($extra['zweite']) && $extra['zweite'] !== (string)$alt['zweite']) $alt['titel'] .= "\0"; // zweite Unterschrift ändert das Dokument: neue Fassung
+            foreach ($extra as $spalte => $wert) self::pdo()->prepare("UPDATE vorlagen SET $spalte=? WHERE id=?")->execute([$wert, $id]);
             $version = (int)$alt['version'] + (json_encode(self::bloeckeVon($alt), JSON_UNESCAPED_UNICODE) !== $json || $alt['titel'] !== $titel || $alt['art'] !== $art || $alt['kuerzel'] !== $kuerzel ? 1 : 0);
             $pdo->prepare('UPDATE vorlagen SET art=?, titel=?, text=?, bloecke=?, version=?, kuerzel=?, aktiv=?, muster=0, geaendert=? WHERE id=?')->execute([$art, $titel, $text, $json, $version, $kuerzel, $aktiv, time(), $id]);
             return $id;
         }
-        if ((int)$pdo->query('SELECT COUNT(*) FROM vorlagen')->fetchColumn() >= 100) throw new \InvalidArgumentException('Es sind höchstens 100 Vorlagen möglich.');
-        $pdo->prepare('INSERT INTO vorlagen (art, titel, text, bloecke, version, kuerzel, gruppen, aktiv, muster, geaendert) VALUES (?, ?, ?, ?, 1, ?, ?, ?, 0, ?)')->execute([$art, $titel, $text, $json, $kuerzel, $gruppen ?? self::gruppeZurArt($art), $aktiv, time()]);
-        return (int)$pdo->lastInsertId();
+        if ((int)$pdo->query('SELECT COUNT(*) FROM vorlagen')->fetchColumn() >= 300) throw new \InvalidArgumentException('Es sind höchstens 300 Vorlagen möglich.');
+        $pdo->prepare('INSERT INTO vorlagen (art, titel, text, bloecke, version, kuerzel, gruppen, aktiv, muster, geaendert, ablauf) VALUES (?, ?, ?, ?, 1, ?, ?, ?, 0, ?, ?)')->execute([$art, $titel, $text, $json, $kuerzel, $gruppen ?? self::gruppeZurArt($art), $aktiv, time(), $art === 'datenschutz' ? 1 : 0]);
+        $neueId = (int)$pdo->lastInsertId();
+        foreach ($extra as $spalte => $wert) $pdo->prepare("UPDATE vorlagen SET $spalte=? WHERE id=?")->execute([$wert, $neueId]);
+        foreach (['sprache', 'original'] as $spalte) if (isset($in[$spalte])) $pdo->prepare("UPDATE vorlagen SET $spalte=? WHERE id=?")->execute([$in[$spalte], $neueId]);
+        return $neueId;
     }
 
     public static function vorlageLoeschen(int $id): void {
@@ -330,13 +428,14 @@ final class Seite {
         $bloecke = Bausteine::einsetzen(self::bloeckeVon($vorlage), $werte);
         $text = Bausteine::alsText($bloecke);
         self::aufraeumen($jetzt);
-        self::pdo()->prepare('INSERT INTO vorgaenge (vorlage_id, art, titel, text, patient, kontext, kontext_bis, status, druck_vorher, druck_nachher, erstellt, erstellt_von, pad_id, quelle, quelle_ref, leistungen, patient_id, kontakt_alt, kontakt_neu, kontakt_status, geburtsdatum, praxis, bloecke, vorlage_version, kuerzel)
-            VALUES (?, ?, ?, ?, ?, ?, ?, "wartet", ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        self::pdo()->prepare('INSERT INTO vorgaenge (vorlage_id, art, titel, text, patient, kontext, kontext_bis, status, druck_vorher, druck_nachher, erstellt, erstellt_von, pad_id, quelle, quelle_ref, leistungen, patient_id, kontakt_alt, kontakt_neu, kontakt_status, geburtsdatum, praxis, bloecke, vorlage_version, kuerzel, zweite, sprache, ablauf, patient_schluessel)
+            VALUES (?, ?, ?, ?, ?, ?, ?, "wartet", ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
             ->execute([(int)$vorlage['id'], $vorlage['art'], $vorlage['titel'], $text, $patient, $kontext, $kontext === '' ? 0 : $jetzt + 4 * 3600,
                 !empty($in['druck_vorher']) ? 1 : 0, !empty($in['druck_nachher']) ? 1 : 0, $jetzt, self::zeile($benutzer, 'Benutzer', 80, false), $padId, $quelle, $quelleRef, $liste ? json_encode($liste, JSON_UNESCAPED_UNICODE) : '',
                 $kontaktStatus !== '' ? $patientId : '', $kontaktStatus !== '' ? json_encode(['telefon' => $telAlt, 'email' => $mailAlt], JSON_UNESCAPED_UNICODE) : '', $kontaktStatus !== '' ? json_encode($kontaktNeu, JSON_UNESCAPED_UNICODE) : '', $kontaktStatus,
                 $geburtsdatum, json_encode(array_map('strval', array_intersect_key($praxis, array_flip(['name', 'street', 'city', 'contact']))), JSON_UNESCAPED_UNICODE),
-                json_encode($bloecke, JSON_UNESCAPED_UNICODE), (int)($vorlage['version'] ?? 1), (string)($vorlage['kuerzel'] ?? '')]);
+                json_encode($bloecke, JSON_UNESCAPED_UNICODE), (int)($vorlage['version'] ?? 1), (string)($vorlage['kuerzel'] ?? ''),
+                (string)$vorlage['zweite'], (string)$vorlage['sprache'], (int)$vorlage['ablauf'], self::patientSchluessel($patientId, $patient, $geburtsdatum)]);
         return (int)self::pdo()->lastInsertId();
     }
 
@@ -484,8 +583,8 @@ final class Seite {
     }
 
     private static function dateienLoeschen(int $id): void {
-        foreach (['png', 'sdb', 'pdf'] as $endung) {
-            $p = self::unterschriftenOrdner() . '/' . $id . '.' . $endung;
+        foreach (['png', 'sdb', 'pdf', '-2.png', '-2.sdb'] as $endung) {
+            $p = self::unterschriftenOrdner() . '/' . $id . ($endung[0] === '-' ? '' : '.') . $endung;
             if (is_file($p) || is_link($p)) @unlink($p);
         }
     }
@@ -515,6 +614,8 @@ final class Seite {
         $st = self::pdo()->prepare('DELETE FROM vorgaenge WHERE status IN ("uebertragen","abgebrochen") AND erstellt < ?');
         $st->execute([$grenze]);
         foreach ($ids as $id) self::dateienLoeschen($id);
+        // Abgelaufene Einwilligungen ein Jahr nach dem Ablauf entfernen (Datensparsamkeit; bis dahin „abgelaufen“ anzeigen).
+        self::pdo()->prepare('DELETE FROM einwilligungen WHERE bis < ?')->execute([($jetzt ?? time()) - 365 * 86400]);
         return $st->rowCount();
     }
 

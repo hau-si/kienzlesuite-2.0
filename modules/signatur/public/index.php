@@ -92,7 +92,7 @@ try {
             }
             $in = json_decode((string)file_get_contents('php://input', false, null, 0, 300000), true);
             if (!is_array($in)) $antwort(['error' => 'Ungültige Anfrage.'], 400);
-            $id = Seite::vorlageSpeichern(['id' => (int)($in['id'] ?? 0), 'art' => (string)($in['art'] ?? ''), 'titel' => (string)($in['titel'] ?? ''), 'aktiv' => !empty($in['aktiv']), 'kuerzel' => (string)($in['kuerzel'] ?? ''), 'gruppen' => (string)($in['gruppen'] ?? ''), 'bloecke' => $in['bloecke'] ?? null]);
+            $id = Seite::vorlageSpeichern(['id' => (int)($in['id'] ?? 0), 'art' => (string)($in['art'] ?? ''), 'titel' => (string)($in['titel'] ?? ''), 'aktiv' => !empty($in['aktiv']), 'kuerzel' => (string)($in['kuerzel'] ?? ''), 'gruppen' => (string)($in['gruppen'] ?? ''), 'leistungen' => (string)($in['leistungen'] ?? ''), 'ablauf' => !empty($in['ablauf']), 'zweite' => (string)($in['zweite'] ?? ''), 'bloecke' => $in['bloecke'] ?? null]);
             $v = Seite::vorlage($id);
             $antwort(['ok' => true, 'id' => $id, 'version' => (int)$v['version']]);
         } catch (InvalidArgumentException $e) {
@@ -117,6 +117,25 @@ try {
         echo $json;
         exit;
     }
+    if ($rel === '/editor/uebersetzen') {
+        // Sprachfassung mit DeepL anlegen/erneuern (inaktiv, zum Prüfen). JSON {id, sprache}, Suite-CSRF im Kopf, Recht „vorlagen“.
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        $antwort = static function (array $d, int $code = 200): never { http_response_code($code); echo json_encode($d, JSON_UNESCAPED_UNICODE); exit; };
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') $antwort(['error' => 'Nur POST.'], 405);
+        if (!$darfVorlage) $antwort(['error' => 'Keine Berechtigung für Vorlagen.'], 403);
+        if (!$k->csrfGueltig($_SERVER['HTTP_X_KIENZLE_CSRF'] ?? null)) $antwort(['error' => 'Sitzung abgelaufen. Bitte die Seite neu laden.'], 403);
+        $in = json_decode((string)file_get_contents('php://input', false, null, 0, 1000), true);
+        try {
+            $id = sg_uebersetzung()->vorlage((int)($in['id'] ?? 0), (string)($in['sprache'] ?? ''));
+            $antwort(['ok' => true, 'id' => $id]);
+        } catch (InvalidArgumentException | RuntimeException $e) {
+            $antwort(['error' => $e->getMessage()], 422);
+        } catch (Throwable $e) {
+            error_log('signatur uebersetzen: ' . get_class($e));
+            $antwort(['error' => 'Übersetzen nicht möglich (' . get_class($e) . ').'], 500);
+        }
+    }
     if ($rel === '/editor/import') {
         // Exportdatei roh hochladen (nicht multipart). Legt nur neue Vorlagen an.
         header('Content-Type: application/json; charset=utf-8');
@@ -134,6 +153,15 @@ try {
             error_log('signatur import: ' . get_class($e));
             $antwort(['error' => 'Import nicht möglich (' . get_class($e) . ').'], 500);
         }
+    }
+    if ($rel === '/einwilligungen') {
+        // Gültige/abgelaufene Einwilligungen eines Patienten (für die Dokumentliste). Nur Lesen, nur mit Recht auf Vorgänge.
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        if (!$darfVorgang) { http_response_code(403); echo '{"error":"Keine Berechtigung."}'; exit; }
+        $s = Seite::patientSchluessel(mb_substr(trim((string)($_GET['patient_id'] ?? '')), 0, 64), mb_substr((string)($_GET['name'] ?? ''), 0, 80), mb_substr((string)($_GET['geb'] ?? ''), 0, 20));
+        echo json_encode(['einwilligungen' => array_map(fn($e) => ['vorlage' => $e['vorlage_id'], 'bis' => date('d.m.Y', $e['bis']), 'gueltig' => $e['gueltig']], Seite::einwilligungen($s))], JSON_UNESCAPED_UNICODE);
+        exit;
     }
     if ($rel === '/favorit') {
         // Favorit einer Vorlage an/aus (für die ganze Praxis, wie im Fax). JSON {id, an}, Suite-CSRF im Kopf.
@@ -260,6 +288,9 @@ try {
                     $bearbeite = ['id' => (int)($_POST['id'] ?? 0), 'art' => (string)($_POST['art'] ?? 'sonstige'), 'titel' => (string)($_POST['titel'] ?? ''), 'text' => (string)($_POST['text'] ?? ''), 'aktiv' => !empty($_POST['aktiv']) ? 1 : 0, 'muster' => 0];
                     throw $e;
                 }
+            } elseif ($aktion === 'einwilligung-zeit' && ($darfVorlage || $k->istAdmin())) {
+                Seite::einwilligungMonateSetzen($_POST['monate'] ?? '');
+                $meldung = 'Gültigkeit von Einwilligungen gespeichert.';
             } elseif ($aktion === 'vorlage-loeschen' && $darfVorlage) {
                 Seite::vorlageLoeschen((int)($_POST['id'] ?? 0));
                 $meldung = 'Vorlage gelöscht.';

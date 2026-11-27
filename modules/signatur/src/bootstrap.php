@@ -42,6 +42,11 @@ function sg_fhir(): KienzleSignatur\Fhir {
     return new KienzleSignatur\Fhir($verbindung, $ca);
 }
 
+/** Übersetzung (DeepL) aus der Verbindung „uebersetzung“ der Basis. */
+function sg_uebersetzung(): KienzleSignatur\Uebersetzung {
+    return new KienzleSignatur\Uebersetzung(sg_modul()->verbindung('uebersetzung') ?? []);
+}
+
 /** Pfad eines anderen Moduls aus dem Menü der Basis (z. B. „/kasse/“), null, wenn es fehlt oder der Benutzer es nicht sehen darf. */
 function sg_modulPfad(string $id): ?string {
     foreach (sg_modul()->menue()['ids'] as $href => $mid) if ($mid === $id) return $href;

@@ -15,6 +15,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import padformular  # noqa: E402
 import padseiten  # noqa: E402
+import padtexte  # noqa: E402
 
 DATEN = os.environ.get('KIENZLE_SIGNATUR_DATEN', '/var/lib/kienzle/signatur')
 LEERLAUF = 600  # Sekunden ohne Bedienung am Pad, dann geht der Vorgang zurück auf „wartet“
@@ -110,10 +111,13 @@ class Abbruch(Exception):
 def ablauf(c: sqlite3.Connection, vorgang: sqlite3.Row, geraet, ausgabe: str, jetzt=time.time, leerlauf: int = LEERLAUF) -> str:
     """Führt den Vorgang am Gerät aus. Rückgabe: 'unterschrieben', 'zurueck' (am Pad abgebrochen/Zeit abgelaufen), 'abgebrochen' (Seite) oder 'fehler'."""
     vorschau = Vorschau(os.path.join(os.path.dirname(os.path.abspath(ausgabe)), 'vorschau'), int(vorgang['id']))
+    # Bedienwörter am Pad in der Sprache der Vorlage (Sprachfassung aus dem Editor).
+    padtexte.SPRACHE = str(vorgang['sprache']) if 'sprache' in vorgang.keys() and vorgang['sprache'] else 'de'
     try:
         return _ablauf(c, vorgang, geraet, ausgabe, jetzt, leerlauf, vorschau)
     finally:
         vorschau.weg()
+        padtexte.SPRACHE = 'de'
 
 
 def _bloecke(vorgang: sqlite3.Row) -> list:
@@ -192,10 +196,62 @@ def _ablauf(c: sqlite3.Connection, vorgang: sqlite3.Row, geraet, ausgabe: str, j
                 c.execute('UPDATE vorgaenge SET meldung=? WHERE id=? AND status="am_pad"', (hinweis[:300], vid))
                 c.commit()
                 continue
+            zweite = _zweite(c, vorgang, geraet, ausgabe, jetzt, leerlauf, vorschau)
+            if zweite:
+                return zweite
             geraet.danke(padseiten.hinweisseite('Vielen Dank'))
             status_setzen(c, vid, 'unterschrieben', '', zeit=int(jetzt()))
             pdf_erzeugen(c, vid, ausgabe)
             return 'unterschrieben'
+
+
+def _zweite(c: sqlite3.Connection, vorgang: sqlite3.Row, geraet, ausgabe: str, jetzt, leerlauf: int, vorschau: Vorschau) -> str | None:
+    """Zweite Unterschrift (z. B. Ärztin/Arzt bei der Aufklärung), wenn die Vorlage eine verlangt. None = erledigt oder nicht nötig,
+    sonst das Ergebnis des Ablaufs (zurueck, fehler, abgebrochen). Gespeichert als <vorgang>-2.png/.sdb."""
+    bez = str(vorgang['zweite']).strip() if 'zweite' in vorgang.keys() and vorgang['zweite'] else ''
+    if not bez:
+        return None
+    vid = int(vorgang['id'])
+    sign = padseiten.unterschriftsseite(vorgang['titel'], 'Zweite Unterschrift: ' + bez, 'Unterschrift ' + bez, zurueck=False)
+    geraet.zeige(sign['bild'])
+    vorschau.seite(sign['bild'], 1, 1, 'unterschrift')
+    ids = geraet.knoepfe(sign['knoepfe'])
+    namen = {ids[n]: n for n in ids}
+    geraet.unterschrift_starten(sign['feld'])
+    zuletzt = jetzt()
+    while True:
+        if c.execute('SELECT status FROM vorgaenge WHERE id=?', (vid,)).fetchone()['status'] != 'am_pad':
+            geraet.raeumen()
+            return 'abgebrochen'
+        if jetzt() - zuletzt > leerlauf:
+            geraet.raeumen()
+            status_setzen(c, vid, 'wartet', f'Zweite Unterschrift ({bez}) fehlt (Zeit abgelaufen).')
+            return 'zurueck'
+        ev = geraet.ereignis(1.0)
+        if ev is None:
+            continue
+        art, wert = ev
+        zuletzt = jetzt()
+        if art == EV_DISCONNECT:
+            status_setzen(c, vid, 'fehler', 'Verbindung zum Pad getrennt.')
+            return 'fehler'
+        if art != EV_HOTSPOT or wert not in namen:
+            continue
+        taste = namen[wert]
+        if taste == 'Abbrechen':
+            geraet.raeumen()
+            status_setzen(c, vid, 'wartet', f'Am Pad abgebrochen (zweite Unterschrift {bez} fehlt).')
+            return 'zurueck'
+        if taste == 'Löschen':
+            geraet.unterschrift_neu()
+        elif taste == 'OK':
+            if geraet.bestaetigen(ausgabe, f'{vid}-2') is None:
+                h = getattr(geraet, 'hinweis', '') or 'Bitte zuerst im Feld unterschreiben.'
+                c.execute('UPDATE vorgaenge SET meldung=? WHERE id=? AND status="am_pad"', (h[:300], vid))
+                c.commit()
+                continue
+            log(f'Vorgang {vid}: zweite Unterschrift erfasst.')
+            return None
 
 
 def _formular(c: sqlite3.Connection, vorgang: sqlite3.Row, geraet, ausgabe: str, jetzt, leerlauf: int, vorschau: Vorschau) -> str:
@@ -297,6 +353,9 @@ def _formular(c: sqlite3.Connection, vorgang: sqlite3.Row, geraet, ausgabe: str,
                 c.execute('UPDATE vorgaenge SET meldung=? WHERE id=? AND status="am_pad"', (h[:300], vid))
                 c.commit()
                 continue
+            zweite = _zweite(c, vorgang, geraet, ausgabe, jetzt, leerlauf, vorschau)
+            if zweite:
+                return zweite
             geraet.danke(padseiten.hinweisseite('Vielen Dank'))
             antworten_speichern(c, vorgang, bloecke, antworten)
             status_setzen(c, vid, 'unterschrieben', '', zeit=int(jetzt()))

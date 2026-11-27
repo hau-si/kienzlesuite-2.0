@@ -1,5 +1,13 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.47
+
+- **Vorlage je IGeL-Leistung:** Im Editor unter „Weitere Einstellungen“ GOÄ-Ziffern oder Leistungsnamen eintragen. Kommt eine dieser Leistungen aus der Kasse, ist diese Vorlage vorgewählt; sonst der Standard-IGeL-Vertrag.
+- **Gültigkeit von Einwilligungen:** Häkchen „Einwilligung mit Ablauf“ je Vorlage (Datenschutz vorbelegt), Dauer zentral unter Einstellungen (Standard 24 Monate). Bei der Dokumentwahl steht je Patient „Einwilligung gültig bis …“ bzw. „abgelaufen am …“. Gemerkt werden nur ein Schlüssel des Patienten (T2med-Nummer oder Prüfsumme aus Name und Geburtsdatum), Vorlage und Zeitraum; ein Jahr nach Ablauf gelöscht.
+- **Zweite Unterschrift** (z. B. Ärztin/Arzt bei der Aufklärung): Bezeichnung je Vorlage; am Pad folgt nach dem OK des Patienten ein zweites Feld, im PDF eine zweite Unterschriftszeile.
+- **Sprachfassungen mit DeepL:** Im Editor „Übersetzen in …“ (Englisch, Türkisch, Russisch, Ukrainisch, Polnisch, Französisch, Italienisch, Spanisch, Rumänisch, Griechisch). Platzhalter und Formatierung bleiben erhalten, der Eintrag für die Akte bleibt deutsch. Das Ergebnis ist eine eigene, zunächst nicht freigegebene Vorlage zum Prüfen; auf der Startseite wählt man die Sprache an der deutschen Vorlage. Am Pad erscheinen auch die Bedienwörter in der Sprache, im PDF wird bei Bedarf die Schrift DejaVu Sans eingebettet (dann etwa 0,7 MB je PDF). Arabisch fehlt noch (Schrift von rechts nach links).
+- Datenbank 13. Mit Tests (DeepL und Pad nachgebaut) und im Browser ohne Server geprüft, **nicht mit DeepL, nicht am Pad, nicht auf der VM**.
+
 ## 0.1.0-beta.46
 
 - **Vorlagen exportieren und importieren:** Im Editor unter den Vorlagen „Alle exportieren“ und „Importieren …“, oben am Dokument ein Symbol zum Exportieren der gewählten Vorlage. Die Datei (JSON) enthält Titel, Art, Gruppen, Kürzel und Bausteine samt Bildern, keine Vorgänge und keine Patientendaten.

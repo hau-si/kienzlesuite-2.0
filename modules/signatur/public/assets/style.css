@@ -190,3 +190,16 @@ button.ed-mini.breit { padding: 0 9px; }
 .ed-platzhalter { max-width: 100%; }
 .ed-austausch { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
 .ed-austausch .button.klein { display: inline-flex; align-items: center; font-size: 13px; font-weight: 600; padding: 6px 10px; min-height: 0; border-radius: 8px; cursor: pointer; background: var(--soft); color: #315f53; text-decoration: none; margin: 0; }
+/* Weitere Einstellungen der Vorlage, Gültigkeit von Einwilligungen */
+.ed-mehr { margin: 0 0 12px; border: 1px solid var(--line, #dde3ea); border-radius: 10px; padding: 6px 12px; background: #fbfcfb; }
+.ed-mehr summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.ed-mehr-felder { padding: 4px 0 8px; }
+.us-gueltig { justify-self: start; margin-top: 3px; font-size: 12px; }
+.us-reihe { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+.us-reihe input[type=number] { width: 120px; }
+/* Sprachfassungen */
+.ed-reihe { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ed-reihe select { width: auto; }
+.ed-fassungen { margin: 4px 0 8px; padding-left: 18px; font-size: 14px; }
+.ed-hinweis { background: #fff7e0; border: 1px solid #f0d58a; border-radius: 8px; padding: 8px 10px; font-size: 14px; }
+select.us-sprache { width: auto; min-height: 34px; padding: 2px 6px; font-size: 13px; margin-right: 4px; }

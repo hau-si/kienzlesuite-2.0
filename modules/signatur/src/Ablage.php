@@ -35,6 +35,7 @@ class Ablage {
         $st = Speicher::pdo()->query("SELECT * FROM vorgaenge WHERE status='unterschrieben' AND ablage='' ORDER BY id LIMIT 20");
         foreach ($st->fetchAll() as $v) {
             $vid = (int)$v['id'];
+            Seite::einwilligungMerken($v, $jetzt);
             $pdf = Seite::pdfPfad($vid);
             if ($pdf === null) continue; // PDF entsteht noch (Pad-Dienst)
             try {

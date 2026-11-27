@@ -54,7 +54,35 @@
       if (uebergabe) zk.setAttribute('data-kontext', d.kontext); else zk.removeAttribute('data-kontext');
     }
     feld.hidden = true;
+    einwilligungenLaden();
   }
+  // Einwilligungen mit Ablauf: je Vorlage „gültig bis …“ bzw. „abgelaufen am …“ für den gewählten Patienten.
+  var ewZeit = null;
+  function einwilligungenLaden() {
+    var zeilen = document.querySelectorAll('input[name="vorlage_id"][data-ablauf]');
+    if (!zeilen.length) return;
+    var wert = function (id) { var e = document.getElementById(id); return e ? e.value.trim() : ''; };
+    var q = new URLSearchParams({ patient_id: wert('n-patient-id'), name: wert('n-patient'), geb: wert('n-geburtsdatum') });
+    document.querySelectorAll('.us-gueltig').forEach(function (s) { s.hidden = true; s.textContent = ''; });
+    if (!q.get('patient_id') && !(q.get('name') && q.get('geb'))) return;
+    var basisEw = (location.pathname.match(/^\/[a-z0-9-]{1,31}/) || ['/signatur'])[0];
+    fetch(basisEw + '/einwilligungen?' + q.toString(), { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : { einwilligungen: [] }; })
+      .then(function (j) {
+        (j.einwilligungen || []).forEach(function (e) {
+          document.querySelectorAll('input[name="vorlage_id"][data-ablauf][data-original="' + parseInt(e.vorlage, 10) + '"]').forEach(function (r) {
+            var s = r.closest('.us-dok').querySelector('.us-gueltig'); if (!s) return;
+            s.textContent = e.gueltig ? 'Einwilligung gültig bis ' + e.bis : 'Einwilligung abgelaufen am ' + e.bis;
+            s.className = 'us-gueltig tag ' + (e.gueltig ? 'ok' : 'warn'); s.hidden = false;
+          });
+        });
+      })
+      .catch(function () { /* ohne Antwort keine Anzeige */ });
+  }
+  ['n-patient', 'n-geburtsdatum'].forEach(function (id) {
+    var e = document.getElementById(id);
+    if (e) e.addEventListener('input', function () { clearTimeout(ewZeit); ewZeit = setTimeout(einwilligungenLaden, 500); });
+  });
   // Der Patient bleibt im Tab erhalten (Seitenwechsel, neuer Vorgang, Wechsel zur Kasse und zurück), bis „Entfernen“.
   var SP = 'sg-patient', ZURUECK = 'sg-zurueck';
   function merken(quelle, d) { try { sessionStorage.setItem(SP, JSON.stringify({ quelle: quelle, d: d })); } catch (e) { /* ohne sessionStorage */ } }
@@ -162,8 +190,16 @@
     var l = document.getElementById('n-leistung'), b = document.getElementById('n-betrag');
     if (l) { l.value = liste.map(function (z) { return z.label; }).join(', ').slice(0, 120); l.readOnly = true; }
     if (b) { b.value = (summe / 100).toFixed(2).replace('.', ','); b.readOnly = true; }
-    // Aus der Kasse (IGeL): den IGeL-Vertrag vorwählen.
-    var igel = document.querySelector('input[name="vorlage_id"][data-art="igel"]'); if (igel) igel.checked = true;
+    // Aus der Kasse (IGeL): die Vorlage, die für eine dieser Leistungen hinterlegt ist (GOÄ-Ziffer oder Name), sonst den Standard-IGeL-Vertrag.
+    var schluessel = [];
+    liste.forEach(function (z) { if (z.code) schluessel.push(z.code.toLowerCase()); schluessel.push(z.label.toLowerCase()); });
+    var wahl = null;
+    document.querySelectorAll('input[name="vorlage_id"][data-leistungen]').forEach(function (r) {
+      if (wahl) return;
+      if (r.getAttribute('data-leistungen').split('|').some(function (e) { return e && schluessel.indexOf(e) >= 0; })) wahl = r;
+    });
+    wahl = wahl || document.querySelector('input[name="vorlage_id"][data-standard]') || document.querySelector('input[name="vorlage_id"][data-art="igel"]');
+    if (wahl) wahl.checked = true;
     patientZeigen('kasse', d);
     return true;
   }
@@ -312,6 +348,13 @@
       if (dokSuche) dokSuche.value = '';
       dokFilter = ''; document.querySelectorAll('.us-chip[data-filter]').forEach(function (x) { x.classList.toggle('an', x.getAttribute('data-filter') === ''); });
       dokFiltern(); r.checked = true; r.focus();
+    });
+  });
+  // Sprachfassung wählen: Der Auswahlpunkt der Zeile bekommt die ID der gewählten Fassung.
+  document.querySelectorAll('select.us-sprache').forEach(function (s) {
+    s.addEventListener('change', function () {
+      var r = s.closest('.us-dokzeile').querySelector('input[name="vorlage_id"]');
+      if (r) { r.value = s.value; r.checked = true; }
     });
   });
   document.querySelectorAll('.us-stern[data-favorit]').forEach(function (s) {

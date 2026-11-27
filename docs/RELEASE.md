@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.42
+
+- Neue Verbindung **Übersetzung (DeepL)** unter Verwaltung → Verbindungen: Schlüssel der DeepL API Free (endet auf „:fx“) oder Pro, „Schlüssel prüfen“ zeigt die genutzten Zeichen des Monats. Module melden sie mit `[[connections]] id = "uebersetzung"` an (zuerst die Signatur für Sprachfassungen von Vorlagen). Mit Tests geprüft, nicht mit DeepL und nicht auf der VM.
+
 ## 0.22.0-beta.41
 
 - **Fehler behoben (Nutzer-Meldung): Agent hing nach einem Neustart des PCs über 30 Minuten auf „wird aktualisiert“.** Scheiterte die Selbstaktualisierung (z. B. Laden dauerte länger als 20 Sekunden oder die alte Programmdatei ließ sich nicht austauschen), versuchte der Agent es alle 2 Sekunden erneut. Das Symbol zeigte dadurch dauerhaft den blauen Punkt, und der Grund stand nirgends. Jetzt: Laden darf bis zu 3 Minuten dauern; nach einem Fehlschlag wartet der Agent 10 Minuten bis zum nächsten Versuch; der Grund steht in `starter.log` und als gelbe Zeile „Aktualisierung“ im Statusfenster. Ist die frühere Programmdatei noch belegt, weicht der Agent auf einen eigenen Namen aus (wird beim nächsten Start aufgeräumt). Dauert eine Aktualisierung länger als 6 Minuten, zeigt das Symbol rot „Update hängt“ mit Hinweis statt endlos blau. Agent 2.3.13.

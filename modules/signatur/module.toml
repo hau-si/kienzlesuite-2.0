@@ -4,7 +4,7 @@
 [module]
 id = "signatur"
 name = "Signatur"
-version = "0.1.0-beta.46"
+version = "0.1.0-beta.47"
 core_api = "2"
 description = "Verträge, Aufklärungen und Datenschutzerklärungen am Unterschriftenpad unterschreiben lassen, auch zeitversetzt, und als PDF in T2med ablegen."
 
@@ -41,6 +41,11 @@ purpose = "Unterschriebene PDFs von Vorgängen aus der Kasse an die Kasse geben;
 [[connections]]
 id = "t2med"
 purpose = "Unterschriebenes PDF in die T2med-Akte schreiben (FHIR)"
+
+[[connections]]
+id = "uebersetzung"
+purpose = "Vorlagen in andere Sprachen übersetzen (DeepL, nur Vorlagentexte)"
+required = false
 
 [backup]
 paths = ["/var/lib/kienzle/signatur"]

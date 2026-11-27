@@ -7,7 +7,7 @@ final class Speicher {
     public static string $data = '/var/lib/kienzle/signatur';
     private static ?\PDO $pdo = null;
     private static string $pfad = '';
-    public const VERSION = 12;
+    public const VERSION = 13;
 
     public static function pdo(): \PDO {
         $datei = self::$data . '/signatur.db';
@@ -174,6 +174,19 @@ final class Speicher {
             $pdo->exec('ALTER TABLE vorlagen ADD COLUMN gruppen TEXT NOT NULL DEFAULT ""');
             $st = $pdo->prepare('UPDATE vorlagen SET gruppen=? WHERE id=?');
             foreach ($pdo->query('SELECT id, art FROM vorlagen')->fetchAll() as $r) $st->execute([Seite::gruppeZurArt((string)$r['art']), (int)$r['id']]);
+        }
+        if ($v < 13) {
+            // Signatur 4: Vorlage je IGeL-Leistung, Einwilligungen mit Ablauf, zweite Unterschrift, Sprachfassungen.
+            foreach (['leistungen TEXT NOT NULL DEFAULT ""', 'ablauf INTEGER NOT NULL DEFAULT 0', 'zweite TEXT NOT NULL DEFAULT ""', 'sprache TEXT NOT NULL DEFAULT "de"', 'original INTEGER NOT NULL DEFAULT 0'] as $s)
+                $pdo->exec('ALTER TABLE vorlagen ADD COLUMN ' . $s);
+            $pdo->exec("UPDATE vorlagen SET ablauf=1 WHERE art='datenschutz'");
+            foreach (['zweite TEXT NOT NULL DEFAULT ""', 'sprache TEXT NOT NULL DEFAULT "de"', 'ablauf INTEGER NOT NULL DEFAULT 0', 'patient_schluessel TEXT NOT NULL DEFAULT ""'] as $s)
+                $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN ' . $s);
+            // Einwilligungen bleiben länger als die Vorgänge (30 Tage): nur Schlüssel des Patienten, Vorlage und Zeitraum, kein Inhalt.
+            $pdo->exec('CREATE TABLE einwilligungen (vorgang_id INTEGER PRIMARY KEY, schluessel TEXT NOT NULL, vorlage_id INTEGER NOT NULL, original INTEGER NOT NULL DEFAULT 0,
+                titel TEXT NOT NULL, unterschrieben INTEGER NOT NULL, bis INTEGER NOT NULL)');
+            $pdo->exec('CREATE INDEX einwilligungen_schluessel ON einwilligungen(schluessel)');
+            $pdo->exec('CREATE TABLE einstellungen (schluessel TEXT PRIMARY KEY, wert TEXT NOT NULL)');
         }
         $pdo->exec('PRAGMA user_version=' . self::VERSION);
         $pdo->commit();

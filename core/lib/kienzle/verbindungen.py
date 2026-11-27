@@ -75,7 +75,8 @@ def load() -> dict:
         data = json.loads((ETC / 'konfiguration.json').read_text(encoding='utf-8'))
     except FileNotFoundError:
         data = {}
-    return {'t2med': data.get('t2med'), 'mail': data.get('mail'), 'sms': data.get('sms'), 'letterxpress': data.get('letterxpress'), 'ablage': data.get('ablage', [])}
+    return {'t2med': data.get('t2med'), 'mail': data.get('mail'), 'sms': data.get('sms'), 'letterxpress': data.get('letterxpress'), 'uebersetzung': data.get('uebersetzung'),
+            'ablage': data.get('ablage', [])}
 
 
 def save(config: dict) -> None:
@@ -193,6 +194,49 @@ def set_letterxpress(config: dict, d: dict) -> None:
     if mode not in ('test', 'live'):
         raise Fehler('Betrieb: bitte Test oder Live wählen.')
     config['letterxpress'] = {'username': _text(d.get('username', ''), 'Benutzername', 200), 'api_key': key, 'modus': mode}
+
+
+DEEPL_FREE = 'https://api-free.deepl.com/v2'
+DEEPL_PRO = 'https://api.deepl.com/v2'
+
+
+def deepl_url(key: str) -> str:
+    """DeepL API Free: Schlüssel enden auf „:fx“ und gehen an api-free.deepl.com, sonst an die Pro-Adresse."""
+    return DEEPL_FREE if key.endswith(':fx') else DEEPL_PRO
+
+
+def set_uebersetzung(config: dict, d: dict) -> None:
+    """Übersetzung (DeepL API Free oder Pro): nur der Schlüssel; ein leerer Schlüssel behält den gespeicherten."""
+    old = config.get('uebersetzung') or {}
+    key = d.get('api_key', '')
+    if not isinstance(key, str) or len(key) > 200 or CONTROL.search(key) or ' ' in key.strip():
+        raise Fehler('DeepL-Schlüssel ungültig.')
+    key = key.strip() or old.get('api_key', '')
+    if not key:
+        raise Fehler('Bitte den Authentifizierungsschlüssel von DeepL eingeben.')
+    if not re.fullmatch(r'[A-Za-z0-9-]{8,100}(:fx)?', key):
+        raise Fehler('Der DeepL-Schlüssel hat ein unerwartetes Format (Buchstaben, Ziffern und Bindestriche, bei der Gratis-API mit „:fx“ am Ende).')
+    config['uebersetzung'] = {'anbieter': 'deepl', 'api_key': key}
+
+
+def test_uebersetzung(c: dict | None) -> str:
+    """Schlüssel prüfen über die Nutzungsabfrage (es wird nichts übersetzt)."""
+    if not c:
+        raise Fehler('Die Übersetzung ist nicht eingerichtet.')
+    import urllib.request
+    req = urllib.request.Request(deepl_url(c['api_key']) + '/usage', method='GET', headers={'Authorization': 'DeepL-Auth-Key ' + c['api_key'], 'Accept': 'application/json'})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:  # noqa: S310 (feste https-Adresse)
+            out = json.loads(r.read(20000).decode('utf-8', 'replace'))
+    except OSError as e:
+        raise Fehler(f'DeepL nicht erreichbar oder Schlüssel abgelehnt: {str(e)[:100]}') from None
+    except ValueError:
+        raise Fehler('DeepL hat unlesbar geantwortet.') from None
+    n, grenze = out.get('character_count'), out.get('character_limit')
+    tarif = 'DeepL API Free' if c['api_key'].endswith(':fx') else 'DeepL API Pro'
+    if isinstance(n, int) and isinstance(grenze, int) and grenze > 0:
+        return f'Verbunden ({tarif}). Diesen Monat {n:,} von {grenze:,} Zeichen genutzt.'.replace(',', '.')
+    return f'Verbunden ({tarif}).'
 
 
 def letterxpress_balance(c: dict | None) -> float | None:
@@ -377,6 +421,8 @@ def distribute(config: dict) -> list[str]:
             out['mail'] = config['mail']
         if 'letterxpress' in ids and config.get('letterxpress'):
             out['letterxpress'] = config['letterxpress']
+        if 'uebersetzung' in ids and config.get('uebersetzung'):
+            out['uebersetzung'] = {**config['uebersetzung'], 'url': deepl_url(config['uebersetzung']['api_key'])}
         if 'ablage' in ids:
             spool = SPOOL / mid
             spool.mkdir(mode=0o2770, parents=True, exist_ok=True)
@@ -619,6 +665,7 @@ def view(config: dict, extra: dict | None = None) -> dict:
     mail = config['mail']
     sms = config.get('sms')
     lxp = config.get('letterxpress')
+    ueb = config.get('uebersetzung')
     ca_fp = ''
     if t2 and t2.get('ca_pem'):
         ca_fp = hashlib.sha256(ssl.PEM_cert_to_DER_cert(t2['ca_pem'])).hexdigest()
@@ -635,6 +682,8 @@ def view(config: dict, extra: dict | None = None) -> dict:
            'mail': _mail_status(mail) if mail else None,
            'sms': {'anbieter': sms['anbieter'], 'absender': sms.get('absender', ''), 'schluessel_gesetzt': bool(sms.get('api_key'))} if sms else None,
            'letterxpress': {'username': lxp['username'], 'modus': lxp.get('modus', 'test'), 'schluessel_gesetzt': bool(lxp.get('api_key'))} if lxp else None,
+           'uebersetzung': {'anbieter': ueb.get('anbieter', 'deepl'), 'gratis': ueb.get('api_key', '').endswith(':fx'),
+                            'schluessel_gesetzt': bool(ueb.get('api_key'))} if ueb else None,
            'ablage': [{**{k: v for k, v in t.items() if k != 'passwort'}, 'passwort_gesetzt': bool(t.get('passwort')),
                        'fingerprint': ablage.fingerprint(t['hostkey']) if t.get('hostkey') else ''} for t in config['ablage']],
            'nutzung': usage, 'sftp_schluessel': ABLAGE_PUB.read_text(encoding='utf-8').strip() if ABLAGE_PUB.is_file() else ''}
@@ -723,6 +772,14 @@ def dispatch(config: dict, req: dict) -> str:
         save(config)
         view(config, {'hinweise': distribute(config)})
         return 'Letterxpress gespeichert und an die Module verteilt.' if config.get('letterxpress') else 'Letterxpress entfernt.'
+    if action == 'uebersetzung':
+        if req.get('loeschen') is True:
+            config['uebersetzung'] = None
+        else:
+            set_uebersetzung(config, d)
+        save(config)
+        view(config, {'hinweise': distribute(config)})
+        return 'Übersetzung (DeepL) gespeichert und an die Module verteilt.' if config.get('uebersetzung') else 'Übersetzung entfernt.'
     if action == 'sms-senden':
         send_sms(config.get('sms'), req.get('an'), req.get('text'))
         return 'SMS verschickt.'
@@ -758,6 +815,8 @@ def dispatch(config: dict, req: dict) -> str:
                 msg = test_sms(config.get('sms'))
             elif art == 'letterxpress':
                 msg = test_letterxpress(config.get('letterxpress'))
+            elif art == 'uebersetzung':
+                msg = test_uebersetzung(config.get('uebersetzung'))
             elif art == 'guthaben' and tid == 'sms':
                 key = 'guthaben'
                 msg = balance_sms(config.get('sms'))

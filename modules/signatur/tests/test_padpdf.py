@@ -72,6 +72,35 @@ class PdfTest(unittest.TestCase):
         for i, lage in enumerate(lagen, 1):
             self.assertTrue(pdf[int(lage):].startswith(b'%d 0 obj' % i))
 
+    def test_fremde_schrift_eingebettet(self):
+        # Sprachfassung mit Zeichen außerhalb von WinAnsi: DejaVu Sans eingebettet, Text per ToUnicode lesbar, keine „?“.
+        ziel = os.path.join(self.ordner, 'uni.pdf')
+        text = 'Rıza ve onay: Şükrü Ğüneş\nZgoda: Łódź, ąęść\nСогласие пациента\nΣυναίνεση'
+        padpdf.erzeugen({'titel': 'Onam formu', 'text': text, 'patient': 'Max Mustermann', 'zeit': 1795000000, 'vorgang': 3}, ziel)
+        with open(ziel, 'rb') as fh:
+            pdf = fh.read()
+        self.assertIn(b'/Subtype /Type0', pdf)
+        self.assertIn(b'/FontFile2', pdf)
+        self.assertNotIn(b'/WinAnsiEncoding', pdf)
+        unicode = ''
+        for m in re.findall(rb'stream\n(.*?)\nendstream', pdf, re.S):
+            try:
+                roh = zlib.decompress(m)
+            except zlib.error:
+                continue
+            if b'beginbfchar' in roh:
+                unicode += ''.join(bytes.fromhex(h.decode()).decode('utf-16-be') for h in re.findall(rb'<[0-9a-f]{4}> <([0-9a-f]+)>', roh))
+        for ch in 'ıŞşĞŁąСΣ':
+            self.assertIn(ch, unicode)
+        self.assertIsNone(padpdf._SCHRIFT, 'danach wieder Standardschrift')
+        # gleiche Lage der Objekte (xref)
+        start = int(re.search(rb'startxref\n(\d+)', pdf).group(1))
+        for i, lage in enumerate(re.findall(rb'(\d{10}) 00000 n', pdf[start:]), 1):
+            self.assertTrue(pdf[int(lage):].startswith(b'%d 0 obj' % i))
+        t = padpdf.TrueType(padpdf.SCHRIFTEN[0])
+        self.assertGreater(t.glyphe('Ж'), 0)
+        self.assertAlmostEqual(t.breite(' '), 317.87, delta=2)
+
     def test_ohne_bild_und_alte_spalten(self):
         c = sqlite3.connect(':memory:')
         c.row_factory = sqlite3.Row

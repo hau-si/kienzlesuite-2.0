@@ -430,6 +430,78 @@ wirft(fn() => Seite::vorlagenImport('{"format":"anders"}'), 'fremde Datei');
 $ohneBild = $ed; $ohneBild['bilder'] = [];
 wirft(fn() => Seite::vorlagenImport(json_encode($ohneBild)), 'Bild fehlt');
 foreach (glob(Speicher::$data . '/bilder/*') ?: [] as $f) @unlink($f); @rmdir(Speicher::$data . '/bilder');
+// Signatur 4: Vorlage je IGeL-Leistung, Einwilligungen mit Ablauf, zweite Unterschrift
+$fest4 = Seite::festeVorlageId();
+$reise = Seite::vorlageSpeichern(['art' => 'igel', 'titel' => 'Reiseimpfung', 'aktiv' => 1, 'leistungen' => ' 5855 , Reiseberatung,5855', 'bloecke' => json_encode([['typ' => 'text', 'text' => 'Reise {{patient}}']])]);
+check(Seite::vorlage($reise)['leistungen'] === '5855, Reiseberatung', 'IGeL-Leistungen bereinigt');
+check(Seite::vorlageFuerLeistungen([['code' => '5855', 'label' => 'x']]) === $reise && Seite::vorlageFuerLeistungen([['code' => '', 'label' => 'reiseberatung']]) === $reise
+    && Seite::vorlageFuerLeistungen([['code' => '1', 'label' => 'Ultraschall']]) === $fest4, 'Vorlage je Leistung, sonst Standard');
+$stIgel = Ansicht::seite('/', 'tok', [], Seite::vorlagen(), true, true, null, null);
+check(str_contains($stIgel, 'data-leistungen="5855|reiseberatung"') && str_contains($stIgel, 'value="' . $fest4 . '" data-art="igel"') && str_contains($stIgel, 'data-standard="1"'), 'Startseite: Leistungen und Standard für die Auswahl');
+wirft(fn() => Seite::leistungenListe(str_repeat('a', 81)), 'zu lange Leistung');
+// Einwilligung mit Ablauf
+check(Seite::einwilligungMonate() === 24, 'Standard 24 Monate');
+Seite::einwilligungMonateSetzen('12');
+check(Seite::einwilligungMonate() === 12, 'Monate gespeichert');
+wirft(fn() => Seite::einwilligungMonateSetzen('0'), 'Monate 0');
+$ds = Seite::vorlageSpeichern(['art' => 'datenschutz', 'titel' => 'Datenschutz neu', 'aktiv' => 1, 'bloecke' => json_encode([['typ' => 'text', 'text' => 'DS']])]);
+check((int)Seite::vorlage($ds)['ablauf'] === 1, 'Datenschutz: Einwilligung mit Ablauf vorbelegt');
+$padE = (int)(Seite::pads(true)[0]['id'] ?? 0);
+$ew = Seite::vorgangAnlegen(['vorlage_id' => $ds, 'patient' => 'Max  Mustermann', 'geburtsdatum' => '01.02.1970', 'pad_id' => $padE], 'x', $praxis);
+check(str_starts_with(Seite::vorgang($ew)['patient_schluessel'], 'h:') && !str_contains(Seite::vorgang($ew)['patient_schluessel'], 'Muster'), 'Schlüssel ohne Klartext');
+Speicher::pdo()->prepare("UPDATE vorgaenge SET status='unterschrieben', unterschrieben=? WHERE id=?")->execute([strtotime('2026-01-15 10:00'), $ew]);
+Seite::einwilligungMerken(Seite::vorgang($ew));
+Seite::einwilligungMerken(Seite::vorgang($ew));
+$liste = Seite::einwilligungen(Seite::patientSchluessel('', 'max mustermann', '01.02.1970'), strtotime('2026-06-01'));
+check(count($liste) === 1 && $liste[0]['vorlage_id'] === $ds && $liste[0]['gueltig'] && date('Y-m-d', $liste[0]['bis']) === '2027-01-15', 'Einwilligung gültig bis (12 Monate)');
+check(!Seite::einwilligungen(Seite::patientSchluessel('', 'max mustermann', '01.02.1970'), strtotime('2027-02-01'))[0]['gueltig'], 'danach abgelaufen');
+check(Seite::patientSchluessel('', 'Max', '') === '' && Seite::patientSchluessel('p-7', 'x', '') === 'p:p-7', 'Schlüssel nur mit Geburtsdatum oder T2med-ID');
+$einst = Ansicht::seite('/einstellungen', 'tok', [], Seite::vorlagen(), true, true, null, null, null, null);
+check(str_contains($einst, 'value="einwilligung-zeit"') && str_contains($einst, 'value="12"'), 'Einstellung Gültigkeit');
+Seite::aufraeumen(strtotime('2028-02-01'));
+check(Seite::einwilligungen(Seite::patientSchluessel('', 'max mustermann', '01.02.1970')) === [], 'ein Jahr nach Ablauf gelöscht');
+// Zweite Unterschrift: Fassung steigt, Vorgang übernimmt die Bezeichnung
+$auf = Seite::vorlageSpeichern(['art' => 'aufklaerung', 'titel' => 'Aufklärung OP', 'aktiv' => 1, 'bloecke' => json_encode([['typ' => 'text', 'text' => 'OP']])]);
+Seite::vorlageSpeichern(['id' => $auf, 'art' => 'aufklaerung', 'titel' => 'Aufklärung OP', 'aktiv' => 1, 'zweite' => 'Ärztin/Arzt', 'bloecke' => json_encode(Seite::bloeckeVon(Seite::vorlage($auf)))]);
+check(Seite::vorlage($auf)['zweite'] === 'Ärztin/Arzt' && (int)Seite::vorlage($auf)['version'] === 2, 'zweite Unterschrift: neue Fassung');
+check(Seite::vorgang(Seite::vorgangAnlegen(['vorlage_id' => $auf, 'patient' => 'K', 'pad_id' => $padE], 'x', $praxis))['zweite'] === 'Ärztin/Arzt', 'Vorgang mit zweiter Unterschrift');
+$ex4 = json_decode(Seite::vorlagenExport([$reise]), true)['vorlagen'][0];
+check($ex4['leistungen'] === '5855, Reiseberatung' && $ex4['sprache'] === 'de', 'Export mit Leistungen und Sprache');
+// Übersetzung (DeepL, nachgebaut): Platzhalter und Auszeichnung geschützt, Zeilenanfänge bleiben, Ergebnis inaktiv zum Prüfen
+check(\KienzleSignatur\Uebersetzung::schuetzen('Hallo {{patient}}, **bitte** *lesen* & __jetzt__ <x>') === 'Hallo <ph>{{patient}}</ph>, <b>bitte</b> <i>lesen</i> &amp; <u>jetzt</u> &lt;x&gt;', 'Text geschützt');
+check(\KienzleSignatur\Uebersetzung::zurueck('Hello <ph>{{patient}}</ph>, <b>please</b> <i>read</i> &amp; <u>now</u> &lt;x&gt;') === 'Hello {{patient}}, **please** *read* & __now__ <x>', 'zurück in Klartext');
+$deepl = new class(['api_key' => '0000-beispiel:fx', 'url' => 'https://api-free.deepl.example.org/v2']) extends \KienzleSignatur\Uebersetzung {
+    public array $koerper = []; public int $status = 200;
+    protected function anfrage(string $koerper): array {
+        $this->koerper[] = $koerper;
+        preg_match_all('/(?:^|&)text=([^&]*)/', $koerper, $m);
+        return ['status' => $this->status, 'body' => ['translations' => array_map(fn($t) => ['text' => 'EN:' . rawurldecode($t)], $m[1])]];
+    }
+};
+$quelle = Seite::vorlageSpeichern(['art' => 'aufklaerung', 'titel' => 'Aufklärung Haut', 'aktiv' => 1, 'kuerzel' => 'HAUT', 'akte' => '', 'bloecke' => json_encode([
+    ['typ' => 'text', 'text' => "# Kopf\n- Punkt für {{patient}}\nNormal **fett**"], ['typ' => 'einzel', 'frage' => 'Befund?', 'optionen' => ['Post', 'Mail'], 'akte' => 'Befund: {{antwort}}'],
+    ['typ' => 'ankreuz', 'text' => 'Ja, einverstanden']])]);
+$enId = $deepl->vorlage($quelle, 'en');
+$en = Seite::vorlage($enId); $eb = Seite::bloeckeVon($en);
+check($en['sprache'] === 'en' && (int)$en['original'] === $quelle && (int)$en['aktiv'] === 0 && $en['titel'] === 'EN:Aufklärung Haut (Englisch)' && $en['kuerzel'] === 'HAUT', 'Sprachfassung inaktiv mit Verweis');
+check($eb[0]['text'] === "# EN:Kopf\n- EN:Punkt für {{patient}}\nEN:Normal **fett**" && $eb[1]['optionen'] === ['EN:Post', 'EN:Mail'] && $eb[1]['akte'] === 'Befund: {{antwort}}' && $eb[2]['text'] === 'EN:Ja, einverstanden', 'Bausteine übersetzt, Akte deutsch');
+check(str_contains($deepl->koerper[0], 'target_lang=EN-GB') && str_contains($deepl->koerper[0], 'tag_handling=xml') && str_contains($deepl->koerper[0], 'ignore_tags=ph') && !str_contains($deepl->koerper[0], 'Mustermann'), 'Anfrage an DeepL ohne Patientendaten');
+check($deepl->vorlage($quelle, 'en') === $enId, 'erneutes Übersetzen erneuert dieselbe Fassung');
+wirft(fn() => $deepl->vorlage($enId, 'tr'), 'Sprachfassung nicht weiter übersetzen');
+wirft(fn() => $deepl->vorlage($quelle, 'xx'), 'unbekannte Sprache');
+$deepl->status = 456;
+$lauf = function (callable $f): string { try { $f(); } catch (RuntimeException $e) { return $e->getMessage(); } return ''; };
+check(str_contains($lauf(fn() => $deepl->vorlage($quelle, 'tr')), 'Zeichenkontingent'), 'Kontingent aufgebraucht');
+check(str_contains($lauf(fn() => (new \KienzleSignatur\Uebersetzung([]))->texte(['a'], 'en')), 'nicht eingerichtet'), 'ohne Verbindung');
+Seite::vorlageSpeichern(['id' => $enId, 'art' => 'aufklaerung', 'titel' => $en['titel'], 'aktiv' => 1, 'bloecke' => json_encode($eb)]);
+$stSp = Ansicht::seite('/', 'tok', [], Seite::vorlagen(), true, true, null, null);
+check(str_contains($stSp, 'class="us-sprache" data-fuer="' . $quelle . '"') && str_contains($stSp, '<option value="' . $enId . '">Englisch</option>') && !str_contains($stSp, 'name="vorlage_id" value="' . $enId . '"'), 'Startseite: Sprachfassung als Auswahl an der deutschen Vorlage');
+$vgEn = Seite::vorgang(Seite::vorgangAnlegen(['vorlage_id' => $enId, 'patient' => 'Max Mustermann', 'pad_id' => $padE], 'x', $praxis));
+check($vgEn['sprache'] === 'en' && str_contains($vgEn['text'], 'EN:Punkt für Max Mustermann'), 'Vorgang in der Sprachfassung');
+Ansicht::$editorVorlage = (string)$enId;
+$edEn = json_decode(html_entity_decode(preg_replace('#^.*<script type="application/json" id="ed-daten">(.*?)</script>.*$#s', '$1', Ansicht::seite('/editor', 'tok', [], Seite::vorlagen(), true, true, null, null))), true);
+check($edEn['vorlage']['sprache'] === 'en' && count($edEn['fassungen']) === 2, 'Editor kennt die Fassungen');
+Ansicht::$editorVorlage = '';
 
 // Anrede-Platzhalter
 $at = Seite::vorlageSpeichern(['art' => 'sonstige', 'titel' => 'Anrede-Test', 'text' => '{{briefanrede}}|{{anrede}}|{{vorname}}|{{nachname}}', 'aktiv' => 1]);

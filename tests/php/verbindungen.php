@@ -146,6 +146,20 @@ function test_letterxpress(): void {
     check(str_contains($page2, '<strong>12,50 €</strong>') && str_contains($page2, '(abgefragt ') && str_contains($page2, '<span class="tag warn">Testbetrieb</span>'), 'Guthaben mit Zeit oder gelbes Testbetrieb-Schild fehlt');
 }
 
+function test_uebersetzung(): void {
+    [$env, $c] = con_env(['uebersetzung' => ['anbieter' => 'deepl', 'gratis' => true, 'schluessel_gesetzt' => true]]);
+    [$b] = admin_browser($env);
+    $b->web = fn() => $b->defaultWeb(null, null, $c);
+    $page = $b->get('/verwaltung/verbindungen')->body;
+    check(str_contains($page, 'Übersetzung (DeepL)') && str_contains($page, 'DeepL API Free') && str_contains($page, 'gespeichert – leer lassen') && str_contains($page, 'Schlüssel prüfen'), 'DeepL-Abschnitt unvollständig');
+    $r = $b->post('/verwaltung/verbindungen', ['aktion' => 'uebersetzung', 'api_key' => ' 0000-beispiel:fx ']);
+    check($r->status === 303 && req_v($env) === ['action' => 'uebersetzung', 'daten' => ['api_key' => '0000-beispiel:fx']], 'DeepL: Speicher-Anfrage falsch');
+    $b->post('/verwaltung/verbindungen', ['aktion' => 'pruefen', 'art' => 'uebersetzung']);
+    check(req_v($env) === ['action' => 'pruefen', 'art' => 'uebersetzung', 'id' => ''], 'DeepL: Prüf-Anfrage falsch');
+    $b->post('/verwaltung/verbindungen', ['aktion' => 'entfernen', 'was' => 'uebersetzung']);
+    check(req_v($env) === ['action' => 'uebersetzung', 'loeschen' => true], 'DeepL: Entfernen-Anfrage falsch');
+}
+
 function test_gmail(): void {
     [$env, $c] = con_env([]);
     [$b] = admin_browser($env);

@@ -246,6 +246,49 @@
   var art = $('ed-art');
   Object.keys(D.arten).forEach(function (k) { art.appendChild(new Option(D.arten[k], k)); });
   $('ed-titel').value = vorlage.titel; art.value = vorlage.art; $('ed-aktiv').checked = vorlage.aktiv; $('ed-kuerzel').value = vorlage.kuerzel || ''; $('ed-gruppen').value = vorlage.gruppen || '';
+  $('ed-leistungen').value = vorlage.leistungen || ''; $('ed-ablauf').checked = !!vorlage.ablauf; $('ed-zweite').value = vorlage.zweite || '';
+  if (vorlage.leistungen || vorlage.ablauf || vorlage.zweite) $('ed-mehr').open = true;
+  // Sprachfassungen: Übersetzen mit DeepL (Verbindung der Basis), Ergebnis als inaktive Vorlage zum Prüfen.
+  (function () {
+    var box = $('ed-sprachen'); if (!box || !vorlage.id) return;
+    var fassungen = D.fassungen || [];
+    if (vorlage.sprache && vorlage.sprache !== 'de') {
+      var orig = fassungen.filter(function (f) { return f.sprache === 'de'; })[0];
+      box.appendChild(el('p', 'ed-hinweis', 'Sprachfassung (' + (D.sprachen[vorlage.sprache] || vorlage.sprache) + ')' + (orig ? ' von „' + orig.titel + '“' : '')
+        + '. Bitte den Text prüfen und erst dann „aktiv“ setzen. Änderungen an der deutschen Vorlage übernimmt „Neu übersetzen“ dort.'));
+      $('ed-mehr').open = true;
+      return;
+    }
+    var andere = fassungen.filter(function (f) { return f.sprache !== 'de'; });
+    var kopf = el('p', 'ed-label', 'Sprachfassungen'); box.appendChild(kopf);
+    if (andere.length) {
+      var ul = el('ul', 'ed-fassungen');
+      andere.forEach(function (f) {
+        var li = el('li'), a = el('a', '', (D.sprachen[f.sprache] || f.sprache) + ': ' + f.titel + (f.aktiv ? '' : ' (noch nicht freigegeben)'));
+        a.href = D.basis + '/editor?vorlage=' + f.id; li.appendChild(a); ul.appendChild(li);
+      });
+      box.appendChild(ul);
+    }
+    var reihe = el('div', 'ed-reihe'), wahl = el('select'); wahl.setAttribute('aria-label', 'Zielsprache');
+    Object.keys(D.sprachen).forEach(function (k) { if (k !== 'de') wahl.appendChild(new Option(D.sprachen[k], k)); });
+    var los = el('button', 'secondary', 'Übersetzen in …'); los.type = 'button';
+    var stand = el('p', 'muted klein-text');
+    if (!D.uebersetzung) { los.disabled = true; stand.textContent = 'Dafür unter Verwaltung → Verbindungen → „Übersetzung (DeepL)“ den Schlüssel der DeepL API Free eintragen.'; }
+    else stand.textContent = 'Übersetzt mit DeepL (nur der Vorlagentext, keine Patientendaten). Eine vorhandene Fassung dieser Sprache wird erneuert und wieder auf „nicht freigegeben“ gesetzt.';
+    los.addEventListener('click', function () {
+      if (geaendert) { stand.textContent = 'Bitte zuerst speichern.'; return; }
+      los.disabled = true; stand.textContent = 'Wird übersetzt …';
+      fetch(D.basis + '/editor/uebersetzen', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Kienzle-CSRF': csrf },
+        body: JSON.stringify({ id: vorlage.id, sprache: wahl.value }) })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }, function () { return { ok: false, j: {} }; }); })
+        .then(function (r) {
+          if (!r.ok || !r.j.ok) { stand.textContent = r.j.error || 'Übersetzen nicht möglich.'; los.disabled = false; return; }
+          location.href = D.basis + '/editor?vorlage=' + r.j.id;
+        })
+        .catch(function () { stand.textContent = 'Die Verbindung wurde unterbrochen.'; los.disabled = false; });
+    });
+    reihe.appendChild(wahl); reihe.appendChild(los); box.appendChild(reihe); box.appendChild(stand);
+  })();
   var imp = $('ed-import');
   if (imp) imp.addEventListener('change', function () {
     var f = imp.files[0], st = $('ed-import-stand'); if (!f) return;
@@ -273,11 +316,12 @@
   if (vorlage.fest) { art.disabled = true; $('ed-aktiv').disabled = true; art.title = 'Der IGeL-Vertrag der Kasse bleibt ein IGeL-Vertrag und immer aktiv.'; }
   function fassung() { $('ed-fassung').textContent = vorlage.version ? 'Fassung ' + vorlage.version + (vorlage.geaendert ? ' vom ' + vorlage.geaendert : '') : 'neu'; }
   fassung();
-  [$('ed-titel'), art, $('ed-aktiv'), $('ed-kuerzel'), $('ed-gruppen')].forEach(function (e) { e.addEventListener('input', function () { aendern(); vorschau(); }); e.addEventListener('change', aendern); });
+  [$('ed-titel'), art, $('ed-aktiv'), $('ed-kuerzel'), $('ed-gruppen'), $('ed-leistungen'), $('ed-ablauf'), $('ed-zweite')].forEach(function (e) { e.addEventListener('input', function () { aendern(); vorschau(); }); e.addEventListener('change', aendern); });
   $('ed-speichern').addEventListener('click', function () {
     var knopf = $('ed-speichern'); knopf.disabled = true; meldung('Wird gespeichert …');
     fetch(D.basis + '/editor/speichern', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Kienzle-CSRF': csrf },
-      body: JSON.stringify({ id: vorlage.id, titel: $('ed-titel').value, art: art.value, aktiv: $('ed-aktiv').checked, kuerzel: $('ed-kuerzel').value.trim(), gruppen: $('ed-gruppen').value, bloecke: bloecke }) })
+      body: JSON.stringify({ id: vorlage.id, titel: $('ed-titel').value, art: art.value, aktiv: $('ed-aktiv').checked, kuerzel: $('ed-kuerzel').value.trim(), gruppen: $('ed-gruppen').value,
+        leistungen: $('ed-leistungen').value, ablauf: $('ed-ablauf').checked, zweite: $('ed-zweite').value.trim(), bloecke: bloecke }) })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (r) {
         knopf.disabled = false;

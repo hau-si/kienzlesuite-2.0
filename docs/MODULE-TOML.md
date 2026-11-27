@@ -156,7 +156,7 @@ bekommen deren Zugangsdaten; sie sind dann nur für `ks-<id>` lesbar. Zugänge, 
 
 | Schlüssel | Pflicht | Regel |
 |---|---|---|
-| `id` | ja | `"t2med"` (FHIR-Zugang zu T2med), `"mail"` (E-Mail-Versand: `art` = `smtp` mit Server und Zugang oder `gmail` mit `client_id`, `client_secret`, `refresh_token` für die Gmail-API, Umfang gmail.send; ein Modul muss beide Arten unterstützen oder `art` prüfen), `"letterxpress"` (Briefversand: `username`, `api_key`, `modus` = `test`/`live`), `"ablage"` (Netzwerkspeicher) oder `"nachrichten"` (SMS und E-Mail über den Nachrichten-Ausgang der Basis, ohne Zugangsdaten im Modul; siehe `docs/MODUL-SCHNITTSTELLE.md`); je einmal |
+| `id` | ja | `"t2med"` (FHIR-Zugang zu T2med), `"mail"` (E-Mail-Versand: `art` = `smtp` mit Server und Zugang oder `gmail` mit `client_id`, `client_secret`, `refresh_token` für die Gmail-API, Umfang gmail.send; ein Modul muss beide Arten unterstützen oder `art` prüfen), `"letterxpress"` (Briefversand: `username`, `api_key`, `modus` = `test`/`live`), `"ablage"` (Netzwerkspeicher), `"uebersetzung"` (DeepL: `api_key`, `url` = Gratis- oder Pro-Adresse; nur Vorlagentexte, keine Patientendaten) oder `"nachrichten"` (SMS und E-Mail über den Nachrichten-Ausgang der Basis, ohne Zugangsdaten im Modul; siehe `docs/MODUL-SCHNITTSTELLE.md`); je einmal |
 | `purpose` | ja | wofür das Modul die Verbindung nutzt, höchstens 120 Zeichen; wird dem Admin angezeigt |
 | `required` | nein | `true` (Vorgabe): ohne die Verbindung arbeitet das Modul nicht; `false`: nur einzelne Funktionen fehlen |
 

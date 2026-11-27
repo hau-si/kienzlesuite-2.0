@@ -79,6 +79,60 @@ class AblaufTest(unittest.TestCase):
             self.assertTrue(fh.read().startswith(b'%PDF-1.4'))
         self.assertEqual(os.stat(os.path.join(self.ordner, '1.pdf')).st_mode & 0o777, 0o600)
 
+    def test_zweite_unterschrift(self):
+        # Vorlage mit zweiter Unterschrift (Ärztin/Arzt): nach dem OK des Patienten ein zweites Feld ohne „Zurück“; beide Bilder ins PDF.
+        from PIL import Image
+
+        class MitBild(Fake):
+            def bestaetigen(self, ausgabe, vid):
+                self.log.append(f'ok:{vid}')
+                Image.new('L', (40, 20), 0).save(os.path.join(ausgabe, f'{vid}.png'))
+                return True
+        self.c.execute("ALTER TABLE vorgaenge ADD COLUMN zweite TEXT DEFAULT ''")
+        self.c.execute("UPDATE vorgaenge SET zweite='Ärztin/Arzt' WHERE id=1")
+        self.c.commit()
+        v = self.c.execute('SELECT * FROM vorgaenge WHERE id=1').fetchone()
+        f = MitBild(['Weiter', 'OK', 'Löschen', 'OK'])
+        erg = padauftrag.ablauf(self.c, v, f, self.ordner)
+        self.assertEqual(erg, 'unterschrieben')
+        self.assertEqual([x for x in f.log if x.startswith('ok')], ['ok:1', 'ok:1-2'])
+        self.assertNotIn('Zurück', f.ids, 'zweite Unterschrift ohne „Zurück“')
+        with open(os.path.join(self.ordner, '1.pdf'), 'rb') as fh:
+            pdf = fh.read()
+        self.assertIn(b'/Im2', pdf)
+        import re
+        import zlib
+        inhalt = b''.join(zlib.decompress(m) for m in re.findall(rb'/FlateDecode /Length \d+ >>\nstream\n(.*?)\nendstream', pdf, re.S) if len(m) > 40)
+        self.assertIn(b'Zweite Unterschrift', inhalt)
+
+    def test_zweite_unterschrift_abgebrochen(self):
+        self.c.execute("ALTER TABLE vorgaenge ADD COLUMN zweite TEXT DEFAULT ''")
+        self.c.execute("UPDATE vorgaenge SET zweite='Ärztin/Arzt' WHERE id=1")
+        self.c.commit()
+        erg, _ = self.lauf(['Weiter', 'OK', 'Abbrechen'])
+        self.assertEqual(erg, 'zurueck')
+        self.assertEqual(self.status()[0], 'wartet')
+        self.assertIn('zweite Unterschrift', self.status()[1])
+
+    def test_bedienwoerter_in_der_sprache_der_vorlage(self):
+        import padseiten
+        import padtexte
+        padtexte.SPRACHE = 'tr'
+        try:
+            self.assertEqual(padtexte.t('Weiter'), 'İleri')
+            self.assertEqual(padtexte.t('Seite {a} von {b}', a=1, b=2), 'Sayfa 1 / 2')
+            self.assertEqual(padtexte.t('Unbekannt'), 'Unbekannt')
+            s = padseiten.unterschriftsseite('Rıza formu', 'Max Mustermann')
+            self.assertIn('OK', s['knoepfe'], 'Tastflächen behalten ihre Namen, nur die Beschriftung wechselt')
+        finally:
+            padtexte.SPRACHE = 'de'
+        self.c.execute("ALTER TABLE vorgaenge ADD COLUMN sprache TEXT DEFAULT 'de'")
+        self.c.execute("UPDATE vorgaenge SET sprache='pl' WHERE id=1")
+        self.c.commit()
+        erg, _ = self.lauf(['Weiter', 'OK'])
+        self.assertEqual(erg, 'unterschrieben')
+        self.assertEqual(padtexte.SPRACHE, 'de', 'nach dem Vorgang wieder Deutsch')
+
     def test_vorschau_waehrend_des_vorgangs(self):
         gesehen = []
         ordner = self.ordner

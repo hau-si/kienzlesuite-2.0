@@ -13,6 +13,7 @@ import re
 from PIL import Image, ImageDraw
 
 import padseiten as ps
+from padtexte import t
 
 TEXT, ZEILE = 28, 40
 KASTEN = 34
@@ -259,7 +260,7 @@ def zeichne_seite(titel: str, seite: list[dict], nr: int, anzahl: int, antworten
     """Bild und Tastflächen {name: (links, oben, breite, höhe)} einer Formularseite."""
     bild = Image.new('RGB', (ps.BREITE, ps.HOEHE), 'white')
     d = ImageDraw.Draw(bild)
-    ps.kopfzeile(d, titel, f'Seite {nr + 1} von {anzahl}')
+    ps.kopfzeile(d, titel, t('Seite {a} von {b}', a=nr + 1, b=anzahl))
     tasten: dict[str, tuple[int, int, int, int]] = {}
     x0 = ps.RAND
     for e in seite:
@@ -273,11 +274,11 @@ def zeichne_seite(titel: str, seite: list[dict], nr: int, anzahl: int, antworten
         elif art == 'feld':
             wert = (antworten.get(e['id']) or {}).get(e['feld'], '')
             d.rounded_rectangle((x0, y, x0 + BREITE_INHALT, y + 54), radius=10, outline=(202, 216, 210), width=2)
-            d.text((x0 + 16, y + 27), f"{FELDER.get(e['feld'], e['feld'])}: {wert or '–'}", font=ps.schrift(TEXT), fill=ps.DUNKEL, anchor='lm')
+            d.text((x0 + 16, y + 27), f"{t(FELDER.get(e['feld'], e['feld']))}: {wert or '–'}", font=ps.schrift(TEXT), fill=ps.DUNKEL, anchor='lm')
             if e['aenderbar']:
                 r = (x0 + BREITE_INHALT - 190, y + 6, 180, 42)
                 d.rounded_rectangle((r[0], r[1], r[0] + r[2], r[1] + r[3]), radius=10, fill=ps.HELL, outline=ps.GRUEN, width=2)
-                d.text((r[0] + r[2] / 2, r[1] + r[3] / 2), 'Ändern', font=ps.schrift(26, True), fill=ps.GRUEN, anchor='mm')
+                d.text((r[0] + r[2] / 2, r[1] + r[3] / 2), t('Ändern'), font=ps.schrift(26, True), fill=ps.GRUEN, anchor='mm')
                 tasten[f"e:{e['id']}:{e['feld']}"] = r
         elif art == 'ankreuz':
             _kasten(d, x0, y + 3, False, antworten.get(e['id']) is True)
@@ -295,7 +296,7 @@ def zeichne_seite(titel: str, seite: list[dict], nr: int, anzahl: int, antworten
         elif art == 'linie':
             d.line((x0, y + 12, x0 + BREITE_INHALT, y + 12), fill=(202, 216, 210), width=3)
     if hinweis:
-        d.text((ps.BREITE / 2, INHALT_UNTEN + 20), hinweis, font=ps.schrift(26, True), fill=ROT, anchor='mm')
+        d.text((ps.BREITE / 2, INHALT_UNTEN + 20), t(hinweis), font=ps.schrift(26, True), fill=ROT, anchor='mm')
     namen = ['Abbrechen'] + (['Zurück'] if nr > 0 else []) + ['Weiter']
     reihe = ps._knopfreihe(namen, 'Weiter')
     for n, r in reihe.items():
@@ -318,11 +319,11 @@ def zeichne_tastatur(feld: str, wert: str, modus: str, hinweis: str = '') -> dic
     'k:Abbrechen'. Höchstens 32 Tastflächen."""
     bild = Image.new('RGB', (ps.BREITE, ps.HOEHE), 'white')
     d = ImageDraw.Draw(bild)
-    ps.kopfzeile(d, f'{FELDER.get(feld, feld)} ändern', 'Tastatur')
+    ps.kopfzeile(d, t(FELDER.get(feld, feld)), t('Ändern'))
     d.rounded_rectangle((ps.RAND, ps.KOPF, ps.BREITE - ps.RAND, ps.KOPF + 70), radius=12, outline=ps.GRUEN, width=3)
     d.text((ps.RAND + 20, ps.KOPF + 35), (wert or '') + '|', font=ps.schrift(34), fill=ps.DUNKEL, anchor='lm')
     if hinweis:
-        d.text((ps.BREITE / 2, ps.KOPF + 96), hinweis, font=ps.schrift(24, True), fill=ROT, anchor='mm')
+        d.text((ps.BREITE / 2, ps.KOPF + 96), t(hinweis), font=ps.schrift(24, True), fill=ROT, anchor='mm')
     tasten: dict[str, tuple[int, int, int, int]] = {}
     reihen = TASTATUR[modus]
     oben, h = ps.KOPF + 120, 70
@@ -332,7 +333,7 @@ def zeichne_tastatur(feld: str, wert: str, modus: str, hinweis: str = '') -> dic
         for i, z in enumerate(reihe):
             rect = (int(start + i * (b + 10)), oben + r * (h + 10), b, h)
             d.rounded_rectangle((rect[0], rect[1], rect[0] + b, rect[1] + h), radius=10, fill=ps.HELL, outline=ps.GRUEN, width=2)
-            d.text((rect[0] + b / 2, rect[1] + h / 2), 'Leer' if z == ' ' else z, font=ps.schrift(32, True), fill=ps.GRUEN, anchor='mm')
+            d.text((rect[0] + b / 2, rect[1] + h / 2), t('Leer') if z == ' ' else z, font=ps.schrift(32, True), fill=ps.GRUEN, anchor='mm')
             tasten['k:' + z] = rect
     namen = (['k:ebene'] if modus != 'tel' else []) + ['k:zurueck', 'k:Abbrechen', 'k:OK']
     beschr = {'k:ebene': '123' if modus == 'abc' else 'abc', 'k:zurueck': '⌫', 'k:Abbrechen': 'Abbrechen', 'k:OK': 'OK'}

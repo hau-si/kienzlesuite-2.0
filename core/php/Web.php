@@ -1954,6 +1954,20 @@ final class Web {
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'guthaben']) . '<button class="secondary">' . V::symbol('coins') . ' Guthaben abfragen</button></form> '
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'letterxpress']) . '<button class="danger">Entfernen</button></form></div>' : '')
             . '</section>';
+        // Übersetzung (DeepL)
+        $ueb = $st['uebersetzung'] ?? [];
+        $body .= '<section><h2>Übersetzung (DeepL)</h2><p class="muted">Übersetzt Vorlagen in andere Sprachen (z. B. in der Signatur: Editor → Weitere Einstellungen → „Übersetzen in …“). '
+            . 'Die Übersetzung wird als eigene Sprachfassung gespeichert und erst nach dem Prüfen freigegeben. Es gehen nur Vorlagentexte an DeepL, keine Patientendaten.</p>'
+            . '<p class="muted">Schlüssel: auf deepl.com ein Konto „DeepL API Free“ anlegen (bis 500.000 Zeichen im Monat kostenlos), dann unter Konto → API-Schlüssel den Schlüssel kopieren (endet auf „:fx“). '
+            . 'Für einen Vertrag zur Auftragsverarbeitung bietet DeepL „DeepL API Pro“ an; deren Schlüssel funktioniert hier ebenso.</p>'
+            . '<form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('uebersetzung')
+            . $this->tipInput('api_key', 'DeepL-Schlüssel', 'Authentifizierungsschlüssel aus dem DeepL-Konto (Konto → API-Schlüssel). Er liegt nur für den Systemdienst lesbar auf dem Server und wird nach dem Speichern nie wieder angezeigt; leer lassen = unverändert.', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($ueb['schluessel_gesetzt'] ?? false))) . '"')
+            . ($ueb ? '<p>' . (($ueb['gratis'] ?? false) ? '<span class="tag ok">DeepL API Free</span>' : '<span class="tag ok">DeepL API Pro</span>') . '</p>' : '')
+            . '<button>Speichern</button></form>'
+            . ($ueb ? $this->testLine($st['tests'], 'uebersetzung')
+                . '<div class="actions"><form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'uebersetzung']) . '<button>Schlüssel prüfen</button></form> '
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'uebersetzung']) . '<button class="danger">Entfernen</button></form></div>' : '')
+            . '</section>';
         // Netzwerkspeicher
         $body .= '<section><h2>Netzwerkspeicher</h2>';
         foreach ($st['ablage'] as $t) {
@@ -2000,13 +2014,13 @@ final class Web {
             . '</section>';
         // Nutzung
         $rows = '';
-        $art = ['t2med' => 'T2med', 'mail' => 'E-Mail', 'ablage' => 'Netzwerkspeicher', 'letterxpress' => 'Letterxpress', 'nachrichten' => 'SMS und E-Mail (Versand durch die Basis)'];
+        $art = ['t2med' => 'T2med', 'mail' => 'E-Mail', 'ablage' => 'Netzwerkspeicher', 'letterxpress' => 'Letterxpress', 'nachrichten' => 'SMS und E-Mail (Versand durch die Basis)', 'uebersetzung' => 'Übersetzung (DeepL)'];
         foreach ($st['nutzung'] as $u) $rows .= '<tr><td>' . V::h((string)$u['name']) . '</td><td>' . V::h($art[(string)$u['verbindung']] ?? (string)$u['verbindung']) . '</td><td>' . V::h((string)$u['zweck']) . '</td><td>' . (($u['pflicht'] ?? false) ? 'ja' : 'nein') . '</td></tr>';
         $body .= '<section><h2>Wer nutzt was</h2>' . ($rows !== '' ? '<table><tr><th>Modul</th><th>Verbindung</th><th>Wofür</th><th>Nötig</th></tr>' . $rows . '</table>' : '<p>Kein installiertes Modul nutzt eine zentrale Verbindung.</p>') . '</section>';
         $body = preg_replace('#(<p>Zugänge, die mehrere Module brauchen.*?</p>)#s', '<section class="card">$1</section>', $body, 1);
         // Jeder Abschnitt klappt zu; eingerichtete tragen ein grünes „✓ eingerichtet“, offene und fehlerhafte bleiben aufgeklappt.
         $done = ['T2med (FHIR)' => trim((string)($t2['base_url'] ?? '')) !== '', 'E-Mail-Versand' => $mail !== null && $mail !== [],
-            'SMS (seven.io)' => !empty($st['sms']), 'Letterxpress (Briefversand)' => !empty($st['letterxpress']), 'Netzwerkspeicher' => !empty($st['ablage'])];
+            'SMS (seven.io)' => !empty($st['sms']), 'Letterxpress (Briefversand)' => !empty($st['letterxpress']), 'Übersetzung (DeepL)' => !empty($st['uebersetzung']), 'Netzwerkspeicher' => !empty($st['ablage'])];
         foreach ($done as $title => $ok) V::$status[$title] = [$ok, 'eingerichtet', 'nicht eingerichtet'];
         $body = preg_replace_callback('#<section><h2>([^<]*)</h2>(.*?)</section>#s', function (array $m) use ($done): string {
             $title = html_entity_decode($m[1], ENT_QUOTES, 'UTF-8');
@@ -2031,6 +2045,7 @@ final class Web {
                     $what = 'mail'; break;
                 case 'sms': $c->saveSms(['api_key' => $f('api_key'), 'absender' => $f('absender', 20)]); $what = 'sms'; break;
                 case 'letterxpress': $c->saveLetterxpress(['username' => $f('username', 200), 'api_key' => $f('api_key', 200), 'modus' => $f('modus', 10)]); $what = 'letterxpress'; break;
+                case 'uebersetzung': $c->saveUebersetzung(['api_key' => $f('api_key', 200)]); $what = 'uebersetzung'; break;
                 case 'gmail-start': $c->gmailStart($f('client_id', 200), $f('absender', 254)); $what = 'gmail-start'; break;
                 case 'gmail': $c->saveGmail($f('client_secret', 200), $f('adresse', 2000)); $what = 'gmail'; break;
                 case 'testsms': $c->testSms($f('an', 40)); $what = 'testsms'; break;

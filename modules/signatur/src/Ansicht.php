@@ -90,6 +90,7 @@ final class Ansicht {
         if ($route === '/vorgaenge') return $o . self::vorgangsliste($csrfFeld, $vorgaenge, $padNamen, $darfVorgang) . '</div>';
         if ($route === '/editor') return $o . ($darfVorlage ? self::editor($csrfFeld, $vorlagen) : '') . '</div>';
         if ($route === '/einstellungen') {
+            if ($darfVorlage || $admin) $o .= self::einwilligungsZeit($csrfFeld);
             if ($admin) $o .= self::pads($csrfFeld, $pads) . self::pad($csrfFeld, $pad);
             else $o .= '<section class="card"><p class="muted">Vorlagen bearbeiten Sie unter „Editor“. Pads richtet ein Admin ein.</p></section>';
             return $o . '</div>';
@@ -126,14 +127,23 @@ final class Ansicht {
             // Dokumentliste (Wunsch des Nutzers, wie im Fax): Suche nach Namensteilen, Favoriten oben, zuletzt gewählte, Gruppen als Filter.
             usort($aktive, fn($x, $y) => ((int)$y['favorit'] <=> (int)$x['favorit']) ?: strcasecmp((string)$x['titel'], (string)$y['titel']));
             $zuletzt = Seite::zuletzt();
+            $festId = Seite::festeVorlageId();
             $vorwahl = $zuletzt[0] ?? (int)($aktive[0]['id'] ?? 0);
             $opt = '';
+            $fassungen = [];
+            foreach ($aktive as $v) if ((string)$v['sprache'] !== 'de' && (int)$v['original'] > 0) $fassungen[(int)$v['original']][] = $v;
             foreach ($aktive as $v) {
+                if ((string)$v['sprache'] !== 'de' && isset(array_flip(array_map('intval', array_column($aktive, 'id')))[(int)$v['original']])) continue;
                 $gr = Seite::gruppenVon($v);
                 $fav = (int)$v['favorit'] === 1;
                 $opt .= '<div class="us-dokzeile" data-name="' . $h(mb_strtolower((string)$v['titel'])) . '" data-gruppen="' . $h(mb_strtolower(implode('|', $gr))) . '"' . ($fav ? ' data-fav="1"' : '') . '>'
-                    . '<label class="us-dok"><input type="radio" name="vorlage_id" value="' . (int)$v['id'] . '" data-art="' . $h($v['art']) . '"' . ((int)$v['id'] === $vorwahl ? ' checked' : '') . '><span><strong>' . $h($v['titel']) . '</strong>'
-                    . '<span class="muted klein-text">' . $h($gr ? implode(' · ', $gr) : (Seite::ARTEN[$v['art']] ?? $v['art'])) . '</span></span></label>'
+                    . '<label class="us-dok"><input type="radio" name="vorlage_id" value="' . (int)$v['id'] . '" data-art="' . $h($v['art']) . '"' . ((int)$v['id'] === $vorwahl ? ' checked' : '')
+                    . ((string)$v['leistungen'] !== '' ? ' data-leistungen="' . $h(mb_strtolower(str_replace(', ', '|', (string)$v['leistungen']))) . '"' : '') . ((int)$v['id'] === $festId ? ' data-standard="1"' : '')
+                    . ' data-original="' . ((int)$v['original'] ?: (int)$v['id']) . '"' . ((int)$v['ablauf'] ? ' data-ablauf="1"' : '') . '><span><strong>' . $h($v['titel']) . '</strong>'
+                    . '<span class="muted klein-text">' . $h($gr ? implode(' · ', $gr) : (Seite::ARTEN[$v['art']] ?? $v['art']))
+                    . ((string)$v['sprache'] !== 'de' ? ' · ' . $h(Seite::SPRACHEN[$v['sprache']] ?? $v['sprache']) : '') . '</span><span class="us-gueltig" hidden></span></span></label>'
+                    . (isset($fassungen[(int)$v['id']]) ? '<select class="us-sprache" data-fuer="' . (int)$v['id'] . '" aria-label="Sprache: ' . $h($v['titel']) . '"><option value="' . (int)$v['id'] . '">Deutsch</option>'
+                        . implode('', array_map(fn($f) => '<option value="' . (int)$f['id'] . '">' . $h(Seite::SPRACHEN[$f['sprache']] ?? $f['sprache']) . '</option>', $fassungen[(int)$v['id']])) . '</select>' : '')
                     . '<button type="button" class="us-stern' . ($fav ? ' an' : '') . '" data-favorit="' . (int)$v['id'] . '" aria-pressed="' . ($fav ? 'true' : 'false') . '" title="' . ($fav ? 'Favorit entfernen' : 'Als Favorit oben anzeigen') . '" aria-label="Favorit: ' . $h($v['titel']) . '">' . self::STERN . '</button></div>';
             }
             $namen = array_column($aktive, 'titel', 'id');
@@ -234,6 +244,16 @@ final class Ansicht {
             'arten' => Seite::ARTEN, 'typen' => Bausteine::TYPEN, 'felder' => Bausteine::FELDER, 'platzhalter' => Seite::PLATZHALTER,
         ];
         $daten['vorlage']['gruppen'] = $wahl ? (string)$wahl['gruppen'] : '';
+        foreach (['leistungen' => '', 'zweite' => '', 'sprache' => 'de'] as $feld => $vorgabe) $daten['vorlage'][$feld] = $wahl ? (string)$wahl[$feld] : $vorgabe;
+        $daten['vorlage']['ablauf'] = $wahl ? (bool)(int)$wahl['ablauf'] : false;
+        $daten['vorlage']['original'] = $wahl ? (int)$wahl['original'] : 0;
+        $daten['sprachen'] = Seite::SPRACHEN;
+        // Sprachfassungen der deutschen Vorlage (bzw. der Vorlage, zu der diese Fassung gehört)
+        $orig = $wahl ? ((int)$wahl['original'] ?: (int)$wahl['id']) : 0;
+        $daten['fassungen'] = [];
+        foreach ($vorlagen as $v) if ($orig > 0 && ((int)$v['original'] === $orig || (int)$v['id'] === $orig))
+            $daten['fassungen'][] = ['id' => (int)$v['id'], 'sprache' => (string)$v['sprache'], 'titel' => (string)$v['titel'], 'aktiv' => (bool)(int)$v['aktiv']];
+        $daten['uebersetzung'] = function_exists('sg_uebersetzung') && sg_uebersetzung()->bereit();
         $daten['gruppen'] = Seite::alleGruppen($vorlagen);
         // Vorlagen nach der ersten Gruppe, Favoriten zuerst; Suche nach Namensteilen (editor.js).
         $nachGruppe = [];
@@ -272,6 +292,13 @@ final class Ansicht {
             . '<datalist id="ed-gruppenliste">' . implode('', array_map(fn($g) => '<option value="' . $h($g) . '">', Seite::alleGruppen($vorlagen))) . '</datalist>'
             . '<label class="check"><input type="checkbox" id="ed-aktiv"> aktiv</label></div>'
             . '<div class="ed-aktionen"><span class="muted klein-text" id="ed-fassung"></span>' . $export . $loeschen . '<button type="button" class="primary" id="ed-speichern">Speichern</button></div></div>'
+            . '<details class="ed-mehr" id="ed-mehr"><summary>Weitere Einstellungen</summary><div class="ed-mehr-felder">'
+            . '<label class="ed-label">Für IGeL-Leistungen (GOÄ-Ziffern oder Namen, mit Komma getrennt)<input id="ed-leistungen" maxlength="2000" placeholder="z. B. 5855, Reiseimpfung"></label>'
+            . '<p class="muted klein-text">Kommt eine dieser Leistungen aus der Kasse, wird diese Vorlage gewählt; sonst der Standard-IGeL-Vertrag' . ($fest > 0 ? ' („' . $h((string)(Seite::vorlage($fest)['titel'] ?? '')) . '“)' : '') . '.</p>'
+            . '<label class="check"><input type="checkbox" id="ed-ablauf"> Einwilligung mit Ablauf (gilt ' . Seite::einwilligungMonate() . ' Monate, zentral unter Einstellungen)</label>'
+            . '<label class="ed-label">Zweite Unterschrift (Bezeichnung, z. B. „Ärztin/Arzt“; leer = keine)<input id="ed-zweite" maxlength="60" placeholder="Ärztin/Arzt"></label>'
+            . '<div id="ed-sprachen"></div>'
+            . '</div></details>'
             . '<p class="ed-meldung" id="ed-meldung" role="status" aria-live="polite" hidden></p>'
             . '<div class="ed-dokument" id="ed-dokument" aria-label="Dokument"></div></section>'
             . '<aside class="ed-rechts"><section class="card"><h2>Eigenschaften</h2><div id="ed-eigenschaften"><p class="muted">Eine Zeile im Dokument anklicken.</p></div></section>'
@@ -297,6 +324,18 @@ final class Ansicht {
     private const MUELL = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>';
 
     /** Bereich „Unterschriftenpads“ nur für Admins: eingerichtete Pads als feste Zeilen (Stift, Mülleimer), darunter Anlegen und Suche im Netz. */
+    /** Zentrale Gültigkeit von Einwilligungen (für alle Vorlagen mit „Einwilligung mit Ablauf“). */
+    private static function einwilligungsZeit(string $csrfFeld): string {
+        $m = Seite::einwilligungMonate();
+        return '<details class="fold" id="einwilligungen"><summary><h2>Gültigkeit von Einwilligungen</h2><span class="tag ok">' . $m . ' Monate</span></summary><div class="us-body">'
+            . '<p class="muted">Gilt für alle Vorlagen mit „Einwilligung mit Ablauf“ (im Editor unter „Weitere Einstellungen“, z. B. Datenschutz). Bei der Dokumentwahl steht dann je Patient „gültig bis …“ oder „abgelaufen“. '
+            . 'Gemerkt werden nur ein Schlüssel des Patienten (T2med-Nummer oder Prüfsumme aus Name und Geburtsdatum), die Vorlage und der Zeitraum; ein Jahr nach dem Ablauf wird der Eintrag gelöscht. '
+            . 'Eine neue Dauer gilt für künftige Unterschriften.</p>'
+            . '<form method="post" class="us-form us-reihe">' . $csrfFeld . '<input type="hidden" name="aktion" value="einwilligung-zeit">'
+            . '<label for="ew-monate">Gültig für (Monate)</label><input id="ew-monate" name="monate" type="number" min="1" max="120" required value="' . $m . '">'
+            . '<button type="submit" class="primary">Speichern</button></form></div></details>';
+    }
+
     private static function pads(string $csrfFeld, array $pads): string {
         $h = 'sg_h';
         $o = '<details class="fold" id="pads"' . ($pads || self::$padSuche !== null || self::$padBearbeiten ? ' open' : '') . '><summary><h2>Unterschriftenpads</h2>'
