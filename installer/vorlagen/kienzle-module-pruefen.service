@@ -1,6 +1,6 @@
-# Kienzle-Suite: Angebot an Modulen (mitgeliefert und GitHub) täglich neu ermitteln.
+# DocLibre: Angebot an Modulen (mitgeliefert und GitHub) täglich neu ermitteln.
 [Unit]
-Description=Kienzle-Suite Module prüfen
+Description=DocLibre Module prüfen
 After=network-online.target
 Wants=network-online.target
 

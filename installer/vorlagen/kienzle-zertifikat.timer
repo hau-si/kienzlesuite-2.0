@@ -1,5 +1,5 @@
 [Unit]
-Description=Kienzle-Suite Server-Zertifikat täglich prüfen
+Description=DocLibre Server-Zertifikat täglich prüfen
 
 [Timer]
 OnCalendar=daily

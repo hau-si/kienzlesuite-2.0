@@ -1,6 +1,6 @@
-# Kienzle-Suite: Einrichtungs-Überblicke der Module einsammeln (Haken laufen als Modul-Benutzer).
+# DocLibre: Einrichtungs-Überblicke der Module einsammeln (Haken laufen als Modul-Benutzer).
 [Unit]
-Description=Kienzle-Suite Einrichtungs-Überblick
+Description=DocLibre Einrichtungs-Überblick
 
 [Service]
 Type=oneshot

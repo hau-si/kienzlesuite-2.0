@@ -1,4 +1,4 @@
-# Kienzle-Suite 2.0 – Architektur
+# DocLibre 2.0 – Architektur
 
 Stand: Konzept; Umsetzung läuft nach `docs/PLAN.md`. Entscheidungen vom 22.11.2026 eingearbeitet (nginx, Updates, Zertifikat, Drucken, Backup-Ziele). Übersicht als Whiteboard:
 https://claude.ai/artifact/EGTAPzMGVFBYbxCBUzGjsh (nur mit Freigabe sichtbar)

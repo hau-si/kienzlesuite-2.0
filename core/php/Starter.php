@@ -133,11 +133,11 @@ final class Starter {
     private static function readme(string $system, string $url, array $schemas, bool $drucker = false): string {
         $nl = $system === 'windows' ? "\r\n" : "\n";
         $steps = match ($system) {
-            'windows' => ["Diese ZIP-Datei mit Rechtsklick → „Alle extrahieren …“ entpacken (nicht direkt aus der ZIP starten).", "Im entpackten Ordner „install-windows.cmd“ doppelklicken. Meldet Windows „Der Computer wurde durch Windows geschützt“: „Weitere Informationen“ → „Trotzdem ausführen“.", "Die Frage nach Administratorrechten mit „Ja“ bestätigen (das Fenster kann hinter anderen liegen).", "„Arbeitsplatz eingerichtet“ erscheint. Der Ordner kann danach gelöscht werden; Starter, Zertifikat und Drucker hält der Kienzle-Agent ab jetzt selbst aktuell."],
-            'macos' => ["Die ZIP-Datei doppelklicken (entpackt in „Downloads“).", "Im entpackten Ordner „install-macos.command“ mit Rechtsklick → „Öffnen“ starten und „Öffnen“ bestätigen.", "Für das Zertifikat das Mac-Anmeldepasswort eingeben.", "„Kienzle-Starter eingerichtet“ erscheint. Der Ordner kann danach gelöscht werden."],
+            'windows' => ["Diese ZIP-Datei mit Rechtsklick → „Alle extrahieren …“ entpacken (nicht direkt aus der ZIP starten).", "Im entpackten Ordner „install-windows.cmd“ doppelklicken. Meldet Windows „Der Computer wurde durch Windows geschützt“: „Weitere Informationen“ → „Trotzdem ausführen“.", "Die Frage nach Administratorrechten mit „Ja“ bestätigen (das Fenster kann hinter anderen liegen).", "„Arbeitsplatz eingerichtet“ erscheint. Der Ordner kann danach gelöscht werden; Starter, Zertifikat und Drucker hält der DocLibre-Agent ab jetzt selbst aktuell."],
+            'macos' => ["Die ZIP-Datei doppelklicken (entpackt in „Downloads“).", "Im entpackten Ordner „install-macos.command“ mit Rechtsklick → „Öffnen“ starten und „Öffnen“ bestätigen.", "Für das Zertifikat das Mac-Anmeldepasswort eingeben.", "„DocLibre-Starter eingerichtet“ erscheint. Der Ordner kann danach gelöscht werden."],
             default => ["Die ZIP-Datei entpacken (unzip kienzle-starter-linux.zip -d kienzle-starter).", "Im Terminal im entpackten Ordner:  bash install-linux.sh", "Das Zertifikat server.crt im Browser als vertrauenswürdig importieren."],
         };
-        $text = 'Kienzle-Starter – Einrichtung des Arbeitsplatzes' . $nl . $nl;
+        $text = 'DocLibre-Starter – Einrichtung des Arbeitsplatzes' . $nl . $nl;
         foreach ($steps as $i => $s) $text .= ($i + 1) . '. ' . $s . $nl;
         return $text . $nl . 'In T2med als Eintrag „Programm/URL“ je Modul: ' . implode(', ', array_map(fn($s) => $s . '://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}', $schemas)) . $nl
             . 'Server: ' . $url . $nl . 'Diese Dateien enthalten den Starter-Schlüssel der Praxis. Nicht weitergeben, nach der Einrichtung löschen.' . $nl;

@@ -29,7 +29,7 @@ var druckerSkript string
 const druckerSkriptFrist = 180 * time.Second
 
 // windowsPlattform: Aufrufe in HKLM (für alle Benutzer), Zertifizierungsstelle im Speicher des Computers, Drucker per PowerShell.
-// Läuft als SYSTEM (geplante Aufgabe „Kienzle-Agent“).
+// Läuft als SYSTEM (geplante Aufgabe „DocLibre-Agent“).
 type windowsPlattform struct{ ordner string }
 
 func neuePlattform(ordner string) Plattform { return &windowsPlattform{ordner: ordner} }

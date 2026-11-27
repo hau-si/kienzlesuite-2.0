@@ -244,7 +244,7 @@ def _sms_call(c: dict, path: str, payload: dict | None) -> dict:
     import urllib.request
     data = json.dumps(payload).encode() if payload is not None else None
     req = urllib.request.Request(SMS_URL + path, data=data, method='POST' if payload is not None else 'GET',
-                                 headers={'X-Api-Key': c['api_key'], 'Accept': 'application/json', 'Content-Type': 'application/json', 'SentWith': 'Kienzle-Suite'})
+                                 headers={'X-Api-Key': c['api_key'], 'Accept': 'application/json', 'Content-Type': 'application/json', 'SentWith': 'DocLibre'})
     try:
         with urllib.request.urlopen(req, timeout=15) as r:  # noqa: S310 (feste https-Adresse)
             body = r.read(20000).decode('utf-8', 'replace')
@@ -310,7 +310,7 @@ def send_sms(c: dict | None, to: str, text: str) -> None:
 
 
 def test_sms_send(c: dict | None, to: str) -> str:
-    send_sms(c, to, 'Kienzle-Suite: Testnachricht. Es ist nichts weiter zu tun.')
+    send_sms(c, to, 'DocLibre: Testnachricht. Es ist nichts weiter zu tun.')
     return f'Test-SMS an {to} verschickt.'
 
 
@@ -596,7 +596,7 @@ def send_mail(c: dict | None, to: list[str], subject: str, body: str) -> None:  
 def test_mail_send(c: dict | None, to: str) -> str:
     if not isinstance(to, str) or not EMAIL.match(to):
         raise Fehler('Bitte eine gültige Empfängeradresse eingeben.')
-    send_mail(c, [to], 'Kienzle-Suite: Testnachricht', 'Diese Nachricht wurde von der Kienzle-Suite verschickt, um die E-Mail-Verbindung zu prüfen.\n'
+    send_mail(c, [to], 'DocLibre: Testnachricht', 'Diese Nachricht wurde von DocLibre verschickt, um die E-Mail-Verbindung zu prüfen.\n'
               'Es ist nichts weiter zu tun.\n')
     return f'Testnachricht an {to} verschickt.'
 

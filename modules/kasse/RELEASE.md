@@ -1,5 +1,10 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.58
+
+- **Neuer Name: „DocLibre – freie Software für die Arztpraxis“** (vorher Kienzle-Suite; Wunsch von T2med nach einem unterscheidbaren Namen).
+- Nur Texte geändert, in der Kassenansicht das Herz-Symbol oben links. Mit Tests geprüft, nicht auf der VM.
+
 ## 2.3.4-beta.57
 
 - **Kein Demo-Schlüssel mehr (Vorgabe von T2med).** Fehlt der T2med-API-Schlüssel unter Verwaltung → Verbindungen → T2med, verbindet sich die Kasse nicht mit T2med und meldet das klar. Live-Betrieb lässt sich ohne Schlüssel nicht einschalten.

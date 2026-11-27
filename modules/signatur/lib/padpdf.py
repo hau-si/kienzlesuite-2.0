@@ -229,7 +229,7 @@ def _zusammensetzen(seiten: list[Seite], bild, titel: str, patient: str, zeit: i
     objekte[katalog - 1] = b'<< /Type /Catalog /Pages %d 0 R >>' % seitenbaum
     objekte[seitenbaum - 1] = b'<< /Type /Pages /Kids [%s] /Count %d >>' % (b' '.join(b'%d 0 R' % k for k in kinder), len(kinder))
     datum = time.strftime('D:%Y%m%d%H%M%S', time.localtime(zeit))
-    info = neu(b'<< /Title %s /Subject %s /Producer (Kienzle-Suite Signatur) /CreationDate (%s) >>' % (_pdf_text(titel), _pdf_text(patient), datum.encode()))
+    info = neu(b'<< /Title %s /Subject %s /Producer (DocLibre Signatur) /CreationDate (%s) >>' % (_pdf_text(titel), _pdf_text(patient), datum.encode()))
     aus = io.BytesIO()
     aus.write(b'%PDF-1.4\n%\xe2\xe3\xcf\xd3\n')
     lagen = []

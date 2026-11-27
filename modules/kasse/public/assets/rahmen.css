@@ -85,7 +85,7 @@ main.modul:has(#welcome) { max-width: 780px; }
 @media (max-width: 980px) { .start-right.mit-patient .work-frame { height: 85vh; } }
 
 /* Patientenkarte der Kasse: Name hat Vorrang (schrumpft nicht, die Knöpfe rücken notfalls in eine zweite Zeile), „T2m-Rechnung“ | „IGeL“,
-   Mülltonne zum Entfernen, Klick auf Name oder Etikett öffnet die Akte in T2med (GDT über den Kienzle-Agent). */
+   Mülltonne zum Entfernen, Klick auf Name oder Etikett öffnet die Akte in T2med (GDT über den DocLibre-Agent). */
 .patient-karte { flex-wrap: wrap; }
 .pk-text { flex: 1 0 auto; max-width: 100%; }
 button.pk-marke { border: 0; border-radius: 0; font: inherit; font-weight: 750; font-size: 13px; min-height: 0; cursor: default; }

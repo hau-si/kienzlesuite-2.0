@@ -1,4 +1,4 @@
-/* Kienzle-Suite, Basis. Gestaltung wie kienzle-sumup (Beta, Zweig rechnungseingang): ruhiges Petrol, Karten, klare Knöpfe. */
+/* DocLibre, Basis. Gestaltung wie kienzle-sumup (Beta, Zweig rechnungseingang): ruhiges Petrol, Karten, klare Knöpfe. */
 :root { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #203c43; background: #f1f5f4; font-synthesis: none;
   --teal: #12695d; --line: #dce5e2; --soft: #eef4f1; --muted: #71837e; --error: #993d2b; --ok: #16503f; }
 * { box-sizing: border-box; }
@@ -10,6 +10,7 @@ a { color: var(--teal); }
 aside.side { flex: 1 1 240px; max-width: 260px; position: sticky; top: 0; height: 100vh; overflow-y: auto; box-sizing: border-box; background: #fff; border-right: 1px solid var(--line); padding: 24px 16px; display: flex; flex-direction: column; gap: 22px; }
 .brand { display: flex; align-items: center; gap: 12px; padding: 0 8px; text-decoration: none; color: inherit; }
 .mark { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 13px; background: var(--teal); color: #fff; font-size: 21px; font-weight: 700; flex: none; }
+.mark-herz { width: 26px; height: 26px; display: block; }
 .brand strong { display: block; font-size: 17px; letter-spacing: -.4px; }
 .brand span.sub { display: block; font-size: 12px; color: var(--muted); }
 nav.menu { display: flex; flex-direction: column; gap: 18px; }

@@ -1,6 +1,6 @@
 package main
 
-// Kienzle-Agent: derselbe Starter läuft mit --dienst dauerhaft (Windows: geplante Aufgabe mit Systemrechten beim Start des PCs).
+// DocLibre-Agent: derselbe Starter läuft mit --dienst dauerhaft (Windows: geplante Aufgabe mit Systemrechten beim Start des PCs).
 // Er fragt die Suite etwa alle zwei Sekunden nach Aufträgen und hält den PC auf dem Sollzustand der Suite:
 //   - Starterprogramm (Selbstaktualisierung, Prüfsumme aus der Suite),
 //   - Aufrufe aus T2med (URL-Schemata) und client.json für den Startermodus,

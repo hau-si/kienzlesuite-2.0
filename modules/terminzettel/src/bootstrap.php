@@ -18,7 +18,7 @@ function tz_modul(): KienzleModul {
     static $k;
     if (!$k) {
         if (!class_exists('KienzleModul', false)) {
-            if (!is_file(KienzleTerminzettel\Seite::$helper)) throw new RuntimeException('Kienzle-Suite nicht gefunden.');
+            if (!is_file(KienzleTerminzettel\Seite::$helper)) throw new RuntimeException('DocLibre nicht gefunden.');
             require_once KienzleTerminzettel\Seite::$helper;
         }
         $k = new KienzleModul('terminzettel');

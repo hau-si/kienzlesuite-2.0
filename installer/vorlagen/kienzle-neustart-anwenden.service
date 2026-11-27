@@ -1,6 +1,6 @@
-# Kienzle-Suite: Dienste oder den Server neu starten (root).
+# DocLibre: Dienste oder den Server neu starten (root).
 [Unit]
-Description=Kienzle-Suite Neustart anwenden
+Description=DocLibre Neustart anwenden
 
 [Service]
 Type=oneshot

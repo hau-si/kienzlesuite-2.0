@@ -1,6 +1,6 @@
-# Kienzle-Suite: Server-Zertifikat erneuern (60 Tage vor Ablauf oder bei geänderten Namen), danach nginx neu laden.
+# DocLibre: Server-Zertifikat erneuern (60 Tage vor Ablauf oder bei geänderten Namen), danach nginx neu laden.
 [Unit]
-Description=Kienzle-Suite Server-Zertifikat prüfen und erneuern
+Description=DocLibre Server-Zertifikat prüfen und erneuern
 
 [Service]
 Type=oneshot

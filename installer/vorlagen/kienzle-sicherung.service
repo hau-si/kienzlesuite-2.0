@@ -1,6 +1,6 @@
-# Kienzle-Suite: nächtliche Sicherung (sonntags zusätzlich aufräumen und prüfen, monatlich Probe-Wiederherstellung).
+# DocLibre: nächtliche Sicherung (sonntags zusätzlich aufräumen und prüfen, monatlich Probe-Wiederherstellung).
 [Unit]
-Description=Kienzle-Suite Sicherung
+Description=DocLibre Sicherung
 After=network-online.target
 Wants=network-online.target
 

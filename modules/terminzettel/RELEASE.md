@@ -1,5 +1,10 @@
 # Terminzettel – Release-Notizen
 
+## 1.3.0-beta.20
+
+- **Neuer Name: „DocLibre – freie Software für die Arztpraxis“** (vorher Kienzle-Suite; Wunsch von T2med nach einem unterscheidbaren Namen).
+- Nur Texte geändert. Mit Tests geprüft, nicht auf der VM.
+
 ## 1.3.0-beta.19
 
 - **Neuer Standardtext der Absage-Mail:** „Guten Tag, leider muss ich meinen Termin am {{termine}} absagen. Viele Grüße, {{patient}}“, Betreff „Terminabsage {{patient}}“. Die bisherigen Standardtexte werden beim Öffnen der Einstellungen durch den neuen ersetzt; selbst geänderte Texte bleiben unverändert. Nicht auf der VM geprüft.

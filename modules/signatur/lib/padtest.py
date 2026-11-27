@@ -87,7 +87,7 @@ def main(argv: list[str]) -> int:
     except OSError as exc:
         schritt(f'FEHLER Bibliothek nicht ladbar: {exc}')
         return 1
-    lib.STControlSetAppName('Kienzle-Suite')
+    lib.STControlSetAppName('DocLibre')
     try:
         rc = lib.STDeviceSetComPort(f'IP={ip}:{port}')
         schritt(f'Suche nur an {ip}:{port}: {"ok" if rc >= 0 else "FEHLER " + fehlertext(lib, rc)}')
@@ -116,7 +116,7 @@ def main(argv: list[str]) -> int:
         schritt('Pad geöffnet.')
         try:
             lib.STDisplaySetFont('DejaVu Sans', 32, 0)
-            for zeile, text in enumerate(('Kienzle-Suite', 'Verbindungstest erfolgreich')):
+            for zeile, text in enumerate(('DocLibre', 'Verbindungstest erfolgreich')):
                 rc = lib.STDisplaySetText(40, 60 + 60 * zeile, 0, text)
                 if rc < 0:
                     schritt('FEHLER Text anzeigen: ' + fehlertext(lib, rc))

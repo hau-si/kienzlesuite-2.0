@@ -1,5 +1,10 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.37
+
+- **Neuer Name: „DocLibre – freie Software für die Arztpraxis“** (vorher Kienzle-Suite; Wunsch von T2med nach einem unterscheidbaren Namen).
+- Nur Texte geändert. Mit Tests geprüft, nicht auf der VM.
+
 ## 0.1.0-beta.36
 
 - **Kein Demo-Schlüssel mehr (Vorgabe von T2med).** Ohne T2med-API-Schlüssel in der Basis (Verwaltung → Verbindungen → T2med) gibt es keine Verbindung zu T2med; die Signatur meldet das klar.

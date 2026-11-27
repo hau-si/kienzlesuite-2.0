@@ -85,7 +85,7 @@ def main(argv: list[str]) -> int:
             pruefen(lib, 'Display leeren', lib.STDisplayErase())
             pruefen(lib, 'Ziel', lib.STDisplaySetTarget(FOREGROUND))
             lib.STDisplaySetFont('DejaVu Sans', 30, 0)
-            pruefen(lib, 'Text', lib.STDisplaySetTextInRect(40, 30, b - 80, 120, 0, 'Testseite der Kienzle-Suite. Bitte unten im Feld unterschreiben.', 0))
+            pruefen(lib, 'Text', lib.STDisplaySetTextInRect(40, 30, b - 80, 120, 0, 'Testseite DocLibre. Bitte unten im Feld unterschreiben.', 0))
             if 'bild' in varianten:
                 import padseiten
                 seite = padseiten.unterschriftsseite('Test', 'Testpatient')

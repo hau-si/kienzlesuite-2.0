@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -IB
-"""Dienste oder den ganzen Server der Kienzle-Suite neu starten (nur root, gestartet von kienzle-neustart.path).
+"""Dienste oder den ganzen Server DocLibre neu starten (nur root, gestartet von kienzle-neustart.path).
 
   kienzle-neustart anwenden    Anfrage des Webinterfaces (anfragen/neustart.json) verarbeiten: {"art": "dienste"|"server"}
 """

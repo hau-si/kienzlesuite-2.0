@@ -430,14 +430,14 @@ def test_page(name: str) -> str:
     if not q:
         raise Fehler('Drucker nicht gefunden.')
     raw = 'Bondrucker' in q['description']
-    data = (b'\x1b@Kienzle-Suite\nTestseite ' + time.strftime('%d.%m.%Y %H:%M').encode() + b'\n\n\n\n\x1dV\x00') if raw else _test_pdf()
-    out = run('lp', '-d', name, '-t', 'Kienzle-Suite Testseite', *(['-o', 'raw'] if raw else []), data=data, timeout=30)
+    data = (b'\x1b@DocLibre\nTestseite ' + time.strftime('%d.%m.%Y %H:%M').encode() + b'\n\n\n\n\x1dV\x00') if raw else _test_pdf()
+    out = run('lp', '-d', name, '-t', 'DocLibre Testseite', *(['-o', 'raw'] if raw else []), data=data, timeout=30)
     m = re.search(r'request id is (\S+)', out)
     return f'Testseite an „{name}“ geschickt' + (f' (Auftrag {m.group(1)}).' if m else '.')
 
 
 def _test_pdf() -> bytes:
-    text = 'Kienzle-Suite - Testseite ' + time.strftime('%d.%m.%Y %H:%M')
+    text = 'DocLibre - Testseite ' + time.strftime('%d.%m.%Y %H:%M')
     content = f'BT /F1 18 Tf 72 760 Td ({text}) Tj ET'.encode()
     objs = [b'<< /Type /Catalog /Pages 2 0 R >>', b'<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
             b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Alle Tests der Kienzle-Suite. Muss vor jedem Commit grün sein (AGENTS.md).
+# Alle Tests DocLibre. Muss vor jedem Commit grün sein (AGENTS.md).
 #   bash tests/run-all.sh
 set -euo pipefail
 cd -- "$(dirname -- "$0")/.."

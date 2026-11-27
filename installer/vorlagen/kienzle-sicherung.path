@@ -1,6 +1,6 @@
-# Kienzle-Suite: Aufträge der Seite „Sicherung“ übernehmen (Anfragedatei von ks-core).
+# DocLibre: Aufträge der Seite „Sicherung“ übernehmen (Anfragedatei von ks-core).
 [Unit]
-Description=Kienzle-Suite Sicherung (Anfragen)
+Description=DocLibre Sicherung (Anfragen)
 
 [Path]
 PathExists=/var/lib/kienzle/core/anfragen/sicherung.json

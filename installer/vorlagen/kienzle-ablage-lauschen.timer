@@ -1,5 +1,5 @@
 [Unit]
-Description=Kienzle-Suite Lauschordner auf dem Netzwerkspeicher (alle 15 Sekunden)
+Description=DocLibre Lauschordner auf dem Netzwerkspeicher (alle 15 Sekunden)
 
 [Timer]
 OnBootSec=1min

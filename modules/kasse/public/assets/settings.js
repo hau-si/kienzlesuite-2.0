@@ -1,6 +1,6 @@
 'use strict';
 const $ = id => document.getElementById(id);
-// Webpfad des Moduls in der Kienzle-Suite (z. B. /kasse/). Anmeldung und Rechte kommen von der Suite.
+// Webpfad des Moduls in DocLibre (z. B. /kasse/). Anmeldung und Rechte kommen von der Suite.
 const BASE = document.body.dataset.base || '/';
 let csrf = '';
 const TESTS = {sumup: ['sumup', 'Verbindung zu SumUp prüfen'], printing: ['receipt_printer', 'Testbon drucken'],

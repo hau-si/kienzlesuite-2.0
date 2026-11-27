@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -IB
-"""Servernamen und Praxisname der Kienzle-Suite ändern (nur root).
+"""Servernamen und Praxisname DocLibre ändern (nur root).
 
   kienzle-servername anwenden              Anfrage des Webinterfaces verarbeiten (kienzle-servername.path)
   kienzle-servername setzen [--neue-ca] NAME [NAME …]

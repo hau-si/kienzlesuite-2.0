@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Kienzle-Suite: Installer der Basis für Ubuntu Server 26.04 LTS.
+# DocLibre: Installer der Basis für Ubuntu Server 26.04 LTS.
 #
 #   sudo bash installer/install.sh                         (Erstinstallation; Name und Praxis danach im Webinterface)
 #   sudo bash installer/install.sh --name kienzle.praxis.internal [--name 192.0.2.10] [--praxis "Praxis Dr. Muster"]
@@ -38,7 +38,7 @@ done
 [ "$EUID" -eq 0 ] || { echo 'Bitte mit sudo ausführen.'; exit 1; }
 . /etc/os-release
 if [ "${ID:-}" != ubuntu ] || [ "${VERSION_ID:-}" != 26.04 ]; then
-  echo "Die Kienzle-Suite unterstützt nur Ubuntu Server 26.04 LTS (gefunden: ${PRETTY_NAME:-unbekannt})."; exit 1
+  echo "DocLibre unterstützt nur Ubuntu Server 26.04 LTS (gefunden: ${PRETTY_NAME:-unbekannt})."; exit 1
 fi
 [ -n "$nosystemd" ] || command -v systemctl >/dev/null || { echo 'systemd wird benötigt.'; exit 1; }
 [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ ]] || { echo 'core/VERSION ungültig.'; exit 1; }
@@ -91,7 +91,7 @@ wait_apt() {
   done
   echo 'Paketsperre nach 10 Minuten noch belegt.'; return 1
 }
-echo "== Kienzle-Suite Basis $version"
+echo "== DocLibre Basis $version"
 wait_apt
 DEBIAN_FRONTEND=noninteractive apt-get update -q
 wait_apt
@@ -232,7 +232,7 @@ echo '== Automatische Sicherheitsupdates'
 if ! grep -rqs 'APT::Periodic::Unattended-Upgrade' /etc/apt/apt.conf.d/; then
   printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' > /etc/apt/apt.conf.d/20auto-upgrades
 fi
-printf '// Kienzle-Suite: Neustarts plant die Praxis selbst.\nUnattended-Upgrade::Automatic-Reboot "false";\n' > /etc/apt/apt.conf.d/52kienzle-unattended
+printf '// DocLibre: Neustarts plant die Praxis selbst.\nUnattended-Upgrade::Automatic-Reboot "false";\n' > /etc/apt/apt.conf.d/52kienzle-unattended
 
 if [ -n "$kanal" ]; then
   python3 - "$kanal" <<'PY'
@@ -320,7 +320,7 @@ if [ -z "$nosystemd" ]; then
 fi
 
 echo
-echo "Kienzle-Suite Basis $version ist installiert: https://${names[0]}/"
+echo "DocLibre Basis $version ist installiert: https://${names[0]}/"
 echo 'Zertifizierungsstelle für die Arbeitsplätze: https://'"${names[0]}"'/ca.crt'
 echo "Einrichtungs-Überblick: https://${names[0]}/verwaltung/einrichtung"
 echo "Fingerabdruck zum Vergleich: $(/opt/kienzle/core/current/bin/kienzle-zertifikat status | sed -n 's/^CA (SHA-256): //p')"

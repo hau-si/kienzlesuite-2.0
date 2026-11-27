@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Kienzle-Agent: Anmeldung der PCs, Abholen, Sollzustand, „Akte öffnen“ (GDT), Zuordnung Browser → PC, Seiten. Nur erfundene Daten.
+// DocLibre-Agent: Anmeldung der PCs, Abholen, Sollzustand, „Akte öffnen“ (GDT), Zuordnung Browser → PC, Seiten. Nur erfundene Daten.
 require __DIR__ . '/lib.php';
 require __DIR__ . '/browser.php';
 

@@ -1,5 +1,12 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.30
+
+- **Neuer Name: „DocLibre – freie Software für die Arztpraxis“** (vorher Kienzle-Suite; Wunsch von T2med nach einem unterscheidbaren Namen).
+- Oben links steht jetzt das Herz-Symbol statt des Buchstabens. Agent und Starter heißen in Texten „DocLibre-Agent“ bzw. „DocLibre-Starter“.
+- Interne Namen bleiben vorerst gleich, damit bestehende Installationen ohne Neueinrichtung weiterlaufen: Ordner und Dienste (`kienzle-…`, `/opt/kienzle`), die geplante Aufgabe „Kienzle-Agent“ unter Windows, die Programmordner am PC, die Aufrufadressen aus T2med (`kienzle-kasse://` usw.), Druckerkennungen und Zertifikatsfelder.
+- Mit Tests geprüft. **Nicht auf der VM und nicht unter Windows geprüft.**
+
 ## 0.22.0-beta.29
 
 - Verwaltung → Verbindungen → T2med: Hinweise auf den T2med-Demo-Schlüssel entfernt. Jede Praxis trägt ihren eigenen API-Schlüssel ein; ohne Schlüssel verbinden sich die Module nicht mit T2med.

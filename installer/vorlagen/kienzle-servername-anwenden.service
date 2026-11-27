@@ -1,6 +1,6 @@
-# Kienzle-Suite: Servernamen übernehmen – core.json, Server-Zertifikat, nginx (root).
+# DocLibre: Servernamen übernehmen – core.json, Server-Zertifikat, nginx (root).
 [Unit]
-Description=Kienzle-Suite Servername anwenden
+Description=DocLibre Servername anwenden
 
 [Service]
 Type=oneshot

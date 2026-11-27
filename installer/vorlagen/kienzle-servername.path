@@ -1,6 +1,6 @@
-# Kienzle-Suite: neue Servernamen aus Verwaltung → Server übernehmen (Anfragedatei von ks-core).
+# DocLibre: neue Servernamen aus Verwaltung → Server übernehmen (Anfragedatei von ks-core).
 [Unit]
-Description=Kienzle-Suite Servername (Anfragen)
+Description=DocLibre Servername (Anfragen)
 
 [Path]
 PathExists=/var/lib/kienzle/core/anfragen/servername.json

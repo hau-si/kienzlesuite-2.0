@@ -1,6 +1,6 @@
-# Kienzle-Suite, Modul signatur: Pad-Dienst (zeigt Vorgänge am Unterschriftenpad und nimmt Unterschriften auf).
+# DocLibre, Modul signatur: Pad-Dienst (zeigt Vorgänge am Unterschriftenpad und nimmt Unterschriften auf).
 [Unit]
-Description=Kienzle-Suite Modul signatur (Unterschriftenpad)
+Description=DocLibre Modul signatur (Unterschriftenpad)
 After=network.target
 
 [Service]

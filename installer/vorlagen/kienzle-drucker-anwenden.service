@@ -1,7 +1,7 @@
-# Kienzle-Suite: Drucker suchen, anlegen, entfernen, freigeben (root; einziger Aufrufer von lpadmin).
+# DocLibre: Drucker suchen, anlegen, entfernen, freigeben (root; einziger Aufrufer von lpadmin).
 # Ohne ProtectSystem: Der Dienst schreibt Einheiten der virtuellen Drucker und die Samba-Einstellungen.
 [Unit]
-Description=Kienzle-Suite Drucker anwenden
+Description=DocLibre Drucker anwenden
 After=cups.service
 
 [Service]

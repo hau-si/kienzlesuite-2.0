@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Kienzle-Suite: holt die Basis aus GitHub und startet den Installer (läuft beim ersten Start des neuen Systems).
+"""DocLibre: holt die Basis aus GitHub und startet den Installer (läuft beim ersten Start des neuen Systems).
 
   holen.py --kanal stabil|beta [--unsigniert-erlauben] [--zweig main|beta] [--ziel /opt/kienzle-installer] [--name SERVER] [--praxis NAME]
 

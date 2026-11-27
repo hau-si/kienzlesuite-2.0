@@ -66,7 +66,7 @@ final class Env {
         $this->users = new Users($this->db, $this->secrets, $this->modules);
         $this->audit = new AuditLog($this->dir);
         $this->auth = new Auth($this->db, $this->users, $this->audit, $client);
-        $this->passkeys = new Passkeys($this->db, 'kienzle.example.org', 'Kienzle-Suite');
+        $this->passkeys = new Passkeys($this->db, 'kienzle.example.org', 'DocLibre');
     }
     /** Konto mit Passwort; bei $otp mit eingerichtetem OTP. Liefert [id, secret]. */
     public function user(string $login, bool $admin = false, string $password = 'Wiesen-Blume-Fahrrad-7', bool $otp = false): array {

@@ -1,4 +1,4 @@
-"""Firewall der Kienzle-Suite (root-Dienst, Aufruf über core/bin/kienzle-firewall).
+"""Firewall DocLibre (root-Dienst, Aufruf über core/bin/kienzle-firewall).
 
 Übernommen aus kienzle-suite-beta (scripts/firewall-apply.py) und verallgemeinert:
 - Das Webinterface legt nur eine kleine Anfragedatei ab. Dieser Dienst prüft sie streng und erzeugt die Regeln aus

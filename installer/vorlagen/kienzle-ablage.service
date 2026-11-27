@@ -1,6 +1,6 @@
-# Kienzle-Suite: Dateien der Module auf den Netzwerkspeicher übertragen (als ks-ablage, ohne Mount).
+# DocLibre: Dateien der Module auf den Netzwerkspeicher übertragen (als ks-ablage, ohne Mount).
 [Unit]
-Description=Kienzle-Suite Netzwerkspeicher
+Description=DocLibre Netzwerkspeicher
 After=network-online.target
 
 [Service]

@@ -1,6 +1,6 @@
-# Kienzle-Suite: Firewall-Anfrage des Webinterfaces abarbeiten (Anfragedatei von ks-core).
+# DocLibre: Firewall-Anfrage des Webinterfaces abarbeiten (Anfragedatei von ks-core).
 [Unit]
-Description=Kienzle-Suite Firewall-Anfragen
+Description=DocLibre Firewall-Anfragen
 
 [Path]
 PathExists=/var/lib/kienzle/core/anfragen/firewall.json

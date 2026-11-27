@@ -1,6 +1,6 @@
-# Kienzle-Suite: Sicherung einrichten, sofort sichern, prüfen, wiederherstellen (root; Passwort nur root lesbar).
+# DocLibre: Sicherung einrichten, sofort sichern, prüfen, wiederherstellen (root; Passwort nur root lesbar).
 [Unit]
-Description=Kienzle-Suite Sicherung anwenden
+Description=DocLibre Sicherung anwenden
 After=network-online.target
 
 [Service]

@@ -1,6 +1,6 @@
-# Kienzle-Suite: Update-Anfrage des Webinterfaces abarbeiten (Anfragedatei von ks-core).
+# DocLibre: Update-Anfrage des Webinterfaces abarbeiten (Anfragedatei von ks-core).
 [Unit]
-Description=Kienzle-Suite Update-Anfragen
+Description=DocLibre Update-Anfragen
 
 [Path]
 PathExists=/var/lib/kienzle/core/anfragen/update.json

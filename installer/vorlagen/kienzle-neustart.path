@@ -1,6 +1,6 @@
-# Kienzle-Suite: Neustart von Diensten oder Server aus dem Menü (Anfragedatei von ks-core).
+# DocLibre: Neustart von Diensten oder Server aus dem Menü (Anfragedatei von ks-core).
 [Unit]
-Description=Kienzle-Suite Neustart (Anfragen)
+Description=DocLibre Neustart (Anfragen)
 
 [Path]
 PathExists=/var/lib/kienzle/core/anfragen/neustart.json

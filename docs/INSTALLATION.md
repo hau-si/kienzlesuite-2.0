@@ -1,4 +1,4 @@
-# Installation der Kienzle-Suite (Basis)
+# Installation DocLibre (Basis)
 
 Für die Praxis bzw. die betreuende IT. Was dabei technisch passiert: `docs/ARCHITEKTUR.md`.
 Prüfliste für die Test-VM: `docs/VM-TEST.md`.

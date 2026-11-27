@@ -1,7 +1,7 @@
-# Kienzle-Suite: signiertes Release prüfen und installieren, bei Fehler zurückspringen.
+# DocLibre: signiertes Release prüfen und installieren, bei Fehler zurückspringen.
 # Läuft als root ohne Sandbox: Der Installer richtet Pakete, Dienste und nginx ein.
 [Unit]
-Description=Kienzle-Suite Update anwenden
+Description=DocLibre Update anwenden
 After=network-online.target
 Wants=network-online.target
 

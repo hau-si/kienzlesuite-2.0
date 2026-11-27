@@ -1,6 +1,6 @@
-# Kienzle-Suite: Verbindungen speichern, prüfen und an die Module verteilen (root, Zugangsdaten bleiben root-eigen).
+# DocLibre: Verbindungen speichern, prüfen und an die Module verteilen (root, Zugangsdaten bleiben root-eigen).
 [Unit]
-Description=Kienzle-Suite Verbindungen anwenden
+Description=DocLibre Verbindungen anwenden
 After=network-online.target
 
 [Service]

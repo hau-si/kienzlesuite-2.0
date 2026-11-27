@@ -15,7 +15,7 @@ try {
     $audit = new AuditLog($config->dataDir);
     $request = Request::fromGlobals();
     $rpId = Passkeys::rpIdFrom($config);
-    $web = new Web($config, $db, $users, new Auth($db, $users, $audit, $request->remote), $rpId ? new Passkeys($db, $rpId, 'Kienzle-Suite') : null, $modules, $audit,
+    $web = new Web($config, $db, $users, new Auth($db, $users, $audit, $request->remote), $rpId ? new Passkeys($db, $rpId, 'DocLibre') : null, $modules, $audit,
         null, new Firewall($db, new Network(), $modules), new Updates($db, $config), new Connections($db), new Backup($db, $modules), null, new Printers($db), new Oidc($db, $users, $secrets, $config), store: new ModuleAdmin($db), starter: new Starter($db, $secrets, $config, dirname(__DIR__)));
     $web->handle($request)->send();
 } catch (Throwable $e) {
@@ -25,5 +25,5 @@ try {
     http_response_code(500);
     header('Content-Type: text/plain; charset=utf-8');
     header('Cache-Control: no-store');
-    echo "Interner Fehler der Kienzle-Suite. Details im Systemprotokoll (journalctl -t kienzle-core-php).\n";
+    echo "Interner Fehler DocLibre. Details im Systemprotokoll (journalctl -t kienzle-core-php).\n";
 }

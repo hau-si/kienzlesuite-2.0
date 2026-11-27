@@ -66,10 +66,10 @@ func AnsichtBauen(s Status, vorhanden bool, jetzt time.Time) Ansicht {
 	switch {
 	case wirdAktualisiert:
 		v.Farbe, v.Kopf = Blau, "wird aktualisiert …"
-		v.Zeilen = append(v.Zeilen, Zeile{"Kienzle-Agent", "lädt die neue Fassung und startet gleich neu, bitte kurz warten", Blau})
+		v.Zeilen = append(v.Zeilen, Zeile{"DocLibre-Agent", "lädt die neue Fassung und startet gleich neu, bitte kurz warten", Blau})
 	case alt:
 		v.Farbe, v.Kopf = Rot, "Agent läuft nicht"
-		v.Zeilen = append(v.Zeilen, Zeile{"Kienzle-Agent", "keine Rückmeldung – PC neu starten oder Paket erneut ausführen", Rot})
+		v.Zeilen = append(v.Zeilen, Zeile{"DocLibre-Agent", "keine Rückmeldung – PC neu starten oder Paket erneut ausführen", Rot})
 	case !s.Verbunden:
 		v.Farbe, v.Kopf = Rot, "keine Verbindung"
 		v.Zeilen = append(v.Zeilen, Zeile{"Verbindung", kuerzen(s.Fehler, 90), Rot})
@@ -128,7 +128,7 @@ func AnsichtBauen(s Status, vorhanden bool, jetzt time.Time) Ansicht {
 			v.Farbe = z.Farbe
 		}
 	}
-	v.Tooltip = kuerzen("Kienzle-Suite – "+v.Kopf+map[bool]string{true: " (" + s.Name + ")", false: ""}[s.Name != "" && !alt], 120)
+	v.Tooltip = kuerzen("DocLibre – "+v.Kopf+map[bool]string{true: " (" + s.Name + ")", false: ""}[s.Name != "" && !alt], 120)
 	return v
 }
 
