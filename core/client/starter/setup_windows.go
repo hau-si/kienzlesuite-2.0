@@ -3,9 +3,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"syscall"
 	"unsafe"
 )
@@ -54,12 +54,58 @@ func setupStart() bool {
 		setupMeldung("Paket nicht lesbar: " + err.Error())
 		return true
 	}
-	cmd := exec.Command("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", dir+`\install-windows.ps1`)
-	cmd.Dir = dir
-	// Eigenes Konsolenfenster (das Programm selbst hat keins): CREATE_NEW_CONSOLE.
-	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: 0x00000010}
-	if err := cmd.Run(); err != nil {
-		setupMeldung(fmt.Sprintf("Die Einrichtung ist mit einem Fehler beendet (%v). Bitte die Meldungen im Fenster prüfen oder das Paket erneut laden.", err))
+	// Über ShellExecuteEx starten, nicht über exec.Command: Go verbindet sonst Ein- und Ausgabe des Kindprozesses mit NUL,
+	// das Fenster bliebe leer und „Enter drücken“ würde nicht warten.
+	code, err := shellStartenUndWarten("powershell.exe", `-NoProfile -ExecutionPolicy Bypass -File "`+dir+`\install-windows.ps1"`, dir)
+	if err != nil {
+		setupMeldung("PowerShell ließ sich nicht starten: " + err.Error())
+	} else if code != 0 {
+		setupMeldung(fmt.Sprintf("Die Einrichtung ist mit Fehler %d beendet. Bitte die Meldungen im Fenster bzw. das Protokoll %%TEMP%%\\praxisherz-einrichtung.log prüfen.", code))
 	}
 	return true
+}
+
+// shellExecuteInfo entspricht SHELLEXECUTEINFOW (64 Bit).
+type shellExecuteInfo struct {
+	cbSize       uint32
+	fMask        uint32
+	hwnd         uintptr
+	lpVerb       *uint16
+	lpFile       *uint16
+	lpParameters *uint16
+	lpDirectory  *uint16
+	nShow        int32
+	hInstApp     uintptr
+	lpIDList     uintptr
+	lpClass      *uint16
+	hkeyClass    uintptr
+	dwHotKey     uint32
+	hIcon        uintptr
+	hProcess     uintptr
+}
+
+var (
+	pShellExecuteExW     = shell32.NewProc("ShellExecuteExW")
+	pWaitForSingleObject = kernel32.NewProc("WaitForSingleObject")
+	pGetExitCodeProcess  = kernel32.NewProc("GetExitCodeProcess")
+)
+
+// shellStartenUndWarten startet ein Programm mit eigenem, sichtbarem Fenster und wartet auf sein Ende (Rückgabe: Exit-Code).
+func shellStartenUndWarten(datei, parameter, ordner string) (uint32, error) {
+	f, _ := syscall.UTF16PtrFromString(datei)
+	p, _ := syscall.UTF16PtrFromString(parameter)
+	d, _ := syscall.UTF16PtrFromString(ordner)
+	info := shellExecuteInfo{fMask: 0x40 /* SEE_MASK_NOCLOSEPROCESS */, lpFile: f, lpParameters: p, lpDirectory: d, nShow: 1}
+	info.cbSize = uint32(unsafe.Sizeof(info))
+	if r, _, e := pShellExecuteExW.Call(uintptr(unsafe.Pointer(&info))); r == 0 {
+		return 0, e
+	}
+	if info.hProcess == 0 {
+		return 0, errors.New("kein Prozess")
+	}
+	defer pCloseHandle.Call(info.hProcess)
+	pWaitForSingleObject.Call(info.hProcess, 0xFFFFFFFF)
+	var code uint32
+	pGetExitCodeProcess.Call(info.hProcess, uintptr(unsafe.Pointer(&code)))
+	return code, nil
 }

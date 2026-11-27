@@ -40,7 +40,7 @@ def fehlversuch(ip: str) -> None:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = 'Kienzle'
+    server_version = 'Praxisherz'
     sys_version = ''
     timeout = 10
 

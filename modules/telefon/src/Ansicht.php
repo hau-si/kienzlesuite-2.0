@@ -725,7 +725,7 @@ final class Ansicht {
                 . self::feld('google_stimme', 'Stimme', (string)($kz['google']['stimme'] ?? ''), 'Leer = de-DE-Chirp3-HD-Enceladus.')
                 . self::feld('google_tempo', 'Sprechtempo', (string)($kz['google']['tempo'] ?? ''), 'Leer = 0,93 (0,25 bis 2).') . '</details>';
             $o .= self::fold('sprachmenue', 'Sprachmenü', $kz['aktiv'] ? self::tag('ok', 'an') : self::tag('opt', 'aus'),
-                '<p class="muted">Sprachmenü aus Kienzlefon: Öffnungs- und Telefonzeiten, Begrüßung, Menü (Praxis, Rezept, Überweisung, Termin), Apotheken- und Fachstellenweg. '
+                '<p class="muted">Sprachmenü: Öffnungs- und Telefonzeiten, Begrüßung, Menü (Praxis, Rezept, Überweisung, Termin), Apotheken- und Fachstellenweg. '
                 . 'Erst einschalten, wenn die Ansagen erzeugt sind.</p>'
                 . ($kz['aktiv'] ? '<p><a class="button secondary" href="' . $h(tf_basis()) . '/sprachmenue">Zeiten, Ansagetexte, Menütasten und Wartemusik bearbeiten →</a></p>' : '')
                 . self::formular($csrf, 'sprachmenue-speichern', $form, 'Speichern') . self::ansagen($csrf, (string)$kz['tts']));

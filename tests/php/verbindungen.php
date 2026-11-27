@@ -36,9 +36,19 @@ function test_anfragen(): void {
 
 function test_seite(): void {
     [$env, $c] = con_env();
+    $mods = [];
+    foreach ($env->modules->all() as $id => $m) {
+        if ($id === 'kasse') $m['starters'] = [['schema' => 'praxisherz-kasse', 'label' => 'Kasse'], ['schema' => 'kienzle-igel', 'label' => 'IGeL <b>']];
+        $mods[] = $m;
+    }
+    $env->modules = Kienzle\Core\Modules::fromArray($mods);
     [$b] = admin_browser($env);
     $b->web = fn() => $b->defaultWeb(null, null, $c);
     $p = $b->get('/verwaltung/verbindungen');
+    // Einträge in T2med: alle Aufrufadressen der Module, neue Schreibweise mit Hinweis auf die frühere
+    check(str_contains($p->body, 'id="t2med"') && str_contains($p->body, 'praxisherz-kasse://?kontextId=') && str_contains($p->body, 'kienzle-igel://'), 'Verbindungen → T2med: alle Aufrufadressen');
+    check(str_contains($p->body, 'Frühere Adresse <code>kienzle-kasse://…</code>') && substr_count($p->body, 'Frühere Adresse') === 1, 'Hinweis auf die frühere Adresse');
+    check(!str_contains($p->body, 'IGeL <b>') && str_contains($p->body, 'IGeL &lt;b&gt;'), 'Kontext nicht maskiert');
     check($p->status === 200 && str_contains($p->body, 'value="https://t2med.example.org:16567/fhir"') && str_contains($p->body, 'gespeichert – leer lassen'), 'Seite unvollständig');
     check(!str_contains($p->body, '<script>') && !str_contains($p->body, 'Steuer<b>') && str_contains($p->body, 'Steuer&lt;b&gt;büro'), 'Inhalte nicht maskiert');
     check(str_contains($p->body, 'FHIR-Server antwortet') && str_contains($p->body, 'Patient lesen') && str_contains($p->body, 'ssh-ed25519 AAAATEST'), 'Prüfung, Nutzung oder SFTP-Schlüssel fehlen');

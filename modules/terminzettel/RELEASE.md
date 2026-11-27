@@ -1,5 +1,9 @@
 # Terminzettel – Release-Notizen
 
+## 1.3.0-beta.23
+
+- Druckermodell vTermine heißt „Praxisherz vTermine PDF“. Nicht auf der VM geprüft.
+
 ## 1.3.0-beta.22
 
 - Texte: „die Suite“/„der Suite“ heißt jetzt überall „Praxisherz“. Nur Texte geändert, mit Tests geprüft, nicht auf der VM.

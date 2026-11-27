@@ -12,8 +12,8 @@ function test_server(): void {
     Server::$unit = $env->dir . '/kienzle-servername.path'; touch(Server::$unit);
     [$b] = admin_browser($env);
     $p = $b->get('/verwaltung/server');
-    check($p->status === 200 && str_contains($p->body, 'name="kurzname" value="praxisherz"') && str_contains($p->body, '<option value="" selected>ohne Endung (empfohlen)') && !str_contains($p->body, 'name="praxis"'), 'Seite Server (ohne Praxisname)');
-    check(str_contains($p->body, 'kienzle.example.org</textarea>') && str_contains($p->body, 'über 192.0.2.5 erreichbar'), 'weitere Namen oder IP fehlen');
+    check($p->status === 200 && str_contains($p->body, '<option value="">ohne Endung (empfohlen)') && !str_contains($p->body, 'name="praxis"'), 'Seite Server (ohne Praxisname)');
+    check(str_contains($p->body, 'name="kurzname" value="kienzle"') && str_contains($p->body, '<option value=".example.org" selected>.example.org (bisher)') && str_contains($p->body, 'über 192.0.2.5 erreichbar'), 'heutiger Name mit eigener Endung fehlt');
     $r = $b->post('/verwaltung/server', ['aktion' => 'speichern', 'kurzname' => ' Kienzle ', 'endung' => '.praxis.internal', 'weitere' => '']);
     check($r->status === 303, 'Speichern');
     $f = $env->dir . '/anfragen/servername.json';
@@ -33,7 +33,7 @@ function test_server(): void {
     $r = $b->post('/verwaltung/praxis', ['aktion' => 'anschrift', 'street' => 'Musterweg 1', 'city' => '12345 Musterstadt', 'contact' => 'Telefon 01234 56789']);
     check($r->status === 200 && str_contains($b->get('/verwaltung/praxis')->body, 'value="Musterweg 1"'), 'Anschrift speichern');
     check($b->post('/verwaltung/praxis', ['aktion' => 'anschrift', 'street' => '<b>', 'city' => '', 'contact' => ''])->status === 422, 'Anschrift mit < abgelehnt');
-    foreach ([['kurzname' => ''], ['kurzname' => 'a b'], ['kurzname' => '-x'], ['endung' => '.example.org'], ['weitere' => 'a b!'],
+    foreach ([['kurzname' => ''], ['kurzname' => 'a b'], ['kurzname' => '-x'], ['endung' => '.example.net'], ['weitere' => 'a b!'],
               ['weitere' => implode("\n", array_map(fn($i) => "n$i.example.org", range(1, 11)))]] as $bad) {
         check($b->post('/verwaltung/server', $bad + $ok)->status === 422, 'ungültig angenommen: ' . json_encode($bad));
     }

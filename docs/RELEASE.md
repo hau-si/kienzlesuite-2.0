@@ -1,5 +1,13 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.38
+
+- **Fehler behoben: Beim Setup blieb das PowerShell-Fenster leer** und schloss sich bei einem Fehler sofort. Das Setup startet die Einrichtung jetzt mit sichtbarem Fenster; bei einem Fehler bleibt es offen („FEHLER: …“), das Protokoll steht in `%TEMP%\praxisherz-einrichtung.log` (Agent 2.3.10).
+- **Einrichten → Server:** Der heutige Servername wird wieder angezeigt, auch mit einer Endung, die nicht in der Auswahl steht (z. B. eigene Domain; erscheint als „(bisher)“).
+- **Einrichten → Arbeitsplätze:** statt der Adressliste ein Verweis auf **Verwaltung → Verbindungen → T2med**. Dort stehen jetzt alle Aufrufadressen aller Module (neue Schreibweise, frühere funktioniert weiter).
+- Sichtbares „Kienzle“ entfernt: GDT-Ordner im Hilfetext `C:\Praxisherz\GDT`, Druckerbeschreibungen und Druckermodell „Praxisherz …“ (bestehende Warteschlangen werden weiter erkannt).
+- Mit Tests geprüft. **Nicht unter Windows und nicht auf der VM geprüft.**
+
 ## 0.22.0-beta.37
 
 - **Fehler behoben (Nutzer-Meldung): Agent meldete „agent.json fehlt … C:\ProgramData\Praxisherz“.** Lagen im neuen Ordner schon Einstellungen, der Zugang des Agents aber nur im früheren Ordner „Kienzle“ (z. B. Paket nicht bis zum Ende gelaufen), suchte der Agent im neuen. Jetzt gilt der Ordner, in dem der Zugang liegt (Agent 2.3.9).

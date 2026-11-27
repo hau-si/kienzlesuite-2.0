@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.63
+
+- Drucker und Excel tragen „Praxisherz“ statt „Kienzle-SumUp“ (Druckauftrag, Belegdruck, Dateieigenschaften, Druckermodell vKasse/vBriefversand). Mit Tests geprüft, nicht auf der VM.
+
 ## 2.3.4-beta.62
 
 - Texte: „die Suite“/„der Suite“ heißt jetzt überall „Praxisherz“. Nur Texte geändert, mit Tests geprüft, nicht auf der VM.

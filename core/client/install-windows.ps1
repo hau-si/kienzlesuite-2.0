@@ -17,6 +17,18 @@ if (!$admin) {
     Start-Process powershell.exe -Verb RunAs -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $PSCommandPath + '"')
     exit 0
 }
+# Protokoll für Rückfragen; bei einem Fehler bleibt das Fenster offen (sonst schlösse es sich sofort und man sähe nichts).
+$log = Join-Path $env:TEMP 'praxisherz-einrichtung.log'
+try { Start-Transcript -Path $log -Force | Out-Null } catch { }
+trap {
+    Write-Host ''
+    Write-Host ('FEHLER: ' + $_) -ForegroundColor Red
+    Write-Host ('Protokoll: ' + $log)
+    try { Stop-Transcript | Out-Null } catch { }
+    Read-Host 'Zum Schließen Enter drücken'
+    exit 1
+}
+Write-Host ('Praxisherz-Agent wird eingerichtet (Protokoll: ' + $log + ') …')
 if (!(Test-Path client.json) -or !(Test-Path schemas.txt) -or !(Test-Path ca.crt)) { throw 'client.json, schemas.txt und ca.crt aus dem Paket fehlen. Bitte das Paket auf dem Server neu laden.' }
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64' -or $env:PROCESSOR_ARCHITEW6432 -eq 'ARM64') { 'arm64' } else { 'amd64' }
 $asset = "praxisherz-starter-windows-$arch.exe"
@@ -112,4 +124,5 @@ Write-Host ''
 Write-Host 'Arbeitsplatz eingerichtet. Das Paket kann gelöscht werden; künftig aktualisiert sich alles selbst.'
 Write-Host 'Für „Akte öffnen“: in T2med beim GDT-Gerät „Telefonaufruf“ als Importdatei C:\Praxisherz\GDT\AUFRUFi.gdt eintragen.'
 if (Test-Path 'C:\Kienzle\GDT') { Write-Host 'Bisher stand dort C:\Kienzle\GDT\AUFRUFi.gdt. Bitte in T2med umstellen; bis dahin schreibt der Agent die Datei in beide Ordner. Danach den Ordner C:\Kienzle löschen.' }
+try { Stop-Transcript | Out-Null } catch { }
 Read-Host 'Zum Schließen Enter drücken'

@@ -136,7 +136,7 @@ class Virtuell(Umgebung):
         self.assertEqual(stat.S_IMODE((self.t / 'ppd' / 'kienzle-beispiel-beispiel-drucker.ppd').stat().st_mode), 0o644)
         q = self.cups()['queues']['Beispiel-Drucker']
         self.assertEqual(q['uri'], 'kienzle-beispiel-beispiel-drucker:/Beispiel-Drucker')
-        self.assertTrue(q['desc'].startswith('Kienzle-Suite Modul beispiel:'))
+        self.assertTrue(q['desc'].startswith('Praxisherz Modul beispiel:'))
         self.assertIn('printer-is-shared=true', q['options'])
         self.assertIn('[Beispiel-Drucker]', (self.t / 'kienzle-drucker.conf').read_text())
         calls = len(self.cups()['calls'])

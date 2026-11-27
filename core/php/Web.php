@@ -207,21 +207,39 @@ final class Web {
     /** Endungen für den Servernamen, die die Zertifizierungsstelle erlaubt (verständlich beschriftet). */
     private const SUFFIXES = ['' => 'ohne Endung (empfohlen)', '.praxis.internal' => '.praxis.internal', '.fritz.box' => '.fritz.box (FRITZ!Box)', '.local' => '.local', '.lan' => '.lan'];
 
+    /**
+     * Wählbare Endungen: die festen und, falls der Server heute unter einer anderen Endung läuft (z. B. „.home.arpa“ oder eine
+     * eigene Domain), auch diese, damit Seite und Name zusammenpassen.
+     * @return array<string,string>
+     */
+    private function serverEndungen(): array {
+        $out = self::SUFFIXES;
+        foreach ($this->config->hostnames as $n) {
+            if (filter_var($n, FILTER_VALIDATE_IP) || !str_contains($n, '.')) continue;
+            foreach (self::SUFFIXES as $suf => $_) if ($suf !== '' && str_ends_with($n, $suf)) continue 2;
+            $eigene = substr($n, strpos($n, '.'));
+            $out[$eigene] = $eigene . ' (bisher)';
+            break;
+        }
+        return $out;
+    }
+
     private function serverPage(?string $error = null): Response {
         $st = $this->srv()->status();
+        $endungen = $this->serverEndungen();
         $ips = array_values(array_filter($st['names'], fn($n) => filter_var($n, FILTER_VALIDATE_IP)));
         $dns = array_values(array_filter($st['names'], fn($n) => !filter_var($n, FILTER_VALIDATE_IP)));
         // Erster Name mit bekannter Endung → Feld „Name“ und Auswahl der Endung; alles andere steht unter „Weitere Namen“.
         [$short, $suffix, $extra] = ['praxisherz', '', []];
         foreach ($dns as $i => $n) {
-            foreach (self::SUFFIXES as $suf => $_) {
-                if ($suf === '' ? !str_contains($n, '.') : (str_ends_with($n, $suf) && strlen($n) > strlen($suf))) { [$short, $suffix] = [substr($n, 0, -strlen($suf)), $suf]; unset($dns[$i]); break 2; }
+            foreach ($endungen as $suf => $_) {
+                if ($suf === '' ? !str_contains($n, '.') : (str_ends_with($n, $suf) && strlen($n) > strlen($suf) && !str_contains(substr($n, 0, -strlen($suf)), '.'))) { [$short, $suffix] = [substr($n, 0, -strlen($suf)), $suf]; unset($dns[$i]); break 2; }
             }
         }
         $extra = array_values($dns);
         if (!$this->srv()->named() && $extra) $short = explode('.', $extra[0])[0];
         $options = '';
-        foreach (self::SUFFIXES as $suf => $label) $options .= '<option value="' . V::h($suf) . '"' . ($suf === $suffix ? ' selected' : '') . '>' . V::h($label) . '</option>';
+        foreach ($endungen as $suf => $label) $options .= '<option value="' . V::h($suf) . '"' . ($suf === $suffix ? ' selected' : '') . '>' . V::h($label) . '</option>';
         $address = 'https://' . $short . $suffix . '/';
         $body = V::error($error) . ($st['last'] ? '<p class="' . (($st['last']['ok'] ?? false) ? 'notice' : 'error') . '">' . V::h((string)($st['last']['meldung'] ?? '')) . '</p>' : '')
             . ($st['pending'] ? '<p class="notice">Wird übernommen …</p>' : '')
@@ -346,7 +364,7 @@ final class Web {
         $names = '';
         try {
             if (!preg_match('/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/D', $short)) throw new Problem('Name des Servers: nur Buchstaben, Ziffern und Bindestrich, z. B. praxisherz.', 422);
-            if (!isset(self::SUFFIXES[$suffix])) throw new Problem('Bitte eine Endung wählen.', 422);
+            if (!isset($this->serverEndungen()[$suffix])) throw new Problem('Bitte eine Endung wählen.', 422);
             $ips = $r->field('ohne_ip') === '1' ? [] : array_filter($this->config->hostnames, fn($n) => filter_var($n, FILTER_VALIDATE_IP));
             $names = implode("\n", array_merge([$short . $suffix], preg_split('/\R/', trim($r->field('weitere', 3000))) ?: [], $ips));
             $this->srv()->save($names, $this->config->practice, $r->field('neue_ca') === '1');   // Praxisname unverändert; er steht unter Praxis
@@ -1855,10 +1873,7 @@ final class Web {
             . V::checkbox('pin', '1', 'Nur genau dieses Zertifikat annehmen (Pinning)', (bool)($t2['pin'] ?? false))
             . '<p class="muted small">Die „erlaubte fhirBasisUrl“ ist die FHIR-Adresse, die T2med beim Aufruf mitschickt (Platzhalter fhirBasisUrl). Die Adresse des FHIR-Servers oben gilt immer als erlaubt; weitere Zeilen nur, wenn T2med sich anders meldet. Bei einer Ablehnung zeigt die Kasse den tatsächlich gesendeten Wert.</p>'
             . '<button>Speichern</button></form>'
-            . '<div class="box wide"><h3>Eintrag in T2med (Drittanbieter-Zugriffe verwalten → Neue URL hinzufügen)</h3>'
-            . '<p>Als Adresse genau so eintragen, mit den Platzhaltern, und eine Bezeichnung wie „Kartenzahlung“ vergeben:</p>'
-            . '<p><code class="secret">praxisherz-kasse://?kontextId=${kontextId}&amp;fhirBasisUrl=${fhirBasisUrl}&amp;oAuthToken=${oAuthToken}</code></p>'
-            . '<p class="muted small">Ausführliche Anleitung mit Bildern: in der Kasse unter Einstellungen → Zahlung &amp; T2med. Der Starter muss auf dem Arbeitsplatz installiert sein.</p></div>'
+            . $this->t2medAufrufe()
             . ($t2 ? '<p>Zertifikat: ' . (($t2['zertifikat'] ?? '') !== '' ? '<code>' . V::h((string)$t2['zertifikat']) . '</code>' . ($t2['pin'] ? ' (fest hinterlegt)' : '') : '<strong>nicht hinterlegt</strong> (nur öffentlich beglaubigte Zertifikate werden angenommen)') . '</p>'
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('zertifikat-holen') . '<button>Zertifikat des Servers abrufen</button></form> '
                 . (($st['zertifikate']['t2med']['fingerprint'] ?? '') !== '' ? '<form method="post" action="/verwaltung/verbindungen" class="box">' . $this->hidden('zertifikat-uebernehmen', ['fingerprint' => (string)$st['zertifikate']['t2med']['fingerprint']])
@@ -2180,14 +2195,11 @@ final class Web {
         $list = $this->modules->starters();
         $body = V::error($error) . ($notice ? '<p class="notice">' . V::h($notice) . '</p>' : '')
             . '<p>Ein Paket pro Arbeitsplatz richtet den <strong>Praxisherz-Agent</strong> ein: ein Programm, das Module direkt aus T2med öffnet (aktueller Patient wird mitgegeben) und unter Windows als Dienst mit Systemrechten läuft. '
-            . 'Der Agent fragt Praxisherz alle paar Sekunden und hält Starter, Aufrufe, Zertifikat und virtuelle Drucker selbst aktuell; „Akte öffnen“ legt er als GDT-Datei in <code>C:\Kienzle\GDT</code> ab '
-            . '(in T2med beim GDT-Gerät „Telefonaufruf“ als Importdatei <code>C:\Praxisherz\GDT\AUFRUFi.gdt</code> eintragen; früher <code>C:\Kienzle\GDT</code>, dorthin schreibt der Agent weiter, solange der Ordner besteht). Er führt keine Befehle von Praxisherz aus, nur diese festen Aufgaben. macOS und Linux bekommen vorerst nur den Starter (ohne Dienst).</p>';
+            . 'Der Agent fragt Praxisherz alle paar Sekunden und hält Starter, Aufrufe, Zertifikat und virtuelle Drucker selbst aktuell; „Akte öffnen“ legt er als GDT-Datei in <code>C:\Praxisherz\GDT</code> ab '
+            . '(in T2med beim GDT-Gerät „Telefonaufruf“ als Importdatei <code>C:\Praxisherz\GDT\AUFRUFi.gdt</code> eintragen). Er führt keine Befehle von Praxisherz aus, nur diese festen Aufgaben. macOS und Linux bekommen vorerst nur den Starter (ohne Dienst).</p>';
         if (!$list) return $body . '<p class="muted">Kein installiertes Modul bietet einen Startkontext an.</p>';
-        $rows = '';
-        foreach ($list as $s) $rows .= '<tr><td>' . V::h($this->modules->name($s['modul'])) . '</td><td>' . V::h($s['label']) . '</td><td><code>' . V::h($s['schema'] . '://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}') . '</code>'
-            . ($s['alt'] !== '' ? '<br><small class="muted">Frühere Adresse <code>' . V::h($s['alt']) . '://…</code> funktioniert weiter.</small>' : '') . '</td></tr>';
-        $body .= '<h3>Startkontexte</h3><p class="muted">Diese Adresse in T2med als Eintrag „Programm/URL“ je Kontext anlegen. Bestehende Einträge mit „kienzle-…“ funktionieren weiter; beim nächsten Bearbeiten in T2med bitte auf die neue Adresse umstellen.</p>'
-            . '<table><thead><tr><th>Modul</th><th>Kontext</th><th>Adresse in T2med</th></tr></thead><tbody>' . $rows . '</tbody></table>';
+        $body .= '<h3>Aufrufe aus T2med</h3><p>Die Adressen für die Einträge in T2med (je Modul) stehen unter '
+            . '<a href="/verwaltung/verbindungen#t2med">Verwaltung → Verbindungen → T2med</a>.</p>';
         $body .= '<h3>Paket laden</h3><p>Das Paket enthält Starterprogramm, Zertifikat, Starter-Schlüssel, die virtuellen Drucker der Module und das Einrichtungsskript. Schlägt die Druckereinrichtung fehl, gilt die Anleitung oben (Abschnitt „Virtuelle Drucker“). Nur für Admins, nach der Einrichtung löschen.</p><p class="row-buttons">';
         if (is_file($this->clientDist() . '/' . self::SETUP_PROGRAMM)) {
             $body .= '<a class="button primary" href="/verwaltung/arbeitsplaetze/' . self::SETUP_DATEI . '">Windows: ' . self::SETUP_DATEI . '</a></p>'
@@ -2367,6 +2379,21 @@ final class Web {
         $this->audit->write($admin, 'starter-schluessel-erneuert', '');
         $this->flash('Neuer Starter-Schlüssel erzeugt. Die Pakete bitte neu laden und die Arbeitsplätze neu einrichten.');
         return Response::redirect('/hilfe/arbeitsplatz#paket');
+    }
+
+    /** Kasten „Einträge in T2med“: je Modul mit Startkontext die Adresse (neu) und die frühere, die weiter funktioniert. */
+    private function t2medAufrufe(): string {
+        $list = $this->modules->starters();
+        $platzhalter = '://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}';
+        $out = '<div class="box wide" id="t2med"><h3>Einträge in T2med (Drittanbieter-Zugriffe verwalten → Neue URL hinzufügen)</h3>';
+        if (!$list) return $out . '<p class="muted">Kein installiertes Modul wird aus T2med aufgerufen.</p></div>';
+        $rows = '';
+        foreach ($list as $s) $rows .= '<tr><td>' . V::h($this->modules->name($s['modul'])) . '</td><td>' . V::h($s['label']) . '</td><td><code class="secret">' . V::h($s['schema'] . $platzhalter) . '</code>'
+            . ($s['alt'] !== '' ? '<br><small class="muted">Frühere Adresse <code>' . V::h($s['alt']) . '://…</code> funktioniert weiter.</small>' : '') . '</td></tr>';
+        return $out . '<p>Je Eintrag die Adresse genau so eintragen, mit den Platzhaltern, und eine Bezeichnung vergeben (z. B. „Kartenzahlung“). '
+            . 'Bestehende Einträge mit „kienzle-…“ funktionieren weiter; beim nächsten Bearbeiten in T2med bitte auf die neue Adresse umstellen.</p>'
+            . '<table><thead><tr><th>Modul</th><th>Kontext</th><th>Adresse in T2med</th></tr></thead><tbody>' . $rows . '</tbody></table>'
+            . '<p class="muted small">Voraussetzung am PC: der Praxisherz-Agent (Einrichten → Arbeitsplätze). Anleitung mit Bildern für die Kasse: Kasse → Einstellungen → Zahlung &amp; T2med.</p></div>';
     }
 
     public const SETUP_DATEI = 'Praxisherz-Setup.exe';

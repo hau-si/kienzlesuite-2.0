@@ -54,9 +54,7 @@ function test_seite_und_paket(): void {
     [$b] = admin_browser($env); st_web($env, $st, $b);
     check($b->get('/verwaltung/arbeitsplaetze')->status === 303, 'alte Starter-Seite leitet zu den Arbeitsplätzen');
     $page = $b->get('/hilfe/arbeitsplatz');
-    check($page->status === 200 && str_contains($page->body, 'id="paket"') && str_contains($page->body, 'praxisherz-kasse://?kontextId=') && str_contains($page->body, 'kienzle-igel://'), 'Startkontexte fehlen');
-    check(str_contains($page->body, 'Frühere Adresse <code>kienzle-kasse://…</code>') && substr_count($page->body, 'Frühere Adresse') === 1, 'Hinweis auf die frühere Adresse');
-    check(!str_contains($page->body, 'IGeL <b>') && str_contains($page->body, 'IGeL &lt;b&gt;'), 'nicht maskiert');
+    check($page->status === 200 && str_contains($page->body, 'id="paket"') && str_contains($page->body, 'href="/verwaltung/verbindungen#t2med"') && !str_contains($page->body, 'kontextId='), 'Arbeitsplätze: nur Verweis auf Verbindungen → T2med');
     check(str_contains($page->body, '/verwaltung/arbeitsplaetze/windows.zip'), 'Paket-Link fehlt');
     $zip = $b->get('/verwaltung/arbeitsplaetze/linux.zip');
     check($zip->status === 200 && $zip->header('Content-Type') === 'application/zip' && str_starts_with($zip->body, "PK\x03\x04"), 'ZIP');

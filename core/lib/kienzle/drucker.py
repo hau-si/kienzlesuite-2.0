@@ -51,7 +51,8 @@ if not Path(BIN['ippeveprinter']).is_file() and Path('/usr/bin/ippeveprinter').i
     BIN['ippeveprinter'] = '/usr/bin/ippeveprinter'
 JOB = re.compile(r'^[A-Za-z0-9_-]{1,40}-\d{1,9}$')
 WORKGROUP = re.compile(r'^[A-Za-z0-9][A-Za-z0-9-]{0,14}$')
-MARK = 'Kienzle-Suite'
+MARK = 'Praxisherz'
+MARK_FRUEHER = 'Kienzle-Suite'   # Warteschlangen vor der Umbenennung (Beschreibung beginnt damit)
 KINDS = {
     'tm-m10': {'label': 'Bondrucker Epson TM-m10 (58 mm)', 'port': 9100, 'name': 'TM-m10'},
     'tm-m30iii': {'label': 'Bondrucker Epson TM-m30III (80 mm)', 'port': 9100, 'name': 'TM-m30III'},
@@ -91,11 +92,11 @@ def ppd_text(p: dict) -> str:
     Mit „-m everywhere“ bietet CUPS zusätzlich Raster- und Bildformate an; der Windows-IPP-Treiber wählt dann ein Bildformat,
     und das PDF hat keine Textebene mehr (Texterkennung nötig)."""
     name = re.sub(r'[^A-Za-z0-9_-]', '', str(p['name'])) or 'Drucker'
-    label = re.sub(r'[^\x20-\x7e]', '?', f'Kienzle-Suite {p["name"]}')[:60].replace('"', "'")
+    label = re.sub(r'[^\x20-\x7e]', '?', f'Praxisherz {p["name"]}')[:60].replace('"', "'")
     paper = p.get('paper') if p.get('paper') in ('A4', 'A5', 'A6') else 'A4'          # nur das Papierformat des Moduls anbieten
     sizes = tuple(s for s in (('A6', 298, 420), ('A5', 420, 595), ('A4', 595, 842)) if s[0] == paper)
     lines = ['*PPD-Adobe: "4.3"', '*FormatVersion: "4.3"', '*FileVersion: "1.0"', '*LanguageVersion: English', '*LanguageEncoding: ISOLatin1',
-             f'*PCFileName: "{name[:8].upper()}.PPD"', '*Manufacturer: "Kienzle-Suite"', f'*Product: "({label})"', f'*ModelName: "{label}"',
+             f'*PCFileName: "{name[:8].upper()}.PPD"', '*Manufacturer: "Praxisherz"', f'*Product: "({label})"', f'*ModelName: "{label}"',
              f'*ShortNickName: "{label}"', f'*NickName: "{label} (PDF/PostScript)"', '*PSVersion: "(3010.000) 0"', '*LanguageLevel: "3"',
              '*ColorDevice: False', '*DefaultColorSpace: Gray', '*FileSystem: False', '*Throughput: "1"', '*LandscapeOrientation: Plus90',
              '*TTRasterizer: Type42', '*cupsVersion: 1.1', '*cupsManualCopies: True', '*cupsMaxCopies: 99',
@@ -218,8 +219,8 @@ def queues() -> list[dict]:
             if d:
                 desc = d.group(1).strip()
                 found[current]['description'] = desc
-                found[current]['managed'] = desc.startswith(MARK)
-                mm = re.match(rf'^{MARK} Modul ([a-z][a-z0-9-]{{1,28}}):', desc)
+                found[current]['managed'] = desc.startswith((MARK, MARK_FRUEHER))
+                mm = re.match(rf'^(?:{MARK}|{MARK_FRUEHER}) Modul ([a-z][a-z0-9-]{{1,28}}):', desc)
                 found[current]['modul'] = mm.group(1) if mm else ''
     shares = _read(STATE / 'freigaben.json', {})
     for q in found.values():
@@ -482,8 +483,8 @@ def unit_text(p: dict, port: int) -> str:
     mid = p['modul']
     spool = DATA / mid / 'druckauftraege'
     cmd = PROGRAMS / mid / 'current' / p['command']
-    return (f'# Kienzle-Suite: virtueller Drucker „{p["name"]}“ des Moduls {mid} (von kienzle-drucker erzeugt).\n[Unit]\n'
-            f'Description=Kienzle-Suite Drucker {p["name"]} ({mid})\nAfter=network.target avahi-daemon.service\nWants=avahi-daemon.service\n\n'
+    return (f'# Praxisherz: virtueller Drucker „{p["name"]}“ des Moduls {mid} (von kienzle-drucker erzeugt).\n[Unit]\n'
+            f'Description=Praxisherz Drucker {p["name"]} ({mid})\nAfter=network.target avahi-daemon.service\nWants=avahi-daemon.service\n\n'
             f'[Service]\nUser=ks-{mid}\nGroup=ks-{mid}\nEnvironment=KIENZLE_DRUCKER={p["name"]}\n'
             f'ExecStartPre=/usr/bin/mkdir -p {spool}\n'
             f'ExecStart={BIN["ippeveprinter"]} -p {port} -n localhost -r off -c {cmd} -f {",".join(p["formats"])} -d {spool} {p["scheme"]}\n'
@@ -726,7 +727,7 @@ def samba() -> bool:
     """Samba-Freigaben genau für die markierten Warteschlangen von Praxisherz. Liefert True, wenn sich etwas änderte."""
     shares = _read(STATE / 'freigaben.json', {})
     known = {q['name']: q for q in queues()}
-    parts = ['# Kienzle-Suite: von kienzle-drucker erzeugt, nicht von Hand ändern.\n']
+    parts = ['# Praxisherz: von kienzle-drucker erzeugt, nicht von Hand ändern.\n']
     for name in sorted(shares):
         q = known.get(name)
         if not q or not q['managed'] or 'samba' not in shares[name] or not NAME.match(name):
@@ -759,7 +760,7 @@ def network() -> dict:
 
 
 def network_conf(n: dict) -> str:
-    head = '# Kienzle-Suite: von kienzle-drucker erzeugt (Verwaltung → Drucker → Windows-Netz), nicht von Hand ändern.\n'
+    head = '# Praxisherz: von kienzle-drucker erzeugt (Verwaltung → Drucker → Windows-Netz), nicht von Hand ändern.\n'
     return head + f'   workgroup = {n["arbeitsgruppe"].upper()}\n   server role = standalone server\n'
 
 

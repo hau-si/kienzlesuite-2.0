@@ -1,5 +1,9 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.30
+
+- Texte ohne „Kienzle“ (Modulbeschreibung, Sprachmenü-Hinweis, Kennung der Telefon-Einrichtung). Mit Tests geprüft, nicht auf der VM.
+
 ## 0.1.0-beta.29
 
 - Texte: „die Suite“/„der Suite“ heißt jetzt überall „Praxisherz“. Nur Texte geändert, mit Tests geprüft, nicht auf der VM.
