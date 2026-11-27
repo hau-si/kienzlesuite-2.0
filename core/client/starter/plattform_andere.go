@@ -25,3 +25,6 @@ func (p *anderePlattform) GDTOrdner() string                                    
 
 // tray: Das Symbol in der Taskleiste gibt es nur unter Windows.
 func tray(string) error { return errors.New("Symbol in der Taskleiste nur unter Windows") }
+
+func einzigerDienst() bool { return true }
+func neuStarten(string)    {}

@@ -76,7 +76,8 @@ Say 'ok' ($out -join ' ')
 
 # Dienst: geplante Aufgabe mit Systemrechten beim Start des PCs, startet nach Ende oder Aktualisierung neu.
 $action = New-ScheduledTaskAction -Execute $exe -Argument '--dienst'
-$trigger = New-ScheduledTaskTrigger -AtStartup
+# Beim Start des PCs und zusätzlich alle 5 Minuten (läuft der Agent schon, beendet sich der zweite Start sofort).
+$trigger = @((New-ScheduledTaskTrigger -AtStartup), (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5)))
 $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
 $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 9999 -RestartInterval (New-TimeSpan -Minutes 1) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances IgnoreNew
 Register-ScheduledTask -TaskName $task -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description 'Kienzle-Suite: hält Starter, Zertifikat und Drucker aktuell, öffnet Akten in T2med.' -Force | Out-Null

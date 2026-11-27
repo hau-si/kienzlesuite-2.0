@@ -10,8 +10,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
+	"unsafe"
 )
 
 //go:embed drucker-agent.ps1
@@ -148,5 +150,49 @@ func (w *windowsPlattform) Symbol(programm string) error {
 			return fmt.Errorf("Rechte für %s: %v %s", ordner, err, strings.TrimSpace(string(out)))
 		}
 	}
-	return reg("add", `HKLM\Software\Microsoft\Windows\CurrentVersion\Run`, "/v", "KienzleSuite", "/t", "REG_SZ", "/d", `"`+programm+`" --tray`, "/f")
+	if err := reg("add", `HKLM\Software\Microsoft\Windows\CurrentVersion\Run`, "/v", "KienzleSuite", "/t", "REG_SZ", "/d", `"`+programm+`" --tray`, "/f"); err != nil {
+		return err
+	}
+	return aufgabeSichern()
+}
+
+// einzigerDienst: benannter Mutex für alle Sitzungen. Läuft schon ein Agent (z. B. der alte während einer Aktualisierung oder
+// ein zweiter Start der Aufgabe), höchstens eine Minute warten; der Mutex wird frei, wenn der andere endet.
+func einzigerDienst() bool {
+	runtime.LockOSThread() // der Mutex gehört dem Thread, der ihn hält; der Hauptthread bleibt bis zum Ende bestehen
+	h, _, _ := pCreateMutexW.Call(0, 0, uintptr(unsafe.Pointer(w16(`Global\KienzleAgentDienst`))))
+	if h == 0 {
+		return true
+	}
+	r, _, _ := kernel32.NewProc("WaitForSingleObject").Call(h, 60_000)
+	return r == 0 || r == 0x80 // WAIT_OBJECT_0, WAIT_ABANDONED
+}
+
+// neuStarten startet das (neue) Programm als Dienst, losgelöst von diesem Prozess; es wartet in einzigerDienst, bis dieser endet.
+func neuStarten(exe string) {
+	for _, flags := range []uint32{0x01000000 | 0x00000200 | 0x00000008, 0x00000200 | 0x00000008} { // BREAKAWAY_FROM_JOB, NEW_PROCESS_GROUP, DETACHED_PROCESS
+		cmd := exec.Command(exe, "--dienst")
+		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: flags}
+		if cmd.Start() == nil {
+			_ = cmd.Process.Release()
+			return
+		}
+	}
+}
+
+// aufgabeSichern: Die geplante Aufgabe startet zusätzlich alle 5 Minuten (läuft der Agent, beendet sich der zweite Start sofort).
+// Ältere Einrichtungen hatten nur „beim Systemstart“; dort blieb der Agent nach der ersten Aktualisierung stehen.
+const aufgabeSkript = `$t = Get-ScheduledTask -TaskName 'Kienzle-Agent' -ErrorAction Stop
+if (!(@($t.Triggers) | Where-Object { $_.Repetition -and $_.Repetition.Interval })) {
+    $neu = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5)
+    Set-ScheduledTask -TaskName 'Kienzle-Agent' -Trigger (@($t.Triggers) + $neu) -ErrorAction Stop | Out-Null
+    Write-Output 'ergänzt'
+}`
+
+func aufgabeSichern() error {
+	out, err := versteckt(exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", aufgabeSkript)).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("geplante Aufgabe: %v %s", err, strings.TrimSpace(strings.ToValidUTF8(string(out), "?")))
+	}
+	return nil
 }

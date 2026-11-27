@@ -19,6 +19,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -303,7 +304,7 @@ func TestDruckerSkriptLoeschtNie(t *testing.T) {
 	if strings.Contains(einrichten, "Remove-Printer") || strings.Count(txt, "Remove-Printer ") != 1 || !strings.Contains(entfernen, "@(Alte | Where-Object { $wunsch -contains $_ })") {
 		t.Fatal("drucker-agent.ps1 darf beim Einrichten nie löschen; entfernen nur alte und bestätigte Drucker")
 	}
-	if !strings.Contains(druckerSkriptText(), "Set-Printer -Name $d.name -PortName $d.url") || !strings.Contains(druckerSkriptText(), "Restart-Service Spooler") {
+	if !strings.Contains(druckerSkriptText(), "Set-Printer -Name ([string]$d.name) -PortName ([string]$d.url)") || !strings.Contains(druckerSkriptText(), "Restart-Service Spooler") {
 		t.Fatal("vorhandene Drucker werden umgestellt, nicht neu angelegt")
 	}
 }
@@ -366,5 +367,35 @@ func TestAlteDruckerNurNachBestaetigung(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "anstoss", "drucker-entfernen")); err == nil {
 		t.Fatal("Bestätigung muss danach weg sein")
+	}
+}
+
+// Der Ausdruck in Passt (drucker-agent.ps1) erkennt Drucker, die mit Servername oder IP auf dieselbe Warteschlange zeigen.
+func TestDruckerSkriptPasstAusdruck(t *testing.T) {
+	txt := druckerSkriptText()
+	i := strings.Index(txt, "[string]$port -notmatch '")
+	if i < 0 {
+		t.Fatal("Passt fehlt")
+	}
+	roh := txt[i+len("[string]$port -notmatch '"):]
+	roh = roh[:strings.Index(roh, "'")]
+	re := regexp.MustCompile(roh)
+	for _, f := range []struct {
+		port, host, queue string
+	}{
+		{"http://192.0.2.5:631/printers/vKasse", "192.0.2.5", "vKasse"},
+		{"HTTP://kienzle.example.org:631/printers/vTermine/", "kienzle.example.org", "vTermine"},
+		{"http://[fe80::1]:631/printers/vFax1", "fe80::1", "vFax1"},
+		{"http://kienzle.example.org/printers/vFax2", "kienzle.example.org", "vFax2"},
+	} {
+		m := re.FindStringSubmatch(f.port)
+		if m == nil || m[1]+m[2] != f.host || m[4] != f.queue {
+			t.Fatalf("%s: %q", f.port, m)
+		}
+	}
+	for _, p := range []string{"IP_192.0.2.5", "http://192.0.2.5:8080/printers/vKasse", "USB001"} {
+		if re.MatchString(p) {
+			t.Fatalf("%s darf nicht passen", p)
+		}
 	}
 }

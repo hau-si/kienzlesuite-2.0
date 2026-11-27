@@ -9,16 +9,29 @@ $ErrorActionPreference = 'Continue'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch { }  # Umlaute in Namen und Windows-Meldungen
 $list = @(Get-Content -Raw $Liste | ConvertFrom-Json | Where-Object { $_.name -match '^[A-Za-z0-9_-]{1,40}$' -and $_.url -match '^http://[^\s/]+:631/printers/' })
 
+# Adressen des Servers: Name aus der Suite und seine IP-Adressen (IPv4 zuerst; IPv6 ohne Zonenangabe wie „%18“).
+$hosts = @(); $ips = @()
+if ($list.Count) {
+    $hosts = @(([Uri]$list[0].url).Host.ToLower())
+    try { $ips = @([System.Net.Dns]::GetHostAddresses(([Uri]$list[0].url).Host) | Sort-Object { $_.AddressFamily -ne 'InterNetwork' }) } catch { }
+    $hosts += @($ips | ForEach-Object { ($_.IPAddressToString -replace '%.*$', '').ToLower() })
+}
+# Passt: Der Anschluss zeigt auf dieselbe Warteschlange dieses Servers, mit Namen oder IP-Adresse (z. B. früher von Hand mit
+# http://<IP>:631/printers/vKasse eingerichtet). Solche Drucker funktionieren und bleiben unverändert.
+function Passt($port, $d) {
+    if ($port -eq $d.url) { return $true }
+    if ([string]$port -notmatch '^(?i)https?://(?:\[([^\]]+)\]|([^/:\[]+))(:631)?/printers/([^/?#]+)/?$') { return $false }
+    $h = $(if ($Matches[1]) { $Matches[1] } else { $Matches[2] })
+    ($hosts -contains $h.ToLower()) -and ([Uri]::UnescapeDataString($Matches[4]).ToLower() -eq ([Uri]$d.url).Segments[-1].Trim('/').ToLower())
+}
+
 function Alte {
     if (!$list.Count) { return @() }
-    $u = [Uri]$list[0].url
-    $hosts = @($u.Host.ToLower())
-    try { $hosts += @([System.Net.Dns]::GetHostAddresses($u.Host) | ForEach-Object { $_.IPAddressToString.ToLower() }) } catch { }
     $queues = @($list | ForEach-Object { ([Uri]$_.url).Segments[-1].Trim('/').ToLower() })
     $namen = @($list | ForEach-Object { $_.name.ToLower() })
     @(Get-Printer -ErrorAction SilentlyContinue | Where-Object {
-        if ($_.PortName -notmatch '^(?i)(https?|ipp)://([^/:]+)(:\d+)?/printers/([^/?#]+)') { return $false }
-        $h = $Matches[2].ToLower(); $q = [Uri]::UnescapeDataString($Matches[4]).ToLower()
+        if ($_.PortName -notmatch '^(?i)(https?|ipp)://(?:\[([^\]]+)\]|([^/:\[]+))(:\d+)?/printers/([^/?#]+)') { return $false }
+        $h = $(if ($Matches[2]) { $Matches[2] } else { $Matches[3] }).ToLower(); $q = [Uri]::UnescapeDataString($Matches[5]).ToLower()
         ($hosts -contains $h) -and ($queues -notcontains $q) -and ($namen -notcontains $_.Name.ToLower())
     } | ForEach-Object { $_.Name })
 }
@@ -49,18 +62,23 @@ $fehlt = @(); $alt = @(); $ok = 0; $grund = ''
 $erreichbar = ''
 if ($list.Count) {
     $u = [Uri]$list[0].url
-    try { $ip = ([System.Net.Dns]::GetHostAddresses($u.Host) | Select-Object -First 1).IPAddressToString } catch { $ip = '' }
-    if (!$ip) { $erreichbar = 'Servername ' + $u.Host + ' an diesem PC unbekannt (Router oder hosts-Datei)' }
+    if (!$ips.Count) { $erreichbar = 'Servername ' + $u.Host + ' an diesem PC unbekannt (Router oder hosts-Datei)' }
     else {
-        $c = New-Object System.Net.Sockets.TcpClient
-        try { $c.ConnectAsync($ip, $u.Port).Wait(4000) | Out-Null } catch { }
-        if (!$c.Connected) { $erreichbar = 'Port ' + $u.Port + ' auf ' + $ip + ' nicht erreichbar (Firewall der Suite?)' }
-        $c.Close()
+        # Alle Adressen versuchen, IPv4 zuerst (eine IPv6-Adresse wie fe80::… allein sagt nichts über die Firewall).
+        $verbunden = $false
+        foreach ($ip in $ips) {
+            $c = New-Object System.Net.Sockets.TcpClient($ip.AddressFamily)
+            try { $c.ConnectAsync($ip, $u.Port).Wait(4000) | Out-Null } catch { }
+            if ($c.Connected) { $verbunden = $true }
+            $c.Close()
+            if ($verbunden) { break }
+        }
+        if (!$verbunden) { $erreichbar = 'Port ' + $u.Port + ' auf ' + $ips[0].IPAddressToString + ' nicht erreichbar (Firewall der Suite?)' }
     }
 }
 # Wie install-drucker.ps1 (manuell bewährt): nur wenn etwas fehlt oder umzustellen ist, Internetdrucken einschalten,
 # Druckwarteschlange neu starten (erst dann kennt Windows http://-Anschlüsse), Treiber laden, dann je Drucker bis zu 4 Versuche.
-$todo = @($list | Where-Object { $p = Get-Printer -Name $_.name -ErrorAction SilentlyContinue; !$p -or $p.PortName -ne $_.url })
+$todo = @($list | Where-Object { $p = Get-Printer -Name $_.name -ErrorAction SilentlyContinue; !$p -or !(Passt $p.PortName $_) })
 $ok = $list.Count - $todo.Count
 if ($todo.Count) {
     $f = Enable-WindowsOptionalFeature -Online -FeatureName Printing-Foundation-InternetPrinting-Client -NoRestart -ErrorAction SilentlyContinue
@@ -74,14 +92,14 @@ foreach ($d in $todo) {
     $p = Get-Printer -Name $d.name -ErrorAction SilentlyContinue
     if ($p) {
         # Vorhanden mit anderer Adresse (z. B. früher von Hand mit der IP eingerichtet): nur umstellen, nie löschen.
-        for ($i = 1; $i -le 4 -and (Get-Printer -Name $d.name -ErrorAction SilentlyContinue).PortName -ne $d.url; $i++) {
+        for ($i = 1; $i -le 4 -and !(Passt (Get-Printer -Name $d.name -ErrorAction SilentlyContinue).PortName $d); $i++) {
             if (!(Get-PrinterPort -Name $d.url -ErrorAction SilentlyContinue)) {
                 try { Add-PrinterPort -Name $d.url -ErrorAction Stop } catch { if (!$grund) { $grund = 'Anschluss: ' + $_.Exception.Message } }
             }
             Start-Sleep 3
-            try { Set-Printer -Name $d.name -PortName $d.url -ErrorAction Stop } catch { if (!$grund) { $grund = 'Umstellen: ' + $_.Exception.Message } }
+            try { Set-Printer -Name ([string]$d.name) -PortName ([string]$d.url) -ErrorAction Stop } catch { if (!$grund) { $grund = 'Umstellen: ' + $_.Exception.Message } }
         }
-        if ((Get-Printer -Name $d.name -ErrorAction SilentlyContinue).PortName -eq $d.url) { $ok++ } else { $alt += $d.name }
+        if (Passt (Get-Printer -Name $d.name -ErrorAction SilentlyContinue).PortName $d) { $ok++ } else { $alt += $d.name }
         continue
     }
     for ($i = 1; $i -le 4 -and !(Get-Printer -Name $d.name -ErrorAction SilentlyContinue); $i++) {

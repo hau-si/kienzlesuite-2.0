@@ -30,7 +30,7 @@ import (
 var DruckerPause = 10 * time.Minute
 
 // Version des Programms (scripts/starter-bauen setzt sie nicht; der Server vergleicht die Prüfsumme der Datei).
-const version = "2.2.0"
+const version = "2.3.0"
 
 // AgentConfig steht in agent.json (nur für SYSTEM und Administratoren lesbar).
 type AgentConfig struct {

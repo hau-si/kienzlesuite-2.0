@@ -1,5 +1,13 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.18
+
+- **Fehler behoben: Agent blieb nach seiner Aktualisierung stehen** (Arbeitsplatz „zuletzt …“, alte Version). Die geplante Aufgabe startet ein Programm, das mit Fehlercode endet, nicht neu. Der Agent startet sich nach der Aktualisierung jetzt selbst neu. Zusätzlich startet die Aufgabe alle 5 Minuten; das trägt der Agent bei bestehenden Einrichtungen selbst nach. Ein benannter Mutex sorgt dafür, dass je PC nur ein Agent läuft.
+- **Fehler behoben: Drucker galten als „unverändert mit alter Adresse“,** obwohl sie funktionierten. Ein Drucker, der mit der IP-Adresse des Servers auf dieselbe Warteschlange zeigt (z. B. früher von Hand eingerichtet), gilt jetzt als eingerichtet und wird nicht umgestellt.
+- Die Prüfung von Port 631 versucht alle Adressen des Servers, IPv4 zuerst. Vorher meldete sie eine IPv6-Adresse wie `fe80::…` als nicht erreichbar.
+- Beim Umstellen eines Anschlusses werden Name und Adresse ausdrücklich als Text übergeben. Vorher meldete Windows „Argumenttransformation für den Parameter PortName“.
+- Programmversion 2.3.0. Geprüft mit Tests (Go, Ausdruck der Druckererkennung). **Nicht auf einem echten Windows-PC geprüft.** Ein Agent, der schon stehen geblieben ist, läuft erst nach einem Neustart des PCs oder einem erneuten Ausführen des Pakets wieder an.
+
 ## 0.22.0-beta.17
 
 - **Neu: Alte Kienzle-Drucker entfernen, nach Rückfrage.** Der Kienzle-Agent sucht höchstens alle 10 Minuten (und nach „Drucker prüfen“) nach Druckern, die auf die Suite zeigen (Servername oder dessen IP-Adresse), deren Warteschlange es dort aber nicht mehr gibt, z. B. „Terminzettel“ oder „SumUp-Rechnung“ von früher. Das Symbol in der Taskleiste zeigt sie gelb unter „Alte Drucker“ und bietet „Alte Drucker entfernen …“ an. Gelöscht wird erst nach „Ja“ in der Rückfrage (Vorgabe ist „Nein“), und nur Drucker, die der Agent unmittelbar davor erneut als alt erkennt. Der freie Anschluss wird mit entfernt.

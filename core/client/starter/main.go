@@ -37,12 +37,18 @@ func main() {
 			}
 			return
 		case "--dienst":
-			// Dauerbetrieb (geplante Aufgabe „Kienzle-Agent“ mit Systemrechten). Endet nur nach einer Aktualisierung mit Code 3,
-			// damit die Aufgabe das neue Programm startet.
+			// Dauerbetrieb (geplante Aufgabe „Kienzle-Agent“ mit Systemrechten). Nur ein Agent je PC: ein zweiter Start wartet
+			// höchstens eine Minute, bis der erste endet (nach einer Aktualisierung), sonst beendet er sich.
+			if !einzigerDienst() {
+				return
+			}
 			exe, _ := os.Executable()
 			_ = os.Remove(exe + ".alt")
 			a := &Agent{Ordner: datenOrdner(), Programm: exe, Plattform: neuePlattform(datenOrdner())}
 			if err := a.Dienst(nil); err != nil {
+				// Neues Programm eingespielt: selbst neu starten. Die geplante Aufgabe startet bei einem Ende mit Fehlercode
+				// nicht neu (das hielt Agenten nach der ersten Aktualisierung an); zur Sicherheit startet sie zusätzlich alle 5 Minuten.
+				neuStarten(exe)
 				os.Exit(3)
 			}
 			return
