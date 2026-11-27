@@ -45,7 +45,14 @@
     var geb = String(d.geburtsdatum || ''), m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(geb);
     document.getElementById('n-gewaehlt-info').textContent = geb ? 'geb. ' + (m ? m[3] + '.' + m[2] + '.' + m[1] : geb) : '';
     var zk = document.getElementById('n-zur-kasse');
-    if (zk) { var weg = quelle === 'kasse' && RUECKWEG.test(String(d.zurueck || '')); zk.hidden = !weg; if (weg) zk.href = d.zurueck; }
+    if (zk) {
+      // Aus der Kasse: Rückweg dorthin. Direkt aus T2med: Übergabe an die Kasse mit dem T2med-Zugang (Zahlung wird dort in die Akte geschrieben).
+      var weg = quelle === 'kasse' && RUECKWEG.test(String(d.zurueck || ''));
+      var uebergabe = quelle === 't2med' && !!kasten.getAttribute('data-kasse') && /^[A-Za-z0-9._-]{1,128}$/.test(String(d.kontext || ''));
+      zk.hidden = !weg && !uebergabe;
+      zk.href = weg ? d.zurueck : '#';
+      if (uebergabe) zk.setAttribute('data-kontext', d.kontext); else zk.removeAttribute('data-kontext');
+    }
     feld.hidden = true;
   }
   // Der Patient bleibt im Tab erhalten (Seitenwechsel, neuer Vorgang, Wechsel zur Kasse und zurück), bis „Entfernen“.
@@ -70,6 +77,23 @@
       document.getElementById('n-patient').focus();
     });
   })();
+  // „Zur Kasse“ bei Patienten direkt aus T2med: Übergabe anlegen und im selben Tab zur Kasse (dort erscheint der Patient oben).
+  document.addEventListener('click', function (e) {
+    var zk = e.target && e.target.closest ? e.target.closest('#n-zur-kasse[data-kontext]') : null;
+    if (!zk) return;
+    e.preventDefault();
+    var csrf = document.querySelector('meta[name="kienzle-csrf"]');
+    var basis = (location.pathname.match(/^\/[a-z0-9-]{1,31}/) || ['/signatur'])[0];
+    zk.setAttribute('aria-busy', 'true');
+    fetch(basis + '/zur-kasse', { method: 'POST', credentials: 'same-origin', body: new URLSearchParams({ 'kienzle-csrf': csrf ? csrf.content : '', kontext: zk.getAttribute('data-kontext') }) })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (a) {
+        zk.removeAttribute('aria-busy');
+        if (a.ok && /^\/[a-z0-9-]{1,31}\/#uebergabe=[0-9a-f]{32}$/.test(a.j.url || '')) { location.href = a.j.url; return; }
+        window.alert(a.j.error || 'Die Übergabe an die Kasse ist nicht möglich.');
+      })
+      .catch(function () { zk.removeAttribute('aria-busy'); window.alert('Keine Verbindung zum Server.'); });
+  });
   // Platzhalter-Knöpfe in den Vorlagen: {{name}} an der Cursorstelle des Textfelds einfügen.
   document.addEventListener('click', function (e) {
     var b = e.target && e.target.closest ? e.target.closest('[data-platzhalter]') : null;

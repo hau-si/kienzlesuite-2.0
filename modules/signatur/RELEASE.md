@@ -1,5 +1,10 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.35
+
+- **Neu: „Zur Kasse“ auch bei Patienten direkt aus T2med.** Der Knopf in der Patientenkarte gibt den Patienten samt T2med-Zugang an die Kasse weiter: über den gemeinsamen Ordner, einmalig, höchstens 5 Minuten, im selben Tab. Dort kann gleich kassiert werden, und die Zahlung geht in die Akte. Voraussetzung: Kasse ist installiert und für den Benutzer sichtbar, der Aufruf aus T2med ist höchstens 4 Stunden alt.
+- Mit Tests geprüft. **Nicht auf der VM und nicht mit echtem T2med geprüft.**
+
 ## 0.1.0-beta.34
 
 - **Neu: Live-Vorschau des Pads** (Vorschlag A). Liegt ein Vorgang am Pad, zeigt seine Karte links in „Vorgänge“ ein kleines Bild der Seite, die der Patient gerade sieht. Darunter steht der Stand, z. B. „Live · Unterschriftsseite 3 von 3 · wird unterschrieben“; die Anzeige erneuert sich etwa alle 1,5 Sekunden. So kann man am Empfang helfen, etwa „bitte auf Weiter tippen“.

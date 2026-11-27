@@ -150,6 +150,28 @@ final class App {
      * Leerer Vorgang ohne Patientenakte für die Startseite der Kasse: Leistungen (GOÄ/IGeL) oder ein freier Betrag, Karte, Bar oder Überweisung.
      * Name und Geburtsdatum des Patienten sind beim Bezahlen optional (siehe start()).
      */
+    /**
+     * Patientenübergabe aus einem anderen Modul (zuerst Signatur, docs/MODUL-SCHNITTSTELLE.md): Dort liegt im gemeinsamen Austauschordner
+     * uebergabe-kasse/<code>.json mit T2med-Kontext und Zugriffstoken (höchstens 5 Minuten alt). Einmalig einlösen (Datei wird gelöscht)
+     * und damit einen Besuch anlegen wie beim Aufruf aus T2med; der Zugang endet spätestens mit dem ursprünglichen Aufruf (4 Stunden).
+     */
+    public function uebergabeEinloesen(string $code, string $ordner, ?int $jetzt = null): array {
+        $jetzt ??= time();
+        if (!preg_match('/^[0-9a-f]{32}$/D', $code)) throw new Problem('Ungültige Übergabe.');
+        $datei = $ordner . '/uebergabe-kasse/' . $code . '.json';
+        $roh = is_file($datei) && !is_link($datei) && filesize($datei) <= 20000 ? (string)file_get_contents($datei) : '';
+        @unlink($datei);
+        $d = json_decode($roh, true);
+        if (!is_array($d) || !is_string($d['kontext'] ?? null) || !is_string($d['token'] ?? null) || (int)($d['zeit'] ?? 0) < $jetzt - 300 || (int)($d['zeit'] ?? 0) > $jetzt + 60) {
+            throw new Problem('Die Übergabe ist abgelaufen oder schon verwendet. Bitte im anderen Modul erneut „Zur Kasse“ wählen.', 410);
+        }
+        $basis = $this->config->get('fhir', 'launch_urls', [])[0] ?? $this->config->get('fhir', 'base_url', '');
+        $result = $this->launch(['context_id' => $d['kontext'], 'oauth_token' => $d['token'], 'fhir_base_url' => (string)$basis]);
+        $bis = (int)($d['bis'] ?? 0);
+        // Gebundene Werte sind Text: deshalb kein MIN(), sondern Vergleich mit der Spalte (INTEGER-Affinität).
+        if ($bis > $jetzt) $this->db->query('UPDATE visits SET expires_at=? WHERE context_id=? AND expires_at>?', [$bis, $d['kontext'], $bis]);
+        return $result;
+    }
     public function manualOpen(): array {
         $id = self::id();
         $this->db->query('INSERT INTO visits(id,context_id,patient_id,patient_name,patient_birthdate,patient_address,oauth_cipher,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?)',

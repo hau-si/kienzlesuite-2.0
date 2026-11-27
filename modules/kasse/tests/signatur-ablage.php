@@ -82,6 +82,23 @@ check(!$antwort(11)['ok'] && !$antwort(12)['ok'] && str_contains($antwort(12)['m
 check(glob("$aus/an-kasse/*") === [], 'Auftragsordner geleert (keine Endlosschleife des Pfad-Dienstes)');
 check(count($http->posts) === 3, 'nur gültige Aufträge an T2med');
 
+// Patientenübergabe aus Signatur: einmalig, höchstens 5 Minuten alt, Zugang endet mit dem ursprünglichen Aufruf
+mkdir("$aus/uebergabe-kasse", 0770);
+$code = str_repeat('ab', 16);
+$bis = time() + 1800;
+file_put_contents("$aus/uebergabe-kasse/$code.json", json_encode(['kontext' => 'kontext-ueb', 'token' => 'token-ueb', 'bis' => $bis, 'zeit' => time(), 'von' => 'signatur']));
+$r = $app->uebergabeEinloesen($code, $aus);
+check(str_contains($r['url'], '#launch=') && !is_file("$aus/uebergabe-kasse/$code.json"), 'Übergabe eingelöst, Datei gelöscht');
+$v = $app->db->one("SELECT * FROM visits WHERE context_id=?", ["kontext-ueb"]);
+check($v && (int)$v['expires_at'] <= $bis && (int)$v['expires_at'] > time() && $v['oauth_cipher'] !== '', 'Besuch mit Zugang höchstens bis zum ursprünglichen Ablauf');
+$zweimal = false; try { $app->uebergabeEinloesen($code, $aus); } catch (\KienzleKasse\Problem $e) { $zweimal = $e->http === 410; }
+check($zweimal, 'Übergabe nur einmal');
+file_put_contents("$aus/uebergabe-kasse/$code.json", json_encode(['kontext' => 'kontext-ueb', 'token' => 'token-ueb', 'zeit' => time() - 900]));
+$alt = false; try { $app->uebergabeEinloesen($code, $aus); } catch (\KienzleKasse\Problem $e) { $alt = $e->http === 410; }
+check($alt && !is_file("$aus/uebergabe-kasse/$code.json"), 'alte Übergabe abgelehnt und gelöscht');
+$falsch = false; try { $app->uebergabeEinloesen('../x', $aus); } catch (\KienzleKasse\Problem) { $falsch = true; }
+check($falsch, 'ungültiger Code');
+
 // Ohne T2med (manuelle Kasse) kein Vormerken
 check($app->signaturOffen(['id' => 'x', 'patient_id' => 'manual', 'context_id' => 'manual-1', 'oauth_cipher' => '']) === ['ablage' => false], 'manuell: nichts vormerken');
 echo "Signatur-Ablage der Kasse: alles in Ordnung\n";

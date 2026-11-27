@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.28
+
+- Modul-Schnittstelle: neuer Abschnitt **„Patientenübergabe zwischen Modulen“** (`docs/MODUL-SCHNITTSTELLE.md`). Ein Patient mit T2med-Zugang geht über den gemeinsamen Austauschordner an ein anderes Modul (Datei `uebergabe-<ziel>/<code>.json`, höchstens 5 Minuten, einmalig, im selben Tab). Nur Dokumentation.
+
 ## 0.22.0-beta.27
 
 - **Fehler behoben: Das Statusfenster des Symbols in der Taskleiste konnte beim Klick auf einen Knopf komplett hängen bleiben** (Nutzer-Meldung: „bei Neustart des PC und dann Klick auf Tray-Icon öffnet sich das Statusfenster, dieses hängt sich aber bei Klick darauf ganz oft komplett auf“). Alle Knöpfe des Fensters (Suite öffnen, Drucker prüfen, Protokoll, Alte Drucker entfernen) schrieben Dateien oder starteten Programme (Browser, `notepad.exe`) bisher direkt im Fenster-Thread; läuft `CreateProcess` oder ein Dateizugriff dabei einmal langsam (z. B. weil der Virenscanner kurz nach dem Hochfahren jede neue Datei und jedes gestartete Programm prüft), blockiert das die ganze Nachrichtenschleife des Fensters – es reagiert dann auf nichts mehr, bis der Scan durch ist, und wirkt „komplett aufgehängt“. Diese Aktionen laufen jetzt in einem eigenen Hintergrund-Thread; das Fenster bleibt dabei immer reagierfähig (die Win32-Aufrufe selbst macht weiterhin nur der Fenster-Thread, der Hintergrund-Thread meldet nur sein Ergebnis zurück). Die Rückfrage „Alte Drucker entfernen?“ bleibt bewusst wartend (soll eine Antwort abwarten), nur das Schreiben danach ist jetzt asynchron.

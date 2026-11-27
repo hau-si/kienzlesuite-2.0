@@ -47,6 +47,13 @@ final class Speicher {
         self::pdo()->prepare('INSERT OR REPLACE INTO tokens (kontext, cipher, bis) VALUES (?, ?, ?)')->execute([$kontext, $cipher, $bis]);
     }
 
+    /** Ablauf des Tokens zu einem Kontext (Unix-Zeit, 0 = keins). */
+    public static function tokenBis(string $kontext): int {
+        $st = self::pdo()->prepare('SELECT bis FROM tokens WHERE kontext = ?');
+        $st->execute([$kontext]);
+        return (int)$st->fetchColumn();
+    }
+
     /** Token zu einem Kontext; null, wenn es keines gibt oder es abgelaufen ist. */
     public static function tokenHolen(string $kontext, ?int $jetzt = null): ?string {
         $jetzt ??= time();

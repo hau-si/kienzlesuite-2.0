@@ -35,6 +35,11 @@ try {
     } elseif ($action === 'manual') {
         $result = $app->manualStart($input);
         $result['url'] = str_replace('/#launch=', ks_url('#launch='), $result['url']);
+    } elseif ($action === 'uebergabe_einloesen') {
+        // Patient aus einem anderen Modul (z. B. Signatur nach einem Aufruf aus T2med), mit dessen T2med-Zugang.
+        $ordner = '/var/spool/kienzle/austausch/kasse_signatur';
+        $result = $app->uebergabeEinloesen(App::string($input, 'code', 32), (string)($GLOBALS['KS_TEST_AUSTAUSCH'] ?? $ordner));
+        $result['url'] = str_replace('/#launch=', ks_url('#launch='), $result['url']);
     } elseif ($action === 'manual_open') {
         $result = $app->manualOpen();
         $result['url'] = str_replace('/#launch=', ks_url('#launch='), $result['url']);

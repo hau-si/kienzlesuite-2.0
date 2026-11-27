@@ -427,6 +427,17 @@ check(Seite::vorgang($k2v)['ablage'] === 'fehler' && Seite::vorgang($k2v)['meldu
 $alt = $neuerSignierter('kontext-unbekannt');
 \KienzleSignatur\Ablage::lauf(fn() => $fake);
 check(Seite::vorgang($alt)['ablage'] === 'fehler' && str_contains(Seite::vorgang($alt)['meldung'], 'abgelaufen'), 'ohne gültigen Token: Fehler mit Hinweis');
+// Patientenübergabe an die Kasse mit dem T2med-Zugang
+Speicher::tokenMerken('k-ueb', 'tok-ueb', time() + 3600);
+$code = \KienzleSignatur\Uebergabe::anKasse('k-ueb');
+$ue = "$dir/austausch/uebergabe-kasse/$code.json";
+$ud = json_decode((string)file_get_contents($ue), true);
+check(preg_match('/^[0-9a-f]{32}$/D', $code) === 1 && $ud['kontext'] === 'k-ueb' && $ud['token'] === 'tok-ueb' && $ud['bis'] > time() && (fileperms($ue) & 0777) === 0660, 'Übergabe mit Token für die Kasse (0660)');
+wirft(fn() => \KienzleSignatur\Uebergabe::anKasse('k-unbekannt'), 'ohne gültigen Token keine Übergabe');
+wirft(fn() => \KienzleSignatur\Uebergabe::anKasse('../x'), 'ungültiger Kontext');
+touch($ue, time() - 600);
+\KienzleSignatur\Uebergabe::anKasse('k-ueb');
+check(!is_file($ue), 'alte Übergaben werden weggeräumt');
 foreach (array_merge(glob("$dir/austausch/*/*") ?: [], glob("$dir/austausch/*/.*") ?: []) as $f) if (is_file($f)) unlink($f);
 foreach (glob("$dir/austausch/*") ?: [] as $d) rmdir($d);
 rmdir("$dir/austausch");

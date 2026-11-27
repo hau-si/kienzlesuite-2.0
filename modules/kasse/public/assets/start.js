@@ -75,6 +75,14 @@ function patientEntfernen() {
   try { sessionStorage.removeItem(PK); } catch { /* ohne sessionStorage */ }
   if (aktiv === 'patient' || aktiv === 'start') frei(); else patientKarte();
 }
+// Übergabe aus einem anderen Modul (#uebergabe=<code>, z. B. „Zur Kasse“ in Signatur): einmalig einlösen, dann wie ein Aufruf aus T2med.
+let uebergabe = null;
+(() => {
+  const m = /^#uebergabe=([0-9a-f]{32})$/.exec(location.hash || '');
+  if (!m) return;
+  history.replaceState(null, '', location.pathname + location.search);
+  uebergabe = api('uebergabe_einloesen', {code: m[1]}).then(r => { startHash = '#' + (r.url.split('#')[1] || ''); }).catch(e => alert(e.message));
+})();
 function startOeffnen() {
   if (!startHash) return;
   aktiv = 'start'; $('detail').hidden = true; $('work').hidden = false;
@@ -181,6 +189,7 @@ function anzeigen() {
 }
 function inArbeit() { try { return $('work').contentDocument.body.dataset.dirty === '1'; } catch { return false; } }
 async function liste() {
+  if (ersterLauf && uebergabe) { await uebergabe; uebergabe = null; }
   const startSeite = ersterLauf && (!!startHash || !!patient());
   if (ersterLauf && startHash) startOeffnen(); else if (ersterLauf && patient()) zumPatienten();
   try {

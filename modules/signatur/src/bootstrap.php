@@ -41,3 +41,9 @@ function sg_fhir(): KienzleSignatur\Fhir {
     }
     return new KienzleSignatur\Fhir($verbindung, $ca);
 }
+
+/** Pfad eines anderen Moduls aus dem Menü der Basis (z. B. „/kasse/“), null, wenn es fehlt oder der Benutzer es nicht sehen darf. */
+function sg_modulPfad(string $id): ?string {
+    foreach (sg_modul()->menue()['ids'] as $href => $mid) if ($mid === $id) return $href;
+    return null;
+}

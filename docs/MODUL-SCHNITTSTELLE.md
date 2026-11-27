@@ -185,3 +185,22 @@ Ein PHP-Modul kann eine Seite in den Rahmen der Suite setzen (Seitenleiste, Kopf
 (Inhalt der Seite bekommt `<main class="modul">`). Das Menü kommt mit der ohnehin laufenden Anmelde-Prüfung (Kopfzeile `X-Kienzle-Menue`),
 es entsteht also keine zusätzliche Anfrage. Die Sitzungs-Marke der Basis erhält das Modul nicht: Abmelden führt deshalb über „Mein Konto“.
 Schlanke Seiten (z. B. die Kassieren-Ansicht in T2med) bleiben ohne Rahmen.
+
+## Patientenübergabe zwischen Modulen
+
+Ein Patient, der in einem Modul aus T2med geöffnet wurde (mit T2med-Kontext und Zugriffstoken), lässt sich an ein anderes Modul
+weitergeben, damit dieses ebenfalls in die Akte schreiben kann (z. B. Signatur → Kasse: Zahlung dokumentieren). Weg und Regeln:
+
+- **Gemeinsamer Austauschordner** beider Module (`[[exchange]]` in beiden `module.toml`, z. B. `/var/spool/kienzle/austausch/kasse_signatur`).
+  Nur die beiden Modulbenutzer haben Zugriff (ACL der Basis).
+- Das abgebende Modul schreibt `uebergabe-<ziel>/<code>.json` mit `code` = 32 Hex-Zeichen (zufällig), Inhalt
+  `{"kontext", "token", "bis", "zeit", "von"}`, Dateirechte 0660 (das Ziel muss lesen und löschen), erst unter einem Punktnamen schreiben,
+  dann umbenennen. Alte Übergaben (älter als 5 Minuten) räumt es selbst weg.
+- Der Browser geht **im selben Tab** zu `/<ziel>/#uebergabe=<code>` (Fragment, geht nicht an den Server und nicht ins Protokoll).
+- Das Zielmodul löst einmalig ein: Datei lesen und sofort löschen, nur annehmen, wenn `zeit` höchstens 5 Minuten alt ist, dann wie beim
+  Aufruf aus T2med den Patienten über FHIR lesen (prüft Kontext und Token) und einen eigenen Vorgang anlegen. Der Zugang endet spätestens
+  zu `bis` (ursprünglicher Aufruf plus 4 Stunden).
+- Ohne T2med-Zugang (Patient von Hand) gibt es keine Übergabe mit Token; dann reicht die Übergabe der Angaben (z. B. Kasse → Signatur mit
+  `#uebergabe=<base64url-JSON>`).
+
+Umgesetzt: Signatur → Kasse (Knopf „Zur Kasse“ in der Patientenkarte, Signatur `src/Uebergabe.php`, Kasse `App::uebergabeEinloesen`).

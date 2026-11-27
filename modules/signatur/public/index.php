@@ -62,6 +62,21 @@ try {
         echo json_encode($z, JSON_UNESCAPED_UNICODE);
         exit;
     }
+    if ($rel === '/zur-kasse') {
+        // Patientenübergabe an die Kasse mit dem T2med-Zugang dieses Aufrufs (Knopf „Zur Kasse“ in der Patientenkarte).
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || !$darfVorgang || !$k->csrfGueltig($_POST['kienzle-csrf'] ?? null)) { http_response_code(403); echo '{"error":"Nicht erlaubt."}'; exit; }
+        $kasse = sg_modulPfad('kasse');
+        try {
+            if ($kasse === null) throw new InvalidArgumentException('Die Kasse ist nicht installiert oder für Sie nicht freigegeben.');
+            $code = \KienzleSignatur\Uebergabe::anKasse((string)($_POST['kontext'] ?? ''));
+            echo json_encode(['url' => $kasse . '#uebergabe=' . $code]);
+        } catch (InvalidArgumentException | RuntimeException $e) {
+            http_response_code(409); echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        }
+        exit;
+    }
     if ($rel === '/pad-hochladen') {
         // Roher Upload (nicht multipart): Für die PHP-Instanz der Module ist file_uploads aus.
         header('Content-Type: application/json; charset=utf-8');

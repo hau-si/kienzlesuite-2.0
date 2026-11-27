@@ -1,5 +1,11 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.56
+
+- **Neu: Patientenübergabe aus Signatur.** Wurde ein Patient direkt aus T2med in der Signatur geöffnet, führt dort „Zur Kasse“ in die Kasse. Die Kasse übernimmt den T2med-Zugang der Signatur, legt einen Besuch an wie beim Aufruf aus T2med (Patientenkarte oben, Aktenaufruf) und schreibt die Zahlung in die Akte. Der Zugang endet spätestens 4 Stunden nach dem ursprünglichen Aufruf.
+- Die Übergabe gilt einmal und höchstens 5 Minuten (`/kasse/#uebergabe=<code>`, Datei im gemeinsamen Ordner mit Signatur, wird beim Einlösen gelöscht).
+- Mit Tests und in der Vorschau geprüft. **Nicht auf der VM und nicht mit echtem T2med geprüft.**
+
 ## 2.3.4-beta.55
 
 - **„T2m-Rechnung“ und „IGeL“ oben in der Patientenkarte.** Liegt für den Patienten eine offene T2med-Rechnung vor, ist „T2m-Rechnung“ vorgewählt: Die Rechnung steht in der Mitte, wo sonst die IGeL-Liste steht. „IGeL“ zeigt dort wieder die Leistungsliste. Das gilt für Patienten aus T2med und für Rechnungen aus dem Eingang.
