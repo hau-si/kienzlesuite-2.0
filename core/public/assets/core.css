@@ -473,4 +473,5 @@ main.modul { max-width: 940px; }
 .pk-knoepfe { display: flex; align-items: center; gap: 8px; padding: 10px 14px; flex-wrap: wrap; justify-content: flex-end; }
 .pk-knopf, a.button.pk-knopf { display: inline-flex; align-items: center; gap: 6px; min-height: 0; padding: 8px 13px; border-radius: 9px; font-size: 14px; }
 .pk-weg { background: #fff; border: 1px solid #e6cfc6; color: #99412b; }
+.patient-karte [hidden] { display: none !important; }
 @media (max-width: 640px) { .patient-karte { flex-wrap: wrap; } .pk-knoepfe { width: 100%; justify-content: flex-start; } }

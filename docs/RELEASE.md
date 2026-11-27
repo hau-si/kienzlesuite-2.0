@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.23
+
+- **Fehler behoben:** In der Patientenkarte ließen sich Knöpfe nicht ausblenden. In Signatur standen ohne Patient trotzdem „Zur Kasse“ und „Entfernen“. `core.css?v=39`.
+- In der Vorschau geprüft. **Nicht auf der VM geprüft.**
+
 ## 0.22.0-beta.22
 
 - **Neu: Gestaltungsregel für Module** (`docs/MODUL-GESTALTUNG.md`): Patient oben als Karte, Vorgänge links, der Patient bleibt im Tab erhalten (auch beim Wechsel zwischen Modulen), Wechsel zwischen Modulen im selben Tab, alle Seiten 1400 px breit, Liniensymbole statt Emojis.
