@@ -1,5 +1,11 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.41
+
+- **Kopf wie in der Kasse:** Reiter **Start · Vorgänge · Editor**, rechts ein kleines Zahnrad für die Einstellungen. Die Vorlagen stehen jetzt unter „Editor“ (der neue Baustein-Editor folgt), die Einstellungen enthalten die Pads.
+- **Archivieren:** In der linken Spalte der Startseite hat jeder Vorgang die Symbole **Archivieren** und **Löschen** (rot, mit Rückfrage). Archivierte Vorgänge stehen unter „Vorgänge“ mit dem Filter „Archiv“ und lassen sich zurückholen (Datenbank 9, Spalte `archiviert`).
+- Mit Tests geprüft, nicht auf der VM.
+
 ## 0.1.0-beta.40
 
 - Texte: „die Suite“/„der Suite“ heißt jetzt überall „Praxisherz“. Nur Texte geändert, mit Tests geprüft, nicht auf der VM.

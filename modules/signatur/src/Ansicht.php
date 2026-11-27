@@ -12,12 +12,16 @@ final class Ansicht {
 
     private static function datum(int $t): string { return $t > 0 ? date('d.m.Y H:i', $t) : '–'; }
 
-    /** Seitenkopf mit Unterseiten wie in der Kasse: Start, Vorgänge, Einstellungen. */
-    private static function kopfzeile(string $route, bool $darfVorlage, bool $admin): string {
+    /** Seitenkopf wie in der Kasse: Reiter Start, Vorgänge, Editor; rechts ein kleines Zahnrad für die Einstellungen. */
+    private static function kopfzeile(string $route, bool $darfVorlage, bool $admin, bool $darfVorgang = true): string {
         $link = static fn(string $ziel, string $text, string $r, string $icon = ''): string => '<a class="button ' . ($route === $r ? 'primary' : 'secondary') . ' mit-icon" href="' . sg_h(sg_basis()) . $ziel . '"' . ($route === $r ? ' aria-current="page"' : '') . '>' . $icon . $text . '</a>';
-        return '<header class="seitenkopf"><div><p class="eyebrow">Signatur</p><h1>' . ['/' => 'Unterschriften', '/vorgaenge' => 'Vorgänge', '/einstellungen' => 'Einstellungen'][$route] . '</h1></div>'
-            . '<span class="start-tools">' . ($route === '/' ? '' : $link('/', 'Start', '', self::HAUS)) . ($route !== '/vorgaenge' ? $link('/vorgaenge', 'Alle Vorgänge', '/vorgaenge', self::LISTE) : '')
-            . ($route !== '/einstellungen' && ($darfVorlage || $admin) ? $link('/einstellungen', 'Einstellungen', '/einstellungen', self::ZAHNRAD) : '') . '</span></header>';
+        $titel = ['/' => 'Unterschriften', '/vorgaenge' => 'Vorgänge', '/editor' => 'Editor', '/einstellungen' => 'Einstellungen'][$route];
+        $o = '<header class="seitenkopf"><div><p class="eyebrow">Signatur</p><h1>' . $titel . '</h1></div><span class="start-tools">';
+        if ($darfVorgang) $o .= $link('/', 'Start', '/', self::HAUS) . $link('/vorgaenge', 'Vorgänge', '/vorgaenge', self::LISTE);
+        if ($darfVorlage) $o .= $link('/editor', 'Editor', '/editor', self::EDITOR);
+        if ($darfVorlage || $admin) $o .= '<a class="button ' . ($route === '/einstellungen' ? 'primary' : 'secondary') . ' us-zahnrad" href="' . sg_h(sg_basis()) . '/einstellungen" title="Einstellungen" aria-label="Einstellungen"'
+            . ($route === '/einstellungen' ? ' aria-current="page"' : '') . '>' . self::ZAHNRAD . '</a>';
+        return $o . '</span></header>';
     }
 
     /** Eine Zeile der Vorgangsliste mit Daten für die Filter (Art, Status, Suchtext). */
@@ -36,7 +40,7 @@ final class Ansicht {
             $stat .= '<div class="muted klein-text">' . ($v['kontakt_status'] === 'geschrieben' ? 'In T2med übernommen: ' : 'Für T2med vorgemerkt: ') . $h($was) . ($v['kontakt_status'] === 'fehler' ? ' – ' . $h((string)$v['kontakt_meldung']) : '') . '</div>';
         }
         $suche = mb_strtolower($v['patient'] . ' ' . $v['titel'] . ' ' . (Seite::ARTEN[$v['art']] ?? $v['art']));
-        return '<tr data-art="' . $h($v['art']) . '" data-status="' . $h($v['status']) . '" data-suche="' . $h($suche) . '"><td>' . $h(self::datum((int)$v['erstellt'])) . '</td><td>' . $h($v['patient']) . '</td><td>' . $h($v['titel']) . '</td><td>'
+        return '<tr data-art="' . $h($v['art']) . '" data-status="' . $h($v['status']) . '" data-archiv="' . ((int)($v['archiviert'] ?? 0) ? '1' : '0') . '" data-suche="' . $h($suche) . '"><td>' . $h(self::datum((int)$v['erstellt'])) . '</td><td>' . $h($v['patient']) . '</td><td>' . $h($v['titel']) . '</td><td>'
             . $h($padNamen[(int)($v['pad_id'] ?? 0)] ?? '–') . '</td><td>' . $stat . '</td><td class="us-aktionen">' . self::aktionen($v, $csrfFeld, $darfVorgang) . '</td></tr>';
     }
 
@@ -51,7 +55,7 @@ final class Ansicht {
     }
 
     /** Knöpfe zu einem Vorgang je nach Status. */
-    private static function aktionen(array $v, string $csrfFeld, bool $darfVorgang): string {
+    private static function aktionen(array $v, string $csrfFeld, bool $darfVorgang, bool $links = false): string {
         if (!$darfVorgang) return '';
         // Ansehen: unterschrieben = das PDF, sonst der Dokumenttext (neues Fenster).
         $o = '<a class="button secondary small" href="' . sg_h(sg_basis() . '/ansehen/' . (int)$v['id']) . '" target="_blank" rel="noopener">'
@@ -62,32 +66,39 @@ final class Ansicht {
         if ($v['status'] === 'unterschrieben' && (($v['ablage'] ?? '') === 'fehler' || (($v['ablage'] ?? '') === 'manuell' && ($v['quelle'] === 'kasse' || $v['kontext'] !== ''))))
             $o .= self::knopf($csrfFeld, 'ablage-erneut', (int)$v['id'], ($v['ablage'] === 'fehler' ? 'Erneut in T2med ablegen' : 'In T2med ablegen'), 'primary small');
         if ($v['status'] === 'abgebrochen') $o .= self::knopf($csrfFeld, 'wiederaufnehmen', (int)$v['id'], 'Wieder aufnehmen', 'primary small');
-        if ($v['status'] === 'am_pad') $o .= self::knopf($csrfFeld, 'abbrechen', (int)$v['id'], 'Abbrechen', 'danger small');
-        else $o .= self::knopf($csrfFeld, 'vorgang-loeschen', (int)$v['id'], 'Löschen', 'danger small', 'Diesen Vorgang endgültig löschen?');
-        return $o;
+        if ($v['status'] === 'am_pad') return $o . self::knopf($csrfFeld, 'abbrechen', (int)$v['id'], 'Abbrechen', 'danger small');
+        if ($links) {
+            // Linke Spalte der Startseite: kleine Symbole Archivieren und Löschen (rot).
+            return $o . self::symbolKnopf($csrfFeld, 'archivieren', (int)$v['id'], self::ARCHIV, 'Archivieren (bleibt unter „Vorgänge“)', '')
+                . self::symbolKnopf($csrfFeld, 'vorgang-loeschen', (int)$v['id'], self::MUELL, 'Löschen', 'Diesen Vorgang endgültig löschen?', true);
+        }
+        if ((int)($v['archiviert'] ?? 0)) $o .= self::knopf($csrfFeld, 'zurueckholen', (int)$v['id'], 'Zurückholen', 'small');
+        else $o .= self::knopf($csrfFeld, 'archivieren', (int)$v['id'], 'Archivieren', 'small');
+        return $o . self::knopf($csrfFeld, 'vorgang-loeschen', (int)$v['id'], 'Löschen', 'danger small', 'Diesen Vorgang endgültig löschen?');
     }
 
     public static function seite(string $route, string $csrf, array $vorgaenge, array $vorlagen, bool $darfVorgang, bool $darfVorlage, ?string $meldung, ?string $fehler, ?array $bearbeite = null, ?array $pad = null, array $pads = [], ?array $aktuell = null): string {
         $h = 'sg_h';
         $csrfFeld = '<input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '">';
         $admin = $pad !== null;
-        $o = '<div class="us">' . self::kopfzeile($route, $darfVorlage, $admin);
+        $o = '<div class="us">' . self::kopfzeile($route, $darfVorlage, $admin, $darfVorgang);
         if ($meldung) $o .= '<p class="ok" role="status">' . $h($meldung) . '</p>';
         if ($fehler) $o .= '<p class="fehler" role="alert">' . $h($fehler) . '</p>';
         $padNamen = [];
         foreach ($pads as $p) $padNamen[(int)$p['id']] = $p['name'];
 
         if ($route === '/vorgaenge') return $o . self::vorgangsliste($csrfFeld, $vorgaenge, $padNamen, $darfVorgang) . '</div>';
+        if ($route === '/editor') return $o . ($darfVorlage ? self::vorlagen($csrfFeld, $vorlagen, $bearbeite) : '') . '</div>';
         if ($route === '/einstellungen') {
-            if ($darfVorlage) $o .= self::vorlagen($csrfFeld, $vorlagen, $bearbeite);
             if ($admin) $o .= self::pads($csrfFeld, $pads) . self::pad($csrfFeld, $pad);
+            else $o .= '<section class="card"><p class="muted">Vorlagen bearbeiten Sie unter „Editor“. Pads richtet ein Admin ein.</p></section>';
             return $o . '</div>';
         }
 
         // Linke Spalte: offene Vorgänge (wie die Liste der Kasse), rechts groß Patient und Dokumentauswahl.
         // Wie in der Kasse: die letzten Tage (7), neuester oben, unabhängig vom Status.
         $grenze = time() - 7 * 86400;
-        $offene = array_values(array_filter($vorgaenge, fn($v) => (int)$v['erstellt'] >= $grenze));
+        $offene = array_values(array_filter($vorgaenge, fn($v) => (int)$v['erstellt'] >= $grenze && !(int)($v['archiviert'] ?? 0)));
         usort($offene, fn($x, $y) => ((int)$y['erstellt'] <=> (int)$x['erstellt']) ?: ((int)$y['id'] <=> (int)$x['id']));
         $links = '<aside class="card us-links"><div class="us-kopf"><h2>Vorgänge</h2><a class="muted klein-text" href="' . $h(sg_basis()) . '/vorgaenge">Alle</a></div>';
         if (!$offene) $links .= '<p class="muted">Keine Vorgänge in den letzten Tagen. Rechts einen neuen anlegen.</p>';
@@ -97,7 +108,7 @@ final class Ansicht {
                 . ($v['meldung'] !== '' ? '<div class="muted klein-text">' . $h($v['meldung']) . '</div>' : '')
                 // Live-Vorschau des Pads (Vorschlag A): app.js lädt Bild und Stand alle 1,5 s.
                 . ($v['status'] === 'am_pad' ? '<div class="us-padvorschau" data-vorschau="' . $h(sg_basis() . '/pad-vorschau/' . (int)$v['id']) . '"><img alt="Was der Patient gerade am Pad sieht" hidden><div class="us-pv-stand muted klein-text"><span class="us-pv-punkt"></span><span class="us-pv-text">Pad wird verbunden …</span></div></div>' : '')
-                . '<div class="aktionen">' . self::aktionen($v, $csrfFeld, $darfVorgang) . '</div></div>';
+                . '<div class="aktionen">' . self::aktionen($v, $csrfFeld, $darfVorgang, true) . '</div></div>';
         }
         $links .= '</aside>';
         // Patient aus T2med oder der Kasse: Kasten oben rechts (JS blendet ihn ein und das Patientenfeld im Formular aus).
@@ -160,11 +171,16 @@ final class Ansicht {
         foreach (Seite::ARTEN as $k => $l) $o .= '<option value="' . $h($k) . '">' . $h($l) . '</option>';
         $o .= '</select><select id="vg-status" aria-label="Status"><option value="">Alle Status</option>';
         foreach (Seite::STATI as $k => $l) $o .= '<option value="' . $h($k) . '">' . $h($l) . '</option>';
-        $o .= '</select></div><p class="muted" id="vg-zahl" role="status" aria-live="polite"></p>';
+        $o .= '</select><select id="vg-archiv" aria-label="Archiv"><option value="0">Aktuell</option><option value="1">Archiv</option><option value="">Alle</option></select></div><p class="muted" id="vg-zahl" role="status" aria-live="polite"></p>';
         if (!$vorgaenge) return $o . '<p class="muted">Noch keine Vorgänge.</p></section>';
         $o .= '<table class="us-tabelle" id="vg-tabelle"><thead><tr><th>Angelegt</th><th>Patient</th><th>Dokument</th><th>Pad</th><th>Status</th><th></th></tr></thead><tbody>';
         foreach ($vorgaenge as $v) $o .= self::zeile($v, $padNamen, $csrfFeld, $darfVorgang);
         return $o . '</tbody></table><p class="muted" id="vg-leer" hidden>Kein Vorgang passt zu Suche und Filtern.</p></section>';
+    }
+
+    private static function symbolKnopf(string $csrfFeld, string $aktion, int $id, string $symbol, string $titel, string $frage, bool $rot = false): string {
+        return '<form method="post" class="inline">' . $csrfFeld . '<input type="hidden" name="aktion" value="' . $aktion . '"><input type="hidden" name="id" value="' . $id . '"><button class="us-symbol' . ($rot ? ' rot' : '') . '" type="submit" title="' . sg_h($titel) . '" aria-label="' . sg_h($titel) . '"'
+            . ($frage !== '' ? ' data-bestaetigen="' . sg_h($frage) . '"' : '') . '>' . $symbol . '</button></form> ';
     }
 
     private static function knopf(string $csrfFeld, string $aktion, int $id, string $text, string $klasse, string $frage = ''): string {
@@ -179,6 +195,8 @@ final class Ansicht {
     private const LISTE = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>';
     private const ZAHNRAD = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>';
     private const STIFT = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>';
+    private const ARCHIV = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18v4H3zM5 8v12h14V8M10 12h4"/></svg>';
+    private const EDITOR = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
     private const MUELL = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>';
 
     /** Bereich „Unterschriftenpads“ nur für Admins: eingerichtete Pads als feste Zeilen (Stift, Mülleimer), darunter Anlegen und Suche im Netz. */

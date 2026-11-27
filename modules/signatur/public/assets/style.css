@@ -101,3 +101,10 @@ main.modul { max-width: 1400px; }
 .us-pv-stand { display: flex; align-items: center; gap: 7px; margin-top: 5px; }
 .us-pv-punkt { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #9aa5a2; }
 .us-padvorschau.live .us-pv-punkt { background: #2fb36b; }
+
+/* Kopf: kleines Zahnrad rechts (nur Symbol), Symbol-Knöpfe in der linken Spalte (Archivieren, Löschen rot) */
+.us-zahnrad { padding: 0; width: 42px; }
+.us-zahnrad svg { margin: 0; }
+button.us-symbol { min-height: 30px; width: 32px; padding: 0; background: var(--soft); color: #315f53; border-radius: 8px; }
+button.us-symbol.rot { background: #fdecea; color: #b42318; }
+button.us-symbol svg { width: 16px; height: 16px; }

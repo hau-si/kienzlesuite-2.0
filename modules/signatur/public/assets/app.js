@@ -218,19 +218,19 @@
   // Vorgangsliste: Suche und Filter wirken sofort im Browser.
   var tabelle = document.getElementById('vg-tabelle');
   if (tabelle) {
-    var suche = document.getElementById('vg-suche'), art = document.getElementById('vg-art'), stat = document.getElementById('vg-status');
+    var suche = document.getElementById('vg-suche'), art = document.getElementById('vg-art'), stat = document.getElementById('vg-status'), archiv = document.getElementById('vg-archiv');
     var zeilen = Array.prototype.slice.call(tabelle.tBodies[0].rows);
     var filtern = function () {
       var q = suche.value.trim().toLowerCase(), n = 0;
       zeilen.forEach(function (z) {
-        var ok = (!q || (z.getAttribute('data-suche') || '').indexOf(q) !== -1) && (!art.value || z.getAttribute('data-art') === art.value) && (!stat.value || z.getAttribute('data-status') === stat.value);
+        var ok = (!q || (z.getAttribute('data-suche') || '').indexOf(q) !== -1) && (!art.value || z.getAttribute('data-art') === art.value) && (!stat.value || z.getAttribute('data-status') === stat.value) && (!archiv.value || z.getAttribute('data-archiv') === archiv.value);
         z.hidden = !ok;
         if (ok) n++;
       });
       document.getElementById('vg-zahl').textContent = n + ' von ' + zeilen.length + ' Vorgängen';
       document.getElementById('vg-leer').hidden = n !== 0;
     };
-    [suche, art, stat].forEach(function (e) { e.addEventListener('input', filtern); e.addEventListener('change', filtern); });
+    [suche, art, stat, archiv].forEach(function (e) { e.addEventListener('input', filtern); e.addEventListener('change', filtern); });
     filtern();
   }
   // Solange ein Vorgang am Pad unterschrieben wird, die Liste alle 5 Sekunden neu laden (ohne das Formular erneut zu senden).

@@ -129,9 +129,10 @@ try {
         exit;
     }
     if ($rel === '') $rel = '/';
-    if (!in_array($rel, ['/', '/vorgaenge', '/einstellungen'], true)) { http_response_code(404); echo 'Nicht gefunden.'; exit; }
+    if (!in_array($rel, ['/', '/vorgaenge', '/editor', '/einstellungen'], true)) { http_response_code(404); echo 'Nicht gefunden.'; exit; }
     if ($rel === '/einstellungen' && !$darfVorlage && !$k->istAdmin()) $k->verweigern();
-    if ($rel !== '/einstellungen' && !$darfVorgang) $k->verweigern();
+    if ($rel === '/editor' && !$darfVorlage) $k->verweigern();
+    if (!in_array($rel, ['/einstellungen', '/editor'], true) && !$darfVorgang) $k->verweigern();
     header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
     $meldung = $fehler = null;
     $bearbeite = null;
@@ -151,6 +152,12 @@ try {
             } elseif ($aktion === 'vorgang-loeschen' && $darfVorgang) {
                 Seite::vorgangLoeschen((int)($_POST['id'] ?? 0));
                 $meldung = 'Vorgang gelöscht.';
+            } elseif ($aktion === 'archivieren' && $darfVorgang) {
+                Seite::archivieren((int)($_POST['id'] ?? 0));
+                $meldung = 'Vorgang archiviert. Er steht weiter unter „Vorgänge“ (Filter „Archiv“).';
+            } elseif ($aktion === 'zurueckholen' && $darfVorgang) {
+                Seite::archivieren((int)($_POST['id'] ?? 0), false);
+                $meldung = 'Vorgang zurückgeholt.';
             } elseif ($aktion === 'wiederaufnehmen' && $darfVorgang) {
                 Seite::wiederaufnehmen((int)($_POST['id'] ?? 0));
                 $meldung = 'Vorgang wieder aufgenommen.';

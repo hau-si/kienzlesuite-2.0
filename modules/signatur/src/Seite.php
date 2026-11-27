@@ -321,6 +321,14 @@ final class Seite {
         return self::pdo()->query('SELECT * FROM vorgaenge WHERE status IN ("wartet","fehler","unterschrieben") ORDER BY erstellt DESC, id DESC LIMIT 1')->fetch() ?: null;
     }
 
+    /** Vorgang archivieren (aus der linken Spalte der Startseite nehmen) oder zurückholen. Am Pad nicht. */
+    public static function archivieren(int $id, bool $archiv = true): void {
+        $v = self::vorgang($id);
+        if (!$v) throw new \InvalidArgumentException('Vorgang nicht gefunden.');
+        if ($archiv && $v['status'] === 'am_pad') throw new \InvalidArgumentException('Der Vorgang liegt gerade am Pad. Bitte zuerst abbrechen.');
+        self::pdo()->prepare('UPDATE vorgaenge SET archiviert=? WHERE id=?')->execute([$archiv ? 1 : 0, $id]);
+    }
+
     /** Löscht einen abgebrochenen Vorgang endgültig (Patientendaten sollen nicht länger als nötig liegen). */
     public static function vorgangLoeschen(int $id): void {
         $v = self::vorgang($id);

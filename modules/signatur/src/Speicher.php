@@ -7,7 +7,7 @@ final class Speicher {
     public static string $data = '/var/lib/kienzle/signatur';
     private static ?\PDO $pdo = null;
     private static string $pfad = '';
-    public const VERSION = 8;
+    public const VERSION = 9;
 
     public static function pdo(): \PDO {
         $datei = self::$data . '/signatur.db';
@@ -149,6 +149,10 @@ final class Speicher {
             // Schon übertragene Vorgänge gelten als erledigt, schon unterschriebene ältere nicht automatisch (kein Nachholen ohne Wunsch).
             $pdo->exec("UPDATE vorgaenge SET ablage='erledigt' WHERE status='uebertragen'");
             $pdo->exec("UPDATE vorgaenge SET ablage='manuell' WHERE status='unterschrieben'");
+        }
+        if ($v < 9) {
+            // Archiv (Startseite: Vorgang aus der linken Spalte nehmen, bleibt unter „Vorgänge“ mit Filter „Archiv“).
+            $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN archiviert INTEGER NOT NULL DEFAULT 0');
         }
         $pdo->exec('PRAGMA user_version=' . self::VERSION);
         $pdo->commit();

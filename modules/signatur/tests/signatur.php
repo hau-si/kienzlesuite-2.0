@@ -87,7 +87,7 @@ Seite::vorlageSpeichern(['id' => 0, 'art' => 'igel', 'titel' => '<b>Titel</b>', 
 $aktiv = Seite::vorlagen(true);
 $xss = Seite::vorgang(Seite::vorgangAnlegen(['vorlage_id' => (int)$aktiv[0]['id'], 'patient' => '<script>x</script>'], 'x', $praxis));
 $liste = Ansicht::seite('/vorgaenge', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, 'Gespeichert.', null);
-$einst = Ansicht::seite('/einstellungen', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null);
+$einst = Ansicht::seite('/editor', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null);
 $start = Ansicht::seite('/', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null, null, null, [], Seite::aktuellerVorgang());
 check(!str_contains($liste, '<script>x') && str_contains($liste, '&lt;script&gt;x') && !str_contains($einst, '<b>Titel</b>') && str_contains($einst, '&lt;b&gt;Titel'), 'Ausgabe maskiert');
 check(str_contains($start, 'name="kienzle-csrf" value="tok"') && str_contains($start, 'Dokument wählen') && str_contains($start, 'us-links') && str_contains($start, 'name="vorlage_id"') && str_contains($start, 'class="patient-karte us-gewaehlt"') && str_contains($start, 'id="n-zur-kasse"') && str_contains($einst, 'id="vorlagen"'), 'Start und Einstellungen');
@@ -95,7 +95,15 @@ check(str_contains($liste, 'id="vg-suche"') && str_contains($liste, 'data-suche=
 check(!str_contains($start, 'id="vorlagen"') && !str_contains($liste, 'id="vorlagen"'), 'Vorlagen nur unter Einstellungen');
 $nurVorgang = Ansicht::seite('/', 'tok', [], [], true, false, null, null);
 check(str_contains($nurVorgang, 'keine aktive Vorlage'), 'ohne aktive Vorlage Hinweis');
-$nurVorlage = Ansicht::seite('/einstellungen', 'tok', [], Seite::vorlagen(), false, true, null, null);
+// Archiv: aus der linken Spalte nehmen, bleibt in der Liste (Filter „Archiv“), zurückholen; Kopf mit Reitern und Zahnrad
+check(str_contains($start, 'title="Archivieren (bleibt unter „Vorgänge“)"') && str_contains($start, 'class="us-symbol rot"') && str_contains($start, 'aria-label="Einstellungen"') && str_contains($start, '/editor"'), 'Start: Symbole Archivieren/Löschen, Reiter Editor, Zahnrad');
+Seite::archivieren((int)$xss['id']);
+$startA = Ansicht::seite('/', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null);
+$listeA = Ansicht::seite('/vorgaenge', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null);
+check(!str_contains($startA, '&lt;script&gt;x') && str_contains($listeA, 'data-archiv="1"') && str_contains($listeA, 'id="vg-archiv"') && str_contains($listeA, 'value="zurueckholen"'), 'archiviert: nicht links, in der Liste mit Zurückholen');
+Seite::archivieren((int)$xss['id'], false);
+check(!(int)Seite::vorgang((int)$xss['id'])['archiviert'], 'zurückgeholt');
+$nurVorlage = Ansicht::seite('/editor', 'tok', [], Seite::vorlagen(), false, true, null, null);
 check(!str_contains($nurVorlage, '<h2>Neuer Vorgang</h2>') && str_contains($nurVorlage, 'id="vorlagen"'), 'ohne Vorgangsrecht kein Formular');
 check(str_contains(Ansicht::kopf('/signatur', 'tok'), '/signatur/assets/app.js'), 'Kopf bindet Skript ein');
 
