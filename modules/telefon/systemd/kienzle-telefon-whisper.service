@@ -1,7 +1,7 @@
-# Kienzle-Suite, Modul telefon: Whisper-Worker aus Kienzlefon (aufgesprochene Anliegen in Text umwandeln, Vorgänge verschlüsselt ablegen).
+# Praxisherz, Modul telefon: Whisper-Worker aus Kienzlefon (aufgesprochene Anliegen in Text umwandeln, Vorgänge verschlüsselt ablegen).
 # Läuft nur, wenn Whisper eingerichtet ist (Knopf „Whisper einrichten“); gestartet wird er dann von kienzle-telefon-whisper.path.
 [Unit]
-Description=Kienzle-Suite Modul telefon (Anliegen in Text umwandeln, Whisper)
+Description=Praxisherz Modul telefon (Anliegen in Text umwandeln, Whisper)
 After=kienzle-telefon-asterisk.service
 ConditionPathExists=/var/lib/kienzle/telefon/whisper/bereit.json
 ConditionPathExists=/var/lib/kienzle/telefon/kienzlefon/kienzlefon.toml

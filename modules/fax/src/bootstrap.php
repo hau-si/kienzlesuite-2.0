@@ -25,7 +25,7 @@ function fx_modul(): KienzleModul {
     if (!$k) {
         if (!class_exists('KienzleModul', false)) {
             $helfer = (string)(getenv('KIENZLE_SUITE_HILFE') ?: '/opt/kienzle/core/current/php/modul/Kienzle.php');
-            if (!is_file($helfer)) throw new RuntimeException('Kienzle-Suite nicht gefunden.');
+            if (!is_file($helfer)) throw new RuntimeException('Praxisherz nicht gefunden.');
             require_once $helfer;
         }
         $k = new KienzleModul('fax');

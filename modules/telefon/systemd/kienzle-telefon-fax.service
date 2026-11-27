@@ -1,6 +1,6 @@
-# Kienzle-Suite, Modul telefon: Fax-Worker aus Kienzlefax (Aufträge des Moduls fax im Austauschordner senden).
+# Praxisherz, Modul telefon: Fax-Worker aus Kienzlefax (Aufträge des Moduls fax im Austauschordner senden).
 [Unit]
-Description=Kienzle-Suite Modul telefon (Faxversand)
+Description=Praxisherz Modul telefon (Faxversand)
 After=kienzle-telefon-asterisk.service
 
 [Service]

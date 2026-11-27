@@ -1,6 +1,6 @@
-# Kienzle-Suite, Modul telefon: liefert Telefonen ihre Einstellungsdatei (nur Port 8780, nur aus den Praxisnetzen).
+# Praxisherz, Modul telefon: liefert Telefonen ihre Einstellungsdatei (nur Port 8780, nur aus den Praxisnetzen).
 [Unit]
-Description=Kienzle-Suite Modul telefon (Einrichtung der Telefone, Provisionierung)
+Description=Praxisherz Modul telefon (Einrichtung der Telefone, Provisionierung)
 After=network.target
 
 [Service]

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Übernommen aus Kienzlefax 3.5.0 (installer-modular/pdf_with_header.sh) von Dr. Thomas Kienzle, MIT-Lizenz.
-# Kienzle-Suite, Modul telefon: Praxisname aus KFX_PRAXIS_DATEI (von der Basis), sonst unverändert.
+# Praxisherz, Modul telefon: Praxisname aus KFX_PRAXIS_DATEI (von der Basis), sonst unverändert.
 set -euo pipefail
 
 # Usage:

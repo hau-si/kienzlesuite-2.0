@@ -1,6 +1,6 @@
-# Kienzle-Suite, Modul fax: Sobald der Lauschordner-Dienst eine Datei vom NAS in den Eingang legt oder jemand eine in die Freigabe „Fax-Ausgang“ zieht, sofort übernehmen (statt bis zu eine Minute zu warten).
+# Praxisherz, Modul fax: Sobald der Lauschordner-Dienst eine Datei vom NAS in den Eingang legt oder jemand eine in die Freigabe „Fax-Ausgang“ zieht, sofort übernehmen (statt bis zu eine Minute zu warten).
 [Unit]
-Description=Kienzle-Suite Modul fax (Lauschordner: neue Datei)
+Description=Praxisherz Modul fax (Lauschordner: neue Datei)
 
 [Path]
 PathChanged=/var/spool/kienzle/ablage/fax/eingang

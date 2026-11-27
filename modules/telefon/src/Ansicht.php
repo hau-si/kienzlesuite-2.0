@@ -618,11 +618,11 @@ final class Ansicht {
         $e = Verzeichnis::einstellungen();
         $laeuft = Verzeichnis::laden();
         $zustand = $st['anzahl'] > 0 ? self::tag('ok', number_format($st['anzahl'], 0, ',', '.') . ' Patienten') : self::tag('opt', 'nicht geladen');
-        $i = '<p class="muted">Namen der Anrufer am Telefon und in „Anrufe“, Patientensuche oben auf jeder Seite, „Akte öffnen“ in T2med am eigenen PC (Kienzle-Agent). '
+        $i = '<p class="muted">Namen der Anrufer am Telefon und in „Anrufe“, Patientensuche oben auf jeder Seite, „Akte öffnen“ in T2med am eigenen PC (Praxisherz-Agent). '
             . 'Das Verzeichnis enthält Name, Geburtsdatum, Telefonnummern und Patientennummer und bleibt auf diesem Server.</p>';
         if (!$t2med['eingerichtet']) $i .= '<p class="fehler">Zuerst in der Basis die Verbindung zu T2med einrichten: Verwaltung → Verbindungen → T2med.</p>';
         $i .= '<h3>Laden und aktualisieren</h3><ol class="tf-schritte"><li>In T2med unter Drittanbieter einen Eintrag (Programm/URL) anlegen:<br><code>kienzle-telefonverzeichnis://?kontextId=${kontextId}&amp;fhirBasisUrl=${fhirBasisUrl}&amp;oAuthToken=${oAuthToken}</code></li>'
-            . '<li>Der Arbeitsplatz braucht den Kienzle-Agent bzw. Starter (Einrichten → Arbeitsplätze; nach dem Update der Basis kommt der neue Aufruf von selbst).</li>'
+            . '<li>Der Arbeitsplatz braucht den Praxisherz-Agent bzw. Starter (Einrichten → Arbeitsplätze; nach dem Update der Basis kommt der neue Aufruf von selbst).</li>'
             . '<li>In T2med den Eintrag aufrufen: Die Suite öffnet sich und lädt das Verzeichnis (Fortschritt oben auf der Seite). Bei neuen Patienten oder geänderten Nummern einfach wiederholen.</li></ol>';
         if ($t2med['eingerichtet'] && ($t2med['ohne_schluessel'] ?? false)) $i .= '<p class="fehler">' . $h(T2med::OHNE_SCHLUESSEL) . '</p>';
         $i .= '<p>' . ($st['zeit'] > 0 ? 'Zuletzt geladen: ' . $h(date('d.m.Y H:i', $st['zeit'])) . '. ' : '') . ($laeuft ? self::tag('warn', 'Laden läuft (' . (int)$laeuft['anzahl'] . ' bisher)') : '') . '</p>';

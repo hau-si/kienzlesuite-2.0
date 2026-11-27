@@ -1,11 +1,11 @@
 # Telefon: Telefonanlage (Asterisk) mit Leitungen, Nebenstellen, Warteschlange und Faxkanal für das Modul fax.
-# Auf Grundlage von Kienzlefax 3.5.0 und Kienzlefon 2.7 von Dr. Thomas Kienzle, für die Kienzle-Suite 2.0 als Modul umgebaut.
+# Auf Grundlage von Kienzlefax 3.5.0 und Kienzlefon 2.7 von Dr. Thomas Kienzle, für Praxisherz als Modul umgebaut.
 # Stufe 1: Anlage aus Kienzlefax. Sprachmenü, Transkription, Ansagen und KI aus Kienzlefon folgen (docs/PLAN-FAX-TELEFON.md).
 
 [module]
 id = "telefon"
 name = "Telefon"
-version = "0.1.0-beta.26"
+version = "0.1.0-beta.27"
 core_api = "2"
 description = "Telefonanlage: Leitungen der Anbieter, Telefone, Warteschlange, Sprachmenü (Kienzlefon) und Kanalgrenze. Stellt auch die Faxleitung für das Modul Fax bereit; Fax lässt sich erst danach installieren."
 

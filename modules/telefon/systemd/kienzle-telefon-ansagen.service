@@ -1,6 +1,6 @@
-# Kienzle-Suite, Modul telefon: Piper optional nachladen (Paketliste mit Prüfsummen) und die Ansagen von Kienzlefon erzeugen.
+# Praxisherz, Modul telefon: Piper optional nachladen (Paketliste mit Prüfsummen) und die Ansagen von Kienzlefon erzeugen.
 [Unit]
-Description=Kienzle-Suite Modul telefon (Ansagen erzeugen, Piper nachladen)
+Description=Praxisherz Modul telefon (Ansagen erzeugen, Piper nachladen)
 
 [Service]
 Type=oneshot

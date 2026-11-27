@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # Übernommen aus Kienzlefax 3.5.0 (installer-modular/worker.sh) von Dr. Thomas Kienzle, MIT-Lizenz.
-# Kienzle-Suite, Modul telefon: gestartet von fax-dienst (Umgebung aus dem Datenordner).
-# Abweichung vom Original (seit 1.3.20, Kienzle-Suite): finalize_ok legt das Original zusätzlich in
+# Praxisherz, Modul telefon: gestartet von fax-dienst (Umgebung aus dem Datenordner).
+# Abweichung vom Original (seit 1.3.20, Praxisherz): finalize_ok legt das Original zusätzlich in
 # sendeberichte/eingang/ ab, analog zu copy_original_to_fail_in, damit das Modul Fax erfolgreich gesendete
 # Faxe für begrenzte Zeit erneut senden kann (Wunsch des Nutzers, Modul Fax löscht das Original nach 7 Tagen).
 # -*- coding: utf-8 -*-
@@ -9,7 +9,7 @@
 kienzlefax-worker.py — Asterisk-Only Worker (SendFAX)
 Version: 1.3.20
 Stand:  2026-11-27
-Autor:  Dr. Thomas Kienzle (Kienzle-Suite: Original-Aufbewahrung bei Erfolg, s. o.)
+Autor:  Dr. Thomas Kienzle (Praxisherz: Original-Aufbewahrung bei Erfolg, s. o.)
 
 Changelog (komplett):
 - 1.2.4:
@@ -101,7 +101,7 @@ Changelog (komplett):
     dial_start nach erfolgreicher Provider-Kapazitaetsreservierung erhoeht.
   - Status DEFERRED bei voller externer Kapazitaet wird nach dem normalen Cooldown
     ohne Verbrauch eines Sendeversuchs in die Queue zurueckgestellt.
-- 1.3.20 (Kienzle-Suite, Abweichung vom Original):
+- 1.3.20 (Praxisherz, Abweichung vom Original):
   - finalize_ok legt das Original zusaetzlich unter sendeberichte/eingang/ ab
     (copy_original_to_ok_in, analog zu copy_original_to_fail_in), damit das Modul Fax
     erfolgreich gesendete Faxe fuer eine begrenzte Zeit erneut senden kann.
@@ -679,7 +679,7 @@ def find_original_pdf_in_jobdir(jobdir: Path) -> Optional[Path]:
     return None
 
 def copy_original_to_fail_in(jobdir: Path, job: Dict[str, Any]) -> None:
-    # Kienzle-Suite (1.3.20): Dateiname trägt immer die Job-ID (vorher nur bei einer Namenskollision), damit das
+    # Praxisherz (1.3.20): Dateiname trägt immer die Job-ID (vorher nur bei einer Namenskollision), damit das
     # Modul Fax das Original eines bestimmten Fehlerberichts eindeutig wiederfindet (Knopf „Erneut senden“).
     safe_mkdir(FAIL_IN)
     src = job.get("source") or {}
@@ -693,7 +693,7 @@ def copy_original_to_fail_in(jobdir: Path, job: Dict[str, Any]) -> None:
     log(f"fail: original copied -> {dest.name}")
 
 def copy_original_to_ok_in(jobdir: Path, job: Dict[str, Any]) -> None:
-    # Kienzle-Suite (1.3.20): analog zu copy_original_to_fail_in, mit Job-ID im Dateinamen, damit das Modul Fax
+    # Praxisherz (1.3.20): analog zu copy_original_to_fail_in, mit Job-ID im Dateinamen, damit das Modul Fax
     # das Original eines bestimmten Sendeprotokoll-Eintrags eindeutig wiederfindet (Knopf „Erneut senden“).
     safe_mkdir(OK_IN)
     src = job.get("source") or {}

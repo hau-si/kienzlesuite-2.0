@@ -1,6 +1,6 @@
-# Kienzle-Suite, Modul telefon: Steuerungsdienst starten, sobald die Rufgruppen eingeschaltet sind.
+# Praxisherz, Modul telefon: Steuerungsdienst starten, sobald die Rufgruppen eingeschaltet sind.
 [Unit]
-Description=Kienzle-Suite Modul telefon (Rufgruppen eingeschaltet)
+Description=Praxisherz Modul telefon (Rufgruppen eingeschaltet)
 
 [Path]
 PathExists=/var/lib/kienzle/telefon/kienzlefon/control-ami.json

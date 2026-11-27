@@ -1,7 +1,7 @@
-# Kienzle-Suite, Modul telefon: eigene Asterisk-Instanz (Ubuntu-Paket) als ks-telefon, Konfiguration im Datenordner.
+# Praxisherz, Modul telefon: eigene Asterisk-Instanz (Ubuntu-Paket) als ks-telefon, Konfiguration im Datenordner.
 # Der Paketdienst asterisk.service ist abgeschaltet ([system] disables).
 [Unit]
-Description=Kienzle-Suite Modul telefon (Telefonanlage)
+Description=Praxisherz Modul telefon (Telefonanlage)
 After=network-online.target
 Wants=network-online.target
 

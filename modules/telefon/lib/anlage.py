@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Telefonanlage des Moduls telefon (Kienzle-Suite): Asterisk-Konfiguration erzeugen, neu laden, Zustand lesen.
+"""Telefonanlage des Moduls telefon (Praxisherz): Asterisk-Konfiguration erzeugen, neu laden, Zustand lesen.
 
 Übernommen aus Kienzlefax 3.5.0 von Dr. Thomas Kienzle (installer-modular/pjsip-provider.sh, extensions.sh,
 telefonie-queue.sh): Leitungsvorlagen der Anbieter, gemeinsame Kanalgrenze (kfx_external_capacity), Faxversand
@@ -446,7 +446,7 @@ def render_pjsip(c: dict) -> tuple[str, str]:
     ext = c['netz']['extern']
     external = f'external_signaling_address={ext}\nexternal_media_address={ext}\n' if ext else ''
     local = ''.join(f'local_net={n}\n' for n in nets)
-    out = ('; Erzeugt vom Modul telefon der Kienzle-Suite (Vorlagen aus Kienzlefax). Änderungen gehen verloren.\n\n'
+    out = ('; Erzeugt vom Modul telefon von Praxisherz (Vorlagen aus Kienzlefax). Änderungen gehen verloren.\n\n'
            '[system]\ntype=system\ncompact_headers=yes\n\n[global]\ntype=global\nuser_agent=KienzleSuite\n\n'
            f'[transport-udp]\ntype=transport\nprotocol=udp\nbind=0.0.0.0:{PROVIDER_PORT}\n{external}{local}')
     if tls:
@@ -672,7 +672,7 @@ exten => s,1,NoOp(KienzleFax Telefoniewarteschlange)
 def render_extensions(c: dict) -> tuple[str, str]:
     """Hauptdatei (Kanalgrenze, Leitungen, Fax) und Telefonie-Datei (extensions-kfx-telefonie.conf) wie Kienzlefax."""
     agi = str(PROGRAM / 'lib' / 'kfx' / 'kfx_update_status.agi')
-    out = ('; Erzeugt vom Modul telefon der Kienzle-Suite (Vorlagen aus Kienzlefax). Änderungen gehen verloren.\n'
+    out = ('; Erzeugt vom Modul telefon von Praxisherz (Vorlagen aus Kienzlefax). Änderungen gehen verloren.\n'
            '[general]\nstatic=yes\nwriteprotect=yes\nclearglobalvars=no\n')
     k = c['kanaele']
     out += (CAPACITY.replace('@GESAMT@', str(k['gesamt'])).replace('@TELEFON@', str(k['telefon']))
@@ -814,7 +814,7 @@ def base_files() -> dict[str, str]:
     """Grunddateien ohne Zugangsdaten der Leitungen (asterisk.conf, Module, Protokoll, AMI, RTP)."""
     run = AST / 'run'
     files = {
-        'asterisk.conf': ('; Erzeugt vom Modul telefon der Kienzle-Suite: eigene Asterisk-Instanz als ks-telefon.\n[directories]\n'
+        'asterisk.conf': ('; Erzeugt vom Modul telefon von Praxisherz: eigene Asterisk-Instanz als ks-telefon.\n[directories]\n'
                           f'astetcdir => {ETC}\nastmoddir => {module_dir()}\nastvarlibdir => {AST / "lib"}\nastdbdir => {AST / "lib"}\n'
                           f'astkeydir => {AST / "lib"}\nastdatadir => /usr/share/asterisk\nastagidir => {PROGRAM / "lib" / "kfx"}\n'
                           f'astspooldir => {AST / "spool"}\nastrundir => {run}\nastlogdir => {AST / "log"}\nastcachedir => {AST / "cache"}\nastsbindir => /usr/sbin\n\n'

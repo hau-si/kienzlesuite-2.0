@@ -1,6 +1,6 @@
-# Kienzle-Suite, Modul fax: Ergebnisse abholen, „sofort senden“, Lauschordner, Export auf das NAS, Aufräumen (jede Minute, siehe .timer).
+# Praxisherz, Modul fax: Ergebnisse abholen, „sofort senden“, Lauschordner, Export auf das NAS, Aufräumen (jede Minute, siehe .timer).
 [Unit]
-Description=Kienzle-Suite Modul fax (Pflege)
+Description=Praxisherz Modul fax (Pflege)
 StartLimitIntervalSec=0
 
 [Service]

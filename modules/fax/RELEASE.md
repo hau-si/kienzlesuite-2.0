@@ -1,5 +1,9 @@
 # Release-Notizen Fax
 
+## 0.1.0-beta.14
+
+- **Neuer Name: „Praxisherz – freie Software für die Arztpraxis“** (vorher Kienzle-Suite) in Texten, Hinweisen und Dienstbeschreibungen. Mit Tests geprüft, nicht auf der VM.
+
 ## 0.1.0-beta.13
 
 - **„Erneut senden“ direkt in Sendeprotokoll und Fehlerberichte:** Statt wie bisher über die Dokumentliste von „Fax senden“ (Quelle „Sendefehler“) gibt es jetzt einen Knopf **„Erneut senden“** direkt an jedem Eintrag, mit Rückfrage; er sendet an denselben Empfänger mit denselben Einstellungen (Auflösung, ECM) erneut. Der Knopf erscheint nur, solange das Original noch vorliegt.

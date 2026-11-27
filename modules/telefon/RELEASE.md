@@ -1,5 +1,9 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.27
+
+- **Neuer Name: „Praxisherz – freie Software für die Arztpraxis“** (vorher Kienzle-Suite) in Texten, Hinweisen und Dienstbeschreibungen; der Agent heißt „Praxisherz-Agent“. Programmteile von Thomas Kienzle (Kienzlefon) unverändert. Mit Tests geprüft, nicht auf der VM.
+
 ## 0.1.0-beta.26
 
 - **Kein Demo-Schlüssel mehr (Vorgabe von T2med).** Ohne T2med-API-Schlüssel in der Basis lädt das Telefonverzeichnis nicht und meldet das klar; die Begrenzung für den Demo-Schlüssel entfällt.

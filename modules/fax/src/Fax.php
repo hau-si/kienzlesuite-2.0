@@ -472,7 +472,7 @@ final class Fax {
         $anzahl = count($namen);
         $praxis = trim((string)($k->praxis()['name'] ?? ''));
         $text = ($anzahl === 1 ? 'Ein neues Fax ist eingegangen' : "$anzahl neue Faxe sind eingegangen") . ($seiten > 0 ? " ($seiten " . ($seiten === 1 ? 'Seite' : 'Seiten') . ')' : '') . ".\n\n"
-            . "Öffnen: Kienzle-Suite → Fax → Eingang.\n\nDiese Nachricht enthält aus Datenschutzgründen weder Absender noch Inhalt.\n"
+            . "Öffnen: Praxisherz → Fax → Eingang.\n\nDiese Nachricht enthält aus Datenschutzgründen weder Absender noch Inhalt.\n"
             . ($praxis !== '' ? "\n$praxis\n" : '');
         try {
             $k->mailSenden($an, $anzahl === 1 ? 'Neues Fax eingegangen' : "$anzahl neue Faxe eingegangen", $text);

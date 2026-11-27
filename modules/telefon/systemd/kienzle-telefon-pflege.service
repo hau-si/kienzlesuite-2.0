@@ -1,6 +1,6 @@
-# Kienzle-Suite, Modul telefon: Protokolle (7 Tage) und liegengebliebene Empfangsdateien aufräumen.
+# Praxisherz, Modul telefon: Protokolle (7 Tage) und liegengebliebene Empfangsdateien aufräumen.
 [Unit]
-Description=Kienzle-Suite Modul telefon (Aufräumen)
+Description=Praxisherz Modul telefon (Aufräumen)
 
 [Service]
 Type=oneshot
