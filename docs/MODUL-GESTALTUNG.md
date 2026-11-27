@@ -16,7 +16,12 @@ Gilt für Module, die mit einem Patienten arbeiten (Kasse, Signatur und künftig
   - Rechts die Knöpfe:
     - **„Zum Patienten“** holt ihn zurück, wenn gerade etwas anderes offen ist.
     - **„Zur Kasse“** bzw. ein anderes Modul führt in das Modul, aus dem der Patient kam.
-    - **„Entfernen“** nimmt ihn heraus.
+    - **Entfernen** als Mülltonnen-Symbol (Titel „Patient entfernen“) nimmt ihn heraus.
+  - Ein Klick auf Name oder T2med-Etikett öffnet die Akte in T2med (`POST /arbeitsplatz/akte` mit der Patientennummer, GDT über den
+    Kienzle-Agent), wenn die Patientennummer bekannt ist.
+  - Hat ein Modul zwei Arbeitsflächen für den Patienten (Kasse: offene T2med-Rechnung und IGeL-Liste), stehen kompakte Umschalter in der
+    Karte („T2m-Rechnung“ mit Herz, „IGeL“ mit Igel). Die Mitte wechselt, das Bezahl- bzw. Abschlussfeld bleibt rechts an derselben Stelle.
+  - Der Name hat Vorrang: Er wird nicht gekürzt, Knöpfe rücken notfalls in eine zweite Zeile.
   - Ohne Patient darf die Karte das Eingabefeld für den Namen tragen.
 - **Der Patient bleibt erhalten,** bis er entfernt wird: beim Öffnen anderer Vorgänge, beim Wechsel auf andere Seiten des Moduls
   und beim Wechsel zwischen Modulen im selben Browser-Tab.

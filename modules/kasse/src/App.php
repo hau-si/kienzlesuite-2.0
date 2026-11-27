@@ -67,9 +67,9 @@ final class App {
             $visit = $this->db->one('SELECT * FROM visits WHERE context_id=? AND patient_id=? AND completed_at IS NULL ORDER BY created_at DESC LIMIT 1', [$context, $patient['id']]);
             $id = $visit['id'] ?? self::id();
             if ($visit) {
-                $this->db->query('UPDATE visits SET oauth_cipher=?, expires_at=?, patient_name=?, patient_birthdate=?, patient_address=? WHERE id=?', [$this->encrypt($token), $expires, $patient['name'], $patient['birthdate'], json_encode($patient['address'] ?? [], JSON_THROW_ON_ERROR), $id]);
+                $this->db->query('UPDATE visits SET oauth_cipher=?, expires_at=?, patient_name=?, patient_birthdate=?, patient_address=?, patient_nummer=? WHERE id=?', [$this->encrypt($token), $expires, $patient['name'], $patient['birthdate'], json_encode($patient['address'] ?? [], JSON_THROW_ON_ERROR), (string)($patient['nummer'] ?? ''), $id]);
             } else {
-                $this->db->query('INSERT INTO visits(id,context_id,patient_id,patient_name,patient_birthdate,patient_address,oauth_cipher,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?)', [$id, $context, $patient['id'], $patient['name'], $patient['birthdate'], json_encode($patient['address'] ?? [], JSON_THROW_ON_ERROR), $this->encrypt($token), time(), $expires]);
+                $this->db->query('INSERT INTO visits(id,context_id,patient_id,patient_name,patient_birthdate,patient_address,oauth_cipher,created_at,expires_at,patient_nummer) VALUES(?,?,?,?,?,?,?,?,?,?)', [$id, $context, $patient['id'], $patient['name'], $patient['birthdate'], json_encode($patient['address'] ?? [], JSON_THROW_ON_ERROR), $this->encrypt($token), time(), $expires, (string)($patient['nummer'] ?? '')]);
             }
             $ticket = bin2hex(random_bytes(32));
             $this->db->query('INSERT INTO launch_tickets(hash,visit_id,expires_at) VALUES(?,?,?)', [hash('sha256', $ticket), $id, time() + 300]);   // 5 Minuten: Zeit für die Anmeldung an der Suite
@@ -119,7 +119,7 @@ final class App {
     public function state(array $visit, array $browser): array {
         $payment = $this->db->one("SELECT * FROM payments WHERE visit_id=? AND payment_status<>'discarded' ORDER BY rowid DESC LIMIT 1", [$visit['id']]);
         return ['visit_id' => $visit['id'], 'csrf' => $browser['csrf'], 'manual' => self::isManual($visit),
-            'patient' => ['name' => $visit['patient_name'], 'birthdate' => $visit['patient_birthdate']],
+            'patient' => ['name' => $visit['patient_name'], 'birthdate' => $visit['patient_birthdate'], 'nummer' => (string)($visit['patient_nummer'] ?? '')],
             'completed' => $visit['completed_at'] !== null,
             't2med' => !self::isManual($visit) && $visit['patient_id'] !== 'inbox' && $visit['oauth_cipher'] !== '',
             'services' => array_map(static fn($s) => ['vat' => (bool)$s['vat'], 'signature' => (bool)$s['signature']] + $s, $this->db->query('SELECT id,label,category,price_cents,goae_code,factor,fee_type,on_request,vat,base_cents,default_reason,signature FROM services WHERE active=1 ORDER BY LENGTH(category)=0, category COLLATE NOCASE, label COLLATE NOCASE')->fetchAll()),

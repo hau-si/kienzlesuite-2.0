@@ -85,6 +85,15 @@ html:has(body.embed), body.embed { overflow-x: hidden; }
   .embed #services, .embed #groups { max-height: 45vh; }
 }
 
-/* Patient aus T2med: Name und Marke stehen oben auf der Startseite (Karte), hier nicht noch einmal. */
-.embed.t2med-patient .patient { display: none; }
+/* Name, Marke und die Knöpfe „T2m-Rechnung“ | „IGeL“ stehen oben auf der Startseite (Patientenkarte), hier nicht noch einmal. */
+.embed.t2med-patient .patient, .embed.rechnung .patient { display: none; }
+/* Rechnung: Angaben in der Mitte (wo sonst die IGeL-Liste steht), Bezahlfeld rechts an derselben Stelle wie bei der IGeL-Liste. */
+.embed.rechnung .invoice { grid-template-columns: minmax(0, 1fr) 330px; gap: 14px; background: transparent; border: 0; border-radius: 0; padding: 0; align-items: start; }
+.embed.rechnung .invoice-line { grid-row: auto; background: #fff; border: 1px solid #d9e3df; border-radius: 12px; padding: 14px 16px; }
+.embed.rechnung .invoice > .invoice-pay-box { grid-column: 2; display: flex; flex-direction: column; gap: 8px; background: #fff; border: 1px solid #d9e3df; border-radius: 12px; padding: 10px 12px; }
+.embed.rechnung .invoice-pay-box .pay-method { margin: 0; }
+.embed.rechnung .invoice-pay-head { margin: 0; font-size: 12px; }
+.embed.rechnung .invoice-line .invoice-letter-note { margin: 4px 0 0; }
+.embed.rechnung .invoice + .invoice { margin-top: 12px; }
 .pay-ico { flex: none; }
+@media (max-width: 640px) { .embed.rechnung .invoice { grid-template-columns: minmax(0, 1fr); } .embed.rechnung .invoice > .invoice-pay-box { grid-column: 1; } }

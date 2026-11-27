@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.25
+
+- Gestaltungsregel der Module ergänzt (`docs/MODUL-GESTALTUNG.md`): Entfernen als Mülltonne, Klick auf Name oder T2med-Etikett öffnet die Akte, Umschalter für zwei Arbeitsflächen (Kasse: „T2m-Rechnung“ | „IGeL“), der Name hat Vorrang. Nur Dokumentation.
+
 ## 0.22.0-beta.24
 
 - **Fehler behoben:** In der Patientenkarte ließen sich Knöpfe nicht ausblenden. In Signatur standen ohne Patient trotzdem „Zur Kasse“ und „Entfernen“. `core.css?v=39`.

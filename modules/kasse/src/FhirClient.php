@@ -5,6 +5,7 @@ namespace KienzleKasse;
 final class FhirClient {
     public const CONTEXT = 'https://fhir.t2med.de/identifier/kontext';
     public const PAYMENT = 'https://github.com/thomaskien/t2med-sumup/identifier/payment';
+    public const NUMMER = 'https://fhir.t2med.de/identifier/patientennummer';
     public function __construct(private Config $config, private HttpClient $http) {}
 
     private function request(string $method, string $path, string $token, ?array $body = null, bool $patient = false): array {
@@ -32,7 +33,7 @@ final class FhirClient {
         return 'Patientenkontext konnte nicht aus t2med geladen werden (HTTP ' . $status . '). ' . $hint . $detail;
     }
     public function patient(string $context, string $token): array {
-        if ($this->config->get('fhir', 'mode') === 'mock') return ['id' => 'demo-' . $context, 'name' => 'Erika Musterfrau', 'birthdate' => '1980-04-12', 'email' => 'erika@example.invalid', 'address' => ['Musterstraße 1', '12345 Musterstadt']];
+        if ($this->config->get('fhir', 'mode') === 'mock') return ['id' => 'demo-' . $context, 'nummer' => '1001', 'name' => 'Erika Musterfrau', 'birthdate' => '1980-04-12', 'email' => 'erika@example.invalid', 'address' => ['Musterstraße 1', '12345 Musterstadt']];
         try {
             $result = $this->request('GET', '/Patient?' . http_build_query(['identifier' => self::CONTEXT . '|' . $context]), $token, null, true);
         } catch (TransportError $e) {
@@ -65,7 +66,13 @@ final class FhirClient {
             $address = array_values(array_filter(array_map(static fn($line) => mb_substr(preg_replace('/[\x00-\x1f\x7f]/u', ' ', $line), 0, 200), array_slice($lines, 0, 5))));
             if ($address) break;
         }
-        return ['id' => (string)$p['id'], 'name' => $label ?: 'Patient ' . $p['id'], 'birthdate' => $p['birthDate'] ?? '', 'email' => $emails[0]['value'] ?? '', 'given' => mb_substr(trim(implode(' ', array_filter((array)($name['given'] ?? []), 'is_string'))), 0, 80), 'family' => mb_substr(is_string($name['family'] ?? null) ? trim($name['family']) : '', 0, 80), 'gender' => in_array($p['gender'] ?? '', ['male', 'female', 'other', 'unknown'], true) ? $p['gender'] : 'unknown', 'phone' => isset($phones[0]) ? trim($phones[0]['value']) : '', 'address' => $address];
+        // Patientennummer (für „Akte öffnen“ per GDT): nur eine eindeutige, gültige Nummer, sonst leer.
+        $nummern = [];
+        foreach (is_array($p['identifier'] ?? null) ? $p['identifier'] : [] as $i) {
+            if (is_array($i) && ($i['system'] ?? '') === self::NUMMER && is_string($i['value'] ?? null) && preg_match('/^[1-9][0-9]{0,11}$/D', $i['value'])) $nummern[] = $i['value'];
+        }
+        $nummern = array_values(array_unique($nummern));
+        return ['id' => (string)$p['id'], 'nummer' => count($nummern) === 1 ? $nummern[0] : '', 'name' => $label ?: 'Patient ' . $p['id'], 'birthdate' => $p['birthDate'] ?? '', 'email' => $emails[0]['value'] ?? '', 'given' => mb_substr(trim(implode(' ', array_filter((array)($name['given'] ?? []), 'is_string'))), 0, 80), 'family' => mb_substr(is_string($name['family'] ?? null) ? trim($name['family']) : '', 0, 80), 'gender' => in_array($p['gender'] ?? '', ['male', 'female', 'other', 'unknown'], true) ? $p['gender'] : 'unknown', 'phone' => isset($phones[0]) ? trim($phones[0]['value']) : '', 'address' => $address];
     }
     public function resource(array $visit, array $payment): array {
         $zone = new \DateTimeZone($this->config->get('app', 'timezone'));

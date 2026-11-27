@@ -1,5 +1,13 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.55
+
+- **„T2m-Rechnung“ und „IGeL“ oben in der Patientenkarte.** Liegt für den Patienten eine offene T2med-Rechnung vor, ist „T2m-Rechnung“ vorgewählt: Die Rechnung steht in der Mitte, wo sonst die IGeL-Liste steht. „IGeL“ zeigt dort wieder die Leistungsliste. Das gilt für Patienten aus T2med und für Rechnungen aus dem Eingang.
+- **Das Bezahlfeld steht immer rechts an derselben Stelle**, auch bei Rechnungen (Zahlart mit Symbolen, darunter der große Knopf).
+- **Akte öffnen:** Ein Klick auf den Namen oder das T2med-Etikett (Herz) öffnet die Patientenakte in T2med am eigenen PC. Das läuft über den GDT-Aufruf der Basis und den Kienzle-Agent, wie im Telefon. Dafür merkt sich die Kasse die T2med-Patientennummer (Datenbank Version 24); bei Rechnungen aus dem Eingang gibt es keinen Aktenaufruf.
+- „Entfernen“ ist nur noch eine Mülltonne, der Name hat Vorrang: Er wird nicht gekürzt, die Knöpfe rücken notfalls in eine zweite Zeile. Bei einer Rechnung eines anderen Patienten zeigt die Karte diesen, „Zum Patienten“ führt zum gemerkten Patienten zurück.
+- In der Vorschau mit erfundenen Daten geprüft (Wechsel der Knöpfe, Aktenaufruf mit nachgestellter Antwort der Basis). **Nicht auf der VM und nicht mit echtem T2med geprüft.**
+
 ## 2.3.4-beta.54
 
 - **Wechsel zu Signatur im selben Tab:** „Zur Unterschrift“ öffnet Signatur jetzt im selben Tab statt in einem neuen. Der Patient bleibt oben erhalten, und Signatur springt nach der Unterschrift hierher zurück zum Bezahlen. Die gewählten Leistungen stehen dann noch da.

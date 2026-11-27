@@ -13,12 +13,12 @@ final class Database {
     }
     public function migrate(): void {
         $version = (int)$this->pdo->query('PRAGMA user_version')->fetchColumn();
-        if ($version > 23) throw new \RuntimeException('Datenbank ist neuer als die Anwendung.');
-        if ($version === 23) return;
+        if ($version > 24) throw new \RuntimeException('Datenbank ist neuer als die Anwendung.');
+        if ($version === 24) return;
         $this->transaction(function (): void {
             $this->pdo->exec((string)file_get_contents(__DIR__ . '/schema.sql'));
             foreach (['services' => ['category' => "TEXT NOT NULL DEFAULT ''", 'goae_code' => "TEXT NOT NULL DEFAULT ''", 'factor' => "TEXT NOT NULL DEFAULT ''", 'fee_type' => "TEXT NOT NULL DEFAULT 'standard'", 'on_request' => 'INTEGER NOT NULL DEFAULT 0', 'vat' => 'INTEGER NOT NULL DEFAULT 0', 'base_cents' => 'INTEGER NOT NULL DEFAULT 0', 'default_reason' => "TEXT NOT NULL DEFAULT ''", 'signature' => 'INTEGER NOT NULL DEFAULT 0'],
-                'visits' => ['patient_address' => "TEXT NOT NULL DEFAULT '[]'", 'signatur_offen' => 'INTEGER NOT NULL DEFAULT 0'], 'payments' => ['doc_number' => "TEXT NOT NULL DEFAULT ''", 'storno_at' => 'INTEGER', 'invoice_json' => 'TEXT', 'inbox_id' => 'TEXT', 't2med_invoice' => 'TEXT',
+                'visits' => ['patient_address' => "TEXT NOT NULL DEFAULT '[]'", 'signatur_offen' => 'INTEGER NOT NULL DEFAULT 0', 'patient_nummer' => "TEXT NOT NULL DEFAULT ''"], 'payments' => ['doc_number' => "TEXT NOT NULL DEFAULT ''", 'storno_at' => 'INTEGER', 'invoice_json' => 'TEXT', 'inbox_id' => 'TEXT', 't2med_invoice' => 'TEXT',
                     'export_status' => "TEXT NOT NULL DEFAULT ''", 'export_error' => "TEXT NOT NULL DEFAULT ''", 'export_path' => "TEXT NOT NULL DEFAULT ''",
                     'auto_print' => 'INTEGER NOT NULL DEFAULT 0', 'print_status' => "TEXT NOT NULL DEFAULT ''", 'print_error' => "TEXT NOT NULL DEFAULT ''", 'print_info' => "TEXT NOT NULL DEFAULT ''", 't2med_done_at' => 'INTEGER', 'payment_method' => "TEXT NOT NULL DEFAULT 'card'", 'corrected_cents' => 'INTEGER', 'voided_at' => 'INTEGER', 'correction_note' => "TEXT NOT NULL DEFAULT ''"],
                 'admin_sessions' => ['role' => "TEXT NOT NULL DEFAULT 'admin'", 'remember' => 'INTEGER NOT NULL DEFAULT 0', 'net' => "TEXT NOT NULL DEFAULT ''", 'label' => "TEXT NOT NULL DEFAULT ''", 'last_used' => 'INTEGER NOT NULL DEFAULT 0', 'confirmed_at' => 'INTEGER NOT NULL DEFAULT 0'],
@@ -28,7 +28,7 @@ final class Database {
             }
             // Erst nach dem Ergänzen der Spalten: Index für bereits kassierte T2med-Rechnungen.
             $this->pdo->exec('CREATE INDEX IF NOT EXISTS payment_t2med_invoice ON payments(t2med_invoice)');
-            $this->pdo->exec('PRAGMA user_version=23');
+            $this->pdo->exec('PRAGMA user_version=24');
         });
     }
     public function query(string $sql, array $params = []): \PDOStatement {

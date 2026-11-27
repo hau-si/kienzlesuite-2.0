@@ -157,8 +157,11 @@ function renderInvoices() {
       const target = {card, cash, later}[value] || box.querySelector('.invoice-letter');
       if (target) target.click();
     };
-    box.append(line, chips, go, card, cash, later);
-    if (invoice.printed_at) box.append(element('p', '🖨 Rechnung gedruckt am ' + new Date(invoice.printed_at * 1000).toLocaleString('de-DE', {dateStyle: 'short', timeStyle: 'short'}), 'muted invoice-letter-note'));
+    // Rechts dieselbe Stelle wie das Bezahlfeld der IGeL-Liste (Zahlart und Knopf), links die Angaben der Rechnung.
+    const rechts = element('div', '', 'invoice-pay-box');
+    rechts.append(element('div', 'Zahlungsart', 'muted small invoice-pay-head'), chips, go, card, cash, later);
+    box.append(line, rechts);
+    if (invoice.printed_at) line.append(element('p', '🖨 Rechnung gedruckt am ' + new Date(invoice.printed_at * 1000).toLocaleString('de-DE', {dateStyle: 'short', timeStyle: 'short'}), 'muted invoice-letter-note'));
     if (state.letter?.enabled && invoice.letter?.postable) {
       const sent = invoice.letter || {};
       const when = sent.sent_at ? new Date(sent.sent_at * 1000).toLocaleString('de-DE', {dateStyle: 'short', timeStyle: 'short'}) : '';
@@ -167,7 +170,7 @@ function renderInvoices() {
       if (stamp) {
         const icon = element('p', '', 'invoice-letter-note post-icon ' + (sent.status === 'unknown' ? 'post-unknown' : sent.mode === 'live' ? 'post-sent' : 'post-test'));
         icon.append(element('span', sent.status === 'unknown' ? '✉ ?' : '✉', 'post-glyph'), document.createTextNode(' ' + stamp));
-        icon.title = stamp; box.append(icon);
+        icon.title = stamp; line.append(icon);
       }
       if (!sent.locked) {
         const post = element('button', 'Per Post senden (Letterxpress)', 'text-button invoice-letter'); post.hidden = true;
@@ -179,13 +182,40 @@ function renderInvoices() {
           const result = await api('invoice_letter', {invoice_id: invoice.id});
           message(result.message, true); await load();
         });
-        box.append(post);
+        rechts.append(post);
       }
     }
     $('invoices').append(box);
   }
   updateTotal();
+  ansichtMelden();
 }
+// Eingebettet in die Startseite: Die Patientenkarte oben zeigt Name, „T2m-Rechnung“ | „IGeL“ und den Aktenaufruf; hier nur die Arbeitsfläche.
+const EINGEBETTET = window.parent !== window, AUS_EINGANG = !!new URL(location.href).searchParams.get('rechnung');
+function tabSetzen(tab) {
+  document.body.dataset.tab = tab === 'igel' ? 'igel' : 'rechnung';
+  document.querySelectorAll('.work-tab').forEach(x => x.setAttribute('aria-pressed', x.dataset.tab === document.body.dataset.tab ? 'true' : 'false'));
+}
+function ansichtMelden() {
+  if (!EINGEBETTET || !state) return;
+  const offen = (state.invoices || []).filter(i => !invoiceLater.has(i.id)).length;
+  const t2med = !!state.t2med && !AUS_EINGANG;
+  document.body.classList.toggle('t2med-patient', t2med);
+  if (t2med) {
+    // Patient aus T2med mit offener Rechnung: wie Rechnungen aus dem Eingang „T2m-Rechnung“ (vorgewählt) und „IGeL“.
+    document.body.classList.toggle('rechnung', offen > 0);
+    if (offen > 0 && !document.body.dataset.tab) tabSetzen('rechnung');
+  }
+  const daten = {visit: visitId, name: state.patient.name, geburt: state.patient.birthdate || '', nummer: t2med ? (state.patient.nummer || '') : '',
+    rechnungen: (AUS_EINGANG || t2med) ? offen : 0, tab: document.body.dataset.tab || 'rechnung'};
+  parent.postMessage(Object.assign({typ: t2med ? 'ks-patient' : AUS_EINGANG ? 'ks-ansicht' : 'ks-patient-aus'}, daten), location.origin);
+}
+window.addEventListener('message', event => {
+  if (event.origin !== location.origin || !event.data || event.data.typ !== 'ks-tab') return;
+  tabSetzen(event.data.tab);
+  if (document.body.dataset.tab === 'igel') $('service-search').focus();
+  ansichtMelden();
+});
 const chosenMethod = new Map();   // Rechnungs-ID → von Hand gewählte Zahlart (übersteht das Neuaufbauen der Liste)
 // Neue gedruckte Rechnungen erscheinen ohne Neuladen, solange kein Zahlungsvorgang angezeigt wird.
 setInterval(async () => {
@@ -492,13 +522,7 @@ async function load() {
   $('service-date').max=state.today;
   renderVatOption(); renderServices(); renderInvoices(); renderPrintBox(); renderPayment(); markDirty();
   if (window.parent !== window) parent.postMessage('ks-refresh', location.origin);   // Startseite: Rechnungsliste aktualisieren
-  // Patient aus T2med: Die Startseite zeigt ihn oben als Karte (Entwurf B3) und hält ihn, bis er entfernt wird; der Kopf hier entfällt dann.
-  const t2medPatient = state.t2med && !new URL(location.href).searchParams.get('rechnung');
-  document.body.classList.toggle('t2med-patient', t2medPatient);
-  if (window.parent !== window && !new URL(location.href).searchParams.get('rechnung')) {
-    // Abgelaufener T2med-Zugang (4 Stunden) oder freie Eingabe: Die Startseite nimmt diesen Besuch aus der Karte, falls er dort stand.
-    parent.postMessage(t2medPatient ? {typ: 'ks-patient', visit: visitId, name: state.patient.name, geburt: state.patient.birthdate || ''} : {typ: 'ks-patient-aus', visit: visitId}, location.origin);
-  }
+  ansichtMelden();
 }
 async function poll() {
   if(busy) { timer=setTimeout(poll,2200); return; }
