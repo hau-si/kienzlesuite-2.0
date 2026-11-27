@@ -38,7 +38,7 @@ Oberfläche, Hilfetexte, Dokumentation und Commit-Nachrichten auf Deutsch.
 
 ## Hinweise für neue Sitzungen (Stand 26.11.2026)
 
-**Stand:** Basis 0.22.0-beta.18, Kasse (`kasse`) 2.3.4-beta.50, Terminzettel 1.3.0-beta.19, Signatur 0.1.0-beta.29, Telefon 0.1.0-beta.23, Fax 0.1.0-beta.12; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
+**Stand:** Basis 0.22.0-beta.18, Kasse (`kasse`) 2.3.4-beta.50, Terminzettel 1.3.0-beta.19, Signatur 0.1.0-beta.30, Telefon 0.1.0-beta.23, Fax 0.1.0-beta.12; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
 (Basis 0.19.1). Der Nutzer testet auf einer echten Ubuntu-26.04-VM (Aktualisierung dort: `cd ~/kienzlesuite-2.0 && git pull && sudo bash installer/install.sh`,
 oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nicht ins Repository.
 
@@ -124,6 +124,7 @@ oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nich
 - **Mitgelieferte Module:** Die Basis bringt `modules/` mit (`/opt/kienzle/core/current/modules`); ein dort liegendes Modul erscheint unter Verwaltung → Module auch nach dem Entfernen als „verfügbar“, bis die Basis aktualisiert ist.
 - **Installer auf der VM:** liegt im Klon `~/kienzlesuite-2.0`; vorher `git pull` auf `beta`, sonst wird der alte Stand wieder installiert.
 - **Windows-Drucker per IPP:** Port 631 muss in Verwaltung → Firewall für das Netz des PCs offen sein (Server und PC können in verschiedenen Netzen liegen, z. B. 192.168.111.x und 192.168.1.x). Ist er zu, scheitern `Add-PrinterPort` (0x8007007b) und der Rest, und `SilentlyContinue` verbarg das; das Skript meldet seit beta.47 den Grund. `Add-Printer -ConnectionName` funktioniert dafür nicht (0x80070032); Anschluss plus `-PortName` mit der Adresse als Anschlussname klappt.
+- **signotec-Pad braucht `AF_NETLINK`** (Signatur beta.30): Mit `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6` kamen Tasten, aber keine Stiftpunkte an (Fehler -17). Am Pad per `systemd-run` mit den Schutzeinstellungen eingegrenzt.
 - **Sicherheitsprüfung der Sitzung:** Fremde Binärdateien (z. B. die signotec-Bibliothek) werden nicht gestartet, auch nicht zum Testen; nur lesen und die Doku auswerten.
 
 ### Gelöst (zur Erinnerung)

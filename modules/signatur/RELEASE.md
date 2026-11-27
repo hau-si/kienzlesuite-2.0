@@ -1,5 +1,10 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.30
+
+- **Fehler behoben: Unterschrift kam am Pad nicht an** („Stiftereignisse 0“, „Noch keine Unterschrift erkannt“ in Dauerschleife). Ursache war die Absicherung des Pad-Dienstes: Er durfte keine Netlink-Abfragen stellen (`RestrictAddressFamilies`), mit denen die signotec-Bibliothek die Netzwerkadressen des Servers ermittelt. Die Tasten kamen trotzdem an, die Stiftpunkte nicht. Jetzt ist `AF_NETLINK` erlaubt, alle anderen Schutzeinstellungen bleiben.
+- Am echten Pad (signotec Delta, Ethernet) mit dem Ablauftest unter denselben Schutzeinstellungen geprüft: ohne Netlink 0, mit Netlink 64 Stiftpunkte. Der Dienst selbst wird nach dem Update geprüft.
+
 ## 0.1.0-beta.29
 
 - Neu: `lib/padablauf.py` (Ablauftest am Pad mit mehreren Seiten, Wegwerf-Datenbank): `sudo systemctl stop kienzle-signatur-pad; sudo -u ks-signatur python3 /opt/kienzle/signatur/current/lib/padablauf.py <IP> 1002`; danach Dienst wieder starten. Zeigt im Protokoll Aufnahmestart, Stiftereignisse und Ergebnis. Mit `PADABLAUF=direkt` (vor `python3`: `sudo -u ks-signatur env PADABLAUF=direkt python3 …`) ohne Textseiten, gleich die Unterschriftsseite. Nur Werkzeug zur Fehlersuche, nicht am Pad geprüft.

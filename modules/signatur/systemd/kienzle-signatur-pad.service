@@ -22,7 +22,9 @@ ProtectKernelLogs=yes
 ProtectControlGroups=yes
 ProtectClock=yes
 ProtectHostname=yes
-RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# AF_NETLINK: Die signotec-Bibliothek fragt damit die eigenen Netzwerkadressen ab; ohne kommen beim Delta (Ethernet) die
+# Tasten an, aber keine Stiftpunkte (am Pad geprüft: ohne 0, mit 64 Stiftereignisse).
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 RestrictNamespaces=yes
 RestrictRealtime=yes
 RestrictSUIDSGID=yes

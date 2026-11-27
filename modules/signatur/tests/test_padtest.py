@@ -34,5 +34,13 @@ class SignTest(unittest.TestCase):
         self.assertEqual(m.main([]), 2)
 
 
+class DienstEinheitTest(unittest.TestCase):
+    def test_netlink_fuer_stiftpunkte(self):
+        einheit = open(os.path.join(os.path.dirname(__file__), '..', 'systemd', 'kienzle-signatur-pad.service'), encoding='utf-8').read()
+        zeile = [z for z in einheit.splitlines() if z.startswith('RestrictAddressFamilies=')]
+        self.assertEqual(len(zeile), 1)
+        self.assertIn('AF_NETLINK', zeile[0].split('=', 1)[1].split(), 'ohne AF_NETLINK liefert das Pad keine Stiftpunkte')
+
+
 if __name__ == '__main__':
     unittest.main()
