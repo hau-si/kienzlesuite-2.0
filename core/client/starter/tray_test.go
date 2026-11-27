@@ -86,6 +86,41 @@ func TestStatusUndAnstoss(t *testing.T) {
 	}
 }
 
+func TestAnsichtWirdAktualisiert(t *testing.T) {
+	jetzt := time.Unix(1_800_000_000, 0)
+	gut := Status{Zeit: jetzt.Unix(), Verbunden: true, Name: "Empfang", Version: "2.3.2", WirdAktualisiert: true,
+		Drucker: []string{"vKasse"}, DruckerOk: true, Aufrufe: 1, Zertifikat: true}
+	v := AnsichtBauen(gut, true, jetzt)
+	if v.Farbe != Blau || v.Kopf != "wird aktualisiert …" || !strings.Contains(v.Zeilen[0].Wert, "bitte kurz warten") {
+		t.Fatalf("wird aktualisiert muss blau sein, nicht rot: %+v", v)
+	}
+	// Auch mit zwei Minuten altem Zeitstempel (länger als die sonst übliche 3-Minuten-Frist) noch blau, nicht rot.
+	spaeter := jetzt.Add(130 * time.Second)
+	if v := AnsichtBauen(gut, true, spaeter); v.Farbe != Blau {
+		t.Fatalf("wird aktualisiert bleibt blau, solange die Frist nicht um ist: %+v", v)
+	}
+	// Länger als aktualisierenFrist: kein Update findet mehr statt, muss wie gewohnt rot werden.
+	vielSpaeter := jetzt.Add((aktualisierenFrist + 60) * time.Second)
+	if v := AnsichtBauen(gut, true, vielSpaeter); v.Farbe != Rot || v.Kopf != "Agent läuft nicht" {
+		t.Fatalf("nach Ablauf der Frist muss es wie ein hängender Agent aussehen: %+v", v)
+	}
+}
+
+func TestAgentAktualisiert(t *testing.T) {
+	if AgentAktualisiert(Status{}, false, "2.3.1") {
+		t.Fatal("ohne status.json nicht neu starten")
+	}
+	if AgentAktualisiert(Status{Version: "2.3.1"}, true, "2.3.1") {
+		t.Fatal("gleiche Version: nicht neu starten")
+	}
+	if !AgentAktualisiert(Status{Version: "2.3.2"}, true, "2.3.1") {
+		t.Fatal("Dienst schon aktualisiert (neuere Version): Symbol muss sich neu starten")
+	}
+	if AgentAktualisiert(Status{Version: ""}, true, "2.3.1") {
+		t.Fatal("leere Version (altes/unvollständiges status.json): nicht neu starten")
+	}
+}
+
 func TestAnsichtAlteDrucker(t *testing.T) {
 	jetzt := time.Unix(1_800_000_000, 0)
 	s := Status{Zeit: jetzt.Unix(), Verbunden: true, Drucker: []string{"vTermine"}, DruckerOk: true, Aufrufe: 1, Zertifikat: true,

@@ -12,12 +12,14 @@ import (
 	"time"
 )
 
-// Farben der Ampel.
+// Farben der Ampel. Blau ist kein Ampelzustand, sondern „Agent wird gerade aktualisiert, bitte warten“ – wird bei der
+// Bestimmung der schlechtesten Farbe wie Grau behandelt (rein informativ, überschreibt nichts und wird nicht überschrieben).
 const (
 	Gruen = iota
 	Gelb
 	Rot
 	Grau
+	Blau
 )
 
 // Zeile im Statusfenster.
@@ -49,11 +51,22 @@ func StatusLesen(ordner string) (Status, bool) {
 	return s, true
 }
 
-// AnsichtBauen macht aus dem Zustand die Zeilen des Fensters. Ein Zustand älter als 3 Minuten heißt: Der Agent läuft nicht.
+// aktualisierenFrist: So lange gilt „wird aktualisiert“ (blau) statt „läuft nicht“ (rot) nach dem letzten Lebenszeichen
+// mit gesetztem WirdAktualisiert. Länger als die 3-Minuten-Frist unten und als die 5-Minuten-Rückfallschiene der
+// geplanten Aufgabe (beta.18): Eine Selbstaktualisierung, die dort hängen bleibt, zeigt sich am Ende trotzdem als Fehler.
+const aktualisierenFrist = 6 * 60
+
+// AnsichtBauen macht aus dem Zustand die Zeilen des Fensters. Ein Zustand älter als 3 Minuten heißt: Der Agent läuft nicht –
+// außer der Dienst hat sich laut status.json gerade erst selbst aktualisiert (dann „wird aktualisiert“, blau, bis zu 6 Minuten).
 func AnsichtBauen(s Status, vorhanden bool, jetzt time.Time) Ansicht {
 	v := Ansicht{Farbe: Gruen, Kopf: "verbunden"}
-	alt := !vorhanden || jetzt.Unix()-s.Zeit > 180
+	alter := jetzt.Unix() - s.Zeit
+	wirdAktualisiert := vorhanden && s.WirdAktualisiert && alter <= aktualisierenFrist
+	alt := !wirdAktualisiert && (!vorhanden || alter > 180)
 	switch {
+	case wirdAktualisiert:
+		v.Farbe, v.Kopf = Blau, "wird aktualisiert …"
+		v.Zeilen = append(v.Zeilen, Zeile{"Kienzle-Agent", "lädt die neue Fassung und startet gleich neu, bitte kurz warten", Blau})
 	case alt:
 		v.Farbe, v.Kopf = Rot, "Agent läuft nicht"
 		v.Zeilen = append(v.Zeilen, Zeile{"Kienzle-Agent", "keine Rückmeldung – PC neu starten oder Paket erneut ausführen", Rot})
@@ -111,12 +124,19 @@ func AnsichtBauen(s Status, vorhanden bool, jetzt time.Time) Ansicht {
 		v.Fuss = "Version " + s.Version + " · zuletzt " + time.Unix(s.Zeit, 0).Format("15:04")
 	}
 	for _, z := range v.Zeilen {
-		if z.Farbe != Grau && z.Farbe > v.Farbe {
+		if z.Farbe != Grau && z.Farbe != Blau && z.Farbe > v.Farbe {
 			v.Farbe = z.Farbe
 		}
 	}
 	v.Tooltip = kuerzen("Kienzle-Suite – "+v.Kopf+map[bool]string{true: " (" + s.Name + ")", false: ""}[s.Name != "" && !alt], 120)
 	return v
+}
+
+// AgentAktualisiert meldet, ob sich der Agent (Dienst) seit dem Start dieses Symbol-Prozesses bereits selbst
+// aktualisiert hat: status.json nennt dann eine andere Programmversion als die dieses laufenden Prozesses. Das Symbol
+// startet sich in dem Fall neu (tray_windows.go), statt auf dem alten Stand stehen zu bleiben.
+func AgentAktualisiert(s Status, vorhanden bool, eigeneVersion string) bool {
+	return vorhanden && s.Version != "" && s.Version != eigeneVersion
 }
 
 func kuerzen(s string, n int) string {
@@ -132,7 +152,7 @@ func SymbolBild(n int, farbe int) []uint32 {
 	px := make([]uint32, n*n)
 	f := float64(n) / 32
 	teal := uint32(0xFF12695D)
-	punkt := map[int]uint32{Gruen: 0xFF2FB36B, Gelb: 0xFFE0A400, Rot: 0xFFD4473A, Grau: 0xFF9AA5A2}[farbe]
+	punkt := map[int]uint32{Gruen: 0xFF2FB36B, Gelb: 0xFFE0A400, Rot: 0xFFD4473A, Grau: 0xFF9AA5A2, Blau: 0xFF2E7DD1}[farbe]
 	r := 6 * f
 	for y := 0; y < n; y++ {
 		for x := 0; x < n; x++ {

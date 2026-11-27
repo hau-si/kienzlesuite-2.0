@@ -1,10 +1,21 @@
 # Basis – Release-Notizen
 
-## 0.22.0-beta.20
+## 0.22.0-beta.22
 
 - **Neu: Gestaltungsregel für Module** (`docs/MODUL-GESTALTUNG.md`): Patient oben als Karte, Vorgänge links, der Patient bleibt im Tab erhalten (auch beim Wechsel zwischen Modulen), Wechsel zwischen Modulen im selben Tab, alle Seiten 1400 px breit, Liniensymbole statt Emojis.
 - **Neu: Patientenkarte als Bauteil** in `core.css` (`.patient-karte`, `.pk-marke` mit Herz „T2med“ oder neutral, `.pk-text`, `.pk-knoepfe`, `.pk-knopf`, `.pk-weg`), zuerst genutzt von Kasse und Signatur. `core.css?v=38`.
 - Nur Oberfläche, mit Tests und in der Vorschau geprüft. **Nicht auf der VM geprüft.** Vor Kasse und Signatur aktualisieren, sonst fehlt der Karte die Gestaltung.
+
+## 0.22.0-beta.21
+
+- **Neu: Symbol in der Taskleiste zeigt „wird aktualisiert“ (blau)**, solange der Hintergrunddienst eine neue Fassung lädt, austauscht und sich dafür beendet (Wunsch des Nutzers, nach dem Fehler in beta.20). Vorher blieb in dieser kurzen Zeit nur die Wahl zwischen „verbunden“ (veraltet) und dem alarmierenden „Agent läuft nicht“ (rot); jetzt schreibt der Dienst vor dem Laden `wird_aktualisiert: true` in status.json, das Symbol zeigt dafür bis zu 6 Minuten lang einen blauen Punkt mit dem Hinweis „lädt die neue Fassung und startet gleich neu, bitte kurz warten“ statt rot zu werden. Scheitert die Aktualisierung (z. B. falsche Prüfsumme), wird der Hinweis sofort wieder zurückgenommen. Nach Ablauf der 6 Minuten gilt wie gewohnt „Agent läuft nicht“.
+- Programmversion 2.3.3. Geprüft mit Tests (Go, neue Tests für die blaue Anzeige und das Zurücksetzen bei einer gescheiterten Aktualisierung) und Kreuz-Kompilierung für Windows. **Nicht auf einem echten Windows-PC geprüft** (wie der übrige Agent).
+
+## 0.22.0-beta.20
+
+- **Fehler behoben: Symbol in der Taskleiste blieb nach einer Selbstaktualisierung des Agents hängen** (roter Punkt, lässt sich nicht mehr anklicken), obwohl der Agent selbst (Dienst) nach der Aktualisierung einwandfrei lief (Arbeitsplatz „verbunden“, Drucker eingerichtet). Ursache: Nur der Hintergrunddienst startet sich nach einer Aktualisierung selbst neu (beta.18); das Symbol in der Taskleiste ist ein zweiter, unabhängiger Prozess, der nur beim Anmelden startet und sonst unbegrenzt mit dem alten Programmstand weiterlief. Das Symbol erkennt jetzt an `status.json` (andere Programmversion als die eigene), dass der Dienst sich inzwischen aktualisiert hat, und startet sich selbst mit der neuen Fassung neu – ohne Zutun des Benutzers, in der Regel binnen weniger Sekunden nach der Aktualisierung des Dienstes.
+- Wer gerade ein hängendes, rotes und nicht anklickbares Symbol hat: einmal abmelden und wieder anmelden (oder den PC neu starten) behebt es sofort; ab dieser Fassung tritt es nicht mehr auf.
+- Programmversion 2.3.2. Geprüft mit Tests (Go, neuer Test `TestAgentAktualisiert`) und Kreuz-Kompilierung für Windows. **Nicht auf einem echten Windows-PC geprüft** (wie der übrige Agent).
 
 ## 0.22.0-beta.19
 

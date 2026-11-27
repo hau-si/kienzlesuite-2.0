@@ -32,7 +32,7 @@ import (
 var DruckerPause = 10 * time.Minute
 
 // Version des Programms (scripts/starter-bauen setzt sie nicht; der Server vergleicht die Prüfsumme der Datei).
-const version = "2.3.1"
+const version = "2.3.3"
 
 // AgentConfig steht in agent.json (nur für SYSTEM und Administratoren lesbar).
 type AgentConfig struct {
@@ -122,6 +122,10 @@ type Status struct {
 	AkteOk     bool     `json:"akte_ok,omitempty"`
 	AltDrucker []string `json:"alt_drucker,omitempty"` // alte Kienzle-Drucker, Entfernen nach Rückfrage im Symbol
 	AltText    string   `json:"alt_text,omitempty"`
+	// WirdAktualisiert: gesetzt kurz bevor das neue Programm geladen wird (aktualisieren()); das Symbol in der
+	// Taskleiste zeigt dann „wird aktualisiert“ (blau) statt „läuft nicht“ (rot), solange dieser Dienst-Prozess lädt,
+	// austauscht und sich beendet. Der neue Prozess startet mit einem frischen, falschen Wert (false).
+	WirdAktualisiert bool `json:"wird_aktualisiert,omitempty"`
 }
 
 // statusSchreiben: bei Änderung sofort, sonst höchstens jede Minute (Lebenszeichen für das Symbol).
@@ -398,6 +402,7 @@ func (a *Agent) angleichen(s *Soll) error {
 	if soll, ok := s.Programme[assetName]; ok && len(soll) == 64 {
 		if ist, err := dateiHash(a.Programm); err == nil && ist != soll {
 			if err := a.aktualisieren(soll); err != nil {
+				a.status.WirdAktualisiert = false
 				meldungen = append(meldungen, "Aktualisierung: "+err.Error())
 				fehler = true
 			} else {
@@ -488,6 +493,10 @@ func (a *Agent) angleichen(s *Soll) error {
 // aktualisieren lädt das neue Programm, prüft die Prüfsumme und tauscht die Datei aus (unter Windows lässt sich ein laufendes
 // Programm umbenennen, aber nicht überschreiben).
 func (a *Agent) aktualisieren(soll string) error {
+	// Vor dem (unter Umständen etwas dauernden) Laden schon vermerken: Das Symbol in der Taskleiste soll währenddessen
+	// „wird aktualisiert“ zeigen, nicht „läuft nicht“, falls dieser Prozess sich beendet, bevor er wieder antwortet.
+	a.status.WirdAktualisiert = true
+	a.statusSchreiben(nil)
 	req, _ := http.NewRequest(http.MethodGet, a.cfg.ServerURL+"/agent/programm/"+assetName, nil)
 	req.Header.Set("Authorization", "Bearer "+a.ac.Token)
 	resp, err := a.Client.Do(req)

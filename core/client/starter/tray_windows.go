@@ -63,6 +63,7 @@ var (
 	pCreateBitmap           = gdi32.NewProc("CreateBitmap")
 	pGetDeviceCaps          = gdi32.NewProc("GetDeviceCaps")
 	pCreateMutexW           = kernel32.NewProc("CreateMutexW")
+	pCloseHandle            = kernel32.NewProc("CloseHandle")
 	pGetModuleHandleW       = kernel32.NewProc("GetModuleHandleW")
 	pDwmSetWindowAttribute  = dwmapi.NewProc("DwmSetWindowAttribute")
 )
@@ -83,6 +84,7 @@ const (
 	swShow        = 5
 	nimAdd        = 0
 	nimModify     = 1
+	nimDelete     = 2
 	nifMessage    = 0x1
 	nifIcon       = 0x2
 	nifTip        = 0x4
@@ -160,6 +162,7 @@ type bitmapInfoHeader struct {
 type trayZustand struct {
 	ordner  string
 	hwnd    uintptr
+	mutex   uintptr
 	nid     notifyIconData
 	ansicht Ansicht
 	farbe   int
@@ -188,7 +191,7 @@ func tray(ordner string) error {
 	if m != 0 && err == syscall.Errno(183) { // ERROR_ALREADY_EXISTS
 		return nil
 	}
-	tz = &trayZustand{ordner: ordner, farbe: -1, skala: 1}
+	tz = &trayZustand{ordner: ordner, farbe: -1, skala: 1, mutex: m}
 	if dc, _, _ := pGetDC.Call(0); dc != 0 {
 		if dpi, _, _ := pGetDeviceCaps.Call(dc, 90); dpi > 0 { // LOGPIXELSY
 			tz.skala = float64(dpi) / 96
@@ -221,9 +224,16 @@ func tray(ordner string) error {
 	}
 }
 
-// aktualisieren liest den Zustand, setzt Symbol und Hinweistext und zeichnet ein offenes Fenster neu.
+// aktualisieren liest den Zustand, setzt Symbol und Hinweistext und zeichnet ein offenes Fenster neu. Hat sich der Agent
+// (Dienst) inzwischen selbst aktualisiert, steht in status.json eine andere Programmversion als die dieses laufenden
+// Symbol-Prozesses: Der startet dann (ohne jede Aktion des Benutzers) eine neue, frische Fassung von sich selbst und
+// beendet sich – sonst bliebe das Symbol auf dem alten alten Stand stehen (rot, nicht mehr anklickbar).
 func (t *trayZustand) aktualisieren() {
 	s, ok := StatusLesen(t.ordner)
+	if AgentAktualisiert(s, ok, version) {
+		t.neustart()
+		return
+	}
 	t.ansicht = AnsichtBauen(s, ok, time.Now())
 	if t.ansicht.Farbe != t.farbe {
 		alt := t.icon
@@ -242,6 +252,19 @@ func (t *trayZustand) aktualisieren() {
 		t.groesse()
 		pInvalidateRect.Call(t.hwnd, 0, 1)
 	}
+}
+
+// neustart: Symbol entfernen, eigenen Mutex freigeben (sonst bekäme die neue Fassung ihn nicht), eine frische Fassung
+// dieses Programms mit --tray starten und sich selbst beenden.
+func (t *trayZustand) neustart() {
+	pShellNotifyIconW.Call(nimDelete, uintptr(unsafe.Pointer(&t.nid)))
+	if t.mutex != 0 {
+		pCloseHandle.Call(t.mutex)
+	}
+	if exe, err := os.Executable(); err == nil {
+		_ = exec.Command(exe, "--tray").Start()
+	}
+	os.Exit(0)
 }
 
 // symbolIcon: 32-Bit-Symbol aus SymbolBild in der Größe der kleinen Symbole.
@@ -403,6 +426,8 @@ func ampel(f int) uintptr {
 		return rgb(0xD4, 0x47, 0x3A)
 	case Grau:
 		return rgb(0x9A, 0xA5, 0xA2)
+	case Blau:
+		return rgb(0x2E, 0x7D, 0xD1)
 	}
 	return rgb(0x2F, 0xB3, 0x6B)
 }
@@ -449,8 +474,11 @@ func (t *trayZustand) zeichnen() {
 	kreis(38, 38, 5, ampel(v.Farbe))
 	t.text(dc, "Kienzle-Suite", rect{t.px(50), t.px(14), t.px(breite - 110), t.px(34)}, dunkel, dtLeft|dtSingleLine|dtVCenter)
 	markeFarbe, markeText := rgb(0xE3, 0xF1, 0xEE), teal
-	if v.Farbe == Rot {
+	switch v.Farbe {
+	case Rot:
 		markeFarbe, markeText = rgb(0xFB, 0xEE, 0xEA), rgb(0x99, 0x3D, 0x2B)
+	case Blau:
+		markeFarbe, markeText = rgb(0xE4, 0xEE, 0xFA), rgb(0x1F, 0x51, 0x8C)
 	}
 	pSelectObject.Call(dc, klein)
 	kasten(breite-16-110, 16, breite-16, 36, 8, markeFarbe)

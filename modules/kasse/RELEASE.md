@@ -3,7 +3,7 @@
 ## 2.3.4-beta.54
 
 - **Wechsel zu Signatur im selben Tab:** „Zur Unterschrift“ öffnet Signatur jetzt im selben Tab statt in einem neuen. Der Patient bleibt oben erhalten, und Signatur springt nach der Unterschrift hierher zurück zum Bezahlen. Die gewählten Leistungen stehen dann noch da.
-- Die Patientenkarte nutzt das neue Bauteil der Basis (ab Basis 0.22.0-beta.20, `docs/MODUL-GESTALTUNG.md`).
+- Die Patientenkarte nutzt das neue Bauteil der Basis (ab Basis 0.22.0-beta.22, `docs/MODUL-GESTALTUNG.md`).
 - **Nicht auf der VM geprüft.**
 
 ## 2.3.4-beta.53

@@ -269,6 +269,10 @@ func TestSelbstaktualisierung(t *testing.T) {
 	if b, _ := os.ReadFile(exe + ".alt"); string(b) != "Programm Fassung 1" {
 		t.Fatal("alte Fassung fehlt")
 	}
+	// status.json muss „wird aktualisiert“ zeigen, bevor der Dienst-Prozess sich beendet (Symbol: blau statt rot).
+	if s, ok := StatusLesen(dir); !ok || !s.WirdAktualisiert {
+		t.Fatalf("WirdAktualisiert nicht gesetzt: %v %+v", ok, s)
+	}
 	// Falsche Prüfsumme: nichts wird ersetzt
 	ts.mu.Lock()
 	ts.programm = []byte("Programm Fassung 3")
@@ -277,6 +281,33 @@ func TestSelbstaktualisierung(t *testing.T) {
 	a2.Laden()
 	a2.aktualisieren(strings.Repeat("0", 64))
 	if b, _ := os.ReadFile(exe); string(b) != "Programm Fassung 2" {
+		t.Fatal("Programm trotz falscher Prüfsumme ersetzt")
+	}
+}
+
+// TestWirdAktualisiertZurueckgesetztBeiFehler: Scheitert die Aktualisierung (z. B. falsche Prüfsumme aus der Suite),
+// bleibt der Dienst-Prozess am Leben; WirdAktualisiert darf dann nicht hängen bleiben (sonst zeigt das Symbol dauerhaft
+// „wird aktualisiert“, obwohl gar nichts mehr passiert).
+func TestWirdAktualisiertZurueckgesetztBeiFehler(t *testing.T) {
+	ts := neuerTestServer(t, []byte("Programm Fassung 1"))
+	dir := agentOrdner(t, ts)
+	if _, err := Anmelden(dir, nil); err != nil {
+		t.Fatal(err)
+	}
+	exe := filepath.Join(dir, "kienzle-starter")
+	os.WriteFile(exe, []byte("altes Programm"), 0o755)
+	a := &Agent{Ordner: dir, Programm: exe, Plattform: &testPlattform{ordner: dir}}
+	if err := a.Laden(); err != nil {
+		t.Fatal(err)
+	}
+	err := a.angleichen(&Soll{Programme: map[string]string{assetName: strings.Repeat("0", 64)}})
+	if err == nil || !strings.Contains(err.Error(), "Aktualisierung") {
+		t.Fatalf("erwartet Fehler wegen falscher Prüfsumme, bekam %v", err)
+	}
+	if a.status.WirdAktualisiert {
+		t.Fatal("WirdAktualisiert muss nach gescheiterter Aktualisierung wieder false sein")
+	}
+	if b, _ := os.ReadFile(exe); string(b) != "altes Programm" {
 		t.Fatal("Programm trotz falscher Prüfsumme ersetzt")
 	}
 }
