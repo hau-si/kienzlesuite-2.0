@@ -893,6 +893,61 @@ final class App {
             default => 'Druckübergabe nicht bestätigt. Drucker und Warteschlange prüfen, bevor erneut gedruckt wird.',
         }];
     }
+    /** Übergabe an Signatur: T2med-Zugang dieses Besuchs für die Ablage des unterschriebenen PDFs vormerken. */
+    public function signaturOffen(array $visit): array {
+        if (self::isManual($visit) || $visit['patient_id'] === 'inbox' || $visit['oauth_cipher'] === '') return ['ablage' => false];
+        $this->db->query('UPDATE visits SET signatur_offen=1 WHERE id=?', [$visit['id']]);
+        return ['ablage' => true];
+    }
+
+    /**
+     * Unterschriebene PDFs aus Signatur (Austauschordner an-kasse/) in die T2med-Akte schreiben und das Ergebnis zurückmelden
+     * (von-kasse/<vorgang>.json). Zugang: der Besuch, aus dem die Übergabe kam, sonst ein noch gültiger Besuch desselben Patienten.
+     * @return list<string> Protokollzeilen ohne Patientendaten
+     */
+    public function signaturAblage(string $ordner, ?int $jetzt = null): array {
+        $jetzt ??= time();
+        $log = [];
+        $aus = $ordner . '/von-kasse';
+        if (!is_dir($aus)) { @mkdir($aus, 0770); @chmod($aus, 0770); }
+        foreach (array_slice(glob($ordner . '/an-kasse/*.json') ?: [], 0, 20) as $datei) {
+            if (!preg_match('#/([1-9][0-9]{0,9})\.json$#D', $datei, $m)) { @unlink($datei); continue; }
+            $vid = (int)$m[1];
+            $pdfDatei = $ordner . '/an-kasse/' . $vid . '.pdf';
+            $antwort = static function (bool $ok, string $meldung) use ($aus, $vid, $datei, $pdfDatei): void {
+                $tmp = $aus . '/.' . $vid . '.' . bin2hex(random_bytes(4));
+                file_put_contents($tmp, json_encode(['vorgang' => $vid, 'ok' => $ok, 'meldung' => mb_substr($meldung, 0, 250)], JSON_UNESCAPED_UNICODE));
+                @chmod($tmp, 0660);
+                rename($tmp, $aus . '/' . $vid . '.json');
+                @unlink($datei);
+                @unlink($pdfDatei);
+            };
+            try {
+                $a = is_link($datei) || filesize($datei) > 4096 ? null : json_decode((string)file_get_contents($datei), true);
+                if (!is_array($a) || (int)($a['vorgang'] ?? 0) !== $vid || !is_string($a['ref'] ?? null) || !preg_match('/^[A-Za-z0-9_-]{1,64}$/D', $a['ref'])) throw new Problem('Auftrag der Signatur ist ungültig.');
+                $pdf = !is_link($pdfDatei) && is_file($pdfDatei) && filesize($pdfDatei) <= 10 * 1024 * 1024 ? (string)file_get_contents($pdfDatei) : '';
+                if (!str_starts_with($pdf, '%PDF-')) throw new Problem('Das PDF fehlt oder ist zu groß.');
+                $visit = $this->db->one('SELECT * FROM visits WHERE id=?', [$a['ref']]);
+                if (!$visit) throw new Problem('Der Kassenvorgang ist nicht mehr vorhanden.');
+                $zugang = $visit['oauth_cipher'] !== '' && (int)$visit['expires_at'] > $jetzt ? $visit
+                    : $this->db->one("SELECT * FROM visits WHERE patient_id=? AND oauth_cipher<>'' AND expires_at>? AND patient_id NOT IN ('manual','inbox') AND context_id NOT LIKE 'manual-%' AND context_id NOT LIKE 'inbox-%' ORDER BY created_at DESC LIMIT 1", [$visit['patient_id'], $jetzt]);
+                if (!$zugang) throw new Problem('Der T2med-Zugang der Kasse ist abgelaufen (höchstens 4 Stunden). Bitte den Patienten frisch aus T2med in der Kasse öffnen und in Signatur „Erneut in T2med ablegen“ wählen.');
+                $titel = is_string($a['titel'] ?? null) ? $a['titel'] : 'Unterschriebenes Dokument';
+                if ($this->config->get('fhir', 'mode') !== 'mock') $this->fhir->dokument((string)$zugang['context_id'], $this->decrypt($zugang['oauth_cipher']), $pdf, $titel, (int)($a['zeit'] ?? $jetzt));
+                $this->db->query("UPDATE visits SET signatur_offen=0, oauth_cipher=CASE WHEN completed_at IS NOT NULL THEN '' ELSE oauth_cipher END WHERE id=?", [$visit['id']]);
+                $antwort(true, '');
+                $log[] = "Vorgang $vid: in T2med abgelegt";
+            } catch (Problem | TransportError $e) {
+                $antwort(false, $e->getMessage());
+                $log[] = "Vorgang $vid: nicht abgelegt";
+            } catch (\Throwable $e) {
+                $antwort(false, 'Interner Fehler der Kasse (' . get_class($e) . ').');
+                $log[] = "Vorgang $vid: interner Fehler";
+            }
+        }
+        return $log;
+    }
+
     /** Kontaktdaten des Patienten (Telefon, E-Mail, Anschrift) für die Übergabe an Signatur, frisch aus T2med; ohne T2med leer. */
     public function patientKontakt(array $visit): array {
         $leer = ['vorname' => '', 'nachname' => '', 'geschlecht' => 'unknown', 'telefon' => '', 'email' => '', 'adresse' => '', 'geburtsdatum' => (string)$visit['patient_birthdate'], 'hinweis' => ''];
@@ -1087,7 +1142,9 @@ final class App {
     private function finish(array $payment, string $resource): array {
         $this->db->transaction(function () use ($payment, $resource): void {
             $this->db->query("UPDATE payments SET doc_status='written',fhir_written_at=?,fhir_resource_id=?,error_message='' WHERE id=?", [time(), $resource, $payment['id']]);
-            $this->db->query("UPDATE visits SET completed_at=?,oauth_cipher='' WHERE id=?", [time(), $payment['visit_id']]);
+            // Liegt ein Dokument noch zur Unterschrift in Signatur, bleibt der T2med-Zugang (höchstens bis zum Ablauf nach 4 Stunden),
+            // damit die Kasse das unterschriebene PDF danach in die Akte schreiben kann.
+            $this->db->query("UPDATE visits SET completed_at=?,oauth_cipher=CASE WHEN signatur_offen=1 THEN oauth_cipher ELSE '' END WHERE id=?", [time(), $payment['visit_id']]);
         });
         // Spätestens beim Abschluss die Rechnungs-PDF ablegen; ein Fehler blockiert die Dokumentation nicht.
         $this->exportPayment($this->db->one('SELECT * FROM payments WHERE id=?', [$payment['id']]));

@@ -97,5 +97,35 @@ class PdfTest(unittest.TestCase):
         self.assertEqual(paddienst.pdf_nachholen(c, self.ordner), 0, 'schon vorhanden')
 
 
+class AblageTest(unittest.TestCase):
+    def test_anstossen(self):
+        c = sqlite3.connect(':memory:')
+        c.execute("CREATE TABLE vorgaenge (id INTEGER PRIMARY KEY, status TEXT, ablage TEXT)")
+        uhr = [100.0]
+        gestartet = []
+
+        class P:
+            def __init__(self): self.fertig = None
+            def poll(self): return self.fertig
+
+        def starten():
+            gestartet.append(P())
+            return gestartet[-1]
+        paddienst.ABLAGE.update(proc=None, zuletzt=0.0)
+        self.assertFalse(paddienst.ablage_anstossen(c, jetzt=lambda: uhr[0], starten=starten), 'nichts offen')
+        c.execute("INSERT INTO vorgaenge VALUES (1, 'unterschrieben', '')")
+        self.assertTrue(paddienst.ablage_anstossen(c, jetzt=lambda: uhr[0], starten=starten))
+        uhr[0] += 60
+        self.assertFalse(paddienst.ablage_anstossen(c, jetzt=lambda: uhr[0], starten=starten), 'läuft noch: nicht doppelt')
+        gestartet[-1].fertig = 0
+        uhr[0] += 5
+        self.assertFalse(paddienst.ablage_anstossen(c, jetzt=lambda: uhr[0] - 60, starten=starten), 'Takt abwarten')
+        self.assertTrue(paddienst.ablage_anstossen(c, jetzt=lambda: uhr[0], starten=starten))
+        self.assertEqual(len(gestartet), 2)
+        c2 = sqlite3.connect(':memory:')
+        c2.execute("CREATE TABLE vorgaenge (id INTEGER PRIMARY KEY, status TEXT)")
+        self.assertFalse(paddienst.ablage_offen(c2), 'alte Datenbank ohne Spalte')
+
+
 if __name__ == '__main__':
     unittest.main()

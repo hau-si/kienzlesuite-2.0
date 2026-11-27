@@ -309,7 +309,7 @@ wirft(fn() => Seite::vorgangAnlegen(['vorlage_id' => $kt, 'pad_id' => $padT, 'pa
 // API-Schlüssel: leer = Demo-Schlüssel wie in der Kasse; 403 mit Hinweis
 $kopfTest = new class(['base_url' => 'https://t2med.example.org/aps/fhir/api/r4', 'api_key' => '']) extends Fhir {
     public array $kopf = []; public int $status = 403;
-    protected function anfrage(string $url, string $token, string $methode = 'GET', ?array $body = null, array $mehr = []): array { return ['status' => $this->status, 'body' => null]; }
+    protected function anfrage(string $url, string $token, string $methode = 'GET', ?array $body = null, array $mehr = [], string $profil = ''): array { return ['status' => $this->status, 'body' => null]; }
 };
 try { $kopfTest->patient('k1', 'tok'); check(false, '403 ohne Fehler'); } catch (RuntimeException $e) { check(str_contains($e->getMessage(), 'HTTP 403') && str_contains($e->getMessage(), 'API-Schlüssel'), '403 mit Hinweis auf den API-Schlüssel'); }
 $rm = new ReflectionMethod(Fhir::class, 'anfrage');
@@ -327,8 +327,10 @@ wirft(fn() => $an(['geschlecht' => 'x']), 'ungültiges Geschlecht');
 // In T2med übernehmen (nur Telefon/E-Mail, nur auf Knopfdruck, nach der Unterschrift)
 $fake = new class(['base_url' => 'https://t2med.example.org/aps/fhir/api/r4']) extends Fhir {
     public array $aufrufe = []; public int $putStatus = 200;
-    protected function anfrage(string $url, string $token, string $methode = 'GET', ?array $body = null, array $mehr = []): array {
-        $this->aufrufe[] = [$methode, $url, $token, $mehr, $body];
+    public int $postStatus = 201; public ?array $postAntwort = null;
+    protected function anfrage(string $url, string $token, string $methode = 'GET', ?array $body = null, array $mehr = [], string $profil = 'https://fhir.t2med.de/StructureDefinition/FhirApiPatient|1.0.0'): array {
+        $this->aufrufe[] = [$methode, $url, $token, $mehr, $body, $profil];
+        if ($methode === 'POST') return ['status' => $this->postStatus, 'body' => $this->postAntwort];
         if ($methode === 'GET') return ['status' => 200, 'body' => ['resourceType' => 'Patient', 'id' => 'p1', 'meta' => ['versionId' => 'abc/_history/4'], 'address' => [['city' => 'Stuttgart']],
             'telecom' => [['system' => 'phone', 'value' => '0711 1', 'use' => 'home'], ['system' => 'email', 'value' => 'alt@example.invalid', 'use' => 'work']]]];
         return ['status' => $this->putStatus, 'body' => null];
@@ -362,5 +364,64 @@ check($fest > 0, 'fester IGeL-Vertrag vorhanden');
 Seite::vorlageSpeichern(['id' => $fest, 'art' => 'sonstige', 'titel' => 'IGeL neu', 'text' => 'Neuer Text {{patient}}', 'aktiv' => '']);
 $fv = Seite::vorlage($fest);
 check($fv['art'] === 'igel' && (int)$fv['aktiv'] === 1 && $fv['text'] === 'Neuer Text {{patient}}', 'fester IGeL-Vertrag: Text änderbar, Art und Aktiv bleiben');
+
+// Ablage in T2med: direkt (Start aus T2med) oder über die Kasse (Austauschordner); ohne Weg „manuell“.
+\KienzleSignatur\Ablage::$austausch = $dir . '/austausch';
+mkdir($dir . '/austausch', 0770);
+@mkdir($dir . '/unterschriften', 0700);
+$neuerSignierter = function (string $kontext, string $quelle = '', string $ref = '') use ($at, $padT, $praxis, $dir): int {
+    $id = Seite::vorgangAnlegen(['vorlage_id' => $at, 'pad_id' => $padT, 'patient' => 'Max Mustermann'], 'x', $praxis, $kontext);
+    Speicher::pdo()->prepare("UPDATE vorgaenge SET status='unterschrieben', unterschrieben=?, quelle=?, quelle_ref=?, ablage='' WHERE id=?")->execute([1795000000, $quelle, $ref, $id]);
+    file_put_contents("$dir/unterschriften/$id.pdf", "%PDF-1.4 erfunden $id");
+    return $id;
+};
+$direkt = $neuerSignierter('kontext-1');
+$ueberKasse = $neuerSignierter('', 'kasse', 'visit_abc-1');
+$ohne = $neuerSignierter('');
+$ohnePdf = Seite::vorgangAnlegen(['vorlage_id' => $at, 'pad_id' => $padT, 'patient' => 'Max Mustermann'], 'x', $praxis, 'kontext-1');
+Speicher::pdo()->prepare("UPDATE vorgaenge SET status='unterschrieben', ablage='' WHERE id=?")->execute([$ohnePdf]);
+check(\KienzleSignatur\Ablage::offen(), 'Ablage offen');
+$fake->aufrufe = [];
+\KienzleSignatur\Ablage::lauf(fn() => $fake);
+$post = array_values(array_filter($fake->aufrufe, fn($a) => $a[0] === 'POST'));
+check(count($post) === 1 && str_ends_with($post[0][1], '/DocumentReference') && $post[0][5] === '' && $post[0][2] === 'tok', 'Direkt: ein POST DocumentReference mit dem Token');
+$res = $post[0][4];
+check($res['resourceType'] === 'DocumentReference' && $res['meta']['profile'] === [Fhir::ANHANG] && $res['identifier'][0] === ['system' => Fhir::KONTEXT, 'value' => 'kontext-1']
+    && $res['content'][0]['attachment']['contentType'] === 'application/pdf' && base64_decode($res['content'][0]['attachment']['data']) === "%PDF-1.4 erfunden $direkt"
+    && $res['description'] === 'Anrede-Test (unterschrieben)' && $res['content'][0]['attachment']['title'] === 'Anrede-Test.pdf', 'Aufbau der DocumentReference');
+check(Seite::vorgang($direkt)['status'] === 'uebertragen' && Seite::vorgang($direkt)['ablage'] === 'erledigt', 'direkt abgelegt');
+check(Seite::vorgang($ueberKasse)['ablage'] === 'an_kasse' && is_file("$dir/austausch/an-kasse/$ueberKasse.pdf"), 'an die Kasse übergeben');
+$auftrag = json_decode((string)file_get_contents("$dir/austausch/an-kasse/$ueberKasse.json"), true);
+check($auftrag['vorgang'] === $ueberKasse && $auftrag['ref'] === 'visit_abc-1' && $auftrag['zeit'] === 1795000000 && (fileperms("$dir/austausch/an-kasse/$ueberKasse.json") & 0777) === 0660, 'Auftrag für die Kasse (0660)');
+check(Seite::vorgang($ohne)['ablage'] === 'manuell' && Seite::vorgang($ohne)['status'] === 'unterschrieben', 'ohne Weg: manuell');
+check(Seite::vorgang($ohnePdf)['ablage'] === '', 'ohne PDF noch warten');
+mkdir("$dir/austausch/von-kasse", 0770);
+file_put_contents("$dir/austausch/von-kasse/$ueberKasse.json", json_encode(['vorgang' => $ueberKasse, 'ok' => true, 'meldung' => '']));
+\KienzleSignatur\Ablage::lauf(fn() => $fake);
+check(Seite::vorgang($ueberKasse)['status'] === 'uebertragen' && Seite::vorgang($ueberKasse)['ablage'] === 'erledigt' && !is_file("$dir/austausch/von-kasse/$ueberKasse.json"), 'Antwort der Kasse übernommen');
+// Fehler von T2med: Meldung mit Auskunft, Knopf „Erneut“ setzt zurück
+$fehlerhaft = $neuerSignierter('kontext-1');
+$fake->postStatus = 422; $fake->postAntwort = ['resourceType' => 'OperationOutcome', 'issue' => [['severity' => 'error', 'diagnostics' => 'description fehlt']]];
+\KienzleSignatur\Ablage::lauf(fn() => $fake);
+$fv = Seite::vorgang($fehlerhaft);
+check($fv['ablage'] === 'fehler' && str_contains($fv['meldung'], 'HTTP 422') && str_contains($fv['meldung'], 'description fehlt'), 'Fehler mit Auskunft von T2med');
+check(str_contains(Ansicht::seite('/vorgaenge', 'tok', Seite::vorgaenge(), Seite::vorlagen(), true, true, null, null), 'value="ablage-erneut"'), 'Knopf Erneut ablegen');
+\KienzleSignatur\Ablage::erneut($fehlerhaft);
+$fake->postStatus = 201; $fake->postAntwort = ['resourceType' => 'OperationOutcome', 'issue' => [['severity' => 'information']]];
+\KienzleSignatur\Ablage::lauf(fn() => $fake);
+check(Seite::vorgang($fehlerhaft)['status'] === 'uebertragen', 'erneut abgelegt');
+wirft(fn() => \KienzleSignatur\Ablage::erneut($fehlerhaft), 'abgelegte Vorgänge nicht erneut');
+// Fehlermeldung der Kasse; abgelaufener Token
+$k2v = $neuerSignierter('', 'kasse', 'visit_x');
+\KienzleSignatur\Ablage::lauf(fn() => $fake);
+file_put_contents("$dir/austausch/von-kasse/$k2v.json", json_encode(['vorgang' => $k2v, 'ok' => false, 'meldung' => 'Zugang abgelaufen']));
+\KienzleSignatur\Ablage::lauf(fn() => $fake);
+check(Seite::vorgang($k2v)['ablage'] === 'fehler' && Seite::vorgang($k2v)['meldung'] === 'Kasse: Zugang abgelaufen', 'Fehler der Kasse übernommen');
+$alt = $neuerSignierter('kontext-unbekannt');
+\KienzleSignatur\Ablage::lauf(fn() => $fake);
+check(Seite::vorgang($alt)['ablage'] === 'fehler' && str_contains(Seite::vorgang($alt)['meldung'], 'abgelaufen'), 'ohne gültigen Token: Fehler mit Hinweis');
+foreach (array_merge(glob("$dir/austausch/*/*") ?: [], glob("$dir/austausch/*/.*") ?: []) as $f) if (is_file($f)) unlink($f);
+foreach (glob("$dir/austausch/*") ?: [] as $d) rmdir($d);
+rmdir("$dir/austausch");
 
 echo "Signatur-Tests grün.\n";

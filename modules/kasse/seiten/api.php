@@ -102,6 +102,7 @@ try {
             'document' => $app->document($visit, App::string($input, 'payment_id', 32)),
             'receipt_share' => $app->receiptShare($visit, App::string($input, 'payment_id', 32)),
             'patient_kontakt' => $app->patientKontakt($visit),
+            'signatur_offen' => $app->signaturOffen($visit),
             'receipt_recipient' => $app->receiptRecipient($visit, App::string($input, 'payment_id', 32)),
             'receipt_email' => $app->receiptEmail($visit, $input),
             'receipt_print' => $app->receiptPrint($visit, $input),

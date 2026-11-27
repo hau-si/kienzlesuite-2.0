@@ -1,0 +1,10 @@
+# Kienzle-Suite, Modul kasse: Unterschriebene PDFs aus Signatur abholen, sobald welche im Austauschordner liegen.
+[Unit]
+Description=Kienzle-Suite Modul kasse (Unterschriften aus Signatur)
+
+[Path]
+PathExistsGlob=/var/spool/kienzle/austausch/kasse_signatur/an-kasse/*.json
+Unit=kienzle-kasse-signatur.service
+
+[Install]
+WantedBy=multi-user.target

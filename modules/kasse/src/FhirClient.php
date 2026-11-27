@@ -118,6 +118,36 @@ final class FhirClient {
         // Ein leeres Ergebnis ist KEIN Beweis, dass ein vorheriger POST nicht noch verarbeitet wird.
         return $found[0] ?? null;
     }
+    public const ANHANG = 'https://fhir.t2med.de/StructureDefinition/FhirApiDocumentReferenceAnhang|1.0.0';
+
+    /** Unterschriebenes PDF aus Signatur als DocumentReference (Profil „Anhang“) in die Akte des Kontexts (Integrationsleitfaden 1.10). */
+    public function dokument(string $context, string $token, string $pdf, string $titel, int $zeit): void {
+        if (!preg_match('/^[A-Za-z0-9._-]{1,128}$/D', $context)) throw new Problem('Ungültiger T2med-Kontext.');
+        $iso = date('c', $zeit);
+        $titel = trim(preg_replace('/[\x00-\x1f\x7f]+/u', ' ', $titel) ?? '') ?: 'Unterschriebenes Dokument';
+        $datei = trim(preg_replace('/[^A-Za-z0-9ÄÖÜäöüß _.-]+/u', '', $titel) ?? '') ?: 'dokument';
+        $result = $this->request('POST', '/DocumentReference', $token, ['resourceType' => 'DocumentReference', 'meta' => ['profile' => [self::ANHANG]],
+            'identifier' => [['system' => self::CONTEXT, 'value' => $context]], 'status' => 'current', 'date' => $iso,
+            'description' => mb_substr($titel . ' (unterschrieben)', 0, 200),
+            'content' => [['attachment' => ['contentType' => 'application/pdf', 'title' => mb_substr($datei, 0, 80) . '.pdf', 'creation' => $iso, 'data' => base64_encode($pdf)]]]]);
+        $code = $result['status'];
+        $detail = ''; $error = false;
+        $body = $result['body'];
+        if (is_array($body) && ($body['resourceType'] ?? '') === 'OperationOutcome') foreach ($body['issue'] ?? [] as $issue) {
+            if (!in_array($issue['severity'] ?? '', ['fatal', 'error'], true)) continue;
+            $error = true;
+            $detail = mb_substr(trim(preg_replace('/[\x00-\x1f\x7f]+/u', ' ', (string)($issue['details']['text'] ?? $issue['diagnostics'] ?? '')) ?? ''), 0, 160);
+            break;
+        }
+        if ($code >= 200 && $code < 300 && !$error) return;
+        $grund = match (true) {
+            $code === 401, $code === 403 => 'T2med lehnt den Zugriff ab (Aufruf älter als 4 Stunden oder Schlüssel falsch).',
+            $code === 413 => 'Das PDF ist für T2med zu groß.',
+            default => 'T2med hat das Dokument nicht angenommen (HTTP ' . $code . ').',
+        };
+        throw new TransportError($grund . ($detail !== '' ? ' Auskunft von T2med: ' . $detail : ''), false, $code);
+    }
+
     public function write(array $visit, array $payment, string $token, bool $conditional): string {
         $request = ['method' => 'POST', 'url' => 'Observation'];
         if ($conditional) $request['ifNoneExist'] = http_build_query(['identifier' => self::PAYMENT . '|' . $payment['id']]);

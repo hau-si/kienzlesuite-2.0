@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS visits (
     id TEXT PRIMARY KEY, context_id TEXT NOT NULL, patient_id TEXT NOT NULL,
     patient_name TEXT NOT NULL, patient_birthdate TEXT NOT NULL DEFAULT '', patient_address TEXT NOT NULL DEFAULT '[]',
     oauth_cipher TEXT NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL,
-    completed_at INTEGER, mock_document_fail INTEGER NOT NULL DEFAULT 0
+    completed_at INTEGER, mock_document_fail INTEGER NOT NULL DEFAULT 0,
+    signatur_offen INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS visits_context ON visits(context_id, patient_id);
 CREATE TABLE IF NOT EXISTS launch_tickets (

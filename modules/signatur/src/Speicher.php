@@ -7,7 +7,7 @@ final class Speicher {
     public static string $data = '/var/lib/kienzle/signatur';
     private static ?\PDO $pdo = null;
     private static string $pfad = '';
-    public const VERSION = 7;
+    public const VERSION = 8;
 
     public static function pdo(): \PDO {
         $datei = self::$data . '/signatur.db';
@@ -135,6 +135,13 @@ final class Speicher {
         if ($v < 7) {
             // Für das PDF (Entwurf C): Geburtsdatum des Patienten und Praxisangaben (Name, Anschrift) zum Zeitpunkt des Anlegens.
             foreach (['geburtsdatum', 'praxis'] as $spalte) $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN ' . $spalte . ' TEXT NOT NULL DEFAULT ""');
+        }
+        if ($v < 8) {
+            // Ablage des PDFs in T2med (direkt oder über die Kasse): '', an_kasse, erledigt, fehler, manuell.
+            $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN ablage TEXT NOT NULL DEFAULT ""');
+            // Schon übertragene Vorgänge gelten als erledigt, schon unterschriebene ältere nicht automatisch (kein Nachholen ohne Wunsch).
+            $pdo->exec("UPDATE vorgaenge SET ablage='erledigt' WHERE status='uebertragen'");
+            $pdo->exec("UPDATE vorgaenge SET ablage='manuell' WHERE status='unterschrieben'");
         }
         $pdo->exec('PRAGMA user_version=' . self::VERSION);
         $pdo->commit();

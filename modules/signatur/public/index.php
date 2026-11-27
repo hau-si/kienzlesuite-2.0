@@ -5,7 +5,7 @@ declare(strict_types=1);
  * (auth_request) und Benutzer, Rolle und Rechte als KIENZLE_* übergeben.
  */
 require_once dirname(__DIR__) . '/src/bootstrap.php';
-use KienzleSignatur\{Ansicht, Pad, Seite, Start};
+use KienzleSignatur\{Ablage, Ansicht, Pad, Seite, Start};
 
 header('X-Frame-Options: DENY');
 header('X-Content-Type-Options: nosniff');
@@ -14,17 +14,6 @@ $root = dirname(__DIR__);
 $base = preg_match('#^/[a-z0-9-]{1,31}$#D', (string)($_SERVER['KIENZLE_PFAD'] ?? '')) ? (string)$_SERVER['KIENZLE_PFAD'] : '/signatur';
 $path = (string)parse_url((string)($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
 $rel = str_starts_with($path, $base . '/') ? substr($path, strlen($base)) : '/';
-
-/** T2med-Zugang der Basis (Verwaltung → Verbindungen) samt hinterlegter CA für den FHIR-Zugriff. */
-function sg_fhir(): KienzleSignatur\Fhir {
-    $verbindung = sg_modul()->verbindung('t2med') ?? [];
-    $ca = '';
-    if (trim((string)($verbindung['ca_pem'] ?? '')) !== '') {
-        $ca = KienzleSignatur\Speicher::$data . '/t2med-ca.pem';
-        if (!is_file($ca) || file_get_contents($ca) !== trim((string)$verbindung['ca_pem']) . "\n") { file_put_contents($ca, trim((string)$verbindung['ca_pem']) . "\n"); chmod($ca, 0600); }
-    }
-    return new KienzleSignatur\Fhir($verbindung, $ca);
-}
 
 if (($_SERVER['KIENZLE_OEFFENTLICH'] ?? '') === 'starter') {
     // POST /starter/signatur: nur mit der Prüfung der Basis (auth_request), nie direkt aus dem Browser.
@@ -139,6 +128,9 @@ try {
             } elseif ($aktion === 'wiederaufnehmen' && $darfVorgang) {
                 Seite::wiederaufnehmen((int)($_POST['id'] ?? 0));
                 $meldung = 'Vorgang wieder aufgenommen.';
+            } elseif ($aktion === 'ablage-erneut' && $darfVorgang) {
+                Ablage::erneut((int)($_POST['id'] ?? 0));
+                $meldung = 'Das PDF wird in wenigen Sekunden in T2med abgelegt.';
             } elseif ($aktion === 'kontakt-uebernehmen' && $darfVorgang) {
                 $meldung = Seite::kontaktUebernehmen((int)($_POST['id'] ?? 0), sg_fhir());
             } elseif ($aktion === 'abbrechen' && $darfVorgang) {

@@ -30,3 +30,14 @@ function sg_modul(): KienzleModul {
     }
     return $k;
 }
+
+/** T2med-Zugang aus der Verbindung „t2med“ der Basis (Web und Hintergrundlauf). */
+function sg_fhir(): KienzleSignatur\Fhir {
+    $verbindung = sg_modul()->verbindung('t2med') ?? [];
+    $ca = '';
+    if (trim((string)($verbindung['ca_pem'] ?? '')) !== '') {
+        $ca = KienzleSignatur\Speicher::$data . '/t2med-ca.pem';
+        if (!is_file($ca) || file_get_contents($ca) !== trim((string)$verbindung['ca_pem']) . "\n") { file_put_contents($ca, trim((string)$verbindung['ca_pem']) . "\n"); chmod($ca, 0600); }
+    }
+    return new KienzleSignatur\Fhir($verbindung, $ca);
+}

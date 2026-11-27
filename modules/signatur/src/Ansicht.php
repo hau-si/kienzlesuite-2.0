@@ -26,6 +26,9 @@ final class Ansicht {
         $abbrechbar = !in_array($v['status'], ['uebertragen', 'abgebrochen'], true);
         $stat = '<span class="us-status s-' . $h($v['status']) . '">' . $h(Seite::STATI[$v['status']] ?? $v['status']) . '</span>';
         if ($v['meldung'] !== '') $stat .= '<div class="muted klein-text">' . $h($v['meldung']) . '</div>';
+        if ($v['status'] === 'unterschrieben' && isset(Ablage::STATI[$v['ablage'] ?? ''])) {
+            $stat .= '<div class="muted klein-text">' . $h(Ablage::STATI[$v['ablage']]) . '</div>';
+        }
         if ($v['status'] === 'wartet' && $v['kontext'] !== '' && !Seite::kontextGueltig($v)) $stat .= '<div class="muted klein-text">T2med-Verbindung abgelaufen: Das Ablegen braucht einen neuen Aufruf aus T2med.</div>';
         if (($v['kontakt_status'] ?? '') !== '') {
             $k = json_decode((string)$v['kontakt_neu'], true) ?: [];
@@ -56,6 +59,8 @@ final class Ansicht {
         if (in_array($v['status'], ['wartet', 'fehler'], true) && (int)($v['pad_id'] ?? 0) > 0) $o .= self::knopf($csrfFeld, 'am-pad', (int)$v['id'], 'Zum Pad senden', 'primary small');
         if ($v['status'] === 'am_pad') $o .= self::knopf($csrfFeld, 'vom-pad', (int)$v['id'], 'Vom Pad nehmen', 'small');
         if (in_array($v['kontakt_status'] ?? '', ['offen', 'fehler'], true) && in_array($v['status'], ['unterschrieben', 'uebertragen'], true)) $o .= self::knopf($csrfFeld, 'kontakt-uebernehmen', (int)$v['id'], 'Kontaktdaten in T2med übernehmen', 'primary small', 'Telefon und E-Mail dieses Patienten in T2med ändern? Alle anderen Angaben bleiben unverändert.');
+        if ($v['status'] === 'unterschrieben' && (($v['ablage'] ?? '') === 'fehler' || (($v['ablage'] ?? '') === 'manuell' && ($v['quelle'] === 'kasse' || $v['kontext'] !== ''))))
+            $o .= self::knopf($csrfFeld, 'ablage-erneut', (int)$v['id'], ($v['ablage'] === 'fehler' ? 'Erneut in T2med ablegen' : 'In T2med ablegen'), 'primary small');
         if ($v['status'] === 'abgebrochen') $o .= self::knopf($csrfFeld, 'wiederaufnehmen', (int)$v['id'], 'Wieder aufnehmen', 'primary small');
         if ($v['status'] === 'am_pad') $o .= self::knopf($csrfFeld, 'abbrechen', (int)$v['id'], 'Abbrechen', 'danger small');
         else $o .= self::knopf($csrfFeld, 'vorgang-loeschen', (int)$v['id'], 'Löschen', 'danger small', 'Diesen Vorgang endgültig löschen?');

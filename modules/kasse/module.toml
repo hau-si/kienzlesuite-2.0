@@ -5,14 +5,15 @@
 [module]
 id = "kasse"
 name = "Kasse"
-version = "2.3.4-beta.50"
-core_api = "1"
+version = "2.3.4-beta.51"
+core_api = "2"
 description = "Kartenzahlung am SumUp Solo aus T2med, T2med-Rechnungseingang über den Drucker „vKasse“, GOÄ-Leistungen, Barzahlung, Belege per E-Mail, Druck und Post."
 
 [system]
 packages = ["php-fpm", "php-cli", "php-curl", "php-sqlite3", "php-mbstring", "php-gd", "librsvg2-bin", "qpdf", "fonts-dejavu-core", "poppler-utils", "tesseract-ocr", "tesseract-ocr-deu", "ghostscript", "cups-client"]
 user = "ks-kasse"
 data = "/var/lib/kienzle/kasse"
+services = ["kienzle-kasse-signatur.service", "kienzle-kasse-signatur.path"]
 
 [web]
 path = "/kasse"
@@ -78,6 +79,10 @@ command = "printer/kienzle-letterxpress"
 formats = ["application/pdf", "application/postscript"]
 paper = "A4"
 share = ["ipp"]
+
+[[exchange]]
+module = "signatur"
+purpose = "Unterschriebene PDFs aus Signatur in die T2med-Akte schreiben (mit dem T2med-Zugang der Kasse)"
 
 [[connections]]
 id = "t2med"

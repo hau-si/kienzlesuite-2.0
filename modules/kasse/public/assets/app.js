@@ -67,6 +67,8 @@ async function signaturSenden() {
   const bytes = new TextEncoder().encode(roh); let bin = ''; bytes.forEach(b => { bin += String.fromCharCode(b); });
   const kodiert = btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   if (kodiert.length > 12000) { alert('Die Liste ist für die Übergabe zu lang. Bitte weniger Positionen wählen.'); return; }
+  // T2med-Zugang dieses Besuchs für die Ablage des unterschriebenen PDFs vormerken (bleibt auch nach dem Kassieren, höchstens 4 Stunden).
+  try { await api('signatur_offen'); } catch (e) { /* ohne T2med wird das PDF nur in Signatur abgelegt */ }
   window.open(SIGNATUR + '#uebergabe=' + kodiert, '_blank', 'noopener');
   const note = $('sign-note'); note.hidden = false; note.textContent = 'In Signatur geöffnet. Dort Dokument wählen und den Vorgang anlegen; danach hier wie gewohnt kassieren.' + (kontakt.hinweis ? ' ' + kontakt.hinweis : '');
 }

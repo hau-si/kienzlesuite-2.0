@@ -1,5 +1,15 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.32
+
+- **Neu: Unterschriebenes PDF in die T2med-Akte.** Kurz nach „OK“ am Pad legt die Signatur das PDF als Anhang (`DocumentReference`, Profil „Anhang“) in der Akte des Patienten ab:
+  - **Vorgang aus der Kasse** („Zur Unterschrift“): Das PDF geht über einen gemeinsamen Austauschordner an die Kasse. Die Kasse schreibt es mit ihrem T2med-Zugang in die Akte und meldet das Ergebnis zurück (Entscheidung: Rückgabe an die Kasse).
+  - **Vorgang mit Start aus T2med:** Die Signatur schreibt selbst, solange der Aufruf höchstens 4 Stunden alt ist.
+  - **Ohne T2med** (Patient von Hand eingegeben): Das PDF bleibt in der Signatur („Nicht automatisch in T2med abgelegt“).
+- In der Vorgangsliste steht der Stand der Ablage. Nach einem Fehler, etwa einem abgelaufenen Zugang, gibt es „Erneut in T2med ablegen“; die Meldung nennt den Grund und die Auskunft von T2med.
+- Neu als Voraussetzung: `core_api = "2"` (Austauschordner mit der Kasse, Basis ab 0.22.0) und das Paket `php-curl`. Vorgänge, die vor diesem Update unterschrieben wurden, werden nicht von selbst abgelegt; dafür gibt es den Knopf „In T2med ablegen“.
+- Geprüft mit Tests (Aufbau der `DocumentReference` nach dem T2med-Integrationsleitfaden, Austausch mit der Kasse, Fehlerfälle). **Nicht gegen echtes T2med und nicht auf der VM geprüft: bitte zuerst mit einem Testpatienten.**
+
 ## 0.1.0-beta.31
 
 - **Neu: PDF des unterschriebenen Dokuments** (Entwurf C). Kopf mit Praxis links und Patient (mit Geburtsdatum) rechts, Titel, Dokumenttext (mehrseitig mit „Seite x von y“). Unten links ein Kasten „Unterschriftsnachweis“ mit Zeitpunkt, Pad, Vorgang und Prüfsumme der Unterschriftsdaten, rechts die Unterschrift. Echtes Text-PDF (durchsuchbar, wenige KB), erzeugt vom Pad-Dienst direkt nach „OK“ und für schon unterschriebene Vorgänge nachträglich. Es liegt nur im Datenordner (0600).

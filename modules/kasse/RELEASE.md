@@ -1,5 +1,12 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.51
+
+- **Neu: Unterschriebene Dokumente aus Signatur in die T2med-Akte.** Bei „Zur Unterschrift“ merkt sich die Kasse den T2med-Zugang dieses Besuchs. Nach der Unterschrift legt Signatur das PDF in den gemeinsamen Austauschordner (`/var/spool/kienzle/austausch/kasse_signatur`). Der neue Dienst `kienzle-kasse-signatur` (ausgelöst über `.path`) schreibt es als `DocumentReference` (Profil „Anhang“) in die Akte und meldet das Ergebnis an Signatur zurück.
+- Der T2med-Zugang bleibt dafür nach dem Kassieren erhalten, solange eine Unterschrift offen ist, höchstens bis zum Ablauf nach 4 Stunden. Danach und nach dem Ablegen wird er gelöscht. Ist er abgelaufen, nimmt die Kasse einen anderen noch gültigen Aufruf desselben Patienten.
+- Neu als Voraussetzung: `core_api = "2"` (Basis ab 0.22.0), Datenbank Version 23 (Spalte `visits.signatur_offen`).
+- Geprüft mit Tests (`tests/signatur-ablage.php`). **Nicht gegen echtes T2med und nicht auf der VM geprüft: bitte zuerst mit einem Testpatienten.**
+
 ## 2.3.4-beta.50
 
 - Nur Tests: Startseite-, vBriefversand- und Letterxpress-Test rechnen das Datum in der Zeitzone der Kasse (Europe/Berlin) (scheiterte sonst zwischen 23 und 24 Uhr UTC). Keine Änderung am Programm.
