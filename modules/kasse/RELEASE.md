@@ -1,5 +1,10 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.52
+
+- **Fehler behoben: Leistungen ließen sich nicht auswählen, die Zahlungsknöpfe lagen falsch,** wenn ein Patient aus T2med kam und für ihn eine offene T2med-Rechnung vorlag. Die Rechnung rutschte dann in die linke Spalte, die Leistungsliste in die schmale rechte und die Zahlung darunter. Jetzt steht die offene Rechnung in einer eigenen Zeile über „Leistungen | Zahlung“.
+- In der Vorschau mit erfundenen Daten geprüft. **Nicht auf der VM geprüft.**
+
 ## 2.3.4-beta.51
 
 - **Neu: Unterschriebene Dokumente aus Signatur in die T2med-Akte.** Bei „Zur Unterschrift“ merkt sich die Kasse den T2med-Zugang dieses Besuchs. Nach der Unterschrift legt Signatur das PDF in den gemeinsamen Austauschordner (`/var/spool/kienzle/austausch/kasse_signatur`). Der neue Dienst `kienzle-kasse-signatur` (ausgelöst über `.path`) schreibt es als `DocumentReference` (Profil „Anhang“) in die Akte und meldet das Ergebnis an Signatur zurück.

@@ -11,6 +11,9 @@ body.embed { background: transparent; margin: 0; }
 .embed .free-patient label { font-size: 12px; margin: 0; }
 .embed .free-patient input { margin: 0; padding: 7px 10px; }
 .embed #selection { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 14px; align-items: start; }
+/* Offene T2med-Rechnung beim Aufruf aus T2med: eigene Zeile über Leistungen | Zahlung (sonst rutschte die Leistungsliste in die
+   schmale rechte Spalte und die Zahlung darunter, Klicks trafen die falschen Knöpfe). */
+.embed #selection > #invoices-section { grid-column: 1 / -1; margin: 0; }
 .embed .col-left, .embed .col-right { background: #fff; border: 1px solid #d9e3df; border-radius: 12px; padding: 10px 12px; min-width: 0; }
 .embed .col-left { display: flex; flex-direction: column; }
 .embed .section-heading { margin: 0 0 6px; }
