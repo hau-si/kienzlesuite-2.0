@@ -129,6 +129,7 @@ type testServer struct {
 	auftraege []map[string]any
 	ergebnis  []map[string]any
 	abfragen  int
+	geladen   int
 }
 
 func neuerTestServer(t *testing.T, programm []byte) *testServer {
@@ -168,6 +169,7 @@ func neuerTestServer(t *testing.T, programm []byte) *testServer {
 			ts.ergebnis = append(ts.ergebnis, in)
 			w.Write([]byte(`{"ok":true}`))
 		case "/agent/programm/" + assetName:
+			ts.geladen++
 			w.Write(ts.programm)
 		default:
 			w.WriteHeader(404)
@@ -477,5 +479,78 @@ func TestSkriptMitBOMUndServerIP(t *testing.T) {
 	}
 	if !strings.Contains(txt, "[string]$ServerIp = ''") || !strings.Contains(txt, "$perIp = $true") {
 		t.Fatal("Server-IP als Ersatz für den unbekannten Namen fehlt")
+	}
+}
+
+// TestGescheiterteAktualisierungNichtDauernd: Nach einem Fehlschlag lädt der Agent dieselbe Fassung erst nach UpdatePause
+// erneut (vorher alle 2 Sekunden, das Symbol stand dadurch dauerhaft auf „wird aktualisiert“). Der Grund steht in status.json.
+func TestGescheiterteAktualisierungNichtDauernd(t *testing.T) {
+	ts := neuerTestServer(t, []byte("Programm Fassung 1"))
+	dir := agentOrdner(t, ts)
+	if _, err := Anmelden(dir, nil); err != nil {
+		t.Fatal(err)
+	}
+	exe := filepath.Join(dir, "praxisherz-starter")
+	os.WriteFile(exe, []byte("altes Programm"), 0o755)
+	a := &Agent{Ordner: dir, Programm: exe, Plattform: &testPlattform{ordner: dir}}
+	if err := a.Laden(); err != nil {
+		t.Fatal(err)
+	}
+	soll := &Soll{Programme: map[string]string{assetName: strings.Repeat("0", 64)}}
+	for i := 0; i < 3; i++ {
+		if err := a.angleichen(soll); err == nil || !strings.Contains(err.Error(), "Prüfsumme") {
+			t.Fatalf("Versuch %d: %v", i, err)
+		}
+	}
+	ts.mu.Lock()
+	geladen := ts.geladen
+	ts.mu.Unlock()
+	if geladen != 1 {
+		t.Fatalf("nach einem Fehlschlag nicht sofort erneut laden, geladen: %d", geladen)
+	}
+	a.statusSchreiben(nil)
+	s, _ := StatusLesen(dir)
+	if s.WirdAktualisiert || s.AktualisierungSeit != 0 || !strings.Contains(s.AktualisierungFehler, "Prüfsumme") {
+		t.Fatalf("status.json nach Fehlschlag: %+v", s)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "starter.log")); !strings.Contains(string(b), "Aktualisierung gescheitert") {
+		t.Fatal("Fehlschlag fehlt in starter.log")
+	}
+	// Nach der Pause wieder versuchen.
+	a.updateVersuch = time.Now().Add(-UpdatePause - time.Second)
+	a.angleichen(soll)
+	ts.mu.Lock()
+	geladen = ts.geladen
+	ts.mu.Unlock()
+	if geladen != 2 {
+		t.Fatalf("nach der Pause erneut laden, geladen: %d", geladen)
+	}
+}
+
+// TestAustauschMitBelegterAltDatei: Lässt sich die .alt-Datei nicht löschen (unter Windows: läuft noch), weicht der Agent
+// auf einen eigenen Namen aus. Hier nachgestellt mit einem Ordner namens .alt, den os.Remove nicht löschen kann.
+func TestAustauschMitBelegterAltDatei(t *testing.T) {
+	neu := []byte("Programm Fassung 2")
+	ts := neuerTestServer(t, neu)
+	dir := agentOrdner(t, ts)
+	if _, err := Anmelden(dir, nil); err != nil {
+		t.Fatal(err)
+	}
+	exe := filepath.Join(dir, "praxisherz-starter")
+	os.WriteFile(exe, []byte("altes Programm"), 0o755)
+	os.MkdirAll(filepath.Join(exe+".alt", "belegt"), 0o755)
+	a := &Agent{Ordner: dir, Programm: exe, Plattform: &testPlattform{ordner: dir}}
+	if err := a.Laden(); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(neu)
+	if err := a.aktualisieren(hex.EncodeToString(sum[:])); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(exe); string(b) != string(neu) {
+		t.Fatal("neues Programm nicht eingespielt")
+	}
+	if reste, _ := filepath.Glob(exe + ".alt-*"); len(reste) != 1 {
+		t.Fatalf("Ausweichname fehlt: %v", reste)
 	}
 }
