@@ -94,3 +94,10 @@ main.modul { max-width: 1400px; }
 .us-gewaehlt #n-patient-feld input { margin: 0; }
 .us-pk-anzeige { display: flex; flex-direction: column; }
 .us-pk-anzeige[hidden] { display: none; }
+
+/* Live-Vorschau des Pads in der Vorgangskarte */
+.us-padvorschau { margin: 8px 0 4px; }
+.us-padvorschau img { display: block; width: 100%; border-radius: 8px; border: 1px solid #cfdcd7; background: #fff; }
+.us-pv-stand { display: flex; align-items: center; gap: 7px; margin-top: 5px; }
+.us-pv-punkt { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #9aa5a2; }
+.us-padvorschau.live .us-pv-punkt { background: #2fb36b; }

@@ -210,7 +210,25 @@
     filtern();
   }
   // Solange ein Vorgang am Pad unterschrieben wird, die Liste alle 5 Sekunden neu laden (ohne das Formular erneut zu senden).
-  if (document.querySelector('.us-status.s-am_pad')) setTimeout(function () { location.replace(location.pathname + location.search); }, 5000);
+  // Liegt ein Vorgang am Pad: Mit Live-Vorschau (Startseite) Bild und Stand alle 1,5 s holen und neu laden, sobald der Vorgang
+  // das Pad verlässt (Vorschau weg); sonst wie bisher alle 5 s neu laden.
+  var vorschau = document.querySelector('.us-padvorschau[data-vorschau]');
+  if (vorschau) {
+    var basis = vorschau.getAttribute('data-vorschau'), bild = vorschau.querySelector('img'), text = vorschau.querySelector('.us-pv-text'), zuletzt = '', fehlt = 0, gesehen = false;
+    var holen = function () {
+      fetch(basis + '.json', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+        if (!j) { fehlt++; if (gesehen || fehlt > 20) { location.replace(location.pathname + location.search); return; } setTimeout(holen, 1500); return; }
+        gesehen = true; fehlt = 0;
+        var marke = j.seite + '/' + j.seiten + '/' + j.zeit;
+        if (j.seite + '/' + j.seiten !== zuletzt.split('/').slice(0, 2).join('/')) { bild.src = basis + '.png?t=' + Date.now(); bild.hidden = false; }
+        zuletzt = marke;
+        vorschau.classList.add('live');
+        text.textContent = 'Live · ' + (j.art === 'unterschrift' ? 'Unterschriftsseite' : 'Seite') + ' ' + j.seite + ' von ' + j.seiten + (j.art === 'unterschrift' ? (j.punkte > 0 ? ' · wird unterschrieben' : ' · noch keine Unterschrift') : '');
+        setTimeout(holen, 1500);
+      }).catch(function () { setTimeout(holen, 3000); });
+    };
+    holen();
+  } else if (document.querySelector('.us-status.s-am_pad')) setTimeout(function () { location.replace(location.pathname + location.search); }, 5000);
   // Pad-Software hochladen: ZIP roh senden (file_uploads ist für Module aus), Ergebnis in der Seite zeigen.
   var los = document.getElementById('pad-los');
   if (los) los.addEventListener('click', function () {

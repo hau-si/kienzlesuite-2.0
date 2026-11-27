@@ -1,5 +1,6 @@
 import importlib.util
 import os
+import shutil
 import sqlite3
 import sys
 import tempfile
@@ -51,8 +52,10 @@ class AblaufTest(unittest.TestCase):
         self.c.execute("INSERT INTO pads (id, name, adresse) VALUES (1, 'Pad Empfang', '192.0.2.10')")
         self.c.execute("INSERT INTO vorgaenge (id, titel, text, patient, status, pad_id) VALUES (1, 'IGeL-Vertrag', 'Text für Max Mustermann.', 'Max Mustermann', 'am_pad', 1)")
         self.c.commit()
-        self.ordner = tempfile.mkdtemp(prefix='sg-pad-')
-        self.addCleanup(lambda: [os.remove(os.path.join(self.ordner, f)) for f in os.listdir(self.ordner)] and None or os.rmdir(self.ordner))
+        self.wurzel = tempfile.mkdtemp(prefix='sg-pad-')
+        self.addCleanup(shutil.rmtree, self.wurzel, True)
+        self.ordner = os.path.join(self.wurzel, 'unterschriften')   # Vorschau landet daneben in <wurzel>/vorschau
+        os.makedirs(self.ordner)
 
     def lauf(self, tasten, **kw):
         v = self.c.execute('SELECT * FROM vorgaenge WHERE id=1').fetchone()
@@ -75,6 +78,28 @@ class AblaufTest(unittest.TestCase):
         with open(os.path.join(self.ordner, '1.pdf'), 'rb') as fh:
             self.assertTrue(fh.read().startswith(b'%PDF-1.4'))
         self.assertEqual(os.stat(os.path.join(self.ordner, '1.pdf')).st_mode & 0o777, 0o600)
+
+    def test_vorschau_waehrend_des_vorgangs(self):
+        gesehen = []
+        ordner = self.ordner
+        vorschau = os.path.join(self.wurzel, 'vorschau')
+
+        class Schauen(Fake):
+            def ereignis(self, t):
+                import json
+                with open(os.path.join(vorschau, '1.json')) as fh:
+                    gesehen.append(json.load(fh))
+                self.stift = {'n': 12}
+                return super().ereignis(t)
+        v = self.c.execute('SELECT * FROM vorgaenge WHERE id=1').fetchone()
+        erg = padauftrag.ablauf(self.c, v, Schauen(['Weiter', 'OK']), ordner)
+        self.assertEqual(erg, 'unterschrieben')
+        self.assertEqual((gesehen[0]['seite'], gesehen[0]['art']), (1, 'text'))
+        self.assertEqual((gesehen[1]['seite'], gesehen[1]['art'], gesehen[1]['seiten']), (2, 'unterschrift', 2))
+        self.assertEqual(gesehen[1]['punkte'], 0)
+        self.assertEqual(os.listdir(vorschau), [], 'Vorschau nach dem Vorgang gelöscht')
+        with open(os.path.join(self.ordner, '1.pdf'), 'rb') as fh:
+            self.assertTrue(fh.read().startswith(b'%PDF'))
 
     def test_zurueck_loeschen_und_leere_bestaetigung(self):
         erg, f = self.lauf(['Weiter', 'Zurück', 'Weiter', 'Löschen', 'OK'], unterschrieben=False)

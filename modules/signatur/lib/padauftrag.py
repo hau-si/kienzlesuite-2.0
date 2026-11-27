@@ -51,12 +51,70 @@ def pdf_erzeugen(c: sqlite3.Connection, vid: int, ordner: str) -> bool:
         return False
 
 
+class Vorschau:
+    """Was der Patient gerade am Pad sieht, für die Seite (Vorschlag A): <daten>/vorschau/<vorgang>.png (verkleinert) und .json
+    (Seite, Seitenzahl, Stiftpunkte). Nur im Datenordner (0600), nach dem Vorgang gelöscht."""
+
+    def __init__(self, ordner: str, vid: int):
+        self.ordner, self.vid, self.stand = ordner, vid, {}
+        try:
+            os.makedirs(ordner, mode=0o700, exist_ok=True)
+        except OSError:
+            self.ordner = ''
+
+    def _schreiben(self, name: str, daten: bytes) -> None:
+        if not self.ordner:
+            return
+        ziel = os.path.join(self.ordner, name)
+        tmp = ziel + '.tmp'
+        try:
+            with open(tmp, 'wb') as fh:
+                fh.write(daten)
+            os.replace(tmp, ziel)
+        except OSError:
+            pass
+
+    def seite(self, bild, nr: int, von: int, art: str) -> None:
+        import io
+        klein = bild.copy()
+        klein.thumbnail((640, 400))
+        puffer = io.BytesIO()
+        klein.save(puffer, 'PNG', optimize=True)
+        self._schreiben(f'{self.vid}.png', puffer.getvalue())
+        self.stand = {'seite': nr, 'seiten': von, 'art': art, 'punkte': 0}
+        self.melden()
+
+    def punkte(self, n: int) -> None:
+        if self.stand and n != self.stand.get('punkte'):
+            self.stand['punkte'] = n
+            self.melden()
+
+    def melden(self) -> None:
+        import json
+        self._schreiben(f'{self.vid}.json', json.dumps({**self.stand, 'zeit': int(time.time())}).encode())
+
+    def weg(self) -> None:
+        for e in ('png', 'json'):
+            try:
+                os.remove(os.path.join(self.ordner, f'{self.vid}.{e}'))
+            except OSError:
+                pass
+
+
 class Abbruch(Exception):
     """Der Vorgang wurde auf der Seite abgebrochen oder zurückgenommen: Pad räumen, nichts mehr eintragen."""
 
 
 def ablauf(c: sqlite3.Connection, vorgang: sqlite3.Row, geraet, ausgabe: str, jetzt=time.time, leerlauf: int = LEERLAUF) -> str:
     """Führt den Vorgang am Gerät aus. Rückgabe: 'unterschrieben', 'zurueck' (am Pad abgebrochen/Zeit abgelaufen), 'abgebrochen' (Seite) oder 'fehler'."""
+    vorschau = Vorschau(os.path.join(os.path.dirname(os.path.abspath(ausgabe)), 'vorschau'), int(vorgang['id']))
+    try:
+        return _ablauf(c, vorgang, geraet, ausgabe, jetzt, leerlauf, vorschau)
+    finally:
+        vorschau.weg()
+
+
+def _ablauf(c: sqlite3.Connection, vorgang: sqlite3.Row, geraet, ausgabe: str, jetzt, leerlauf: int, vorschau: Vorschau) -> str:
     vid = int(vorgang['id'])
     text_seiten = padseiten.textseiten(vorgang['titel'], vorgang['text'])
     sign = padseiten.unterschriftsseite(vorgang['titel'], vorgang['patient'])
@@ -68,6 +126,7 @@ def ablauf(c: sqlite3.Connection, vorgang: sqlite3.Row, geraet, ausgabe: str, je
     def zeigen(i: int) -> dict:
         s = seiten[i]
         geraet.zeige(s['bild'])
+        vorschau.seite(s['bild'], i + 1, len(seiten), 'unterschrift' if i == letzte else 'text')
         ids = geraet.knoepfe(s['knoepfe'])
         if i == letzte:
             geraet.unterschrift_starten(sign['feld'])
@@ -83,6 +142,7 @@ def ablauf(c: sqlite3.Connection, vorgang: sqlite3.Row, geraet, ausgabe: str, je
             status_setzen(c, vid, 'wartet', 'Am Pad nicht unterschrieben (Zeit abgelaufen).')
             return 'zurueck'
         ev = geraet.ereignis(1.0)
+        vorschau.punkte(int((getattr(geraet, 'stift', None) or {}).get('n', 0)))
         if ev is None:
             continue
         art, wert = ev

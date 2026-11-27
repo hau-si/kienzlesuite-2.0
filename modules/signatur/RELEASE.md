@@ -1,5 +1,13 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.34
+
+- **Neu: Live-Vorschau des Pads** (Vorschlag A). Liegt ein Vorgang am Pad, zeigt seine Karte links in „Vorgänge“ ein kleines Bild der Seite, die der Patient gerade sieht. Darunter steht der Stand, z. B. „Live · Unterschriftsseite 3 von 3 · wird unterschrieben“; die Anzeige erneuert sich etwa alle 1,5 Sekunden. So kann man am Empfang helfen, etwa „bitte auf Weiter tippen“.
+  - Die Striche der Unterschrift selbst erscheinen nicht im Bild, nur ob schon unterschrieben wird.
+  - Bild und Stand schreibt der Pad-Dienst in den Datenordner (`vorschau/`) und löscht sie nach dem Vorgang; abrufbar nur mit dem Recht „Vorgänge“.
+- Die Seite lädt jetzt erst neu, wenn der Vorgang das Pad verlässt, statt alle 5 Sekunden.
+- Mit Tests und in der Vorschau geprüft. **Nicht am echten Pad und nicht auf der VM geprüft.**
+
 ## 0.1.0-beta.33
 
 - **Patientenkarte oben (Entwurf B3, wie in der Kasse):**

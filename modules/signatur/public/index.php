@@ -5,7 +5,7 @@ declare(strict_types=1);
  * (auth_request) und Benutzer, Rolle und Rechte als KIENZLE_* übergeben.
  */
 require_once dirname(__DIR__) . '/src/bootstrap.php';
-use KienzleSignatur\{Ablage, Ansicht, Pad, Seite, Start};
+use KienzleSignatur\{Ablage, Ansicht, Pad, Seite, Speicher, Start};
 
 header('X-Frame-Options: DENY');
 header('X-Content-Type-Options: nosniff');
@@ -82,6 +82,17 @@ try {
             error_log('signatur pad-hochladen: ' . get_class($e) . ': ' . $e->getMessage());
             $antwort(['error' => 'Interner Fehler (' . get_class($e) . '): ' . $e->getMessage()], 500);
         }
+    }
+    if (preg_match('#^/pad-vorschau/([1-9][0-9]{0,9})\.(png|json)$#D', $rel, $m)) {
+        // Live-Vorschau: was der Patient gerade am Pad sieht (vom Pad-Dienst geschrieben, nur während der Vorgang am Pad liegt).
+        if (!$darfVorgang) $k->verweigern();
+        $datei = Speicher::$data . '/vorschau/' . $m[1] . '.' . $m[2];
+        header('Cache-Control: no-store');
+        header('X-Content-Type-Options: nosniff');
+        if (!is_file($datei) || is_link($datei)) { http_response_code(404); exit; }
+        header('Content-Type: ' . ($m[2] === 'png' ? 'image/png' : 'application/json'));
+        readfile($datei);
+        exit;
     }
     if (preg_match('#^/ansehen/([1-9][0-9]{0,9})$#D', $rel, $m)) {
         // Dokument ansehen: unterschrieben = das PDF (im Browser), sonst der eingesetzte Text des Vorgangs.

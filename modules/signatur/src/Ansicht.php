@@ -95,6 +95,8 @@ final class Ansicht {
             $links .= '<div class="us-vz' . ($v['status'] === 'am_pad' ? ' am-pad' : '') . '" data-status="' . $h($v['status']) . '"' . ($v['quelle'] === 'kasse' ? ' data-ref="' . $h((string)$v['quelle_ref']) . '"' : '') . '><div class="us-vz-kopf"><div><strong>' . $h($v['patient']) . '</strong><div class="muted klein-text">' . $h($v['titel']) . ' · ' . $h(self::datum((int)$v['erstellt'])) . '</div></div>'
                 . '<span class="us-status s-' . $h($v['status']) . '">' . $h(Seite::STATI[$v['status']] ?? $v['status']) . '</span></div>'
                 . ($v['meldung'] !== '' ? '<div class="muted klein-text">' . $h($v['meldung']) . '</div>' : '')
+                // Live-Vorschau des Pads (Vorschlag A): app.js lädt Bild und Stand alle 1,5 s.
+                . ($v['status'] === 'am_pad' ? '<div class="us-padvorschau" data-vorschau="' . $h(sg_basis() . '/pad-vorschau/' . (int)$v['id']) . '"><img alt="Was der Patient gerade am Pad sieht" hidden><div class="us-pv-stand muted klein-text"><span class="us-pv-punkt"></span><span class="us-pv-text">Pad wird verbunden …</span></div></div>' : '')
                 . '<div class="aktionen">' . self::aktionen($v, $csrfFeld, $darfVorgang) . '</div></div>';
         }
         $links .= '</aside>';
