@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.54
+
+- Dokumentation: `docs/MODUL-GESTALTUNG.md` beschreibt jetzt zentral Seitenbreite, Seitenkopf (Titel, Knopfleiste mit Symbolen, Zähler, Einstellungen zuletzt), Symbole und Meldungen für alle Module. Am Programm ändert sich nichts.
+
 ## 0.22.0-beta.53
 
 - Prüfung auf GitHub: Nach beta.52 lief der Ubuntu-26.04-Container weiter und scheiterte an zwei Tests des Sprachmenüs (Kokoro-Installer prüft `ensurepip`). Das Paket `python3-venv` steht jetzt in der Paketliste des Containers. Am Programm ändert sich nichts.
