@@ -540,29 +540,37 @@ final class Web {
                 . ($created['secret'] !== '' ? '<tr><td>Client-Geheimnis</td><td><code>' . V::h($created['secret']) . '</code><br><small>Wird nur jetzt angezeigt.</small></td></tr>' : '')
                 . '</table></div>';
         }
-        $body .= '<p>Dienste mit eigener Anmeldung (z. B. Oberfläche der Telefonanlage, NAS) können Benutzer über Praxisherz anmelden '
-            . '(OpenID Connect). Es gelten dieselben Konten, Authenticator-Apps und Passkeys. Die Arbeitsplätze müssen der '
-            . '<a href="/ca.crt">Zertifizierungsstelle</a> vertrauen, der Dienst ebenfalls.</p>'
-            . '<p>Anbieter: <code>' . V::h($o->issuer()) . '</code></p>';
-        $rows = '';
+        // Entwurf A (28.11.2026): Liste wie bei den Modulen, „Dienst hinzufügen“ oben rechts öffnet das Formular (?neu=1).
+        $neu = ($this->req?->query['neu'] ?? '') === '1' || $error !== null;
+        $zeilen = '';
         foreach ($o->clients() as $c) {
-            $rows .= '<tr><td><strong>' . V::h($c['name']) . '</strong><br><code>' . V::h($c['id']) . '</code></td><td>' . implode('<br>', array_map(fn($u) => V::h($u), $c['redirect_uris']))
-                . '</td><td>' . ($c['admin_only'] ? 'nur Admins' : ($c['module'] !== '' ? 'Zugang zu ' . V::h($this->modules->name($c['module'])) : 'alle Benutzer')) . ($c['public'] ? '<br>öffentlich (PKCE)' : '')
-                . '</td><td>' . (!$c['public'] ? '<form method="post" action="/verwaltung/sso" class="inline">' . $this->hidden('geheimnis', ['id' => $c['id']]) . '<button>Neues Geheimnis</button></form> ' : '')
-                . '<form method="post" action="/verwaltung/sso" class="inline">' . $this->hidden('loeschen', ['id' => $c['id']]) . '<button class="danger">Entfernen</button></form></td></tr>';
+            $wer = $c['admin_only'] ? 'nur Admins' : ($c['module'] !== '' ? 'Zugang zu ' . V::h($this->modules->name($c['module'])) : 'alle Benutzer');
+            $zeilen .= '<div class="mod-zeile dienst-zeile"><span class="t-ico">' . V::icon('/verwaltung/sso') . '</span><div><p class="mod-name">' . V::h($c['name']) . '</p>'
+                . '<p class="muted mod-desc">' . implode(' · ', array_map(fn($u) => V::h($u), $c['redirect_uris'])) . '</p></div>'
+                . '<p class="muted mod-ver"><code>' . V::h($c['id']) . '</code></p><span class="mod-zustand muted">' . $wer . ($c['public'] ? ' · öffentlich (PKCE)' : '') . '</span><span></span>'
+                . '<details class="mod-more"><summary class="icon-btn" title="Mehr" aria-label="Mehr zu ' . V::h($c['name']) . '">' . V::icon('st:mehr') . '</summary><div class="mod-menu">'
+                . (!$c['public'] ? '<form method="post" action="/verwaltung/sso">' . $this->hidden('geheimnis', ['id' => $c['id']]) . '<button class="mod-item">' . V::icon('st:neustart') . ' Neues Geheimnis</button></form>' : '')
+                . '<form method="post" action="/verwaltung/sso">' . $this->hidden('loeschen', ['id' => $c['id']]) . '<button class="mod-item danger-text">' . V::icon('st:papierkorb') . ' Entfernen</button></form>'
+                . '</div></details></div>';
         }
-        $body .= '<h2>Dienste</h2>' . ($rows !== '' ? '<table><tr><th>Dienst</th><th>Weiterleitung</th><th>Wer darf</th><th></th></tr>' . $rows . '</table>' : '<p>Noch keine.</p>');
         $mods = '<option value="">alle aktiven Benutzer</option>';
         foreach ($this->modules->all() as $id => $m) $mods .= '<option value="' . V::h($id) . '">nur mit Zugang zu ' . V::h($this->modules->name($id)) . '</option>';
-        $body .= '<h2>Dienst hinzufügen</h2><form method="post" action="/verwaltung/sso" class="box wide">' . $this->hidden('anlegen')
-            . V::input('name', 'Name', 'text', '', 'required maxlength="60"')
-            . '<label>Weiterleitungsadressen (eine je Zeile, https)<textarea name="redirect_uris" rows="3" required placeholder="https://telefon.example.org/oauth/callback"></textarea></label>'
-            . '<label>Adressen nach dem Abmelden (optional)<textarea name="logout_uris" rows="2"></textarea></label>'
-            . '<label>Wer darf sich anmelden<select name="modul">' . $mods . '</select></label>'
-            . V::checkbox('admin_only', '1', 'nur Basis-Admins', false)
-            . V::checkbox('public', '1', 'öffentlicher Dienst ohne Geheimnis (App im Browser; nur mit PKCE)', false)
-            . '<button>Anlegen</button></form>';
-        return Response::html(V::page('Anmeldung für Dienste', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+        if ($neu) {
+            $body .= '<section class="card" id="neu"><h2>Dienst hinzufügen</h2><form method="post" action="/verwaltung/sso">' . $this->hidden('anlegen')
+                . V::input('name', 'Name', 'text', '', 'required maxlength="60"')
+                . '<label>Weiterleitungsadressen (eine je Zeile, https)<textarea name="redirect_uris" rows="3" required placeholder="https://telefon.example.org/oauth/callback"></textarea></label>'
+                . '<label>Adressen nach dem Abmelden (optional)<textarea name="logout_uris" rows="2"></textarea></label>'
+                . '<label>Wer darf sich anmelden<select name="modul">' . $mods . '</select></label>'
+                . V::checkbox('admin_only', '1', 'nur Basis-Admins', false)
+                . V::checkbox('public', '1', 'öffentlicher Dienst ohne Geheimnis (App im Browser; nur mit PKCE)', false)
+                . '<button>Anlegen</button> <a class="button secondary" href="/verwaltung/sso">Abbrechen</a></form></section>';
+        }
+        $body .= $zeilen !== '' ? '<section class="card mod-liste">' . $zeilen . '</section>' : '<section class="card"><p class="muted">Noch keine Dienste eingetragen.</p></section>';
+        $body .= '<p class="muted">Dienste mit eigener Anmeldung (z. B. Oberfläche der Telefonanlage, NAS) können Benutzer über Praxisherz anmelden '
+            . '(OpenID Connect). Es gelten dieselben Konten, Authenticator-Apps und Passkeys. Die Arbeitsplätze müssen der '
+            . '<a href="/ca.crt">Zertifizierungsstelle</a> vertrauen, der Dienst ebenfalls. Anbieter: <code>' . V::h($o->issuer()) . '</code></p>';
+        $werkzeuge = '<a class="button mit-icon" href="/verwaltung/sso?neu=1#neu">' . V::icon('st:plus') . 'Dienst hinzufügen</a>';
+        return Response::html(V::page('Dienste', $body, $this->nav(), $this->config->practice, null, ['werkzeuge' => $werkzeuge]), $error ? 422 : 200);
     }
 
     private function ssoAction(Request $r, string $admin): Response {
@@ -1321,7 +1329,7 @@ final class Web {
         if ($get && $r->path === '/verwaltung/arbeitsplaetze/' . self::SETUP_DATEI) return $this->starterSetup($admin);
         if ($r->path === '/verwaltung/drucker') return $get ? $this->printersPage() : $this->printersAction($r, $admin);
         if ($r->path === '/verwaltung/einrichtung') return $get ? $this->overviewPage() : $this->overviewAction($r, $admin);
-        if ($r->path === '/verwaltung/sicherung') return $get ? $this->backupPage() : $this->backupAction($r, $admin);
+        if ($r->path === '/verwaltung/sicherung') return $get ? $this->backupPage(null, $r) : $this->backupAction($r, $admin);
         if ($r->path === '/verwaltung/sicherung/export' && $get) {
             [$file, $name] = $this->bk()->exportFile();
             $data = @file_get_contents($file);
@@ -1573,10 +1581,10 @@ final class Web {
             if ($idle % 60 !== 0 || $max % 3600 !== 0) throw new Problem('Die Höchstdauer einer Sitzung gibt es nur in ganzen Stunden oder Tagen.', 422);
             $this->auth->saveTimes(intdiv($idle, 60), intdiv($max, 3600));
         } catch (Problem $e) {
-            return $this->securityPage($e->getMessage());
+            return $this->securityPage($e->getMessage(), null, 'zugang');
         }
         $this->audit->write($admin, 'zugang-gespeichert', 'abmeldezeiten');
-        return $this->securityPage(null, 'Gespeichert.');
+        return $this->securityPage(null, 'Gespeichert.', 'zugang');
     }
 
     /** Inhalt einer fertigen Seite ohne Rahmen und Überschrift (für zusammengelegte Seiten). */
@@ -1615,30 +1623,49 @@ final class Web {
             PasswordPolicy::save($this->db, ['min' => $r->field('min', 3), 'klassen' => $r->field('klassen', 2), 'staerke' => $r->field('staerke', 2),
                 'schwach' => $r->field('schwach', 2) === '1', 'login' => $r->field('login', 2) === '1']);
         } catch (Problem $e) {
-            return $this->securityPage($e->getMessage());
+            return $this->securityPage($e->getMessage(), null, 'passwoerter');
         }
         $this->audit->write($admin, 'passwortregeln-gespeichert', 'passwortregeln');
-        return $this->securityPage(null, 'Gespeichert.');
+        return $this->securityPage(null, 'Gespeichert.', 'passwoerter');
     }
 
-    /** Sicherheit: Firewall, Zugang (Abmeldezeiten) und Protokoll als aufklappbare Abschnitte in einer Karte. */
-    private function securityPage(?string $error = null, ?string $notice = null): Response {
-        $log = $this->protocol();
+    /** Sicherheit (Entwurf A, 28.11.2026): Reiter Firewall | Zugang | Passwörter | Protokoll oben rechts (`?bereich=`). */
+    private function securityPage(?string $error = null, ?string $notice = null, ?string $bereich = null): Response {
+        $bereiche = ['firewall' => ['Firewall', 'st:mauer'], 'zugang' => ['Zugang', 'st:zeit'], 'passwoerter' => ['Passwörter', 'st:schloss'], 'protokoll' => ['Protokoll', 'st:liste']];
+        $bereich ??= (string)($this->req?->query['bereich'] ?? '');
+        if (!isset($bereiche[$bereich])) $bereich = 'firewall';
         try {
-            $fw = $this->firewallPage(); $fwState = (string)$this->fw()->overview($this->req->remote)['status']['state'];
+            $fwState = (string)$this->fw()->overview($this->req->remote)['status']['state'];
         } catch (Problem $e) {
-            $fw = Response::html('<main><h1>x</h1><p class="muted">' . V::h($e->getMessage()) . '</p></main>'); $fwState = 'off';
+            $fwState = 'off';
         }
-        $open = fn(string $id) => str_contains((string)($this->req?->query['bereich'] ?? ''), $id) || $error !== null && $id === 'zugang' ? ' open' : '';
         $pwWarn = PasswordPolicy::warnings(PasswordPolicy::load($this->db)) !== [];
-        $body = V::error($error) . V::notice($notice) . '<section class="card">'
-            . '<details class="fold" id="firewall"' . ($open('firewall') ?: ($fwState === 'pending' ? ' open' : '')) . '><summary><h2>Firewall</h2></summary>' . self::stripCards(self::inner($fw)) . '</details>'
-            . '<details class="fold" id="zugang"' . $open('zugang') . '><summary><h2>Zugang (Abmeldezeiten)</h2></summary>' . $this->accessBody() . '</details>'
-            . '<details class="fold" id="passwoerter"' . ($open('passwoerter') ?: ($pwWarn ? ' open' : '')) . '><summary><h2>Passwörter</h2>' . ($pwWarn ? '<span class="tag warn">Warnung</span>' : '') . '</summary>' . $this->passwordRulesBody() . '</details>'
-            . '<details class="fold" id="protokoll"' . $open('protokoll') . '><summary><h2>Protokoll</h2></summary>' . self::stripCards(self::inner($log)) . '</details></section>';
+        $werkzeuge = '';
+        foreach ($bereiche as $id => [$text, $icon]) {
+            $zahl = ($id === 'passwoerter' && $pwWarn) || ($id === 'firewall' && $fwState === 'pending') ? 1 : 0;
+            $werkzeuge .= V::reiter('/verwaltung/sicherheit' . ($id === 'firewall' ? '' : '?bereich=' . $id), $text, $icon, $id === $bereich, $zahl);
+        }
+        $refresh = null;
+        if ($bereich === 'firewall') {
+            try {
+                $fw = $this->firewallPage();
+                $inhalt = self::stripCards(self::inner($fw));
+                $refresh = $fw->header('Refresh');
+            } catch (Problem $e) {
+                $inhalt = '<p class="muted">' . V::h($e->getMessage()) . '</p>';
+            }
+            $titel = 'Firewall';
+        } elseif ($bereich === 'zugang') {
+            [$titel, $inhalt] = ['Zugang (Abmeldezeiten)', $this->accessBody()];
+        } elseif ($bereich === 'passwoerter') {
+            [$titel, $inhalt] = ['Passwörter', $this->passwordRulesBody()];
+        } else {
+            [$titel, $inhalt] = ['Protokoll', self::stripCards(self::inner($this->protocol()))];
+        }
+        $body = V::error($error) . V::notice($notice) . '<section class="card" id="' . $bereich . '"><h2>' . V::h($titel) . '</h2>' . $inhalt . '</section>';
         V::$status = ['Firewall' => [$fwState === 'active', 'aktiv', $fwState === 'pending' ? 'wartet auf Bestätigung' : 'aus']];
-        $response = Response::html(V::page('Sicherheit', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
-        if (($refresh = $fw->header('Refresh')) !== null) $response->with('Refresh', $refresh);
+        $response = Response::html(V::page('Sicherheit', $body, $this->nav(), $this->config->practice, null, ['werkzeuge' => $werkzeuge]), $error ? 422 : 200);
+        if ($refresh !== null) $response->with('Refresh', $refresh);
         return $response;
     }
 
@@ -2678,90 +2705,111 @@ final class Web {
             ->with('Content-Disposition', 'attachment; filename="' . Starter::filename($system) . '"')->with('Cache-Control', 'no-store');
     }
 
-    private function printersPage(?string $error = null): Response {
+    /** Bereich der Druckerseite, zu dem eine Aktion gehört (für Rückkehr und Fehlermeldung). */
+    private const DRUCKER_BEREICH = ['abgleichen' => 'virtuell', 'freigabe' => 'virtuell', 'rollen' => 'zuordnung', 'abbrechen' => 'auftraege', 'alle-abbrechen' => 'auftraege'];
+
+    /** Drucker (Entwurf A, 28.11.2026): Reiter Drucker | Virtuelle Drucker | Zuordnung | Aufträge, Drehpfeil = Drucker suchen (`?bereich=`). */
+    private function printersPage(?string $error = null, ?string $bereich = null): Response {
         $st = $this->pr()->status();
         $busy = $st['pending'];
         $dis = $busy ? ' disabled' : '';
+        $bereiche = ['drucker' => ['Drucker', '/verwaltung/drucker'], 'virtuell' => ['Virtuelle Drucker', 'st:wolke'], 'zuordnung' => ['Zuordnung', 'st:link'], 'auftraege' => ['Aufträge', 'st:liste']];
+        $bereich ??= (string)($this->req?->query['bereich'] ?? '');
+        if (!isset($bereiche[$bereich])) $bereich = 'drucker';
+        $werkzeuge = '';
+        foreach ($bereiche as $id => [$text, $icon]) {
+            $werkzeuge .= V::reiter('/verwaltung/drucker' . ($id === 'drucker' ? '' : '?bereich=' . $id), $text, $icon, $id === $bereich, $id === 'auftraege' ? count($st['jobs']) : 0);
+        }
+        $werkzeuge .= V::drehpfeil('/verwaltung/drucker', 'suchen', 'Netzwerk und USB nach Druckern durchsuchen', V::csrf($this->session['csrf']), $busy);
         $body = V::error($error) . ($st['last'] ? '<p class="' . (($st['last']['ok'] ?? false) ? 'notice' : 'error') . '">' . V::h((string)($st['last']['meldung'] ?? '')) . '</p>' : '')
             . ($busy ? '<p class="notice">Vorgang läuft …</p>' : '') . ($st['error'] !== '' ? '<p class="error">' . V::h($st['error']) . '</p>' : '')
-            . (!$st['service'] ? '<p class="error">Der Druckerdienst ist nicht eingerichtet. Bitte den Installer ausführen.</p>' : '')
-            . '<p>Drucker werden einmal hier eingerichtet; alle Module können sie nutzen. Echte Drucker brauchen keine Freigabe. Virtuelle Drucker sind immer per IPP freigegeben; das wirkt erst, '
-            . 'wenn die <a href="/verwaltung/firewall">Firewall</a> Drucken (IPP, Port 631) aus den Praxisnetzen zulässt.</p>';
-        $rows = $virtualRows = '';
+            . (!$st['service'] ? '<p class="error">Der Druckerdienst ist nicht eingerichtet. Bitte den Installer ausführen.</p>' : '');
         $host = $this->printerHost();
-        foreach ($st['queues'] as $q) {
-            if ($q['modul'] !== '') { $virtualRows .= $this->virtualPrinterCard($q, $host, $dis); continue; }
-            $actions = '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('testseite', ['name' => $q['name']]) . '<button' . $dis . '>Testseite</button></form> ';
-            if ($q['managed']) $actions .= '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('entfernen', ['name' => $q['name']])
-                . '<button class="danger"' . $dis . '>Entfernen</button></form>';
-            $rows .= '<tr><td><strong>' . V::h($q['name']) . '</strong><br><small>' . V::h($q['description']) . '</small></td><td>' . V::h($q['address']) . '</td><td>'
-                . V::h($q['state']) . '</td><td>' . ($q['managed'] ? 'Praxisherz' : 'fremd') . '</td><td>' . $actions . '</td></tr>';
-        }
-        $head = '<table><tr><th>Name</th><th>Adresse</th><th>Zustand</th><th>Von</th><th></th></tr>';
-        $body .= '<h2>Drucker</h2><p class="muted">Echte Drucker und Bondrucker, die in der Praxis stehen.</p>' . ($rows !== '' ? $head . $rows . '</table>' : '<p>Noch keine.</p>')
-            . '<h2>Virtuelle Drucker</h2><p class="muted">Legen Module an (z. B. „vKasse“, „vTermine“): In T2med oder anderen Programmen drucken, das Modul verarbeitet den Auftrag. Sie werden nicht von Hand angelegt.</p>'
-            . ($virtualRows !== '' ? '<div class="vp-liste">' . $virtualRows . '</div>' : '<p>Noch keine.</p>')
-            . $this->virtualPrinterHelp($st['queues'])
-            . '<form method="post" action="/verwaltung/drucker">' . $this->hidden('abgleichen') . '<button' . $dis . '>Virtuelle Drucker der Module abgleichen</button></form>';
-        $roles = $this->printerRoles();
-        $pick = '';
-        foreach (self::PRINTER_ROLES as $k => $label) {
-            $opts = '<option value="">– keiner –</option>';
-            foreach ($st['queues'] as $q) if ($q['modul'] === '') $opts .= '<option value="' . V::h($q['name']) . '"' . ($roles[$k] === $q['name'] ? ' selected' : '') . '>' . V::h($q['name']) . '</option>';
-            $pick .= '<label>' . V::h($label) . '<select name="' . $k . '">' . $opts . '</select></label>';
-        }
-        $width = $this->bonWidth();
-        $pick .= '<label>Papierbreite des Bondruckers <span class="hilfe" tabindex="0" role="note" aria-label="Gilt für alle Module (Kasse, Terminzettel)." data-tip="Gilt für alle Module, die Bons drucken (Kasse, Terminzettel). 58 mm: Epson TM-m10, 80 mm: Epson TM-m30III.">?</span><select name="bonbreite"><option value="58"' . ($width === 58 ? ' selected' : '') . '>58 mm (Epson TM-m10)</option><option value="80"' . ($width === 80 ? ' selected' : '') . '>80 mm (Epson TM-m30III)</option></select></label>';
-        $body .= '<h2>Wofür welcher Drucker?</h2><p class="muted">Module drucken auf diese Zuordnung; in den Einstellungen der Module wird kein Drucker und keine Papierbreite mehr gewählt.</p>'
-            . '<form method="post" action="/verwaltung/drucker" class="box">' . $this->hidden('rollen') . $pick . '<button>Zuordnung speichern</button></form>';
-        $jobRows = '';
-        foreach ($st['jobs'] as $j) {
-            $jobRows .= '<tr><td><code>' . V::h($j['id']) . '</code></td><td>' . V::h($j['drucker']) . '</td><td>' . V::h($j['benutzer']) . '</td><td>' . max(1, (int)($j['groesse'] / 1024)) . ' KB</td><td>'
-                . V::h($j['zeit']) . '</td><td><form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('abbrechen', ['auftrag' => $j['id']])
-                . '<button class="danger"' . $dis . '>Abbrechen</button></form></td></tr>';
-        }
-        $body .= '<h2>Druckaufträge</h2>' . ($jobRows !== '' ? '<table><tr><th>Auftrag</th><th>Drucker</th><th>Von</th><th>Größe</th><th>Seit</th><th></th></tr>' . $jobRows . '</table>'
-            . implode('', array_map(fn($q) => '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('alle-abbrechen', ['name' => $q])
-                . '<button' . $dis . '>Alle Aufträge von ' . V::h($q) . ' abbrechen</button></form> ', array_values(array_unique(array_column($st['jobs'], 'drucker'))))) : '<p>Keine offenen Aufträge.</p>');
-        $kinds = implode('', array_map(fn($k, $l) => '<option value="' . V::h($k) . '">' . V::h($l) . '</option>', array_keys(Printers::KINDS), Printers::KINDS));
-        $found = '';
-        foreach ($st['found'] as $f) {
-            $found .= '<tr><td>' . V::h($f['name']) . '</td><td>' . V::h($f['connection']) . '</td><td><form method="post" action="/verwaltung/drucker" class="inline">'
-                . $this->hidden('anlegen', ['adresse' => $f['uri']]) . '<select name="art">'
-                . implode('', array_map(fn($k, $l) => '<option value="' . V::h($k) . '"' . ($f['kind'] === $k ? ' selected' : '') . '>' . V::h($l) . '</option>', array_keys(Printers::KINDS), Printers::KINDS))
-                . '</select> ' . V::input('name', 'Name', 'text', '', 'maxlength="40" pattern="[A-Za-z0-9][A-Za-z0-9_\-]*"') . '<button' . $dis . '>Übernehmen</button></form></td></tr>';
-        }
-        $body .= '<h2>Drucker suchen</h2><form method="post" action="/verwaltung/drucker">' . $this->hidden('suchen') . '<button' . $dis . '>Netzwerk und USB durchsuchen</button></form>'
-            . ($st['searched'] ? '<p><small>Zuletzt gesucht: ' . V::date($st['searched']) . '</small></p>' : '')
-            . ($found !== '' ? '<table><tr><th>Gefunden</th><th>Anschluss</th><th></th></tr>' . $found . '</table>' : '');
-        $body .= '<h2>Drucker von Hand eintragen</h2><form method="post" action="/verwaltung/drucker" class="box">' . $this->hidden('anlegen')
-            . '<label>Art<select name="art">' . $kinds . '</select></label>'
-            . V::input('adresse', 'IP-Adresse oder Name des Druckers', 'text', '', 'placeholder="192.0.2.80" required maxlength="300"')
-            . V::input('name', 'Name der Warteschlange (leer = Vorschlag)', 'text', '', 'maxlength="40"')
-            . '<button' . $dis . '>Anlegen</button></form>';
-        $net = $st['net'];
-        if ($st['fileshares']) {
-            $body .= '<h2>Ordner zum Ablegen (Windows-Freigabe)</h2><p>Module können einen Ordner anbieten, in den Arbeitsplätze Dateien ziehen. Die Anmeldung in Windows '
-                . 'erfolgt mit dem angezeigten Benutzer und einem Kennwort, das Sie hier vergeben (8 bis 64 Zeichen). Erreichbar nur, wenn die Firewall '
-                . '„Drucken über Windows-Freigabe (445)“ für das Praxisnetz freigegeben ist.</p>';
-            foreach ($st['fileshares'] as $f) {
-                $user = 'ks-' . $f['modul'];
-                $body .= '<form method="post" action="/verwaltung/drucker" class="box">' . $this->hidden('dateifreigabe', ['key' => $f['key']])
-                    . '<p><strong>' . V::h($f['name']) . '</strong> – ' . V::h($f['label']) . ' <small>(Modul ' . V::h($f['modul']) . ')</small><br>'
-                    . ($f['on'] ? 'Eingeschaltet: <code>\\\\' . V::h($this->printerHost()) . '\\' . V::h($f['name']) . '</code>, Benutzer <code>' . V::h($user) . '</code>'
-                        : 'Ausgeschaltet. Benutzer für die Anmeldung wird <code>' . V::h($user) . '</code>.') . '</p>'
-                    . V::input('kennwort', $f['on'] ? 'Neues Kennwort (leer = unverändert)' : 'Kennwort', 'password', '', 'autocomplete="new-password" minlength="8" maxlength="64"' . ($f['on'] ? '' : ' required'))
-                    . '<button name="an" value="1"' . $dis . '>' . ($f['on'] ? 'Kennwort ändern' : 'Einschalten') . '</button>'
-                    . ($f['on'] ? ' <button name="an" value="0"' . $dis . '>Ausschalten</button>' : '') . '</form>';
+        $fold = fn(string $id, string $titel, string $inhalt, bool $offen = false) => '<details class="fold" id="' . $id . '"' . ($offen ? ' open' : '') . '><summary><h2>' . V::h($titel) . '</h2></summary>' . $inhalt . '</details>';
+        if ($bereich === 'drucker') {
+            $zeilen = '';
+            foreach ($st['queues'] as $q) {
+                if ($q['modul'] !== '') continue;
+                $menu = '<form method="post" action="/verwaltung/drucker">' . $this->hidden('testseite', ['name' => $q['name']]) . '<button class="mod-item"' . $dis . '>' . V::icon('/verwaltung/drucker') . ' Testseite</button></form>'
+                    . ($q['managed'] ? '<form method="post" action="/verwaltung/drucker">' . $this->hidden('entfernen', ['name' => $q['name']]) . '<button class="mod-item danger-text"' . $dis . '>' . V::icon('st:papierkorb') . ' Entfernen</button></form>' : '');
+                $zeilen .= '<div class="mod-zeile"><span class="t-ico">' . V::icon('/verwaltung/drucker') . '</span><div><p class="mod-name">' . V::h($q['name']) . '</p><p class="muted mod-desc">' . V::h($q['description']) . '</p></div>'
+                    . '<p class="muted mod-ver">' . V::h($q['address']) . '</p><span class="mod-zustand"><span class="pkt' . ($q['state'] === 'bereit' ? ' an' : '') . '"></span><span class="muted">' . V::h($q['state']) . '</span></span>'
+                    . '<span class="muted mod-desc">' . ($q['managed'] ? 'von Praxisherz' : 'fremd') . '</span>'
+                    . '<details class="mod-more"><summary class="icon-btn" title="Mehr" aria-label="Mehr zu ' . V::h($q['name']) . '">' . V::icon('st:mehr') . '</summary><div class="mod-menu">' . $menu . '</div></details></div>';
             }
+            $body .= ($zeilen !== '' ? '<section class="card mod-liste">' . $zeilen . '</section>' : '<section class="card"><p class="muted">Noch keine Drucker. Mit dem Drehpfeil oben das Netzwerk durchsuchen oder unten von Hand eintragen.</p></section>')
+                . '<p class="muted">Echte Drucker und Bondrucker, die in der Praxis stehen. Einmal hier eingerichtet, können alle Module sie nutzen; sie brauchen keine Freigabe.</p>';
+            $found = '';
+            foreach ($st['found'] as $f) {
+                $found .= '<tr><td>' . V::h($f['name']) . '</td><td>' . V::h($f['connection']) . '</td><td><form method="post" action="/verwaltung/drucker" class="inline">'
+                    . $this->hidden('anlegen', ['adresse' => $f['uri']]) . '<select name="art">'
+                    . implode('', array_map(fn($k, $l) => '<option value="' . V::h($k) . '"' . ($f['kind'] === $k ? ' selected' : '') . '>' . V::h($l) . '</option>', array_keys(Printers::KINDS), Printers::KINDS))
+                    . '</select> ' . V::input('name', 'Name', 'text', '', 'maxlength="40" pattern="[A-Za-z0-9][A-Za-z0-9_\-]*"') . '<button' . $dis . '>Übernehmen</button></form></td></tr>';
+            }
+            $body .= '<details class="fold" id="suchen"' . ($found !== '' ? ' open' : '') . '><summary><h2>Drucker suchen</h2></summary>'
+                . '<form method="post" action="/verwaltung/drucker">' . $this->hidden('suchen') . '<button' . $dis . '>Netzwerk und USB durchsuchen</button></form>'
+                . ($st['searched'] ? '<p><small>Zuletzt gesucht: ' . V::date($st['searched']) . '</small></p>' : '')
+                . ($found !== '' ? '<table><tr><th>Gefunden</th><th>Anschluss</th><th></th></tr>' . $found . '</table>' : '') . '</details>';
+            $kinds = implode('', array_map(fn($k, $l) => '<option value="' . V::h($k) . '">' . V::h($l) . '</option>', array_keys(Printers::KINDS), Printers::KINDS));
+            $body .= $fold('hand', 'Drucker von Hand eintragen', '<form method="post" action="/verwaltung/drucker" class="box">' . $this->hidden('anlegen')
+                . '<label>Art<select name="art">' . $kinds . '</select></label>'
+                . V::input('adresse', 'IP-Adresse oder Name des Druckers', 'text', '', 'placeholder="192.0.2.80" required maxlength="300"')
+                . V::input('name', 'Name der Warteschlange (leer = Vorschlag)', 'text', '', 'maxlength="40"')
+                . '<button' . $dis . '>Anlegen</button></form>', $error !== null);
+            if ($st['fileshares']) {
+                $fs = '<p>Module können einen Ordner anbieten, in den Arbeitsplätze Dateien ziehen. Die Anmeldung in Windows '
+                    . 'erfolgt mit dem angezeigten Benutzer und einem Kennwort, das Sie hier vergeben (8 bis 64 Zeichen). Erreichbar nur, wenn die Firewall '
+                    . '„Drucken über Windows-Freigabe (445)“ für das Praxisnetz freigegeben ist.</p>';
+                foreach ($st['fileshares'] as $f) {
+                    $user = 'ks-' . $f['modul'];
+                    $fs .= '<form method="post" action="/verwaltung/drucker" class="box">' . $this->hidden('dateifreigabe', ['key' => $f['key']])
+                        . '<p><strong>' . V::h($f['name']) . '</strong> – ' . V::h($f['label']) . ' <small>(Modul ' . V::h($f['modul']) . ')</small><br>'
+                        . ($f['on'] ? 'Eingeschaltet: <code>\\\\' . V::h($this->printerHost()) . '\\' . V::h($f['name']) . '</code>, Benutzer <code>' . V::h($user) . '</code>'
+                            : 'Ausgeschaltet. Benutzer für die Anmeldung wird <code>' . V::h($user) . '</code>.') . '</p>'
+                        . V::input('kennwort', $f['on'] ? 'Neues Kennwort (leer = unverändert)' : 'Kennwort', 'password', '', 'autocomplete="new-password" minlength="8" maxlength="64"' . ($f['on'] ? '' : ' required'))
+                        . '<button name="an" value="1"' . $dis . '>' . ($f['on'] ? 'Kennwort ändern' : 'Einschalten') . '</button>'
+                        . ($f['on'] ? ' <button name="an" value="0"' . $dis . '>Ausschalten</button>' : '') . '</form>';
+                }
+                $body .= $fold('ablage', 'Ordner zum Ablegen (Windows-Freigabe)', $fs);
+            }
+            $net = $st['net'];
+            $body .= $fold('netz', 'Windows-Netz', '<p>Arbeitsgruppe: <strong>' . V::h($net['arbeitsgruppe']) . '</strong>. Hinweis: Windows 11 Pro lässt Gastzugriff auf Windows-Freigaben ab 24H2 '
+                . 'nicht mehr zu; dort besser über IPP drucken.</p>'
+                . '<form method="post" action="/verwaltung/drucker" class="box">' . $this->hidden('arbeitsgruppe')
+                . V::input('arbeitsgruppe', 'Arbeitsgruppe', 'text', $net['arbeitsgruppe'], 'required maxlength="15" pattern="[A-Za-z0-9][A-Za-z0-9\\-]*"')
+                . '<button' . $dis . '>Speichern</button></form>');
+        } elseif ($bereich === 'virtuell') {
+            $virtualRows = '';
+            foreach ($st['queues'] as $q) if ($q['modul'] !== '') $virtualRows .= $this->virtualPrinterCard($q, $host, $dis);
+            $body .= '<section class="card"><h2>Virtuelle Drucker</h2><p class="muted">Legen Module an (z. B. „vKasse“, „vTermine“): In T2med oder anderen Programmen drucken, das Modul verarbeitet den Auftrag. Sie werden nicht von Hand angelegt. '
+                . 'Virtuelle Drucker sind immer per IPP freigegeben; das wirkt erst, wenn die <a href="/verwaltung/firewall">Firewall</a> Drucken (IPP, Port 631) aus den Praxisnetzen zulässt.</p>'
+                . ($virtualRows !== '' ? '<div class="vp-liste">' . $virtualRows . '</div>' : '<p>Noch keine.</p>')
+                . $this->virtualPrinterHelp($st['queues'])
+                . '<form method="post" action="/verwaltung/drucker">' . $this->hidden('abgleichen') . '<button class="secondary"' . $dis . '>Virtuelle Drucker der Module abgleichen</button></form></section>';
+        } elseif ($bereich === 'zuordnung') {
+            $roles = $this->printerRoles();
+            $pick = '';
+            foreach (self::PRINTER_ROLES as $k => $label) {
+                $opts = '<option value="">– keiner –</option>';
+                foreach ($st['queues'] as $q) if ($q['modul'] === '') $opts .= '<option value="' . V::h($q['name']) . '"' . ($roles[$k] === $q['name'] ? ' selected' : '') . '>' . V::h($q['name']) . '</option>';
+                $pick .= '<label>' . V::h($label) . '<select name="' . $k . '">' . $opts . '</select></label>';
+            }
+            $width = $this->bonWidth();
+            $pick .= '<label>Papierbreite des Bondruckers <span class="hilfe" tabindex="0" role="note" aria-label="Gilt für alle Module (Kasse, Terminzettel)." data-tip="Gilt für alle Module, die Bons drucken (Kasse, Terminzettel). 58 mm: Epson TM-m10, 80 mm: Epson TM-m30III.">?</span><select name="bonbreite"><option value="58"' . ($width === 58 ? ' selected' : '') . '>58 mm (Epson TM-m10)</option><option value="80"' . ($width === 80 ? ' selected' : '') . '>80 mm (Epson TM-m30III)</option></select></label>';
+            $body .= '<section class="card"><h2>Wofür welcher Drucker?</h2><p class="muted">Module drucken auf diese Zuordnung; in den Einstellungen der Module wird kein Drucker und keine Papierbreite mehr gewählt.</p>'
+                . '<form method="post" action="/verwaltung/drucker">' . $this->hidden('rollen') . $pick . '<button>Zuordnung speichern</button></form></section>';
+        } else {
+            $jobRows = '';
+            foreach ($st['jobs'] as $j) {
+                $jobRows .= '<tr><td><code>' . V::h($j['id']) . '</code></td><td>' . V::h($j['drucker']) . '</td><td>' . V::h($j['benutzer']) . '</td><td>' . max(1, (int)($j['groesse'] / 1024)) . ' KB</td><td>'
+                    . V::h($j['zeit']) . '</td><td><form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('abbrechen', ['auftrag' => $j['id']])
+                    . '<button class="danger"' . $dis . '>Abbrechen</button></form></td></tr>';
+            }
+            $body .= '<section class="card"><h2>Druckaufträge</h2>' . ($jobRows !== '' ? '<table><tr><th>Auftrag</th><th>Drucker</th><th>Von</th><th>Größe</th><th>Seit</th><th></th></tr>' . $jobRows . '</table>'
+                . implode('', array_map(fn($q) => '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('alle-abbrechen', ['name' => $q])
+                    . '<button' . $dis . '>Alle Aufträge von ' . V::h($q) . ' abbrechen</button></form> ', array_values(array_unique(array_column($st['jobs'], 'drucker'))))) : '<p>Keine offenen Aufträge.</p>') . '</section>';
         }
-        $body .= '<h2>Windows-Netz</h2>';
-        $body .= '<p>Arbeitsgruppe: <strong>' . V::h($net['arbeitsgruppe']) . '</strong>. Hinweis: Windows 11 Pro lässt Gastzugriff auf Windows-Freigaben ab 24H2 '
-            . 'nicht mehr zu; dort besser über IPP drucken.</p>'
-            . '<form method="post" action="/verwaltung/drucker" class="box">' . $this->hidden('arbeitsgruppe')
-            . V::input('arbeitsgruppe', 'Arbeitsgruppe', 'text', $net['arbeitsgruppe'], 'required maxlength="15" pattern="[A-Za-z0-9][A-Za-z0-9\\-]*"')
-            . '<button' . $dis . '>Speichern</button></form>';
-        $response = Response::html(V::page('Drucker', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+        $response = Response::html(V::page('Drucker', $body, $this->nav(), $this->config->practice, null, ['werkzeuge' => $werkzeuge]), $error ? 422 : 200);
         return $busy ? $response->with('Refresh', '3') : $response;
     }
 
@@ -2844,12 +2892,12 @@ final class Web {
                 default => throw new Problem('Unbekannte Aktion.', 422),
             };
         } catch (Problem $e) {
-            if ($e->http === 422 || $e->http === 409 || $e->http === 404) return $this->printersPage($e->getMessage());
+            if ($e->http === 422 || $e->http === 409 || $e->http === 404) return $this->printersPage($e->getMessage(), self::DRUCKER_BEREICH[$a] ?? 'drucker');
             throw $e;
         }
         $this->audit->write($admin, 'drucker-' . $a, $a === 'abbrechen' ? $r->field('auftrag', 60) : ($a === 'arbeitsgruppe' ? $r->field('arbeitsgruppe', 20) : ($a === 'dateifreigabe' ? $r->field('key', 60) . ($r->field('an') === '1' ? ' an' : ' aus') : $r->field('name', 60))));
         $this->flash('Auftrag an den Druckerdienst übergeben.');
-        return Response::redirect('/verwaltung/drucker');
+        return Response::redirect('/verwaltung/drucker' . (isset(self::DRUCKER_BEREICH[$a]) ? '?bereich=' . self::DRUCKER_BEREICH[$a] : ''));
     }
 
     // ---- Einrichtungs-Überblick ----------------------------------------------------------------------------------
@@ -2941,36 +2989,51 @@ final class Web {
             . (isset($r['bytes']) ? ' (' . (int)($r['bytes'] / 1048576) . ' MB geprüft, ' . (int)(($r['neu'] ?? 0) / 1048576) . ' MB neu)' : '') . '</td></tr>';
     }
 
-    private function backupPage(?string $error = null): Response {
+    /** Sicherung (Entwurf B, 28.11.2026): Zustand oben, alles andere eingeklappt; Reiter Sicherung | Protokoll, „Jetzt sichern“ oben rechts. */
+    private function backupPage(?string $error = null, ?Request $req = null): Response {
         $st = $this->bk()->status();
         $busy = $st['pending'] || $st['laeuft'] !== '';
         $dis = $busy ? ' disabled' : '';
         $form = fn(string $action, string $label, string $class = '', array $extra = []) => '<form method="post" action="/verwaltung/sicherung" class="inline">'
             . $this->hidden($action, $extra) . '<button' . ($class ? ' class="' . $class . '"' : '') . $dis . '>' . V::h($label) . '</button></form> ';
+        $protokoll = ($req?->query['ansicht'] ?? '') === 'protokoll';
+        $werkzeuge = V::reiter('/verwaltung/sicherung', 'Sicherung', 'st:backup', !$protokoll, count($st['warnungen']))
+            . V::reiter('/verwaltung/sicherung?ansicht=protokoll', 'Protokoll', 'st:liste', $protokoll)
+            . ($st['eingerichtet'] ? '<form method="post" action="/verwaltung/sicherung" class="inline">' . $this->hidden('jetzt') . '<button class="mit-icon button"' . $dis . '>' . V::icon('st:backup') . 'Jetzt sichern</button></form>' : '');
+        $opts = ['werkzeuge' => $werkzeuge];
         $body = V::error($error)
             . ($st['letzte'] ? '<p class="' . ($st['letzte']['ok'] ? 'notice' : 'error') . '">' . V::h((string)$st['letzte']['meldung']) . '</p>' : '')
             . ($busy ? '<p class="notice">Vorgang läuft: ' . V::h($st['laeuft'] ?: 'wird übernommen') . ' …</p>' : '')
-            . implode('', array_map(fn($w) => '<p class="error">' . V::h($w) . '</p>', $st['warnungen']))
             . (!$st['service'] ? '<p class="error">Der Sicherungsdienst ist nicht eingerichtet. Bitte den Installer ausführen.</p>' : '');
+        if ($protokoll) {
+            $zeilen = array_values(array_filter($this->audit->recent(500), fn($l) => str_contains($l, 'sicherung') || str_contains($l, 'einstellungen-export')));
+            $body .= '<section class="card"><h2>Protokoll</h2><p class="muted">Aufträge an die Sicherung und Exporte, neueste zuerst.</p>'
+                . ($zeilen ? '<ol class="log">' . implode('', array_map(fn($l) => '<li><code>' . V::h($l) . '</code></li>', array_slice($zeilen, 0, 200))) . '</ol>' : '<p class="muted">Noch keine Einträge.</p>') . '</section>';
+            $response = Response::html(V::page('Sicherung', $body, $this->nav(), $this->config->practice, null, $opts), $error ? 422 : 200);
+            return $busy ? $response->with('Refresh', '3') : $response;
+        }
+        if ($st['eingerichtet']) $body .= implode('', array_map(fn($w) => '<p class="error">' . V::h($w) . '</p>', $st['warnungen']));
+        $schutzOk = !in_array('Schreibgeschützte Schnappschüsse am NAS sind nicht als eingerichtet bestätigt (Schutz vor Erpressungstrojanern).', $st['warnungen'], true);
+        $fold = fn(string $id, string $titel, string $inhalt, string $tag = '', bool $offen = false) => '<details class="fold" id="' . $id . '"' . ($offen ? ' open' : '') . '><summary><h2>' . V::h($titel) . '</h2>' . $tag . '</summary>' . $inhalt . '</details>';
         if (!$st['eingerichtet']) {
             $targets = $this->connections ? $this->connections->status()['ablage'] : [];
-            $opts = implode('', array_map(fn($t) => '<option value="' . V::h((string)$t['id']) . '">' . V::h((string)$t['name']) . ' (' . V::h(strtoupper((string)$t['art'])) . ')</option>', $targets));
-            $body .= '<p>Die Sicherung wird auf dem Server verschlüsselt (restic). Das Passwort wird zufällig erzeugt und einmal auf einem Schlüsselblatt '
+            $zopts = implode('', array_map(fn($t) => '<option value="' . V::h((string)$t['id']) . '">' . V::h((string)$t['name']) . ' (' . V::h(strtoupper((string)$t['art'])) . ')</option>', $targets));
+            $body .= '<section class="card"><div class="update-state err"><span class="big" aria-hidden="true">!</span><div><strong>Die Datensicherung ist noch nicht eingerichtet</strong>'
+                . '<span class="muted">Ohne Sicherung gehen Daten bei einem Ausfall verloren.</span></div></div></section>';
+            $body .= $fold('ziel', 'Ziel der Sicherung', '<p>Die Sicherung wird auf dem Server verschlüsselt (restic). Das Passwort wird zufällig erzeugt und einmal auf einem Schlüsselblatt '
                 . 'ausgegeben – ohne dieses Blatt lässt sich die Sicherung nach einem Totalausfall nicht lesen.</p>'
                 . '<form method="post" action="/verwaltung/sicherung" class="box wide">' . $this->hidden('einrichten')
                 . '<label class="check"><input type="radio" name="art" value="ziel" checked> Netzwerkspeicher aus „Verbindungen“ (SFTP empfohlen)</label>'
-                . ($opts !== '' ? '<label>Ziel<select name="id">' . $opts . '</select></label>' : '<p class="error">Noch kein Ziel unter <a href="/verwaltung/verbindungen">Verbindungen</a> eingetragen.</p>')
+                . ($zopts !== '' ? '<label>Ziel<select name="id">' . $zopts . '</select></label>' : '<p class="error">Noch kein Ziel unter <a href="/verwaltung/verbindungen">Verbindungen</a> eingetragen.</p>')
                 . V::input('ordner', 'Unterordner auf dem Ziel', 'text', 'praxisherz-sicherung')
                 . '<label class="check"><input type="radio" name="art" value="rest"> restic-REST-Server (z. B. im Nur-Anfügen-Modus auf dem NAS)</label>'
                 . V::input('url', 'Adresse', 'url', '', 'placeholder="https://nas.example.org:8000/praxisherz"') . V::input('benutzer', 'Benutzer (REST)', 'text')
                 . V::input('passwort', 'Passwort (REST)', 'password', '', 'autocomplete="new-password"')
                 . '<label class="check"><input type="radio" name="art" value="lokal"> Ordner auf diesem Server (z. B. eingehängte USB-Platte)</label>'
                 . V::input('pfad', 'Ordner', 'text', '', 'placeholder="/media/sicherung"')
-                . '<button' . $dis . '>Sicherung einrichten</button></form>';
-            $body .= $this->exportSection($st, $dis);
-            V::$status = ['Schutz vor Erpressungstrojanern' => [!in_array('Schreibgeschützte Schnappschüsse am NAS sind nicht als eingerichtet bestätigt (Schutz vor Erpressungstrojanern).', $st['warnungen'], true), 'bestätigt', 'nicht bestätigt'],
-            'Schlüsselblatt' => [!$st['blatt'], 'gedruckt', 'noch nicht gedruckt'], 'Benachrichtigung bei Fehlern' => [!empty($st['mail_an']), 'eingerichtet', 'nicht eingerichtet']];
-        $response = Response::html(V::page('Sicherung', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+                . '<button' . $dis . '>Sicherung einrichten</button></form>', '<span class="tag err">nicht eingerichtet</span>', true);
+            $body .= $fold('export', 'Einstellungen exportieren', $this->exportSection($st, $dis), $st['export'] ? '<span class="tag ok">bereit</span>' : '', (bool)$st['export']);
+            $response = Response::html(V::page('Sicherung', $body, $this->nav(), $this->config->practice, null, $opts), $error ? 422 : 200);
             return $busy ? $response->with('Refresh', '3') : $response;
         }
         if ($st['blatt']) {
@@ -2978,38 +3041,44 @@ final class Web {
                 . '<p><a class="button" href="/verwaltung/sicherung/blatt" target="_blank" rel="noopener">Blatt anzeigen und drucken</a></p>'
                 . $form('blatt-gedruckt', 'Blatt ist gedruckt – vom Server löschen') . '</div>';
         }
-        $body .= '<table>' . $this->result($st['letzte_sicherung'], 'Letzte Sicherung') . $this->result($st['letzte_pruefung'], 'Letzte Prüfung')
-            . $this->result($st['letzte_probe'], 'Probe-Wiederherstellung') . $this->result($st['letztes_aufraeumen'], 'Aufräumen') . '</table>'
-            . '<p>Täglich nachts sichern, sonntags aufräumen und prüfen, am ersten Sonntag im Monat zusätzlich lesen und probeweise wiederherstellen.</p><p>'
-            . $form('jetzt', 'Jetzt sichern') . $form('pruefen', 'Prüfen') . $form('pruefen', 'Prüfen und 5 % lesen', '', ['lesen' => '1'])
-            . $form('probe', 'Probe-Wiederherstellung') . $form('aufraeumen', 'Aufräumen') . '</p>';
-        $body .= '<h2>Schutz vor Erpressungstrojanern</h2><form method="post" action="/verwaltung/sicherung" class="box wide">' . $this->hidden('nas-schnappschuesse')
-            . '<p>Wer den Server übernimmt, könnte Sicherungen löschen. Schutz: schreibgeschützte Schnappschüsse des Sicherungsordners <strong>am NAS</strong> '
-            . '(z. B. täglich, 30 Tage) oder ein REST-Server im Nur-Anfügen-Modus. Das wird am NAS eingerichtet, nicht hier.</p>'
-            . V::checkbox('bestaetigt', '1', 'Am NAS sind schreibgeschützte Schnappschüsse eingerichtet', !in_array('Schreibgeschützte Schnappschüsse am NAS sind nicht als eingerichtet bestätigt (Schutz vor Erpressungstrojanern).', $st['warnungen'], true))
-            . '<button' . $dis . '>Speichern</button></form>';
+        $l = $st['letzte_sicherung'];
+        $kind = !$l ? 'new' : (($l['ok'] ?? false) ? 'ok' : 'err');
+        $kopf = !$l ? 'Noch keine Sicherung gelaufen' : 'Letzte Sicherung ' . V::date((int)($l['zeit'] ?? 0)) . (($l['ok'] ?? false) ? ' – erfolgreich' : ' – fehlgeschlagen');
         $z = $st['zeitplan'];
+        $plan = ['taeglich' => 'täglich', 'woechentlich' => 'wöchentlich', 'monatlich' => 'monatlich'][$z['haeufigkeit']] ?? $z['haeufigkeit'];
+        $body .= '<section class="card"><div class="update-state ' . $kind . '"><span class="big" aria-hidden="true">' . ($kind === 'ok' ? '✓' : ($kind === 'err' ? '!' : '…')) . '</span><div><strong>' . V::h($kopf) . '</strong>'
+            . '<span class="muted">Zeitplan: ' . V::h($plan . ' um ' . $z['uhrzeit']) . ' · ' . count($st['schnappschuesse']) . ' Sicherungen vorhanden</span></div></div>'
+            . '<table>' . $this->result($st['letzte_sicherung'], 'Letzte Sicherung') . $this->result($st['letzte_pruefung'], 'Letzte Prüfung')
+            . $this->result($st['letzte_probe'], 'Probe-Wiederherstellung') . $this->result($st['letztes_aufraeumen'], 'Aufräumen') . '</table>'
+            . '<p class="muted">Nachts sichern, sonntags aufräumen und prüfen, am ersten Sonntag im Monat zusätzlich lesen und probeweise wiederherstellen.</p><p>'
+            . $form('pruefen', 'Prüfen', 'secondary') . $form('pruefen', 'Prüfen und 5 % lesen', 'secondary', ['lesen' => '1'])
+            . $form('probe', 'Probe-Wiederherstellung', 'secondary') . $form('aufraeumen', 'Aufräumen', 'secondary') . '</p></section>';
         $sel = fn(string $v, string $cur) => $v === $cur ? ' selected' : '';
         $days = '';
         foreach (['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'] as $i => $d) $days .= '<option value="' . $i . '"' . $sel((string)$i, (string)$z['wochentag']) . '>' . $d . '</option>';
-        $body .= '<h2>Zeitplan</h2><form method="post" action="/verwaltung/sicherung" class="box">' . $this->hidden('zeitplan')
+        $body .= $fold('zeitplan', 'Zeitplan', '<form method="post" action="/verwaltung/sicherung" class="box">' . $this->hidden('zeitplan')
             . '<label>Häufigkeit<select name="haeufigkeit"><option value="taeglich"' . $sel('taeglich', $z['haeufigkeit']) . '>täglich</option>'
             . '<option value="woechentlich"' . $sel('woechentlich', $z['haeufigkeit']) . '>wöchentlich</option><option value="monatlich"' . $sel('monatlich', $z['haeufigkeit']) . '>monatlich</option></select></label>'
             . V::input('uhrzeit', 'Uhrzeit', 'time', $z['uhrzeit'], 'required') . '<label>Wochentag (bei wöchentlich)<select name="wochentag">' . $days . '</select></label>'
             . V::input('tag', 'Tag im Monat (bei monatlich, 1–28)', 'number', (string)$z['tag'], 'min="1" max="28"')
             . '<p>Aufräumen und Prüfen laufen höchstens wöchentlich, Lesen und Probe-Wiederherstellung höchstens monatlich – jeweils im Anschluss an eine Sicherung.</p>'
-            . '<button' . $dis . '>Zeitplan speichern</button></form>';
-        $body .= '<h2>Benachrichtigung bei Fehlern</h2><form method="post" action="/verwaltung/sicherung" class="box">' . $this->hidden('mail-an')
+            . '<button' . $dis . '>Zeitplan speichern</button></form>', '<span class="tag">' . V::h($plan . ' ' . $z['uhrzeit']) . '</span>');
+        $body .= $fold('schutz', 'Schutz vor Erpressungstrojanern', '<form method="post" action="/verwaltung/sicherung" class="box wide">' . $this->hidden('nas-schnappschuesse')
+            . '<p>Wer den Server übernimmt, könnte Sicherungen löschen. Schutz: schreibgeschützte Schnappschüsse des Sicherungsordners <strong>am NAS</strong> '
+            . '(z. B. täglich, 30 Tage) oder ein REST-Server im Nur-Anfügen-Modus. Das wird am NAS eingerichtet, nicht hier.</p>'
+            . V::checkbox('bestaetigt', '1', 'Am NAS sind schreibgeschützte Schnappschüsse eingerichtet', $schutzOk)
+            . '<button' . $dis . '>Speichern</button></form>', $schutzOk ? '<span class="tag ok">bestätigt</span>' : '<span class="tag warn">nicht bestätigt</span>');
+        $body .= $fold('benachrichtigung', 'Benachrichtigung bei Fehlern', '<form method="post" action="/verwaltung/sicherung" class="box">' . $this->hidden('mail-an')
             . V::input('an', 'E-Mail-Empfänger (bis zu 5, durch Komma getrennt; leer = keine)', 'text', implode(', ', $st['mail_an']), 'maxlength="1300"')
             . '<p>Verschickt über die <a href="/verwaltung/verbindungen">zentrale E-Mail-Verbindung</a>, wenn Sicherung, Prüfung oder Probe fehlschlagen.</p>'
             . ($st['letzte_mail'] && !($st['letzte_mail']['ok'] ?? false) ? '<p class="error">Letzter Versand fehlgeschlagen: ' . V::h((string)($st['letzte_mail']['meldung'] ?? '')) . '</p>' : '')
-            . '<button' . $dis . '>Speichern</button></form>';
-        $body .= '<h2>Schlüsselblatt</h2><p>Passwort der Sicherung, SSH-Schlüssel für das NAS und Fingerabdrücke zum Ausdrucken für den Tresor.</p>'
-            . $form('blatt-neu', 'Schlüsselblatt neu erzeugen');
-        $body .= '<h2>Aufbewahrung</h2><form method="post" action="/verwaltung/sicherung" class="box">' . $this->hidden('aufbewahren')
+            . '<button' . $dis . '>Speichern</button></form>', !empty($st['mail_an']) ? '<span class="tag ok">eingerichtet</span>' : '<span class="tag opt">nicht eingerichtet</span>');
+        $body .= $fold('aufbewahrung', 'Aufbewahrung', '<form method="post" action="/verwaltung/sicherung" class="box">' . $this->hidden('aufbewahren')
             . V::input('daily', 'Tägliche', 'number', '7', 'min="0" max="1000"') . V::input('weekly', 'Wöchentliche', 'number', '4', 'min="0" max="1000"')
             . V::input('monthly', 'Monatliche', 'number', '12', 'min="0" max="1000"') . V::input('yearly', 'Jährliche', 'number', '3', 'min="0" max="1000"')
-            . '<button' . $dis . '>Speichern</button></form>';
+            . '<button' . $dis . '>Speichern</button></form>');
+        $body .= $fold('blatt', 'Schlüsselblatt', '<p>Passwort der Sicherung, SSH-Schlüssel für das NAS und Fingerabdrücke zum Ausdrucken für den Tresor.</p>'
+            . $form('blatt-neu', 'Schlüsselblatt neu erzeugen'), $st['blatt'] ? '<span class="tag warn">noch nicht gedruckt</span>' : '<span class="tag ok">gedruckt</span>');
         $rows = '';
         $parts = '';
         foreach ($st['teile'] as $id => $name) $parts .= '<option value="' . V::h($id) . '">' . V::h($name) . '</option>';
@@ -3018,17 +3087,17 @@ final class Web {
                 . '<form method="post" action="/verwaltung/sicherung" class="inline">' . $this->hidden('wiederherstellen', ['snapshot' => (string)$snap['id']])
                 . '<select name="teil">' . $parts . '</select> <button class="danger"' . $dis . '>Wiederherstellen</button></form></td></tr>';
         }
-        $body .= '<h2>Vorhandene Sicherungen</h2>' . $form('schnappschuesse', 'Liste aktualisieren')
+        $body .= $fold('wiederherstellen', 'Vorhandene Sicherungen und Wiederherstellen', $form('schnappschuesse', 'Liste aktualisieren')
             . ($rows !== '' ? '<p><strong>Achtung:</strong> Wiederherstellen ersetzt die Daten des gewählten Teils durch den Stand der Sicherung; spätere Änderungen gehen verloren.</p>'
-                . '<table><tr><th>Sicherung</th><th>Zeit</th><th></th></tr>' . $rows . '</table>' : '<p>Noch keine.</p>');
-        $body .= $this->exportSection($st, $dis);
-        $response = Response::html(V::page('Sicherung', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+                . '<table><tr><th>Sicherung</th><th>Zeit</th><th></th></tr>' . $rows . '</table>' : '<p>Noch keine.</p>'), '<span class="tag">' . count($st['schnappschuesse']) . '</span>');
+        $body .= $fold('export', 'Einstellungen exportieren', $this->exportSection($st, $dis), $st['export'] ? '<span class="tag ok">bereit</span>' : '', (bool)$st['export']);
+        $response = Response::html(V::page('Sicherung', $body, $this->nav(), $this->config->practice, null, $opts), $error ? 422 : 200);
         return $busy ? $response->with('Refresh', '3') : $response;
     }
 
     private function exportSection(array $st, string $dis): string {
         $e = $st['export'];
-        $out = '<h2>Einstellungen exportieren</h2><p>Alle Einstellungen der Basis und der Module (Zertifizierungsstelle, Schlüssel, Verbindungen, '
+        $out = '<p>Alle Einstellungen der Basis und der Module (Zertifizierungsstelle, Schlüssel, Verbindungen, '
             . 'Firewall, Einstellungen der Module, auf Wunsch die Benutzerkonten) in einer Datei, verschlüsselt mit einem Passwort Ihrer Wahl (Argon2id, XChaCha20-Poly1305). '
             . 'Ohne das Passwort ist die Datei wertlos – es wird nirgends gespeichert. Einspielen an der Konsole: '
             . '<code>sudo kienzle-sicherung einstellungen-einspielen DATEI</code>.</p>';

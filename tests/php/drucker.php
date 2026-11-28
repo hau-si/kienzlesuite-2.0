@@ -48,22 +48,27 @@ function test_seite(): void {
     [$env, $p] = pr_env(['letzte' => ['ok' => false, 'meldung' => 'Fehler <script>']]);
     [$b] = admin_browser($env);
     $b->web = fn() => $b->defaultWeb(null, null, null, null, $p);
-    $page = $b->get('/verwaltung/drucker');
+    // Entwurf A: Reiter Drucker | Virtuelle Drucker | Zuordnung | Aufträge und Drehpfeil „Drucker suchen“.
+    $haupt = $b->get('/verwaltung/drucker')->body;
+    check(str_contains($haupt, 'href="/verwaltung/drucker" aria-current="page"') && str_contains($haupt, 'href="/verwaltung/drucker?bereich=virtuell"') && str_contains($haupt, 'href="/verwaltung/drucker?bereich=zuordnung"')
+        && str_contains($haupt, 'Aufträge<span class="zaehler">1</span>') && str_contains($haupt, 'value="suchen"><button class="secondary dreh"') && str_contains($haupt, 'class="mod-zeile"'), 'Seitenkopf der Druckerseite');
+    $page = $b->get('/verwaltung/drucker?bereich=virtuell');
     check($page->status === 200 && str_contains($page->body, 'Virtuelle Drucker') && str_contains($page->body, 'Modul Beispielmodul') && str_contains($page->body, 'Anleitung: virtuelle Drucker an den Arbeitsplätzen') && str_contains($page->body, ':631/printers/'), 'Seite unvollständig');
-    check(str_contains($page->body, 'Wofür welcher Drucker?'), 'Zuordnung fehlt');
+    check(str_contains($b->get('/verwaltung/drucker?bereich=zuordnung')->body, 'Wofür welcher Drucker?'), 'Zuordnung fehlt');
     check($b->post('/verwaltung/drucker', ['aktion' => 'rollen', 'buero' => 'Gibtsnicht', 'bon' => ''])->status === 422, 'Unbekannter Drucker in der Zuordnung');
     check($b->post('/verwaltung/drucker', ['aktion' => 'rollen', 'buero' => 'Fremd', 'bon' => 'Bon'])->status === 303, 'Zuordnung speichern');
     check(json_decode((string)$env->db->setting('drucker.rollen'), true) === ['buero' => 'Fremd', 'bon' => 'Bon'], 'Zuordnung nicht gespeichert');
     check($b->post('/verwaltung/drucker', ['aktion' => 'rollen', 'buero' => 'Fremd', 'bon' => 'Bon', 'bonbreite' => '70'])->status === 422, 'Ungültige Papierbreite');
     check($b->post('/verwaltung/drucker', ['aktion' => 'rollen', 'buero' => 'Fremd', 'bon' => 'Bon', 'bonbreite' => '80'])->status === 303 && $env->db->setting('drucker.bonbreite') === '80', 'Papierbreite nicht gespeichert');
-    check(str_contains($b->get('/verwaltung/drucker')->body, 'Papierbreite des Bondruckers') && str_contains($b->get('/verwaltung/drucker')->body, '<option value="80" selected>'), 'Papierbreite nicht angezeigt');
+    check(str_contains($b->get('/verwaltung/drucker?bereich=zuordnung')->body, 'Papierbreite des Bondruckers') && str_contains($b->get('/verwaltung/drucker?bereich=zuordnung')->body, '<option value="80" selected>'), 'Papierbreite nicht angezeigt');
     check(!str_contains($page->body, '<script>') && !str_contains($page->body, 'Von <b>') && !str_contains($page->body, 'A4 <i>'), 'nicht maskiert');
-    check(substr_count($page->body, '>Entfernen<') === 1, 'Entfernen nur für eigene Drucker von Praxisherz');
+    check(!str_contains($haupt, '<script>') && !str_contains($haupt, 'Von <b>'), 'Hauptseite nicht maskiert');
+    check(substr_count($haupt, ' Entfernen</button>') === 1, 'Entfernen nur für eigene Drucker von Praxisherz');
     $r = $b->post('/verwaltung/drucker', ['aktion' => 'freigabe', 'name' => 'Bon', 'samba' => '1', 'ipp' => '1']);
     check($r->status === 303 && req_p($env) === ['action' => 'freigabe', 'name' => 'Bon', 'freigabe' => ['samba', 'ipp']], 'Freigabe');
     check(str_contains(implode("\n", $env->audit->recent()), 'drucker-freigabe Bon'), 'nicht protokolliert');
     // Virtuelle Drucker: Karte mit IPP-Adresse zum Kopieren, IPP immer an, Samba als Schalter mit Erläuterung; IPP wird auch ohne Feld erzwungen
-    $page = $b->get('/verwaltung/drucker')->body;
+    $page = $b->get('/verwaltung/drucker?bereich=virtuell')->body;
     check(str_contains($page, 'class="vp-karte"') && str_contains($page, 'data-copy="http://') && str_contains($page, ':631/printers/Beispiel-Drucker') && str_contains($page, 'Freigabe per IPP: immer an')
         && str_contains($page, 'Windows-Freigabe (Samba, alt)') && str_contains($page, 'class="inline vp-samba" data-auto') && str_contains($page, 'nicht mehr unterstützt') && str_contains($page, 'Standardweg für alle Betriebssysteme')
         && !str_contains($page, 'Freigabe speichern') && !str_contains($page, 'für macOS und andere freigeben'), 'Karte der virtuellen Drucker: ');
@@ -101,7 +106,7 @@ function test_auftraege_und_netz(): void {
     [$env, $p] = pr_env();
     [$b] = admin_browser($env);
     $b->web = fn() => $b->defaultWeb(null, null, null, null, $p);
-    $page = $b->get('/verwaltung/drucker')->body;
+    $page = $b->get('/verwaltung/drucker?bereich=auftraege')->body . $b->get('/verwaltung/drucker')->body;
     check(str_contains($page, '<code>Bon-12</code>') && !str_contains($page, 'x; rm') && str_contains($page, 'Alle Aufträge von Bon abbrechen'), 'Aufträge');
     check(str_contains($page, 'Arbeitsgruppe: <strong>WORKGROUP') && !str_contains($page, 'Domäne'), 'Windows-Netz');
     $b->post('/verwaltung/drucker', ['aktion' => 'abbrechen', 'auftrag' => 'Bon-12']);

@@ -1,12 +1,21 @@
 # Basis – Release-Notizen
 
-## 0.22.0-beta.60
+## 0.22.0-beta.61
 
 - **Google-Unternehmensprofil angebunden** (Praxis → Verbindungen → „Google-Unternehmensprofil“): Anmeldung wie bei Gmail mit dem eigenen Google-Zugang der Praxis (Desktop-App, Berechtigung `business.manage`, Code aus der Adresszeile), danach Standort wählen. Übertragen werden die **Öffnungszeiten** (Sprechzeiten der Woche) und die **Schließ-, Feier- und Sondertage** der nächsten gut 13 Monate als Sonderzeiten, automatisch nach jeder Änderung unter Praxis → Öffnungszeiten (und beim ersten Öffnen der Seite an einem neuen Tag); dazu „Jetzt übertragen“ und „Standorte neu laden“. Eine leere Woche wird nie geschickt, damit bei Google nichts gelöscht wird. Vertretungen kennt Google nicht.
 - Öffnungszeiten: neuer Haken **„Google-Unternehmensprofil“** je Schließung/Sonderöffnung (bei verbundenem Google vorgewählt) und bei den Feiertagen; im Kopf der Seite steht das Ergebnis der letzten Übertragung.
 - **Voraussetzung bei Google:** Die Schnittstellen für Unternehmensprofile gibt Google nur auf Antrag frei (Profil seit mindestens 60 Tagen bestätigt, Website der Praxis; Kontaktformular „Application for Basic API Access“; Prüfung bis zu 14 Tage). Die Anleitung steht im Abschnitt.
 - Übertragung macht der root-Dienst `kienzle-verbindungen` (das Webinterface hat kein Netz); Zugangsdaten nur in `/etc/kienzle/verbindungen/konfiguration.json`, nie in der Anzeige.
 - Geprüft mit Tests (Google-Schnittstelle nachgestellt); **nicht mit echtem Google-Konto, nicht auf der VM geprüft.**
+
+## 0.22.0-beta.60
+
+Neues Design für weitere Seiten (Entwürfe vom 28.11.2026, Seitenkopf mit Reitern oben rechts wie bei Module/Updates):
+- **Betrieb → Sicherheit (A):** Reiter Firewall | Zugang | Passwörter | Protokoll (`?bereich=`), je Reiter ein Bereich; roter Zähler bei zu lockeren Passwortregeln oder unbestätigter Firewall.
+- **Betrieb → Sicherung (B):** Zustand oben (letzte Sicherung, Prüfung, Probe, Aufräumen), alles andere eingeklappt (Zeitplan, Schutz, Benachrichtigung, Aufbewahrung, Schlüsselblatt, Wiederherstellen, Einstellungen exportieren) mit Zustandsmarke; Reiter Sicherung | Protokoll (Einträge der Sicherung aus dem Protokoll), „Jetzt sichern“ oben rechts.
+- **Praxis → Dienste (A):** Liste wie bei den Modulen, „⋯“ mit Neues Geheimnis/Entfernen; „Dienst hinzufügen“ oben rechts öffnet das Formular (`?neu=1`). Seitentitel jetzt „Dienste“ wie in der Seitenleiste.
+- **Praxis → Drucker (A):** Reiter Drucker | Virtuelle Drucker | Zuordnung | Aufträge (Zähler offener Aufträge), Drehpfeil = Drucker suchen; echte Drucker als Liste mit „⋯“ (Testseite, Entfernen); Suchen, von Hand eintragen, Ablage-Ordner und Windows-Netz eingeklappt. Nach einer Aktion bleibt der Reiter offen.
+- Mit Tests und im Browser der Vorschau (erfundene Daten) geprüft, **nicht auf der VM**.
 
 ## 0.22.0-beta.59
 

@@ -138,6 +138,9 @@ function test_verwaltung(): void {
     check($r->status === 200 && str_contains($r->body, 'Client-Geheimnis') && str_contains($r->body, 'Telefon &lt;b&gt;') && $r->header('Cache-Control') === 'no-store', 'Anlegen zeigt Geheimnis');
     $c = $o->clients()[0];
     check($c['redirect_uris'] === [CB, 'http://localhost:8080/cb'], 'Adressen');
+    $seite = $b->get('/verwaltung/sso')->body;
+    check(str_contains($seite, 'class="mod-zeile dienst-zeile"') && str_contains($seite, 'href="/verwaltung/sso?neu=1#neu"') && str_contains($seite, 'Dienst hinzufügen</a>') && !str_contains($seite, 'name="redirect_uris"'), 'Dienste als Liste, Formular nur über den Knopf oben');
+    check(str_contains($b->get('/verwaltung/sso?neu=1')->body, 'name="redirect_uris"'), 'Formular „Dienst hinzufügen“');
     foreach (['http://dienst.example.org/cb', 'https://dienst.example.org/cb#x', 'javascript:alert(1)', ''] as $bad) {
         check($b->post('/verwaltung/sso', ['aktion' => 'anlegen', 'name' => 'X', 'redirect_uris' => $bad])->status === 422, 'Adresse angenommen: ' . $bad);
     }
