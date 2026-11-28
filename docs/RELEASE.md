@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.54
+
+- Ende-zu-Ende-Prüfung mit echtem nginx (`tests/integration/nginx.sh`, Container Ubuntu 26.04 auf GitHub) auf den heutigen Stand gebracht: Sie erwartete auf der Update-Seite und der Modulseite noch Texte einer älteren Gestaltung. Seit dem Test der Start-ISO war der Container-Lauf vorher abgebrochen, deshalb fiel das nicht auf. Am Programm ändert sich nichts.
+- Die Prüfung läuft nur unter Ubuntu 26.04 (Installer); hier nicht ausführbar, das Ergebnis zeigt der Lauf auf GitHub.
+
 ## 0.22.0-beta.53
 
 - Prüfung auf GitHub: Nach beta.52 lief der Ubuntu-26.04-Container weiter und scheiterte an zwei Tests des Sprachmenüs (Kokoro-Installer prüft `ensurepip`). Das Paket `python3-venv` steht jetzt in der Paketliste des Containers. Am Programm ändert sich nichts.
