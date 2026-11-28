@@ -1,5 +1,13 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.60
+
+- **Google-Unternehmensprofil angebunden** (Praxis → Verbindungen → „Google-Unternehmensprofil“): Anmeldung wie bei Gmail mit dem eigenen Google-Zugang der Praxis (Desktop-App, Berechtigung `business.manage`, Code aus der Adresszeile), danach Standort wählen. Übertragen werden die **Öffnungszeiten** (Sprechzeiten der Woche) und die **Schließ-, Feier- und Sondertage** der nächsten gut 13 Monate als Sonderzeiten, automatisch nach jeder Änderung unter Praxis → Öffnungszeiten (und beim ersten Öffnen der Seite an einem neuen Tag); dazu „Jetzt übertragen“ und „Standorte neu laden“. Eine leere Woche wird nie geschickt, damit bei Google nichts gelöscht wird. Vertretungen kennt Google nicht.
+- Öffnungszeiten: neuer Haken **„Google-Unternehmensprofil“** je Schließung/Sonderöffnung (bei verbundenem Google vorgewählt) und bei den Feiertagen; im Kopf der Seite steht das Ergebnis der letzten Übertragung.
+- **Voraussetzung bei Google:** Die Schnittstellen für Unternehmensprofile gibt Google nur auf Antrag frei (Profil seit mindestens 60 Tagen bestätigt, Website der Praxis; Kontaktformular „Application for Basic API Access“; Prüfung bis zu 14 Tage). Die Anleitung steht im Abschnitt.
+- Übertragung macht der root-Dienst `kienzle-verbindungen` (das Webinterface hat kein Netz); Zugangsdaten nur in `/etc/kienzle/verbindungen/konfiguration.json`, nie in der Anzeige.
+- Geprüft mit Tests (Google-Schnittstelle nachgestellt); **nicht mit echtem Google-Konto, nicht auf der VM geprüft.**
+
 ## 0.22.0-beta.59
 
 - **Betrieb → Module neu (Entwurf B):** eine Liste statt Kacheln (Symbol, Name, Beschreibung, Version, Zustand mit Punkt, eine Pille „✓ aktuell ⟳“ bzw. „↑ Auf … aktualisieren“, „⋯“ mit Neustart und Entfernen). Oben ein Schalter „Automatische Updates“ und ein Hinweis „N Updates verfügbar“; noch nicht installierte Module eingeklappt unter „Weitere Module“. Die Knöpfe unten („Status der Dienste aktualisieren“, „Nach Modulen sehen“, „Automatische Updates …“) entfallen.
