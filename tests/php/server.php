@@ -57,4 +57,15 @@ function test_server(): void {
     check($m->get('/verwaltung/server')->status === 403, 'Mitarbeiter auf der Seite Server');
 }
 
+/** Name ohne Endung (z. B. „praxisherz“ wie bei der Erstinstallation): stand bis Basis beta.56 als leeres Feld da. */
+function test_server_name_ohne_endung(): void {
+    $env = new Env();
+    $env->config = \Kienzle\Core\Config::fromArray(['hostnames' => ['192.0.2.20', 'praxisherz', 'kienzle.example.org'], 'data_dir' => $env->dir, 'secret_key' => $env->dir . '/secret.key',
+        'modules' => $env->dir . '/modules.json', 'practice' => 'Praxis Beispiel']);
+    [$b] = admin_browser($env);
+    $p = $b->get('/verwaltung/server');
+    check(str_contains($p->body, 'name="kurzname" value="praxisherz"') && str_contains($p->body, '<option value="" selected>'), 'Name ohne Endung wird nicht angezeigt');
+    check(str_contains($p->body, 'erreichbar unter <strong>https://192.0.2.20/</strong>, <strong>https://praxisherz/</strong>'), 'aktuelle Adressen fehlen');
+}
+
 run_tests();

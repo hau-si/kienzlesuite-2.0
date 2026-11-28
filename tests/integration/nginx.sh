@@ -126,7 +126,8 @@ code=$(php -r 'require "/opt/kienzle/core/current/php/bootstrap.php"; echo Kienz
 [ "$(code -c "$T/dora" -b "$T/dora" -H "Origin: https://$host" -d "code=$code" "https://$host/anmelden/code")" = "303 https://$host/" ] || fail 'Admin-Code'
 c -b "$T/dora" "https://$host/verwaltung/updates" | grep -q 'Installiert: Basis ' || fail 'Update-Seite'
 c -b "$T/dora" "https://$host/verwaltung/firewall" | grep -q 'Freigegebene Netze' || fail 'Firewall-Seite'
-c -b "$T/dora" "https://$host/verwaltung/verbindungen" | grep -q 'T2med (FHIR)' || fail 'Verbindungsseite'
+c -b "$T/dora" "https://$host/verwaltung/verbindungen" | grep -q 'href="/verwaltung/t2med"' || fail 'Verbindungsseite'
+c -b "$T/dora" "https://$host/verwaltung/t2med" | grep -q 'Verbindung zu T2med (FHIR)' || fail 'Seite T2med'
 c -b "$T/dora" "https://$host/verwaltung/einrichtung" | grep -q 'Admin mit Authenticator-App' || fail 'Einrichtungsseite'
 c "https://$host/.well-known/openid-configuration" | grep -qF "\"issuer\":\"https://$host\"" || fail 'OIDC-Discovery über nginx'
 c "https://$host/oidc/jwks" | grep -q '"crv":"P-256"' || fail 'OIDC-JWKS über nginx'
@@ -134,7 +135,7 @@ c "https://$host/oidc/jwks" | grep -q '"crv":"P-256"' || fail 'OIDC-JWKS über n
 c -b "$T/dora" "https://$host/verwaltung/sso" | grep -q 'Dienst hinzufügen' || fail 'Seite Dienste'
 c "https://$host/hilfe/arbeitsplatz" | grep -q "$(openssl x509 -in /etc/kienzle/ca/ca.crt -noout -fingerprint -sha256 | cut -d= -f2)" || fail 'Hilfe Arbeitsplätze ohne Fingerabdruck'
 # Die Seiten müssen Status und Einheiten der root-Dienste sehen (open_basedir von php-fpm).
-for p in firewall updates verbindungen sicherung einrichtung drucker sso module; do
+for p in firewall updates verbindungen t2med sicherung einrichtung drucker sso module; do
   if c -b "$T/dora" "https://$host/verwaltung/$p" | grep -q 'Bitte den Installer ausführen'; then fail "Seite $p sieht ihren Dienst nicht"; fi
 done
 c -b "$T/dora" "https://$host/verwaltung/verbindungen" | grep -q 'ssh-ed25519 ' || fail 'Verbindungsseite zeigt den SSH-Schlüssel nicht (Status unlesbar)'
@@ -173,7 +174,7 @@ cmp -s "$T/ansicht/etc/kienzle/ca/ca.crt" /etc/kienzle/ca/ca.crt || fail 'CA feh
 sicher '{"action":"blatt-gedruckt"}'
 [ ! -e /var/lib/kienzle/sicherung/blatt.html ] || fail 'Blatt nicht gelöscht'
 
-echo '== Servername ändern (Einrichten → Server)'
+echo '== Servername ändern (Praxis → Server)'
 [ -f /etc/systemd/system/kienzle-servername.path ] || fail 'kienzle-servername.path fehlt'
 c -b "$T/dora" -H "Origin: https://$host" "https://$host/verwaltung/server" | grep -q 'Name des Servers' || fail 'Seite Server'
 runuser -u ks-core -- sh -c "umask 077; printf '%s' '{\"namen\":[\"$host\",\"kienzle.praxis.internal\",\"10.11.12.13\"],\"praxis\":\"Praxis Test\"}' > /var/lib/kienzle/core/anfragen/servername.json"

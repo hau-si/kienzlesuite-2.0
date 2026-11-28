@@ -1174,7 +1174,7 @@ final class Fax {
             ['title' => 'Modul Telefon verbunden (Faxleitung)', 'state' => $telefonDa ? 'done' : 'error',
                 'hint' => $telefonDa ? '' : 'Das Modul Telefon installieren und dort unter Einstellungen → Rufnummern die Faxleitung wählen.', 'link' => '/fax/'],
             ['title' => 'Faxdrucker an den Arbeitsplätzen eingerichtet', 'state' => is_file(self::$data . '/.drucker-genutzt') ? 'done' : 'open',
-                'hint' => 'Der Praxisherz-Agent an den PCs (Einrichten → Arbeitsplätze) richtet die Faxdrucker ein; danach einmal etwas auf einen Faxdrucker (z. B. vFax) drucken.', 'link' => '/fax/'],
+                'hint' => 'Der Praxisherz-Agent an den PCs (Praxis → Arbeitsplätze) richtet die Faxdrucker ein; danach einmal etwas auf einen Faxdrucker (z. B. vFax) drucken.', 'link' => '/fax/'],
         ];
     }
 }

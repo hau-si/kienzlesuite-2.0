@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.68
+
+- Menüwege wie in der Basis ab beta.57: „Praxis → Arbeitsplätze“ statt „Einrichten → Arbeitsplätze“; die T2med-Verbindung und die Aufrufadressen stehen unter „Praxis → T2med“ (Link der Einstellungen „Zahlung & T2med“ führt dorthin). Mit Tests geprüft, nicht auf der VM.
+
 ## 2.3.4-beta.67
 
 - **Einrichtung über den Praxisherz-Agent:** Der Einrichtungs-Überblick nennt statt der früheren Einzelschritte (Zertifikat, Starter, Drucker „vKasse“/„vBriefversand“ am PC) nur noch einen Punkt: Praxisherz-Agent auf den Kassen-PCs installieren (Einrichten → Arbeitsplätze); er richtet Starter, Zertifikat und die Drucker selbst ein. Ob die Drucker auf dem Server bereitstehen, zeigt der Überblick weiter.

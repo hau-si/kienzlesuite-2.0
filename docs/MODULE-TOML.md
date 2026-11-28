@@ -137,12 +137,12 @@ Alle Drucker der Liste teilen sich Programm, Beschreibung und Papier. Das Progra
 
 ### `[[starters]]` – optional
 
-Startkontexte für den zentralen Arbeitsplatz-Starter der Basis (Einrichten → Arbeitsplätze). Nur mit `[web] protocol = "fastcgi"`. Höchstens 5 Einträge je Modul.
+Startkontexte für den zentralen Arbeitsplatz-Starter der Basis (Praxis → Arbeitsplätze). Nur mit `[web] protocol = "fastcgi"`. Höchstens 5 Einträge je Modul.
 
 | Feld | Pflicht | Bedeutung |
 |---|---|---|
 | `schema` | ja | URL-Schema, das T2med aufruft, `praxisherz-<name>` (Kleinbuchstaben, Ziffern, Bindestrich); über alle Module eindeutig |
-| `label` | ja | Name des Kontexts für die Anzeige der T2med-Einträge (Praxis → Verbindungen → T2med) |
+| `label` | ja | Name des Kontexts für die Anzeige der T2med-Einträge (Praxis → T2med) |
 
 Das Starterprogramm sendet `POST https://<server>/starter/<modul-id>` (JSON mit `context_id`, `fhir_base_url`, `oauth_token`, `action = "launch"`).
 Die Basis prüft vorher den Starter-Schlüssel; das Modul sieht `KIENZLE_OEFFENTLICH=starter` und `KIENZLE_STARTER_GEPRUEFT=1` und antwortet mit

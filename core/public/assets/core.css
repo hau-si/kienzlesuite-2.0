@@ -558,3 +558,10 @@ button.schalter.an::after { left: 23px; }
 @media (max-width: 900px) { .mod-zeile { grid-template-columns: 38px minmax(0, 1fr) 32px; } .mod-zeile .mod-ver, .mod-zeile .mod-zustand { display: none; } .mod-zeile .mod-rechts { grid-column: 2 / 4; justify-self: start; } }
 .mod-zeile .mod-menu { bottom: auto; top: 38px; }
 main.breit > details.fold { margin: 0 0 12px; }
+
+/* Seitenkopf mit Reitern wie in den Modulen (Titel links, Knöpfe rechts; z. B. Praxis → T2med) */
+.basis-kopf { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+.basis-kopf h1 { margin: 6px 0 0; }
+.basis-reiter { display: flex; gap: 6px; flex-wrap: wrap; }
+.basis-reiter a.button { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 7px 14px; }
+.basis-reiter a.button:not(.primary) { background: var(--soft); color: #315f53; }

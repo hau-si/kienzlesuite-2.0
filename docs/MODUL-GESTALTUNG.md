@@ -45,7 +45,7 @@ Gemeinsame Regeln für die Oberfläche aller Module Praxisherz. Sie gelten zusä
   sagen, was er tut), kein Textknopf am Seitenende.
 - **Basis-Seiten** bekommen denselben Kopf über `V::page($titel, $inhalt, $nav, $praxis, $gruppe, ['werkzeuge' => …])` mit
   `V::reiter($href, $text, $symbol, $aktuell, $zaehler)` und `V::drehpfeil($action, $aktion, $titel, $csrf)`; die Seite wird dann
-  1400 px breit (`main.breit`). Vorbild: Betrieb → Module und Updates (Basis 0.22.0-beta.57).
+  1400 px breit (`main.breit`). Vorbild: Betrieb → Module und Updates (Basis 0.22.0-beta.58).
 
 CSS (Basis: in `core.css`; Module tragen es bis auf Weiteres in ihrer eigenen Stildatei):
 

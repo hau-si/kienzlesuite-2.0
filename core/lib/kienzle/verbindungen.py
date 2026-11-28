@@ -521,7 +521,7 @@ def test_t2med(c: dict) -> str:
                     break
                 data += chunk
     except (OSError, ssl.SSLError) as e:
-        hint = ' Das Zertifikat lässt sich unter Verbindungen → T2med abrufen und nach Prüfung des Fingerabdrucks übernehmen.' if 'CERTIFICATE_VERIFY_FAILED' in str(e) else ''
+        hint = ' Das Zertifikat lässt sich unter Praxis → T2med abrufen und nach Prüfung des Fingerabdrucks übernehmen.' if 'CERTIFICATE_VERIFY_FAILED' in str(e) else ''
         raise Fehler(f'T2med nicht erreichbar: {str(e)[:120]}.{hint}') from None
     head, _, body = data.partition(b'\r\n\r\n')
     status = head.split(b' ', 2)[1:2]

@@ -152,7 +152,7 @@ function render(data) {
       // Die T2med-Verbindung gehört von Praxisherz: Stand zeigen und direkt zur Einrichtung verlinken.
       const ok = !!(data.connections && data.connections.t2med);
       const note = el('p', ok ? 'Die T2med-Verbindung von Praxisherz ist eingerichtet. ' : 'Die T2med-Verbindung von Praxisherz ist noch nicht eingerichtet. ', ok ? 'notice' : 'inline-error');
-      note.append(el('a', ok ? 'Verbindung prüfen (Praxis → Verbindungen)' : 'Jetzt in Praxisherz einrichten (Praxis → Verbindungen)', null, {href: '/verwaltung/verbindungen'}));
+      note.append(el('a', ok ? 'Verbindung prüfen (Praxis → T2med)' : 'Jetzt in Praxisherz einrichten (Praxis → T2med)', null, {href: '/verwaltung/t2med'}));
       form.prepend(note);
       form.append(t2medSetupHelp());
     }
@@ -201,10 +201,10 @@ function renderPrinterHelp(cfg, info) {
   ol.append(mac); how.append(ol); box.append(how);
 }
 
-// Ein Satz zum Praxisherz-Agent mit Verweis auf Einrichten → Arbeitsplätze von Praxisherz.
+// Ein Satz zum Praxisherz-Agent mit Verweis auf Praxis → Arbeitsplätze von Praxisherz.
 function agentNote(text) {
   const p = el('p', text + ' (');
-  p.append(el('a', 'Einrichten → Arbeitsplätze', null, {href: '/hilfe/arbeitsplatz', target: '_top'}), ').');
+  p.append(el('a', 'Praxis → Arbeitsplätze', null, {href: '/hilfe/arbeitsplatz', target: '_top'}), ').');
   return p;
 }
 // Notweg ohne Agent: dezent eingeklappt (details.how aus dem Stil von Praxisherz).
@@ -323,11 +323,11 @@ function t2medSetupHelp() {
   const li = el('li', 'Als Adresse eintragen (genau so, mit den Platzhaltern) und eine Bezeichnung vergeben, z. B. „Kartenzahlung“:'); li.append(el('br'), el('code', 'praxisherz-kasse://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}', 'code-copy')); ol.append(li);
   ol.append(el('li', 'Auf Plus klicken, oben rechts mit dem Häkchen speichern und in der Liste davor auf „aktualisieren“ (Pfeile) klicken.'));
   ol.append(el('li', 'Dann „Funktionsleisten verwalten“: Konfiguration anlegen oder bearbeiten (Name, Benutzer, Benutzergruppe, Station), „Aktion hinzufügen“, die Aktion unter der vergebenen Bezeichnung suchen, Farbe und Kürzel oder Icon wählen und bestätigen.'));
-  ol.append(el('li', 'Der Starter-Aufruf funktioniert erst, wenn auf dem Arbeitsplatz der Praxisherz-Agent installiert ist (Einrichten → Arbeitsplätze).'));
-  ol.append(el('li', 'Die FHIR-Adresse, die T2med beim Aufruf mitgibt, muss in Praxisherz unter Praxis → Verbindungen → T2med bei „Erlaubte fhirBasisUrl aus T2med“ stehen (die Adresse des FHIR-Servers gilt immer als erlaubt). Bei einer Fehlermeldung zeigt die Seite die tatsächlichen Werte.'));
+  ol.append(el('li', 'Der Starter-Aufruf funktioniert erst, wenn auf dem Arbeitsplatz der Praxisherz-Agent installiert ist (Praxis → Arbeitsplätze).'));
+  ol.append(el('li', 'Die FHIR-Adresse, die T2med beim Aufruf mitgibt, muss in Praxisherz unter Praxis → T2med bei „Erlaubte fhirBasisUrl aus T2med“ stehen (die Adresse des FHIR-Servers gilt immer als erlaubt). Bei einer Fehlermeldung zeigt die Seite die tatsächlichen Werte.'));
   const guide = el('li'); guide.append('Mit Bildern: ', el('a', 'Anleitung „T2med einrichten“', null, {href: GUIDE_URL, target: '_blank', rel: 'noopener'})); ol.append(guide);
   d.append(ol);
-  d.append(el('p', 'Alle Aufrufadressen stehen gesammelt unter Praxis → Verbindungen → T2med.', 'muted'));
+  d.append(el('p', 'Alle Aufrufadressen stehen gesammelt unter Praxis → T2med.', 'muted'));
   return d;
 }
 
@@ -342,7 +342,7 @@ function renderChecklist(data) {
   const web = own.filter(i => i.ort === 'web'), pc = own.filter(i => i.ort === 'pc');
   const items = [
     ...web,
-    {ort: 'pc', info: true, label: 'Praxisherz-Agent auf den Kassen-PCs installieren (Einrichten → Arbeitsplätze) – richtet Starter, Zertifikat' + (agentPrinters.length ? ' und ' + (agentPrinters.length > 1 ? 'die Drucker ' : 'den Drucker ') + agentPrinters.join('/') : '') + ' ein', card: 's-clients', href: '/hilfe/arbeitsplatz#paket', hrefLabel: 'Seite öffnen', note: 'Ohne Agent (Mac/Linux oder wenn etwas schiefgeht): „Von Hand einrichten“ bei den Druckerkarten und auf der Seite Arbeitsplätze.'},
+    {ort: 'pc', info: true, label: 'Praxisherz-Agent auf den Kassen-PCs installieren (Praxis → Arbeitsplätze) – richtet Starter, Zertifikat' + (agentPrinters.length ? ' und ' + (agentPrinters.length > 1 ? 'die Drucker ' : 'den Drucker ') + agentPrinters.join('/') : '') + ' ein', card: 's-clients', href: '/hilfe/arbeitsplatz#paket', hrefLabel: 'Seite öffnen', note: 'Ohne Agent (Mac/Linux oder wenn etwas schiefgeht): „Von Hand einrichten“ bei den Druckerkarten und auf der Seite Arbeitsplätze.'},
     ...pc,
     {ort: 't2med', info: true, label: 'Drittanbieter-Zugriff mit Funktionsleisten-Button „Kartenzahlung“ anlegen (Aufruf-Adresse steht bei der T2med-Anbindung)', card: 's-fhir', href: GUIDE_URL, hrefLabel: 'Anleitung mit Bildern'},
     ...(invoiceQueue ? [{ort: 't2med', info: true, label: 'Rechnungen in T2med auf den Drucker „vKasse“ drucken (richtet der Agent am PC ein)', card: 'invoice-printer-help'}] : []),

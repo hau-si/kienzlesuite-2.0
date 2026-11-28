@@ -1,12 +1,19 @@
 # Basis – Release-Notizen
 
-## 0.22.0-beta.57
+## 0.22.0-beta.58
 
 - **Betrieb → Module neu (Entwurf B):** eine Liste statt Kacheln (Symbol, Name, Beschreibung, Version, Zustand mit Punkt, eine Pille „✓ aktuell ⟳“ bzw. „↑ Auf … aktualisieren“, „⋯“ mit Neustart und Entfernen). Oben ein Schalter „Automatische Updates“ und ein Hinweis „N Updates verfügbar“; noch nicht installierte Module eingeklappt unter „Weitere Module“. Die Knöpfe unten („Status der Dienste aktualisieren“, „Nach Modulen sehen“, „Automatische Updates …“) entfallen.
 - **Seitenkopf wie in den Modulen für Module und Updates:** rechts oben die Reiter „Module“ bzw. „Updates“ (mit rotem Zähler) und „Protokoll“ (`?ansicht=protokoll`) und ein runder Drehpfeil (nach Updates sehen). Beim Modul-Dienst erneuert „Nach Updates sehen“ jetzt auch den Zustand der Dienste.
 - Updates: „Kanal und Signaturprüfung“ und „Zurück auf eine frühere Version“ sind eingeklappt; das Protokoll steht im eigenen Reiter.
-- Für Basis-Seiten: `V::page(…, ['werkzeuge' => …])` mit `V::reiter()` und `V::drehpfeil()` setzt den Seitenkopf und macht die Seite 1400 px breit; Rückmeldungen (`flash`) erscheinen unter dem Seitenkopf. `docs/MODUL-GESTALTUNG.md` ergänzt.
+- Für Basis-Seiten: `V::page(…, ['werkzeuge' => …])` mit `V::reiter()` und `V::drehpfeil()` setzt den Seitenkopf und macht die Seite 1400 px breit; Rückmeldungen (`flash`) erscheinen unter dem Seitenkopf. `docs/MODUL-GESTALTUNG.md` ergänzt. (Praxis → T2med nutzt noch eigene Klassen `basis-kopf`/`basis-reiter`; beides wird beim Umbau der übrigen Seiten zusammengeführt.)
 - Mit Tests und im Browser der Vorschau (erfundene Daten) geprüft, **nicht auf der VM**.
+
+## 0.22.0-beta.57
+
+- **Seitenleiste:** Die Gruppe „Einrichten“ gibt es nicht mehr. „Server“ und „Arbeitsplätze“ stehen jetzt unter „Praxis“, dazu neu „T2med“ (Wunsch des Nutzers). Alle Menüwege in Texten heißen entsprechend „Praxis → Server/Arbeitsplätze/T2med“.
+- **Neue Seite Praxis → T2med** (`/verwaltung/t2med`) mit einer Leiste oben wie in den Modulen: Reiter „FHIR-Verbindung“ (Adresse, API-Schlüssel, Zertifikat, Prüfen – bisher unter Praxis → Verbindungen), „GDT“ (Anleitung für „Akte öffnen“ mit Importdatei `C:\Praxisherz\GDT\AUFRUFi.gdt`, Feldern der Datei und Liste der Arbeitsplätze mit Agent) und „Funktionsleiste“ (Drittanbieter-Zugriff und Knopf in der T2med-Funktionsleiste, Aufrufadressen aller Module). Unter Praxis → Verbindungen steht nur noch ein Verweis.
+- **Fehler behoben:** Unter Praxis → Server blieb das Feld „Name des Servers“ leer, wenn der Server einen Namen ohne Endung hat (z. B. `praxisherz`, so bei der Erstinstallation). Ursache: `substr($name, 0, -0)` ergibt einen leeren Text. Außerdem zeigt die Seite jetzt alle Adressen, unter denen Praxisherz gerade erreichbar ist.
+- Mit Tests geprüft (`tests/php/server.php`, `verbindungen.php`, `starter.php`) und als Bild aus der Testumgebung angesehen; nicht auf der VM und nicht mit T2med geprüft (GDT-Gerät in T2med: Menüname nicht geprüft).
 
 ## 0.22.0-beta.56
 

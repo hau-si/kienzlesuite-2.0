@@ -181,7 +181,7 @@ final class Seite {
             ['title' => 'Terminzettel: Praxisname im Kopf', 'state' => $name ? 'done' : 'open', 'optional' => true,
                 'hint' => 'Einstellungen → Kopf: Praxisname, Adresse und Logo für den Bon', 'link' => '/terminzettel/#kopf'],
             ['title' => 'Terminzettel aus T2med am Bondrucker angekommen', 'optional' => true, 'state' => $angekommen ? 'done' : 'open',
-                'hint' => 'Praxisherz-Agent auf den PCs installieren (Einrichten → Arbeitsplätze), er richtet „vTermine“ ein; in T2med unter Einstellungen → Kalender → Terminliste (DIN A6) wählen; dann einen Terminzettel drucken',
+                'hint' => 'Praxisherz-Agent auf den PCs installieren (Praxis → Arbeitsplätze), er richtet „vTermine“ ein; in T2med unter Einstellungen → Kalender → Terminliste (DIN A6) wählen; dann einen Terminzettel drucken',
                 'link' => '/terminzettel/#drucker'],
         ];
     }

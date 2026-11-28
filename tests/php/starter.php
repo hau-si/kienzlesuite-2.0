@@ -54,7 +54,7 @@ function test_seite_und_paket(): void {
     [$b] = admin_browser($env); st_web($env, $st, $b);
     check($b->get('/verwaltung/arbeitsplaetze')->status === 303, 'alte Starter-Seite leitet zu den Arbeitsplätzen');
     $page = $b->get('/hilfe/arbeitsplatz');
-    check($page->status === 200 && str_contains($page->body, 'id="paket"') && str_contains($page->body, 'href="/verwaltung/verbindungen#t2med"') && !str_contains($page->body, 'kontextId='), 'Arbeitsplätze: nur Verweis auf Verbindungen → T2med');
+    check($page->status === 200 && str_contains($page->body, 'id="paket"') && str_contains($page->body, 'href="/verwaltung/t2med?reiter=funktionsleiste"') && !str_contains($page->body, 'kontextId='), 'Arbeitsplätze: nur Verweis auf Praxis → T2med');
     check(str_contains($page->body, '/verwaltung/arbeitsplaetze/windows.zip'), 'Paket-Link fehlt');
     $zip = $b->get('/verwaltung/arbeitsplaetze/linux.zip');
     check($zip->status === 200 && $zip->header('Content-Type') === 'application/zip' && str_starts_with($zip->body, "PK\x03\x04"), 'ZIP');
