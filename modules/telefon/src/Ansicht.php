@@ -663,10 +663,10 @@ final class Ansicht {
         $zustand = $st['anzahl'] > 0 ? self::tag('ok', number_format($st['anzahl'], 0, ',', '.') . ' Patienten') : self::tag('opt', 'nicht geladen');
         $i = '<p class="muted">Namen der Anrufer am Telefon und in „Anrufe“, Patientensuche oben auf jeder Seite, „Akte öffnen“ in T2med am eigenen PC (Praxisherz-Agent). '
             . 'Das Verzeichnis enthält Name, Geburtsdatum, Telefonnummern und Patientennummer und bleibt auf diesem Server.</p>';
-        if (!$t2med['eingerichtet']) $i .= '<p class="fehler">Zuerst in der Basis die Verbindung zu T2med einrichten: <a href="/verwaltung/verbindungen">Praxis → Verbindungen</a> → T2med.</p>';
-        $i .= '<h3>Laden und aktualisieren</h3><ol class="tf-schritte"><li>In T2med unter Drittanbieter einen Eintrag (Programm/URL) anlegen. Alle Aufrufadressen stehen gesammelt unter <a href="/verwaltung/verbindungen#t2med">Praxis → Verbindungen → T2med</a>.'
+        if (!$t2med['eingerichtet']) $i .= '<p class="fehler">Zuerst in der Basis die Verbindung zu T2med einrichten: <a href="/verwaltung/t2med">Praxis → T2med</a>.</p>';
+        $i .= '<h3>Laden und aktualisieren</h3><ol class="tf-schritte"><li>In T2med unter Drittanbieter einen Eintrag (Programm/URL) anlegen. Alle Aufrufadressen stehen gesammelt unter <a href="/verwaltung/t2med?reiter=funktionsleiste">Praxis → T2med → Funktionsleiste</a>.'
             . '<details class="how"><summary>Adresse für diesen Eintrag</summary><code>praxisherz-telefonverzeichnis://?kontextId=${kontextId}&amp;fhirBasisUrl=${fhirBasisUrl}&amp;oAuthToken=${oAuthToken}</code></details></li>'
-            . '<li>Der Arbeitsplatz braucht den Praxisherz-Agent (<a href="/hilfe/arbeitsplatz">Einrichten → Arbeitsplätze</a>).</li>'
+            . '<li>Der Arbeitsplatz braucht den Praxisherz-Agent (<a href="/hilfe/arbeitsplatz">Praxis → Arbeitsplätze</a>).</li>'
             . '<li>In T2med den Eintrag aufrufen: Praxisherz öffnet sich und lädt das Verzeichnis (Fortschritt oben auf der Seite). Bei neuen Patienten oder geänderten Nummern einfach wiederholen.</li></ol>';
         if ($t2med['eingerichtet'] && ($t2med['ohne_schluessel'] ?? false)) $i .= '<p class="fehler">' . $h(T2med::OHNE_SCHLUESSEL) . '</p>';
         $i .= '<p>' . ($st['zeit'] > 0 ? 'Zuletzt geladen: ' . $h(date('d.m.Y H:i', $st['zeit'])) . '. ' : '') . ($laeuft ? self::tag('warn', 'Laden läuft (' . (int)$laeuft['anzahl'] . ' bisher)') : '') . '</p>';

@@ -169,7 +169,7 @@ final class Overview {
         } else {
             try { $agenten = (int)($this->db->one('SELECT COUNT(*) AS n FROM arbeitsplaetze')['n'] ?? 0); } catch (\Throwable) { $agenten = 0; }
             $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['starter'], isset($manual['starter']) ? 'done' : 'open',
-                'Unter Einrichten → Arbeitsplätze das Paket laden und auf jedem PC einmal ausführen' . ($agenten ? ' – angemeldet: ' . $agenten . ' Arbeitsplatz' . ($agenten === 1 ? '' : 'e') : '')
+                'Unter Praxis → Arbeitsplätze das Paket laden und auf jedem PC einmal ausführen' . ($agenten ? ' – angemeldet: ' . $agenten . ' Arbeitsplatz' . ($agenten === 1 ? '' : 'e') : '')
                 . '. Ohne Agent (Mac, Linux, Tablet) stehen Zertifikat und Drucker dort unter „Von Hand einrichten“', '/hilfe/arbeitsplatz#paket', 'starter');
         }
         if ((int)($this->db->one('SELECT COUNT(*) AS n FROM oidc_clients')['n'] ?? 0) > 0) {

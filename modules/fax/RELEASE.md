@@ -1,5 +1,9 @@
 # Release-Notizen Fax
 
+## 0.1.0-beta.17
+
+- Menüweg in Hinweisen: „Praxis → Arbeitsplätze“ statt „Einrichten → Arbeitsplätze“ (die Basis hat die Gruppe „Einrichten“ ab beta.57 unter „Praxis“ eingeordnet). Mit Tests geprüft.
+
 ## 0.1.0-beta.16
 
 - Faxdrucker: Der Hinweis nennt jetzt den Praxisherz-Agenten (Einrichten → Arbeitsplätze), der die Faxdrucker auf jedem Windows-PC selbst einrichtet und neue Drucker selbst übernimmt; die Handeinrichtung steht als Notweg eingeklappt darunter. Nach einer Änderung der Druckerliste bleibt der Abgleich unter Praxis → Drucker nötig.

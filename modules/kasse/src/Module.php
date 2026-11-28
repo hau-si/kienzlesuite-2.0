@@ -41,7 +41,7 @@ final class Module {
             ['title' => 'Benötigte Hardware: Bondrucker', 'optional' => true, 'state' => 'open', 'hint' => 'Empfohlen: Epson TM-m30III (Bondrucker für Terminliste und Kasse).', 'link' => $link('s-checklist')],
             ['title' => 'Praxisname und Anschrift für Rechnungen', 'state' => $practice ? 'done' : 'open', 'hint' => 'Kommen aus Praxisherz: Praxis → Praxis (Name und Anschrift der Praxis)', 'link' => $link('s-practice')],
             ['title' => Suite::connected('t2med') ? 'T2med-Verbindung von Praxisherz vorhanden' : 'T2med-Verbindung fehlt', 'state' => Suite::connected('t2med') ? 'done' : 'open',
-                'hint' => 'Praxis → Verbindungen → T2med von Praxisherz (Adresse, API-Key, Zertifikat); der Link im Bereich „T2med-Anbindung“ führt direkt dorthin', 'link' => $link('s-fhir')],
+                'hint' => 'Praxis → T2med von Praxisherz (Adresse, API-Key, Zertifikat); der Link im Bereich „T2med-Anbindung“ führt direkt dorthin', 'link' => $link('s-fhir')],
             ['title' => $config->get('fhir', 'mode') === 'live' ? 'T2med-Anbindung live' : 'T2med-Anbindung noch im Testmodus', 'state' => $config->get('fhir', 'mode') === 'live' ? 'done' : 'open',
                 'hint' => 'Einstellungen → Zahlung & T2med', 'link' => $link('s-fhir')],
             ['title' => $config->get('sumup', 'mode') === 'live' ? 'SumUp live verbunden' : 'SumUp: noch Testmodus', 'state' => $config->get('sumup', 'mode') === 'live' ? 'done' : 'open',
@@ -50,7 +50,7 @@ final class Module {
         if ($config->get('invoice_inbox', 'enabled', false)) {
             $q = self::invoicePrinter($config)['queue'];
             $items[] = ['title' => 'Drucker „vKasse“ ' . ($q ? 'bereit' : 'fehlt'), 'state' => $q ? 'done' : 'error',
-                'hint' => $q ? 'In T2med die Rechnung auf diesen Drucker drucken; auf den Windows-PCs richtet ihn der Praxisherz-Agent ein (Einrichten → Arbeitsplätze)' : 'Praxis → Drucker von Praxisherz: virtuelle Drucker abgleichen', 'link' => $link('invoice-printer-help')];
+                'hint' => $q ? 'In T2med die Rechnung auf diesen Drucker drucken; auf den Windows-PCs richtet ihn der Praxisherz-Agent ein (Praxis → Arbeitsplätze)' : 'Praxis → Drucker von Praxisherz: virtuelle Drucker abgleichen', 'link' => $link('invoice-printer-help')];
         }
         if ($config->get('letterxpress', 'enabled', false)) {
             $q = null;
@@ -58,7 +58,7 @@ final class Module {
                 foreach (Suite::modul()->drucker() as $d) if ($d['name'] === self::LETTER_QUEUE) $q = $d;
             } catch (\Throwable) {}
             $items[] = ['title' => 'Drucker „vBriefversand“ ' . ($q ? 'bereit' : 'fehlt'), 'state' => $q ? 'done' : 'error',
-                'hint' => $q ? 'Rechnungen aus T2med, die darauf gedruckt werden, gehen sofort per Post an Letterxpress; auf den Windows-PCs richtet ihn der Praxisherz-Agent ein (Einrichten → Arbeitsplätze)' : 'Praxis → Drucker von Praxisherz: virtuelle Drucker abgleichen', 'link' => $link('letter-printer-help')];
+                'hint' => $q ? 'Rechnungen aus T2med, die darauf gedruckt werden, gehen sofort per Post an Letterxpress; auf den Windows-PCs richtet ihn der Praxisherz-Agent ein (Praxis → Arbeitsplätze)' : 'Praxis → Drucker von Praxisherz: virtuelle Drucker abgleichen', 'link' => $link('letter-printer-help')];
         }
         foreach (['printing' => 'Bondrucker', 'office_printing' => 'Praxisdrucker (A4)'] as $section => $label) {
             if (!$config->get($section, 'enabled', false)) continue;

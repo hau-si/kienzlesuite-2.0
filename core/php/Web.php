@@ -246,11 +246,11 @@ final class Web {
         $ip = $ips[0] ?? '192.0.2.10';
         if (str_ends_with($name, '.fritz.box')) {
             $routerText = '<p>Der Name <code>' . V::h($name) . '</code> endet auf „.fritz.box“: Eine FRITZ!Box kennt Geräte im Netz automatisch unter ihrem Rechnernamen. '
-                . 'Dann muss der Rechnername des Servers genau zu diesem Namen passen (Einrichten → Server).</p>'
+                . 'Dann muss der Rechnername des Servers genau zu diesem Namen passen (Praxis → Server).</p>'
                 . '<p>Anderer Router oder ein eigener DNS-Server: den Namen <code>' . V::h($name) . '</code> mit der Adresse <code>' . V::h($ip) . '</code> eintragen (meist die IT).</p>';
         } else {
             $routerText = '<p>Den Namen <code>' . V::h($name) . '</code> mit der Adresse <code>' . V::h($ip) . '</code> im Router oder einem eigenen DNS-Server eintragen (meist die IT). '
-                . 'Manche Router kennen Geräte im Netz auch automatisch unter ihrem Rechnernamen mit einer eigenen Endung; dann unter Einrichten → Server genau diesen Namen mit der Endung des Routers wählen.</p>';
+                . 'Manche Router kennen Geräte im Netz auch automatisch unter ihrem Rechnernamen mit einer eigenen Endung; dann unter Praxis → Server genau diesen Namen mit der Endung des Routers wählen.</p>';
         }
         $lead = '<p class="lead">Pro PC genügt ein Paket: Es richtet den Praxisherz-Agent ein (Starter für T2med, Zertifikat von Praxisherz, virtuelle Drucker, „Akte öffnen“). Unter Windows hält der Agent danach alles selbst aktuell, auch neue Drucker und Module; ein zweites Mal ist das Paket nur zur Reparatur nötig. '
             . 'Der PC muss außerdem den Namen von Praxisherz kennen (Schritt 2). Klappt etwas nicht, steht unten jeder Schritt auch zum Einrichten von Hand.</p>';
@@ -296,7 +296,7 @@ final class Web {
         $von = '<h2 id="hand">Von Hand einrichten (falls das Paket nicht klappt)</h2>' . $zertifikat . $druckerBlock;
         if ($paket === '') $namen = str_replace('2. Den Namen', '1. Den Namen', $namen);
         $body = $lead . $paket . $namen . $von;
-        return Response::html(V::page('Arbeitsplätze einrichten', $body, $this->nav(), $this->config->practice, 'Einrichten'));
+        return Response::html(V::page('Arbeitsplätze einrichten', $body, $this->nav(), $this->config->practice, 'Praxis'));
     }
 
     /** Endungen für den Servernamen, die die Zertifizierungsstelle erlaubt (verständlich beschriftet). */
@@ -328,7 +328,11 @@ final class Web {
         [$short, $suffix, $extra] = ['praxisherz', '', []];
         foreach ($dns as $i => $n) {
             foreach ($endungen as $suf => $_) {
-                if ($suf === '' ? !str_contains($n, '.') : (str_ends_with($n, $suf) && strlen($n) > strlen($suf) && !str_contains(substr($n, 0, -strlen($suf)), '.'))) { [$short, $suffix] = [substr($n, 0, -strlen($suf)), $suf]; unset($dns[$i]); break 2; }
+                if ($suf === '' ? !str_contains($n, '.') : (str_ends_with($n, $suf) && strlen($n) > strlen($suf) && !str_contains(substr($n, 0, -strlen($suf)), '.'))) {
+                    [$short, $suffix] = [$suf === '' ? $n : substr($n, 0, -strlen($suf)), $suf];   // substr($n, 0, -0) wäre leer
+                    unset($dns[$i]);
+                    break 2;
+                }
             }
         }
         $extra = array_values($dns);
@@ -340,6 +344,7 @@ final class Web {
             . ($st['pending'] ? '<p class="notice">Wird übernommen …</p>' : '')
             . '<p class="muted">Auslastung von Prozessor und Arbeitsspeicher, Festplatte mit Hochrechnung des Platzbedarfs und die Guthaben stehen auf der <a href="/#server-zustand">Startseite unter „Server-Zustand“</a>.</p>'
             . '<h2>Servername</h2>'
+            . '<p>Praxisherz ist zurzeit erreichbar unter ' . implode(', ', array_map(fn($n) => '<strong>' . V::h('https://' . $n . '/') . '</strong>', $st['names'])) . '.</p>'
             . '<form method="post" action="/verwaltung/server">' . $this->hidden('speichern')
             . '<label>Name des Servers<span class="name-row">'
             . '<input type="text" name="kurzname" value="' . V::h($short) . '" required maxlength="40" pattern="[A-Za-z0-9][A-Za-z0-9-]*" aria-label="Name">'
@@ -350,7 +355,7 @@ final class Web {
             . '<details class="how"><summary>Weitere Namen und Fachleute-Einstellungen</summary>'
             . '<label>Weitere Namen oder Adressen (einer je Zeile)<textarea name="weitere" rows="3">' . V::h(implode("\n", $extra)) . '</textarea></label>'
             . '<p class="muted">Erlaubt sind interne Namen (.internal, .local, .lan, .home.arpa, .fritz.box …) und private IP-Adressen. '
-            . 'Für andere Namen braucht es eine neue Zertifizierungsstelle – dann müssen alle Arbeitsplätze sie neu einspielen (das Paket unter Einrichten → Arbeitsplätze noch einmal ausführen oder von Hand).</p>'
+            . 'Für andere Namen braucht es eine neue Zertifizierungsstelle – dann müssen alle Arbeitsplätze sie neu einspielen (das Paket unter Praxis → Arbeitsplätze noch einmal ausführen oder von Hand).</p>'
             . V::checkbox('neue_ca', '1', 'Falls nötig: neue Zertifizierungsstelle erstellen', false)
             . V::checkbox('ohne_ip', '1', 'Nicht mehr über die IP-Adresse erreichbar', false) . '</details>'
             . '<button' . ($st['pending'] ? ' disabled' : '') . '>Speichern</button></form>'
@@ -1303,6 +1308,7 @@ final class Web {
         if ($r->path === '/verwaltung/updates') return $get ? $this->updatesPage() : $this->updatesAction($r, $admin);
         if ($r->path === '/verwaltung/module') return $get ? $this->modulesPage() : $this->modulesAction($r, $admin);
         if ($r->path === '/verwaltung/verbindungen') return $get ? $this->connectionsPage() : $this->connectionsAction($r, $admin);
+        if ($r->path === '/verwaltung/t2med' && $get) return $this->t2medPage(null, (string)($r->query['reiter'] ?? 'fhir'));
         if ($r->path === '/verwaltung/neustart') return $get ? $this->restartPage() : $this->restartDo($r, $admin);
         if ($r->path === '/verwaltung/praxis') return $get ? $this->practicePage() : $this->practiceSave($r, $admin);
         if ($r->path === '/verwaltung/server') return $get ? $this->serverPage() : $this->serverSave($r, $admin);
@@ -1980,7 +1986,6 @@ final class Web {
 
     private function connectionsPage(?string $error = null): Response {
         $st = $this->con()->status();
-        $t2 = $st['t2med'] ?? [];
         $mail = $st['mail'] ?? [];
         $set = static fn(bool $on) => $on ? 'gespeichert – leer lassen für unverändert' : '';
         $body = V::error($error)
@@ -1988,28 +1993,7 @@ final class Web {
             . implode('', array_map(fn($n) => '<p class="error">' . V::h($n) . '</p>', $st['hinweise']))
             . (!$st['service'] ? '<p class="error">Der Dienst für Verbindungen ist nicht eingerichtet. Bitte den Installer ausführen.</p>' : '')
             . '<p>Zugänge, die mehrere Module brauchen, werden hier einmal eingetragen. Ein Modul bekommt nur die Verbindungen, die es anmeldet; '
-            . 'Passwörter und Schlüssel werden nach dem Speichern nie wieder angezeigt.</p>';
-        // T2med
-        $body .= '<section><h2>T2med (FHIR)</h2><form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('t2med')
-            . V::input('base_url', 'Adresse des FHIR-Servers', 'url', (string)($t2['base_url'] ?? ''), 'placeholder="https://t2med-server:16567/aps/fhir/api/r4"')
-            . '<label>Erlaubte fhirBasisUrl aus T2med – weitere Adressen (eine je Zeile)<textarea name="launch_urls" rows="2">' . V::h(implode("\n", array_diff((array)($t2['launch_urls'] ?? []), [(string)($t2['base_url'] ?? '')]))) . '</textarea></label>'
-            . V::input('api_key', 'API-Schlüssel der FHIR-Schnittstelle', 'password', '', 'title="API-Schlüssel der Praxis aus dem Vertrag mit T2med" autocomplete="new-password" placeholder="' . V::h($set((bool)($t2['api_key_gesetzt'] ?? false))) . '"')
-            . '<p class="muted small">Schlüssel der FHIR-Schnittstelle (wird als X-API-Key gesendet). Jede Praxis trägt hier ihren eigenen Schlüssel aus dem Vertrag mit T2med ein; ohne Schlüssel verbinden sich die Module nicht mit T2med. Antwortet T2med mit „FHIR-API-Key fehlt oder ist ungültig“, passt der Wert nicht, z. B. wenn hier das Client Secret des Drittanbieters steht.</p>'
-            . V::checkbox('api_key_entfernen', '1', 'Gespeicherten Schlüssel entfernen', false)
-            . '<label>Zertifikat des T2med-Servers (PEM, optional)' . (($t2['zertifikat'] ?? '') !== '' ? ' – gespeichert, SHA-256 <code>' . V::h(substr((string)$t2['zertifikat'], 0, 16)) . '…</code>' : '')
-            . '<textarea name="ca_pem" rows="3" placeholder="-----BEGIN CERTIFICATE-----"></textarea></label>'
-            . V::checkbox('ca_entfernen', '1', 'Gespeichertes Zertifikat entfernen', false)
-            . V::checkbox('pin', '1', 'Nur genau dieses Zertifikat annehmen (Pinning)', (bool)($t2['pin'] ?? false))
-            . '<p class="muted small">Die „erlaubte fhirBasisUrl“ ist die FHIR-Adresse, die T2med beim Aufruf mitschickt (Platzhalter fhirBasisUrl). Die Adresse des FHIR-Servers oben gilt immer als erlaubt; weitere Zeilen nur, wenn T2med sich anders meldet. Bei einer Ablehnung zeigt die Kasse den tatsächlich gesendeten Wert.</p>'
-            . '<button>Speichern</button></form>'
-            . $this->t2medAufrufe()
-            . ($t2 ? '<p>Zertifikat: ' . (($t2['zertifikat'] ?? '') !== '' ? '<code>' . V::h((string)$t2['zertifikat']) . '</code>' . ($t2['pin'] ? ' (fest hinterlegt)' : '') : '<strong>nicht hinterlegt</strong> (nur öffentlich beglaubigte Zertifikate werden angenommen)') . '</p>'
-                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('zertifikat-holen') . '<button>Zertifikat des Servers abrufen</button></form> '
-                . (($st['zertifikate']['t2med']['fingerprint'] ?? '') !== '' ? '<form method="post" action="/verwaltung/verbindungen" class="box">' . $this->hidden('zertifikat-uebernehmen', ['fingerprint' => (string)$st['zertifikate']['t2med']['fingerprint']])
-                    . '<p>Abgerufen: SHA-256 <code>' . V::h((string)$st['zertifikate']['t2med']['fingerprint']) . '</code>. Nur übernehmen, wenn der Fingerabdruck mit dem Zertifikat des T2med-Servers übereinstimmt (z. B. im Browser unter „Zertifikat anzeigen“).</p><button>Übernehmen und fest hinterlegen</button></form>' : '')
-                . $this->testLine($st['tests'], 't2med') . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 't2med']) . '<button>Verbindung prüfen</button></form> '
-                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 't2med']) . '<button class="danger">Entfernen</button></form>' : '')
-            . '</section>';
+            . 'Passwörter und Schlüssel werden nach dem Speichern nie wieder angezeigt. Die Verbindung zu T2med (FHIR) steht unter <a href="/verwaltung/t2med">Praxis → T2med</a>.</p>';
         // E-Mail
         $sec = (string)($mail['sicherheit'] ?? 'starttls');
         $gmail = ($mail['art'] ?? '') === 'gmail';
@@ -2148,7 +2132,7 @@ final class Web {
         $body .= '<section><h2>Wer nutzt was</h2>' . ($rows !== '' ? '<table><tr><th>Modul</th><th>Verbindung</th><th>Wofür</th><th>Nötig</th></tr>' . $rows . '</table>' : '<p>Kein installiertes Modul nutzt eine zentrale Verbindung.</p>') . '</section>';
         $body = preg_replace('#(<p>Zugänge, die mehrere Module brauchen.*?</p>)#s', '<section class="card">$1</section>', $body, 1);
         // Jeder Abschnitt klappt zu; eingerichtete tragen ein grünes „✓ eingerichtet“, offene und fehlerhafte bleiben aufgeklappt.
-        $done = ['T2med (FHIR)' => trim((string)($t2['base_url'] ?? '')) !== '', 'E-Mail-Versand' => $mail !== null && $mail !== [],
+        $done = ['E-Mail-Versand' => $mail !== null && $mail !== [],
             'SMS (seven.io)' => !empty($st['sms']), 'Letterxpress (Briefversand)' => !empty($st['letterxpress']), 'Übersetzung (DeepL)' => !empty($st['uebersetzung']), 'Netzwerkspeicher' => !empty($st['ablage'])];
         foreach ($done as $title => $ok) V::$status[$title] = [$ok, 'eingerichtet', 'nicht eingerichtet'];
         $body = preg_replace_callback('#<section><h2>([^<]*)</h2>(.*?)</section>#s', function (array $m) use ($done): string {
@@ -2193,11 +2177,91 @@ final class Web {
                 default: throw new Problem('Unbekannte Aktion.', 422);
             }
         } catch (Problem $e) {
-            return $this->connectionsPage($e->getMessage());
+            return $f('zurueck', 10) === 't2med' ? $this->t2medPage($e->getMessage(), 'fhir') : $this->connectionsPage($e->getMessage());
         }
         $this->audit->write($admin, 'verbindung', $what);
         if ($f('zurueck', 10) !== 'start') $this->flash('Gespeichert.');
-        return Response::redirect($f('zurueck', 10) === 'start' ? '/' : '/verwaltung/verbindungen');
+        return Response::redirect(match ($f('zurueck', 10)) { 'start' => '/', 't2med' => '/verwaltung/t2med', default => '/verwaltung/verbindungen' });
+    }
+
+    // ---- T2med (Praxis → T2med): Reiter FHIR, GDT, Funktionsleiste ----------------------------------------------
+    private const T2MED_REITER = ['fhir' => 'FHIR-Verbindung', 'gdt' => 'GDT', 'funktionsleiste' => 'Funktionsleiste'];
+
+    private function t2medPage(?string $error, string $reiter): Response {
+        if (!isset(self::T2MED_REITER[$reiter])) $reiter = 'fhir';
+        $st = $this->con()->status();
+        $t2 = $st['t2med'] ?? [];
+        $symbole = ['fhir' => '<path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/>',
+            'gdt' => '<path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+            'funktionsleiste' => '<rect x="3" y="5" width="18" height="5" rx="1"/><path d="M7 7.5h.01M11 7.5h.01M15 7.5h.01M5 14h14M5 18h9"/>'];
+        $links = '';
+        foreach (self::T2MED_REITER as $id => $text) {
+            $an = $id === $reiter;
+            $links .= '<a class="button ' . ($an ? 'primary' : 'secondary') . ' mit-icon" href="/verwaltung/t2med' . ($id === 'fhir' ? '' : '?reiter=' . $id) . '"' . ($an ? ' aria-current="page"' : '') . '>'
+                . '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' . $symbole[$id] . '</svg>' . V::h($text) . '</a>';
+        }
+        $kopf = '<header class="basis-kopf"><div><p class="eyebrow">Praxis</p><h1>T2med</h1></div><nav class="basis-reiter" aria-label="T2med">' . $links . '</nav></header>';
+        $body = V::error($error) . ($reiter === 'fhir' && $st['letzte'] ? '<p class="' . ($st['letzte']['ok'] ? 'notice' : 'error') . '">' . V::h((string)$st['letzte']['meldung']) . '</p>' : '');
+        if ($reiter === 'fhir') {
+            $set = static fn(bool $on) => $on ? 'gespeichert – leer lassen für unverändert' : '';
+            $zurueck = ['zurueck' => 't2med'];
+            $body .= (!$st['service'] ? '<p class="error">Der Dienst für Verbindungen ist nicht eingerichtet. Bitte den Installer ausführen.</p>' : '')
+                . '<h2>Verbindung zu T2med (FHIR)</h2><p class="muted">Über diese Verbindung lesen die Module Patientendaten aus T2med und schreiben Dokumente und Einträge zurück. Sie wird einmal für alle Module eingetragen.</p>'
+                . '<form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('t2med', $zurueck)
+                . V::input('base_url', 'Adresse des FHIR-Servers', 'url', (string)($t2['base_url'] ?? ''), 'placeholder="https://t2med-server:16567/aps/fhir/api/r4"')
+                . '<label>Erlaubte fhirBasisUrl aus T2med – weitere Adressen (eine je Zeile)<textarea name="launch_urls" rows="2">' . V::h(implode("\n", array_diff((array)($t2['launch_urls'] ?? []), [(string)($t2['base_url'] ?? '')]))) . '</textarea></label>'
+                . V::input('api_key', 'API-Schlüssel der FHIR-Schnittstelle', 'password', '', 'title="API-Schlüssel der Praxis aus dem Vertrag mit T2med" autocomplete="new-password" placeholder="' . V::h($set((bool)($t2['api_key_gesetzt'] ?? false))) . '"')
+                . '<p class="muted small">Schlüssel der FHIR-Schnittstelle (wird als X-API-Key gesendet). Jede Praxis trägt hier ihren eigenen Schlüssel aus dem Vertrag mit T2med ein; ohne Schlüssel verbinden sich die Module nicht mit T2med. Antwortet T2med mit „FHIR-API-Key fehlt oder ist ungültig“, passt der Wert nicht, z. B. wenn hier das Client Secret des Drittanbieters steht.</p>'
+                . V::checkbox('api_key_entfernen', '1', 'Gespeicherten Schlüssel entfernen', false)
+                . '<label>Zertifikat des T2med-Servers (PEM, optional)' . (($t2['zertifikat'] ?? '') !== '' ? ' – gespeichert, SHA-256 <code>' . V::h(substr((string)$t2['zertifikat'], 0, 16)) . '…</code>' : '')
+                . '<textarea name="ca_pem" rows="3" placeholder="-----BEGIN CERTIFICATE-----"></textarea></label>'
+                . V::checkbox('ca_entfernen', '1', 'Gespeichertes Zertifikat entfernen', false)
+                . V::checkbox('pin', '1', 'Nur genau dieses Zertifikat annehmen (Pinning)', (bool)($t2['pin'] ?? false))
+                . '<p class="muted small">Die „erlaubte fhirBasisUrl“ ist die FHIR-Adresse, die T2med beim Aufruf mitschickt (Platzhalter fhirBasisUrl). Die Adresse des FHIR-Servers oben gilt immer als erlaubt; weitere Zeilen nur, wenn T2med sich anders meldet. Bei einer Ablehnung zeigt das Modul den tatsächlich gesendeten Wert.</p>'
+                . '<button>Speichern</button></form>';
+            if ($t2) {
+                $body .= '<h2>Zertifikat und Prüfung</h2><p>Zertifikat: ' . (($t2['zertifikat'] ?? '') !== '' ? '<code>' . V::h((string)$t2['zertifikat']) . '</code>' . ($t2['pin'] ? ' (fest hinterlegt)' : '') : '<strong>nicht hinterlegt</strong> (nur öffentlich beglaubigte Zertifikate werden angenommen)') . '</p>'
+                    . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('zertifikat-holen', $zurueck) . '<button>Zertifikat des Servers abrufen</button></form> '
+                    . (($st['zertifikate']['t2med']['fingerprint'] ?? '') !== '' ? '<form method="post" action="/verwaltung/verbindungen" class="box">' . $this->hidden('zertifikat-uebernehmen', ['fingerprint' => (string)$st['zertifikate']['t2med']['fingerprint']] + $zurueck)
+                        . '<p>Abgerufen: SHA-256 <code>' . V::h((string)$st['zertifikate']['t2med']['fingerprint']) . '</code>. Nur übernehmen, wenn der Fingerabdruck mit dem Zertifikat des T2med-Servers übereinstimmt (z. B. im Browser unter „Zertifikat anzeigen“).</p><button>Übernehmen und fest hinterlegen</button></form>' : '')
+                    . $this->testLine($st['tests'], 't2med') . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 't2med'] + $zurueck) . '<button>Verbindung prüfen</button></form> '
+                    . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 't2med'] + $zurueck) . '<button class="danger">Entfernen</button></form>';
+            }
+            V::$status['Verbindung zu T2med (FHIR)'] = [trim((string)($t2['base_url'] ?? '')) !== '' && (bool)($t2['api_key_gesetzt'] ?? false), 'eingerichtet', 'nicht eingerichtet'];
+        } elseif ($reiter === 'gdt') {
+            $plaetze = $this->ap()->liste();
+            $zeilen = '';
+            foreach ($plaetze as $p) $zeilen .= '<tr><td>' . V::h((string)$p['name']) . '</td><td>' . ($p['online'] ? '<span class="tag ok">verbunden</span>' : '<span class="tag warn">nicht verbunden</span>') . '</td></tr>';
+            $body .= '<h2>Akte öffnen per GDT</h2>'
+                . '<p>Mit „Akte öffnen“ springen die Module (z. B. Telefon, Kasse) in T2med zum Patienten. Praxisherz schickt dafür eine kleine GDT-Datei an den Praxisherz-Agent des PCs, an dem gerade gearbeitet wird; T2med liest sie ein und öffnet die Akte. Die Datei enthält nur die Patientennummer.</p>'
+                . '<h3>In T2med einrichten (einmal je PC bzw. Station)</h3><ol class="steps">'
+                . '<li>In T2med ein GDT-Gerät anlegen oder bearbeiten (z. B. „Praxisherz“ oder das vorhandene Gerät „Telefonaufruf“).</li>'
+                . '<li>Als <strong>Importdatei</strong> eintragen: <code class="secret">C:\Praxisherz\GDT\AUFRUFi.gdt</code></li>'
+                . '<li>Die GDT-Kennungen so setzen: Praxisherz (Absender) <code>AUFRUF</code>, T2med (Empfänger) <code>T2MED_PX</code>.</li>'
+                . '<li>Speichern und in einem Modul „Akte öffnen“ ausprobieren, am besten mit einem Testpatienten.</li></ol>'
+                . '<table><thead><tr><th>Feld der Datei</th><th>Wert</th></tr></thead><tbody>'
+                . '<tr><td>Satzart (8000)</td><td><code>6301</code> – Stammdaten übermitteln</td></tr><tr><td>Empfänger (8315)</td><td><code>T2MED_PX</code></td></tr>'
+                . '<tr><td>Absender (8316)</td><td><code>AUFRUF</code></td></tr><tr><td>GDT-Version (9218)</td><td><code>02.10</code></td></tr><tr><td>Patientennummer (3000)</td><td>aus T2med</td></tr></tbody></table>'
+                . '<h2>Arbeitsplätze mit Agent</h2>'
+                . ($zeilen !== '' ? '<table><thead><tr><th>Arbeitsplatz</th><th>Agent</th></tr></thead><tbody>' . $zeilen . '</tbody></table>'
+                    : '<p>Noch kein Arbeitsplatz angemeldet.</p>')
+                . '<p class="muted">Den Agent richtet das Paket unter <a href="/hilfe/arbeitsplatz#paket">Praxis → Arbeitsplätze</a> ein (Windows). Welcher PC zum Browser gehört, steht unter „Mein Konto → Mein Arbeitsplatz“.</p>';
+            V::$status['Arbeitsplätze mit Agent'] = [(bool)array_filter($plaetze, fn($p) => $p['online']), 'verbunden', 'keiner verbunden'];
+        } else {
+            $body .= '<h2>Knopf in der Funktionsleiste</h2>'
+                . '<p>Ein Knopf in der Funktionsleiste von T2med öffnet ein Modul mit dem aktuellen Patienten, z. B. „Kartenzahlung“ für die Kasse oder „Unterschrift“ für Signatur. Je Modul einmal einrichten:</p>'
+                . '<h3>1. Drittanbieter-Zugriff anlegen</h3><ol class="steps">'
+                . '<li>In T2med die Suche öffnen und <strong>„Drittanbieter-Zugriffe verwalten“</strong> eingeben, Ergebnis anklicken. Fehlt die Funktion, muss ein Administrator sie erst freischalten.</li>'
+                . '<li>In der Liste den Eintrag über den <strong>Stift</strong> bearbeiten.</li>'
+                . '<li>Unter „Neue URL hinzufügen“ die <strong>Adresse</strong> aus der Tabelle unten (genau so, mit den Platzhaltern) und eine <strong>Bezeichnung</strong> eintragen, auf <strong>Plus</strong> klicken, oben rechts mit dem <strong>Häkchen</strong> speichern. Danach die <strong>Aktualisieren-Pfeile</strong> anklicken.</li></ol>'
+                . '<h3>2. Knopf anlegen</h3><ol class="steps">'
+                . '<li><strong>„Funktionsleisten verwalten“</strong> öffnen, eine Konfiguration anlegen oder bearbeiten (Name, Benutzer, Benutzergruppe, Station).</li>'
+                . '<li><strong>„Aktion hinzufügen“</strong>, die Aktion über die vergebene Bezeichnung suchen, Farbe und Kürzel oder Icon wählen und bestätigen.</li></ol>'
+                . '<p class="muted">Der Knopf funktioniert erst, wenn am PC der Praxisherz-Agent installiert ist (<a href="/hilfe/arbeitsplatz#paket">Praxis → Arbeitsplätze</a>) und die FHIR-Verbindung eingetragen ist (Reiter „FHIR-Verbindung“).</p>'
+                . '<h2>Adressen für T2med</h2>' . $this->t2medAufrufe();
+        }
+        $response = Response::html(V::page('T2med', $kopf . V::cards($body), $this->nav(), $this->config->practice, null, ['roh' => true]), $error ? 422 : 200);
+        return $reiter === 'fhir' && $st['pending'] ? $response->with('Refresh', '2') : $response;
     }
 
     // ---- Neustart -----------------------------------------------------------------------------------------------
@@ -2332,7 +2396,7 @@ final class Web {
             . 'Der Agent fragt Praxisherz alle paar Sekunden und hält Starter, Aufrufe, Zertifikat und virtuelle Drucker selbst aktuell; „Akte öffnen“ legt er als GDT-Datei in <code>C:\Praxisherz\GDT</code> ab '
             . '(in T2med beim GDT-Gerät „Telefonaufruf“ als Importdatei <code>C:\Praxisherz\GDT\AUFRUFi.gdt</code> eintragen). Er führt keine Befehle von Praxisherz aus, nur diese festen Aufgaben. macOS und Linux bekommen vorerst nur den Starter (ohne Dienst).</p>';
         if ($list) $body .= '<h3>Aufrufe aus T2med</h3><p>Die Adressen für die Einträge in T2med (je Modul) stehen unter '
-            . '<a href="/verwaltung/verbindungen#t2med">Praxis → Verbindungen → T2med</a>.</p>';
+            . '<a href="/verwaltung/t2med?reiter=funktionsleiste">Praxis → T2med → Funktionsleiste</a>.</p>';
         $body .= '<h3>Paket laden</h3><p>Das Paket enthält Starterprogramm, Zertifikat, Starter-Schlüssel, die virtuellen Drucker der Module und das Einrichtungsskript. Schlägt etwas fehl, steht jeder Schritt unten unter „Von Hand einrichten“. Nur für Admins, nach der Einrichtung löschen.</p><p class="row-buttons">';
         if (is_file($this->clientDist() . '/' . self::SETUP_PROGRAMM)) {
             $body .= '<a class="button primary" href="/verwaltung/arbeitsplaetze/' . self::SETUP_DATEI . '">Windows: ' . self::SETUP_DATEI . '</a></p>'
@@ -2504,13 +2568,13 @@ final class Web {
     private function t2medAufrufe(): string {
         $list = $this->modules->starters();
         $platzhalter = '://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}';
-        $out = '<div class="box wide" id="t2med"><h3>Einträge in T2med (Drittanbieter-Zugriffe verwalten → Neue URL hinzufügen)</h3>';
+        $out = '<div class="box wide" id="t2med">';
         if (!$list) return $out . '<p class="muted">Kein installiertes Modul wird aus T2med aufgerufen.</p></div>';
         $rows = '';
         foreach ($list as $s) $rows .= '<tr><td>' . V::h($this->modules->name($s['modul'])) . '</td><td>' . V::h($s['label']) . '</td><td><code class="secret">' . V::h($s['schema'] . $platzhalter) . '</code></td></tr>';
         return $out . '<p>Je Eintrag die Adresse genau so eintragen, mit den Platzhaltern, und eine Bezeichnung vergeben (z. B. „Kartenzahlung“).</p>'
             . '<table><thead><tr><th>Modul</th><th>Kontext</th><th>Adresse in T2med</th></tr></thead><tbody>' . $rows . '</tbody></table>'
-            . '<p class="muted small">Voraussetzung am PC: der Praxisherz-Agent (Einrichten → Arbeitsplätze). Anleitung mit Bildern für die Kasse: Kasse → Einstellungen → Zahlung &amp; T2med.</p></div>';
+            . '<p class="muted small">Anleitung mit Bildern für die Kasse: Kasse → Einstellungen → Zahlung &amp; T2med.</p></div>';
     }
 
     public const SETUP_DATEI = 'Praxisherz-Setup.exe';
@@ -2747,7 +2811,7 @@ final class Web {
             . ($again ? '<div class="notice warn"><p><strong>Der Servername wurde geändert.</strong> ' . $again . ' Punkt' . ($again === 1 ? '' : 'e') . ' unten stehen deshalb wieder rot und müssen erneut erledigt werden.</p></div>' : '')
             . '<p class="legend"><span class="lg done">✓ erledigt</span><span class="lg open">○ offen</span><span class="lg error">! Fehler oder erneut nötig</span><span class="lg info">i optional</span>'
             . ' · Orte: ' . implode(', ', array_map(fn($p) => '<strong>' . V::h($p[0]) . '</strong> (' . V::h($p[1]) . ')', Overview::PLACES)) . '</p>'
-            . ($this->virtualPrinterHelp($this->printers ? $this->printers->status()['queues'] : [], true) !== '' ? '<p class="muted">Arbeitsplätze: Zertifikat, Starter und die virtuellen Drucker der Module (für T2med) richtet der Praxisherz-Agent ein – ein Paket je PC unter <a href="/hilfe/arbeitsplatz#paket">Einrichten → Arbeitsplätze</a>; dort steht auch der Weg von Hand.</p>' : '');
+            . ($this->virtualPrinterHelp($this->printers ? $this->printers->status()['queues'] : [], true) !== '' ? '<p class="muted">Arbeitsplätze: Zertifikat, Starter und die virtuellen Drucker der Module (für T2med) richtet der Praxisherz-Agent ein – ein Paket je PC unter <a href="/hilfe/arbeitsplatz#paket">Praxis → Arbeitsplätze</a>; dort steht auch der Weg von Hand.</p>' : '');
         foreach (Overview::GROUPS as $gid => $glabel) {
             $part = array_values(array_filter($core, fn($i) => ($i['gruppe'] ?? 'betrieb') === $gid));
             if (!$part) continue;

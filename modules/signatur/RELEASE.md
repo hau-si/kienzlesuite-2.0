@@ -1,5 +1,9 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.52
+
+- Meldungen zur T2med-Verbindung verweisen auf „Praxis → T2med“ (neue Seite der Basis ab beta.57) statt auf „Praxis → Verbindungen“. Mit Tests geprüft.
+
 ## 0.1.0-beta.51
 
 - Menüwege in Meldungen nach der neuen Seitenleiste (Praxis → Verbindungen, Betrieb → Module), ungenutzte Stilregeln entfernt. Mit Tests geprüft, nicht auf der VM.

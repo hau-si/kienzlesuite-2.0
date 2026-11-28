@@ -1,5 +1,9 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.34
+
+- Hinweise im Telefonverzeichnis verweisen auf „Praxis → T2med“ bzw. „Praxis → T2med → Funktionsleiste“ (neue Seite der Basis ab beta.57) und „Praxis → Arbeitsplätze“. Mit Tests geprüft.
+
 ## 0.1.0-beta.33
 
 - Gestaltung wie Kasse, Signatur und Fax (`docs/MODUL-GESTALTUNG.md`): Seiten 1400 px breit; im Seitenkopf auf jeder Seite dieselben Knöpfe mit Symbol (Übersicht, Anrufe, Vorgänge, Rufgruppen, Sprachmenü, Statistik, Einstellungen), die aktuelle Seite ist hervorgehoben; „← Übersicht“ entfällt. Offene Vorgänge als roter Zähler am Knopf. Mit Tests und im Browser der Vorschau geprüft, nicht auf der VM.

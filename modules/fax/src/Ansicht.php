@@ -262,7 +262,7 @@ final class Ansicht {
             return '<div class="fx-tage"><label>' . fx_h($l) . '<input type="number" name="' . $n . '" min="1" max="3650" value="' . ($v > 0 ? $v : 90) . '"' . ($v === 0 ? ' disabled' : '') . '></label>'
                 . '<label class="check"><input type="checkbox" name="' . $n . '_unbegrenzt" value="1" data-schalter="' . $n . '"' . ($v === 0 ? ' checked' : '') . '> unbegrenzt</label></div>';
         };
-        $o = '<section class="card"><h2>Faxdrucker</h2><p>Diese Drucker richtet der Praxisherz-Agent auf jedem Windows-PC selbst ein (<a href="/hilfe/arbeitsplatz">Einrichten → Arbeitsplätze</a>).</p>'
+        $o = '<section class="card"><h2>Faxdrucker</h2><p>Diese Drucker richtet der Praxisherz-Agent auf jedem Windows-PC selbst ein (<a href="/hilfe/arbeitsplatz">Praxis → Arbeitsplätze</a>).</p>'
             . '<details class="how"><summary>Von Hand einrichten (ohne Agent, Mac/Linux oder wenn etwas schiefgeht)</summary><p>Die Adresse jedes Faxdruckers steht unter <a href="/verwaltung/drucker">Praxis → Drucker</a>. Am PC einen Drucker über diese Adresse hinzufügen (Windows: „Freigegebenen Drucker über den Namen auswählen“, Treiber „Microsoft IPP Class Driver“). Voraussetzung: Die Firewall (Betrieb → Sicherheit) lässt Drucken (IPP, Port 631) aus dem Praxisnetz zu.</p></details>'
             . '<p class="muted">Jeder Drucker kann eine <strong>feste Faxnummer</strong> bekommen: '
             . 'Dokumente von diesem Drucker tragen die Nummer schon als Empfänger ein; mit „sofort senden“ gehen sie ohne Rückfrage hinaus. Namen beginnen mit <code>' . fx_h(Fax::VORSATZ) . '</code>.</p>'

@@ -1,6 +1,6 @@
 """Servernamen und Praxisname ändern (root-Dienst, Aufruf über core/bin/kienzle-servername).
 
-Das Webinterface (Einrichten → Server) legt eine Anfrage ab. Der Dienst prüft die Namen, schreibt core.json, stellt das
+Das Webinterface (Praxis → Server) legt eine Anfrage ab. Der Dienst prüft die Namen, schreibt core.json, stellt das
 Server-Zertifikat für die neuen Namen aus (die Zertifizierungsstelle bleibt, die Arbeitsplätze vertrauen weiter) und
 schreibt nginx neu. Lehnt nginx ab oder schlägt etwas fehl, kommt der vorige Stand zurück.
 """
@@ -102,7 +102,7 @@ def apply(names: list[str], practice: str | None, new_ca: bool = False) -> str:
         raise Fehler('Nicht übernommen: ' + (reason[-1][:200] if reason else 'unbekannter Fehler') + '. Der vorige Stand ist wieder aktiv.')
     return ('Gespeichert. Praxisherz ist jetzt erreichbar unter: ' + ', '.join(f'https://{n}/' for n in names)
             + ('. NEUE Zertifizierungsstelle: bitte auf allen Arbeitsplätzen neu einspielen '
-               '(Paket unter Einrichten → Arbeitsplätze erneut ausführen oder /ca.crt von Hand).' if out and new_ca else ''))
+               '(Paket unter Praxis → Arbeitsplätze erneut ausführen oder /ca.crt von Hand).' if out and new_ca else ''))
 
 
 def set_clock(delta) -> str:

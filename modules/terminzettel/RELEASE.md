@@ -1,5 +1,9 @@
 # Terminzettel – Release-Notizen
 
+## 1.3.0-beta.26
+
+- Menüweg in Hinweisen: „Praxis → Arbeitsplätze“ statt „Einrichten → Arbeitsplätze“ (Basis ab beta.57). Mit Tests geprüft.
+
 ## 1.3.0-beta.25
 
 - Drucker „vTermine“: Der Hinweis nennt jetzt den Praxisherz-Agenten (Einrichten → Arbeitsplätze), der den Drucker auf jedem Windows-PC selbst einrichtet; die Handanleitung (Windows, PowerShell, Mac) steht als Notweg eingeklappt darunter. Der Verweis auf den entfallenen Schritt „Virtuelle Drucker“ ist weg. Ohne angekommenen Auftrag verweist der Hinweis auf „Drucker prüfen“ im Praxisherz-Symbol der Taskleiste.

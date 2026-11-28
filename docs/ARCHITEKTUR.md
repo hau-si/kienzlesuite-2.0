@@ -56,7 +56,7 @@ die Basis eine API-Version, gegen die Module geprüft werden.
 | Webinterface und Anmeldung | eine Anmeldung für alle Module, Menü aus den installierten Modulen |
 | Benutzer, Rollen, Rechte | Admin und Mitarbeiter; Rechte kommen aus den Modulen (Kästchen) |
 | Admin-Zugang | Passwort **und** OTP (TOTP, RFC 6238), Wiederherstellungscodes |
-| Arbeitsplätze (PCs) | CA-Zertifikat zum Herunterladen; ein Paket je PC aus der Basis (Einrichten → Arbeitsplätze) richtet den Praxisherz-Agent ein: Starter für alle Module, Zertifikat, virtuelle Drucker; von Hand als Notweg |
+| Arbeitsplätze (PCs) | CA-Zertifikat zum Herunterladen; ein Paket je PC aus der Basis (Praxis → Arbeitsplätze) richtet den Praxisherz-Agent ein: Starter für alle Module, Zertifikat, virtuelle Drucker; von Hand als Notweg |
 | Firewall und Netzwerk | nftables, nur Praxisnetz/VPN; Ports kommen aus den Modulen |
 | Zertifikat und Zugang | lokale Zertifizierungsstelle auf dem Server (siehe unten), ein Zugang über Port 443 (nginx) mit Pfaden je Modul |
 | Einrichtungs-Überblick | eigener Überblick der Basis, darunter die Überblicke der Module |
