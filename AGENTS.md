@@ -38,7 +38,7 @@ Oberfläche, Hilfetexte, Dokumentation und Commit-Nachrichten auf Deutsch.
 
 ## Hinweise für neue Sitzungen (Stand 28.11.2026)
 
-**Stand:** Basis 0.22.0-beta.62, Kasse (`kasse`) 2.3.4-beta.68, Terminzettel 1.3.0-beta.26, Signatur 0.1.0-beta.52, Telefon 0.1.0-beta.34, Fax 0.1.0-beta.17, QM (`qm`) 0.1.0-beta.2, Homepage (`homepage`) 0.1.0-beta.3, Beispiel 0.2.1-beta.1; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
+**Stand:** Basis 0.22.0-beta.63, Kasse (`kasse`) 2.3.4-beta.68, Terminzettel 1.3.0-beta.26, Signatur 0.1.0-beta.52, Telefon 0.1.0-beta.34, Fax 0.1.0-beta.17, QM (`qm`) 0.1.0-beta.2, Homepage (`homepage`) 0.1.0-beta.3, Beispiel 0.2.1-beta.1; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
 (Basis 0.19.1). Der Nutzer testet auf einer echten Ubuntu-26.04-VM (Aktualisierung dort: `cd ~/praxisherz && git pull && sudo bash installer/install.sh`,
 oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nicht ins Repository.
 
@@ -135,7 +135,9 @@ oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nich
 
 ### Aufgeräumt am 28.11.2026 (Basis beta.50, Wunsch des Nutzers)
 
-- **Praxis → T2med (Basis beta.57, `/verwaltung/t2med`, `Web::t2medPage`):** Reiter oben (`.basis-kopf`/`.basis-reiter` in `core.css`, `?reiter=fhir|gdt|funktionsleiste`): FHIR-Verbindung (Formulare posten an `/verwaltung/verbindungen` mit `zurueck=t2med`), GDT-Anleitung mit Arbeitsplätzen, Funktionsleiste mit `t2medAufrufe()`. Unter Praxis → Verbindungen steht T2med nicht mehr.
+- **Neues Design aller Basis-Seiten (Basis beta.58–63, Entwürfe des Nutzers vom 28.11.2026):** gemeinsamer Seitenkopf über `V::page($titel, $inhalt, $nav, $praxis, $gruppe, ['werkzeuge' => …])` (Reiter `V::reiter`, Drehpfeil `V::drehpfeil`, Seite 1400 px; `['breit' => true]` nur breit). Gewählt: Module/Updates B (Liste, Reiter Protokoll, Drehpfeil), Sicherheit A (Reiter `?bereich=`), Sicherung B (Zustand oben, Rest eingeklappt, Reiter Protokoll), Dienste A (Liste, `?neu=1`), Drucker A (Reiter `?bereich=`, Drehpfeil = suchen), Benutzer und Gruppen C (+ „Gruppe hinzufügen“, `/verwaltung/gruppen?name=|?neu=1`), Verbindungen A (Kacheln, `?v=`), Arbeitsplätze B (Liste zuerst, `?einrichten=1`), Praxis A (Reiter `?bereich=`), Mein Konto B (Profil links, Anmeldewege rechts, Abmelden oben), Öffnungszeiten A (Reiter oben), Start A (Einrichtung + Server oben, Module darunter), T2med nur angeglichen. **Server noch offen** (Nutzer hat keinen Entwurf gewählt). Regeln: `docs/MODUL-GESTALTUNG.md`.
+
+- **Praxis → T2med (Basis beta.57, `/verwaltung/t2med`, `Web::t2medPage`):** Reiter oben (seit beta.63 gemeinsamer Seitenkopf `V::page(…, ['werkzeuge' => …])`, `?reiter=fhir|gdt|funktionsleiste`): FHIR-Verbindung (Formulare posten an `/verwaltung/verbindungen` mit `zurueck=t2med`), GDT-Anleitung mit Arbeitsplätzen, Funktionsleiste mit `t2medAufrufe()`. Unter Praxis → Verbindungen steht T2med nicht mehr.
 - Hauptweg am PC ist der Praxisherz-Agent (Paket unter Praxis → Arbeitsplätze). Handanleitungen (Zertifikat, virtuelle Drucker, T2med-Adresse von Hand) bleiben als Notweg, aber **eingeklappt** (`<details class="how">` „Von Hand einrichten (ohne Agent, Mac/Linux oder wenn etwas schiefgeht)“), davor ein offener Satz zum Agent. Neue Hilfetexte bitte genauso.
 - Menüwege in Texten wie in der Seitenleiste (seit Basis beta.57 keine Gruppe „Einrichten“ mehr): „Praxis → Praxis/Server/Arbeitsplätze/T2med/Benutzer und Gruppen/Drucker/Verbindungen/Dienste“, „Betrieb → Sicherung/Updates/Module/Sicherheit“, „Startseite → Einrichtung“ – nicht mehr „Verwaltung → …“.
 - Einrichtungs-Überblick der Basis: ein Punkt „Praxisherz-Agent auf allen Arbeitsplätzen installiert“ (Schlüssel `starter`) statt Zertifikat/Drucker/Starter einzeln; ohne Modul mit `[[starters]]` nur der Zertifikatspunkt (`ca`).

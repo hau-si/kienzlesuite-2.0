@@ -1,5 +1,15 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.63
+
+Neues Design, dritter Teil (Entwürfe vom 28.11.2026):
+- **Mein Konto (B):** links Profil (Name mit Stift, Gruppen) und „Mein Arbeitsplatz“, rechts die Anmeldewege als Ausklappzeilen (E-Mail, Passwort, SMS-Code, Authenticator-App, Passkeys, Geräte); „Abmelden“ oben rechts.
+- **Praxis → Öffnungszeiten (A):** Reiter Kalender | Regelmäßige Zeiten | Feiertage | Vertretungspraxen mit Symbolen und „+ Schließung“ oben rechts im Seitenkopf.
+- **Startseite (A):** Titel „Guten Tag, <Vorname>“, breit; Einrichtung und Server-Zustand oben nebeneinander, die Module darunter.
+- **Praxis → T2med:** gleicher Seitenkopf wie alle anderen Seiten (eigene Klassen `basis-kopf`/`basis-reiter` entfallen).
+- Praxis → Server ist noch unverändert (noch kein Entwurf gewählt).
+- Mit Tests und im Browser der Vorschau (erfundene Daten) geprüft, **nicht auf der VM**.
+
 ## 0.22.0-beta.62
 
 Neues Design, zweiter Teil (Entwürfe vom 28.11.2026):

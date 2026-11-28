@@ -27,11 +27,16 @@ final class ZeitenSeite {
         return '<a class="button' . ($an ? '' : ' secondary') . '" href="' . V::h($href) . '">' . V::h($text) . '</a>';
     }
 
-    /** Kopf mit den Knöpfen und dem Stand der Verteilung. */
+    /** Reiter oben rechts im Seitenkopf (Entwurf A, 28.11.2026): Kalender | Regelmäßige Zeiten | Feiertage | Vertretungspraxen, dazu „Schließung“. */
+    public static function werkzeuge(string $ansicht): string {
+        return V::reiter(self::PFAD, 'Kalender', 'st:kalender', $ansicht === '') . V::reiter(self::PFAD . '?ansicht=woche', 'Regelmäßige Zeiten', 'st:zeit', $ansicht === 'woche')
+            . V::reiter(self::PFAD . '?ansicht=feiertage', 'Feiertage', 'st:stern', $ansicht === 'feiertage') . V::reiter(self::PFAD . '?ansicht=praxen', 'Vertretungspraxen', '/verwaltung/benutzer', $ansicht === 'praxen')
+            . '<a class="button mit-icon" href="' . self::PFAD . '?neu=1">' . V::icon('st:plus') . 'Schließung</a>';
+    }
+
+    /** Stand der Verteilung (über dem Inhalt). */
     private function kopf(string $ansicht): string {
-        $k = '<div class="zt-kopf">' . self::knopf(self::PFAD, 'Kalender', $ansicht === '') . self::knopf(self::PFAD . '?ansicht=woche', 'Regelmäßige Zeiten', $ansicht === 'woche')
-            . self::knopf(self::PFAD . '?ansicht=feiertage', 'Feiertage', $ansicht === 'feiertage') . self::knopf(self::PFAD . '?ansicht=praxen', 'Vertretungspraxen', $ansicht === 'praxen')
-            . self::knopf(self::PFAD . '?neu=1', '+ Schließung', false) . '</div>';
+        $k = '';   // Reiter stehen seit Basis beta.63 oben rechts im Seitenkopf (werkzeuge())
         $stand = '';
         if ($this->nutzer) {
             $stand = '<p class="muted small">Die Angaben gehen automatisch an: ' . V::h(implode(', ', $this->nutzer)) . '. '

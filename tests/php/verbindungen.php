@@ -61,7 +61,7 @@ function test_seite(): void {
     check(str_contains($p->body, '<section class="card"><h2><svg class="h-ico"'), 'Verbindungen: gewählte Verbindung ohne Karte oder Symbol');
     // Praxis → T2med: Reiter FHIR-Verbindung, GDT, Funktionsleiste
     $p = $b->get('/verwaltung/t2med');
-    check($p->status === 200 && str_contains($p->body, 'class="basis-reiter"') && substr_count($p->body, 'class="button ') === 3, 'T2med: Reiterleiste fehlt');
+    check($p->status === 200 && str_contains($p->body, '<nav class="start-tools" aria-label="T2med">') && substr_count($p->body, 'class="button ') === 3, 'T2med: Reiterleiste fehlt');
     check(preg_match('#<a class="button primary mit-icon" href="/verwaltung/t2med" aria-current="page">#', $p->body) === 1, 'T2med: Reiter FHIR nicht gewählt');
     check(str_contains($p->body, 'value="https://t2med.example.org:16567/fhir"') && str_contains($p->body, 'gespeichert – leer lassen') && str_contains($p->body, 'name="zurueck" value="t2med"'), 'T2med: Formular unvollständig');
     check(str_contains($p->body, 'FHIR-Server antwortet') && preg_match('#<h2><svg class="h-ico"[^>]*>.*?</svg>Verbindung zu T2med \(FHIR\) <span class="tag ok">✓ eingerichtet</span></h2>#s', $p->body) === 1, 'T2med: Prüfung oder Status fehlt');

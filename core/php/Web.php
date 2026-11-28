@@ -228,7 +228,8 @@ final class Web {
             'praxen' => $seite->praxenSeite($r->query, $fehler, $eingabe),
             default => $seite->kalenderSeite($r->query, $fehler, $eingabe),
         };
-        return Response::html(V::page('Öffnungszeiten', $body, $this->nav(), $this->config->practice, 'Praxis'), $fehler ? 422 : 200);
+        $reiter = in_array($ansicht, ['woche', 'feiertage', 'praxen'], true) ? $ansicht : '';
+        return Response::html(V::page('Öffnungszeiten', $body, $this->nav(), $this->config->practice, 'Praxis', ['werkzeuge' => ZeitenSeite::werkzeuge($reiter)]), $fehler ? 422 : 200);
     }
 
     // ---- Servername ---------------------------------------------------------------------------------------------
@@ -948,9 +949,11 @@ final class Web {
                     . '<p class="muted">' . $sum['done'] . ' von ' . $sum['total'] . ' nötigen Schritten erledigt.'
                     . ($sum['next'] !== '' ? ' Als Nächstes: <strong>' . V::h($sum['next']) . '</strong>.' : '') . '</p></a>';
             } catch (\Throwable) { /* ohne Überblick keine Karte */ }
-            $body = $setup . $server . $body;
+            // Entwurf A (28.11.2026): Einrichtung und Server-Zustand oben nebeneinander, Module darunter.
+            $body = ($setup !== '' || $server !== '' ? '<div class="start-oben">' . $setup . $server . '</div>' : '') . $body;
         }
-        $response = Response::html(V::page('Start', $body, $this->nav(), $this->config->practice));
+        $vorname = preg_split('/\s+/u', trim((string)($this->session['display'] ?: $this->session['login'])))[0] ?? '';
+        $response = Response::html(V::page($vorname !== '' ? 'Guten Tag, ' . $vorname : 'Start', $body, $this->nav(), $this->config->practice, '', ['breit' => true]));
         // Wird gerade ein Guthaben abgefragt, nach kurzer Zeit neu laden, damit der neue Wert erscheint.
         return $pending ? $response->with('Refresh', '3; url=/') : $response;
     }
@@ -1134,8 +1137,7 @@ final class Web {
             . '<form method="post" action="/konto/name" class="name-form">' . $csrf . '<label class="sr-only" for="k-name">Anzeigename</label>'
             . '<input id="k-name" name="display" value="' . V::h((string)$user['display']) . '" maxlength="80" placeholder="' . V::h((string)$user['login']) . '" autocomplete="name"><button class="secondary">Speichern</button></form></details>'
             . '<div class="muted small">Benutzername ' . V::h($user['login']) . ($mail !== '' ? ' · ' . V::h($mail) : '') . '</div>'
-            . ($chips !== '' ? '<div class="rollen-zeile">' . $chips . '</div>' : '<div class="muted small">Keine Gruppe zugewiesen</div>') . '</div>'
-            . '<form method="post" action="/abmelden" class="profil-abmelden">' . $csrf . '<button class="secondary">Abmelden</button></form></div></section>';
+            . ($chips !== '' ? '<div class="rollen-zeile">' . $chips . '</div>' : '<div class="muted small">Keine Gruppe zugewiesen</div>') . '</div></div></section>';
         $fold = static fn(string $title, string $tag, string $inner, bool $open = false): string => '<details class="fold"' . ($open ? ' open' : '') . '><summary><h2>' . $title . '</h2>' . $tag . '</summary><div class="fold-body">' . $inner . '</div></details>';
         $ok = static fn(bool $good, string $yes, string $no): string => '<span class="tag ' . ($good ? 'ok' : 'warn') . ' fold-status">' . V::h($good ? $yes : $no) . '</span>';
         $folds = $fold('E-Mail-Adresse', $ok($mail !== '', 'bestätigt', $pending !== '' ? 'wartet auf Bestätigung' : 'nicht hinterlegt'),
@@ -1167,10 +1169,13 @@ final class Web {
             . '<button type="button">Passkey hinzufügen</button><p class="error" hidden></p></div>');
         $folds .= $fold('Gemerkte Geräte', '<span class="tag fold-status">' . ($devices !== '' ? count($this->auth->devices($uid, $this->token)) : 0) . '</span>',
             $devices !== '' ? '<table><tr><th>Gerät</th><th>Zuletzt</th><th></th></tr>' . $devices . '</table><form method="post" action="/konto/geraete">' . $csrf . '<input type="hidden" name="id" value="all"><button class="link">Alle abmelden</button></form>' : '<p>Keine.</p>');
-        $folds .= $this->arbeitsplatzFold($fold, $csrf);
-        $body = V::error($error) . V::notice($notice) . $profil . '<section class="card konto">' . $folds . '</section>';
+        // Entwurf B (28.11.2026): links Profil und Arbeitsplatz, rechts die Anmeldewege; Abmelden oben rechts.
+        $platz = $this->arbeitsplatzFold($fold, $csrf);
+        $body = V::error($error) . V::notice($notice) . '<div class="konto-raster"><div>' . $profil . ($platz !== '' ? '<section class="card konto">' . $platz . '</section>' : '') . '</div>'
+            . '<section class="card konto">' . $folds . '</section></div>';
         V::$status = [];
-        return Response::html(V::page('Mein Konto', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+        $werkzeuge = '<form method="post" action="/abmelden" class="inline profil-abmelden">' . $csrf . '<button class="secondary mit-icon button">' . V::icon('st:abmelden') . 'Abmelden</button></form>';
+        return Response::html(V::page('Mein Konto', $body, $this->nav(), $this->config->practice, null, ['werkzeuge' => $werkzeuge]), $error ? 422 : 200);
     }
 
     private function saveName(Request $r): Response {
@@ -2400,7 +2405,6 @@ final class Web {
             $links .= '<a class="button ' . ($an ? 'primary' : 'secondary') . ' mit-icon" href="/verwaltung/t2med' . ($id === 'fhir' ? '' : '?reiter=' . $id) . '"' . ($an ? ' aria-current="page"' : '') . '>'
                 . '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' . $symbole[$id] . '</svg>' . V::h($text) . '</a>';
         }
-        $kopf = '<header class="basis-kopf"><div><p class="eyebrow">Praxis</p><h1>T2med</h1></div><nav class="basis-reiter" aria-label="T2med">' . $links . '</nav></header>';
         $body = V::error($error) . ($reiter === 'fhir' && $st['letzte'] ? '<p class="' . ($st['letzte']['ok'] ? 'notice' : 'error') . '">' . V::h((string)$st['letzte']['meldung']) . '</p>' : '');
         if ($reiter === 'fhir') {
             $set = static fn(bool $on) => $on ? 'gespeichert – leer lassen für unverändert' : '';
@@ -2460,7 +2464,7 @@ final class Web {
                 . '<p class="muted">Der Knopf funktioniert erst, wenn am PC der Praxisherz-Agent installiert ist (<a href="/hilfe/arbeitsplatz#paket">Praxis → Arbeitsplätze</a>) und die FHIR-Verbindung eingetragen ist (Reiter „FHIR-Verbindung“).</p>'
                 . '<h2>Adressen für T2med</h2>' . $this->t2medAufrufe();
         }
-        $response = Response::html(V::page('T2med', $kopf . V::cards($body), $this->nav(), $this->config->practice, null, ['roh' => true]), $error ? 422 : 200);
+        $response = Response::html(V::page('T2med', $body, $this->nav(), $this->config->practice, 'Praxis', ['werkzeuge' => $links]), $error ? 422 : 200);
         return $reiter === 'fhir' && $st['pending'] ? $response->with('Refresh', '2') : $response;
     }
 
