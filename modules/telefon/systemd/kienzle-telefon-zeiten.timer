@@ -1,0 +1,11 @@
+# Praxisherz, Modul telefon: einmal am Tag abgleichen (vergangene Schließungen entfernen, Sprachmenü später eingeschaltet).
+[Unit]
+Description=Praxisherz Modul telefon (Öffnungszeiten täglich abgleichen)
+
+[Timer]
+OnCalendar=*-*-* 00:07
+OnBootSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

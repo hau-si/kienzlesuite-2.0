@@ -11,6 +11,7 @@ shots = [
   ('anmelden', B+'anmelden.html', 1200, 640), ('start', B+'start.html', 1200, 760), ('einrichtung', B+'einrichtung.html', 1200, 1150),
   ('starter', B+'starter.html', 1200, 1000), ('verbindungen', B+'verbindungen.html', 1200, 1250), ('updates', B+'updates.html', 1200, 700),
   ('benutzer', B+'benutzer.html', 1200, 760), ('gruppen', B+'gruppen.html', 1200, 1250), ('konto', B+'konto.html', 1200, 1200),
+  ('zeiten', B+'zeiten.html', 1280, 1250), ('feiertage', B+'feiertage.html', 1280, 900),
   ('kasse-start', K+'/kasse/', 1280, 860), ('kasse-vorgaenge', K+'/kasse/vorgaenge', 1280, 760), ('kasse-einstellungen', K+'/kasse/einstellungen', 1280, 1100),
   ('kasse-ablage', K+'/kasse/einstellungen#praxis', 1100, 900),
   ('kasse-igel', K+'/kasse/', 1280, 1000), ('kasse-goae', K+'/kasse/', 1280, 1000), ('weg-der-rechnung', None, 1200, 790),

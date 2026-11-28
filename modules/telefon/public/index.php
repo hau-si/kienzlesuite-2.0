@@ -332,6 +332,7 @@ try {
             $fehler ??= $e->getMessage();
         }
         if ($meldung === null && isset($_GET['hochgeladen'])) $meldung = 'Eigene Wartemusik eingerichtet und eingeschaltet.';
+        Ansicht::$zeitenZentral = $k->verbindung('zeiten') !== null;
         $inhalt = Ansicht::sprachmenue($daten, $k->csrf(), $meldung, $fehler, (string)($cfg['kienzlefon']['wartemusik'] ?? 'klingelzeichen'));
     } elseif ($rel === '/einstellungen') {
         $leitung = $admin && preg_match('/^[a-z0-9]{1,12}$/D', (string)($_GET['leitung'] ?? '')) ? (string)$_GET['leitung'] : null;

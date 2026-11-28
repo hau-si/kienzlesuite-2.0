@@ -1,8 +1,15 @@
 # Release-Notizen Telefon
 
-## 0.1.0-beta.32
+## 0.1.0-beta.33
 
 - Gestaltung wie Kasse, Signatur und Fax (`docs/MODUL-GESTALTUNG.md`): Seiten 1400 px breit; im Seitenkopf auf jeder Seite dieselben Knöpfe mit Symbol (Übersicht, Anrufe, Vorgänge, Rufgruppen, Sprachmenü, Statistik, Einstellungen), die aktuelle Seite ist hervorgehoben; „← Übersicht“ entfällt. Offene Vorgänge als roter Zähler am Knopf. Mit Tests und im Browser der Vorschau geprüft, nicht auf der VM.
+
+## 0.1.0-beta.32
+
+- **Öffnungszeiten aus der Basis im Sprachmenü** (Verbindung `zeiten`, Praxis → Öffnungszeiten): Öffnungs- und Telefonzeiten kommen von dort und sind auf der Seite „Sprachmenü“ nur noch zu sehen (Link zur Basis); Speichern überschreibt sie nicht.
+- **Ansagen bei Urlaub, Feiertagen und Sonderöffnungen** mit Vertretung: Für jede kommende Schließung bzw. jeden gewählten Feiertag mit Haken „Telefonansage“ legt `lib/zeiten-abgleich` eine geplante Sonderansage von Kienzlefon an (statt Begrüßung, Anrufer werden nicht durchgestellt; Sonderöffnung vor der Begrüßung), erzeugt den Ton mit der eingestellten Sprachausgabe und schaltet sie erst nach dem Erzeugen ein. Urlaub hat Vorrang vor einem Feiertag darin; belegte Prioritäten eigener Sonderansagen werden ausgelassen, andere Sonderansagen bleiben unberührt.
+- Neue Dienste `kienzle-telefon-zeiten` (.path auf die Verbindungsdatei, dazu täglich um 00:07). Ohne Sprachmenü passiert nichts.
+- Braucht Basis 0.22.0-beta.55. Geprüft mit Tests (Ersatz-Piper, echtes ffmpeg, Kienzlefon lädt die Konfiguration); **nicht mit echter Telefonanlage und nicht auf der VM geprüft.**
 
 ## 0.1.0-beta.31
 

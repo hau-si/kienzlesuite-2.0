@@ -1,8 +1,25 @@
 # Basis – Release-Notizen
 
-## 0.22.0-beta.54
+## 0.22.0-beta.56
 
 - Dokumentation: `docs/MODUL-GESTALTUNG.md` beschreibt jetzt zentral Seitenbreite, Seitenkopf (Titel, Knopfleiste mit Symbolen, Zähler, Einstellungen zuletzt), Symbole und Meldungen für alle Module. Am Programm ändert sich nichts.
+
+## 0.22.0-beta.55
+
+- **Neu: Praxis → Öffnungszeiten** (Wunsch des Nutzers: zentrale Verwaltung in der Basis, Entwurf B mit dem Feiertagsteil aus A).
+  - Links ein Monatskalender (geschlossen rot, Feiertag gelb, Sonderöffnung blau; Tag anklicken öffnet den Eintrag oder legt eine Schließung an) und „Als Nächstes“, rechts das Bearbeiten: Art (Urlaub, Fortbildung, Geschlossen, Sonderöffnung), Von/Bis, Bezeichnung, **Vertretung je Zeitraum** (mehrere Zeilen, auch je Tag eine andere Praxis), zusätzlicher Hinweis, „Wo erscheint es?“ (Homepage, Telefonansage) und die fertige Ansage („So hört es der Anrufer“) sowie der Satz für die Homepage.
+  - **Regelmäßige Zeiten:** Sprechzeiten und getrennt pflegbare Telefonzeiten je Wochentag (leer = wie Sprechzeiten).
+  - **Feiertage** je Bundesland ohne Internet berechnet (Ostern, Buß- und Bettag usw.), einzeln an- und abwählbar; die Wahl gilt jedes Jahr. Gesetzliche Feiertage sind vorgewählt; regionale (z. B. Fronleichnam in Sachsen, Mariä Himmelfahrt in Bayern), Rosenmontag, Heiligabend, Silvester und Brückentage zum Anhaken. Schalter für Ansage am Telefon und Ankündigung auf der Homepage.
+  - **Vertretungspraxen** als eigene Liste (Name, Anschrift, Telefon, Zusatz); eine Praxis in einer kommenden Schließung lässt sich nicht löschen.
+- **Neues Recht der Basis „Öffnungszeiten pflegen“** (`core:zeiten`), in der Gruppe MFA vorgewählt (Admin und Arzt ohnehin). Ohne Basis-Admin zeigt die Seitenleiste unter „Praxis“ nur „Öffnungszeiten“. Rechte-Matrix beim Benutzer und bei den Gruppen mit Abschnitt „Praxisherz (Basis)“.
+- **Neue Verbindung `zeiten`** für Module (`[[connections]] id = "zeiten"`, Aufbau in `docs/MODUL-SCHNITTSTELLE.md`): Die Basis rechnet Wochenzeiten, kommende Schließungen und die gewählten Feiertage der nächsten drei Jahre mit fertigen Texten aus und lässt sie vom Dienst `kienzle-verbindungen` an die Module verteilen (nach jeder Änderung, sonst beim ersten Öffnen der Seite an einem neuen Tag). Erste Nutzer: Homepage und Telefon.
+- Google-Unternehmenseintrag ist noch nicht angebunden (geplant als zweiter Schritt unter Praxis → Verbindungen).
+- Geprüft mit Tests (`tests/php/zeiten.php`, `tests/core/test_zeiten.py`); **nicht auf der VM und nicht im echten Browser geprüft.**
+
+## 0.22.0-beta.54
+
+- Ende-zu-Ende-Prüfung mit echtem nginx (`tests/integration/nginx.sh`, Container Ubuntu 26.04 auf GitHub) auf den heutigen Stand gebracht: Sie erwartete auf der Update-Seite und der Modulseite noch Texte einer älteren Gestaltung. Seit dem Test der Start-ISO war der Container-Lauf vorher abgebrochen, deshalb fiel das nicht auf. Am Programm ändert sich nichts.
+- Die Prüfung läuft nur unter Ubuntu 26.04 (Installer); hier nicht ausführbar, das Ergebnis zeigt der Lauf auf GitHub.
 
 ## 0.22.0-beta.53
 

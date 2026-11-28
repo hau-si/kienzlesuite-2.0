@@ -287,6 +287,9 @@ final class Ansicht {
         return self::fold('wartemusik', 'Wartemusik', $marke, $o);
     }
 
+    /** Öffnungszeiten kommen aus der Basis (Verbindung „zeiten“): Öffnungs- und Telefonzeiten nur anzeigen. */
+    public static bool $zeitenZentral = false;
+
     public static function sprachmenue(array $d, string $csrf, ?string $meldung, ?string $fehler, string $wartemusik = 'klingelzeichen'): string {
         $h = 'tf_h';
         $o = '<div class="tf">' . self::kopfzeile('/sprachmenue') . self::meldungen($meldung, $fehler);
@@ -300,18 +303,28 @@ final class Ansicht {
         if (in_array($st['stand'] ?? '', ['laeuft', 'wartet'], true)) $o .= '<p>' . self::tag('warn', 'Ansagen werden erzeugt') . ' <span class="muted">' . $h((string)($st['meldung'] ?? '')) . '</span></p>';
         elseif (($st['stand'] ?? '') === 'fehler') $o .= '<p>' . self::tag('err', 'Fehler beim Erzeugen') . ' <span class="muted">' . $h((string)($st['meldung'] ?? '')) . '</span></p>';
         $stand = (string)$d['stand'];
+        if (self::$zeitenZentral) {
+            $zs = Anlage::zeitenStand();
+            $o .= '<p class="muted">Öffnungs- und Telefonzeiten, Urlaube, Feiertage und Vertretungen kommen aus <a href="/verwaltung/zeiten">Praxis → Öffnungszeiten</a>. '
+                . 'Für jede Schließung entsteht dort automatisch eine Ansage' . ($zs ? ' (zurzeit ' . (int)($zs['ansagen'] ?? 0) . ')' : '') . '.</p>';
+        }
         foreach ($d['zeiten'] as $s => $z) {
+            $zentral = self::$zeitenZentral && in_array($s, ['oeffnungszeiten', 'telefonzeiten'], true);
             $tage = array_keys(array_filter($z['tage'], fn($v) => trim((string)$v) !== ''));
             $pflicht = in_array($s, ['oeffnungszeiten', 'telefonzeiten'], true);
             $marke = $tage ? self::tag('ok', implode(', ', array_map(fn($t) => self::TAGE[$t] ?? $t, $tage))) : ($pflicht ? self::tag('warn', 'keine Zeiten') : self::tag('opt', 'aus'));
             $f = '<p class="muted">' . $h(self::ZEIT_HILFE[$s] ?? '') . ' Mehrere Zeiträume mit Komma trennen, z. B. 08:00-12:00, 14:00-18:00; leer = geschlossen.</p><div class="tf-zeiten">';
             foreach ($z['tage'] as $tag => $v) {
                 $f .= '<label for="z-' . $h($s . '-' . $tag) . '">' . $h(ucfirst((string)$tag)) . '</label><input id="z-' . $h($s . '-' . $tag) . '" name="zeit[' . $h($s) . '][' . $h((string)$tag) . ']" value="' . $h((string)$v)
-                    . '" maxlength="200" placeholder="geschlossen" pattern="[0-9:\-, ;]*" inputmode="numeric">';
+                    . '" maxlength="200" placeholder="geschlossen" pattern="[0-9:\-, ;]*" inputmode="numeric"' . ($zentral ? ' disabled' : '') . '>';
             }
             $f .= '</div>';
-            if ($s !== 'oeffnungszeiten') {
+            if ($s !== 'oeffnungszeiten' && !$zentral) {
                 $f .= '<p><button type="button" class="small secondary" data-zeiten-von="oeffnungszeiten" title="Kopiert die Zeiten aus „Öffnungszeiten“ der Praxis in dieses Schema (alle sieben Tage). Es wird noch nichts gespeichert: danach unten auf „Speichern“ drücken, vorher kann man einzelne Tage noch ändern.">Zeiten der Praxis übernehmen</button> <span class="muted" data-zeiten-status></span></p>';
+            }
+            if ($zentral) {
+                $o .= self::fold('z-' . $s, (string)$z['titel'], $marke, '<p class="muted">Kommt aus <a href="/verwaltung/zeiten?ansicht=woche">Praxis → Öffnungszeiten</a> und wird dort geändert.</p>' . $f);
+                continue;
             }
             $o .= self::fold('z-' . $s, (string)$z['titel'], $marke, '<form method="post" class="tf-form tf-breit">' . self::verborgen($csrf, $stand) . $f . '<button class="primary" type="submit">Speichern</button></form>');
         }

@@ -18,6 +18,7 @@ final class Connections {
         $s = is_array($s) ? $s : [];
         return ['t2med' => is_array($s['t2med'] ?? null) ? $s['t2med'] : null, 'mail' => is_array($s['mail'] ?? null) ? $s['mail'] : null, 'sms' => is_array($s['sms'] ?? null) ? $s['sms'] : null,
             'letterxpress' => is_array($s['letterxpress'] ?? null) ? $s['letterxpress'] : null, 'uebersetzung' => is_array($s['uebersetzung'] ?? null) ? $s['uebersetzung'] : null,
+            'zeiten' => is_array($s['zeiten'] ?? null) ? $s['zeiten'] : null,
             'ablage' => array_values(array_filter((array)($s['ablage'] ?? []), 'is_array')), 'tests' => (array)($s['tests'] ?? []), 'guthaben' => (array)($s['guthaben'] ?? []),
             'hostkeys' => (array)($s['hostkeys'] ?? []), 'zertifikate' => (array)($s['zertifikate'] ?? []), 'nutzung' => array_values(array_filter((array)($s['nutzung'] ?? []), 'is_array')),
             'hinweise' => array_values(array_filter((array)($s['hinweise'] ?? []), 'is_string')), 'letzte' => is_array($s['letzte'] ?? null) ? View::frisch($s['letzte']) : null,
@@ -75,6 +76,9 @@ final class Connections {
         $this->write(['action' => 'gmail', 'daten' => ['client_id' => $p['client_id'], 'client_secret' => trim($secret), 'absender' => $p['absender'], 'code' => $code]]);
         $this->db->store(self::GMAIL_KEY, '');
     }
+
+    /** Öffnungszeiten (fertig ausgerechnetes Paket aus Zeiten::paket) an die Module verteilen lassen. */
+    public function saveZeiten(array $paket): void { $this->write(['action' => 'zeiten', 'daten' => $paket]); }
 
     public function saveSms(array $in): void {
         $this->write(['action' => 'sms', 'daten' => ['api_key' => trim((string)($in['api_key'] ?? '')), 'absender' => trim((string)($in['absender'] ?? ''))]]);

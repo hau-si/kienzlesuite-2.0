@@ -74,7 +74,7 @@ final class Homepage {
         } catch (\Throwable) {
             return self::festhalten(false, 'Der gespeicherte Schlüssel ist nicht lesbar. Bitte unter „Einrichtung“ neu eintragen.', 0);
         }
-        $hinweise = Mitteilungen::fuerHomepage();
+        $hinweise = array_merge(Mitteilungen::fuerHomepage(), Zeiten::fuerHomepage($k));   // eigene und automatische aus Praxis → Öffnungszeiten
         $zeit = time();
         $koerper = (string)json_encode(['format' => 1, 'zeit' => $zeit, 'hinweise' => $hinweise], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         [$code, $antwort, $fehler, $weiter] = self::senden(self::adresse() . self::ROUTE, $koerper, [

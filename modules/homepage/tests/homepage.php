@@ -5,7 +5,7 @@ require dirname(__DIR__, 3) . '/core/php/modul/Kienzle.php';
 require dirname(__DIR__) . '/src/bootstrap.php';
 require __DIR__ . '/wp-nachbau.php';
 require dirname(__DIR__) . '/wordpress/praxisherz-hinweise/praxisherz-hinweise.php';
-use KienzleHomepage\{Homepage, Mitteilungen, Praxen, Speicher};
+use KienzleHomepage\{Homepage, Mitteilungen, Praxen, Speicher, Zeiten};
 
 function check(bool $ok, string $msg): void { if (!$ok) { fwrite(STDERR, "FEHLER: $msg\n"); exit(1); } }
 function wirft(callable $f, string $msg, string $text = ''): void {
@@ -185,6 +185,40 @@ ob_start(); do_action('wp_footer'); $fuss = ob_get_clean();
 check(str_contains($fuss, 'data-ziel="#aktuelles .liste" data-lage="vor"'), 'eingestellte Stelle');
 update_option('praxisherz_hinweise_kasten_ziel', '"><script>');
 check(praxisherz_hinweise_kasten_stelle()[0] === '', 'ungültiger Selektor verworfen');
+
+// ---- Automatisch aus Praxis → Öffnungszeiten (Verbindung „zeiten“ der Basis) ----
+check(Zeiten::hinweise($k) === [] && Zeiten::abgleich($k) === 'unverändert', 'ohne Paket nichts');
+@mkdir("$dir/verbindungen");
+$paket = ['format' => 1, 'stand' => str_repeat('a1', 16), 'praxis' => 'Praxis Beispiel', 'woche' => ['sprech' => [], 'telefon' => []], 'ereignisse' => [
+    ['id' => 'e1', 'art' => 'urlaub', 'titel' => 'Weihnachtsurlaub', 'von' => '2026-12-23', 'bis' => '2027-01-03', 'homepage' => true, 'telefon' => true,
+     'satz' => 'Die Praxis ist vom 23.12. bis 03.01. geschlossen.', 'hinweis' => 'Rezepte bitte vorher bestellen.', 'ansage' => '…',
+     'vertretung' => [['von' => '2026-12-23', 'bis' => '2026-12-31', 'praxen' => [['name' => 'Praxis Dr. med. Erika Beispiel', 'strasse' => 'Musterstraße 1', 'ort' => '12345 Musterstadt', 'telefon' => '01234 56789', 'zusatz' => '']]],
+                      ['von' => '2027-01-02', 'bis' => '2027-01-03', 'praxen' => [['name' => 'Hausarztpraxis Max Mustermann', 'strasse' => '', 'ort' => '', 'telefon' => '01234 98765', 'zusatz' => '']]]]],
+    ['id' => 'f-neujahr-2027', 'art' => 'feiertag', 'titel' => 'Neujahr', 'von' => '2027-01-01', 'bis' => '2027-01-01', 'homepage' => true, 'telefon' => true, 'satz' => 'Die Praxis ist am 01.01. (Neujahr) geschlossen.', 'vertretung' => []],
+    ['id' => 'f-ostermontag-2027', 'art' => 'feiertag', 'titel' => 'Ostermontag', 'von' => '2027-03-29', 'bis' => '2027-03-29', 'homepage' => false, 'telefon' => true, 'satz' => 'x', 'vertretung' => []],
+    ['id' => '<b>', 'art' => 'urlaub', 'titel' => 'kaputt', 'von' => 'morgen', 'bis' => '2027-01-01', 'homepage' => true],
+]];
+file_put_contents("$dir/verbindungen/homepage.json", json_encode(['zeiten' => $paket]));
+$auto = Zeiten::hinweise($k);
+check(count($auto) === 2, 'automatische Mitteilungen: ' . count($auto));
+check(preg_match('/^m9\d{8}$/', $auto[0]['id']) === 1 && $auto[0]['von'] === '2026-12-09' && $auto[0]['bis'] === '2027-01-03' && $auto[0]['farbe'] === 'rot' && $auto[0]['symbol'] === 'urlaub', 'Urlaub: Nummer, Vorlauf 14 Tage, Farbe');
+check($auto[0]['punkte'][0] === '23.12.–31.12.: Praxis Dr. med. Erika Beispiel, Musterstraße 1, 12345 Musterstadt, Tel. 01234 56789' && str_contains($auto[0]['text'], 'Rezepte bitte'), 'Vertretung je Zeitraum: ' . json_encode($auto[0]['punkte'], JSON_UNESCAPED_UNICODE));
+check(str_contains($auto[0]['kurz'], 'Vertretung: 23.12.–31.12.: Praxis Dr. med. Erika Beispiel') && $auto[1]['von'] === '2026-12-29' && $auto[1]['symbol'] === 'kalender', 'Kurztext und Feiertag (3 Tage vorher)');
+Zeiten::speichern(['aktiv' => '1', 'orte' => ['fenster'], 'farbe' => 'blau', 'symbol' => 'standard', 'vorlauf' => '7', 'feiertage' => '0']);
+$auto = Zeiten::hinweise($k);
+check($auto[0]['orte'] === ['fenster'] && $auto[0]['farbe'] === 'blau' && $auto[0]['von'] === '2026-12-16' && $auto[1]['von'] === '2027-01-01', 'Einstellungen wirken');
+wirft(fn() => Zeiten::speichern(['orte' => [], 'vorlauf' => '1', 'feiertage' => '1']), 'ohne Ort', 'Ort');
+wirft(fn() => Zeiten::speichern(['orte' => ['leiste'], 'farbe' => 'pink', 'vorlauf' => '1', 'feiertage' => '1']), 'Farbe');
+wirft(fn() => Zeiten::speichern(['orte' => ['leiste'], 'vorlauf' => '99', 'feiertage' => '1']), 'Vorlauf', 'Tage');
+check(Zeiten::abgleich($k) === 'übertragen' && Zeiten::abgleich($k) === 'unverändert', 'Abgleich bei neuem Stand');
+$wp = json_decode((string)file_get_contents($optionen), true);
+$ids = array_column($wp['praxisherz_hinweise']['hinweise'], 'id');
+check(count($ids) === 5 && in_array($auto[0]['id'], $ids, true), 'automatische Mitteilungen in WordPress angekommen (Plugin unverändert): ' . json_encode($ids));
+$GLOBALS['wp_optionen_speicher'] = $wp;
+check(str_contains(praxisherz_hinweise_block('fenster'), 'Hausarztpraxis Max Mustermann'), 'Fenster zeigt die Vertretung');
+Zeiten::speichern(['orte' => ['leiste'], 'vorlauf' => '7', 'feiertage' => '0']);
+check(Zeiten::hinweise($k) === [], 'ausgeschaltet');
+unlink("$dir/verbindungen/homepage.json");
 
 Homepage::einrichten($k, "http://127.0.0.1:$port", str_repeat('ab', 32));
 $st = Homepage::uebertragen($k);

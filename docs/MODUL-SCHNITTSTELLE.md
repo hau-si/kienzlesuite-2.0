@@ -103,6 +103,7 @@ Verbindungen. Ändert der Admin etwas, wird die Datei neu geschrieben; Module le
 | `t2med` | `base_url`, `launch_urls` (Liste), `api_key`, `ca_pem` (leer = Zertifikate des Systems), `pin` (nur genau dieses Zertifikat) |
 | `mail` | `host`, `port`, `sicherheit` (`starttls`/`smtps`), `benutzer`, `passwort`, `absender` |
 | `ablage` | `ausgang` (Ordner für Aufträge), `ziele` (Liste mit `id` und `name`, **ohne** Zugangsdaten) |
+| `zeiten` | Öffnungszeiten aus Praxis → Öffnungszeiten (keine Geheimnisse): `format` (1), `stand` (Prüfsumme, ändert sich mit jedem Inhalt), `praxis`, `woche` (`sprech`/`telefon` je Tag `mo`…`so` als Liste „08:00-12:00“; Telefonzeiten schon aufgelöst), `ereignisse` (kommende Schließungen, Sonderöffnungen und gewählte Feiertage der nächsten drei Jahre: `id`, `art` = `urlaub`/`fortbildung`/`geschlossen`/`sonder`/`feiertag`, `titel`, `von`, `bis`, `zeiten`, `homepage`, `telefon` (soll dort erscheinen), `satz` (Text für die Homepage), `hinweis`, `ansage` (Text zum Vorlesen), `vertretung` (Liste mit `von`, `bis`, `praxen` mit `name`, `strasse`, `ort`, `telefon`, `zusatz`)). Die Basis schreibt die Datei nach jeder Änderung und spätestens beim nächsten Öffnen der Seite an einem neuen Tag neu; Module vergleichen `stand` und reagieren z. B. mit einer `.path`-Einheit auf die Datei |
 
 ```php
 $fhir = $k->verbindung('t2med');      // null, wenn nicht eingerichtet

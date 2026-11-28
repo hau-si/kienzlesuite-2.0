@@ -1,0 +1,10 @@
+# Praxisherz, Modul homepage: Öffnungszeiten der Basis geändert (Verbindungsdatei neu geschrieben) → automatische Mitteilungen übertragen.
+[Unit]
+Description=Praxisherz Modul homepage (Öffnungszeiten beobachten)
+
+[Path]
+PathChanged=/etc/kienzle/verbindungen/module/homepage.json
+Unit=kienzle-homepage-zeiten.service
+
+[Install]
+WantedBy=multi-user.target

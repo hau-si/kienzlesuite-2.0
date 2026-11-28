@@ -1,0 +1,10 @@
+# Praxisherz, Modul telefon: Öffnungszeiten der Basis geändert (Verbindungsdatei neu geschrieben) → Sprachmenü abgleichen.
+[Unit]
+Description=Praxisherz Modul telefon (Öffnungszeiten beobachten)
+
+[Path]
+PathChanged=/etc/kienzle/verbindungen/module/telefon.json
+Unit=kienzle-telefon-zeiten.service
+
+[Install]
+WantedBy=multi-user.target

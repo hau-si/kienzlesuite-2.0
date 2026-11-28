@@ -1,5 +1,13 @@
 # Release-Notizen Homepage
 
+## 0.1.0-beta.3
+
+- **Automatische Mitteilungen aus Praxis → Öffnungszeiten der Basis** (Verbindung `zeiten`): Schließungen, Sonderöffnungen und Feiertage mit Haken „Homepage“ erscheinen von selbst, mit den Vertretungspraxen je Zeitraum. Karte „Automatisch aus den Öffnungszeiten“ auf der Seite Mitteilungen mit Einstellungen: ein/aus, Orte, Farbe, Symbol, wie viele Tage vorher (Schließungen Vorgabe 14, Feiertage 3). Die Vorschau zeigt sie mit.
+- Neuer Dienst `kienzle-homepage-zeiten` (.path auf die Verbindungsdatei): Ändert sich etwas in der Basis, wird sofort übertragen (nur bei neuem Stand).
+- Das Plugin „Praxisherz-Hinweise“ bleibt unverändert (0.2.0); automatische Mitteilungen tragen Nummern ab 900000000.
+- Die eigene Liste der Vertretungspraxen im Modul bleibt für eigene Mitteilungen bestehen; die automatischen nutzen die Liste der Basis.
+- Braucht Basis 0.22.0-beta.55. Geprüft mit Tests (inkl. Übertragung an das nachgebaute WordPress); **nicht mit echtem WordPress und nicht auf der VM geprüft.**
+
 ## 0.1.0-beta.2
 
 - **Fehler behoben (Meldung des Nutzers): „Kasten auf der Startseite“ erschien nicht**, wenn das Theme die Startseite selbst zusammenbaut (feste Abschnitte statt des Inhalts einer Seite, z. B. Startseite als Beitragsliste). Das Plugin gibt den Kasten dann am Seitenende aus, und ein kleines Skript setzt ihn an die richtige Stelle: automatisch über den Inhalt bzw. unter den Kopf der Seite, oder an eine Stelle, die man in WordPress unter **Einstellungen → Praxisherz-Hinweise → „Stelle für den Kasten“** einträgt (CSS-Selektor wie `#aktuelles`, davor/am Anfang/am Ende/danach). Auf statischen Startseiten bleibt es beim Kasten über dem Seiteninhalt.

@@ -13,6 +13,8 @@ final class Groups {
     public const KEY = 'benutzer.gruppen';
     /** Rechte, die die Gruppe MFA von Haus aus bekommt (Kasse im Alltag); alle anderen Gruppen siehe defaults(). */
     private const MFA_RIGHTS = ['kassieren', 'paid', 'inbox'];
+    /** Rechte der Basis selbst (als „core:<id>“ gespeichert; „core“ ist als Modul-ID reserviert). MFA bekommt sie von Haus aus. */
+    public const BASIS_RECHTE = ['zeiten' => 'Öffnungszeiten, Schließungen, Feiertage und Vertretungen pflegen (Praxis → Öffnungszeiten)'];
 
     public function __construct(private Database $db, private Modules $modules) {}
 
@@ -20,6 +22,7 @@ final class Groups {
     public function defaults(): array {
         $all = [];
         $mfa = [];
+        foreach (array_keys(self::BASIS_RECHTE) as $r) { $all[] = 'core:' . $r; $mfa[] = 'core:' . $r; }
         foreach (array_keys($this->modules->all()) as $m) {
             foreach ($this->modules->rights($m) as $r) {
                 $all[] = $m . ':' . $r['id'];
@@ -79,7 +82,7 @@ final class Groups {
 
     /** Alle Rechte aller Module als „modul:recht“. */
     public function known(): array {
-        $out = [];
+        $out = array_map(fn($r) => 'core:' . $r, array_keys(self::BASIS_RECHTE));
         foreach (array_keys($this->modules->all()) as $m) foreach ($this->modules->rights($m) as $r) $out[] = $m . ':' . $r['id'];
         return $out;
     }

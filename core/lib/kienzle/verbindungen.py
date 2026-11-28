@@ -76,7 +76,7 @@ def load() -> dict:
     except FileNotFoundError:
         data = {}
     return {'t2med': data.get('t2med'), 'mail': data.get('mail'), 'sms': data.get('sms'), 'letterxpress': data.get('letterxpress'), 'uebersetzung': data.get('uebersetzung'),
-            'ablage': data.get('ablage', [])}
+            'ablage': data.get('ablage', []), 'zeiten': data.get('zeiten')}
 
 
 def save(config: dict) -> None:
@@ -358,6 +358,26 @@ def test_sms_send(c: dict | None, to: str) -> str:
     return f'Test-SMS an {to} verschickt.'
 
 
+ZEITEN_MAX = 60_000
+ZEITEN_FELDER = {'format', 'stand', 'praxis', 'woche', 'ereignisse', 'notruf'}
+
+
+def set_zeiten(config: dict, d: dict) -> None:
+    """Öffnungszeiten, Schließungen und Feiertage aus Praxis → Öffnungszeiten (keine Geheimnisse, keine Patientendaten).
+    Das Webinterface rechnet alles aus; hier wird nur der Aufbau geprüft und die Größe begrenzt, dann an die Module verteilt."""
+    if not isinstance(d, dict) or set(d) - ZEITEN_FELDER or d.get('format') != 1:
+        raise Fehler('Öffnungszeiten: Aufbau ungültig.')
+    if not isinstance(d.get('stand'), str) or not re.fullmatch(r'[0-9a-f]{16,64}', d['stand']):
+        raise Fehler('Öffnungszeiten: Stand ungültig.')
+    if not isinstance(d.get('woche'), dict) or not isinstance(d.get('ereignisse'), list) or len(d['ereignisse']) > 150:
+        raise Fehler('Öffnungszeiten: Aufbau ungültig.')
+    if any(not isinstance(e, dict) for e in d['ereignisse']):
+        raise Fehler('Öffnungszeiten: Aufbau ungültig.')
+    if len(json.dumps(d, ensure_ascii=False)) > ZEITEN_MAX:
+        raise Fehler('Öffnungszeiten: zu viele Einträge.')
+    config['zeiten'] = d
+
+
 def set_target(config: dict, d: dict) -> None:
     if not isinstance(d, dict):
         raise Fehler('Ziel ungültig.')
@@ -423,6 +443,8 @@ def distribute(config: dict) -> list[str]:
             out['letterxpress'] = config['letterxpress']
         if 'uebersetzung' in ids and config.get('uebersetzung'):
             out['uebersetzung'] = {**config['uebersetzung'], 'url': deepl_url(config['uebersetzung']['api_key'])}
+        if 'zeiten' in ids and config.get('zeiten'):
+            out['zeiten'] = config['zeiten']
         if 'ablage' in ids:
             spool = SPOOL / mid
             spool.mkdir(mode=0o2770, parents=True, exist_ok=True)
@@ -686,6 +708,7 @@ def view(config: dict, extra: dict | None = None) -> dict:
                             'schluessel_gesetzt': bool(ueb.get('api_key'))} if ueb else None,
            'ablage': [{**{k: v for k, v in t.items() if k != 'passwort'}, 'passwort_gesetzt': bool(t.get('passwort')),
                        'fingerprint': ablage.fingerprint(t['hostkey']) if t.get('hostkey') else ''} for t in config['ablage']],
+           'zeiten': {'stand': config['zeiten'].get('stand', '')} if config.get('zeiten') else None,
            'nutzung': usage, 'sftp_schluessel': ABLAGE_PUB.read_text(encoding='utf-8').strip() if ABLAGE_PUB.is_file() else ''}
     out.update(extra or {})
     _write(STATE / 'status.json', out, 0o644)
@@ -780,6 +803,11 @@ def dispatch(config: dict, req: dict) -> str:
         save(config)
         view(config, {'hinweise': distribute(config)})
         return 'Übersetzung (DeepL) gespeichert und an die Module verteilt.' if config.get('uebersetzung') else 'Übersetzung entfernt.'
+    if action == 'zeiten':
+        set_zeiten(config, d)
+        save(config)
+        view(config, {'hinweise': distribute(config)})
+        return 'Öffnungszeiten an die Module verteilt.'
     if action == 'sms-senden':
         send_sms(config.get('sms'), req.get('an'), req.get('text'))
         return 'SMS verschickt.'

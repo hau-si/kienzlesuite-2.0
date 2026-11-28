@@ -5,13 +5,13 @@
 [module]
 id = "telefon"
 name = "Telefon"
-version = "0.1.0-beta.32"
+version = "0.1.0-beta.33"
 core_api = "2"
 description = "Telefonanlage: Leitungen der Anbieter, Telefone, Warteschlange, Sprachmenü und Kanalgrenze. Stellt auch die Faxleitung für das Modul Fax bereit; Fax lässt sich erst danach installieren."
 
 [system]
 packages = ["asterisk", "asterisk-modules", "asterisk-prompt-de", "php-fpm", "php-cli", "php-mbstring", "php-curl", "php-sqlite3", "python3", "python3-reportlab", "python3-pypdf", "python3-cryptography", "ghostscript", "qpdf", "libtiff-tools", "acl", "ffmpeg", "python3-venv", "espeak-ng", "libsndfile1", "libgomp1", "git"]
-services = ["kienzle-telefon-asterisk.service", "kienzle-telefon-fax.service", "kienzle-telefon-pflege.service", "kienzle-telefon-pflege.timer", "kienzle-telefon-ansagen.service", "kienzle-telefon-ansagen.path", "kienzle-telefon-whisper.service", "kienzle-telefon-whisper.path", "kienzle-telefon-steuerung.service", "kienzle-telefon-steuerung.path", "kienzle-telefon-prov.service", "kienzle-telefon-ereignisse.service"]
+services = ["kienzle-telefon-asterisk.service", "kienzle-telefon-fax.service", "kienzle-telefon-pflege.service", "kienzle-telefon-pflege.timer", "kienzle-telefon-ansagen.service", "kienzle-telefon-ansagen.path", "kienzle-telefon-whisper.service", "kienzle-telefon-whisper.path", "kienzle-telefon-steuerung.service", "kienzle-telefon-steuerung.path", "kienzle-telefon-prov.service", "kienzle-telefon-ereignisse.service", "kienzle-telefon-zeiten.service", "kienzle-telefon-zeiten.path", "kienzle-telefon-zeiten.timer"]
 disables = ["asterisk.service"]
 user = "ks-telefon"
 data = "/var/lib/kienzle/telefon"
@@ -84,6 +84,11 @@ label = "Telefon: Anrufstatistik sehen (ohne Nummern und Namen)"
 [[starters]]
 schema = "praxisherz-telefonverzeichnis"
 label = "Telefonverzeichnis aus T2med laden"
+
+[[connections]]
+id = "zeiten"
+purpose = "Öffnungs- und Telefonzeiten sowie Ansagen bei Urlaub, Feiertagen und Vertretung aus Praxis → Öffnungszeiten"
+required = false
 
 [[connections]]
 id = "t2med"
