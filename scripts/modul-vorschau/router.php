@@ -10,7 +10,7 @@ if (str_starts_with($path, '/assets/')) {
 }
 if (!preg_match('#^/(terminzettel|signatur|qm|fax|telefon|homepage)(/|$)#', $path, $m)) { http_response_code(404); echo 'nur /terminzettel, /signatur, /qm, /fax, /telefon und /homepage'; return true; }
 $modul = $m[1];
-$menu = rawurlencode(json_encode(['apps' => ['/kasse/' => 'Kasse', '/terminzettel/' => 'Terminzettel', '/signatur/' => 'Signatur', '/qm/' => 'Qualitätsmanagement', '/fax/' => 'Fax', '/telefon/' => 'Telefon', '/homepage/' => 'Homepage'],
+$menu = rawurlencode(json_encode(['apps' => ['/kasse/' => 'Kasse', '/terminzettel/' => 'Terminzettel', '/signatur/' => 'Signatur', '/qm/' => 'QM', '/fax/' => 'Fax', '/telefon/' => 'Telefon', '/homepage/' => 'Homepage'],
     'ids' => ['/kasse/' => 'kasse', '/terminzettel/' => 'terminzettel', '/signatur/' => 'signatur', '/qm/' => 'qm', '/fax/' => 'fax', '/telefon/' => 'telefon', '/homepage/' => 'homepage'], 'admin' => true, 'login' => 'anna']));
 // Erfundene Personen für „Vorlegen“ (QM); Anmeldung als „anna“ bzw. mit ?als=carla als MFA ohne Schreibrechte.
 $_SERVER['KIENZLE_PERSONEN'] = rawurlencode(json_encode([['l' => 'anna', 'n' => 'Dr. med. Erika Beispiel', 'g' => ['Arzt'], 'a' => true, 'r' => []],

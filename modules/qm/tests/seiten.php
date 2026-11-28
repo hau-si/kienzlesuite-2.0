@@ -36,6 +36,7 @@ $alle = 'lesen,schreiben,vidieren,vorlegen';
 $o = aufruf($dir, '/qm/', 'anna', 'lesen');
 check(str_contains($o, '#CODE=200') && str_contains($o, 'Guten Tag, Anna') && str_contains($o, 'Nichts zu lesen') && !str_contains($o, 'Neues Dokument') && str_contains($o, '<aside class="side">'), 'Startseite MFA im Rahmen');
 check(str_contains(aufruf($dir, '/qm/', 'erika', '', 'admin'), 'Guten Tag, Erika'), 'Anrede ohne Titel');
+check(str_contains($o, '<p class="eyebrow">QM</p>') && !str_contains($o, '>Qualitätsmanagement<'), 'sichtbarer Name „QM“');
 check(str_contains(aufruf($dir, '/qm/', 'anna', ''), '#CODE=403'), 'ohne Recht kein Zugang');
 check(str_contains(aufruf($dir, '/qm/neu', 'anna', 'lesen'), '#CODE=403') && str_contains(aufruf($dir, '/qm/import', 'anna', 'lesen'), '#CODE=403'), 'Neu und Import nur mit „schreiben“');
 $o = aufruf($dir, '/qm/neu', 'ben', 'lesen,schreiben');
