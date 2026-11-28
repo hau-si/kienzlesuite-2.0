@@ -93,6 +93,11 @@ class PdfTest(unittest.TestCase):
         for ch in 'ıŞşĞŁąСΣ':
             self.assertIn(ch, unicode)
         self.assertIsNone(padpdf._SCHRIFT, 'danach wieder Standardschrift')
+        try:
+            import fontTools  # noqa: F401
+            self.assertLess(len(pdf), 150_000, 'mit fontTools nur die benutzten Zeichen eingebettet')
+        except ImportError:
+            pass
         # gleiche Lage der Objekte (xref)
         start = int(re.search(rb'startxref\n(\d+)', pdf).group(1))
         for i, lage in enumerate(re.findall(rb'(\d{10}) 00000 n', pdf[start:]), 1):

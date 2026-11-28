@@ -4,7 +4,8 @@ Unterschriftsnachweis (Zeitpunkt, Pad, Vorgang, Prüfsumme der Unterschriftsdate
 
 Echtes Text-PDF mit den Standardschriften Helvetica (WinAnsi, deckt Umlaute, €, „“, –, • ab), die Unterschrift als Graustufenbild.
 Enthält der Text Zeichen außerhalb von WinAnsi (Sprachfassungen: Türkisch, Polnisch, Rumänisch, Kyrillisch, Griechisch), wird DejaVu Sans
-eingebettet (TrueType, Identity-H, mit ToUnicode zum Suchen und Kopieren).
+eingebettet (TrueType, Identity-H, mit ToUnicode zum Suchen und Kopieren). Mit python3-fonttools nur die benutzten Zeichen
+(Glyphen-Nummern bleiben gleich), sonst die ganze Schrift.
 Ohne Zusatzpakete außer Pillow. Aufruf: padpdf.vorgang_pdf(verbindung, vorgangs_id, ordner_unterschriften)."""
 from __future__ import annotations
 
@@ -73,6 +74,33 @@ class TrueType:
         g = self.cmap.get(ord(ch), self.cmap.get(ord('?'), 0))
         self.benutzt.setdefault(g, ch)
         return g
+
+    def ausschnitt(self) -> bytes:
+        """Schrift nur mit den benutzten Glyphen (gleiche Nummern, damit CID = GID bleibt); ohne fontTools die ganze Datei."""
+        try:
+            import logging
+
+            from fontTools import subset
+            from fontTools.ttLib import TTFont
+            logging.getLogger('fontTools').setLevel(logging.ERROR)
+        except ImportError:
+            return self.roh
+        try:
+            opt = subset.Options()
+            opt.retain_gids = True
+            opt.notdef_outline = True
+            opt.name_IDs = ['*']
+            opt.hinting = False
+            opt.layout_features = []
+            schrift = TTFont(io.BytesIO(self.roh))
+            s = subset.Subsetter(opt)
+            s.populate(gids=sorted(set(self.benutzt) | {0}))
+            s.subset(schrift)
+            aus = io.BytesIO()
+            schrift.save(aus)
+            return aus.getvalue()
+        except Exception:  # noqa: BLE001 – lieber die ganze Schrift als kein PDF
+            return self.roh
 
     def breite(self, ch: str) -> float:
         g = self.cmap.get(ord(ch), self.cmap.get(ord('?'), 0))
@@ -322,7 +350,12 @@ def _erzeugen(d: dict, ziel: str) -> None:
 
 def _schrift_einbetten(neu, strom, f: TrueType, name: bytes) -> int:
     """Type0-Schrift (Identity-H) mit eingebetteter TrueType-Datei, Breiten der benutzten Glyphen und ToUnicode."""
-    datei = neu(strom(b'/Length1 %d /Filter /FlateDecode' % len(f.roh), zlib.compress(f.roh, 9)))
+    roh = f.ausschnitt()
+    if roh is not f.roh:
+        # Ausschnitt: Name mit sechs Großbuchstaben und „+“ (PDF-Norm), abgeleitet aus den benutzten Glyphen
+        h = hashlib.sha256(repr(sorted(f.benutzt)).encode()).digest()
+        name = bytes(65 + b % 26 for b in h[:6]) + b'+' + name
+    datei = neu(strom(b'/Length1 %d /Filter /FlateDecode' % len(roh), zlib.compress(roh, 9)))
     beschr = neu(b'<< /Type /FontDescriptor /FontName /%s /Flags 32 /FontBBox [%d %d %d %d] /ItalicAngle 0 /Ascent %d /Descent %d /CapHeight %d /StemV 80 /FontFile2 %d 0 R >>'
                  % (name, *f.bbox, f.aufwaerts, f.abwaerts, f.aufwaerts, datei))
     glyphen = sorted(f.benutzt)

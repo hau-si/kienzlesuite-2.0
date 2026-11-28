@@ -1,5 +1,11 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.48
+
+- **Kleinere PDFs in Fremdsprachen:** Statt der ganzen Schrift (etwa 0,7 MB) wird nur noch der Ausschnitt mit den benutzten Zeichen eingebettet (meist unter 30 KB). Dafür kommt das Paket `python3-fonttools` dazu (wird mit dem Modul installiert); fehlt es, wird wie bisher die ganze Schrift eingebettet.
+- Verweise auf fremde Produkte aus Code und Texten entfernt.
+- Mit Tests geprüft, nicht auf der VM.
+
 ## 0.1.0-beta.47
 
 - **Vorlage je IGeL-Leistung:** Im Editor unter „Weitere Einstellungen“ GOÄ-Ziffern oder Leistungsnamen eintragen. Kommt eine dieser Leistungen aus der Kasse, ist diese Vorlage vorgewählt; sonst der Standard-IGeL-Vertrag.
