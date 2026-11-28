@@ -1,0 +1,41 @@
+# Homepage: Mitteilungen der Praxis (Vertretung, Impfstoff lieferbar, Sonderöffnungszeiten, freier Text) auf die eigene
+# WordPress-Homepage schicken. Auf der Homepage zeigt das mitgelieferte Plugin „Praxisherz-Hinweise“ sie an.
+
+[module]
+id = "homepage"
+name = "Homepage"
+version = "0.1.0-beta.1"
+core_api = "2"
+description = "Mitteilungen auf die WordPress-Homepage der Praxis: Vertretung (mehrere Praxen), Impfstoff lieferbar, Sonderöffnungszeiten, freier Text. Je Mitteilung ein- und ausschaltbar, mit Zeitraum und wählbarem Ort (Leiste, Kasten, Fenster, Kurzcode)."
+
+[system]
+packages = ["php-fpm", "php-cli", "php-sqlite3", "php-curl", "php-zip", "php-mbstring"]
+user = "ks-homepage"
+data = "/var/lib/kienzle/homepage"
+
+[web]
+path = "/homepage"
+upstream = "unix:/run/kienzle/homepage/web.sock"
+protocol = "fastcgi"
+entry = "public/index.php"
+
+[[rights]]
+id = "mitteilungen"
+label = "Homepage: Mitteilungen anlegen, ändern, ein- und ausschalten"
+
+[[rights]]
+id = "praxen"
+label = "Homepage: Liste der Vertretungspraxen pflegen"
+
+[backup]
+paths = ["/var/lib/kienzle/homepage"]
+
+[setup]
+overview = "bin/setup-overview"
+
+[hooks]
+install = "bin/install"
+update = "bin/update"
+remove = "bin/remove"
+busy = "bin/busy"
+health = "bin/health"

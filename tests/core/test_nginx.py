@@ -147,7 +147,7 @@ class Befehl(unittest.TestCase):
             r = self.run_cli(tmp, 'schreiben', str(ROOT / 'modules'))
             self.assertEqual(r.returncode, 0, r.stderr)
             reg = json.loads((Path(tmp) / 'modules.json').read_text())
-            self.assertEqual([m['module']['id'] for m in reg['modules']], ['beispiel', 'fax', 'kasse', 'qm', 'signatur', 'telefon', 'terminzettel'])
+            self.assertEqual([m['module']['id'] for m in reg['modules']], ['beispiel', 'fax', 'homepage', 'kasse', 'qm', 'signatur', 'telefon', 'terminzettel'])
             self.assertIn('/_auth/beispiel', (Path(tmp) / 'kienzle.conf').read_text())
             self.assertEqual(oct((Path(tmp) / 'modules.json').stat().st_mode & 0o777), '0o640')
 

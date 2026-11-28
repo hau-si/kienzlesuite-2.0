@@ -1,6 +1,6 @@
 # Basis – Release-Notizen
 
-## 0.22.0-beta.48
+## 0.22.0-beta.50
 
 - **Alte Verweise aufgeräumt (Wunsch des Nutzers): Der Praxisherz-Agent ist der Hauptweg, Handanleitungen bleiben eingeklappt als Notweg.**
 - Einrichtungs-Überblick: Die drei Handpunkte am PC („Zertifizierungsstelle eingerichtet“, „Virtuelle Drucker eingerichtet“, „Arbeitsplatz-Starter der Module neu installiert“) sind ein Punkt „Praxisherz-Agent auf allen Arbeitsplätzen installiert (Starter, Zertifikat, Drucker)“ mit der Zahl der angemeldeten Arbeitsplätze. Ohne Modul mit T2med-Start bleibt nur der Punkt zum Zertifikat. Ein früher bestätigter Starter-Punkt gilt weiter als erledigt.
@@ -10,6 +10,19 @@
 - Start-ISO heißt jetzt `praxisherz-start.iso`, vorbelegter Servername in Doku und Kommentaren `praxisherz`. Video: Titelbild mit Herz statt „K“.
 - Doku (README, ARCHITEKTUR, INSTALLATION, VM-TEST mit neuem Abschnitt zum Agent, MODULE-TOML, MODUL-SCHNITTSTELLE) auf den aktuellen Stand; Bildschirmfotos neu erzeugt.
 - Mit Tests geprüft. Nicht auf der VM, nicht unter Windows geprüft.
+
+## 0.22.0-beta.49
+
+- Neues Modul **Homepage** (`modules/homepage`, 0.1.0-beta.1) wird mitgeliefert: Mitteilungen (Vertretung, Impfstoff lieferbar, Sonderöffnungszeiten, freier Text) auf die WordPress-Homepage der Praxis, mit Plugin „Praxisherz-Hinweise“. Details in `modules/homepage/RELEASE.md`.
+- Globus-Symbol für das Modul „Homepage“ in Seitenleiste und Startseite.
+- Lokale Vorschau (`scripts/modul-vorschau`) und Bildschirmfotos um die Homepage erweitert.
+- Mit Tests geprüft. Nicht auf der VM geprüft.
+
+## 0.22.0-beta.48
+
+- **README und Bilder aktualisiert:** Übersicht aller Module mit Stand und Funktionen (Kasse, Terminzettel, Signatur, Qualitätsmanagement, Telefon, Fax), neue Abschnitte und Bilder für Telefon (Vorgänge, Statistik, Anlage), Fax (Senden, Eingang) und den Signatur-Editor; alle vorhandenen Bilder neu erzeugt. Das Erklärvideo bekommt die neuen Szenen (`scripts/video-bauen.py`).
+- Bildschirmfotos: Die Seiten der Basis zeigen jetzt die echten Module (Menü, Rechte, Gruppen, Starter) statt des Beispielmoduls; die Modul-Vorschau (`scripts/modul-vorschau/`) kann Fax und Telefon mit erfundenen Daten (`init-fax-telefon.php`), die Signatur zeigt eine erfundene Live-Ansicht des Pads.
+- Nur Dokumentation und Werkzeuge für Bilder, keine Änderung am Server. Bilder mit Chromium in der lokalen Vorschau erzeugt, nicht auf der VM.
 
 ## 0.22.0-beta.47
 

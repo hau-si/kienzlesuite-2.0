@@ -1,17 +1,22 @@
 # Praxisherz – freie Software für die Arztpraxis
 
 Praxis-Appliance für Hausarztpraxen mit T2med: **eine Basis**, einmal auf einer VM installiert, und **Module**, die
-einzeln dazukommen – Kasse (SumUp), Terminzettel, Signatur, Qualitätsmanagement, Fax und Telefon. Verwaltung komplett im
-Webinterface; Firewall, Benutzer, Admin-Zugang mit OTP, Updates und verschlüsselte Sicherung gibt es nur einmal, in der Basis.
+einzeln dazukommen. Verwaltung komplett im Webinterface; Anmeldung, Benutzer und Rechte, Firewall, Admin-Zugang mit OTP,
+Updates, verschlüsselte Sicherung und die Verbindungen zu T2med, E-Mail, SMS und Netzwerkspeicher gibt es nur einmal, in der Basis.
 
-Stand (28.11.2026, Zweig `beta`): **Basis 0.22.0-beta.48** mit den Modulen
-- **Kasse** 2.3.4-beta.67: SumUp-Kartenzahlung, Rechnungseingang aus T2med (mit Nachbearbeitung nicht erkannter Rechnungen), Überweisung mit QR-Code, IGeL und GOÄ, Vorgänge mit Excel-Export, Post per Letterxpress.
-- **Terminzettel** 1.3.0-beta.25: T2med-Termine auf dem Bondrucker, mit Praxislogo, Kalender-QR und Absage-QR.
-- **Signatur** 0.1.0-beta.51: Verträge, Aufklärungen und Datenschutz am signotec-Pad unterschreiben lassen, als PDF in die T2med-Akte.
-- **Qualitätsmanagement** 0.1.0-beta.1: QM-Handbuch mit Lesebestätigung und Wiedervorlage.
-- **Telefon** 0.1.0-beta.31 und **Fax** 0.1.0-beta.16: Telefonanlage mit Sprachmenü und Rufgruppen, papierloses Fax (übernommen von Kienzlefon und Kienzlefax).
+Stand (28.11.2026, Zweig `beta`): **Basis 0.22.0-beta.50** mit den Modulen
 
-Installierbar bisher nur auf einer Test-VM ([docs/VM-TEST.md](docs/VM-TEST.md)).
+| Modul | Version | Was es kann |
+|---|---|---|
+| **Kasse** | 2.3.4-beta.67 | Kartenzahlung am SumUp-Terminal, bar oder per Überweisung mit QR-Code. Rechnungen aus T2med kommen über den Drucker „vKasse“ an und werden gelesen (auch per Texterkennung, mit Nachbearbeitung nicht erkannter Rechnungen). IGeL und GOÄ ohne T2med-Rechnung, Storno, Vorgänge mit Excel-Export, Post per Letterxpress, PDF-Ablage im Netzwerkordner. |
+| **Terminzettel** | 1.3.0-beta.25 | Termine aus T2med groß und lesbar auf dem Bondrucker, mit Praxislogo, Kalender-QR je Termin und Absage-QR (vorbereitete E-Mail). |
+| **Signatur** | 0.1.0-beta.51 | IGeL-Verträge, Aufklärungen und Datenschutzerklärungen am signotec-Pad unterschreiben lassen, mit Live-Ansicht des Pads. Eigene Dokumente im Baustein-Editor (Text, Patientendaten, Ankreuzfelder, Auswahl, Bilder). Patient aus T2med, Übergabe an die Kasse, unterschriebenes PDF zurück in die Akte. |
+| **Qualitätsmanagement** | 0.1.0-beta.1 | QM-Handbuch mit Ordnern, Tags und Suche; Dokumente schreiben oder aus Word übernehmen (z. B. QEP-Muster der KBV), vidieren, zur Kenntnis vorlegen, Lesebestätigung und Wiedervorlage. |
+| **Telefon** | 0.1.0-beta.31 | Eigene Telefonanlage (Asterisk) mit Leitungen, Telefonen und Warteschlange. Sprachmenü mit Ansagen und Wartemusik; aufgesprochene Anliegen (Rezept, Termin, Überweisung, Rückruf) werden als Text erkannt und als Vorgänge abgearbeitet, mit Rückruf und SMS. Rufgruppen, Anrufübersicht, Anrufstatistik ohne Nummern und Namen. |
+| **Fax** | 0.1.0-beta.16 | Papierloses Fax über die Leitung des Moduls Telefon: auf einen Faxdrucker drucken oder Dateien hineinziehen, mehrere Dokumente zu einem Fax, Telefonbuch mit Favoriten, Sendeprotokoll und Fehlerberichte, Faxeingang mit Texterkennung und Benachrichtigung per E-Mail. |
+| **Homepage** | 0.1.0-beta.1 | Mitteilungen auf die WordPress-Homepage: Vertretung (mehrere Praxen aus einer Liste), Impfstoff lieferbar, Sonderöffnungszeiten oder freier Text; je Mitteilung ein- und ausschaltbar, mit Zeitraum und Ort (Leiste, Kasten, Fenster, Kurzcode). Plugin „Praxisherz-Hinweise“ für WordPress liegt bei. |
+
+Installierbar nur auf einer Test-VM ([docs/VM-TEST.md](docs/VM-TEST.md)); was noch geplant ist, steht in [docs/PLAN.md](docs/PLAN.md).
 
 ![Basis und Module](docs/architektur-whiteboard.png)
 
@@ -41,7 +46,7 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 
 ![Einrichtung](docs/screenshots/einrichtung.png)
 
-**Arbeitsplätze:** Ein Paket je PC richtet den Praxisherz-Agent ein: Er öffnet die Module aus T2med mit dem aktuellen Patienten, richtet Zertifikat und virtuelle Drucker ein, öffnet Akten per „Akte öffnen“ und hält sich selbst aktuell. Wer keinen Agent nutzt (Mac, Linux), findet jeden Schritt eingeklappt auch zum Einrichten von Hand.
+**Arbeitsplätze:** Ein Paket je PC richtet den Praxisherz-Agent ein (Windows-Setup mit einem Klick): Starter für T2med, Zertifikat, virtuelle Drucker und „Akte öffnen“. Ein Schlüssel gilt für alle Module; T2med startet damit Kasse, Signatur und Telefon mit dem aktuellen Patienten. Ohne Agent (Mac, Linux) steht jeder Schritt eingeklappt auch zum Einrichten von Hand bereit.
 
 ![Starter](docs/screenshots/starter.png)
 
@@ -79,9 +84,15 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 
 ![Terminzettel](docs/screenshots/terminzettel.png)
 
-**Signatur:** Vorgänge für Unterschriften am Pad, Pads je Arbeitsplatz und die Pad-Software von signotec (wird nicht mitgeliefert, Upload als ZIP).
+**Signatur:** Patient oben rechts (aus T2med oder per Namen), Dokument wählen, ans Pad am Arbeitsplatz senden. Links die offenen Vorgänge; liegt ein Dokument am Pad, zeigt die Live-Ansicht, was der Patient gerade sieht. Dokumente lassen sich vor und nach der Unterschrift drucken.
 
 ![Signatur-Vorgänge](docs/screenshots/signatur-vorgaenge.png)
+
+**Signatur – Editor:** Dokumente aus Bausteinen (Text mit Platzhaltern wie `{{patient}}`, Patientendaten, Ankreuzfeld, Einzel- und Mehrfachauswahl, Aufzählung, Bild, Trennlinie, Seitenumbruch); rechts die Vorschau, wie das Pad das Dokument zeigt.
+
+![Signatur-Editor](docs/screenshots/signatur-editor.png)
+
+**Signatur – Einstellungen:** Pads je Arbeitsplatz (Suche im Netzwerk, Anleitung für das Servicemenü) und die Pad-Software von signotec (wird nicht mitgeliefert, Upload als ZIP).
 
 ![Signatur-Pads](docs/screenshots/signatur-pads.png)
 
@@ -98,6 +109,32 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 ![QM-Editor](docs/screenshots/qm-editor.png)
 
 ![QM-Import](docs/screenshots/qm-import.png)
+
+**Telefon – Vorgänge:** Anrufer sprechen im Sprachmenü ihr Anliegen auf; die Spracherkennung (Whisper, auf dem Server) macht daraus eine Karte mit Name, Geburtsdatum, Rückrufnummer und Anliegen. Reiter Neu, In Bearbeitung, Erledigt und Papierkorb; „Übernehmen“, „Dringend“, Kommentare, Zurückrufen am eigenen Telefon und SMS an den Anrufer. Die Vorgänge liegen verschlüsselt auf dem Server, die Tonaufnahme lässt sich 14 Tage anhören.
+
+![Telefon-Vorgänge](docs/screenshots/telefon-vorgaenge.png)
+
+**Telefon – Statistik:** Anrufe je Tag, gewählte Anliegen, angenommene Anrufe und Wartezeit, dazu die Zeiten, in denen am meisten angerufen wird. Gespeichert werden nur Zeitpunkte und Anliegen, keine Nummern oder Namen.
+
+![Telefon-Statistik](docs/screenshots/telefon-statistik.png)
+
+**Telefon – Anlage:** Leitungen der Anbieter und Telefone der Praxis (mit automatischer Einrichtung für Snom-Telefone), Warteschlange, Rufgruppen, Sprachmenü mit Ansagen (Sprachausgabe auf dem Server) und Wartemusik. Mit T2med lassen sich Patienten suchen und ihre Akte am Arbeitsplatz öffnen (die Namensanzeige beim Anruf wird gerade an die Vorgaben von T2med angepasst).
+
+![Telefonanlage](docs/screenshots/telefon-anlage.png)
+
+**Fax senden:** Am PC auf einen Faxdrucker (vFax1 … vFax5, auch mit fester Nummer, z. B. „Labor“) drucken oder Dateien in die Seite ziehen; mehrere Dokumente werden in der Reihenfolge des Anhakens ein Fax. Empfänger aus Telefonbuch, Favoriten und „zuletzt“; Vorschau der ersten Seite.
+
+![Fax senden](docs/screenshots/fax-senden.png)
+
+**Faxeingang:** Empfangene Faxe mit Absender aus dem Telefonbuch; die Suche findet auch Wörter im Faxtext (Texterkennung auf dem Server). Auf Wunsch kommt eine E-Mail bei jedem neuen Fax, Ablage im Netzwerkordner möglich.
+
+![Faxeingang](docs/screenshots/fax-eingang.png)
+
+**Homepage:** Mitteilungen auf die WordPress-Homepage der Praxis schicken: Vertretung (mehrere Praxen aus einer Liste, mit Anschrift und Telefon), Impfstoff lieferbar, Sonderöffnungszeiten oder freier Text. Jede Mitteilung lässt sich ein- und ausschalten, hat einen Zeitraum und erscheint wahlweise als Leiste oben, Kasten auf der Startseite, Fenster beim Öffnen oder an der Stelle eines Kurzcodes. Vorschau beim Tippen; in WordPress zeigt das mitgelieferte Plugin „Praxisherz-Hinweise“ die Mitteilungen an.
+
+![Homepage-Mitteilungen](docs/screenshots/homepage-mitteilungen.png)
+
+![Homepage-Vertretungspraxen](docs/screenshots/homepage-praxen.png)
 
 **Updater:** Updates je Modul und Basis aus signierten Releases (Kanal stabil oder beta), Sicherung vor dem Update, automatischer Rücksprung bei einem Fehler. Kein Update, solange z. B. eine Kartenzahlung läuft.
 

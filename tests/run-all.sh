@@ -110,6 +110,13 @@ php modules/qm/tests/seiten.php
 grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/qm/module.toml | head -1)" modules/qm/VERSION || { echo 'modules/qm/VERSION passt nicht zu module.toml'; exit 1; }
 for h in modules/qm/bin/*; do sh -n "$h"; done
 
+step 'Modul Homepage (modules/homepage/tests)'
+php modules/homepage/tests/homepage.php
+php modules/homepage/tests/seiten.php
+php -l modules/homepage/wordpress/praxisherz-hinweise/praxisherz-hinweise.php >/dev/null
+grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/homepage/module.toml | head -1)" modules/homepage/VERSION || { echo 'modules/homepage/VERSION passt nicht zu module.toml'; exit 1; }
+for h in modules/homepage/bin/*; do sh -n "$h"; done
+
 step 'Arbeitsplatz-Starter (core/client/starter)'
 if command -v go >/dev/null; then (cd core/client/starter && go vet ./... && go test ./...); else echo 'go nicht installiert – Starter-Tests übersprungen.'; fi
 for h in core/client/install-linux.sh core/client/install-macos.command; do bash -n "$h"; done

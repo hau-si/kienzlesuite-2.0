@@ -1,8 +1,8 @@
 <?php
-// Legt erfundene Beispieldaten für die Vorschau von Terminzettel, Signatur und QM an: php scripts/modul-vorschau/init.php  (Ziel $VORSCHAU_DATEN, Standard /tmp/modul-vorschau)
+// Legt erfundene Beispieldaten für die Vorschau von Terminzettel, Signatur, QM, Fax, Telefon und Homepage an: php scripts/modul-vorschau/init.php  (Ziel $VORSCHAU_DATEN, Standard /tmp/modul-vorschau)
 $root = dirname(__DIR__, 2);
 $ziel = rtrim(getenv('VORSCHAU_DATEN') ?: '/tmp/modul-vorschau', '/');
-foreach (['signatur', 'terminzettel', 'qm'] as $m) if (!is_dir("$ziel/$m")) mkdir("$ziel/$m", 0755, true);
+foreach (['signatur', 'terminzettel', 'qm', 'fax', 'telefon', 'homepage', 'austausch', 'schluessel'] as $m) if (!is_dir("$ziel/$m")) mkdir("$ziel/$m", 0755, true);
 putenv("KIENZLE_DATEN=$ziel/signatur");
 require $root . '/modules/signatur/src/bootstrap.php';
 use KienzleSignatur\{Pad, Seite, Speicher};
@@ -20,6 +20,18 @@ if (!(int)$pdo->query('SELECT COUNT(*) FROM pads')->fetchColumn()) {
     $id1 = Seite::vorgangAnlegen(['vorlage_id' => $v[0]['id'], 'patient' => 'Max Mustermann', 'leistung' => 'Reisemedizinische Beratung', 'betrag' => '45,00', 'pad_id' => Seite::pads(true)[0]['id']], 'anna', $praxis);
     Seite::vorgangAnlegen(['vorlage_id' => $v[1]['id'], 'patient' => 'Erika Musterfrau', 'leistung' => 'Impfberatung', 'pad_id' => Seite::pads(true)[1]['id']], 'anna', $praxis);
     Seite::amPadZeigen($id1);
+}
+// Live-Vorschau des Pads (sonst schreibt sie der Pad-Dienst): Unterschriftsseite mit erfundenem Text und Unterschriftslinie.
+if (!is_file("$ziel/signatur/vorschau/1.png") && function_exists('imagecreatetruecolor')) {
+    if (!is_dir("$ziel/signatur/vorschau")) mkdir("$ziel/signatur/vorschau", 0700, true);
+    $im = imagecreatetruecolor(640, 400); $weiss = imagecolorallocate($im, 255, 255, 255); $grau = imagecolorallocate($im, 90, 90, 90); $blau = imagecolorallocate($im, 20, 50, 140);
+    imagefill($im, 0, 0, $weiss);
+    foreach (['Patientenaufklaerung (Muster)', '', 'Patient: Max Mustermann', 'Ich habe die Aufklaerung gelesen und verstanden.', 'Datum: ' . date('d.m.Y')] as $i => $z) imagestring($im, $i ? 4 : 5, 30, 30 + $i * 28, $z, $grau);
+    imageline($im, 30, 330, 610, 330, $grau); imagestring($im, 3, 30, 340, 'Unterschrift', $grau);
+    $x0 = 60; $y0 = 300;
+    for ($x = 0; $x < 260; $x += 2) { $y = (int)($y0 - 18 * sin($x / 14) - ($x % 60 < 30 ? $x % 30 : 30 - $x % 30) * 0.6); imagefilledellipse($im, $x0 + $x, $y, 4, 4, $blau); }
+    imagepng($im, "$ziel/signatur/vorschau/1.png");
+    file_put_contents("$ziel/signatur/vorschau/1.json", json_encode(['seite' => 2, 'seiten' => 2, 'zeit' => time(), 'art' => 'unterschrift', 'punkte' => 412]));
 }
 
 // QM: Handbuch mit erfundenen Dokumenten in allen Zuständen
@@ -65,4 +77,21 @@ if (!(int)KienzleQm\Speicher::pdo()->query('SELECT COUNT(*) FROM dokumente')->fe
         $q::vidieren($x, $arzt, 'EB', $t + 600);
     }
 }
+require __DIR__ . '/init-fax-telefon.php';
 echo "Daten in $ziel\n";
+
+// Homepage: Vertretungspraxen und Mitteilungen (erfunden)
+require $root . '/modules/homepage/src/bootstrap.php';
+KienzleHomepage\Speicher::$data = "$ziel/homepage";
+if (!KienzleHomepage\Praxen::alle()) {
+    $hp = 'KienzleHomepage\Praxen';
+    $a = $hp::speichern(0, ['name' => 'Praxis Dr. med. Erika Beispiel', 'strasse' => 'Musterstraße 1', 'ort' => '12345 Musterstadt', 'telefon' => '01234 56789']);
+    $b = $hp::speichern(0, ['name' => 'Hausarztpraxis Max Mustermann', 'strasse' => 'Beispielweg 7', 'ort' => '12345 Musterstadt', 'telefon' => '01234 98765', 'zusatz' => 'Mo–Fr 8–12 Uhr']);
+    $hp::speichern(0, ['name' => 'Praxis Dr. med. Anna Muster', 'strasse' => 'Am Beispielplatz 3', 'ort' => '12345 Musterstadt', 'telefon' => '01234 55555']);
+    $mt = 'KienzleHomepage\Mitteilungen';
+    $heute = date('Y-m-d');
+    $mt::speichern(0, ['art' => 'vertretung', 'titel' => 'Urlaubsvertretung', 'praxen' => [$a, $b], 'von' => date('Y-m-d', strtotime('-1 day')), 'bis' => date('Y-m-d', strtotime('+12 days')), 'orte' => ['leiste', 'kasten']], 'anna');
+    $mt::speichern(0, ['art' => 'impfstoff', 'titel' => 'Grippeimpfstoff ist lieferbar', 'text' => 'Bitte vereinbaren Sie einen Termin.', 'orte' => ['kasten']], 'anna');
+    $mt::speichern(0, ['art' => 'oeffnungszeiten', 'titel' => 'Silvester nur bis 12 Uhr geöffnet', 'orte' => ['fenster'], 'tage_datum' => [date('Y') . '-12-31'], 'tage_zeit' => ['8–12 Uhr']], 'anna', false);
+    $mt::speichern(0, ['art' => 'frei', 'titel' => 'Praxis wegen Fortbildung geschlossen', 'von' => date('Y-m-d', strtotime('+20 days')), 'bis' => date('Y-m-d', strtotime('+20 days')), 'orte' => ['leiste']], 'anna');
+}

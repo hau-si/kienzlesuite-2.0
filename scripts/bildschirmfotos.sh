@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 ziel="${1:-docs/screenshots}"; tmp="$(mktemp -d)"; mkdir -p "$ziel"
 php scripts/bildschirmfotos.php "$tmp" >/dev/null
-# Module: lokale PHP-Server mit erfundenen Werten (Kasse Port 8099, Terminzettel, Signatur und QM Port 8098)
+# Module: lokale PHP-Server mit erfundenen Werten (Kasse Port 8099, Terminzettel, Signatur, QM, Fax und Telefon Port 8098)
 export VORSCHAU_DATEN="$tmp/kasse"; php scripts/kasse-vorschau/init.php >/dev/null
 VORSCHAU_DATEN="$tmp/module" php scripts/modul-vorschau/init.php >/dev/null
 php -S 127.0.0.1:8099 scripts/kasse-vorschau/router.php >/dev/null 2>&1 & server=$!

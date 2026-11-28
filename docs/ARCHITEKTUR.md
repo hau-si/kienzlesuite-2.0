@@ -38,6 +38,7 @@ praxisherz/
     terminzettel/
     signatur/
     qm/                 Qualitätsmanagement
+    homepage/           Mitteilungen auf die WordPress-Homepage (mit Plugin „Praxisherz-Hinweise“)
     fax/
     telefon/
     kienzlezeit/
