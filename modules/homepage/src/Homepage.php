@@ -76,7 +76,8 @@ final class Homepage {
         }
         $hinweise = array_merge(Mitteilungen::fuerHomepage(), Zeiten::fuerHomepage($k));   // eigene und automatische aus Praxis → Öffnungszeiten
         $zeit = time();
-        $koerper = (string)json_encode(['format' => 1, 'zeit' => $zeit, 'hinweise' => $hinweise], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        // Öffnungszeiten-Karte (Kurzcode [praxisherz_oeffnungszeiten]); fehlt sie, bleibt die Karte auf der Homepage leer.
+        $koerper = (string)json_encode(['format' => 1, 'zeit' => $zeit, 'hinweise' => $hinweise, 'oeffnung' => Oeffnung::fuerHomepage($k)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         [$code, $antwort, $fehler, $weiter] = self::senden(self::adresse() . self::ROUTE, $koerper, [
             'Content-Type: application/json; charset=utf-8',
             'X-Praxisherz-Zeit: ' . $zeit,
@@ -149,7 +150,7 @@ final class Homepage {
         try {
             $z = new \ZipArchive();
             if ($z->open($tmp, \ZipArchive::OVERWRITE) !== true) throw new \RuntimeException('ZIP nicht anlegbar.');
-            foreach (['praxisherz-hinweise.php', 'hinweise.css', 'hinweise.js', 'readme.txt'] as $f) $z->addFile($quelle . '/' . $f, self::PLUGIN . '/' . $f);
+            foreach (['praxisherz-hinweise.php', 'hinweise.css', 'hinweise.js', 'oeffnung.js', 'readme.txt'] as $f) $z->addFile($quelle . '/' . $f, self::PLUGIN . '/' . $f);
             $z->close();
             return (string)file_get_contents($tmp);
         } finally {

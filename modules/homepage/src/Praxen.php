@@ -50,6 +50,9 @@ final class Praxen {
                 throw new \InvalidArgumentException('„' . $p['name'] . '“ steht noch in der Mitteilung „' . Mitteilungen::titel($m) . '“. Bitte dort zuerst abwählen.');
             }
         }
+        foreach (Oeffnung::dienste() as $d) {
+            if ($d['praxis'] === $id) throw new \InvalidArgumentException('„' . $p['name'] . '“ steht noch beim Bereitschaftsdienst (' . Oeffnung::wannText($d['wann'], $d['datum']) . '). Bitte dort zuerst ändern.');
+        }
         $pdo = Speicher::pdo();
         $pdo->beginTransaction();
         foreach (Mitteilungen::alle() as $m) {

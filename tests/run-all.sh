@@ -113,6 +113,7 @@ for h in modules/qm/bin/*; do sh -n "$h"; done
 step 'Modul Homepage (modules/homepage/tests)'
 php modules/homepage/tests/homepage.php
 php modules/homepage/tests/seiten.php
+php modules/homepage/tests/oeffnung.php
 php -l modules/homepage/wordpress/praxisherz-hinweise/praxisherz-hinweise.php >/dev/null
 grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/homepage/module.toml | head -1)" modules/homepage/VERSION || { echo 'modules/homepage/VERSION passt nicht zu module.toml'; exit 1; }
 for h in modules/homepage/bin/*; do sh -n "$h"; done

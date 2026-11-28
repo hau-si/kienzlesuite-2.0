@@ -1,5 +1,17 @@
 # Release-Notizen Homepage
 
+## 0.1.0-beta.4
+
+- **Neue Seite „Öffnungszeiten“** (Entwurf A, Wahl des Nutzers) mit der **Öffnungszeiten-Karte für die Homepage** (Entwurf B): Kurzcode `[praxisherz_oeffnungszeiten]` in einer WordPress-Seite oder einem Widget.
+  - Die Karte zeigt **immer die regulären Sprechzeiten** (gleiche Zeiten zusammengefasst, heute hervorgehoben) und darüber den aktuellen Zustand: „Jetzt geöffnet – bis 12:00 Uhr“, „Mittagspause – wieder erreichbar ab 14:00 Uhr (in 1 Std. 20 Min.)“ oder „Gerade geschlossen – öffnet morgen um 08:00 Uhr (in 13 Std.)“. Bei Urlaub, Feiertag oder Schließung steht der Grund dabei („Heute: Urlaub“) und die Vertretung.
+  - Außerhalb der Sprechzeiten erscheint der **gerade zuständige ärztliche Bereitschaftsdienst** (Praxis, Anschrift, Telefon, bis wann) bzw. „heute ab …“; darunter immer ein Hinweis, Vorgabe „Ärztlicher Bereitschaftsdienst: 116 117“ (änderbar).
+  - Gerechnet wird im Browser des Besuchers und jede Minute neu (`oeffnung.js`), damit es auch bei zwischengespeicherten Seiten stimmt.
+- **Bereitschaftsdienst** als Liste mit „+ Eintrag“: jede Woche gleich (z. B. jeden Mittwoch 13–19 Uhr, Praxis aus der Liste der Vertretungspraxen), **an Feiertagen abweichend** (gilt an den Feiertagen der Praxis statt der Wochentagsregel) oder an einem einzelnen Datum (ersetzt an diesem Tag alle anderen). Ende vor Beginn = über Nacht bis zum Folgetag. Neues Recht `oeffnungszeiten`.
+- Reguläre Sprechzeiten, Feiertage, Urlaub und Sonderöffnungen kommen aus **Praxis → Öffnungszeiten** der Basis (nicht doppelt pflegen); die Seite zeigt sie und verweist dorthin.
+- **Plugin „Praxisherz-Hinweise“ 0.3.0** (neue Datei `oeffnung.js`) – bitte in WordPress ersetzen.
+- Eine Vertretungspraxis, die beim Bereitschaftsdienst eingetragen ist, lässt sich nicht löschen. Dienste an vergangenen Tagen werden beim Update aufgeräumt. Datenbank Schema 3 (Tabelle `dienste`).
+- Geprüft mit Tests (PHP, Rechnung des Skripts mit node: geöffnet, Mittagspause, geschlossen, Feiertag, Urlaub, Dienst über Mitternacht) und in Chromium mit fester Uhrzeit. **Nicht mit echtem WordPress und nicht auf der VM geprüft.**
+
 ## 0.1.0-beta.3
 
 - **Automatische Mitteilungen aus Praxis → Öffnungszeiten der Basis** (Verbindung `zeiten`): Schließungen, Sonderöffnungen und Feiertage mit Haken „Homepage“ erscheinen von selbst, mit den Vertretungspraxen je Zeitraum. Karte „Automatisch aus den Öffnungszeiten“ auf der Seite Mitteilungen mit Einstellungen: ein/aus, Orte, Farbe, Symbol, wie viele Tage vorher (Schließungen Vorgabe 14, Feiertage 3). Die Vorschau zeigt sie mit.

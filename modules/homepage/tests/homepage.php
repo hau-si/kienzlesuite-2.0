@@ -112,7 +112,7 @@ $tmp = "$dir/p.zip";
 file_put_contents($tmp, $zip);
 $z = new ZipArchive();
 check($z->open($tmp) === true && $z->locateName('praxisherz-hinweise/praxisherz-hinweise.php') !== false && $z->locateName('praxisherz-hinweise/hinweise.js') !== false
-    && $z->locateName('praxisherz-hinweise/readme.txt') !== false && $z->numFiles === 4, 'ZIP mit Plugin-Ordner');
+    && $z->locateName('praxisherz-hinweise/readme.txt') !== false && $z->locateName('praxisherz-hinweise/oeffnung.js') !== false && $z->numFiles === 5, 'ZIP mit Plugin-Ordner');
 $z->close();
 check(Homepage::pluginVersion() === PRAXISHERZ_HINWEISE_VERSION, 'Version aus dem Plugin-Kopf');
 

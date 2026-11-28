@@ -4,7 +4,7 @@
 [module]
 id = "homepage"
 name = "Homepage"
-version = "0.1.0-beta.3"
+version = "0.1.0-beta.4"
 core_api = "2"
 description = "Mitteilungen auf die WordPress-Homepage der Praxis: Vertretung (mehrere Praxen), Impfstoff lieferbar, Sonderöffnungszeiten, freier Text. Je Mitteilung ein- und ausschaltbar, mit Zeitraum und wählbarem Ort (Leiste, Kasten, Fenster, Kurzcode)."
 
@@ -28,6 +28,10 @@ required = false
 [[rights]]
 id = "mitteilungen"
 label = "Homepage: Mitteilungen anlegen, ändern, ein- und ausschalten"
+
+[[rights]]
+id = "oeffnungszeiten"
+label = "Homepage: Bereitschaftsdienst für die Öffnungszeiten-Karte pflegen"
 
 [[rights]]
 id = "praxen"

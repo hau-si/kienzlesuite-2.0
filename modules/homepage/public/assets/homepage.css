@@ -119,3 +119,13 @@ button.hp-klein-knopf { min-height: 32px; padding: 4px 12px; font-size: 13px; ma
 label.hp-symbolwahl { padding: 5px 9px; }
 label.hp-symbolwahl:has(input:checked)::before { content: none; }
 label.hp-symbolwahl svg { width: 18px; height: 18px; }
+
+/* Öffnungszeiten */
+.hp-woche th { width: 30%; font-weight: 600; color: inherit; border-bottom: 1px solid #edf0ee; }
+.hp-code { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 6px 6px 12px; border-radius: 9px; background: #f3f6f5; }
+.hp-code code { background: none; font-size: 14px; }
+.hp-code button { min-height: 32px; padding: 4px 12px; font-size: 13px; }
+.hp-notdienst { margin-top: 16px; }
+.hp-dienstform [data-wann][hidden] { display: none; }
+.hp-vorschau-karte .ph-oeffnung { max-width: none; }
+.hp-nowrap { white-space: nowrap; }

@@ -135,4 +135,28 @@ $o = aufruf($dir, '/homepage/', 'mitteilungen', 'mitarbeiter', ['aktion' => 'zei
 check(str_contains(ort($o), 'ok=zeiten') && str_contains(aufruf($dir, '/homepage/', 'mitteilungen'), 'ab 20.12.'), 'Einstellungen gespeichert: ' . ort($o));
 check(str_contains(ort(aufruf($dir, '/homepage/', 'praxen', 'mitarbeiter', ['aktion' => 'zeiten', 'orte' => ['kasten'], 'vorlauf' => '3', 'feiertage' => '1', 'kienzle-csrf' => $csrf])), 'fehler='), 'Einstellungen nur mit Recht');
 
+// Öffnungszeiten-Karte und Bereitschaftsdienst
+check(str_contains(aufruf($dir, '/homepage/oeffnungszeiten', 'oeffnungszeiten'), '#CODE=200'), 'Seite nur mit Recht „oeffnungszeiten“ erreichbar');
+file_put_contents("$dir/verbindungen/homepage.json", json_encode(['zeiten' => ['format' => 1, 'stand' => str_repeat('d', 32), 'woche' => ['sprech' => ['mo' => ['08:00-12:00'], 'di' => [], 'mi' => [],
+    'do' => [], 'fr' => [], 'sa' => [], 'so' => []], 'telefon' => []], 'ereignisse' => []]]));
+$o = aufruf($dir, '/homepage/oeffnungszeiten', 'oeffnungszeiten');
+check(str_contains($o, 'Reguläre Sprechzeiten') && str_contains($o, '08:00–12:00 Uhr') && str_contains($o, 'href="/verwaltung/zeiten"') && str_contains($o, '+ Eintrag')
+    && str_contains($o, 'class="ph-oeffnung"') && str_contains($o, '/homepage/plugin-dateien/oeffnung.js') && str_contains($o, '[praxisherz_oeffnungszeiten]'), 'Seite Öffnungszeiten');
+check(!str_contains(aufruf($dir, '/homepage/oeffnungszeiten', 'mitteilungen'), '+ Eintrag'), 'ohne Recht nur lesen');
+check(str_contains(aufruf($dir, '/homepage/oeffnungszeiten?dienst=neu', 'oeffnungszeiten'), 'name="wann"'), 'Formular');
+check(str_contains(aufruf($dir, '/homepage/plugin-dateien/oeffnung.js', 'oeffnungszeiten'), 'function status') && str_contains(aufruf($dir, '/homepage/plugin-dateien/praxisherz-hinweise.php', 'oeffnungszeiten'), '#CODE=404'), 'Plugin-Dateien (feste Liste)');
+$neu = ['aktion' => 'dienst-speichern', 'id' => '0', 'wann' => 'mi', 'von' => '13:00', 'bis' => '19:00', 'praxis' => (string)$ids[0], 'kienzle-csrf' => $csrf];
+check(str_contains(ort(aufruf($dir, '/homepage/oeffnungszeiten', 'mitteilungen', 'mitarbeiter', $neu)), 'fehler='), 'Dienst nur mit Recht');
+check(str_contains(aufruf($dir, '/homepage/oeffnungszeiten', 'oeffnungszeiten', 'mitarbeiter', ['kienzle-csrf' => 'x'] + $neu), '#CODE=403'), 'Dienst ohne CSRF');
+check(str_contains(ort(aufruf($dir, '/homepage/oeffnungszeiten', 'oeffnungszeiten', 'mitarbeiter', $neu)), 'ok=dienst'), 'Dienst angelegt');
+$fehler = ort(aufruf($dir, '/homepage/oeffnungszeiten', 'oeffnungszeiten', 'mitarbeiter', ['wann' => 'datum', 'datum' => ''] + $neu));
+check(str_contains($fehler, 'dienst=neu') && str_contains($fehler, 'fehler='), 'Fehler zurück ins Formular');
+$o = aufruf($dir, '/homepage/oeffnungszeiten', 'oeffnungszeiten');
+check(str_contains($o, 'jeden Mittwoch') && str_contains($o, '13:00–19:00') && str_contains($o, 'value="dienst-loeschen"'), 'Dienst in der Liste');
+$did = (int)db($dir)->query('SELECT id FROM dienste')->fetchColumn();
+check(str_contains(ort(aufruf($dir, '/homepage/oeffnungszeiten', 'oeffnungszeiten', 'mitarbeiter', ['aktion' => 'notdienst', 'notdienst' => 'Notruf 112, Bereitschaftsdienst 116 117', 'kienzle-csrf' => $csrf])), 'ok=notdienst')
+    && str_contains(aufruf($dir, '/homepage/oeffnungszeiten', 'oeffnungszeiten'), 'Notruf 112, Bereitschaftsdienst 116 117'), 'Hinweis gespeichert');
+check(str_contains(ort(aufruf($dir, '/homepage/oeffnungszeiten', 'oeffnungszeiten', 'mitarbeiter', ['aktion' => 'dienst-loeschen', 'id' => (string)$did, 'kienzle-csrf' => $csrf])), 'ok=dienst-weg')
+    && (int)db($dir)->query('SELECT COUNT(*) FROM dienste')->fetchColumn() === 0, 'Dienst gelöscht');
+
 echo "Homepage-Seiten: alle Tests bestanden.\n";

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Praxisherz-Hinweise
  * Description: Zeigt Mitteilungen aus Praxisherz (Vertretung, Impfstoff lieferbar, Sonderöffnungszeiten, freier Text) auf der Homepage an: als Leiste oben, Kasten auf der Startseite, Fenster beim Öffnen oder an der Stelle des Kurzcodes [praxisherz_hinweise].
- * Version: 0.2.0
+ * Version: 0.3.0
  * Requires at least: 5.3
  * Requires PHP: 7.4
  * Author: Praxisherz
@@ -17,7 +17,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('PRAXISHERZ_HINWEISE_VERSION', '0.2.0');
+define('PRAXISHERZ_HINWEISE_VERSION', '0.3.0');
 define('PRAXISHERZ_HINWEISE_ARTEN', ['vertretung', 'impfstoff', 'oeffnungszeiten', 'frei']);
 define('PRAXISHERZ_HINWEISE_ORTE', ['leiste', 'kasten', 'fenster', 'kurzcode']);
 define('PRAXISHERZ_HINWEISE_MAX_KOERPER', 262144);
@@ -54,7 +54,7 @@ register_activation_hook(__FILE__, 'praxisherz_hinweise_schluessel');
 register_uninstall_hook(__FILE__, 'praxisherz_hinweise_entfernen');
 
 function praxisherz_hinweise_entfernen(): void {
-    foreach (['praxisherz_hinweise_schluessel', 'praxisherz_hinweise', 'praxisherz_hinweise_zuletzt', 'praxisherz_hinweise_kasten_ziel', 'praxisherz_hinweise_kasten_lage'] as $o) delete_option($o);
+    foreach (['praxisherz_hinweise_schluessel', 'praxisherz_hinweise', 'praxisherz_hinweise_zuletzt', 'praxisherz_hinweise_kasten_ziel', 'praxisherz_hinweise_kasten_lage', 'praxisherz_oeffnung'] as $o) delete_option($o);
 }
 
 // ---- Empfang ------------------------------------------------------------------------------------------------------------
@@ -111,6 +111,95 @@ function praxisherz_hinweise_bereinigen($daten): ?array {
     return $out;
 }
 
+// ---- Öffnungszeiten-Karte ------------------------------------------------------------------------------------------------
+
+define('PRAXISHERZ_OEFFNUNG_TAGE', ['mo' => 'Mo', 'di' => 'Di', 'mi' => 'Mi', 'do' => 'Do', 'fr' => 'Fr', 'sa' => 'Sa', 'so' => 'So']);
+
+function praxisherz_oeffnung_uhr($w): bool { return is_string($w) && preg_match('/^([01]\d|2[0-4]):[0-5]\d$/D', $w) === 1; }
+
+/** Liste von Zeitfenstern [[von, bis], …] säubern (höchstens vier). */
+function praxisherz_oeffnung_fenster($l): array {
+    $out = [];
+    foreach (array_slice(is_array($l) ? $l : [], 0, 4) as $f) {
+        if (is_array($f) && count($f) === 2 && praxisherz_oeffnung_uhr($f[0] ?? null) && praxisherz_oeffnung_uhr($f[1] ?? null) && $f[0] < $f[1]) $out[] = [$f[0], $f[1]];
+    }
+    return $out;
+}
+
+function praxisherz_oeffnung_praxis($p): ?array {
+    if (!is_array($p)) return null;
+    $out = [];
+    foreach (['name' => 120, 'strasse' => 120, 'ort' => 80, 'telefon' => 40, 'zusatz' => 200] as $f => $max) $out[$f] = praxisherz_hinweise_text($p[$f] ?? '', $max);
+    return $out['name'] !== '' ? $out : null;
+}
+
+function praxisherz_oeffnung_dienst($r, bool $mitTag): ?array {
+    if (!is_array($r) || !praxisherz_oeffnung_uhr($r['von'] ?? null) || !praxisherz_oeffnung_uhr($r['bis'] ?? null)) return null;
+    $p = praxisherz_oeffnung_praxis($r['praxis'] ?? null);
+    if (!$p) return null;
+    $out = ['von' => $r['von'], 'bis' => $r['bis'], 'praxis' => $p];
+    if ($mitTag) {
+        if (!isset(PRAXISHERZ_OEFFNUNG_TAGE[$r['tag'] ?? ''])) return null;
+        $out = ['tag' => $r['tag']] + $out;
+    }
+    return $out;
+}
+
+/** Daten der Öffnungszeiten-Karte säubern; null = keine Karte. */
+function praxisherz_oeffnung_bereinigen($d): ?array {
+    if (!is_array($d)) return null;
+    $woche = [];
+    foreach (PRAXISHERZ_OEFFNUNG_TAGE as $t => $_) $woche[$t] = praxisherz_oeffnung_fenster($d['woche'][$t] ?? []);
+    $tage = [];
+    foreach (array_slice(is_array($d['tage'] ?? null) ? $d['tage'] : [], 0, 500, true) as $datum => $t) {
+        if (!praxisherz_hinweise_datum((string)$datum) || !is_array($t)) continue;
+        $vertretung = array_values(array_filter(array_map('praxisherz_oeffnung_praxis', array_slice(is_array($t['vertretung'] ?? null) ? $t['vertretung'] : [], 0, 10))));
+        $tage[$datum] = ['zeiten' => praxisherz_oeffnung_fenster($t['zeiten'] ?? []), 'grund' => praxisherz_hinweise_text($t['grund'] ?? '', 80), 'feiertag' => ($t['feiertag'] ?? false) === true, 'vertretung' => $vertretung];
+    }
+    $dienste = ['woche' => [], 'feiertag' => [], 'tage' => []];
+    $quelle = is_array($d['dienste'] ?? null) ? $d['dienste'] : [];
+    foreach (array_slice(is_array($quelle['woche'] ?? null) ? $quelle['woche'] : [], 0, 100) as $r) if ($x = praxisherz_oeffnung_dienst($r, true)) $dienste['woche'][] = $x;
+    foreach (array_slice(is_array($quelle['feiertag'] ?? null) ? $quelle['feiertag'] : [], 0, 20) as $r) if ($x = praxisherz_oeffnung_dienst($r, false)) $dienste['feiertag'][] = $x;
+    foreach (array_slice(is_array($quelle['tage'] ?? null) ? $quelle['tage'] : [], 0, 200, true) as $datum => $l) {
+        if (!praxisherz_hinweise_datum((string)$datum) || !is_array($l)) continue;
+        foreach (array_slice($l, 0, 10) as $r) if ($x = praxisherz_oeffnung_dienst($r, false)) $dienste['tage'][$datum][] = $x;
+    }
+    return ['woche' => $woche, 'tage' => $tage, 'dienste' => $dienste, 'notdienst' => praxisherz_hinweise_text($d['notdienst'] ?? '', 160)];
+}
+
+/** Wochentabelle: gleiche Zeiten zusammengefasst („Mo, Di, Do“). */
+function praxisherz_oeffnung_gruppen(array $woche): array {
+    $gruppen = [];
+    foreach (PRAXISHERZ_OEFFNUNG_TAGE as $t => $_) {
+        $z = $woche[$t] ?? [];
+        $text = $z ? implode(', ', array_map(function ($f) { return $f[0] . '–' . $f[1]; }, $z)) . ' Uhr' : 'geschlossen';
+        $gruppen[$text][] = $t;
+    }
+    $out = [];
+    foreach ($gruppen as $text => $tage) $out[] = ['tage' => $tage, 'label' => implode(', ', array_map(function ($t) { return PRAXISHERZ_OEFFNUNG_TAGE[$t]; }, $tage)), 'text' => $text];
+    return $out;
+}
+
+/** Karte: Zustand und Bereitschaftsdienst füllt oeffnung.js, die Wochentabelle steht immer da (auch ohne Skript). */
+function praxisherz_oeffnung_karte(?array $d, string $titel = 'Öffnungszeiten'): string {
+    if (!$d) return '';
+    $o = '<div class="ph-oeffnung" data-oeffnung="' . esc_attr((string)json_encode($d, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) . '">'
+        . ($titel !== '' ? '<h3 class="ph-oe-titel">' . esc_html($titel) . '</h3>' : '')
+        . '<div class="ph-oe-status" hidden></div><div class="ph-oe-dienst" hidden></div><table class="ph-oe-woche"><tbody>';
+    foreach (praxisherz_oeffnung_gruppen($d['woche']) as $g) {
+        $o .= '<tr data-tage="' . esc_attr(implode(' ', $g['tage'])) . '"><th scope="row">' . esc_html($g['label']) . '</th><td>' . esc_html($g['text']) . '</td></tr>';
+    }
+    $o .= '</tbody></table>';
+    if ($d['notdienst'] !== '') $o .= '<p class="ph-oe-notdienst">' . esc_html($d['notdienst']) . '</p>';
+    return $o . '</div>';
+}
+
+add_shortcode('praxisherz_oeffnungszeiten', function ($attr = []) {
+    $titel = is_array($attr) && isset($attr['titel']) ? praxisherz_hinweise_text((string)$attr['titel'], 80) : 'Öffnungszeiten';
+    $d = get_option('praxisherz_oeffnung', null);
+    return praxisherz_oeffnung_karte(is_array($d) ? $d : null, $titel);
+});
+
 function praxisherz_hinweise_empfangen($anfrage) {
     $koerper = (string)$anfrage->get_body();
     if (strlen($koerper) > PRAXISHERZ_HINWEISE_MAX_KOERPER) return new WP_REST_Response(['ok' => false, 'message' => 'zu groß'], 413);
@@ -121,6 +210,8 @@ function praxisherz_hinweise_empfangen($anfrage) {
     $hinweise = praxisherz_hinweise_bereinigen($daten);
     if ($hinweise === null) return new WP_REST_Response(['ok' => false, 'message' => 'unbekanntes Format'], 400);
     update_option('praxisherz_hinweise', ['empfangen' => time(), 'hinweise' => $hinweise], true);
+    $oeffnung = praxisherz_oeffnung_bereinigen($daten['oeffnung'] ?? null);
+    if ($oeffnung) update_option('praxisherz_oeffnung', $oeffnung, true); else delete_option('praxisherz_oeffnung');
     update_option('praxisherz_hinweise_zuletzt', (int)$daten['zeit'], false);
     praxisherz_hinweise_cache_leeren();
     return new WP_REST_Response(['ok' => true, 'anzahl' => count($hinweise)], 200);
@@ -196,9 +287,11 @@ function praxisherz_hinweise_kasten_stelle(): array {
 
 add_action('wp_enqueue_scripts', function () {
     $d = get_option('praxisherz_hinweise', []);
-    if (empty($d['hinweise'])) return;
+    $oeffnung = get_option('praxisherz_oeffnung', null);
+    if (empty($d['hinweise']) && empty($oeffnung)) return;
     wp_enqueue_style('praxisherz-hinweise', plugins_url('hinweise.css', __FILE__), [], PRAXISHERZ_HINWEISE_VERSION);
-    wp_enqueue_script('praxisherz-hinweise', plugins_url('hinweise.js', __FILE__), [], PRAXISHERZ_HINWEISE_VERSION, true);
+    if (!empty($d['hinweise'])) wp_enqueue_script('praxisherz-hinweise', plugins_url('hinweise.js', __FILE__), [], PRAXISHERZ_HINWEISE_VERSION, true);
+    if (!empty($oeffnung)) wp_enqueue_script('praxisherz-oeffnung', plugins_url('oeffnung.js', __FILE__), [], PRAXISHERZ_HINWEISE_VERSION, true);
 });
 
 $GLOBALS['praxisherz_hinweise_leiste'] = false;
@@ -306,5 +399,7 @@ function praxisherz_hinweise_seite(): void {
         . '<li><strong>Leiste oben:</strong> auf allen Seiten ganz oben.</li>'
         . '<li><strong>Kasten Startseite:</strong> über dem Inhalt der Startseite oder an der eingestellten Stelle.</li>'
         . '<li><strong>Fenster:</strong> öffnet sich beim Besuch einmal je Sitzung.</li>'
-        . '<li><strong>Kurzcode:</strong> an der Stelle, an der <code>[praxisherz_hinweise]</code> in einer Seite oder einem Widget steht.</li></ul></div>';
+        . '<li><strong>Kurzcode:</strong> an der Stelle, an der <code>[praxisherz_hinweise]</code> in einer Seite oder einem Widget steht.</li></ul>'
+        . '<h2>Öffnungszeiten</h2><p><code>[praxisherz_oeffnungszeiten]</code> zeigt die Sprechzeiten, ob die Praxis gerade geöffnet hat, und den ärztlichen Bereitschaftsdienst. '
+        . 'Eigene Überschrift: <code>[praxisherz_oeffnungszeiten titel="Sprechzeiten"]</code>, ohne Überschrift: <code>titel=""</code>.</p></div>';
 }

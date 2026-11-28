@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.63
+
+- Mitgeliefert: Modul Homepage 0.1.0-beta.4 mit Öffnungszeiten-Karte und Bereitschaftsdienst (Details in `modules/homepage/RELEASE.md`).
+- README, Bildschirmfoto „homepage-oeffnungszeiten“, Szenenliste des Videos und Modul-Vorschau (erfundene Öffnungszeiten für die Homepage) ergänzt; Testlauf um die Tests der Öffnungszeiten erweitert.
+- Am Server der Basis ändert sich nichts. Nur mit Tests und in der lokalen Vorschau geprüft, nicht auf der VM.
+
 ## 0.22.0-beta.62
 
 Neues Design, zweiter Teil (Entwürfe vom 28.11.2026):

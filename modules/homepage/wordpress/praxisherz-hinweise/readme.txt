@@ -1,7 +1,7 @@
 === Praxisherz-Hinweise ===
 Requires at least: 5.3
 Requires PHP: 7.4
-Stable tag: 0.2.0
+Stable tag: 0.3.0
 License: MIT
 
 Zeigt Mitteilungen aus Praxisherz (Vertretung, Impfstoff lieferbar, Sonderöffnungszeiten, freier Text) auf der Homepage der Praxis an.
@@ -18,6 +18,12 @@ Zeigt Mitteilungen aus Praxisherz (Vertretung, Impfstoff lieferbar, Sonderöffnu
 * Kasten Startseite: über dem Inhalt der Startseite.
 * Fenster: öffnet sich einmal je Browser-Sitzung.
 * Kurzcode: an der Stelle von [praxisherz_hinweise] in einer Seite oder einem Widget.
+
+== Öffnungszeiten ==
+
+[praxisherz_oeffnungszeiten] zeigt eine Karte mit den regulären Sprechzeiten (heute hervorgehoben), darüber ob die Praxis gerade
+geöffnet hat (auch Mittagspause und „öffnet in …“), bei Urlaub die Vertretung und außerhalb der Sprechzeiten den zuständigen
+ärztlichen Bereitschaftsdienst. Andere Überschrift: titel="Sprechzeiten", ohne Überschrift: titel="".
 
 == Datenschutz ==
 

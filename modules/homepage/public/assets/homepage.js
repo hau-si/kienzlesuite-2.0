@@ -67,6 +67,18 @@
     neu.querySelector('input[name="titel"]')?.focus({preventScroll: true});
   });
 
+  // Bereitschaftsdienst: Datum nur bei „an einem Datum“
+  const wann = document.getElementById('d-wann');
+  if (wann) {
+    const datum = document.querySelector('[data-wann="datum"]');
+    const pruefen = () => { datum.hidden = wann.value !== 'datum'; datum.querySelector('input').required = wann.value === 'datum'; };
+    wann.addEventListener('change', pruefen);
+    pruefen();
+  }
+  document.querySelectorAll('[data-kopieren]').forEach(b => b.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(b.dataset.kopieren); b.textContent = 'Kopiert ✓'; } catch (e) { b.textContent = 'Bitte von Hand markieren'; }
+  }));
+
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-frage]');
     if (b && !confirm(b.dataset.frage)) e.preventDefault();

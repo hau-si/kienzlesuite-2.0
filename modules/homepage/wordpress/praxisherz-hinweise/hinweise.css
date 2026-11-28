@@ -28,3 +28,23 @@
 .ph-fenster .ph-titel { padding-right: 28px; font-size: 19px; }
 .ph-zu { position: absolute; top: 6px; right: 10px; padding: 0 6px; border: 0; background: none; color: #555; font-size: 28px; line-height: 1; cursor: pointer; }
 .ph-zu:focus-visible { outline: 3px solid #a3d0c2; }
+
+/* Öffnungszeiten-Karte [praxisherz_oeffnungszeiten] */
+.ph-oeffnung { box-sizing: border-box; max-width: 560px; padding: 16px 18px; border: 1px solid #dce5e2; border-radius: 10px; background: #fff; color: #1e2b30; font-size: 16px; line-height: 1.5; }
+.ph-oe-titel { margin: 0 0 10px; font-size: 19px; }
+.ph-oe-status { margin: 0 0 10px; }
+.ph-oe-zeile { display: flex; align-items: center; gap: 8px; font-size: 18px; }
+.ph-oe-punkt { flex: none; width: 11px; height: 11px; border-radius: 50%; background: #a32d2d; }
+.ph-oe-offen .ph-oe-punkt { background: #2e7d32; }
+.ph-oe-pause .ph-oe-punkt { background: #b07a00; }
+.ph-oe-zusatz, .ph-oe-grund { margin-left: 19px; color: #55706a; font-size: 15px; }
+.ph-oe-dienst { margin: 0 0 12px; padding: 10px 12px; border-left: 4px solid #a32d2d; border-radius: 4px; background: #fdf0ef; font-size: 15px; }
+.ph-oe-kopf { display: block; margin-top: 4px; }
+.ph-oe-kopf:first-child { margin-top: 0; }
+.ph-oe-name, .ph-oe-anschrift { display: block; }
+.ph-oe-anschrift { color: #55706a; font-size: 14px; }
+.ph-oe-woche { width: 100%; border-collapse: collapse; font-size: 15px; }
+.ph-oe-woche th, .ph-oe-woche td { padding: 6px 8px; border: 0; border-bottom: 1px solid #edf0ee; text-align: left; vertical-align: top; }
+.ph-oe-woche th { width: 40%; font-weight: 600; }
+.ph-oe-woche tr.ph-oe-heute { background: #eef4f1; font-weight: 700; }
+.ph-oe-notdienst { margin: 10px 0 0; color: #55706a; font-size: 14px; }

@@ -22,7 +22,7 @@ shots = [
   ('fax-senden', M+'/fax/', 1280, 980), ('fax-eingang', M+'/fax/eingang', 1280, 560),
   ('telefon-vorgaenge', M+'/telefon/vorgaenge', 1280, 1000), ('telefon-statistik', M+'/telefon/statistik', 1280, 1130),
   ('telefon-anlage', M+'/telefon/', 1280, 860),
-  ('homepage-mitteilungen', M+'/homepage/', 1440, 900), ('homepage-praxen', M+'/homepage/praxen', 1280, 640),
+  ('homepage-mitteilungen', M+'/homepage/', 1440, 900), ('homepage-praxen', M+'/homepage/praxen', 1280, 640), ('homepage-oeffnungszeiten', M+'/homepage/oeffnungszeiten', 1440, 1100),
 ]
 
 # Schaubild „Weg der Rechnung“: drei Wege (T2med-Verbindungsklick, Rechnung drucken, IGeL-Modul) → Kassieren → Netzwerkordner

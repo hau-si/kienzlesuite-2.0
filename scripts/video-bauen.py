@@ -45,6 +45,7 @@ SZENEN = [
     ('fax-senden', 'Fax senden', 'Aus jedem Programm auf den Faxdrucker drucken oder Dateien hineinziehen, Empfänger aus Telefonbuch und Favoriten.', 9),
     ('fax-eingang', 'Faxeingang mit Texterkennung', 'Empfangene Faxe mit Absender aus dem Telefonbuch; die Suche findet auch Wörter im Faxtext.', 8),
     ('homepage-mitteilungen', 'Homepage: Mitteilungen', 'Vertretung, Impfstoff oder Sonderöffnungszeiten auf die WordPress-Homepage: ein- und ausschalten, mit Zeitraum und Vorschau.', 8),
+    ('homepage-oeffnungszeiten', 'Homepage: Öffnungszeiten und Bereitschaftsdienst', 'Die Homepage zeigt, ob die Praxis gerade geöffnet hat, und außerhalb der Sprechzeiten den zuständigen Bereitschaftsdienst.', 8),
     ('homepage-praxen', 'Homepage: Vertretungspraxen', 'Praxen einmal mit Anschrift und Telefon anlegen, in der Mitteilung nur noch ankreuzen.', 6),
     ('updates', 'Updates mit Sicherung und Rücksprung', 'Kanal stabil oder beta, Schnappschuss vor jedem Update und automatischer Rücksprung bei einem Fehler.', 7),
     ('benutzer', 'Benutzer, Gruppen und Rechte', 'Gruppen sind Rollen mit Rechten je Modul. Sensible Funktionen sehen nur Admins.', 7),

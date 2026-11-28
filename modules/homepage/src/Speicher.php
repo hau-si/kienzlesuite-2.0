@@ -7,7 +7,7 @@ final class Speicher {
     public static string $data = '/var/lib/kienzle/homepage';
     private static ?\PDO $pdo = null;
     private static string $pfad = '';
-    public const VERSION = 2;
+    public const VERSION = 3;
 
     public static function pdo(): \PDO {
         $datei = self::$data . '/homepage.db';
@@ -72,6 +72,18 @@ final class Speicher {
             // Farbe und Symbol je Mitteilung („standard“ = passend zur Art)
             $pdo->exec('ALTER TABLE mitteilungen ADD COLUMN farbe TEXT NOT NULL DEFAULT \'standard\'');
             $pdo->exec('ALTER TABLE mitteilungen ADD COLUMN symbol TEXT NOT NULL DEFAULT \'standard\'');
+        }
+        if ($v < 3) {
+            // Ärztlicher Bereitschaftsdienst: jede Woche gleich (mo…so), an Feiertagen oder an einem Datum (ersetzt dann die Regeln des Tages)
+            $pdo->exec('CREATE TABLE dienste (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                wann TEXT NOT NULL,
+                datum TEXT NOT NULL DEFAULT \'\',
+                von TEXT NOT NULL,
+                bis TEXT NOT NULL,
+                praxis INTEGER NOT NULL,
+                erstellt INTEGER NOT NULL
+            )');
         }
         $pdo->exec('PRAGMA user_version = ' . self::VERSION);
         $pdo->commit();

@@ -5,7 +5,7 @@ declare(strict_types=1);
  * und Benutzer, Rolle und Rechte als KIENZLE_* übergeben.
  */
 require_once dirname(__DIR__) . '/src/bootstrap.php';
-use KienzleHomepage\{Ansicht, Homepage, Mitteilungen, Praxen, Zeiten};
+use KienzleHomepage\{Oeffnung, Ansicht, Homepage, Mitteilungen, Praxen, Zeiten};
 
 header('X-Frame-Options: DENY');
 header('X-Content-Type-Options: nosniff');
@@ -32,8 +32,8 @@ function hp_weiter(string $ziel, string $ok = '', string $fehler = '', string $a
 
 try {
     $k = hp_modul();
-    $r = ['mitteilungen' => $k->recht('mitteilungen'), 'praxen' => $k->recht('praxen'), 'admin' => $k->istAdmin()];
-    if (!$r['mitteilungen'] && !$r['praxen']) $k->verweigern();
+    $r = ['mitteilungen' => $k->recht('mitteilungen'), 'praxen' => $k->recht('praxen'), 'oeffnungszeiten' => $k->recht('oeffnungszeiten'), 'admin' => $k->istAdmin()];
+    if (!$r['mitteilungen'] && !$r['praxen'] && !$r['oeffnungszeiten']) $k->verweigern();
     $wer = $k->benutzer();
     if ($wer === '') $k->verweigern();
     Ansicht::$r = $r;
@@ -52,6 +52,13 @@ try {
         header('Content-Type: ' . $types[$ext]);
         header('Cache-Control: private, max-age=3600');
         readfile($file);
+        exit;
+    }
+    if (preg_match('#^/plugin-dateien/(hinweise\.css|oeffnung\.js)$#D', $rel, $m)) {
+        // Stil und Skript des WordPress-Plugins für die Vorschau der Öffnungszeiten-Karte (feste Liste)
+        header('Content-Type: ' . (str_ends_with($m[1], '.css') ? 'text/css' : 'text/javascript') . '; charset=utf-8');
+        header('Cache-Control: private, max-age=3600');
+        readfile($root . '/wordpress/praxisherz-hinweise/' . $m[1]);
         exit;
     }
     if ($rel === '/plugin.zip') {
@@ -86,7 +93,7 @@ try {
     }
 
     if ($rel === '') $rel = '/';
-    if (!in_array($rel, ['/', '/praxen', '/einrichtung'], true)) { http_response_code(404); echo 'Nicht gefunden.'; exit; }
+    if (!in_array($rel, ['/', '/praxen', '/oeffnungszeiten', '/einrichtung'], true)) { http_response_code(404); echo 'Nicht gefunden.'; exit; }
     if ($rel === '/einrichtung' && !$r['admin']) $k->verweigern();
 
     if ($methode === 'POST') {
@@ -126,6 +133,21 @@ try {
                     Zeiten::speichern($_POST);
                     Homepage::nachAenderung($k);
                     hp_weiter($base . '/', 'zeiten');
+                case 'dienst-speichern':
+                    $darf($r['oeffnungszeiten']);
+                    Oeffnung::dienstSpeichern($id, $_POST);
+                    Homepage::nachAenderung($k);
+                    hp_weiter($base . '/oeffnungszeiten', 'dienst', '', '#dienst');
+                case 'dienst-loeschen':
+                    $darf($r['oeffnungszeiten']);
+                    Oeffnung::dienstLoeschen($id);
+                    Homepage::nachAenderung($k);
+                    hp_weiter($base . '/oeffnungszeiten', 'dienst-weg', '', '#dienst');
+                case 'notdienst':
+                    $darf($r['oeffnungszeiten']);
+                    Oeffnung::notdienstSpeichern((string)($_POST['notdienst'] ?? ''));
+                    Homepage::nachAenderung($k);
+                    hp_weiter($base . '/oeffnungszeiten', 'notdienst', '', '#dienst');
                 case 'praxis-speichern':
                     $darf($r['praxen']);
                     $pid = Praxen::speichern($id, $_POST);
@@ -151,7 +173,8 @@ try {
             }
         } catch (InvalidArgumentException $e) {
             $zurueck = $rel === '/praxen' && $aktion === 'praxis-speichern' ? $base . '/praxen?' . ($id ? 'id=' . $id : 'neu=1') : ($rel === '/' && $id ? $base . '/?id=' . $id : $hier);
-            hp_weiter($zurueck, '', $e->getMessage(), $rel === '/' && $id ? '#m' . $id : '');
+            if ($aktion === 'dienst-speichern') $zurueck = $base . '/oeffnungszeiten?dienst=' . ($id ?: 'neu');
+            hp_weiter($zurueck, '', $e->getMessage(), $rel === '/' && $id ? '#m' . $id : ($rel === '/oeffnungszeiten' ? '#dienst' : ''));
         }
     }
 
@@ -165,8 +188,9 @@ try {
         '/' => Ansicht::start($_GET, $meldung),
         '/praxen' => Ansicht::praxen($_GET, $meldung),
         '/einrichtung' => Ansicht::einrichtung($meldung),
+        '/oeffnungszeiten' => Ansicht::oeffnungszeiten($_GET, $meldung, Oeffnung::woche($k), Oeffnung::fuerHomepage($k)),
     };
-    echo $k->rahmen('Homepage', $inhalt, ['roh' => true, 'kopf' => Ansicht::kopf($base, $k->csrf())]);
+    echo $k->rahmen('Homepage', $inhalt, ['roh' => true, 'kopf' => Ansicht::kopf($base, $k->csrf(), $rel === '/oeffnungszeiten')]);
 } catch (Throwable $e) {
     error_log('homepage: ' . get_class($e) . ': ' . $e->getMessage());
     http_response_code(500);

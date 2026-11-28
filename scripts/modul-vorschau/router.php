@@ -29,6 +29,11 @@ if ($modul === 'telefon') {
     require_once $root . '/core/php/modul/Kienzle.php';
     $GLOBALS['tf_test_modul'] = new KienzleModul('telefon', $_SERVER, $daten . '/verbindungen', $daten . '/schluessel');
 }
+if ($modul === 'homepage') {
+    // Öffnungszeiten der Basis aus $daten/verbindungen/homepage.json (von init.php erfunden)
+    require_once $root . '/core/php/modul/Kienzle.php';
+    $GLOBALS['hp_test_modul'] = new KienzleModul('homepage', $_SERVER, $daten . '/verbindungen', $daten . '/schluessel');
+}
 // Die Terminzettel-Hilfe nimmt den Pfad von Praxisherz-Hilfe nur in der CLI aus der Umgebung: hier (php -S) von Hand setzen.
 require_once $root . '/modules/' . $modul . '/src/bootstrap.php';
 if ($modul === 'terminzettel') KienzleTerminzettel\Seite::$helper = $root . '/core/php/modul/Kienzle.php';

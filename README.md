@@ -4,7 +4,7 @@ Praxis-Appliance für Hausarztpraxen mit T2med: **eine Basis**, einmal auf einer
 einzeln dazukommen. Verwaltung komplett im Webinterface; Anmeldung, Benutzer und Rechte, Firewall, Admin-Zugang mit OTP,
 Updates, verschlüsselte Sicherung und die Verbindungen zu T2med, E-Mail, SMS und Netzwerkspeicher gibt es nur einmal, in der Basis.
 
-Stand (28.11.2026, Zweig `beta`): **Basis 0.22.0-beta.58** mit den Modulen
+Stand (28.11.2026, Zweig `beta`): **Basis 0.22.0-beta.63** mit den Modulen
 
 | Modul | Version | Was es kann |
 |---|---|---|
@@ -14,7 +14,7 @@ Stand (28.11.2026, Zweig `beta`): **Basis 0.22.0-beta.58** mit den Modulen
 | **Qualitätsmanagement** | 0.1.0-beta.1 | QM-Handbuch mit Ordnern, Tags und Suche; Dokumente schreiben oder aus Word übernehmen (z. B. QEP-Muster der KBV), vidieren, zur Kenntnis vorlegen, Lesebestätigung und Wiedervorlage. |
 | **Telefon** | 0.1.0-beta.31 | Eigene Telefonanlage (Asterisk) mit Leitungen, Telefonen und Warteschlange. Sprachmenü mit Ansagen und Wartemusik; aufgesprochene Anliegen (Rezept, Termin, Überweisung, Rückruf) werden als Text erkannt und als Vorgänge abgearbeitet, mit Rückruf und SMS. Rufgruppen, Anrufübersicht, Anrufstatistik ohne Nummern und Namen. |
 | **Fax** | 0.1.0-beta.16 | Papierloses Fax über die Leitung des Moduls Telefon: auf einen Faxdrucker drucken oder Dateien hineinziehen, mehrere Dokumente zu einem Fax, Telefonbuch mit Favoriten, Sendeprotokoll und Fehlerberichte, Faxeingang mit Texterkennung und Benachrichtigung per E-Mail. |
-| **Homepage** | 0.1.0-beta.1 | Mitteilungen auf die WordPress-Homepage: Vertretung (mehrere Praxen aus einer Liste), Impfstoff lieferbar, Sonderöffnungszeiten oder freier Text; je Mitteilung ein- und ausschaltbar, mit Zeitraum und Ort (Leiste, Kasten, Fenster, Kurzcode). Plugin „Praxisherz-Hinweise“ für WordPress liegt bei. |
+| **Homepage** | 0.1.0-beta.4 | Mitteilungen auf die WordPress-Homepage: Vertretung (mehrere Praxen aus einer Liste), Impfstoff lieferbar, Sonderöffnungszeiten oder freier Text; je Mitteilung ein- und ausschaltbar, mit Zeitraum und Ort (Leiste, Kasten, Fenster, Kurzcode). Dazu eine Öffnungszeiten-Karte (geöffnet/Mittagspause/geschlossen, Bereitschaftsdienst). Plugin „Praxisherz-Hinweise“ für WordPress liegt bei. |
 
 Installierbar nur auf einer Test-VM ([docs/VM-TEST.md](docs/VM-TEST.md)); was noch geplant ist, steht in [docs/PLAN.md](docs/PLAN.md).
 
@@ -141,6 +141,10 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 ![Homepage-Mitteilungen](docs/screenshots/homepage-mitteilungen.png)
 
 ![Homepage-Vertretungspraxen](docs/screenshots/homepage-praxen.png)
+
+**Homepage – Öffnungszeiten:** Eine Karte für die Homepage (`[praxisherz_oeffnungszeiten]`) zeigt immer die Sprechzeiten aus Praxis → Öffnungszeiten und darüber, ob die Praxis gerade geöffnet hat, Mittagspause macht oder wann sie wieder öffnet. Außerhalb der Sprechzeiten steht der gerade zuständige ärztliche Bereitschaftsdienst (jede Woche gleich, an Feiertagen oder einzelnen Tagen abweichend), bei Urlaub die Vertretung.
+
+![Homepage-Öffnungszeiten](docs/screenshots/homepage-oeffnungszeiten.png)
 
 **Updater:** Updates je Modul und Basis aus signierten Releases (Kanal stabil oder beta), Sicherung vor dem Update, automatischer Rücksprung bei einem Fehler. Kein Update, solange z. B. eine Kartenzahlung läuft.
 

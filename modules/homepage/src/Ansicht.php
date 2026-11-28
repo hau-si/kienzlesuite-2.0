@@ -4,14 +4,15 @@ namespace KienzleHomepage;
 
 /** HTML der Seiten (Entwurf B2: Mitteilungen links als Ausklappzeilen, Vorschau rechts; Vertretungspraxen als eigene Liste). */
 final class Ansicht {
-    /** @var array{mitteilungen:bool,praxen:bool,admin:bool} */
-    public static array $r = ['mitteilungen' => false, 'praxen' => false, 'admin' => false];
+    /** @var array{mitteilungen:bool,praxen:bool,oeffnungszeiten:bool,admin:bool} */
+    public static array $r = ['mitteilungen' => false, 'praxen' => false, 'oeffnungszeiten' => false, 'admin' => false];
     public static string $csrf = '';
     public static string $praxisName = '';
 
     private const MELDUNGEN = [
         'angelegt' => 'Mitteilung angelegt.', 'gespeichert' => 'Gespeichert.', 'zeiten' => 'Einstellungen für die automatischen Mitteilungen gespeichert.', 'an' => 'Eingeschaltet.', 'aus' => 'Ausgeschaltet.', 'geloescht' => 'Mitteilung gelöscht.',
         'uebertragen' => 'An die Homepage übertragen.', 'praxis' => 'Praxis gespeichert.', 'praxis-weg' => 'Praxis gelöscht.',
+        'dienst' => 'Bereitschaftsdienst gespeichert.', 'dienst-weg' => 'Eintrag gelöscht.', 'notdienst' => 'Hinweis gespeichert.',
         'eingerichtet' => 'Verbindung gespeichert.', 'getrennt' => 'Verbindung zur Homepage getrennt.',
     ];
     private const TAG = ['vertretung' => 'hp-vert', 'impfstoff' => 'hp-impf', 'oeffnungszeiten' => 'hp-zeit', 'frei' => ''];
@@ -26,15 +27,19 @@ final class Ansicht {
 
     private static function csrfFeld(): string { return '<input type="hidden" name="kienzle-csrf" value="' . self::h(self::$csrf) . '">'; }
 
-    public static function kopf(string $base, string $csrf): string {
+    /** $plugin: Stil und Skript des WordPress-Plugins mitladen (Vorschau der Öffnungszeiten-Karte, gleiche Rechnung wie auf der Homepage). */
+    public static function kopf(string $base, string $csrf, bool $plugin = false): string {
         $v = static fn(string $f): string => '?v=' . substr((string)@md5_file(dirname(__DIR__) . '/public/assets/' . $f), 0, 8);
+        $pv = static fn(string $f): string => '?v=' . substr((string)@md5_file(dirname(__DIR__) . '/wordpress/praxisherz-hinweise/' . $f), 0, 8);
         return '<meta name="kienzle-csrf" content="' . self::h($csrf) . '"><meta name="hp-basis" content="' . self::h($base) . '">'
-            . '<link rel="stylesheet" href="' . self::h($base) . '/assets/homepage.css' . $v('homepage.css') . '"><script src="' . self::h($base) . '/assets/homepage.js' . $v('homepage.js') . '" defer></script>';
+            . '<link rel="stylesheet" href="' . self::h($base) . '/assets/homepage.css' . $v('homepage.css') . '"><script src="' . self::h($base) . '/assets/homepage.js' . $v('homepage.js') . '" defer></script>'
+            . ($plugin ? '<link rel="stylesheet" href="' . self::h($base) . '/plugin-dateien/hinweise.css' . $pv('hinweise.css') . '"><script src="' . self::h($base) . '/plugin-dateien/oeffnung.js' . $pv('oeffnung.js') . '" defer></script>' : '');
     }
 
     private static function symbol(string $name): string {
         return self::SVG . match ($name) {
             'liste' => '<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',
+            'uhr' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
             'praxen' => '<path d="M3 21h18M5 21V7l7-4 7 4v14M10 9h4M12 7v4M9 21v-5h6v5"/>',
             'einrichtung' => '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
             default => '',
@@ -47,7 +52,7 @@ final class Ansicht {
             return '<a class="button ' . ($an ? 'primary' : 'secondary') . ' hp-mit-symbol" href="' . self::h(self::u($ziel)) . '"' . ($an ? ' aria-current="page"' : '') . '>' . self::symbol($sym) . self::h($text) . '</a>';
         };
         $o = '<header class="hp-kopf"><div><p class="eyebrow">Homepage</p><h1>' . self::h($titel) . '</h1></div><nav class="hp-werkzeuge" aria-label="Homepage">' . $extra
-            . $link('/', 'Mitteilungen', 'start', 'liste') . $link('/praxen', 'Vertretungspraxen', 'praxen', 'praxen');
+            . $link('/', 'Mitteilungen', 'start', 'liste') . $link('/oeffnungszeiten', 'Öffnungszeiten', 'oeffnungszeiten', 'uhr') . $link('/praxen', 'Vertretungspraxen', 'praxen', 'praxen');
         if (self::$r['admin']) $o .= $link('/einrichtung', 'Einrichtung', 'einrichtung', 'einrichtung');
         return $o . '</nav></header>';
     }
@@ -341,5 +346,95 @@ final class Ansicht {
             . '<li><b>Kurzcode-Stelle:</b> dort, wo in WordPress <code>[praxisherz_hinweise]</code> in einer Seite oder einem Widget steht.</li></ul>'
             . '<p class="muted hp-klein">Neue Versionen des Plugins kommen mit Praxisherz; dann erneut herunterladen und in WordPress hochladen („Ersetzen“).</p></section></div>';
         return $o . '</div>';
+    }
+    // ---- Öffnungszeiten-Karte und Bereitschaftsdienst (Entwurf A, Karte aus Entwurf B) ---------------------------------
+
+    /** Gleiches Markup wie praxisherz_oeffnung_karte() im Plugin (Test vergleicht beide). */
+    public static function karte(?array $d, string $titel = 'Öffnungszeiten'): string {
+        if (!$d) return '';
+        $o = '<div class="ph-oeffnung" data-oeffnung="' . self::h((string)json_encode($d, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) . '">'
+            . ($titel !== '' ? '<h3 class="ph-oe-titel">' . self::h($titel) . '</h3>' : '')
+            . '<div class="ph-oe-status" hidden></div><div class="ph-oe-dienst" hidden></div><table class="ph-oe-woche"><tbody>';
+        foreach (Oeffnung::gruppen($d['woche']) as $g) {
+            $o .= '<tr data-tage="' . self::h(implode(' ', $g['tage'])) . '"><th scope="row">' . self::h($g['label']) . '</th><td>' . self::h($g['text']) . '</td></tr>';
+        }
+        $o .= '</tbody></table>';
+        if ($d['notdienst'] !== '') $o .= '<p class="ph-oe-notdienst">' . self::h($d['notdienst']) . '</p>';
+        return $o . '</div>';
+    }
+
+    public static function oeffnungszeiten(array $get, string $meldung, ?array $woche, ?array $daten): string {
+        $darf = self::$r['oeffnungszeiten'];
+        $o = '<div class="hp">' . self::seitenkopf('oeffnungszeiten', 'Öffnungszeiten') . $meldung . '<div class="hp-zwei"><div class="hp-links">';
+
+        $o .= '<section class="card"><div class="hp-listenkopf"><div><h2>Reguläre Sprechzeiten</h2><p class="muted hp-klein">Gepflegt zentral unter Praxis → Öffnungszeiten, '
+            . 'ebenso Feiertage, Urlaub und Sonderöffnungen.</p></div>' . (self::$r['admin'] || $woche !== null ? '<a class="button secondary" href="/verwaltung/zeiten">Ändern</a>' : '') . '</div>';
+        if ($woche === null) {
+            $o .= '<p class="muted">Noch keine Sprechzeiten von Praxisherz erhalten. Bitte unter <b>Praxis → Öffnungszeiten</b> eintragen (Praxisherz ab Basis 0.22.0-beta.55).</p>';
+        } else {
+            $o .= '<table class="hp-tabelle hp-woche"><tbody>';
+            foreach (Oeffnung::TAGE as $t => $name) {
+                $z = $woche[$t];
+                $o .= '<tr><th>' . self::h($name) . '</th><td>' . ($z ? self::h(implode(', ', array_map(fn($f) => $f[0] . '–' . $f[1], $z)) . ' Uhr') : '<span class="muted">geschlossen</span>') . '</td></tr>';
+            }
+            $o .= '</tbody></table>';
+        }
+        $o .= '</section>';
+
+        $o .= '<section class="card hp-liste" id="dienst"><div class="hp-listenkopf"><div><h2>Ärztlicher Bereitschaftsdienst</h2><p class="muted hp-klein">Jede Woche gleich; an Feiertagen '
+            . 'oder einzelnen Tagen abweichend. Ein Eintrag mit Datum ersetzt an diesem Tag alle anderen.</p></div>'
+            . ($darf ? '<a class="button primary" href="' . self::h(self::u('/oeffnungszeiten', ['dienst' => 'neu'])) . '#dienst">+ Eintrag</a>' : '') . '</div>';
+        $wahl = (string)($get['dienst'] ?? '');
+        if ($darf && ($wahl === 'neu' || ctype_digit($wahl))) {
+            $d = $wahl === 'neu' ? null : Oeffnung::dienst((int)$wahl);
+            $d ??= ['id' => 0, 'wann' => 'mi', 'datum' => '', 'von' => '13:00', 'bis' => '19:00', 'praxis' => 0];
+            $praxen = Praxen::alle();
+            $o .= '<form method="post" class="box hp-dienstform" action="' . self::h(self::u('/oeffnungszeiten')) . '">' . self::csrfFeld() . '<input type="hidden" name="id" value="' . (int)$d['id'] . '">'
+                . '<h3>' . ($d['id'] ? 'Eintrag ändern' : 'Neuer Eintrag') . '</h3><div class="hp-raster">'
+                . '<div><label for="d-wann">Wann</label><select id="d-wann" name="wann">';
+            foreach ([...array_keys(Oeffnung::TAGE), 'feiertag', 'datum'] as $w) $o .= '<option value="' . $w . '"' . ($d['wann'] === $w ? ' selected' : '') . '>' . self::h(Oeffnung::wannText($w)) . '</option>';
+            $o .= '</select></div><div data-wann="datum"><label for="d-datum">Datum</label><input type="date" id="d-datum" name="datum" value="' . self::h($d['datum']) . '"></div>'
+                . '<div><label for="d-von">Von</label><input type="time" id="d-von" name="von" required value="' . self::h($d['von']) . '"></div>'
+                . '<div><label for="d-bis">Bis <span class="muted">(früher als „Von“ = über Nacht)</span></label><input type="time" id="d-bis" name="bis" required value="' . self::h($d['bis']) . '"></div></div>'
+                . '<label for="d-praxis">Praxis</label>';
+            if (!$praxen) $o .= '<p class="muted">Noch keine Praxen angelegt. <a href="' . self::h(self::u('/praxen', ['neu' => 1])) . '">Praxis anlegen</a></p>';
+            else {
+                $o .= '<select id="d-praxis" name="praxis" required><option value="">Bitte wählen</option>';
+                foreach ($praxen as $p) $o .= '<option value="' . (int)$p['id'] . '"' . ((int)$p['id'] === $d['praxis'] ? ' selected' : '') . '>' . self::h($p['name'] . ($p['telefon'] !== '' ? ' · ' . $p['telefon'] : '')) . '</option>';
+                $o .= '</select>';
+            }
+            $o .= '<div class="row-buttons"><button name="aktion" value="dienst-speichern">Speichern</button><a class="button secondary" href="' . self::h(self::u('/oeffnungszeiten')) . '">Abbrechen</a></div></form>';
+        }
+        $liste = Oeffnung::dienste();
+        $praxen = Mitteilungen::praxenNachId();
+        if (!$liste) $o .= '<p class="muted">Noch kein Bereitschaftsdienst eingetragen. Außerhalb der Sprechzeiten steht dann nur der Hinweis unten.</p>';
+        else {
+            $o .= '<table class="hp-tabelle"><thead><tr><th>Wann</th><th>Zeit</th><th>Praxis</th>' . ($darf ? '<th></th>' : '') . '</tr></thead><tbody>';
+            foreach ($liste as $d) {
+                $p = $praxen[$d['praxis']] ?? null;
+                $o .= '<tr><td>' . self::h(Oeffnung::wannText($d['wann'], $d['datum'])) . '</td><td class="hp-nowrap">' . self::h($d['von'] . '–' . $d['bis']) . ($d['bis'] <= $d['von'] ? ' <span class="muted">(bis Folgetag)</span>' : '')
+                    . '</td><td>' . ($p ? self::h($p['name']) . ($p['telefon'] !== '' ? '<br><span class="muted">' . self::h($p['telefon']) . '</span>' : '') : '<span class="muted">gelöscht</span>') . '</td>';
+                if ($darf) {
+                    $o .= '<td class="hp-aktionen"><a class="button secondary" href="' . self::h(self::u('/oeffnungszeiten', ['dienst' => $d['id']])) . '#dienst">Bearbeiten</a>'
+                        . '<form method="post" class="inline" action="' . self::h(self::u('/oeffnungszeiten')) . '">' . self::csrfFeld() . '<input type="hidden" name="id" value="' . $d['id'] . '">'
+                        . '<button name="aktion" value="dienst-loeschen" class="danger" data-frage="Diesen Eintrag löschen?">Löschen</button></form></td>';
+                }
+                $o .= '</tr>';
+            }
+            $o .= '</tbody></table>';
+        }
+        $o .= '<form method="post" class="hp-notdienst" action="' . self::h(self::u('/oeffnungszeiten')) . '">' . self::csrfFeld()
+            . '<label for="d-not">Hinweis unter der Karte <span class="muted">(immer sichtbar; leer = keiner)</span></label><div class="name-row"><input id="d-not" name="notdienst" maxlength="160" value="'
+            . self::h(Oeffnung::notdienst()) . '"' . ($darf ? '' : ' disabled') . '>' . ($darf ? '<button name="aktion" value="notdienst">Speichern</button>' : '') . '</div></form></section>';
+
+        $o .= '<section class="card"><h2>Auf der Homepage einbinden</h2><p>In WordPress in eine Seite oder ein Widget schreiben (Plugin „Praxisherz-Hinweise“ ab Version 0.3.0):</p>'
+            . '<div class="hp-code"><code>[praxisherz_oeffnungszeiten]</code><button type="button" class="secondary" data-kopieren="[praxisherz_oeffnungszeiten]">Kopieren</button></div>'
+            . '<p class="muted hp-klein">Andere Überschrift: <code>[praxisherz_oeffnungszeiten titel="Sprechzeiten"]</code>, ohne Überschrift: <code>titel=""</code>.</p></section>';
+
+        $o .= '</div><aside class="card hp-vorschau-karte" aria-label="Vorschau"><h2>So sieht es auf der Homepage aus</h2>'
+            . ($daten ? self::karte($daten) : '<p class="muted">Noch nichts zu zeigen: Sprechzeiten unter Praxis → Öffnungszeiten eintragen.</p>')
+            . '<p class="muted hp-klein">Zustand jetzt. Auf der Homepage rechnet der Browser jede Minute neu: „Jetzt geöffnet“, „Mittagspause“ oder „Gerade geschlossen – öffnet in …“; '
+            . 'außerhalb der Sprechzeiten erscheint der zuständige Bereitschaftsdienst, bei Urlaub die Vertretung.</p></aside></div></div>';
+        return $o;
     }
 }

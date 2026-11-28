@@ -95,3 +95,19 @@ if (!KienzleHomepage\Praxen::alle()) {
     $mt::speichern(0, ['art' => 'oeffnungszeiten', 'titel' => 'Silvester nur bis 12 Uhr geöffnet', 'orte' => ['fenster'], 'tage_datum' => [date('Y') . '-12-31'], 'tage_zeit' => ['8–12 Uhr']], 'anna', false);
     $mt::speichern(0, ['art' => 'frei', 'titel' => 'Praxis wegen Fortbildung geschlossen', 'von' => date('Y-m-d', strtotime('+20 days')), 'bis' => date('Y-m-d', strtotime('+20 days')), 'orte' => ['leiste']], 'anna');
 }
+
+// Homepage: Öffnungszeiten wie aus der Basis (Verbindung „zeiten“) und Bereitschaftsdienst
+if (!is_dir("$ziel/verbindungen")) mkdir("$ziel/verbindungen", 0755, true);
+$hpVerb = is_file("$ziel/verbindungen/homepage.json") ? (json_decode((string)file_get_contents("$ziel/verbindungen/homepage.json"), true) ?: []) : [];
+$hpWoche = ['mo' => ['08:00-12:00', '14:00-18:00'], 'di' => ['08:00-12:00', '14:00-18:00'], 'mi' => ['08:00-12:00'], 'do' => ['08:00-12:00', '14:00-18:00'], 'fr' => ['08:00-13:00'], 'sa' => [], 'so' => []];
+$hpVerb['zeiten'] = ['format' => 1, 'stand' => str_repeat('e', 32), 'praxis' => 'Praxis Dr. Beispiel', 'woche' => ['sprech' => $hpWoche, 'telefon' => $hpWoche], 'ereignisse' => [
+    ['id' => 'u1', 'art' => 'urlaub', 'titel' => 'Urlaub', 'von' => date('Y-m-d', strtotime('+20 days')), 'bis' => date('Y-m-d', strtotime('+24 days')), 'zeiten' => [], 'homepage' => true,
+     'satz' => 'Die Praxis ist geschlossen.', 'hinweis' => '', 'vertretung' => [['von' => date('Y-m-d', strtotime('+20 days')), 'bis' => date('Y-m-d', strtotime('+24 days')),
+     'praxen' => [['name' => 'Praxis Dr. med. Anna Muster', 'strasse' => 'Am Beispielplatz 3', 'ort' => '12345 Musterstadt', 'telefon' => '01234 55555', 'zusatz' => '']]]]]]];
+file_put_contents("$ziel/verbindungen/homepage.json", json_encode($hpVerb, JSON_UNESCAPED_UNICODE));
+if (!KienzleHomepage\Oeffnung::dienste()) {
+    $hpPr = KienzleHomepage\Praxen::alle();
+    KienzleHomepage\Oeffnung::dienstSpeichern(0, ['wann' => 'mi', 'von' => '13:00', 'bis' => '19:00', 'praxis' => $hpPr[2]['id']]);
+    KienzleHomepage\Oeffnung::dienstSpeichern(0, ['wann' => 'fr', 'von' => '14:00', 'bis' => '19:00', 'praxis' => $hpPr[0]['id']]);
+    KienzleHomepage\Oeffnung::dienstSpeichern(0, ['wann' => 'feiertag', 'von' => '08:00', 'bis' => '20:00', 'praxis' => $hpPr[1]['id']]);
+}
