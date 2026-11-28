@@ -39,7 +39,7 @@ var UpdatePause = 10 * time.Minute
 var DownloadFrist = 3 * time.Minute
 
 // Version des Programms (scripts/starter-bauen setzt sie nicht; der Server vergleicht die Prüfsumme der Datei).
-const version = "2.3.13" // ab 2.3.7 auch Adressen praxisherz-… (Web::AGENT_NEUE_ADRESSEN)
+const version = "2.4.0"
 
 // AgentConfig steht in agent.json (nur für SYSTEM und Administratoren lesbar).
 type AgentConfig struct {
@@ -131,7 +131,7 @@ type Status struct {
 	Zertifikat bool     `json:"zertifikat"`
 	AkteZeit   int64    `json:"akte_zeit,omitempty"`
 	AkteOk     bool     `json:"akte_ok,omitempty"`
-	AltDrucker []string `json:"alt_drucker,omitempty"` // alte Kienzle-Drucker, Entfernen nach Rückfrage im Symbol
+	AltDrucker []string `json:"alt_drucker,omitempty"` // alte Drucker dieses Servers, Entfernen nach Rückfrage im Symbol
 	AltText    string   `json:"alt_text,omitempty"`
 	// WirdAktualisiert: gesetzt kurz bevor das neue Programm geladen wird (aktualisieren()); das Symbol in der
 	// Taskleiste zeigt dann „wird aktualisiert“ (blau) statt „läuft nicht“ (rot), solange dieser Dienst-Prozess lädt,
@@ -244,7 +244,7 @@ var (
 	errNeustart = errors.New("neues Programm eingespielt")
 )
 
-// programmName wie in scripts/starter-bauen (praxisherz-starter-windows-amd64.exe …; bis Agent 2.3.7 kienzle-starter-…).
+// programmName wie in scripts/starter-bauen (praxisherz-starter-windows-amd64.exe …).
 func programmName(goos, goarch string) string {
 	if goos == "windows" {
 		return "praxisherz-starter-windows-" + goarch + ".exe"
@@ -388,13 +388,6 @@ func (a *Agent) ausfuehren(auf Auftrag) (bool, string) {
 		}
 		if err := schreibeAtomar(filepath.Join(ordner, d.Datei), []byte(d.Inhalt), 0o664); err != nil {
 			return false, "GDT-Datei nicht geschrieben"
-		}
-		if f, ok := a.Plattform.(gdtFrueher); ok {
-			if alt := f.GDTOrdnerFrueher(); alt != "" && alt != ordner {
-				if st, err := os.Stat(alt); err == nil && st.IsDir() {
-					_ = schreibeAtomar(filepath.Join(alt, d.Datei), []byte(d.Inhalt), 0o664)
-				}
-			}
 		}
 		return true, "geschrieben"
 	}

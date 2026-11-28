@@ -28,7 +28,6 @@ import (
 
 // Ersatzplattform: merkt sich die Aufrufe.
 type testPlattform struct {
-	frueher     string // früherer GDT-Ordner (wie C:\Kienzle\GDT unter Windows)
 	symbol      int
 	alt         []string
 	altAbfragen int
@@ -78,7 +77,6 @@ func (p *testPlattform) DruckerEntfernen(_ []Drucker, namen []string) (string, e
 func (p *testPlattform) Zertifizierungsstelle([]byte) error { p.ca++; return nil }
 func (p *testPlattform) Symbol(string) error                { p.symbol++; return nil }
 func (p *testPlattform) GDTOrdner() string                  { return filepath.Join(p.ordner, "gdt") }
-func (p *testPlattform) GDTOrdnerFrueher() string           { return p.frueher }
 
 // testCA erzeugt eine Zertifizierungsstelle und ein Serverzertifikat für 127.0.0.1.
 func testCA(t *testing.T) (caPEM []byte, server tls.Certificate) {
@@ -103,20 +101,20 @@ func TestVerbindungUeberZertifizierungsstelle(t *testing.T) {
 	srv.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
 	srv.StartTLS()
 	defer srv.Close()
-	cfg := &Config{ServerURL: srv.URL, LauncherKey: "0123456789abcdef0123456789abcdef", CertSHA256: strings.Repeat("0", 64), Contexts: map[string]string{"kienzle-kasse": "/starter/kasse"}}
-	if _, err := run(cfg, "kienzle-kasse://?kontextId=a", nil); err == nil {
+	cfg := &Config{ServerURL: srv.URL, LauncherKey: "0123456789abcdef0123456789abcdef", CertSHA256: strings.Repeat("0", 64), Contexts: map[string]string{"praxisherz-kasse": "/starter/kasse"}}
+	if _, err := run(cfg, "praxisherz-kasse://?kontextId=a", nil); err == nil {
 		t.Fatal("ohne passende CA darf keine Verbindung entstehen")
 	}
 	cfg.CA = parseCA(caPEM)
 	if cfg.CA == nil {
 		t.Fatal("CA nicht gelesen")
 	}
-	if _, err := run(cfg, "kienzle-kasse://?kontextId=a", nil); err != nil {
+	if _, err := run(cfg, "praxisherz-kasse://?kontextId=a", nil); err != nil {
 		t.Fatalf("mit der CA Praxisherz muss die Verbindung gehen: %v", err)
 	}
 	fremd, _ := testCA(t)
 	cfg.CA = parseCA(fremd)
-	if _, err := run(cfg, "kienzle-kasse://?kontextId=a", nil); err == nil {
+	if _, err := run(cfg, "praxisherz-kasse://?kontextId=a", nil); err == nil {
 		t.Fatal("fremde CA darf nicht reichen")
 	}
 }
@@ -156,8 +154,8 @@ func neuerTestServer(t *testing.T, programm []byte) *testServer {
 			ts.abfragen++
 			sum := sha256.Sum256(ts.programm)
 			soll := map[string]any{"server_url": ts.srv.URL, "launcher_key": "neuer-schluessel-0123456789abcdef", "programme": map[string]string{assetName: hex.EncodeToString(sum[:])},
-				"kontexte": map[string]string{"kienzle-kasse": "/starter/kasse", "kienzle-telefon": "/starter/telefon"},
-				"drucker":  []map[string]string{{"name": "vFax", "url": "http://kienzle.example.org:631/printers/vFax"}, {"name": "bös artig", "url": "http://x:631/printers/x"}, {"name": "vKasse", "url": "file:///C:/x"}},
+				"kontexte": map[string]string{"praxisherz-kasse": "/starter/kasse", "praxisherz-telefon": "/starter/telefon"},
+				"drucker":  []map[string]string{{"name": "vFax", "url": "http://praxisherz.example.org:631/printers/vFax"}, {"name": "bös artig", "url": "http://x:631/printers/x"}, {"name": "vKasse", "url": "file:///C:/x"}},
 				"ca":       ""}
 			out := map[string]any{"auftraege": ts.auftraege, "stand": "s1"}
 			if in["stand"] != "s1" {
@@ -183,7 +181,7 @@ func agentOrdner(t *testing.T, ts *testServer) string {
 	t.Helper()
 	dir := t.TempDir()
 	sum := sha256.Sum256(ts.srv.Certificate().Raw)
-	cfg := map[string]any{"server_url": ts.srv.URL, "launcher_key": "0123456789abcdef0123456789abcdef", "certificate_sha256": hex.EncodeToString(sum[:]), "kontexte": map[string]string{"kienzle-kasse": "/starter/kasse"}}
+	cfg := map[string]any{"server_url": ts.srv.URL, "launcher_key": "0123456789abcdef0123456789abcdef", "certificate_sha256": hex.EncodeToString(sum[:]), "kontexte": map[string]string{"praxisherz-kasse": "/starter/kasse"}}
 	data, _ := json.Marshal(cfg)
 	os.WriteFile(filepath.Join(dir, "client.json"), data, 0o600)
 	return dir
@@ -199,7 +197,7 @@ func TestAnmeldenUndAngleichen(t *testing.T) {
 	if st, _ := os.Stat(filepath.Join(dir, "agent.json")); st == nil || st.Mode().Perm() != 0o600 {
 		t.Fatal("agent.json fehlt oder ist für andere lesbar")
 	}
-	exe := filepath.Join(dir, "kienzle-starter")
+	exe := filepath.Join(dir, "praxisherz-starter")
 	os.WriteFile(exe, []byte("neues Programm"), 0o755) // gleiche Prüfsumme: keine Aktualisierung
 	p := &testPlattform{ordner: dir}
 	a := &Agent{Ordner: dir, Programm: exe, Plattform: p}
@@ -213,7 +211,7 @@ func TestAnmeldenUndAngleichen(t *testing.T) {
 		t.Fatalf("Aufrufe/Drucker nicht angeglichen (ungültige Drucker müssen fehlen): %+v", p)
 	}
 	neu, _ := loadConfig(filepath.Join(dir, "client.json"))
-	if neu == nil || neu.LauncherKey != "neuer-schluessel-0123456789abcdef" || neu.Contexts["kienzle-telefon"] != "/starter/telefon" {
+	if neu == nil || neu.LauncherKey != "neuer-schluessel-0123456789abcdef" || neu.Contexts["praxisherz-telefon"] != "/starter/telefon" {
 		t.Fatalf("client.json nicht nachgeführt: %+v", neu)
 	}
 	if err := a.Schritt(); err != nil || p.schemata != 1 || len(p.drucker) != 1 || ts.abfragen != 2 {
@@ -230,10 +228,9 @@ func TestGDTAuftrag(t *testing.T) {
 	if _, err := Anmelden(dir, nil); err != nil {
 		t.Fatal(err)
 	}
-	exe := filepath.Join(dir, "kienzle-starter")
+	exe := filepath.Join(dir, "praxisherz-starter")
 	os.WriteFile(exe, []byte("x"), 0o755)
-	p := &testPlattform{ordner: dir, frueher: filepath.Join(dir, "gdt-frueher")}
-	os.MkdirAll(p.frueher, 0o755)
+	p := &testPlattform{ordner: dir}
 	a := &Agent{Ordner: dir, Programm: exe, Plattform: p}
 	a.Laden()
 	gdt := "01380006301\r\n014300012345\r\n"
@@ -249,9 +246,6 @@ func TestGDTAuftrag(t *testing.T) {
 	if b, _ := os.ReadFile(filepath.Join(dir, "gdt", "AUFRUFi.gdt")); string(b) != gdt {
 		t.Fatalf("GDT-Datei: %q", b)
 	}
-	if b, _ := os.ReadFile(filepath.Join(p.frueher, "AUFRUFi.gdt")); string(b) != gdt {
-		t.Fatalf("GDT-Datei im früheren Ordner (bis T2med umgestellt ist): %q", b)
-	}
 	if len(ts.ergebnis) != 4 || ts.ergebnis[0]["ok"] != true || ts.ergebnis[1]["ok"] != false || ts.ergebnis[2]["ok"] != false || ts.ergebnis[3]["ok"] != false {
 		t.Fatalf("Ergebnisse: %+v", ts.ergebnis)
 	}
@@ -264,7 +258,7 @@ func TestSelbstaktualisierung(t *testing.T) {
 	ts := neuerTestServer(t, []byte("Programm Fassung 2"))
 	dir := agentOrdner(t, ts)
 	Anmelden(dir, nil)
-	exe := filepath.Join(dir, "kienzle-starter")
+	exe := filepath.Join(dir, "praxisherz-starter")
 	os.WriteFile(exe, []byte("Programm Fassung 1"), 0o755)
 	a := &Agent{Ordner: dir, Programm: exe, Plattform: &testPlattform{ordner: dir}}
 	a.Laden()
@@ -302,7 +296,7 @@ func TestWirdAktualisiertZurueckgesetztBeiFehler(t *testing.T) {
 	if _, err := Anmelden(dir, nil); err != nil {
 		t.Fatal(err)
 	}
-	exe := filepath.Join(dir, "kienzle-starter")
+	exe := filepath.Join(dir, "praxisherz-starter")
 	os.WriteFile(exe, []byte("altes Programm"), 0o755)
 	a := &Agent{Ordner: dir, Programm: exe, Plattform: &testPlattform{ordner: dir}}
 	if err := a.Laden(); err != nil {
@@ -377,7 +371,7 @@ func TestDruckerFehlerNichtBeiJederAbfrage(t *testing.T) {
 	ts := neuerTestServer(t, []byte("x"))
 	dir := agentOrdner(t, ts)
 	Anmelden(dir, nil)
-	exe := filepath.Join(dir, "kienzle-starter")
+	exe := filepath.Join(dir, "praxisherz-starter")
 	os.WriteFile(exe, []byte("x"), 0o755)
 	p := &testPlattform{ordner: dir, fehler: errors.New("Drucker: 0 von 1 eingerichtet; fehlen: vFax. Windows meldet: Zugriff verweigert")}
 	a := &Agent{Ordner: dir, Programm: exe, Plattform: p}
@@ -405,7 +399,7 @@ func TestAlteDruckerNurNachBestaetigung(t *testing.T) {
 	ts := neuerTestServer(t, []byte("x"))
 	dir := agentOrdner(t, ts)
 	Anmelden(dir, nil)
-	exe := filepath.Join(dir, "kienzle-starter")
+	exe := filepath.Join(dir, "praxisherz-starter")
 	os.WriteFile(exe, []byte("x"), 0o755)
 	p := &testPlattform{ordner: dir, alt: []string{"Terminzettel", "SumUp-Rechnung"}}
 	a := &Agent{Ordner: dir, Programm: exe, Plattform: p}
@@ -446,9 +440,9 @@ func TestDruckerSkriptPasstAusdruck(t *testing.T) {
 		port, host, queue string
 	}{
 		{"http://192.0.2.5:631/printers/vKasse", "192.0.2.5", "vKasse"},
-		{"HTTP://kienzle.example.org:631/printers/vTermine/", "kienzle.example.org", "vTermine"},
+		{"HTTP://praxisherz.example.org:631/printers/vTermine/", "praxisherz.example.org", "vTermine"},
 		{"http://[fe80::1]:631/printers/vFax1", "fe80::1", "vFax1"},
-		{"http://kienzle.example.org/printers/vFax2", "kienzle.example.org", "vFax2"},
+		{"http://praxisherz.example.org/printers/vFax2", "praxisherz.example.org", "vFax2"},
 	} {
 		m := re.FindStringSubmatch(f.port)
 		if m == nil || m[1]+m[2] != f.host || m[4] != f.queue {

@@ -20,7 +20,6 @@ Die Aufruf-Adresse steht in der Kasse unter *Einstellungen → Zahlung & T2med* 
    praxisherz-kasse://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}
    ```
 
-   (Bis Basis 0.22.0-beta.31 hieß die Adresse `kienzle-kasse://…`; bestehende Einträge funktionieren weiter.)
 
    und eine **Bezeichnung** (z. B. „Kartenzahlung“) eintragen, auf **Plus** klicken, dann oben rechts mit dem **Häkchen** speichern.
    Danach in der Liste davor die **Aktualisieren-Pfeile** anklicken.

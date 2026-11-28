@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.66
+
+- Hinweise auf die frühere Aufrufadresse `kienzle-kasse://` und die alte Einrichtung entfernt. Mit Tests geprüft.
+
 ## 2.3.4-beta.65
 
 - Neu veröffentlicht nach dem Bereinigen der Git-Geschichte (gleicher Inhalt wie die vorige Vorabversion). Die vorigen Vorabversionen bitte auf GitHub löschen.

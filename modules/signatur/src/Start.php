@@ -3,7 +3,7 @@ declare(strict_types=1);
 namespace KienzleSignatur;
 
 /**
- * Start aus T2med (Schema praxisherz-signatur://, früher kienzle-signatur://, zentraler Starter der Basis → POST /starter/signatur):
+ * Start aus T2med (Schema praxisherz-signatur://, zentraler Starter der Basis → POST /starter/signatur):
  * holt den Patienten aus T2med, legt einen einmaligen Startcode an und liefert den Startlink. Nach der Anmeldung
  * löst die Startseite den Code ein und füllt den Patienten in „Neuer Vorgang“.
  */

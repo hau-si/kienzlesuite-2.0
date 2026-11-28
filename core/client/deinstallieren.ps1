@@ -45,26 +45,23 @@ if ($drucker.Count) {
     Write-Host ''
 }
 
-# Agent und Symbol anhalten, Aufgaben entfernen (heutiger und früherer Name).
-foreach ($t in @('Praxisherz-Agent', 'Kienzle-Agent')) {
-    if (Get-ScheduledTask -TaskName $t -ErrorAction SilentlyContinue) {
-        Stop-ScheduledTask -TaskName $t -ErrorAction SilentlyContinue
-        Unregister-ScheduledTask -TaskName $t -Confirm:$false -ErrorAction SilentlyContinue
-        Say 'entfernt' "Aufgabe $t"
-    }
+# Agent und Symbol anhalten, Aufgabe entfernen.
+$t = 'Praxisherz-Agent'
+if (Get-ScheduledTask -TaskName $t -ErrorAction SilentlyContinue) {
+    Stop-ScheduledTask -TaskName $t -ErrorAction SilentlyContinue
+    Unregister-ScheduledTask -TaskName $t -Confirm:$false -ErrorAction SilentlyContinue
+    Say 'entfernt' "Aufgabe $t"
 }
-Get-Process praxisherz-starter, kienzle-starter -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-foreach ($v in @('Praxisherz', 'KienzleSuite')) {
-    if (Get-ItemProperty 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run' -Name $v -ErrorAction SilentlyContinue) {
-        Remove-ItemProperty 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run' -Name $v -ErrorAction SilentlyContinue
-        Say 'entfernt' 'Symbol in der Taskleiste (Autostart)'
-    }
+Get-Process praxisherz-starter -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+if (Get-ItemProperty 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'Praxisherz' -ErrorAction SilentlyContinue) {
+    Remove-ItemProperty 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'Praxisherz' -ErrorAction SilentlyContinue
+    Say 'entfernt' 'Symbol in der Taskleiste (Autostart)'
 }
 
-# Aufrufe aus T2med (praxisherz-…:// und frühere kienzle-…://), nur wenn sie auf unser Programm zeigen.
-Get-ChildItem 'HKLM:\Software\Classes' -ErrorAction SilentlyContinue | Where-Object { $_.PSChildName -match '^(praxisherz|kienzle)-[a-z0-9-]+$' } | ForEach-Object {
+# Aufrufe aus T2med (praxisherz-…://), nur wenn sie auf unser Programm zeigen.
+Get-ChildItem 'HKLM:\Software\Classes' -ErrorAction SilentlyContinue | Where-Object { $_.PSChildName -match '^praxisherz-[a-z0-9-]+$' } | ForEach-Object {
     $befehl = try { (Get-ItemProperty ($_.PSPath + '\shell\open\command') -ErrorAction Stop).'(default)' } catch { '' }
-    if ($befehl -match '(praxisherz|kienzle)-starter\.exe') {
+    if ($befehl -match 'praxisherz-starter\.exe') {
         Remove-Item -Recurse -Force $_.PSPath -ErrorAction SilentlyContinue
         Say 'entfernt' ('Aufruf ' + $_.PSChildName)
     }
@@ -91,7 +88,7 @@ if ($druckerWeg) {
 } elseif ($drucker.Count) { Say 'behalten' 'virtuelle Drucker' }
 
 # Ordner und Eintrag in der App-Liste.
-foreach ($o in @($prog, $daten, 'C:\Praxisherz', (Join-Path $env:ProgramFiles 'Kienzle'), (Join-Path $env:ProgramData 'Kienzle'))) {
+foreach ($o in @($prog, $daten, 'C:\Praxisherz')) {
     if (Test-Path $o) {
         Remove-Item -Recurse -Force $o -ErrorAction SilentlyContinue
         if (Test-Path $o) { Say 'Hinweis' "$o ließ sich nicht ganz entfernen (später von Hand löschen)" } else { Say 'entfernt' $o }
@@ -100,5 +97,4 @@ foreach ($o in @($prog, $daten, 'C:\Praxisherz', (Join-Path $env:ProgramFiles 'K
 Remove-Item -Recurse -Force 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Praxisherz-Agent' -ErrorAction SilentlyContinue
 Write-Host ''
 Write-Host 'Praxisherz-Agent ist entfernt. Den Eintrag dieses PCs auf dem Server löscht ein Admin unter Einrichten → Arbeitsplätze.'
-if (Test-Path 'C:\Kienzle\GDT') { Write-Host 'Der frühere Ordner C:\Kienzle\GDT blieb bestehen; er kann gelöscht werden, wenn T2med ihn nicht mehr nutzt.' }
 Read-Host 'Zum Schließen Enter drücken'

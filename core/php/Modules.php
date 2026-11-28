@@ -50,22 +50,17 @@ final class Modules {
     }
 
     /**
-     * @return list<array{modul:string,pfad:string,schema:string,alt:string,label:string}> Startkontexte der Module ([[starters]] in module.toml),
-     * nach Schema sortiert. „alt“ ist die frühere Adresse kienzle-<name> zu praxisherz-<name> (bestehende Einträge in T2med), sonst leer.
+     * @return list<array{modul:string,pfad:string,schema:string,label:string}> Startkontexte der Module ([[starters]] in module.toml),
+     * nach Schema sortiert.
      */
     public function starters(): array {
         $out = [];
         foreach ($this->modules as $id => $m) foreach ($m['starters'] ?? [] as $s) {
             $schema = (string)$s['schema'];
-            $out[] = ['modul' => $id, 'pfad' => (string)($m['web']['path'] ?? ''), 'schema' => $schema, 'alt' => self::alteAdresse($schema), 'label' => (string)$s['label']];
+            $out[] = ['modul' => $id, 'pfad' => (string)($m['web']['path'] ?? ''), 'schema' => $schema, 'label' => (string)$s['label']];
         }
         usort($out, fn($a, $b) => $a['schema'] <=> $b['schema']);
         return $out;
-    }
-
-    /** Frühere Schreibweise eines Startschemas: praxisherz-<name> → kienzle-<name>; sonst leer. */
-    public static function alteAdresse(string $schema): string {
-        return str_starts_with($schema, 'praxisherz-') ? 'kienzle-' . substr($schema, strlen('praxisherz-')) : '';
     }
 
     /** @return array<string,string> Modul-ID → Webpfad für Module mit Startkontexten (core.js leitet „#launch=…&m=<id>“ dorthin weiter) */

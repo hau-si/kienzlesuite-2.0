@@ -1,4 +1,4 @@
-"""Einstellungen aus dem Kienzle-SumUp-Webinterface: Schriftgrößen, QR-Position, Modell, Vorschau."""
+"""Einstellungen des Terminzettels: Schriftgrößen, QR-Position, Modell, Vorschau."""
 import contextlib
 import importlib.util
 import io

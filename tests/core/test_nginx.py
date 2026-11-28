@@ -77,7 +77,7 @@ class Vorlage(unittest.TestCase):
 
     def test_startkontexte_pruefung_durch_die_basis(self):
         reg = registry()
-        reg['modules'][1]['starters'] = [{'schema': 'kienzle-kasse', 'label': 'Kasse'}]
+        reg['modules'][1]['starters'] = [{'schema': 'praxisherz-kasse', 'label': 'Kasse'}]
         conf = nginx.render(HOSTS, reg)
         b = block(conf, 'location = /starter/kasse {')
         self.assertIn('auth_request /_starter-pruefen;', b)
@@ -89,7 +89,7 @@ class Vorlage(unittest.TestCase):
         self.assertIn('internal;', p)
         self.assertIn('fastcgi_param REQUEST_URI /_starter-pruefen;', p)
         self.assertNotIn('location = /starter/', nginx.render(HOSTS, registry()))      # ohne Startkontexte kein Ort
-        reg['modules'][0]['starters'] = [{'schema': 'kienzle-b', 'label': 'B'}]   # HTTP-Modul
+        reg['modules'][0]['starters'] = [{'schema': 'praxisherz-b', 'label': 'B'}]   # HTTP-Modul
         with self.assertRaises(nginx.Fehler):
             nginx.render(HOSTS, reg)
 

@@ -37,7 +37,7 @@ type Ansicht struct {
 	Zeilen  []Zeile
 	Fuss    string // Version · zuletzt
 	Tooltip string
-	// Entfernen: alte Kienzle-Drucker; das Fenster bietet dann „Alte Drucker entfernen …“ mit Rückfrage an.
+	// Entfernen: alte Drucker dieses Servers; das Fenster bietet dann „Alte Drucker entfernen …“ mit Rückfrage an.
 	Entfernen []string
 }
 

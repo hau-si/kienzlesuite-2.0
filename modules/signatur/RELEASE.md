@@ -1,5 +1,9 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.50
+
+- Hinweise auf die früheren Aufrufadressen `kienzle-signatur://` entfernt (nur noch `praxisherz-signatur://`). Mit Tests geprüft.
+
 ## 0.1.0-beta.49
 
 - Neu veröffentlicht nach dem Bereinigen der Git-Geschichte (gleicher Inhalt wie die vorige Vorabversion). Die vorigen Vorabversionen bitte auf GitHub löschen.

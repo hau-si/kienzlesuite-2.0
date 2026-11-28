@@ -38,13 +38,11 @@ if (!$line -or ((Get-FileHash $asset -Algorithm SHA256).Hash.ToLowerInvariant() 
 
 # Laufenden Agent anhalten, damit das Programm ersetzt werden kann.
 $task = 'Praxisherz-Agent'
-$taskAlt = 'Kienzle-Agent'   # Name vor der Umbenennung
-foreach ($t in @($task, $taskAlt)) { if (Get-ScheduledTask -TaskName $t -ErrorAction SilentlyContinue) { Stop-ScheduledTask -TaskName $t -ErrorAction SilentlyContinue } }
-Get-Process praxisherz-starter, kienzle-starter -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+if (Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue) { Stop-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue }
+Get-Process praxisherz-starter -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
-# Programm: C:\Program Files\Praxisherz (nur Administratoren dürfen ändern). Bis zur Umbenennung hieß der Ordner „Kienzle“.
+# Programm: C:\Program Files\Praxisherz (nur Administratoren dürfen ändern).
 $prog = Join-Path $env:ProgramFiles 'Praxisherz'
-$progAlt = Join-Path $env:ProgramFiles 'Kienzle'
 New-Item -ItemType Directory -Force $prog | Out-Null
 $exe = Join-Path $prog 'praxisherz-starter.exe'
 Place $asset $exe 'Programm (Starter und Agent)'
@@ -53,9 +51,8 @@ Place $asset $exe 'Programm (Starter und Agent)'
 # unsignierte Programm ausgeführt werden darf. Einmal entfernen reicht; harmlos, wenn die Kennzeichnung schon fehlt.
 Unblock-File $exe -ErrorAction SilentlyContinue
 
-# Daten: C:\ProgramData\Praxisherz (früher „Kienzle“). Benutzer dürfen nur lesen (der Agent läuft mit Systemrechten und führt dort ein Skript aus).
+# Daten: C:\ProgramData\Praxisherz. Benutzer dürfen nur lesen (der Agent läuft mit Systemrechten und führt dort ein Skript aus).
 $daten = Join-Path $env:ProgramData 'Praxisherz'
-$datenAlt = Join-Path $env:ProgramData 'Kienzle'
 New-Item -ItemType Directory -Force $daten | Out-Null
 & icacls.exe $daten /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-32-545:(OI)(CI)RX' | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Dateirechte konnten nicht gesetzt werden.' }
@@ -70,7 +67,7 @@ else { Import-Certificate -FilePath (Join-Path $daten 'ca.crt') -CertStoreLocati
 
 # Aufrufe aus T2med für alle Benutzer (der Agent hält sie später selbst aktuell).
 $command = '"' + $exe + '" --url "%1"'
-foreach ($scheme in (Get-Content schemas.txt | Where-Object { $_ -match '^(praxisherz|kienzle)-[a-z0-9-]+$' })) {
+foreach ($scheme in (Get-Content schemas.txt | Where-Object { $_ -match '^praxisherz-[a-z0-9-]+$' })) {
     $reg = "HKLM:\Software\Classes\$scheme"
     $current = try { (Get-ItemProperty "$reg\shell\open\command" -ErrorAction Stop).'(default)' } catch { $null }
     if ($current -ne $command) {
@@ -81,11 +78,7 @@ foreach ($scheme in (Get-Content schemas.txt | Where-Object { $_ -match '^(praxi
         Set-Item "$reg\shell\open\command" -Value $command
         Say ($(if ($current) { 'aktualisiert' } else { 'neu' })) "Aufruf $scheme"
     } else { Say 'unverändert' "Aufruf $scheme" }
-    # Alter Starter (nur für einen Benutzer eingerichtet) hätte Vorrang: entfernen.
-    if (Test-Path "HKCU:\Software\Classes\$scheme") { Remove-Item -Recurse -Force "HKCU:\Software\Classes\$scheme"; Say 'entfernt' "alter Aufruf $scheme (nur dieser Benutzer)" }
 }
-$alt = Join-Path $env:LOCALAPPDATA 'Kienzle-Starter'
-if (Test-Path $alt) { Remove-Item -Recurse -Force $alt -ErrorAction SilentlyContinue; Say 'entfernt' 'alter Starter dieses Benutzers' }
 
 # Agent bei Praxisherz anmelden (eigener Zugang für diesen PC, nur für System und Administratoren lesbar).
 $out = & $exe --anmelden 2>&1
@@ -99,11 +92,6 @@ $action = New-ScheduledTaskAction -Execute $exe -Argument '--dienst'
 $trigger = @((New-ScheduledTaskTrigger -AtStartup), (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5)))
 $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
 $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 9999 -RestartInterval (New-TimeSpan -Minutes 1) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances IgnoreNew
-# Umzug von „Kienzle“ nach „Praxisherz“: alte Aufgabe und alte Ordner entfernen (der Agent ist angehalten, neu angemeldet und läuft gleich aus dem neuen Ordner).
-if (Get-ScheduledTask -TaskName $taskAlt -ErrorAction SilentlyContinue) { Unregister-ScheduledTask -TaskName $taskAlt -Confirm:$false; Say 'entfernt' "alte Aufgabe $taskAlt" }
-foreach ($o in @($progAlt, $datenAlt)) {
-    if (Test-Path $o) { Remove-Item -Recurse -Force $o -ErrorAction SilentlyContinue; if (Test-Path $o) { Say 'Hinweis' "$o ließ sich nicht ganz entfernen (später von Hand löschen)" } else { Say 'entfernt' "alter Ordner $o" } }
-}
 Register-ScheduledTask -TaskName $task -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description 'Praxisherz: hält Starter, Zertifikat und Drucker aktuell, öffnet Akten in T2med.' -Force | Out-Null
 Start-ScheduledTask -TaskName $task
 # Eintrag unter Einstellungen → Apps mit „Deinstallieren“ (Skript liegt beim Programm).
@@ -123,6 +111,5 @@ Say 'läuft' 'Symbol in der Taskleiste (bei ausgeblendeten Symbolen über den Pf
 Write-Host ''
 Write-Host 'Arbeitsplatz eingerichtet. Das Paket kann gelöscht werden; künftig aktualisiert sich alles selbst.'
 Write-Host 'Für „Akte öffnen“: in T2med beim GDT-Gerät „Telefonaufruf“ als Importdatei C:\Praxisherz\GDT\AUFRUFi.gdt eintragen.'
-if (Test-Path 'C:\Kienzle\GDT') { Write-Host 'Bisher stand dort C:\Kienzle\GDT\AUFRUFi.gdt. Bitte in T2med umstellen; bis dahin schreibt der Agent die Datei in beide Ordner. Danach den Ordner C:\Kienzle löschen.' }
 try { Stop-Transcript | Out-Null } catch { }
 Read-Host 'Zum Schließen Enter drücken'

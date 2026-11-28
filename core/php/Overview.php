@@ -18,7 +18,7 @@ final class Overview {
     /** Gruppen der Basis-Liste in der Reihenfolge der Anzeige. */
     public const GROUPS = ['zugang' => 'Zugang und Konten', 'name' => 'Servername und Arbeitsplätze', 'sicherung' => 'Datensicherung', 'betrieb' => 'Schutz und Updates'];
     private const AGAIN = 'ueberblick_erneut';
-    /** Wo ein Punkt erledigt wird (wie im Einrichtungs-Überblick von kienzle-sumup). */
+    /** Wo ein Punkt erledigt wird. */
     public const PLACES = ['web' => ['In diesem Webfenster', 'Einstellungen dieses Servers'], 'pc' => ['Auf den Arbeitsplätzen', 'jeder PC der Praxis'],
         'nas' => ['Am NAS und im Router', 'Geräte im Praxisnetz']];
     private const KEY = 'ueberblick_manuell';

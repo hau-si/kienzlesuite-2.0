@@ -144,7 +144,7 @@ def check_target(ziel: dict) -> dict:
     art = ziel.get('art')
     if art == 'ziel':
         _ablage_target(str(ziel.get('id')))
-        return {'art': 'ziel', 'id': str(ziel['id']), 'ordner': ablage.remote_dir(str(ziel.get('ordner') or 'kienzle-sicherung'))}
+        return {'art': 'ziel', 'id': str(ziel['id']), 'ordner': ablage.remote_dir(str(ziel.get('ordner') or 'praxisherz-sicherung'))}
     if art == 'rest':
         url = str(ziel.get('url', ''))
         if not REST.match(url):
@@ -643,7 +643,7 @@ def full_restore(ziel: dict, password: str, ssh_key: str | None = None) -> list[
     if not isinstance(password, str) or not 8 <= len(password.strip()) <= 200:
         raise Fehler('Passwort ungültig.')
     if ziel.get('art') == 'ziel':
-        z = {'art': 'ziel', 'id': '', 'direkt': ablage.check_target(ziel.get('direkt')), 'ordner': ablage.remote_dir(str(ziel.get('ordner') or 'kienzle-sicherung'))}
+        z = {'art': 'ziel', 'id': '', 'direkt': ablage.check_target(ziel.get('direkt')), 'ordner': ablage.remote_dir(str(ziel.get('ordner') or 'praxisherz-sicherung'))}
     else:
         z = check_target(ziel)
     if (DATA / 'core' / 'core.sqlite').exists():

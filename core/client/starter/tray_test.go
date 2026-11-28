@@ -22,7 +22,7 @@ func TestAnsichtAgentLaeuftNicht(t *testing.T) {
 
 func TestAnsichtFarben(t *testing.T) {
 	jetzt := time.Unix(1_800_000_000, 0)
-	gut := Status{Zeit: jetzt.Unix(), Verbunden: true, Name: "Empfang", Server: "kienzle.example.org", Version: "2.1.0",
+	gut := Status{Zeit: jetzt.Unix(), Verbunden: true, Name: "Empfang", Server: "praxisherz.example.org", Version: "2.1.0",
 		Drucker: []string{"vKasse", "vTermine"}, DruckerOk: true, Aufrufe: 3, Zertifikat: true}
 	v := AnsichtBauen(gut, true, jetzt)
 	if v.Farbe != Gruen || v.Kopf != "verbunden" || len(v.Zeilen) != 4 || !strings.Contains(v.Unter, "Empfang") || !strings.Contains(v.Tooltip, "Empfang") {

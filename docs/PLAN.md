@@ -214,7 +214,7 @@ landen, nach dem Start geprüft werden und bei Fehlern automatisch auf den vorhe
 
 1. **Release:** je Teil ein Archiv `<teil>-<version>.tar.gz` und ein `manifest.json`. Das Manifest enthält Teil, Version,
    Kanal, `core_api` bzw. die nötige Mindestversion der Basis und SHA-256 jeder Datei. Dazu eine Signatur
-   `manifest.json.sig`. Veröffentlicht als GitHub-Release in `hau-si/kienzlesuite-2.0`; Tags `core-v0.4.0`,
+   `manifest.json.sig`. Veröffentlicht als GitHub-Release in `hau-si/praxisherz`; Tags `core-v0.4.0`,
    `sumup-v2.0.0`; Beta = Vorabversion.
 2. **Signatur ohne externe Zertifizierungsstelle:** ein eigenes Ed25519-Schlüsselpaar, erzeugt mit `ssh-keygen -t ed25519`.
    Signiert und geprüft wird mit `ssh-keygen -Y sign/verify` (Namensraum `kienzle-release`); openssh ist auf jedem Ubuntu Server vorhanden.

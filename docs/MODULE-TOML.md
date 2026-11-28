@@ -140,7 +140,7 @@ Startkontexte für den zentralen Arbeitsplatz-Starter der Basis (Verwaltung → 
 
 | Feld | Pflicht | Bedeutung |
 |---|---|---|
-| `schema` | ja | URL-Schema, das T2med aufruft, `kienzle-<name>` (Kleinbuchstaben, Ziffern, Bindestrich); über alle Module eindeutig |
+| `schema` | ja | URL-Schema, das T2med aufruft, `praxisherz-<name>` (Kleinbuchstaben, Ziffern, Bindestrich); über alle Module eindeutig |
 | `label` | ja | Name des Kontexts für die Anzeige auf der Seite „Arbeitsplätze“ |
 
 Das Starterprogramm sendet `POST https://<server>/starter/<modul-id>` (JSON mit `context_id`, `fhir_base_url`, `oauth_token`, `action = "launch"`).

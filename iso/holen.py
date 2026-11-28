@@ -25,7 +25,6 @@ import urllib.request
 from pathlib import Path
 
 REPO = os.environ.get('KIENZLE_REPO', 'hau-si/praxisherz')
-FRUEHERE_REPOS = {'hau-si/praxisherz': ['hau-si/kienzlesuite-2.0']}   # bis das Repository umbenannt ist
 API = os.environ.get('KIENZLE_API', 'https://api.github.com')
 OPENSSL = os.environ.get('KIENZLE_OPENSSL', '/usr/bin/openssl')
 SCHLUESSEL = Path('/usr/share/kienzle-iso/release-keys')
@@ -126,20 +125,9 @@ def auspacken(archiv: bytes, ziel: Path, abschneiden: int = 0) -> int:
     return n
 
 
-def mit_frueheren(abruf):
-    """Erst das Repository unter dem aktuellen Namen, dann unter früheren Namen versuchen."""
-    fehler = None
-    for repo in [REPO, *FRUEHERE_REPOS.get(REPO, [])]:
-        try:
-            return abruf(repo)
-        except Fehler as e:
-            fehler = fehler or e
-    raise fehler
-
-
 def release_holen(kanal: str, unsigniert: bool, schluessel: Path, ziel: Path) -> str:
     try:
-        releases = json.loads(mit_frueheren(lambda repo: holen(f'{API}/repos/{repo}/releases?per_page=100', 5 * 1024 * 1024)))
+        releases = json.loads(holen(f'{API}/repos/{REPO}/releases?per_page=100', 5 * 1024 * 1024))
     except ValueError:
         raise Fehler('Antwort von GitHub nicht lesbar.') from None
     rel = neuestes_release(releases if isinstance(releases, list) else [], kanal)
@@ -173,7 +161,7 @@ def release_holen(kanal: str, unsigniert: bool, schluessel: Path, ziel: Path) ->
 def zweig_holen(zweig: str, ziel: Path) -> str:
     if zweig not in ('main', 'beta'):
         raise Fehler('Zweig muss main oder beta sein.')
-    archiv = mit_frueheren(lambda repo: holen(f'https://github.com/{repo}/archive/refs/heads/{zweig}.tar.gz'))
+    archiv = holen(f'https://github.com/{REPO}/archive/refs/heads/{zweig}.tar.gz')
     auspacken(archiv, ziel, abschneiden=1)
     return f'Zweig {zweig}, UNSIGNIERT (kein Release, keine Prüfsumme)'
 

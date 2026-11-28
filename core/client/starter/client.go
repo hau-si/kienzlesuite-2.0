@@ -33,7 +33,7 @@ type Config struct {
 }
 
 var (
-	schemeRe = regexp.MustCompile(`^(praxisherz|kienzle)-[a-z0-9-]{1,30}$`) // kienzle-… = frühere Adressen in T2med
+	schemeRe = regexp.MustCompile(`^praxisherz-[a-z0-9-]{1,30}$`)
 	pathRe   = regexp.MustCompile(`^/[A-Za-z0-9._/-]{1,80}$`)
 	keyRe    = regexp.MustCompile(`^[A-Za-z0-9._~+/=-]{16,200}$`)
 )
@@ -87,7 +87,7 @@ type Launch struct {
 
 var contextRe = regexp.MustCompile(`^[A-Za-z0-9._-]{1,128}$`)
 
-// parseLaunch zerlegt kienzle-…://?kontextId=…&fhirBasisUrl=…&oAuthToken=… (Schreibweise der Namen wie in T2med; die
+// parseLaunch zerlegt praxisherz-…://?kontextId=…&fhirBasisUrl=…&oAuthToken=… (Schreibweise der Namen wie in T2med; die
 // Namen context_id usw. gehen auch). Weitere einfache Parameter werden als Extra weitergegeben (höchstens 8).
 func parseLaunch(raw string, cfg *Config) (*Launch, string, error) {
 	u, err := url.Parse(raw)

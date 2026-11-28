@@ -2175,20 +2175,10 @@ final class Web {
         return 'https://' . $name;
     }
 
-    /** Ab dieser Agent-Version kennt der Starter Adressen mit „praxisherz-“; ältere bekommen nur „kienzle-“, bis sie sich aktualisiert haben. */
-    public const AGENT_NEUE_ADRESSEN = '2.3.7';
-
-    /**
-     * @return array<string,string> Schema → Pfad auf dem Server. Zu jeder neuen Adresse (praxisherz-…) auch die alte (kienzle-…), damit
-     * bestehende Einträge in T2med weiter funktionieren. $nurAlte: nur kienzle-… (für ältere Agents, die praxisherz-… ablehnen würden).
-     */
-    private function starterKontexte(bool $nurAlte = false): array {
+    /** @return array<string,string> Schema (praxisherz-…) → Pfad auf dem Server. */
+    private function starterKontexte(): array {
         $out = [];
-        foreach ($this->modules->starters() as $s) {
-            $pfad = '/starter/' . $s['modul'];
-            if ($s['alt'] !== '') $out[$s['alt']] = $pfad;
-            if (!$nurAlte || str_starts_with($s['schema'], 'kienzle-')) $out[$s['schema']] = $pfad;
-        }
+        foreach ($this->modules->starters() as $s) $out[$s['schema']] = '/starter/' . $s['modul'];
         return $out;
     }
 
@@ -2246,32 +2236,18 @@ final class Web {
 
     private function clientDist(): string { return self::$clientDist !== '' ? self::$clientDist : dirname(__DIR__) . '/client-dist'; }
 
-    /**
-     * Programme (Datei → SHA-256) aus client-dist/SHA256SUMS. Zu praxisherz-starter-… auch der frühere Name kienzle-starter-…:
-     * Agenten vor 2.3.8 suchen ihr Programm unter diesem Namen und holen sich so die neue Fassung.
-     */
+    /** Programme (Datei → SHA-256) aus client-dist/SHA256SUMS. */
     private function agentProgramme(): array {
         $out = [];
         foreach (preg_split('/\r?\n/', (string)@file_get_contents($this->clientDist() . '/SHA256SUMS')) ?: [] as $z) {
-            if (preg_match('/^([0-9a-f]{64})\s+\*?((?:praxisherz|kienzle)-starter-[a-z0-9-]+(?:\.exe)?)$/D', trim($z), $m) && is_file($this->clientDist() . '/' . $m[2])) {
-                $out[$m[2]] = $m[1];
-                if (str_starts_with($m[2], 'praxisherz-')) $out['kienzle-' . substr($m[2], strlen('praxisherz-'))] ??= $m[1];
-            }
+            if (preg_match('/^([0-9a-f]{64})\s+\*?(praxisherz-starter-[a-z0-9-]+(?:\.exe)?)$/D', trim($z), $m) && is_file($this->clientDist() . '/' . $m[2])) $out[$m[2]] = $m[1];
         }
         return $out;
     }
 
-    /** Datei in client-dist zu einem Programmnamen (früherer Name kienzle-starter-… → praxisherz-starter-…, falls nur diese da ist). */
-    private function agentProgrammDatei(string $name): string {
-        $dist = $this->clientDist();
-        if (!is_file($dist . '/' . $name) && str_starts_with($name, 'kienzle-')) return $dist . '/praxisherz-' . substr($name, strlen('kienzle-'));
-        return $dist . '/' . $name;
-    }
-
     /** Sollzustand für die Agents: Programme, Startkontexte, Drucker, Zertifizierungsstelle, Ablage der GDT-Datei. */
-    private function agentSoll(string $version = ''): array {
-        $alt = $version !== '' && preg_match('/^[0-9]+(\.[0-9]+)*$/D', $version) && version_compare($version, self::AGENT_NEUE_ADRESSEN, '<');
-        return ['server_url' => $this->serverUrl(), 'launcher_key' => $this->st()->key(), 'programme' => $this->agentProgramme(), 'kontexte' => $this->starterKontexte($alt), 'drucker' => $this->starterDrucker(),
+    private function agentSoll(): array {
+        return ['server_url' => $this->serverUrl(), 'launcher_key' => $this->st()->key(), 'programme' => $this->agentProgramme(), 'kontexte' => $this->starterKontexte(), 'drucker' => $this->starterDrucker(),
             'ca' => (string)@file_get_contents(self::$caFile), 'gdt' => ['ordner' => 'C:\\Praxisherz\\GDT']];
     }
 
@@ -2292,7 +2268,7 @@ final class Web {
         if (!$platz) return $fail(401, 'Arbeitsplatz unbekannt oder entfernt. Bitte das Paket auf diesem PC neu einrichten.');
         if ($r->path === '/agent/abholen' && $r->method === 'POST') {
             $auftraege = $this->ap()->abholen($platz, $r->remote, (string)($json['version'] ?? ''), (string)($json['zustand'] ?? ''));
-            $soll = $this->agentSoll((string)($json['version'] ?? ''));
+            $soll = $this->agentSoll();
             $stand = hash('sha256', (string)json_encode($soll));
             $out = ['auftraege' => $auftraege, 'stand' => $stand, 'name' => $platz['name']];
             if (($json['stand'] ?? '') !== $stand) $out['soll'] = $soll;
@@ -2302,8 +2278,8 @@ final class Web {
             $this->ap()->ergebnis($platz, (string)($json['auftrag'] ?? ''), ($json['ok'] ?? false) === true, (string)($json['text'] ?? ''));
             return Response::json(['ok' => true]);
         }
-        if ($r->method === 'GET' && preg_match('#^/agent/programm/((?:praxisherz|kienzle)-starter-[a-z0-9-]+(?:\.exe)?)$#D', $r->path, $m) && isset($this->agentProgramme()[$m[1]])) {
-            return new Response(200, (string)file_get_contents($this->agentProgrammDatei($m[1])), [['Content-Type', 'application/octet-stream'], ['Cache-Control', 'no-store']]);
+        if ($r->method === 'GET' && preg_match('#^/agent/programm/(praxisherz-starter-[a-z0-9-]+(?:\.exe)?)$#D', $r->path, $m) && isset($this->agentProgramme()[$m[1]])) {
+            return new Response(200, (string)file_get_contents($this->clientDist() . '/' . $m[1]), [['Content-Type', 'application/octet-stream'], ['Cache-Control', 'no-store']]);
         }
         return Response::json(['error' => 'Unbekannt.'], 404);
     }
@@ -2396,17 +2372,15 @@ final class Web {
         return Response::redirect('/hilfe/arbeitsplatz#paket');
     }
 
-    /** Kasten „Einträge in T2med“: je Modul mit Startkontext die Adresse (neu) und die frühere, die weiter funktioniert. */
+    /** Kasten „Einträge in T2med“: je Modul mit Startkontext die Adresse. */
     private function t2medAufrufe(): string {
         $list = $this->modules->starters();
         $platzhalter = '://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}';
         $out = '<div class="box wide" id="t2med"><h3>Einträge in T2med (Drittanbieter-Zugriffe verwalten → Neue URL hinzufügen)</h3>';
         if (!$list) return $out . '<p class="muted">Kein installiertes Modul wird aus T2med aufgerufen.</p></div>';
         $rows = '';
-        foreach ($list as $s) $rows .= '<tr><td>' . V::h($this->modules->name($s['modul'])) . '</td><td>' . V::h($s['label']) . '</td><td><code class="secret">' . V::h($s['schema'] . $platzhalter) . '</code>'
-            . ($s['alt'] !== '' ? '<br><small class="muted">Frühere Adresse <code>' . V::h($s['alt']) . '://…</code> funktioniert weiter.</small>' : '') . '</td></tr>';
-        return $out . '<p>Je Eintrag die Adresse genau so eintragen, mit den Platzhaltern, und eine Bezeichnung vergeben (z. B. „Kartenzahlung“). '
-            . 'Bestehende Einträge mit „kienzle-…“ funktionieren weiter; beim nächsten Bearbeiten in T2med bitte auf die neue Adresse umstellen.</p>'
+        foreach ($list as $s) $rows .= '<tr><td>' . V::h($this->modules->name($s['modul'])) . '</td><td>' . V::h($s['label']) . '</td><td><code class="secret">' . V::h($s['schema'] . $platzhalter) . '</code></td></tr>';
+        return $out . '<p>Je Eintrag die Adresse genau so eintragen, mit den Platzhaltern, und eine Bezeichnung vergeben (z. B. „Kartenzahlung“).</p>'
             . '<table><thead><tr><th>Modul</th><th>Kontext</th><th>Adresse in T2med</th></tr></thead><tbody>' . $rows . '</tbody></table>'
             . '<p class="muted small">Voraussetzung am PC: der Praxisherz-Agent (Einrichten → Arbeitsplätze). Anleitung mit Bildern für die Kasse: Kasse → Einstellungen → Zahlung &amp; T2med.</p></div>';
     }

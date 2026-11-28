@@ -64,16 +64,13 @@ function test_agent(): void {
     $auth = ['authorization' => 'Bearer ' . $a['token']];
     check(ap_req($b, 'POST', '/agent/abholen', [], ['authorization' => 'Bearer ' . str_repeat('0', 64)])->status === 401, 'unbekannter Agent');
     $r = json_decode(ap_req($b, 'POST', '/agent/abholen', ['version' => '1.0.0'], $auth)->body, true);
-    check($r['auftraege'] === [] && $r['name'] === 'EMPFANG-PCscript' && $r['soll']['kontexte'] === ['kienzle-kasse' => '/starter/kasse'], 'erste Abfrage mit Sollzustand; älterer Agent nur mit früherer Adresse: ' . json_encode($r['soll']['kontexte'] ?? null));
-    $neu = json_decode(ap_req($b, 'POST', '/agent/abholen', ['version' => Web::AGENT_NEUE_ADRESSEN], $auth)->body, true);
-    check($neu['soll']['kontexte'] === ['kienzle-kasse' => '/starter/kasse', 'praxisherz-kasse' => '/starter/kasse'] && $neu['stand'] !== $r['stand'], 'neuer Agent mit neuer und früherer Adresse: ' . json_encode($neu['soll']['kontexte'] ?? null));
-    check($r['soll']['programme'] === ['praxisherz-starter-windows-amd64.exe' => hash('sha256', 'MZ-Testprogramm'), 'kienzle-starter-windows-amd64.exe' => hash('sha256', 'MZ-Testprogramm')] && $r['soll']['gdt']['ordner'] === 'C:\\Praxisherz\\GDT', 'Programme nur mit Datei, GDT-Ordner fest');
+    check($r['auftraege'] === [] && $r['name'] === 'EMPFANG-PCscript' && $r['soll']['kontexte'] === ['praxisherz-kasse' => '/starter/kasse'], 'erste Abfrage mit Sollzustand: ' . json_encode($r['soll']['kontexte'] ?? null));
+    check($r['soll']['programme'] === ['praxisherz-starter-windows-amd64.exe' => hash('sha256', 'MZ-Testprogramm')] && $r['soll']['gdt']['ordner'] === 'C:\\Praxisherz\\GDT', 'Programme nur mit Datei, GDT-Ordner fest');
     $r2 = json_decode(ap_req($b, 'POST', '/agent/abholen', ['version' => '1.0.0', 'stand' => $r['stand']], $auth)->body, true);
     check(!isset($r2['soll']) && $r2['stand'] === $r['stand'], 'Sollzustand nur bei Änderung');
     $prog = ap_req($b, 'GET', '/agent/programm/praxisherz-starter-windows-amd64.exe', [], $auth);
     check($prog->status === 200 && $prog->body === 'MZ-Testprogramm', 'Programm laden');
-    $prog = ap_req($b, 'GET', '/agent/programm/kienzle-starter-windows-amd64.exe', [], $auth);
-    check($prog->status === 200 && $prog->body === 'MZ-Testprogramm', 'älterer Agent lädt das neue Programm unter dem früheren Namen');
+    check(ap_req($b, 'GET', '/agent/programm/kienzle-starter-windows-amd64.exe', [], $auth)->status === 404, 'früherer Programmname gibt es nicht mehr');
     check(ap_req($b, 'GET', '/agent/programm/praxisherz-starter-gibtsnicht.exe', [], $auth)->status === 404 && ap_req($b, 'GET', '/agent/programm/praxisherz-starter-windows-amd64.exe')->status === 401, 'Programm nur vorhanden und mit Zugang');
     // Neuinstallation am selben PC: gleicher Eintrag, neuer Zugang
     $a2 = json_decode(ap_req($b, 'POST', '/agent/anmelden', ['rechner' => 'EMPFANG-PC<script>'], ['authorization' => 'Bearer ' . $k])->body, true);

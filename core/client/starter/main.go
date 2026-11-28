@@ -1,7 +1,7 @@
 // praxisherz-starter: gemeinsamer Arbeitsplatz-Starter von Praxisherz.
 //
 // T2med ruft ihn über ein URL-Schema auf, z. B. praxisherz-kasse://?kontextId=…&fhirBasisUrl=…&oAuthToken=… oder
-// praxisherz-signatur://… (frühere Adressen kienzle-… gelten weiter). Der Starter sucht das Schema in client.json, schickt den Kontext per HTTPS an die dort
+// praxisherz-signatur://…. Der Starter sucht das Schema in client.json, schickt den Kontext per HTTPS an die dort
 // eingetragene Adresse des Moduls (mit dem Starter-Schlüssel), öffnet den zurückgegebenen einmaligen Link im Browser
 // und beendet sich. Es läuft kein Dienst. Das Serverzertifikat wird über den Fingerabdruck aus client.json geprüft.
 package main

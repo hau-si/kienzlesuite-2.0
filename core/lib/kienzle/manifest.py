@@ -50,7 +50,7 @@ HOOKS = ('install', 'update', 'remove', 'busy', 'health')
 # Zentrale Verbindungen der Basis, die ein Modul anmelden kann (Zugangsdaten bekommen nur anmeldende Module).
 CONNECTIONS = ('t2med', 'mail', 'ablage', 'letterxpress', 'nachrichten', 'uebersetzung')
 SHARES = ('samba', 'ipp')
-STARTER_SCHEMA = re.compile(r'^(?:praxisherz|kienzle)-[a-z0-9-]{1,30}$')   # kienzle-… = alte Schreibweise (vor Basis 0.22.0-beta.32)
+STARTER_SCHEMA = re.compile(r'^praxisherz-[a-z0-9-]{1,30}$')
 # Dienste aus Ubuntu-Paketen, die die Basis abschalten darf, weil das Modul sie selbst betreibt ([system] disables).
 DISABLES = frozenset({'asterisk.service'})
 # Gemeinsame Austauschordner zweier Module ([[exchange]]): /var/spool/kienzle/austausch/<a>_<b> (IDs sortiert).
@@ -97,11 +97,6 @@ def shown(value, limit: int = 60) -> str:
     """Fremden Wert gekürzt und ohne Steuerzeichen für eine Fehlermeldung."""
     text = CONTROL.sub('?', str(value))
     return text if len(text) <= limit else text[:limit] + '…'
-
-
-def alte_schreibweise(schema: str) -> str:
-    """praxisherz-<name> und kienzle-<name> gelten als dasselbe Startschema (die Basis richtet beide ein)."""
-    return re.sub(r'^praxisherz-', 'kienzle-', schema or '')
 
 
 class Invalid(Exception):
@@ -475,8 +470,7 @@ class _Checker:
 
     def starters(self, items: list, web: dict | None) -> list:
         """Startkontexte für den Arbeitsplatz-Starter: je Eintrag ein URL-Schema (praxisherz-…://), das T2med aufruft. Der Starter
-        schickt den Kontext an https://<server>/starter/<modul-id>; dort liegt das Modul (nur FastCGI). Zu praxisherz-<name> richtet
-        die Basis zusätzlich die alte Adresse kienzle-<name> ein (bestehende Einträge in T2med)."""
+        schickt den Kontext an https://<server>/starter/<modul-id>; dort liegt das Modul (nur FastCGI)."""
         if not items:
             return []
         if len(items) > LIMITS['starters']:
@@ -492,9 +486,9 @@ class _Checker:
             if not isinstance(schema, str) or not STARTER_SCHEMA.match(schema):
                 self.error(f'{where}.schema', 'muss mit „praxisherz-“ beginnen, danach Kleinbuchstaben, Ziffern und Bindestriche (z. B. praxisherz-signatur).')
                 schema = None
-            elif alte_schreibweise(schema) in seen:
+            elif schema in seen:
                 self.error(f'{where}.schema', f'„{schema}“ ist doppelt.')
-            seen.add(alte_schreibweise(schema or ''))
+            seen.add(schema or '')
             out.append({'schema': schema, 'label': self.text(t, 'label', where, limit=60)})
         return out
 
@@ -695,7 +689,7 @@ def check_list(folders: list) -> dict:
         if m['web']:
             claim(('path', m['web']['path']), mid, f'Webpfad {m["web"]["path"]}')
         for st in m.get('starters', []):
-            claim(('schema', alte_schreibweise(st['schema'])), mid, f'Startschema {st["schema"]}')
+            claim(('schema', st['schema']), mid, f'Startschema {st["schema"]}')
         for p in m['printers']:
             claim(('printer', p['name'].lower()), mid, f'Drucker „{p["name"]}“')
         for name in (m.get('printer_list') or {}).get('default', []):

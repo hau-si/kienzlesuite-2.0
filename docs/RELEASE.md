@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.44
+
+- **Keine Übergänge von „Kienzle“ mehr** (Wunsch des Nutzers): T2med-Aufrufe nur noch `praxisherz-…://` (die früheren `kienzle-…://` werden nicht mehr eingerichtet und vom Starter abgelehnt), kein früherer Programmname `kienzle-starter-…` für ältere Agenten, keine Ordner `C:\Kienzle` (GDT, Programm, Daten), keine alte Druckermarke „Kienzle-Suite“, keine alten Autostart- und Aufgabeneinträge, keine Ausweichsuche des Updaters und der Start-ISO nach dem früheren Repository-Namen. Zertifikate neuer Installationen heißen „Praxisherz“.
+- Agent 2.4.0. **Bestehende PCs:** einmal `Praxisherz-Setup.exe` neu ausführen; in T2med die Aufrufadressen auf `praxisherz-…://` umstellen (Verwaltung → Verbindungen → T2med) und beim GDT-Gerät `C:\Praxisherz\GDT\AUFRUFi.gdt` eintragen.
+- Mit Tests geprüft, nicht unter Windows und nicht auf der VM.
+
 ## 0.22.0-beta.43
 
 - Neu veröffentlicht nach dem Bereinigen der Git-Geschichte (gleicher Inhalt wie die vorige Vorabversion). Die vorigen Vorabversionen bitte auf GitHub löschen.

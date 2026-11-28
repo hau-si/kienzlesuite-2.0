@@ -8,7 +8,7 @@ namespace KienzleKasse;
  * - T2med (FHIR), E-Mail und Netzwerkspeicher sind zentrale Verbindungen der Basis; das Modul liest nur seine eigene Datei.
  * - Grundwerte (Starter-Schlüssel, Schlüssel der Einstellungen) liegen im eigenen Datenordner (grundwerte.json, 0600),
  *   angelegt vom Haken bin/install.
- * Daraus entsteht dieselbe Config wie früher aus /etc/kienzle-kasse/kienzle-kasse.toml; die Einstellungen der
+ * Daraus entsteht die Config der Kasse; die Einstellungen der
  * Weboberfläche (Settings) liegen weiter verschlüsselt in der Datenbank darüber.
  */
 final class Suite {

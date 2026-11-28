@@ -17,7 +17,7 @@ func testConfig(t *testing.T, srv *httptest.Server) *Config {
 	t.Helper()
 	sum := sha256.Sum256(srv.Certificate().Raw)
 	return &Config{ServerURL: srv.URL, LauncherKey: "0123456789abcdef0123456789abcdef", CertSHA256: hex.EncodeToString(sum[:]),
-		Contexts: map[string]string{"kienzle-kasse": "/starter/kasse", "kienzle-signatur": "/starter/signatur", "praxisherz-signatur": "/starter/signatur"}}
+		Contexts: map[string]string{"praxisherz-kasse": "/starter/kasse", "praxisherz-signatur": "/starter/signatur"}}
 }
 
 func TestStartMitSchemaUndPfad(t *testing.T) {
@@ -31,7 +31,7 @@ func TestStartMitSchemaUndPfad(t *testing.T) {
 	}))
 	defer srv.Close()
 	cfg := testConfig(t, srv)
-	link, err := run(cfg, "kienzle-signatur://?kontextId=ctx-1&fhirBasisUrl=https%3A%2F%2Ft2.example.org%2Ffhir&oAuthToken=tok&dokument=igel", srv.Client())
+	link, err := run(cfg, "praxisherz-signatur://?kontextId=ctx-1&fhirBasisUrl=https%3A%2F%2Ft2.example.org%2Ffhir&oAuthToken=tok&dokument=igel", srv.Client())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestStartMitSchemaUndPfad(t *testing.T) {
 		t.Fatal(link)
 	}
 	// Kasse wie bisher
-	if _, err := run(cfg, "kienzle-kasse://?kontextId=ctx-2&fhirBasisUrl=x&oAuthToken=y", srv.Client()); err != nil || gotPath != "/starter/kasse" {
+	if _, err := run(cfg, "praxisherz-kasse://?kontextId=ctx-2&fhirBasisUrl=x&oAuthToken=y", srv.Client()); err != nil || gotPath != "/starter/kasse" {
 		t.Fatalf("Kasse: %v %q", err, gotPath)
 	}
 }
@@ -60,13 +60,13 @@ func TestUnbekanntesSchemaUndFehler(t *testing.T) {
 	}))
 	defer srv.Close()
 	cfg := testConfig(t, srv)
-	if _, err := run(cfg, "kienzle-fremd://?kontextId=a", srv.Client()); err == nil || !strings.Contains(err.Error(), "nicht eingerichtet") {
+	if _, err := run(cfg, "praxisherz-fremd://?kontextId=a", srv.Client()); err == nil || !strings.Contains(err.Error(), "nicht eingerichtet") {
 		t.Fatalf("unbekanntes Schema: %v", err)
 	}
-	if _, err := run(cfg, "kienzle-kasse://?fhirBasisUrl=x", srv.Client()); err == nil {
+	if _, err := run(cfg, "praxisherz-kasse://?fhirBasisUrl=x", srv.Client()); err == nil {
 		t.Fatal("ohne Kontext muss es scheitern")
 	}
-	if _, err := run(cfg, "kienzle-kasse://?kontextId=a", srv.Client()); err == nil || !strings.Contains(err.Error(), "Starter nicht autorisiert") {
+	if _, err := run(cfg, "praxisherz-kasse://?kontextId=a", srv.Client()); err == nil || !strings.Contains(err.Error(), "Starter nicht autorisiert") {
 		t.Fatalf("Serverfehler: %v", err)
 	}
 }
@@ -76,7 +76,7 @@ func TestFremderLinkWirdNichtGeoeffnet(t *testing.T) {
 		w.Write([]byte(`{"url":"https://boese.example.org/#launch=` + strings.Repeat("a", 64) + `"}`))
 	}))
 	defer srv.Close()
-	if _, err := run(testConfig(t, srv), "kienzle-kasse://?kontextId=a", srv.Client()); err == nil {
+	if _, err := run(testConfig(t, srv), "praxisherz-kasse://?kontextId=a", srv.Client()); err == nil {
 		t.Fatal("Link auf fremden Server muss abgelehnt werden")
 	}
 }
@@ -86,7 +86,7 @@ func TestZertifikatPruefung(t *testing.T) {
 	defer srv.Close()
 	cfg := testConfig(t, srv)
 	cfg.CertSHA256 = strings.Repeat("0", 64)
-	if _, err := run(cfg, "kienzle-kasse://?kontextId=a", nil); err == nil || !strings.Contains(err.Error(), "stimmt nicht") {
+	if _, err := run(cfg, "praxisherz-kasse://?kontextId=a", nil); err == nil || !strings.Contains(err.Error(), "stimmt nicht") {
 		t.Fatalf("falscher Fingerabdruck muss scheitern: %v", err)
 	}
 }
@@ -109,7 +109,7 @@ func TestConfigPruefung(t *testing.T) {
 		`{"server_url":"https://s.example.org","launcher_key":"kurz","certificate_sha256":"` + hash + `"}`,
 		`{"server_url":"https://s.example.org","launcher_key":"` + key + `","certificate_sha256":"zz"}`,
 		`{"server_url":"https://s.example.org","launcher_key":"` + key + `","certificate_sha256":"` + hash + `","kontexte":{"Fremd":"/a"}}`,
-		`{"server_url":"https://s.example.org","launcher_key":"` + key + `","certificate_sha256":"` + hash + `","kontexte":{"kienzle-x":"/../a"}}`,
+		`{"server_url":"https://s.example.org","launcher_key":"` + key + `","certificate_sha256":"` + hash + `","kontexte":{"praxisherz-x":"/../a"}}`,
 	}
 	for i, b := range bad {
 		if _, err := loadConfig(write(b)); err == nil {
@@ -119,7 +119,7 @@ func TestConfigPruefung(t *testing.T) {
 }
 
 func TestURLArgument(t *testing.T) {
-	if urlArgument([]string{"--url", "kienzle-kasse://?a=1"}) != "kienzle-kasse://?a=1" || urlArgument([]string{"kienzle-kasse://x"}) != "kienzle-kasse://x" || urlArgument(nil) != "" {
+	if urlArgument([]string{"--url", "praxisherz-kasse://?a=1"}) != "praxisherz-kasse://?a=1" || urlArgument([]string{"praxisherz-kasse://x"}) != "praxisherz-kasse://x" || urlArgument(nil) != "" {
 		t.Fatal("Argumente")
 	}
 }
@@ -129,13 +129,13 @@ func TestPinnedClientMitRichtigemFingerabdruck(t *testing.T) {
 		w.Write([]byte(`{"url":"https://` + r.Host + `/#launch=` + strings.Repeat("a", 64) + `"}`))
 	}))
 	defer srv.Close()
-	if _, err := run(testConfig(t, srv), "kienzle-kasse://?kontextId=a", nil); err != nil {
+	if _, err := run(testConfig(t, srv), "praxisherz-kasse://?kontextId=a", nil); err != nil {
 		t.Fatalf("richtiger Fingerabdruck muss gehen: %v", err)
 	}
 }
 
-// Neue Adresse praxisherz-… und frühere kienzle-… führen zum selben Modul; fremde Präfixe bleiben abgelehnt.
-func TestNeueUndFruehereAdresse(t *testing.T) {
+// Nur Adressen praxisherz-…; frühere (kienzle-…) und fremde Präfixe werden abgelehnt.
+func TestNurPraxisherzAdressen(t *testing.T) {
 	var pfade []string
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		pfade = append(pfade, r.URL.Path)
@@ -143,7 +143,7 @@ func TestNeueUndFruehereAdresse(t *testing.T) {
 	}))
 	defer srv.Close()
 	cfg := testConfig(t, srv)
-	for _, u := range []string{"praxisherz-signatur://?kontextId=a", "kienzle-signatur://?kontextId=a"} {
+	for _, u := range []string{"praxisherz-signatur://?kontextId=a", "praxisherz-signatur://?kontextId=a"} {
 		if _, err := run(cfg, u, srv.Client()); err != nil {
 			t.Fatalf("%s: %v", u, err)
 		}

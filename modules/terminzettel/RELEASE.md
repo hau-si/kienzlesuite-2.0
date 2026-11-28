@@ -1,5 +1,9 @@
 # Terminzettel – Release-Notizen
 
+## 1.3.0-beta.24
+
+- Alte Bezeichnung in einem Test entfernt (keine Änderung der Funktion).
+
 ## 1.3.0-beta.23
 
 - Druckermodell vTermine heißt „Praxisherz vTermine PDF“. Nicht auf der VM geprüft.

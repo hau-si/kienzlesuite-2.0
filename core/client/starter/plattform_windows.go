@@ -34,14 +34,13 @@ type windowsPlattform struct{ ordner string }
 
 func neuePlattform(ordner string) Plattform { return &windowsPlattform{ordner: ordner} }
 
-// datenOrdner: C:\ProgramData\Praxisherz (client.json, ca.crt, agent.json); auf PCs von vor der Umbenennung
-// C:\ProgramData\Kienzle, bis das Paket neu ausgeführt wird.
+// datenOrdner: C:\ProgramData\Praxisherz (client.json, ca.crt, agent.json).
 func datenOrdner() string {
 	p := os.Getenv("ProgramData")
 	if p == "" {
 		p = `C:\ProgramData`
 	}
-	return ordnerWahl(filepath.Join(p, "Praxisherz"), filepath.Join(p, "Kienzle"), "client.json")
+	return filepath.Join(p, "Praxisherz")
 }
 
 func versteckt(cmd *exec.Cmd) *exec.Cmd {
@@ -152,9 +151,6 @@ func (w *windowsPlattform) druckerSkript(liste []Drucker, extra ...string) (stri
 	return text, nil
 }
 
-// GDTOrdnerFrueher: Ordner vor der Umbenennung; der Agent schreibt zusätzlich hinein, solange es ihn gibt.
-func (w *windowsPlattform) GDTOrdnerFrueher() string { return `C:\Kienzle\GDT` }
-
 // GDTOrdner: fester Ordner C:\Praxisherz\GDT; Benutzer dürfen darin ändern (T2med liest und löscht die Datei).
 func (w *windowsPlattform) GDTOrdner() string {
 	ordner := `C:\Praxisherz\GDT`
@@ -180,7 +176,6 @@ func (w *windowsPlattform) Symbol(programm string) error {
 	if err := reg("add", `HKLM\Software\Microsoft\Windows\CurrentVersion\Run`, "/v", "Praxisherz", "/t", "REG_SZ", "/d", `"`+programm+`" --tray`, "/f"); err != nil {
 		return err
 	}
-	_ = reg("delete", `HKLM\Software\Microsoft\Windows\CurrentVersion\Run`, "/v", "KienzleSuite", "/f") // Eintrag vor der Umbenennung
 	return aufgabeSichern()
 }
 
@@ -210,8 +205,7 @@ func neuStarten(exe string) {
 
 // aufgabeSichern: Die geplante Aufgabe startet zusätzlich alle 5 Minuten (läuft der Agent, beendet sich der zweite Start sofort).
 // Ältere Einrichtungen hatten nur „beim Systemstart“; dort blieb der Agent nach der ersten Aktualisierung stehen.
-// Seit der Umbenennung heißt sie „Praxisherz-Agent“; auf PCs von vorher (bis das Paket neu läuft) noch „Kienzle-Agent“.
-const aufgabeSkript = `$n = if (Get-ScheduledTask -TaskName 'Praxisherz-Agent' -ErrorAction SilentlyContinue) { 'Praxisherz-Agent' } else { 'Kienzle-Agent' }
+const aufgabeSkript = `$n = 'Praxisherz-Agent'
 $t = Get-ScheduledTask -TaskName $n -ErrorAction Stop
 if (!(@($t.Triggers) | Where-Object { $_.Repetition -and $_.Repetition.Interval })) {
     $neu = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5)

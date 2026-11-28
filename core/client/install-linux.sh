@@ -24,14 +24,10 @@ place "$asset" "$target/praxisherz-starter" 700 Starterprogramm
 place client.json "$target/client.json" 600 'Einstellungen und Schlüssel'
 place server.crt "$target/server.crt" 644 'Zertifikat (Datei)'
 escaped=${target//\\/\\\\}; escaped=${escaped//\"/\\\"}; escaped=${escaped//\$/\\\$}; escaped=${escaped//\`/\\\`}; escaped=${escaped//%/%%}
-schemes=$(grep -E '^(praxisherz|kienzle)-[a-z0-9-]+$' schemas.txt || true)
+schemes=$(grep -E '^praxisherz-[a-z0-9-]+$' schemas.txt || true)
 test -n "$schemes" || { echo 'schemas.txt enthält keine Einträge.'; exit 1; }
 mime=''
 for s in $schemes; do mime="${mime}x-scheme-handler/$s;"; done
-# Vor der Umbenennung: Ordner und Eintrag „kienzle-starter“ entfernen.
-for alt in "${XDG_DATA_HOME:-$HOME/.local/share}/kienzle-starter" "$applications/kienzle-starter.desktop"; do
-  if [ -e "$alt" ]; then rm -r -- "$alt" && printf '%-13s %s\n' entfernt "$alt"; fi
-done
 cat > "$applications/praxisherz-starter.desktop" <<EOT
 [Desktop Entry]
 Type=Application

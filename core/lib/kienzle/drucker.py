@@ -52,7 +52,6 @@ if not Path(BIN['ippeveprinter']).is_file() and Path('/usr/bin/ippeveprinter').i
 JOB = re.compile(r'^[A-Za-z0-9_-]{1,40}-\d{1,9}$')
 WORKGROUP = re.compile(r'^[A-Za-z0-9][A-Za-z0-9-]{0,14}$')
 MARK = 'Praxisherz'
-MARK_FRUEHER = 'Kienzle-Suite'   # Warteschlangen vor der Umbenennung (Beschreibung beginnt damit)
 KINDS = {
     'tm-m10': {'label': 'Bondrucker Epson TM-m10 (58 mm)', 'port': 9100, 'name': 'TM-m10'},
     'tm-m30iii': {'label': 'Bondrucker Epson TM-m30III (80 mm)', 'port': 9100, 'name': 'TM-m30III'},
@@ -219,8 +218,8 @@ def queues() -> list[dict]:
             if d:
                 desc = d.group(1).strip()
                 found[current]['description'] = desc
-                found[current]['managed'] = desc.startswith((MARK, MARK_FRUEHER))
-                mm = re.match(rf'^(?:{MARK}|{MARK_FRUEHER}) Modul ([a-z][a-z0-9-]{{1,28}}):', desc)
+                found[current]['managed'] = desc.startswith(MARK)
+                mm = re.match(rf'^{MARK} Modul ([a-z][a-z0-9-]{{1,28}}):', desc)
                 found[current]['modul'] = mm.group(1) if mm else ''
     shares = _read(STATE / 'freigaben.json', {})
     for q in found.values():
