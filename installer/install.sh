@@ -64,7 +64,7 @@ if [ ${#names[@]} -eq 0 ] && [ -z "$restore" ]; then
     mapfile -t names < <(python3 -c 'import json,sys; print("\n".join(json.load(open(sys.argv[1]))["hostnames"]))' "$conf")
   else
     # Erstinstallation ohne Angaben: Rechnername und alle IPv4-Adressen der VM. Den endgültigen Namen legt ein Admin
-    # danach unter Einrichten → Server fest (dort auch Praxisname); das Zertifikat wird dann neu ausgestellt.
+    # danach unter Praxis → Server fest (dort auch Praxisname); das Zertifikat wird dann neu ausgestellt.
     # Zuerst die IP-Adressen: Unter ihnen erreichen die Arbeitsplätze den Server sicher schon jetzt (Einrichtungslink).
     for ip in $(hostname -I 2>/dev/null); do
       if [[ $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] && [[ ! $ip =~ ^127\. ]]; then names+=("$ip"); fi
@@ -327,7 +327,7 @@ echo "Einrichtungs-Überblick: https://${names[0]}/verwaltung/einrichtung"
 echo "Fingerabdruck zum Vergleich: $(/opt/kienzle/core/current/bin/kienzle-zertifikat status | sed -n 's/^CA (SHA-256): //p')"
 if [ -n "$auto_names" ]; then
   echo "Erreichbar unter: ${names[*]}. Den endgültigen Namen (für Passkeys nötig) und den Praxisnamen bitte unter"
-  echo "Einrichten → Server festlegen."
+  echo "Praxis → Server festlegen."
 fi
 /opt/kienzle/core/current/bin/kienzle-ueberblick sammeln >/dev/null || echo 'Hinweis: Einrichtungs-Überblicke der Module nicht lesbar.'
 /opt/kienzle/core/current/bin/kienzle-module pruefen --sofort >/dev/null 2>&1 || true   # Angebot für Betrieb → Module (GitHub darf fehlen)

@@ -1,12 +1,16 @@
 # Basis – Release-Notizen
 
-## 0.22.0-beta.58
+## 0.22.0-beta.59
 
 - **Betrieb → Module neu (Entwurf B):** eine Liste statt Kacheln (Symbol, Name, Beschreibung, Version, Zustand mit Punkt, eine Pille „✓ aktuell ⟳“ bzw. „↑ Auf … aktualisieren“, „⋯“ mit Neustart und Entfernen). Oben ein Schalter „Automatische Updates“ und ein Hinweis „N Updates verfügbar“; noch nicht installierte Module eingeklappt unter „Weitere Module“. Die Knöpfe unten („Status der Dienste aktualisieren“, „Nach Modulen sehen“, „Automatische Updates …“) entfallen.
 - **Seitenkopf wie in den Modulen für Module und Updates:** rechts oben die Reiter „Module“ bzw. „Updates“ (mit rotem Zähler) und „Protokoll“ (`?ansicht=protokoll`) und ein runder Drehpfeil (nach Updates sehen). Beim Modul-Dienst erneuert „Nach Updates sehen“ jetzt auch den Zustand der Dienste.
 - Updates: „Kanal und Signaturprüfung“ und „Zurück auf eine frühere Version“ sind eingeklappt; das Protokoll steht im eigenen Reiter.
 - Für Basis-Seiten: `V::page(…, ['werkzeuge' => …])` mit `V::reiter()` und `V::drehpfeil()` setzt den Seitenkopf und macht die Seite 1400 px breit; Rückmeldungen (`flash`) erscheinen unter dem Seitenkopf. `docs/MODUL-GESTALTUNG.md` ergänzt. (Praxis → T2med nutzt noch eigene Klassen `basis-kopf`/`basis-reiter`; beides wird beim Umbau der übrigen Seiten zusammengeführt.)
 - Mit Tests und im Browser der Vorschau (erfundene Daten) geprüft, **nicht auf der VM**.
+
+## 0.22.0-beta.58
+
+- Ende-zu-Ende-Prüfung mit nginx: Die Seitenprüfungen lasen die Antwort mit `grep -q` aus einer Pipe; bei großen Seiten (Druckerseite) bricht `curl` dann mit einem Schreibfehler ab, und die Prüfung meldete einen Fehler, obwohl der Text da war. Jetzt wird die ganze Ausgabe gelesen. Am Programm ändert sich nichts. Sicherung, Servername und Drucker liefen im Container bereits durch.
 
 ## 0.22.0-beta.57
 
