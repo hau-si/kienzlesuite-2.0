@@ -1,7 +1,7 @@
 import asyncio, pathlib, sys
 from playwright.async_api import async_playwright
 # Bildschirmfotos aller Seiten mit erfundenen Daten (Aufruf durch scripts/bildschirmfotos.sh): python3 scripts/bildschirmfotos-seiten.py <Zielordner> <Ordner der Basis-Seiten> [Name …]
-# Benötigt Playwright für Python und Chrome/Chromium. Kasse läuft auf Port 8099, Terminzettel, Signatur und QM auf 8098 (Vorschau-Server des Skripts).
+# Benötigt Playwright für Python und Chrome/Chromium. Kasse läuft auf Port 8099, Terminzettel, Signatur, QM, Fax und Telefon auf 8098 (Vorschau-Server des Skripts).
 import os
 OUT = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else 'docs/screenshots')
 B = 'file://' + (sys.argv[2] if len(sys.argv) > 2 else '/tmp/basis').rstrip('/') + '/'
@@ -15,8 +15,12 @@ shots = [
   ('kasse-ablage', K+'/kasse/einstellungen#praxis', 1100, 900),
   ('kasse-igel', K+'/kasse/', 1280, 1000), ('kasse-goae', K+'/kasse/', 1280, 1000), ('weg-der-rechnung', None, 1200, 790),
   ('terminzettel', M+'/terminzettel/', 1280, 1720), ('signatur-vorgaenge', M+'/signatur/', 1280, 900), ('signatur-pads', M+'/signatur/einstellungen', 1280, 1250), ('signatur-software', M+'/signatur/einstellungen', 1280, 1150),
+  ('signatur-editor', M+'/signatur/editor', 1440, 1000),
   ('qm-lesemappe', M+'/qm/?als=carla', 1280, 820), ('qm-handbuch', M+'/qm/handbuch?d=2', 1440, 1000), ('qm-dokument', M+'/qm/dokument/2?als=carla', 1280, 900),
   ('qm-editor', M+'/qm/dokument/2?bearbeiten=1', 1280, 1100), ('qm-import', M+'/qm/import', 1280, 860),
+  ('fax-senden', M+'/fax/', 1280, 980), ('fax-eingang', M+'/fax/eingang', 1280, 560),
+  ('telefon-vorgaenge', M+'/telefon/vorgaenge', 1280, 1000), ('telefon-statistik', M+'/telefon/statistik', 1280, 1130),
+  ('telefon-anlage', M+'/telefon/', 1280, 860),
 ]
 
 # Schaubild „Weg der Rechnung“: drei Wege (T2med-Verbindungsklick, Rechnung drucken, IGeL-Modul) → Kassieren → Netzwerkordner

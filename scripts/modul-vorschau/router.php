@@ -1,5 +1,5 @@
 <?php
-// Terminzettel, Signatur und QM lokal ansehen (nur für Bildschirmfotos, erfundene Daten): php -S 127.0.0.1:8098 scripts/modul-vorschau/router.php
+// Terminzettel, Signatur, QM, Fax und Telefon lokal ansehen (nur für Bildschirmfotos, erfundene Daten): php -S 127.0.0.1:8098 scripts/modul-vorschau/router.php
 // Daten je Modul in $VORSCHAU_DATEN/<modul> (Standard /tmp/modul-vorschau), angelegt mit scripts/modul-vorschau/init.php.
 $root = dirname(__DIR__, 2);
 $daten = rtrim(getenv('VORSCHAU_DATEN') ?: '/tmp/modul-vorschau', '/');
@@ -8,10 +8,10 @@ if (str_starts_with($path, '/assets/')) {
     $f = $root . '/core/public' . $path;
     if (is_file($f)) { header('Content-Type: ' . (str_ends_with($f, '.css') ? 'text/css' : (str_ends_with($f, '.svg') ? 'image/svg+xml' : 'text/javascript'))); readfile($f); return true; }
 }
-if (!preg_match('#^/(terminzettel|signatur|qm)(/|$)#', $path, $m)) { http_response_code(404); echo 'nur /terminzettel, /signatur und /qm'; return true; }
+if (!preg_match('#^/(terminzettel|signatur|qm|fax|telefon)(/|$)#', $path, $m)) { http_response_code(404); echo 'nur /terminzettel, /signatur, /qm, /fax und /telefon'; return true; }
 $modul = $m[1];
-$menu = rawurlencode(json_encode(['apps' => ['/kasse/' => 'Kasse', '/terminzettel/' => 'Terminzettel', '/signatur/' => 'Signatur', '/qm/' => 'Qualitätsmanagement'],
-    'ids' => ['/kasse/' => 'kasse', '/terminzettel/' => 'terminzettel', '/signatur/' => 'signatur', '/qm/' => 'qm'], 'admin' => true, 'login' => 'anna']));
+$menu = rawurlencode(json_encode(['apps' => ['/kasse/' => 'Kasse', '/terminzettel/' => 'Terminzettel', '/signatur/' => 'Signatur', '/qm/' => 'Qualitätsmanagement', '/fax/' => 'Fax', '/telefon/' => 'Telefon'],
+    'ids' => ['/kasse/' => 'kasse', '/terminzettel/' => 'terminzettel', '/signatur/' => 'signatur', '/qm/' => 'qm', '/fax/' => 'fax', '/telefon/' => 'telefon'], 'admin' => true, 'login' => 'anna']));
 // Erfundene Personen für „Vorlegen“ (QM); Anmeldung als „anna“ bzw. mit ?als=carla als MFA ohne Schreibrechte.
 $_SERVER['KIENZLE_PERSONEN'] = rawurlencode(json_encode([['l' => 'anna', 'n' => 'Dr. med. Erika Beispiel', 'g' => ['Arzt'], 'a' => true, 'r' => []],
     ['l' => 'ben', 'n' => 'Ben Beispiel', 'g' => ['MFA'], 'a' => false, 'r' => ['lesen', 'schreiben']], ['l' => 'carla', 'n' => 'Carla Muster', 'g' => ['MFA'], 'a' => false, 'r' => ['lesen']],
@@ -21,6 +21,14 @@ $_SERVER += ['KIENZLE_BENUTZER' => 'anna', 'KIENZLE_NAME' => $modul === 'qm' ? '
     'KIENZLE_MENUE' => $menu, 'KIENZLE_PRAXIS' => rawurlencode(json_encode(['name' => 'Praxis Dr. Beispiel', 'street' => 'Musterweg 1', 'city' => '12345 Musterstadt']))];
 putenv('KIENZLE_DATEN=' . $daten . '/' . $modul);
 putenv('KIENZLE_SUITE_HILFE=' . $root . '/core/php/modul/Kienzle.php');
+// Fax und Telefon: gemeinsamer Austauschordner, Telefon ohne laufendes Asterisk und mit eigenem Modulschlüssel (nur Vorschau).
+putenv('KIENZLE_AUSTAUSCH=' . $daten . '/austausch');
+putenv('KIENZLE_ASTERISK=/bin/false');
+putenv('KIENZLE_PROGRAMM=' . $root . '/modules/telefon');
+if ($modul === 'telefon') {
+    require_once $root . '/core/php/modul/Kienzle.php';
+    $GLOBALS['tf_test_modul'] = new KienzleModul('telefon', $_SERVER, $daten . '/verbindungen', $daten . '/schluessel');
+}
 // Die Terminzettel-Hilfe nimmt den Pfad von Praxisherz-Hilfe nur in der CLI aus der Umgebung: hier (php -S) von Hand setzen.
 require_once $root . '/modules/' . $modul . '/src/bootstrap.php';
 if ($modul === 'terminzettel') KienzleTerminzettel\Seite::$helper = $root . '/core/php/modul/Kienzle.php';

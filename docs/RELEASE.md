@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.48
+
+- **README und Bilder aktualisiert:** Übersicht aller Module mit Stand und Funktionen (Kasse, Terminzettel, Signatur, Qualitätsmanagement, Telefon, Fax), neue Abschnitte und Bilder für Telefon (Vorgänge, Statistik, Anlage), Fax (Senden, Eingang) und den Signatur-Editor; alle vorhandenen Bilder neu erzeugt. Das Erklärvideo bekommt die neuen Szenen (`scripts/video-bauen.py`).
+- Bildschirmfotos: Die Seiten der Basis zeigen jetzt die echten Module (Menü, Rechte, Gruppen, Starter) statt des Beispielmoduls; die Modul-Vorschau (`scripts/modul-vorschau/`) kann Fax und Telefon mit erfundenen Daten (`init-fax-telefon.php`), die Signatur zeigt eine erfundene Live-Ansicht des Pads.
+- Nur Dokumentation und Werkzeuge für Bilder, keine Änderung am Server. Bilder mit Chromium in der lokalen Vorschau erzeugt, nicht auf der VM.
+
 ## 0.22.0-beta.47
 
 - **Fehler behoben (Nutzer-Meldung): Webinterface ließ sich nach dem Update auf beta.46 nicht anpassen.** nginx lehnte die Konfiguration ab („fastcgi_busy_buffers_size must be less than the size of all fastcgi_buffers minus one buffer“), weil beta.46 in der Anmeldeprüfung `/_auth/` nur `fastcgi_buffer_size 32k` vergrößert hatte. Jetzt passen die Puffer zusammen (`fastcgi_buffers 8 32k`). Die alte Konfiguration blieb bis dahin aktiv; Module, die die Personenliste brauchen (QM: Vorlegen), gehen erst mit diesem Stand.

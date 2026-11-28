@@ -38,7 +38,7 @@ Oberfläche, Hilfetexte, Dokumentation und Commit-Nachrichten auf Deutsch.
 
 ## Hinweise für neue Sitzungen (Stand 28.11.2026)
 
-**Stand:** Basis 0.22.0-beta.47, Kasse (`kasse`) 2.3.4-beta.66, Terminzettel 1.3.0-beta.24, Signatur 0.1.0-beta.50, Telefon 0.1.0-beta.30, Fax 0.1.0-beta.15, QM (`qm`) 0.1.0-beta.1; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
+**Stand:** Basis 0.22.0-beta.48, Kasse (`kasse`) 2.3.4-beta.66, Terminzettel 1.3.0-beta.24, Signatur 0.1.0-beta.50, Telefon 0.1.0-beta.30, Fax 0.1.0-beta.15, QM (`qm`) 0.1.0-beta.1; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
 (Basis 0.19.1). Der Nutzer testet auf einer echten Ubuntu-26.04-VM (Aktualisierung dort: `cd ~/praxisherz && git pull && sudo bash installer/install.sh`,
 oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nicht ins Repository.
 
@@ -64,6 +64,7 @@ oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nich
 ### Werkzeuge für Bilder und Video
 
 - `bash scripts/bildschirmfotos.sh` erzeugt alle Bilder in `docs/screenshots` (Details: `docs/screenshots/README.md`); `python3 scripts/video-bauen.py` baut daraus das Erklärvideo; das fertige Video (etwa 6 MB) liegt bewusst nicht im Repository, damit es klein bleibt; bei Bedarf neu bauen. Bei neuen Funktionen: Bild ergänzen, README „So sieht es aus“ und die Szenenliste in `scripts/video-bauen.py` anpassen. Nur erfundene Daten.
+- Bildschirmfotos (Basis beta.48): Basis-Seiten mit den echten Modul-Manifesten; Modul-Vorschau auf Port 8098 kann Terminzettel, Signatur, QM, Fax und Telefon (Beispieldaten in `scripts/modul-vorschau/init-fax-telefon.php`, braucht `gs` und GD). Neues Modul ⇒ in `router.php`/`init.php` und in `shots` von `scripts/bildschirmfotos-seiten.py` eintragen.
 - Neu seit beta.59/60: Klicksperre von 30 s für Update-Abfragen (`Web::pruefSperre`, GitHub-Limit 60/h/IP); der virtuelle Drucker „vKasse“ (ippeveprinter-Unit je Modul, `ProtectSystem=strict`) darf den Ablage-Spool beschreiben (`ABLAGE_SPOOL` in `drucker.py`), sonst wird nichts in den Netzwerkordner abgelegt. Ein Knopf „Ablegen“ in den Vorgängen wurde bewusst verworfen.
 
 ### Aufbau, den man kennen muss

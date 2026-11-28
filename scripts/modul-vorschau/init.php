@@ -1,8 +1,8 @@
 <?php
-// Legt erfundene Beispieldaten für die Vorschau von Terminzettel, Signatur und QM an: php scripts/modul-vorschau/init.php  (Ziel $VORSCHAU_DATEN, Standard /tmp/modul-vorschau)
+// Legt erfundene Beispieldaten für die Vorschau von Terminzettel, Signatur, QM, Fax und Telefon an: php scripts/modul-vorschau/init.php  (Ziel $VORSCHAU_DATEN, Standard /tmp/modul-vorschau)
 $root = dirname(__DIR__, 2);
 $ziel = rtrim(getenv('VORSCHAU_DATEN') ?: '/tmp/modul-vorschau', '/');
-foreach (['signatur', 'terminzettel', 'qm'] as $m) if (!is_dir("$ziel/$m")) mkdir("$ziel/$m", 0755, true);
+foreach (['signatur', 'terminzettel', 'qm', 'fax', 'telefon', 'austausch', 'schluessel'] as $m) if (!is_dir("$ziel/$m")) mkdir("$ziel/$m", 0755, true);
 putenv("KIENZLE_DATEN=$ziel/signatur");
 require $root . '/modules/signatur/src/bootstrap.php';
 use KienzleSignatur\{Pad, Seite, Speicher};
@@ -20,6 +20,18 @@ if (!(int)$pdo->query('SELECT COUNT(*) FROM pads')->fetchColumn()) {
     $id1 = Seite::vorgangAnlegen(['vorlage_id' => $v[0]['id'], 'patient' => 'Max Mustermann', 'leistung' => 'Reisemedizinische Beratung', 'betrag' => '45,00', 'pad_id' => Seite::pads(true)[0]['id']], 'anna', $praxis);
     Seite::vorgangAnlegen(['vorlage_id' => $v[1]['id'], 'patient' => 'Erika Musterfrau', 'leistung' => 'Impfberatung', 'pad_id' => Seite::pads(true)[1]['id']], 'anna', $praxis);
     Seite::amPadZeigen($id1);
+}
+// Live-Vorschau des Pads (sonst schreibt sie der Pad-Dienst): Unterschriftsseite mit erfundenem Text und Unterschriftslinie.
+if (!is_file("$ziel/signatur/vorschau/1.png") && function_exists('imagecreatetruecolor')) {
+    if (!is_dir("$ziel/signatur/vorschau")) mkdir("$ziel/signatur/vorschau", 0700, true);
+    $im = imagecreatetruecolor(640, 400); $weiss = imagecolorallocate($im, 255, 255, 255); $grau = imagecolorallocate($im, 90, 90, 90); $blau = imagecolorallocate($im, 20, 50, 140);
+    imagefill($im, 0, 0, $weiss);
+    foreach (['Patientenaufklaerung (Muster)', '', 'Patient: Max Mustermann', 'Ich habe die Aufklaerung gelesen und verstanden.', 'Datum: ' . date('d.m.Y')] as $i => $z) imagestring($im, $i ? 4 : 5, 30, 30 + $i * 28, $z, $grau);
+    imageline($im, 30, 330, 610, 330, $grau); imagestring($im, 3, 30, 340, 'Unterschrift', $grau);
+    $x0 = 60; $y0 = 300;
+    for ($x = 0; $x < 260; $x += 2) { $y = (int)($y0 - 18 * sin($x / 14) - ($x % 60 < 30 ? $x % 30 : 30 - $x % 30) * 0.6); imagefilledellipse($im, $x0 + $x, $y, 4, 4, $blau); }
+    imagepng($im, "$ziel/signatur/vorschau/1.png");
+    file_put_contents("$ziel/signatur/vorschau/1.json", json_encode(['seite' => 2, 'seiten' => 2, 'zeit' => time(), 'art' => 'unterschrift', 'punkte' => 412]));
 }
 
 // QM: Handbuch mit erfundenen Dokumenten in allen Zuständen
@@ -65,4 +77,5 @@ if (!(int)KienzleQm\Speicher::pdo()->query('SELECT COUNT(*) FROM dokumente')->fe
         $q::vidieren($x, $arzt, 'EB', $t + 600);
     }
 }
+require __DIR__ . '/init-fax-telefon.php';
 echo "Daten in $ziel\n";

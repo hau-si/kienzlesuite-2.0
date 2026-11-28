@@ -13,9 +13,23 @@ if (!is_dir($out)) mkdir($out, 0755, true);
 $css = (string)file_get_contents(dirname(__DIR__) . '/core/public/assets/core.css');
 
 $env = new Env();
-[$admin] = admin_browser($env, 'anna');
+// Alle echten Module aus modules/ (ohne Beispielmodul), damit Menü, Rechte und Einrichtung wie auf einem Server mit allen Modulen aussehen.
+$alle = json_decode((string)shell_exec(escapeshellarg(dirname(__DIR__) . '/core/bin/kienzle-modul-pruefen') . ' --alle --json ' . escapeshellarg(dirname(__DIR__) . '/modules')), true);
+$reihe = ['kasse', 'terminzettel', 'signatur', 'qm', 'telefon', 'fax'];
+$echte = array_values(array_filter($alle['modules'] ?? [], fn($m) => in_array($m['module']['id'], $reihe, true)));
+usort($echte, fn($a, $b) => array_search($a['module']['id'], $reihe, true) <=> array_search($b['module']['id'], $reihe, true));
+if (count($echte) === count($reihe)) {
+    $env->modules = Modules::fromArray($echte);
+    $env->users = new Kienzle\Core\Users($env->db, $env->secrets, $env->modules);
+    $env->auth = new Kienzle\Core\Auth($env->db, $env->users, $env->audit, '192.0.2.10');
+}
+[$admin, $annaId] = admin_browser($env, 'anna');
+foreach (array_keys($env->modules->all()) as $id) $env->users->setAccess($annaId, $id, true, []);   // Admin sieht alle Module im Menü
 [$bert] = $env->user('bert'); $env->users->setRoles($bert, ['Arzt']);
 [$clara] = $env->user('clara'); $env->users->setRoles($clara, ['MFA']);
+// Erfundene Zugänge: Arzt alle Module, MFA die Module am Empfang
+foreach (['kasse', 'signatur', 'qm', 'telefon', 'fax', 'terminzettel'] as $id) if ($env->modules->has($id)) $env->users->setAccess($bert, $id, false, $env->modules->rightIds($id));
+foreach (['kasse', 'signatur', 'telefon', 'fax'] as $id) if ($env->modules->has($id)) $env->users->setAccess($clara, $id, false, $env->modules->rightIds($id));
 $env->user('dora');
 
 function seite(string $name, string $html, string $out, string $css): void {
@@ -40,18 +54,7 @@ file_put_contents(Updates::$state . '/status.json', json_encode(['state' => 'don
     'available' => ['core' => [['version' => '99.0.0-beta.1', 'prerelease' => true, 'notes' => "Beispiel für eine Versionsmitteilung (erfundene Daten).", 'published' => '2026-11-24', 'signed' => true]]]]));
 $up = new Updates($env->db, $env->config); $admin->web = fn() => $admin->defaultWeb(null, $up);
 $r = $admin->get('/verwaltung/updates'); echo str_pad('updates', 14) . $r->status . "\n"; if ($r->status === 200) seite('updates', $r->body, $out, $css);
-// Arbeitsplatz-Starter: Startkontexte der Module (Kasse, Signatur) und ein Zertifikat der erfundenen Suite.
-$mods = [];
-foreach ($env->modules->all() as $id => $m) {
-    if ($id === 'kasse') $m['starters'] = [['schema' => 'praxisherz-kasse', 'label' => 'Kasse']];
-    $mods[] = $m;
-}
-foreach ([['terminzettel', 'Terminzettel', '/terminzettel', []], ['signatur', 'Signatur', '/signatur', [['schema' => 'praxisherz-signatur', 'label' => 'Signatur']]]] as [$id, $name, $path, $starters]) {
-    $m = $env->modules->all()['kasse'];
-    $m['module']['id'] = $id; $m['module']['name'] = $name; $m['web']['path'] = $path; $m['starters'] = $starters; $m['rights'] = [];
-    $mods[] = $m;
-}
-$env->modules = Modules::fromArray($mods);
+// Arbeitsplatz-Starter: Startkontexte kommen aus den echten Modulen (Kasse, Signatur, Telefon); ein Zertifikat der erfundenen Suite.
 $crt = $env->dir . '/server.crt';
 exec('openssl req -x509 -newkey rsa:2048 -nodes -keyout ' . escapeshellarg($env->dir . '/k.key') . ' -out ' . escapeshellarg($crt) . ' -subj /CN=kienzle.example.org -days 2 2>/dev/null');
 $st = new Starter($env->db, $env->secrets, $env->config, dirname(__DIR__) . '/core', $crt);
