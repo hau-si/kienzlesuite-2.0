@@ -559,12 +559,6 @@ button.schalter.an::after { left: 23px; }
 .mod-zeile .mod-menu { bottom: auto; top: 38px; }
 main.breit > details.fold { margin: 0 0 12px; }
 
-/* Seitenkopf mit Reitern wie in den Modulen (Titel links, Knöpfe rechts; z. B. Praxis → T2med) */
-.basis-kopf { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
-.basis-kopf h1 { margin: 6px 0 0; }
-.basis-reiter { display: flex; gap: 6px; flex-wrap: wrap; }
-.basis-reiter a.button { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 7px 14px; }
-.basis-reiter a.button:not(.primary) { background: var(--soft); color: #315f53; }
 .mod-zeile.dienst-zeile { grid-template-columns: 38px minmax(0, 1fr) 200px 200px 0 32px; }
 /* Benutzer und Gruppen (Entwurf C) */
 .card.benutzer-liste { padding-bottom: 8px; }
@@ -586,3 +580,11 @@ a.card.verb-kachel.fehler { border-color: #e7b9ad; }
 .verb-kachel .t-ico .ico { width: 20px; height: 20px; }
 .mod-zeile.platz-zeile { grid-template-columns: 38px minmax(0, 1fr) 130px 190px 120px 32px; }
 .mod-menu label { display: grid; gap: 4px; }
+/* Mein Konto (Entwurf B): Profil links, Anmeldewege rechts */
+.konto-raster { display: grid; grid-template-columns: minmax(260px, 380px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.konto-raster > div > .card { margin-bottom: 14px; }
+@media (max-width: 1000px) { .konto-raster { grid-template-columns: 1fr; } }
+/* Startseite (Entwurf A): Einrichtung und Server-Zustand nebeneinander, Module darunter */
+.start-oben { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 16px; align-items: start; margin-bottom: 14px; }
+.start-oben > .card { margin: 0; }
+@media (max-width: 1100px) { .start-oben { grid-template-columns: 1fr; } }

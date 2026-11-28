@@ -1,10 +1,20 @@
 # Basis – Release-Notizen
 
-## 0.22.0-beta.63
+## 0.22.0-beta.64
 
 - Mitgeliefert: Modul Homepage 0.1.0-beta.4 mit Öffnungszeiten-Karte und Bereitschaftsdienst (Details in `modules/homepage/RELEASE.md`).
 - README, Bildschirmfoto „homepage-oeffnungszeiten“, Szenenliste des Videos und Modul-Vorschau (erfundene Öffnungszeiten für die Homepage) ergänzt; Testlauf um die Tests der Öffnungszeiten erweitert.
 - Am Server der Basis ändert sich nichts. Nur mit Tests und in der lokalen Vorschau geprüft, nicht auf der VM.
+
+## 0.22.0-beta.63
+
+Neues Design, dritter Teil (Entwürfe vom 28.11.2026):
+- **Mein Konto (B):** links Profil (Name mit Stift, Gruppen) und „Mein Arbeitsplatz“, rechts die Anmeldewege als Ausklappzeilen (E-Mail, Passwort, SMS-Code, Authenticator-App, Passkeys, Geräte); „Abmelden“ oben rechts.
+- **Praxis → Öffnungszeiten (A):** Reiter Kalender | Regelmäßige Zeiten | Feiertage | Vertretungspraxen mit Symbolen und „+ Schließung“ oben rechts im Seitenkopf.
+- **Startseite (A):** Titel „Guten Tag, <Vorname>“, breit; Einrichtung und Server-Zustand oben nebeneinander, die Module darunter.
+- **Praxis → T2med:** gleicher Seitenkopf wie alle anderen Seiten (eigene Klassen `basis-kopf`/`basis-reiter` entfallen).
+- Praxis → Server ist noch unverändert (noch kein Entwurf gewählt).
+- Mit Tests und im Browser der Vorschau (erfundene Daten) geprüft, **nicht auf der VM**.
 
 ## 0.22.0-beta.62
 
