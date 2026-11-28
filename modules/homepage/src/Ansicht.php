@@ -10,7 +10,7 @@ final class Ansicht {
     public static string $praxisName = '';
 
     private const MELDUNGEN = [
-        'angelegt' => 'Mitteilung angelegt.', 'gespeichert' => 'Gespeichert.', 'an' => 'Eingeschaltet.', 'aus' => 'Ausgeschaltet.', 'geloescht' => 'Mitteilung gelöscht.',
+        'angelegt' => 'Mitteilung angelegt.', 'gespeichert' => 'Gespeichert.', 'zeiten' => 'Einstellungen für die automatischen Mitteilungen gespeichert.', 'an' => 'Eingeschaltet.', 'aus' => 'Ausgeschaltet.', 'geloescht' => 'Mitteilung gelöscht.',
         'uebertragen' => 'An die Homepage übertragen.', 'praxis' => 'Praxis gespeichert.', 'praxis-weg' => 'Praxis gelöscht.',
         'eingerichtet' => 'Verbindung gespeichert.', 'getrennt' => 'Verbindung zur Homepage getrennt.',
     ];
@@ -96,7 +96,7 @@ final class Ansicht {
         $o .= '</section><section class="card"><h2>Geplant und ausgeschaltet</h2>';
         if (!$rest) $o .= '<p class="muted">Keine.</p>';
         foreach ($rest as $m) $o .= self::zeile($m, (int)($get['id'] ?? 0));
-        $o .= '</section></div>';
+        $o .= '</section>' . self::automatisch() . '</div>';
         $datum = is_string($get['datum'] ?? null) && preg_match('/^\d{4}-\d{2}-\d{2}$/D', $get['datum']) ? $get['datum'] : Mitteilungen::heute();
         $o .= '<aside class="card hp-vorschau-karte" aria-label="Vorschau"><h2>Vorschau</h2><div id="hp-vorschau" aria-live="polite">' . self::vorschau(self::darstellungen($alle, $datum), $datum) . '</div>'
             . '<form class="hp-datum" method="get" action="' . self::h(self::u('/')) . '"><label for="hp-datum">Ansehen am</label><input type="date" id="hp-datum" name="datum" value="' . self::h($datum) . '">'
@@ -106,9 +106,46 @@ final class Ansicht {
     }
 
     /** Darstellungen der Mitteilungen, die am Tag $datum zu sehen sind; $bearbeitet: diese ID immer zeigen (Vorschau beim Bearbeiten). */
+    /** Automatische Mitteilungen aus Praxis → Öffnungszeiten (Zeiten::hinweise); null-Paket = Basis liefert noch nichts. */
+    public static array $zeiten = [];
+    public static bool $zeitenDa = false;
+
+    private static function automatisch(): string {
+        $o = '<section class="card"><h2>Automatisch aus den Öffnungszeiten</h2>';
+        if (!self::$zeitenDa) return $o . '<p class="muted">Schließungen, Feiertage und Vertretungen pflegt die Praxis unter <a href="/verwaltung/zeiten">Praxis → Öffnungszeiten</a>. '
+            . 'Von dort erscheinen sie hier von selbst, sobald dort etwas gespeichert ist.</p></section>';
+        $s = Zeiten::einstellung();
+        $heute = Mitteilungen::heute();
+        if (!$s['aktiv']) $o .= '<p class="muted">Ausgeschaltet – es erscheint nichts automatisch.</p>';
+        elseif (!self::$zeiten) $o .= '<p class="muted">Keine kommende Schließung mit Haken „Homepage“.</p>';
+        foreach (self::$zeiten as $z) {
+            $marke = $z['von'] > $heute ? '<span class="tag warn">ab ' . self::h(substr($z['von'], 8, 2) . '.' . substr($z['von'], 5, 2) . '.') . '</span>' : '<span class="tag ok">jetzt</span>';
+            $o .= '<p class="hp-auto"><span class="hp-punkt hp-f-' . self::h($z['farbe']) . '">' . Mitteilungen::svg($z['symbol']) . '</span> <b>' . self::h($z['titel']) . '</b> ' . $marke
+                . '<br><span class="muted">' . self::h($z['kurz']) . '</span></p>';
+        }
+        $o .= '<p class="muted hp-klein">Ändern unter <a href="/verwaltung/zeiten">Praxis → Öffnungszeiten</a>.</p>';
+        if (self::$r['mitteilungen']) {
+            $orte = '';
+            foreach (Mitteilungen::ORTE as $k => $v) $orte .= '<label class="check"><input type="checkbox" name="orte[]" value="' . $k . '"' . (in_array($k, $s['orte'], true) ? ' checked' : '') . '> ' . self::h($v) . '</label>';
+            $farben = '';
+            foreach (Mitteilungen::FARBEN as $k => $v) $farben .= '<option value="' . $k . '"' . ($s['farbe'] === $k ? ' selected' : '') . '>' . self::h($v) . '</option>';
+            $symbole = '<option value="standard">Passend zur Art</option>';
+            foreach (Mitteilungen::SYMBOLE as $k => $v) $symbole .= '<option value="' . $k . '"' . ($s['symbol'] === $k ? ' selected' : '') . '>' . self::h($v[0]) . '</option>';
+            $o .= '<details class="fold"><summary>Einstellungen</summary><form method="post">' . self::csrfFeld() . '<input type="hidden" name="aktion" value="zeiten">'
+                . '<label class="check"><input type="checkbox" name="aktiv" value="1"' . ($s['aktiv'] ? ' checked' : '') . '> Automatische Mitteilungen auf der Homepage zeigen</label>'
+                . '<fieldset><legend>Wo</legend>' . $orte . '</fieldset>'
+                . '<label>Farbe<select name="farbe">' . $farben . '</select></label><label>Symbol<select name="symbol">' . $symbole . '</select></label>'
+                . '<label>Schließungen so viele Tage vorher zeigen<input type="number" name="vorlauf" min="0" max="60" value="' . $s['vorlauf'] . '"></label>'
+                . '<label>Feiertage so viele Tage vorher zeigen<input type="number" name="feiertage" min="0" max="14" value="' . $s['feiertage'] . '"></label>'
+                . '<button>Speichern</button></form></details>';
+        }
+        return $o . '</section>';
+    }
+
     public static function darstellungen(array $alle, string $datum, ?int $bearbeitet = null): array {
         $praxen = Mitteilungen::praxenNachId();
         $out = [];
+        foreach (self::$zeiten as $z) if ($z['von'] <= $datum && $z['bis'] >= $datum) $out[] = $z + ['bearbeitet' => false];
         foreach ($alle as $m) {
             $istEs = $bearbeitet !== null && $m['id'] === $bearbeitet;
             if (Mitteilungen::zustand($istEs ? ['aktiv' => true] + $m : $m, $datum) !== 'aktiv') continue;

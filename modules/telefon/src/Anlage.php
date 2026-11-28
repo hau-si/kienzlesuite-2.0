@@ -197,7 +197,10 @@ final class Anlage {
 
     /** Speichern; danach Anlage neu anwenden (Tasten stehen auch im Wählplan) und Ansagen erzeugen, wenn eine Sprachausgabe bereitsteht. */
     public static function sprachmenueSchreiben(array $p, \KienzleModul $k): string {
-        $r = self::python('sprachmenue-schreiben', self::sprachmenueAuftrag($p));
+        $job = self::sprachmenueAuftrag($p);
+        // Öffnungs- und Telefonzeiten kommen aus Praxis → Öffnungszeiten der Basis (lib/zeiten-abgleich); hier nicht überschreiben.
+        if ($k->verbindung('zeiten') !== null) unset($job['zeiten']['oeffnungszeiten'], $job['zeiten']['telefonzeiten']);
+        $r = self::python('sprachmenue-schreiben', $job);
         if (($r['ok'] ?? false) !== true) throw new \InvalidArgumentException((string)($r['fehler'] ?? 'Die Angaben sind ungültig.'));
         if (!($r['geaendert'] ?? false)) return 'Keine Änderung.';
         self::anwenden($k);
@@ -208,6 +211,12 @@ final class Anlage {
         } catch (\InvalidArgumentException) {
             return 'Gespeichert. Ein anderer Auftrag läuft noch; danach bitte „Geänderte Ansagen erzeugen“ wählen.';
         }
+    }
+
+    /** Stand des Abgleichs mit Praxis → Öffnungszeiten (lib/zeiten-abgleich), ohne Inhalte. */
+    public static function zeitenStand(): ?array {
+        $d = json_decode((string)@file_get_contents(self::$data . '/kienzlefon/zeiten-stand.json'), true);
+        return is_array($d) ? $d : null;
     }
 
     /** Pfad einer erzeugten Ansage zum Anhören (WAV aus ansagen-master), sonst null. */

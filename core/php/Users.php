@@ -211,6 +211,33 @@ final class Users {
         return $out;
     }
 
+    /** Rechte der Basis (Groups::BASIS_RECHTE): aus den Rollen, mit Einzeländerungen „core:<recht>“; Basis-Admins haben alle. @return list<string> */
+    public function basisRechte(int $id): array {
+        $base = $this->db->one('SELECT admin FROM users WHERE id=?', [$id]);
+        if ($base && (int)$base['admin'] === 1) return array_keys(Groups::BASIS_RECHTE);
+        return array_values(array_filter(array_keys(Groups::BASIS_RECHTE), fn($r) => $this->overrides($id)['core:' . $r] ?? in_array($r, $this->basisVonRollen($id), true)));
+    }
+
+    /** Rechte der Basis, die die Rollen allein ergeben. @param list<string>|null $roles @return list<string> */
+    public function basisVonRollen(int $id, ?array $roles = null): array {
+        $groups = $this->groups()->all();
+        $out = [];
+        foreach ($roles ?? $this->roles($id) as $name) foreach ($groups[$name]['rechte'] ?? [] as $e) if (str_starts_with($e, 'core:')) $out[] = substr($e, 5);
+        return array_values(array_intersect(array_keys(Groups::BASIS_RECHTE), $out));
+    }
+
+    /** Rechte der Basis setzen; abgelegt werden nur Abweichungen von den Rollen. */
+    public function setBasisRechte(int $id, array $rights): void {
+        $this->require($id);
+        $rights = array_values(array_unique(array_map('strval', $rights)));
+        foreach ($rights as $r) if (!isset(Groups::BASIS_RECHTE[$r])) throw new Problem('Unbekanntes Recht.', 422);
+        $base = $this->basisVonRollen($id);
+        $this->db->query("DELETE FROM user_overrides WHERE user_id=? AND substr(perm,1,5)='core:'", [$id]);
+        foreach (array_keys(Groups::BASIS_RECHTE) as $r) {
+            if (in_array($r, $rights, true) !== in_array($r, $base, true)) $this->db->query('INSERT INTO user_overrides(user_id,perm,allow) VALUES(?,?,?)', [$id, 'core:' . $r, in_array($r, $rights, true) ? 1 : 0]);
+        }
+    }
+
     /** Gewünschten Zugang zu einem Modul setzen; abgelegt werden nur die Abweichungen von den Rollen. Unbekannte Rechte sind ein Fehler. */
     public function setAccess(int $id, string $module, bool $admin, array $rights): void {
         $this->require($id);

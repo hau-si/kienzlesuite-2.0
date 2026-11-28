@@ -254,7 +254,7 @@ function test_rollen_matrix_speichern(): void {
     $b->post('/verwaltung/benutzer', ['login' => 'dora', 'display' => 'Dora']);
     $id = (int)$env->users->byLogin('dora')['id'];
     // Rolle MFA, aber „paid“ einzeln abgewählt und „catalog“ einzeln dazu
-    $b->post('/verwaltung/benutzer/' . $id, ['display' => 'Dora', 'active' => '1', 'rollen_gesendet' => '1', 'rolle' => ['MFA'], 'recht' => ['kasse:catalog']]);
+    $b->post('/verwaltung/benutzer/' . $id, ['display' => 'Dora', 'active' => '1', 'rollen_gesendet' => '1', 'rolle' => ['MFA'], 'recht' => ['core:zeiten', 'kasse:catalog']]);
     check($env->users->roles($id) === ['MFA'], 'Rolle nicht gespeichert');
     check($env->users->overrides($id) === ['kasse:catalog' => true, 'kasse:paid' => false], 'Einzeländerungen falsch: ' . json_encode($env->users->overrides($id)));
     $b->get('/verwaltung/benutzer/' . $id);

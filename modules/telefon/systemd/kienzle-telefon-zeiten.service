@@ -1,0 +1,30 @@
+# Praxisherz, Modul telefon: Öffnungszeiten der Basis (Wochenzeiten, Schließungen, Feiertage) als Zeiten und Sonderansagen ins Sprachmenü übernehmen.
+[Unit]
+Description=Praxisherz Modul telefon (Öffnungszeiten ins Sprachmenü übernehmen)
+
+[Service]
+Type=oneshot
+TimeoutStartSec=3600
+User=ks-telefon
+Environment=KIENZLE_DATEN=/var/lib/kienzle/telefon
+ExecStart=/opt/kienzle/telefon/current/lib/zeiten-abgleich
+UMask=0077
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/kienzle/telefon -/var/spool/kienzle/austausch/fax_telefon

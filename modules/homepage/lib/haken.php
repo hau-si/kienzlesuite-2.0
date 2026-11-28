@@ -1,14 +1,20 @@
 <?php
 declare(strict_types=1);
-// Haken des Moduls (laufen als ks-homepage, nie als root): install, update, remove, busy, health.
+// Haken des Moduls (laufen als ks-homepage, nie als root): install, update, remove, busy, health; dazu „zeiten“ für den Dienst kienzle-homepage-zeiten.
 require_once dirname(__DIR__) . '/src/bootstrap.php';
-use KienzleHomepage\Speicher;
+use KienzleHomepage\{Speicher, Zeiten};
 
 $haken = (string)($argv[1] ?? '');
 try {
     if ($haken === 'install' || $haken === 'update') {
         Speicher::pdo();
         echo "Homepage bereit.\n";
+        exit(0);
+    }
+    if ($haken === 'zeiten') {
+        // Dienst kienzle-homepage-zeiten: Öffnungszeiten der Basis haben sich geändert → bei neuem Stand übertragen.
+        Speicher::pdo();
+        echo Zeiten::abgleich(hp_modul()) . "\n";
         exit(0);
     }
     if ($haken === 'remove' || $haken === 'busy') exit(0); // Daten bleiben erhalten

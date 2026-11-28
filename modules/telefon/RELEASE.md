@@ -1,5 +1,12 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.32
+
+- **Öffnungszeiten aus der Basis im Sprachmenü** (Verbindung `zeiten`, Praxis → Öffnungszeiten): Öffnungs- und Telefonzeiten kommen von dort und sind auf der Seite „Sprachmenü“ nur noch zu sehen (Link zur Basis); Speichern überschreibt sie nicht.
+- **Ansagen bei Urlaub, Feiertagen und Sonderöffnungen** mit Vertretung: Für jede kommende Schließung bzw. jeden gewählten Feiertag mit Haken „Telefonansage“ legt `lib/zeiten-abgleich` eine geplante Sonderansage von Kienzlefon an (statt Begrüßung, Anrufer werden nicht durchgestellt; Sonderöffnung vor der Begrüßung), erzeugt den Ton mit der eingestellten Sprachausgabe und schaltet sie erst nach dem Erzeugen ein. Urlaub hat Vorrang vor einem Feiertag darin; belegte Prioritäten eigener Sonderansagen werden ausgelassen, andere Sonderansagen bleiben unberührt.
+- Neue Dienste `kienzle-telefon-zeiten` (.path auf die Verbindungsdatei, dazu täglich um 00:07). Ohne Sprachmenü passiert nichts.
+- Braucht Basis 0.22.0-beta.55. Geprüft mit Tests (Ersatz-Piper, echtes ffmpeg, Kienzlefon lädt die Konfiguration); **nicht mit echter Telefonanlage und nicht auf der VM geprüft.**
+
 ## 0.1.0-beta.31
 
 - T2med-Telefonverzeichnis: Verweis auf die gesammelten Aufrufadressen (Praxis → Verbindungen → T2med), die Adresse für den Eintrag steht eingeklappt darunter; nur noch der Praxisherz-Agent als Voraussetzung am PC (ohne alten Starter-Hinweis).

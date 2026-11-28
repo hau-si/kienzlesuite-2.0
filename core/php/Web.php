@@ -128,8 +128,104 @@ final class Web {
         if ($this->oidc && $get && $r->path === '/oidc/authorize') return Response::redirect($this->oidc->authorize($r->query, $this->session));
         if ($this->oidc && $get && preg_match('#^/oidc/fortsetzen/([0-9a-f]{32})$#D', $r->path, $m)) return Response::redirect($this->oidc->authorize($this->oidc->unpark($m[1]), $this->session));
         if ($this->oidc && $r->path === '/oidc/abmelden') return $get ? $this->oidcLogoutPage($r) : $this->oidcLogout($r);
+        if ($r->path === '/verwaltung/zeiten') return $this->zeiten($r, $get);
         if (str_starts_with($r->path, '/verwaltung/')) return $this->admin($r, $get);
         throw new Problem('Seite nicht gefunden.', 404);
+    }
+
+    // ---- Öffnungszeiten (Praxis → Öffnungszeiten; Basis-Admins und Recht „core:zeiten“, z. B. MFA) ---------------------
+
+    /** Module, die die Öffnungszeiten bekommen ([[connections]] id = "zeiten"). @return array<string,string> */
+    private function zeitenNutzer(): array {
+        $out = [];
+        foreach ($this->modules->all() as $id => $m) foreach ($m['connections'] ?? [] as $c) if (($c['id'] ?? '') === 'zeiten') $out[$id] = $this->modules->name($id);
+        return $out;
+    }
+
+    private function zeiten(Request $r, bool $get, ?string $fehler = null, ?array $eingabe = null): Response {
+        $uid = (int)$this->session['user_id'];
+        if (!in_array('zeiten', $this->users->basisRechte($uid), true)) throw new Problem('Für die Öffnungszeiten fehlt das Recht (Praxis → Benutzer und Gruppen).', 403);
+        $z = new Zeiten($this->db);
+        if (!$get && $fehler === null) {
+            $aktion = $r->field('aktion', 30);
+            $ziel = '/verwaltung/zeiten';
+            try {
+                switch ($aktion) {
+                    case 'ereignis':
+                        $in = $r->post;
+                        $id = $z->ereignisSpeichern($in);
+                        $ziel .= '?e=' . $id;
+                        $text = 'Gespeichert.';
+                        break;
+                    case 'ereignis-loeschen':
+                        $z->ereignisLoeschen($r->field('id', 40));
+                        $text = 'Eintrag gelöscht.';
+                        break;
+                    case 'woche':
+                        $z->wocheSpeichern($this->tageListe($r->list('sprech')), $this->tageListe($r->list('telefon')));
+                        $ziel .= '?ansicht=woche';
+                        $text = 'Regelmäßige Zeiten gespeichert.';
+                        break;
+                    case 'feiertage':
+                        $z->feiertageSpeichern($r->field('land', 4), $r->list('gezeigt'), $r->list('haken'), $r->field('f_telefon') === '1', $r->field('f_homepage') === '1');
+                        $ziel .= '?ansicht=feiertage' . (ctype_digit($r->field('jahr', 4)) ? '&jahr=' . $r->field('jahr', 4) : '');
+                        $text = 'Feiertage gespeichert.';
+                        break;
+                    case 'praxis':
+                        $id = $z->praxisSpeichern($r->post);
+                        $ziel .= '?ansicht=praxen&p=' . $id;
+                        $text = 'Vertretungspraxis gespeichert.';
+                        break;
+                    case 'praxis-loeschen':
+                        $z->praxisLoeschen($r->field('id', 40));
+                        $ziel .= '?ansicht=praxen';
+                        $text = 'Vertretungspraxis gelöscht.';
+                        break;
+                    default:
+                        throw new Problem('Unbekannte Aktion.', 400);
+                }
+            } catch (Problem $e) {
+                if ($e->http >= 500 || $e->http === 400) throw $e;
+                $q = match ($aktion) { 'woche' => ['ansicht' => 'woche'], 'feiertage' => ['ansicht' => 'feiertage'], 'praxis', 'praxis-loeschen' => ['ansicht' => 'praxen', 'p' => $r->field('id', 40)],
+                    default => ['e' => $r->field('id', 40)] };
+                $ein = match ($aktion) {
+                    'woche' => ['sprech' => $this->tageListe($r->list('sprech')), 'telefon' => $this->tageListe($r->list('telefon'))],
+                    'praxis' => ['id' => $r->field('id', 40), 'name' => $r->field('name', 120), 'strasse' => $r->field('strasse', 100), 'ort' => $r->field('ort', 100), 'telefon' => $r->field('telefon', 60), 'zusatz' => $r->field('zusatz', 150)],
+                    'ereignis' => ['id' => $r->field('id', 40), 'art' => $r->field('art', 20), 'titel' => $r->field('titel', 100), 'von' => $r->field('von', 20), 'bis' => $r->field('bis', 20),
+                        'zeiten' => $r->field('zeiten', 80), 'hinweis' => $r->field('hinweis', 220), 'homepage' => $r->field('homepage') === '1', 'telefon' => $r->field('telefon') === '1', 'vertretung' => []],
+                    default => null };
+                return $this->zeitenSeite($z, new Request('GET', $r->path, $q), $e->getMessage(), $ein);
+            }
+            $this->audit->write((string)$this->session['login'], 'zeiten-' . $aktion, '');
+            if ($this->connections) $z->verteilen($this->connections, $this->config->practice);
+            $this->flash($text);
+            return Response::redirect($ziel);
+        }
+        return $this->zeitenSeite($z, $r, $fehler, $eingabe);
+    }
+
+    /** Request ordnet Listenfelder neu (sprech[mo] … sprech[so] kommen als Liste); die Felder stehen in der Reihenfolge der Wochentage. */
+    private function tageListe(array $l): array {
+        return count($l) === 7 ? array_combine(array_keys(Zeiten::TAGE), array_map('strval', array_values($l))) : [];
+    }
+
+    private function zeitenSeite(Zeiten $z, Request $r, ?string $fehler, ?array $eingabe): Response {
+        // Wartende Verteilung (anderer Auftrag lief gerade) oder neuer Tag: still nachholen.
+        if ($this->connections && ($z->ausstehend() || $this->db->setting('zeiten.verteilt') === null) && $this->zeitenNutzer()) $z->verteilen($this->connections, $this->config->practice);
+        $verteilt = null;
+        if ($this->connections && $this->connections->status()['service']) {
+            $st = $this->connections->status()['zeiten'];
+            $verteilt = !$z->ausstehend() && is_array($st) && ($st['stand'] ?? '') === $z->paket($this->config->practice)['stand'];
+        }
+        $seite = new ZeitenSeite($z, (string)$this->session['csrf'], $this->zeitenNutzer(), $verteilt);
+        $ansicht = $r->get('ansicht', 20);
+        $body = match ($ansicht) {
+            'woche' => $seite->wocheSeite($fehler, $eingabe),
+            'feiertage' => $seite->feiertageSeite($r->query, $fehler),
+            'praxen' => $seite->praxenSeite($r->query, $fehler, $eingabe),
+            default => $seite->kalenderSeite($r->query, $fehler, $eingabe),
+        };
+        return Response::html(V::page('Öffnungszeiten', $body, $this->nav(), $this->config->practice, 'Praxis'), $fehler ? 422 : 200);
     }
 
     // ---- Servername ---------------------------------------------------------------------------------------------
@@ -1281,13 +1377,14 @@ final class Web {
         $chips = '';
         foreach (array_keys($groups) as $name) $chips .= '<label class="rolle-chip">' . '<input type="checkbox" name="rolle[]" value="' . V::h($name) . '" data-rolle' . (in_array($name, $roles, true) ? ' checked' : '') . '> ' . V::role($name) . ' ' . V::h($name) . '</label>';
         $modules = '';
-        foreach ($this->modules->all() as $mid => $m) {
-            $a = $access[$mid] ?? ['admin' => false, 'rights' => []];
+        $basis = $this->users->basisRechte($id);
+        foreach (['core' => null] + $this->modules->all() as $mid => $m) {
+            $a = $mid === 'core' ? ['admin' => false, 'rights' => $basis] : ($access[$mid] ?? ['admin' => false, 'rights' => []]);
             $head = '<th>Recht</th>';
             foreach ($groups as $name => $_) $head .= '<th class="gcol" data-gcol="' . V::h($name) . '">' . V::role($name) . '<span class="gname">' . V::h($name) . '</span></th>';
             $head .= '<th>Für ' . V::h($this->users->find($id)['login']) . '</th>';
-            $rows = [['@admin', 'Admin dieses Moduls (braucht Authenticator-App)', 'modul_admin[]', $mid, $a['admin']]];
-            foreach ($this->modules->rights($mid) as $right) $rows[] = [$right['id'], $right['label'], 'recht[]', $mid . ':' . $right['id'], in_array($right['id'], $a['rights'], true)];
+            $rows = $mid === 'core' ? [] : [['@admin', 'Admin dieses Moduls (braucht Authenticator-App)', 'modul_admin[]', $mid, $a['admin']]];
+            foreach ($mid === 'core' ? array_map(fn($k, $v) => ['id' => $k, 'label' => $v], array_keys(Groups::BASIS_RECHTE), Groups::BASIS_RECHTE) : $this->modules->rights($mid) as $right) $rows[] = [$right['id'], $right['label'], 'recht[]', $mid . ':' . $right['id'], in_array($right['id'], $a['rights'], true)];
             $body = '';
             foreach ($rows as [$rid, $label, $field, $value, $on]) {
                 $grants = [];
@@ -1302,7 +1399,7 @@ final class Web {
                 $body .= '<tr class="recht' . ($abw ? ' abw' : '') . '" data-grants="' . V::h(implode('|', $grants)) . '"><td>' . V::h($label) . '</td>' . $cells
                     . '<td class="erg"><label class="check"><input type="checkbox" name="' . $field . '" value="' . V::h($value) . '"' . ($on ? ' checked' : '') . ' data-erg> <span class="stift" title="Einzeln geändert, weicht von der Rolle ab">' . V::icon('stift') . '</span></label></td></tr>';
             }
-            $modules .= '<fieldset><legend>' . V::h($this->modules->name($mid)) . '</legend><table class="matrix"><tr>' . $head . '</tr>' . $body . '</table></fieldset>';
+            $modules .= '<fieldset><legend>' . V::h($mid === 'core' ? 'Praxisherz (Basis)' : $this->modules->name($mid)) . '</legend><table class="matrix"><tr>' . $head . '</tr>' . $body . '</table></fieldset>';
         }
         $url = 'https://' . $this->config->hostnames[0] . '/einrichten?t=';
         $body = V::error($error)
@@ -1315,7 +1412,7 @@ final class Web {
             . '<p class="muted small">Die Rolle gilt dauerhaft: Ändert sich die <a href="/verwaltung/benutzer?bereich=gruppen">Gruppe</a>, ändern sich die Rechte aller Mitglieder mit. '
             . '<span class="legende"><span class="punkt blau"></span> von der Rolle &nbsp; <span class="punkt gelb"></span> einzeln geändert</span></p>'
             . V::checkbox('admin', '1', 'Basis-Admin', (int)$user['admin'] === 1) . V::checkbox('active', '1', 'Konto aktiv', (int)$user['active'] === 1)
-            . ($modules !== '' ? '<h2>Zugang zu Modulen</h2><p><button type="button" class="secondary" data-reset>Alle Einzeländerungen zurücknehmen (zurück auf Rolle)</button></p>' . $modules : '<p>Es sind noch keine Module installiert.</p>')
+            . ($modules !== '' ? '<h2>Rechte</h2><p><button type="button" class="secondary" data-reset>Alle Einzeländerungen zurücknehmen (zurück auf Rolle)</button></p>' . $modules : '<p>Es sind noch keine Module installiert.</p>')
             . '<button>Speichern</button></form>'
             . (!$self && !$this->users->needsOtp($user) ? '<form method="post" action="/verwaltung/benutzer/' . $id . '/link" class="box">' . V::csrf($this->session['csrf'])
                 . '<p>Passwort vergessen? Ein neuer Einrichtungslink löscht das bisherige Passwort und meldet alle Geräte ab.</p><button>Neuen Einrichtungslink erzeugen</button></form>'
@@ -1325,7 +1422,9 @@ final class Web {
     }
 
     private function groupBoxes(string $prefix, array $g): string {
-        $out = '';
+        $out = '<fieldset><legend>Praxisherz (Basis)</legend>';
+        foreach (Groups::BASIS_RECHTE as $rid => $label) $out .= V::checkbox('recht[]', 'core:' . $rid, $label, in_array('core:' . $rid, $g['rechte'], true));
+        $out .= '</fieldset>';
         foreach ($this->modules->all() as $mid => $_) {
             $rights = '';
             foreach ($this->modules->rights($mid) as $right) $rights .= V::checkbox('recht[]', $mid . ':' . $right['id'], $right['label'], in_array($mid . ':' . $right['id'], $g['rechte'], true));
@@ -1395,7 +1494,8 @@ final class Web {
                 $this->users->update($id, $r->field('display', 80), $self || $r->field('admin') === '1', $self || $r->field('active') === '1');
                 if ($roles !== null) $this->users->setRoles($id, $roles);
                 foreach (array_keys($this->modules->all()) as $m) $this->users->setAccess($id, $m, in_array($m, $moduleAdmin, true), $rights[$m] ?? []);
-                foreach (array_diff(array_keys($rights), array_keys($this->modules->all())) as $unknown) throw new Problem('Unbekanntes Modul.', 422);
+                $this->users->setBasisRechte($id, $rights['core'] ?? []);
+                foreach (array_diff(array_keys($rights), array_keys($this->modules->all()), ['core']) as $unknown) throw new Problem('Unbekanntes Modul.', 422);
             });
         } catch (Problem $e) {
             return $this->userEdit($id, $e->getMessage());
@@ -1403,6 +1503,7 @@ final class Web {
         $after = $this->users->find($id);
         $summary = [];
         if ((int)$after['admin'] === 1) $summary[] = 'basis-admin';
+        elseif ($this->users->basisRechte($id)) $summary[] = 'basis:' . implode('/', $this->users->basisRechte($id));
         foreach ($this->users->access($id) as $m => $a) $summary[] = $m . ($a['admin'] ? ':admin' : '') . ($a['rights'] ? ':' . implode('/', $a['rights']) : '');
         $this->audit->write($admin, 'benutzer-geaendert', $after['login'] . ' ' . ((int)$after['active'] ? '' : 'gesperrt ') . implode(',', $summary));
         // Neue Admin-Rolle ohne OTP: offene Sitzungen beenden, damit die nächste Anmeldung die App-Einrichtung verlangt.
@@ -2890,6 +2991,7 @@ final class Web {
         $offen = $admin ? $this->openPaths() : [];
         foreach ($meta as $k => $m) $meta[$k]['todo'] = $m['settings'] !== null && in_array($m['settings'], $offen, true);
         return ['apps' => $apps, 'appmeta' => $meta, 'settings' => $settings, 'login' => $this->session['login'], 'admin' => $admin, 'csrf' => $this->session['csrf'],
+            'basis' => $this->users->basisRechte((int)$this->session['user_id']),
             'updates' => $admin && $this->updates ? $this->updates->count() : 0, 'module' => $admin && $this->store ? $this->store->count() : 0, 'sicherung' => $admin && $this->backup ? $this->backup->count() : 0,
             'pfad' => $this->req?->path ?? '', 'einrichtung' => $admin ? $this->openSteps() : 0, 'offenLogo' => $admin && $this->openSteps() > 0, 'offen' => $admin ? $this->openPaths() : []];
     }

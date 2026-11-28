@@ -58,7 +58,7 @@ if command -v node >/dev/null; then
 fi
 
 step 'PHP: Basis (tests/php)'
-for t in tests/php/core.php tests/php/passkeys.php tests/php/web.php tests/php/cli.php tests/php/firewall.php tests/php/updates.php tests/php/verbindungen.php tests/php/sicherung.php tests/php/einrichtung.php tests/php/drucker.php tests/php/oidc.php tests/php/server.php tests/php/uhrzeit.php tests/php/module.php tests/php/startseite.php tests/php/konto_mail.php tests/php/starter.php tests/php/arbeitsplaetze.php; do echo "-- $t"; php "$t"; done
+for t in tests/php/core.php tests/php/passkeys.php tests/php/web.php tests/php/cli.php tests/php/firewall.php tests/php/updates.php tests/php/verbindungen.php tests/php/sicherung.php tests/php/einrichtung.php tests/php/drucker.php tests/php/oidc.php tests/php/server.php tests/php/uhrzeit.php tests/php/module.php tests/php/startseite.php tests/php/konto_mail.php tests/php/starter.php tests/php/arbeitsplaetze.php tests/php/zeiten.php; do echo "-- $t"; php "$t"; done
 
 step 'Modul Kasse (modules/kasse/tests)'
 for t in critical reader-cancel invoice t2med-invoice letterxpress letterdrucker auto-print settings tax goae-t2med cash transfer print-format mail-mime suite fhir-error startseite review discard goae-verzeichnis signatur-ablage; do
@@ -80,8 +80,8 @@ for h in modules/signatur/bin/*; do sh -n "$h"; done
 
 step 'Modul Telefon (modules/telefon/tests)'
 python3 -B -m py_compile modules/telefon/lib/anlage.py modules/telefon/lib/anrufername.agi modules/telefon/lib/telefon-ereignisse modules/telefon/lib/kfx/fax-dienst modules/telefon/lib/kfx/fax-empfangen \
-  modules/telefon/lib/kfx/kienzlefax-worker.py modules/telefon/lib/kfx/kfx_update_status.agi
-if command -v ruff >/dev/null; then ruff check --no-cache --select E,F,W,B --line-length 180 modules/telefon/lib/anlage.py modules/telefon/lib/anrufername.agi modules/telefon/lib/telefon-ereignisse modules/telefon/tests; fi
+  modules/telefon/lib/kfx/kienzlefax-worker.py modules/telefon/lib/kfx/kfx_update_status.agi modules/telefon/lib/zeiten-abgleich
+if command -v ruff >/dev/null; then ruff check --no-cache --select E,F,W,B --line-length 180 modules/telefon/lib/anlage.py modules/telefon/lib/zeiten-abgleich modules/telefon/lib/anrufername.agi modules/telefon/lib/telefon-ereignisse modules/telefon/tests; fi
 php modules/telefon/tests/telefon.php
 php modules/telefon/tests/seiten.php
 php modules/telefon/tests/t2med.php

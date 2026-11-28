@@ -4,7 +4,7 @@ Praxis-Appliance für Hausarztpraxen mit T2med: **eine Basis**, einmal auf einer
 einzeln dazukommen. Verwaltung komplett im Webinterface; Anmeldung, Benutzer und Rechte, Firewall, Admin-Zugang mit OTP,
 Updates, verschlüsselte Sicherung und die Verbindungen zu T2med, E-Mail, SMS und Netzwerkspeicher gibt es nur einmal, in der Basis.
 
-Stand (28.11.2026, Zweig `beta`): **Basis 0.22.0-beta.55** mit den Modulen
+Stand (28.11.2026, Zweig `beta`): **Basis 0.22.0-beta.56** mit den Modulen
 
 | Modul | Version | Was es kann |
 |---|---|---|
@@ -49,6 +49,12 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 **Arbeitsplätze:** Ein Paket je PC richtet den Praxisherz-Agent ein (Windows-Setup mit einem Klick): Starter für T2med, Zertifikat, virtuelle Drucker und „Akte öffnen“. Ein Schlüssel gilt für alle Module; T2med startet damit Kasse, Signatur und Telefon mit dem aktuellen Patienten. Ohne Agent (Mac, Linux) steht jeder Schritt eingeklappt auch zum Einrichten von Hand bereit.
 
 ![Starter](docs/screenshots/starter.png)
+
+**Öffnungszeiten:** Unter Praxis → Öffnungszeiten pflegt die Praxis (auch die MFA mit dem Recht „Öffnungszeiten pflegen“) Sprech- und Telefonzeiten, Urlaub, Fortbildung und Sonderöffnungen mit Vertretung je Zeitraum sowie die Feiertage des Bundeslands, einzeln an- und abwählbar. Homepage und Telefon übernehmen alles von selbst: Mitteilung auf der Homepage, Ansage mit Vertretung am Telefon.
+
+![Öffnungszeiten](docs/screenshots/zeiten.png)
+
+![Feiertage](docs/screenshots/feiertage.png)
 
 **Verbindungen:** Zugänge, die mehrere Module brauchen (T2med, E-Mail, SMS, Letterxpress, Ablage per SFTP oder SMB), werden einmal eingetragen; ein Modul bekommt nur die, die es anmeldet.
 

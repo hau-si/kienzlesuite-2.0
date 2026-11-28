@@ -94,6 +94,18 @@ $o = aufruf($dir, '/telefon/sprachmenue', 'sprachmenue', 'benutzer', ['aktion' =
 check(str_contains($o, 'doppelt'), 'Doppelte Taste abgelehnt');
 check(str_contains(aufruf($dir, '/telefon/sprachmenue', 'sprachmenue', 'benutzer', ['aktion' => 'netz-speichern', 'kienzle-csrf' => $csrf]), 'nur Admins'), 'Andere Aktionen nur Admin');
 check(str_contains(aufruf($dir, '/telefon/einstellungen', 'nebenstellen', 'benutzer', ['aktion' => 'sprachmenue-texte', 'kienzle-csrf' => $csrf]), 'fehlt das Recht'), 'Texte nur mit Recht');
+// Öffnungszeiten aus der Basis (Verbindung „zeiten“): Öffnungs- und Telefonzeiten nur anzeigen und beim Speichern nicht überschreiben
+@mkdir("$dir/verbindungen");
+$vorher = @file_get_contents("$dir/verbindungen/telefon.json");
+$verb = json_decode((string)$vorher, true) ?: [];
+file_put_contents("$dir/verbindungen/telefon.json", json_encode($verb + ['zeiten' => ['format' => 1, 'stand' => str_repeat('c', 32), 'woche' => [], 'ereignisse' => []]]));
+$o = aufruf($dir, '/telefon/sprachmenue', 'sprachmenue');
+check(str_contains($o, 'href="/verwaltung/zeiten"') && str_contains($o, 'name="zeit[oeffnungszeiten][montag]" value="" maxlength="200" placeholder="geschlossen" pattern="[0-9:\\-, ;]*" inputmode="numeric" disabled')
+    && substr_count($o, 'data-zeiten-von="oeffnungszeiten"') === 2, 'Zeiten aus der Basis nur angezeigt');
+preg_match('/name="stand" value="([a-f0-9]{64})"/', $o, $m);
+$o = aufruf($dir, '/telefon/sprachmenue', 'sprachmenue', 'benutzer', ['aktion' => 'sprachmenue-texte', 'kienzle-csrf' => $csrf, 'stand' => $m[1], 'zeit' => ['telefonzeiten' => ['montag' => '09:00-10:00']]]);
+check(!str_contains($o, 'value="09:00-10:00"') && str_contains($o, 'value="08:00-12:00, 14:00-17:00"'), 'Telefonzeiten trotz Basis überschrieben');
+if ($vorher === false) unlink("$dir/verbindungen/telefon.json"); else file_put_contents("$dir/verbindungen/telefon.json", $vorher);
 if (!is_dir("$dir/daten/kienzlefon/ansagen-master")) mkdir("$dir/daten/kienzlefon/ansagen-master", 0700, true);
 file_put_contents("$dir/daten/kienzlefon/ansagen-master/emergency.wav", 'RIFF0000WAVE');
 $o = aufruf($dir, '/telefon/ansage/emergency.wav', 'sprachmenue');

@@ -4,7 +4,7 @@
 [module]
 id = "homepage"
 name = "Homepage"
-version = "0.1.0-beta.2"
+version = "0.1.0-beta.3"
 core_api = "2"
 description = "Mitteilungen auf die WordPress-Homepage der Praxis: Vertretung (mehrere Praxen), Impfstoff lieferbar, Sonderöffnungszeiten, freier Text. Je Mitteilung ein- und ausschaltbar, mit Zeitraum und wählbarem Ort (Leiste, Kasten, Fenster, Kurzcode)."
 
@@ -12,12 +12,18 @@ description = "Mitteilungen auf die WordPress-Homepage der Praxis: Vertretung (m
 packages = ["php-fpm", "php-cli", "php-sqlite3", "php-curl", "php-zip", "php-mbstring"]
 user = "ks-homepage"
 data = "/var/lib/kienzle/homepage"
+services = ["kienzle-homepage-zeiten.service", "kienzle-homepage-zeiten.path"]
 
 [web]
 path = "/homepage"
 upstream = "unix:/run/kienzle/homepage/web.sock"
 protocol = "fastcgi"
 entry = "public/index.php"
+
+[[connections]]
+id = "zeiten"
+purpose = "Schließungen, Feiertage und Vertretungen aus Praxis → Öffnungszeiten automatisch auf der Homepage zeigen"
+required = false
 
 [[rights]]
 id = "mitteilungen"

@@ -124,4 +124,15 @@ check(db($dir)->query("SELECT wert FROM einstellungen WHERE name = 'schluessel'"
 $o = aufruf($dir, '/homepage/plugin.zip', '', 'admin');
 check(str_starts_with($o, "PK\x03\x04"), 'Plugin als ZIP');
 
+// Automatisch aus Praxis → Öffnungszeiten
+check(str_contains(aufruf($dir, '/homepage/', 'mitteilungen'), 'Automatisch aus den Öffnungszeiten') && str_contains(aufruf($dir, '/homepage/', 'mitteilungen'), 'href="/verwaltung/zeiten"'), 'Hinweis ohne Paket');
+@mkdir("$dir/verbindungen");
+file_put_contents("$dir/verbindungen/homepage.json", json_encode(['zeiten' => ['format' => 1, 'stand' => str_repeat('c', 32), 'woche' => [], 'ereignisse' => [
+    ['id' => 'e1', 'art' => 'urlaub', 'titel' => 'Urlaub <b>', 'von' => '2099-12-23', 'bis' => '2099-12-30', 'homepage' => true, 'satz' => 'Die Praxis ist vom 23.12. bis 30.12. geschlossen.', 'vertretung' => []]]]]));
+$o = aufruf($dir, '/homepage/', 'mitteilungen');
+check(str_contains($o, 'Urlaub &lt;b&gt;') && str_contains($o, 'ab 09.12.') && str_contains($o, 'name="aktion" value="zeiten"'), 'automatische Mitteilung in der Liste');
+$o = aufruf($dir, '/homepage/', 'mitteilungen', 'mitarbeiter', ['aktion' => 'zeiten', 'aktiv' => '1', 'orte' => ['kasten'], 'farbe' => 'gruen', 'symbol' => 'standard', 'vorlauf' => '3', 'feiertage' => '1', 'kienzle-csrf' => $csrf]);
+check(str_contains(ort($o), 'ok=zeiten') && str_contains(aufruf($dir, '/homepage/', 'mitteilungen'), 'ab 20.12.'), 'Einstellungen gespeichert: ' . ort($o));
+check(str_contains(ort(aufruf($dir, '/homepage/', 'praxen', 'mitarbeiter', ['aktion' => 'zeiten', 'orte' => ['kasten'], 'vorlauf' => '3', 'feiertage' => '1', 'kienzle-csrf' => $csrf])), 'fehler='), 'Einstellungen nur mit Recht');
+
 echo "Homepage-Seiten: alle Tests bestanden.\n";
