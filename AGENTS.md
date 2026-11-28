@@ -38,7 +38,7 @@ Oberfläche, Hilfetexte, Dokumentation und Commit-Nachrichten auf Deutsch.
 
 ## Hinweise für neue Sitzungen (Stand 28.11.2026)
 
-**Stand:** Basis 0.22.0-beta.52, Kasse (`kasse`) 2.3.4-beta.67, Terminzettel 1.3.0-beta.25, Signatur 0.1.0-beta.51, Telefon 0.1.0-beta.31, Fax 0.1.0-beta.16, QM (`qm`) 0.1.0-beta.1, Homepage (`homepage`) 0.1.0-beta.1, Beispiel 0.2.1-beta.1; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
+**Stand:** Basis 0.22.0-beta.53, Kasse (`kasse`) 2.3.4-beta.67, Terminzettel 1.3.0-beta.25, Signatur 0.1.0-beta.51, Telefon 0.1.0-beta.31, Fax 0.1.0-beta.16, QM (`qm`) 0.1.0-beta.1, Homepage (`homepage`) 0.1.0-beta.1, Beispiel 0.2.1-beta.1; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
 (Basis 0.19.1). Der Nutzer testet auf einer echten Ubuntu-26.04-VM (Aktualisierung dort: `cd ~/praxisherz && git pull && sudo bash installer/install.sh`,
 oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nicht ins Repository.
 

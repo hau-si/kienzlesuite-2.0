@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.53
+
+- Prüfung auf GitHub: Nach beta.52 lief der Ubuntu-26.04-Container weiter und scheiterte an zwei Tests des Sprachmenüs (Kokoro-Installer prüft `ensurepip`). Das Paket `python3-venv` steht jetzt in der Paketliste des Containers. Am Programm ändert sich nichts.
+- Lokal mit allen Tests geprüft; ob der Container-Lauf ganz grün wird, zeigt der nächste Lauf auf GitHub.
+
 ## 0.22.0-beta.52
 
 - Prüfung auf GitHub: Der Testlauf im Ubuntu-26.04-Container brach seit dem Test der Start-ISO ab („No module named 'yaml'“). Das Paket `python3-yaml` steht jetzt in der Paketliste beider Testläufe. Am Programm selbst ändert sich nichts.

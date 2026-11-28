@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     container: ubuntu:26.04
     steps:
-      - run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git ca-certificates python3 shellcheck restic php-cli php-sqlite3 php-mbstring php-gd php-curl php-xml php-zip openssl librsvg2-bin poppler-utils qpdf fonts-dejavu-core ghostscript python3-openpyxl python3-pil python3-fonttools python3-qrcode tesseract-ocr tesseract-ocr-deu asterisk asterisk-modules asterisk-prompt-de libtiff-tools python3-reportlab python3-pypdf python3-pytest python3-cryptography python3-yaml ffmpeg
+      - run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git ca-certificates python3 shellcheck restic php-cli php-sqlite3 php-mbstring php-gd php-curl php-xml php-zip openssl librsvg2-bin poppler-utils qpdf fonts-dejavu-core ghostscript python3-openpyxl python3-pil python3-fonttools python3-qrcode tesseract-ocr tesseract-ocr-deu asterisk asterisk-modules asterisk-prompt-de libtiff-tools python3-reportlab python3-pypdf python3-pytest python3-cryptography python3-yaml python3-venv ffmpeg
       - uses: actions/checkout@v5
       # Im Container gehört der Arbeitsordner einem anderen Benutzer; git braucht die ausdrückliche Freigabe.
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
