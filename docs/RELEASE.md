@@ -1,5 +1,14 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.60
+
+Neues Design für weitere Seiten (Entwürfe vom 28.11.2026, Seitenkopf mit Reitern oben rechts wie bei Module/Updates):
+- **Betrieb → Sicherheit (A):** Reiter Firewall | Zugang | Passwörter | Protokoll (`?bereich=`), je Reiter ein Bereich; roter Zähler bei zu lockeren Passwortregeln oder unbestätigter Firewall.
+- **Betrieb → Sicherung (B):** Zustand oben (letzte Sicherung, Prüfung, Probe, Aufräumen), alles andere eingeklappt (Zeitplan, Schutz, Benachrichtigung, Aufbewahrung, Schlüsselblatt, Wiederherstellen, Einstellungen exportieren) mit Zustandsmarke; Reiter Sicherung | Protokoll (Einträge der Sicherung aus dem Protokoll), „Jetzt sichern“ oben rechts.
+- **Praxis → Dienste (A):** Liste wie bei den Modulen, „⋯“ mit Neues Geheimnis/Entfernen; „Dienst hinzufügen“ oben rechts öffnet das Formular (`?neu=1`). Seitentitel jetzt „Dienste“ wie in der Seitenleiste.
+- **Praxis → Drucker (A):** Reiter Drucker | Virtuelle Drucker | Zuordnung | Aufträge (Zähler offener Aufträge), Drehpfeil = Drucker suchen; echte Drucker als Liste mit „⋯“ (Testseite, Entfernen); Suchen, von Hand eintragen, Ablage-Ordner und Windows-Netz eingeklappt. Nach einer Aktion bleibt der Reiter offen.
+- Mit Tests und im Browser der Vorschau (erfundene Daten) geprüft, **nicht auf der VM**.
+
 ## 0.22.0-beta.59
 
 - **Betrieb → Module neu (Entwurf B):** eine Liste statt Kacheln (Symbol, Name, Beschreibung, Version, Zustand mit Punkt, eine Pille „✓ aktuell ⟳“ bzw. „↑ Auf … aktualisieren“, „⋯“ mit Neustart und Entfernen). Oben ein Schalter „Automatische Updates“ und ein Hinweis „N Updates verfügbar“; noch nicht installierte Module eingeklappt unter „Weitere Module“. Die Knöpfe unten („Status der Dienste aktualisieren“, „Nach Modulen sehen“, „Automatische Updates …“) entfallen.

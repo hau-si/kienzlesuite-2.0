@@ -223,12 +223,16 @@ function test_verwaltung_braucht_bestaetigung_und_csrf(): void {
     $prax = $b->get('/verwaltung/praxis')->body;
     check(str_contains($prax, 'class="h-ico"') && str_contains($prax, 'Anschrift <span class="tag opt">nicht ausgefüllt</span>') && str_contains($prax, 'Kontodaten für Überweisungen <span class="tag ok">✓ ausgefüllt</span>'), 'Praxis und Daten: Symbole oder Statusschilder fehlen');
     check(str_contains($b->get('/konto')->body, 'Authenticator-App</h2><span class="tag ok fold-status">eingerichtet</span>'), 'Konto: Statusschild der Authenticator-App fehlt');
+    // Sicherheit (Entwurf A): Reiter Firewall | Zugang | Passwörter | Protokoll, je Reiter ein Bereich.
     $page = $b->get('/verwaltung/sicherheit')->body;
-    check(str_contains($page, 'Firewall <span class="tag') && str_contains($page, 'Zugang (Abmeldezeiten)') && str_contains($page, 'Protokoll</h2>') && str_contains($page, 'name="idle_einheit"'), 'Sicherheit unvollständig');
+    check(str_contains($page, '<header class="seitenkopf">') && str_contains($page, 'href="/verwaltung/sicherheit" aria-current="page"') && str_contains($page, 'href="/verwaltung/sicherheit?bereich=zugang"')
+        && str_contains($page, 'href="/verwaltung/sicherheit?bereich=passwoerter"') && str_contains($page, 'href="/verwaltung/sicherheit?bereich=protokoll"') && str_contains($page, 'Firewall <span class="tag'), 'Sicherheit: Reiter oder Firewall fehlen');
+    check(str_contains($b->get('/verwaltung/sicherheit?bereich=zugang')->body, 'name="idle_einheit"') && str_contains($b->get('/verwaltung/sicherheit?bereich=protokoll')->body, 'class="log"'), 'Sicherheit: Zugang oder Protokoll fehlen');
+    $page = $b->get('/verwaltung/sicherheit?bereich=passwoerter')->body;
     check(str_contains($page, 'id="passwoerter"') && str_contains($page, 'name="staerke"') && str_contains($page, 'Mindestlänge'), 'Sicherheit: Abschnitt Passwörter fehlt');
     check($b->post('/verwaltung/passwortregeln', ['min' => '4', 'klassen' => '1', 'staerke' => '0'])->status === 422, 'Mindestlänge 4 angenommen');
     $pr = $b->post('/verwaltung/passwortregeln', ['min' => '6', 'klassen' => '1', 'staerke' => '0']);
-    check($pr->status === 200 && str_contains($pr->body, 'Warnung:') && str_contains($pr->body, 'tag warn">Warnung'), 'Zu lockere Regeln ohne Warnung');
+    check($pr->status === 200 && str_contains($pr->body, 'Warnung:') && str_contains($pr->body, 'Passwörter<span class="zaehler">1</span>'), 'Zu lockere Regeln ohne Warnung');
     check($b->post('/verwaltung/passwortregeln', ['min' => '14', 'klassen' => '2', 'staerke' => '2', 'schwach' => '1', 'login' => '1'])->status === 200 && PasswordPolicy::load($env->db)['min'] === 14, 'Passwortregeln nicht gespeichert');
     check(str_contains($b->get('/konto')->body, 'data-staerke="1"') && str_contains($b->get('/konto')->body, 'data-min="14"'), 'Konto: Stärkebalken fehlt');
     check($b->post('/verwaltung/passwortregeln', ['min' => '10', 'klassen' => '1', 'staerke' => '0', 'schwach' => '1', 'login' => '1'])->status === 200, 'Regeln zurücksetzen');
