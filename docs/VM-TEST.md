@@ -127,16 +127,16 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
 ## Basis 0.12.0 – Erstinstallation und Servername
 
 1. [ ] Frische VM: `sudo bash installer/install.sh` ohne Angaben; Ausgabe nennt die IP, Einrichtungslink über die IP funktioniert.
-2. [ ] Einrichten → Server: Namen `praxisherz` (Eintrag im DNS/Router bzw. hosts-Datei) und Praxisname setzen;
+2. [ ] Praxis → Server: Namen `praxisherz` (Eintrag im DNS/Router bzw. hosts-Datei) und Praxisname setzen;
        danach unter dem Namen erreichbar, ohne Zertifikatswarnung.
 3. [ ] Passkey unter dem Namen anlegen und damit anmelden.
 4. [ ] Ungültigen Namen eingeben: Fehlermeldung, nichts geändert.
 
 ## Arbeitsplätze: Praxisherz-Agent (Basis ab 0.22.0)
 
-1. [ ] Einrichten → Arbeitsplätze: `Praxisherz-Setup.exe` laden, am Windows-PC doppelklicken (Warnung „Der Computer wurde durch Windows geschützt“ →
+1. [ ] Praxis → Arbeitsplätze: `Praxisherz-Setup.exe` laden, am Windows-PC doppelklicken (Warnung „Der Computer wurde durch Windows geschützt“ →
        „Weitere Informationen“ → „Trotzdem ausführen“), Administratorrechte bestätigen. „Arbeitsplatz eingerichtet“ erscheint.
-2. [ ] Der PC erscheint unter Einrichten → Arbeitsplätze mit seinem Rechnernamen; Taskleistensymbol „Praxisherz“ zeigt alles grün.
+2. [ ] Der PC erscheint unter Praxis → Arbeitsplätze mit seinem Rechnernamen; Taskleistensymbol „Praxisherz“ zeigt alles grün.
 3. [ ] Ohne weiteres Zutun: keine Zertifikatswarnung im Browser, die virtuellen Drucker der installierten Module (z. B. vKasse, vTermine, vFax1)
        stehen unter Windows → Drucker, die Aufrufadressen `praxisherz-…://` sind registriert.
 4. [ ] Ein Modul neu installieren: Dessen Drucker kommt am PC nach kurzer Zeit von selbst dazu.
@@ -160,7 +160,7 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
 7. [ ] Praxis → Drucker: „vKasse“ erscheint als Drucker des Moduls. Nach dem Praxisherz-Agent (Abschnitt unten) ist er am Windows-PC
        vorhanden; aus T2med eine Testrechnung (Testpatient) drucken: erscheint im Rechnungseingang der Kasse.
        Notweg ohne Agent: als IPP-Drucker `http://<server>:631/printers/vKasse` (Papier A4) von Hand hinzufügen.
-8. [ ] In T2med den Eintrag „Kartenzahlung“ anlegen (Adresse unter Praxis → Verbindungen → T2med). Klick beim Patienten:
+8. [ ] In T2med den Eintrag „Kartenzahlung“ anlegen (Adresse unter Praxis → T2med). Klick beim Patienten:
        Browser öffnet Praxisherz, nach der Anmeldung (falls nötig) die Kasse-Startseite mit dem Patienten.
 9. [ ] Betrieb → Module → Kasse → Entfernen ohne Häkchen: Kasse weg, `/var/lib/kienzle/kasse` bleibt; erneut installieren:
        Einstellungen und Leistungen sind wieder da.

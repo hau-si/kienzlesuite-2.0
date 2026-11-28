@@ -518,3 +518,10 @@ ul.zt-feiertage .d { color: var(--muted); min-width: 88px; display: inline-block
 ul.zt-feiertage li.aus .n { color: #8a9b96; text-decoration: line-through; }
 .zt-jahre { display: flex; gap: 8px; }
 @media (max-width: 900px) { .zt-grid, .zt-reihe { grid-template-columns: 1fr; } ul.zt-feiertage { columns: 1; } .zt-kopf a.button:last-child { margin-left: 0; } }
+
+/* Seitenkopf mit Reitern wie in den Modulen (Titel links, Knöpfe rechts; z. B. Praxis → T2med) */
+.basis-kopf { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+.basis-kopf h1 { margin: 6px 0 0; }
+.basis-reiter { display: flex; gap: 6px; flex-wrap: wrap; }
+.basis-reiter a.button { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 7px 14px; }
+.basis-reiter a.button:not(.primary) { background: var(--soft); color: #315f53; }

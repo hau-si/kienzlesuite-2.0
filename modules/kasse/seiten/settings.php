@@ -26,7 +26,7 @@ ob_start();
 <div id="sections" hidden></div>
 <section class="card settings-card" id="s-checklist"><details class="fold" id="checklist-fold" open><summary><h2>Einrichtung – Überblick</h2><span class="tag" id="checklist-tag"></span></summary><p class="muted">Diese Schritte sind nur einmal nötig, geordnet nach dem Ort, an dem sie erledigt werden. Ein Klick auf einen Punkt öffnet die passende Einstellung.</p><div id="checklist"></div></details></section>
 <section class="card settings-card" id="s-clients"><h2>Arbeitsplätze: Praxisherz-Agent</h2>
-<p>Den Starter, mit dem T2med die Kasse öffnet, das Zertifikat von Praxisherz und die Drucker „vKasse“ und „vBriefversand“ richtet der Praxisherz-Agent auf jedem Windows-PC selbst ein (<a href="/hilfe/arbeitsplatz" target="_top">Einrichten → Arbeitsplätze</a>). Ein Paket für alle Module.</p>
+<p>Den Starter, mit dem T2med die Kasse öffnet, das Zertifikat von Praxisherz und die Drucker „vKasse“ und „vBriefversand“ richtet der Praxisherz-Agent auf jedem Windows-PC selbst ein (<a href="/hilfe/arbeitsplatz" target="_top">Praxis → Arbeitsplätze</a>). Ein Paket für alle Module.</p>
 <p class="row-buttons"><a class="button primary" href="/hilfe/arbeitsplatz#paket" target="_top">Paket für Arbeitsplätze</a></p>
 </section>
 <section class="card settings-card" id="invoice-printer-help" hidden><h2>Drucker „vKasse“</h2>

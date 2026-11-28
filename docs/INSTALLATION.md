@@ -24,7 +24,7 @@ Prüfliste für die Test-VM: `docs/VM-TEST.md`.
    ```
 
    Der Installer nimmt die IP-Adresse(n) und den Rechnernamen der VM. Den endgültigen Namen und den Praxisnamen legt
-   ein Admin danach unter **Einrichten → Server** fest. Wer es gleich richtig haben will, kann beides auch mitgeben:
+   ein Admin danach unter **Praxis → Server** fest. Wer es gleich richtig haben will, kann beides auch mitgeben:
    `--name praxisherz --name 192.0.2.10 --praxis "Praxis Dr. Beispiel"`.
 3. Am Ende zeigt der Installer
    - die Adresse(n), unter denen Praxisherz erreichbar ist (zunächst über die IP),
@@ -33,14 +33,14 @@ Prüfliste für die Test-VM: `docs/VM-TEST.md`.
 4. Auf dem ersten Arbeitsplatz `https://<IP-der-VM>/ca.crt` laden und als **vertrauenswürdige
    Stammzertifizierungsstelle** eintragen (Windows: Doppelklick → Zertifikat installieren → Lokaler Computer →
    „Vertrauenswürdige Stammzertifizierungsstellen“). Fingerabdruck vergleichen. Das ist nur für diesen ersten Zugriff
-   nötig: Weitere PCs bekommen das Zertifikat mit dem Paket unter **Einrichten → Arbeitsplätze** (siehe Schritt 8).
+   nötig: Weitere PCs bekommen das Zertifikat mit dem Paket unter **Praxis → Arbeitsplätze** (siehe Schritt 8).
 5. Einrichtungslink öffnen, Passwort setzen, Authenticator-App einrichten, Wiederherstellungscodes ausdrucken.
-6. **Einrichten → Server:** Namen festlegen, unter dem die Arbeitsplätze Praxisherz erreichen (z. B. `praxisherz`,
+6. **Praxis → Server:** Namen festlegen, unter dem die Arbeitsplätze Praxisherz erreichen (z. B. `praxisherz`,
    Eintrag im DNS bzw. Router nötig), dazu den Praxisnamen. Das Server-Zertifikat wird dabei neu ausgestellt; die
    Zertifizierungsstelle bleibt. Passkeys funktionieren nur über diesen Namen.
 7. **Startseite → Einrichtung** zeigt, was noch fehlt: zweiter Admin, Firewall, Netzwerkspeicher, Sicherung,
    Schlüsselblatt, Schnappschüsse am NAS, Probe-Wiederherstellung – und darunter die Punkte der Module.
-8. **Einrichten → Arbeitsplätze:** Auf jedem Windows-PC einmal `Praxisherz-Setup.exe` ausführen. Der Praxisherz-Agent
+8. **Praxis → Arbeitsplätze:** Auf jedem Windows-PC einmal `Praxisherz-Setup.exe` ausführen. Der Praxisherz-Agent
    richtet Zertifikat, Starter für T2med und die virtuellen Drucker der Module ein und hält sie aktuell. Für Mac, Linux
    oder wenn etwas schiefgeht, steht dort jeder Schritt eingeklappt unter „Von Hand einrichten“.
 

@@ -1,8 +1,15 @@
 # Basis – Release-Notizen
 
-## 0.22.0-beta.57
+## 0.22.0-beta.58
 
 - Ende-zu-Ende-Prüfung mit nginx: Die Seitenprüfungen lasen die Antwort mit `grep -q` aus einer Pipe; bei großen Seiten (Druckerseite) bricht `curl` dann mit einem Schreibfehler ab, und die Prüfung meldete einen Fehler, obwohl der Text da war. Jetzt wird die ganze Ausgabe gelesen. Am Programm ändert sich nichts. Sicherung, Servername und Drucker liefen im Container bereits durch.
+
+## 0.22.0-beta.57
+
+- **Seitenleiste:** Die Gruppe „Einrichten“ gibt es nicht mehr. „Server“ und „Arbeitsplätze“ stehen jetzt unter „Praxis“, dazu neu „T2med“ (Wunsch des Nutzers). Alle Menüwege in Texten heißen entsprechend „Praxis → Server/Arbeitsplätze/T2med“.
+- **Neue Seite Praxis → T2med** (`/verwaltung/t2med`) mit einer Leiste oben wie in den Modulen: Reiter „FHIR-Verbindung“ (Adresse, API-Schlüssel, Zertifikat, Prüfen – bisher unter Praxis → Verbindungen), „GDT“ (Anleitung für „Akte öffnen“ mit Importdatei `C:\Praxisherz\GDT\AUFRUFi.gdt`, Feldern der Datei und Liste der Arbeitsplätze mit Agent) und „Funktionsleiste“ (Drittanbieter-Zugriff und Knopf in der T2med-Funktionsleiste, Aufrufadressen aller Module). Unter Praxis → Verbindungen steht nur noch ein Verweis.
+- **Fehler behoben:** Unter Praxis → Server blieb das Feld „Name des Servers“ leer, wenn der Server einen Namen ohne Endung hat (z. B. `praxisherz`, so bei der Erstinstallation). Ursache: `substr($name, 0, -0)` ergibt einen leeren Text. Außerdem zeigt die Seite jetzt alle Adressen, unter denen Praxisherz gerade erreichbar ist.
+- Mit Tests geprüft (`tests/php/server.php`, `verbindungen.php`, `starter.php`) und als Bild aus der Testumgebung angesehen; nicht auf der VM und nicht mit T2med geprüft (GDT-Gerät in T2med: Menüname nicht geprüft).
 
 ## 0.22.0-beta.56
 

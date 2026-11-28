@@ -4,7 +4,7 @@
 [module]
 id = "terminzettel"
 name = "Terminzettel"
-version = "1.3.0-beta.25"
+version = "1.3.0-beta.26"
 core_api = "1"
 description = "Terminblatt aus T2med als Bon auf dem Bondrucker: virtueller Drucker „vTermine“, Layout mit Vorschau, Kalender-QR je Termin."
 

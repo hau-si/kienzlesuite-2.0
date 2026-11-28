@@ -448,7 +448,7 @@ class Verbindungen(Umgebung):
         # Selbstsigniertes Zertifikat im Webinterface abrufen und nach Fingerabdruck-Prüfung fest übernehmen
         self.registry()
         self.request({'action': 't2med', 'daten': {'base_url': base, 'api_key': 'api-schluessel-1'}})
-        with self.assertRaisesRegex(self.vb.Fehler, 'Verbindungen'):
+        with self.assertRaisesRegex(self.vb.Fehler, 'Praxis → T2med'):
             self.vb.test_t2med(json.loads((self.t / 'etc/konfiguration.json').read_text())['t2med'])
         s = self.request({'action': 'zertifikat-holen'})
         fp = s['zertifikate']['t2med']['fingerprint']

@@ -45,14 +45,27 @@ function test_seite(): void {
     [$b] = admin_browser($env);
     $b->web = fn() => $b->defaultWeb(null, null, $c);
     $p = $b->get('/verwaltung/verbindungen');
-    // Einträge in T2med: alle Aufrufadressen der Module, neue Schreibweise mit Hinweis auf die frühere
-    check(str_contains($p->body, 'id="t2med"') && str_contains($p->body, 'praxisherz-kasse://?kontextId=') && str_contains($p->body, 'praxisherz-igel://'), 'Verbindungen → T2med: alle Aufrufadressen');
-    check(!str_contains($p->body, 'kienzle-') && !str_contains($p->body, 'Frühere Adresse'), 'keine früheren Adressen mehr');
-    check(!str_contains($p->body, 'IGeL <b>') && str_contains($p->body, 'IGeL &lt;b&gt;'), 'Kontext nicht maskiert');
-    check($p->status === 200 && str_contains($p->body, 'value="https://t2med.example.org:16567/fhir"') && str_contains($p->body, 'gespeichert – leer lassen'), 'Seite unvollständig');
+    check($p->status === 200 && !str_contains($p->body, 'name="base_url"') && str_contains($p->body, 'href="/verwaltung/t2med"'), 'Verbindungen: T2med steht jetzt unter Praxis → T2med');
     check(!str_contains($p->body, '<script>') && !str_contains($p->body, 'Steuer<b>') && str_contains($p->body, 'Steuer&lt;b&gt;büro'), 'Inhalte nicht maskiert');
-    check(str_contains($p->body, 'FHIR-Server antwortet') && str_contains($p->body, 'Patient lesen') && str_contains($p->body, 'ssh-ed25519 AAAATEST'), 'Prüfung, Nutzung oder SFTP-Schlüssel fehlen');
-    check(preg_match('#<details class="fold"><summary><h2><svg class="h-ico"[^>]*>.*?</svg>T2med \(FHIR\) <span class="tag ok">✓ eingerichtet</span></h2></summary>#s', $p->body) === 1 && str_contains($p->body, '<details class="fold"><summary><h2><svg class="h-ico"'), 'Verbindungen: Abschnitte nicht einklappbar, ohne Symbol oder ohne Status');
+    check(str_contains($p->body, 'Patient lesen') && str_contains($p->body, 'ssh-ed25519 AAAATEST'), 'Nutzung oder SFTP-Schlüssel fehlen');
+    check(str_contains($p->body, '<details class="fold"><summary><h2><svg class="h-ico"'), 'Verbindungen: Abschnitte nicht einklappbar oder ohne Symbol');
+    // Praxis → T2med: Reiter FHIR-Verbindung, GDT, Funktionsleiste
+    $p = $b->get('/verwaltung/t2med');
+    check($p->status === 200 && str_contains($p->body, 'class="basis-reiter"') && substr_count($p->body, 'class="button ') === 3, 'T2med: Reiterleiste fehlt');
+    check(preg_match('#<a class="button primary mit-icon" href="/verwaltung/t2med" aria-current="page">#', $p->body) === 1, 'T2med: Reiter FHIR nicht gewählt');
+    check(str_contains($p->body, 'value="https://t2med.example.org:16567/fhir"') && str_contains($p->body, 'gespeichert – leer lassen') && str_contains($p->body, 'name="zurueck" value="t2med"'), 'T2med: Formular unvollständig');
+    check(str_contains($p->body, 'FHIR-Server antwortet') && preg_match('#<h2><svg class="h-ico"[^>]*>.*?</svg>Verbindung zu T2med \(FHIR\) <span class="tag ok">✓ eingerichtet</span></h2>#s', $p->body) === 1, 'T2med: Prüfung oder Status fehlt');
+    check(!str_contains($p->body, '<script>') && str_contains($p->body, 'data-menu="praxis"') && !str_contains($p->body, 'data-menu="einrichten"'), 'T2med: Seitenleiste ohne Gruppe Einrichten');
+    $p = $b->get('/verwaltung/t2med?reiter=funktionsleiste');
+    check(str_contains($p->body, 'id="t2med"') && str_contains($p->body, 'praxisherz-kasse://?kontextId=') && str_contains($p->body, 'praxisherz-igel://'), 'Funktionsleiste: alle Aufrufadressen');
+    check(!str_contains($p->body, 'kienzle-') && !str_contains($p->body, 'name="base_url"'), 'Funktionsleiste: keine früheren Adressen, kein Formular');
+    check(!str_contains($p->body, 'IGeL <b>') && str_contains($p->body, 'IGeL &lt;b&gt;'), 'Kontext nicht maskiert');
+    $p = $b->get('/verwaltung/t2med?reiter=gdt');
+    check(str_contains($p->body, 'C:\\Praxisherz\\GDT\\AUFRUFi.gdt') && str_contains($p->body, 'T2MED_PX') && str_contains($p->body, 'Noch kein Arbeitsplatz'), 'GDT: Anleitung fehlt');
+    check($b->get('/verwaltung/t2med?reiter=<x>')->status === 200, 'unbekannter Reiter → FHIR');
+    $r = $b->post('/verwaltung/verbindungen', ['aktion' => 'pruefen', 'art' => 't2med', 'zurueck' => 't2med']);
+    check($r->status === 303 && $r->header('Location') === '/verwaltung/t2med', 'Rückweg zur Seite T2med');
+    @unlink($env->dir . '/anfragen/verbindungen.json');
     $r = $b->post('/verwaltung/verbindungen', ['aktion' => 'ziel', 'id' => 'steuerbuero', 'name' => 'Steuerbüro', 'art' => 'smb', 'host' => 'nas.example.org', 'freigabe' => 'praxis',
         'ordner' => 'Kienzle', 'benutzer' => 'k', 'passwort' => '']);
     check($r->status === 303 && req_v($env)['daten']['passwort'] === '', 'Ziel speichern über die Seite');

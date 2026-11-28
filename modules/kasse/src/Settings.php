@@ -8,7 +8,7 @@ namespace KienzleKasse;
  */
 final class Settings {
     /** Fehlt der T2med-API-Schlüssel, gibt es keinen Ersatz (der Schlüssel gehört der Praxis und steht nie im Quelltext). */
-    public const T2MED_OHNE_SCHLUESSEL = 'Kein T2med-API-Schlüssel eingetragen. Bitte unter Praxis → Verbindungen → T2med von Praxisherz den API-Schlüssel der Praxis eintragen.';
+    public const T2MED_OHNE_SCHLUESSEL = 'Kein T2med-API-Schlüssel eingetragen. Bitte unter Praxis → T2med von Praxisherz den API-Schlüssel der Praxis eintragen.';
     private const ROW = 'config_overrides';
 
     /** Felder je Abschnitt: Typ, Beschriftung, Auswahl, Hilfetext. */
@@ -26,7 +26,7 @@ final class Settings {
         ]],
         'fhir' => ['label' => 'T2med-Anbindung', 'fields' => [
             'mode' => ['type' => 'choice', 'label' => 'Anbindung', 'choices' => ['mock' => 'Testmodus (Testpatient, keine Akteneinträge)', 'live' => 'Live (echte Patientenakte)'],
-                'help' => 'Adresse, Schlüssel und Zertifikat von T2med stehen zentral unter Praxis → Verbindungen → T2med von Praxisherz.'],
+                'help' => 'Adresse, Schlüssel und Zertifikat von T2med stehen zentral unter Praxis → T2med von Praxisherz.'],
             'entry_code' => ['type' => 'string', 'label' => 'Aktenkürzel', 'default' => 'ZAHLUNG'],
         ]],
         'practice' => ['label' => 'Belege (Praxisname und Anschrift: Praxis → Praxis von Praxisherz)', 'fields' => [
@@ -172,7 +172,7 @@ final class Settings {
             if ($values[$key] === null) unset($values[$key]);
         }
         if ($section === 'fhir' && ($values['mode'] ?? '') === 'live' && !Suite::connected('t2med')) {
-            throw new Problem('Für den Live-Betrieb zuerst unter Praxis → Verbindungen die T2med-Verbindung einrichten.', 422);
+            throw new Problem('Für den Live-Betrieb zuerst unter Praxis → T2med die T2med-Verbindung einrichten.', 422);
         }
         if ($section === 'fhir' && ($values['mode'] ?? '') === 'live' && (string)(Suite::modul()->verbindung('t2med')['api_key'] ?? '') === '') throw new Problem(self::T2MED_OHNE_SCHLUESSEL, 422);
         if ($section === 'mail' && ($values['enabled'] ?? false) && !Suite::connected('mail')) {
