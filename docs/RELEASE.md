@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.52
+
+- Prüfung auf GitHub: Der Testlauf im Ubuntu-26.04-Container brach seit dem Test der Start-ISO ab („No module named 'yaml'“). Das Paket `python3-yaml` steht jetzt in der Paketliste beider Testläufe. Am Programm selbst ändert sich nichts.
+- Lokal mit allen Tests geprüft; ob der Container-Lauf auf GitHub grün wird, zeigt der nächste Lauf.
+
 ## 0.22.0-beta.51
 
 - Bildschirmfotos: Die Seiten der Basis (Start, Benutzer, Gruppen, Einrichtung, Starter) zeigen jetzt auch das Modul Homepage im Menü und bei den Rechten (`scripts/bildschirmfotos.php`); Bilder neu erzeugt.
