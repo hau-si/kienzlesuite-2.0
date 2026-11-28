@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.43
+
+- Neu veröffentlicht nach dem Bereinigen der Git-Geschichte (gleicher Inhalt wie die vorige Vorabversion). Die vorigen Vorabversionen bitte auf GitHub löschen.
+
 ## 0.22.0-beta.42
 
 - Neue Verbindung **Übersetzung (DeepL)** unter Verwaltung → Verbindungen: Schlüssel der DeepL API Free (endet auf „:fx“) oder Pro, „Schlüssel prüfen“ zeigt die genutzten Zeichen des Monats. Module melden sie mit `[[connections]] id = "uebersetzung"` an (zuerst die Signatur für Sprachfassungen von Vorlagen). Mit Tests geprüft, nicht mit DeepL und nicht auf der VM.

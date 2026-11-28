@@ -1,5 +1,9 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.65
+
+- Neu veröffentlicht nach dem Bereinigen der Git-Geschichte (gleicher Inhalt wie die vorige Vorabversion). Die vorigen Vorabversionen bitte auf GitHub löschen.
+
 ## 2.3.4-beta.64
 
 - Ablage aus Signatur: Enthält der Auftrag einen Akteneintrag (Text und Kürzel aus der Signaturvorlage), schreibt die Kasse ihn nach dem PDF als Freitext in die T2med-Akte. Scheitert nur der Eintrag, meldet sie einen Hinweis; das PDF bleibt abgelegt. Mit Tests geprüft, nicht mit T2med.

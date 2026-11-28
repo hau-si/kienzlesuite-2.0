@@ -1,5 +1,9 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.49
+
+- Neu veröffentlicht nach dem Bereinigen der Git-Geschichte (gleicher Inhalt wie die vorige Vorabversion). Die vorigen Vorabversionen bitte auf GitHub löschen.
+
 ## 0.1.0-beta.48
 
 - **Kleinere PDFs in Fremdsprachen:** Statt der ganzen Schrift (etwa 0,7 MB) wird nur noch der Ausschnitt mit den benutzten Zeichen eingebettet (meist unter 30 KB). Dafür kommt das Paket `python3-fonttools` dazu (wird mit dem Modul installiert); fehlt es, wird wie bisher die ganze Schrift eingebettet.
