@@ -181,10 +181,18 @@ function test_verwaltung_braucht_bestaetigung_und_csrf(): void {
     check($b->get('/verwaltung/benutzer')->status === 200, 'Verwaltung direkt nach Anmeldung nicht erreichbar');
     $page = $b->get('/verwaltung/benutzer')->body;
     check(str_contains($page, 'Gruppen</h2>') && str_contains($page, 'Benutzer</h2>'), 'Benutzer und Gruppen nicht auf einer Seite');
-    check(str_contains($b->get('/verwaltung/praxis')->body, 'Kontodaten für Überweisungen'), 'Seite Praxis fehlt');
+    // Entwurf C: Benutzerliste, Gruppen als Kacheln darunter, „Benutzer anlegen“ und „Gruppe hinzufügen“ oben rechts.
+    check(str_contains($page, 'class="benutzer-zeile" href="/verwaltung/benutzer/') && str_contains($page, 'class="card gruppen-kachel" href="/verwaltung/gruppen?name=MFA"')
+        && str_contains($page, 'href="/verwaltung/benutzer/neu">') && str_contains($page, 'href="/verwaltung/gruppen?neu=1">'), 'Benutzer und Gruppen: Liste, Kacheln oder Knöpfe oben fehlen');
+    $g1 = $b->get('/verwaltung/gruppen?name=MFA')->body;
+    check(str_contains($g1, ' MFA</h2>') && !str_contains($g1, ' Arzt</h2>') && !str_contains($g1, 'Neue Gruppe</h2>'), 'Einzelne Gruppe');
+    $g2 = $b->get('/verwaltung/gruppen?neu=1')->body;
+    check(str_contains($g2, 'Neue Gruppe</h2>') && !str_contains($g2, ' MFA</h2>'), 'Gruppe hinzufügen');
+    check(str_contains($b->get('/verwaltung/praxis?bereich=konto')->body, 'Kontodaten für Überweisungen'), 'Seite Praxis fehlt');
+    check(str_contains($b->get('/verwaltung/praxis')->body, 'href="/verwaltung/praxis?bereich=konto"') && str_contains($b->get('/verwaltung/praxis')->body, 'href="/verwaltung/praxis" aria-current="page"'), 'Praxis: Reiter fehlen');
     check($b->post('/verwaltung/praxis', ['aktion' => 'konto', 'holder' => 'Praxis Beispiel', 'iban' => 'DE02 1203 0000 0000 2020 52'])->status === 422, 'falsche IBAN angenommen');
-    check($b->post('/verwaltung/praxis', ['aktion' => 'konto', 'holder' => 'Praxis Beispiel', 'iban' => 'DE02 1203 0000 0000 2020 51'])->status === 200 && str_contains($b->get('/verwaltung/praxis')->body, 'DE02 1203 0000 0000 2020 51'), 'Kontodaten nicht gespeichert');
-    check($b->post('/verwaltung/praxis', ['aktion' => 'steuer', 'tax_id' => '12/345/67890', 'small_business' => '1'])->status === 200 && str_contains($b->get('/verwaltung/praxis')->body, '12/345/67890'), 'Steuerangaben nicht gespeichert');
+    check($b->post('/verwaltung/praxis', ['aktion' => 'konto', 'holder' => 'Praxis Beispiel', 'iban' => 'DE02 1203 0000 0000 2020 51'])->status === 200 && str_contains($b->get('/verwaltung/praxis?bereich=konto')->body, 'DE02 1203 0000 0000 2020 51'), 'Kontodaten nicht gespeichert');
+    check($b->post('/verwaltung/praxis', ['aktion' => 'steuer', 'tax_id' => '12/345/67890', 'small_business' => '1'])->status === 200 && str_contains($b->get('/verwaltung/praxis?bereich=steuer')->body, '12/345/67890'), 'Steuerangaben nicht gespeichert');
     check(Connections::phone('0151 123 456 78') === '+4915112345678' && Connections::phone('0049 151 12345678') === '+4915112345678' && Connections::phone('+43 660 1234567') === '+436601234567', 'Handynummer nicht normalisiert');
     try { Connections::phone('12345'); check(false, 'zu kurze Nummer angenommen'); } catch (\Kienzle\Core\Problem $e) { }
     $fake = ['token_hash' => 'sms-test'];
@@ -220,7 +228,7 @@ function test_verwaltung_braucht_bestaetigung_und_csrf(): void {
     $b->post('/verwaltung/einrichtung', ['aktion' => 'ignorieren', 'punkt' => $mi[1], 'an' => '0']);
     preg_match('/(\\d+) von (\\d+) nötigen/', $b->get('/')->body, $c2);
     check($c2[2] === $c0[2], 'Wieder beachten wirkt nicht');
-    $prax = $b->get('/verwaltung/praxis')->body;
+    $prax = $b->get('/verwaltung/praxis')->body . $b->get('/verwaltung/praxis?bereich=konto')->body;
     check(str_contains($prax, 'class="h-ico"') && str_contains($prax, 'Anschrift <span class="tag opt">nicht ausgefüllt</span>') && str_contains($prax, 'Kontodaten für Überweisungen <span class="tag ok">✓ ausgefüllt</span>'), 'Praxis und Daten: Symbole oder Statusschilder fehlen');
     check(str_contains($b->get('/konto')->body, 'Authenticator-App</h2><span class="tag ok fold-status">eingerichtet</span>'), 'Konto: Statusschild der Authenticator-App fehlt');
     // Sicherheit (Entwurf A): Reiter Firewall | Zugang | Passwörter | Protokoll, je Reiter ein Bereich.

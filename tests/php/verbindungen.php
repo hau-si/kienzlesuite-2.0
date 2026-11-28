@@ -8,6 +8,13 @@ require __DIR__ . '/verbindungen_hilfe.php';
 
 use Kienzle\Core\Connections;
 
+/** Seit Basis beta.61 zeigt /verwaltung/verbindungen Kacheln; jede Verbindung steht unter ?v=… . Für die Prüfungen alles zusammen. */
+function verb_alle(Browser $b): string {
+    $o = $b->get('/verwaltung/verbindungen')->body;
+    foreach (['mail', 'sms', 'letterxpress', 'uebersetzung', 'ablage', 'nutzung'] as $v) $o .= $b->get('/verwaltung/verbindungen?v=' . $v)->body;
+    return $o;
+}
+
 function test_anfragen(): void {
     [$env, $c] = con_env();
     $c->saveT2med(['base_url' => ' https://t2med.example.org:16567/fhir ', 'launch_urls' => "https://a.example.org/x\n\n", 'api_key' => '', 'pin' => false]);
@@ -45,10 +52,13 @@ function test_seite(): void {
     [$b] = admin_browser($env);
     $b->web = fn() => $b->defaultWeb(null, null, $c);
     $p = $b->get('/verwaltung/verbindungen');
+    check(str_contains($p->body, 'class="card verb-kachel" href="/verwaltung/verbindungen?v=mail"') && str_contains($p->body, 'href="/verwaltung/verbindungen?v=ablage"') && !str_contains($p->body, 'name="host"'), 'Verbindungen als Kacheln');
+    check(str_contains($b->get('/verwaltung/verbindungen?v=mail')->body, 'name="host"') && str_contains($b->get('/verwaltung/verbindungen?v=mail')->body, 'Alle Verbindungen</a>'), 'Verbindung öffnet sich allein');
+    $p->body = verb_alle($b);
     check($p->status === 200 && !str_contains($p->body, 'name="base_url"') && str_contains($p->body, 'href="/verwaltung/t2med"'), 'Verbindungen: T2med steht jetzt unter Praxis → T2med');
     check(!str_contains($p->body, '<script>') && !str_contains($p->body, 'Steuer<b>') && str_contains($p->body, 'Steuer&lt;b&gt;büro'), 'Inhalte nicht maskiert');
     check(str_contains($p->body, 'Patient lesen') && str_contains($p->body, 'ssh-ed25519 AAAATEST'), 'Nutzung oder SFTP-Schlüssel fehlen');
-    check(str_contains($p->body, '<details class="fold"><summary><h2><svg class="h-ico"'), 'Verbindungen: Abschnitte nicht einklappbar oder ohne Symbol');
+    check(str_contains($p->body, '<section class="card"><h2><svg class="h-ico"'), 'Verbindungen: gewählte Verbindung ohne Karte oder Symbol');
     // Praxis → T2med: Reiter FHIR-Verbindung, GDT, Funktionsleiste
     $p = $b->get('/verwaltung/t2med');
     check($p->status === 200 && str_contains($p->body, 'class="basis-reiter"') && substr_count($p->body, 'class="button ') === 3, 'T2med: Reiterleiste fehlt');
@@ -140,7 +150,7 @@ function test_letterxpress(): void {
     [$env, $c] = con_env(['letterxpress' => ['username' => 'praxis-test', 'modus' => 'live', 'schluessel_gesetzt' => true]]);
     [$b] = admin_browser($env);
     $b->web = fn() => $b->defaultWeb(null, null, $c);
-    $page = $b->get('/verwaltung/verbindungen')->body;
+    $page = verb_alle($b);
     check(str_contains($page, 'Letterxpress (Briefversand)') && str_contains($page, 'value="praxis-test"') && str_contains($page, 'gespeichert – leer lassen') && str_contains($page, 'Zugang prüfen')
         && str_contains($page, '<option value="live" selected>'), 'Letterxpress-Abschnitt unvollständig');
     $r = $b->post('/verwaltung/verbindungen', ['aktion' => 'letterxpress', 'username' => ' praxis-test ', 'api_key' => ' lxp-1 ', 'modus' => 'live']);
@@ -155,7 +165,7 @@ function test_letterxpress(): void {
     [$env2, $c2] = con_env(['letterxpress' => ['username' => 'praxis-test', 'modus' => 'test', 'schluessel_gesetzt' => true], 'guthaben' => ['letterxpress' => ['wert' => 12.5, 'zeit' => time()]]]);
     [$b2] = admin_browser($env2);
     $b2->web = fn() => $b2->defaultWeb(null, null, $c2);
-    $page2 = $b2->get('/verwaltung/verbindungen')->body;
+    $page2 = verb_alle($b2);
     check(str_contains($page2, '<strong>12,50 €</strong>') && str_contains($page2, '(abgefragt ') && str_contains($page2, '<span class="tag warn">Testbetrieb</span>'), 'Guthaben mit Zeit oder gelbes Testbetrieb-Schild fehlt');
 }
 
@@ -163,7 +173,7 @@ function test_uebersetzung(): void {
     [$env, $c] = con_env(['uebersetzung' => ['anbieter' => 'deepl', 'gratis' => true, 'schluessel_gesetzt' => true]]);
     [$b] = admin_browser($env);
     $b->web = fn() => $b->defaultWeb(null, null, $c);
-    $page = $b->get('/verwaltung/verbindungen')->body;
+    $page = verb_alle($b);
     check(str_contains($page, 'Übersetzung (DeepL)') && str_contains($page, 'DeepL API Free') && str_contains($page, 'gespeichert – leer lassen') && str_contains($page, 'Schlüssel prüfen'), 'DeepL-Abschnitt unvollständig');
     $r = $b->post('/verwaltung/verbindungen', ['aktion' => 'uebersetzung', 'api_key' => ' 0000-beispiel:fx ']);
     check($r->status === 303 && req_v($env) === ['action' => 'uebersetzung', 'daten' => ['api_key' => '0000-beispiel:fx']], 'DeepL: Speicher-Anfrage falsch');
@@ -180,7 +190,7 @@ function test_gmail(): void {
     $r = $b->post('/verwaltung/verbindungen', ['aktion' => 'gmail-start', 'client_id' => 'kurz', 'absender' => 'praxis@gmail.example']);
     check($r->status === 422, 'Ungültige Client-ID angenommen');
     $b->post('/verwaltung/verbindungen', ['aktion' => 'gmail-start', 'client_id' => '1234567890-abc.apps.googleusercontent.com', 'absender' => 'praxis@gmail.example']);
-    $page = $b->get('/verwaltung/verbindungen')->body;
+    $page = verb_alle($b);
     check(preg_match('#href="(https://accounts\.google\.com/o/oauth2/v2/auth\?[^"]+)"#', $page, $m) === 1, 'Anmelde-Link fehlt');
     $url = html_entity_decode($m[1]);
     parse_str((string)parse_url($url, PHP_URL_QUERY), $q);
@@ -189,11 +199,11 @@ function test_gmail(): void {
     check($r->status === 422 && !file_exists($env->dir . '/anfragen/verbindungen.json'), 'Falscher Zustandswert angenommen');
     $r = $b->post('/verwaltung/verbindungen', ['aktion' => 'gmail', 'client_secret' => 'GOCSPX-geheim', 'adresse' => 'http://localhost/?state=' . $q['state'] . '&code=4%2Fabc&scope=x']);
     check($r->status === 303 && req_v($env) === ['action' => 'gmail', 'daten' => ['client_id' => '1234567890-abc.apps.googleusercontent.com', 'client_secret' => 'GOCSPX-geheim', 'absender' => 'praxis@gmail.example', 'code' => '4/abc']], 'Gmail-Anfrage falsch');
-    check(!str_contains($b->get('/verwaltung/verbindungen')->body, 'accounts.google.com'), 'Anmeldung nach Abschluss noch offen');
+    check(!str_contains(verb_alle($b), 'accounts.google.com'), 'Anmeldung nach Abschluss noch offen');
     [$env2, $c2] = con_env(['mail' => ['art' => 'gmail', 'client_id' => '1234567890-abc.apps.googleusercontent.com', 'absender' => 'praxis@gmail.example', 'secret_gesetzt' => true, 'verbunden' => true]]);
     [$b2] = admin_browser($env2);
     $b2->web = fn() => $b2->defaultWeb(null, null, $c2);
-    $page2 = $b2->get('/verwaltung/verbindungen')->body;
+    $page2 = verb_alle($b2);
     check(str_contains($page2, 'status-ok">Mit Google verbunden: praxis@gmail.example') && str_contains($page2, 'Gmail-Konto (OAuth, ohne Passwort im Klartext) <span class="tag ok">✓ eingerichtet</span>') && str_contains($page2, 'Erneut einrichten oder anderes Konto verbinden') && !str_contains($page2, 'GOCSPX'), 'Gmail-Status falsch');
 }
 
@@ -201,7 +211,7 @@ function test_testnachricht(): void {
     [$env, $c] = con_env(['mail' => ['host' => 'smtp.example.org', 'port' => 587, 'sicherheit' => 'starttls', 'benutzer' => 'p@example.org', 'absender' => 'p@example.org', 'passwort_gesetzt' => true]]);
     [$b] = admin_browser($env);
     $b->web = fn() => $b->defaultWeb(null, null, $c);
-    check(str_contains($b->get('/verwaltung/verbindungen')->body, 'Testnachricht senden'), 'Testnachricht fehlt');
+    check(str_contains(verb_alle($b), 'Testnachricht senden'), 'Testnachricht fehlt');
     $r = $b->post('/verwaltung/verbindungen', ['aktion' => 'testmail', 'an' => 'it@example.org']);
     check($r->status === 303 && req_v($env) === ['action' => 'pruefen', 'art' => 'testmail', 'an' => 'it@example.org'], 'Testnachricht-Anfrage');
     $page = $b->post('/verwaltung/verbindungen', ['aktion' => 'testmail', 'an' => 'kein-mail']);

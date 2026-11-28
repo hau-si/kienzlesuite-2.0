@@ -138,7 +138,7 @@ c "https://$host/hilfe/arbeitsplatz" | grep -- "$(openssl x509 -in /etc/kienzle/
 for p in firewall updates verbindungen t2med sicherung einrichtung drucker sso module; do
   if c -b "$T/dora" "https://$host/verwaltung/$p" | grep -- 'Bitte den Installer ausführen' >/dev/null; then fail "Seite $p sieht ihren Dienst nicht"; fi
 done
-c -b "$T/dora" "https://$host/verwaltung/verbindungen" | grep -- 'ssh-ed25519 ' >/dev/null || fail 'Verbindungsseite zeigt den SSH-Schlüssel nicht (Status unlesbar)'
+c -b "$T/dora" "https://$host/verwaltung/verbindungen?v=ablage" | grep -- 'ssh-ed25519 ' >/dev/null || fail 'Verbindungsseite zeigt den SSH-Schlüssel nicht (Status unlesbar)'
 runuser -u ks-core -- php -d open_basedir="$(sed -n 's/^php_admin_value\[open_basedir\] = //p' /etc/kienzle/core/php-fpm.conf)" -r 'exit(is_executable("/usr/bin/qrencode") ? 0 : 1);' \
   || fail 'qrencode unter open_basedir nicht erreichbar (QR-Code für OTP)'
 

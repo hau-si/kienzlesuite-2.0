@@ -295,6 +295,19 @@ final class Web {
         $druckerBlock = $drucker !== '' ? '<div id="drucker">' . $drucker . '</div>' : '';
         $von = '<h2 id="hand">Von Hand einrichten (falls das Paket nicht klappt)</h2>' . $zertifikat . $druckerBlock;
         if ($paket === '') $namen = str_replace('2. Den Namen', '1. Den Namen', $namen);
+        $istAdmin = ($this->session['stage'] ?? '') === 'full' && (int)($this->session['user_admin'] ?? 0) === 1;
+        if ($istAdmin) {
+            // Entwurf B (28.11.2026): Liste der Arbeitsplätze zuerst, Einrichtung eingeklappt darunter; „Arbeitsplatz einrichten“ oben rechts.
+            $auf = ($this->req?->query['einrichten'] ?? '') === '1' || $error !== null || $notice !== null;
+            $fold = fn(string $id, string $titel, string $inhalt, bool $offen = false) => '<details class="fold" id="' . $id . '"' . ($offen ? ' open' : '') . '><summary><h2>' . V::h($titel) . '</h2></summary>' . $inhalt . '</details>';
+            $body = ($this->starter !== null ? $this->arbeitsplatzListe() : '')
+                . ($paket !== '' ? $fold('paket', '1. Paket für jeden Arbeitsplatz (Starter, Zertifikat, Drucker)', (string)preg_replace('#^<h2 id="paket">[^<]*</h2>#', '', $paket), $auf) : '')
+                . $fold('name', ($paket !== '' ? '2.' : '1.') . ' Namen von Praxisherz bekannt machen (immer nötig)', (string)preg_replace('#^<h2 id="name">[^<]*</h2>#', '', $namen), $auf && $paket === '')
+                . $fold('hand', 'Von Hand einrichten (falls das Paket nicht klappt)', $zertifikat . $druckerBlock)
+                . str_replace('class="lead"', 'class="muted"', $lead);
+            $werkzeuge = '<a class="button mit-icon" href="/hilfe/arbeitsplatz?einrichten=1#paket">' . V::icon('st:plus') . 'Arbeitsplatz einrichten</a>';
+            return Response::html(V::page('Arbeitsplätze', $body, $this->nav(), $this->config->practice, 'Praxis', ['werkzeuge' => $werkzeuge]));
+        }
         $body = $lead . $paket . $namen . $von;
         return Response::html(V::page('Arbeitsplätze einrichten', $body, $this->nav(), $this->config->practice, 'Praxis'));
     }
@@ -386,28 +399,39 @@ final class Web {
         return $out;
     }
 
-    private function practicePage(?string $error = null, ?string $notice = null): Response {
+    /** Praxis (Entwurf A, 28.11.2026): Reiter Name und Anschrift | Konto | Steuer oben rechts (`?bereich=`). */
+    private function practicePage(?string $error = null, ?string $notice = null, ?string $bereich = null): Response {
         $a = $this->address(); $m = $this->master();
+        $bereiche = ['anschrift' => ['Name und Anschrift', '/verwaltung/praxis'], 'konto' => ['Konto', 'st:euro'], 'steuer' => ['Steuer', 'st:liste']];
+        $bereich ??= (string)($this->req?->query['bereich'] ?? '');
+        if (!isset($bereiche[$bereich])) $bereich = 'anschrift';
+        $werkzeuge = '';
+        foreach ($bereiche as $id => [$text, $icon]) $werkzeuge .= V::reiter('/verwaltung/praxis' . ($id === 'anschrift' ? '' : '?bereich=' . $id), $text, $icon, $id === $bereich);
         $form = fn(string $kind, string $fields, string $button) => '<form method="post" action="/verwaltung/praxis">' . V::csrf($this->session['csrf'])
             . '<input type="hidden" name="aktion" value="' . $kind . '">' . $fields . '<button>' . $button . '</button></form>';
-        $body = V::error($error) . V::notice($notice) . '<section class="card"><p class="muted">Diese Angaben gelten für alle Module (Rechnungen, Belege, Überweisungs-QR, Bons). </p>'
-            . '<details class="fold" open><summary><h2>Name der Praxis</h2></summary>' . $form('name',
-                V::input('praxis', 'Name der Praxis (erscheint auf Belegen, Bons und im Kopf von Praxisherz)', 'text', $this->config->practice, 'maxlength="60" placeholder="Praxis Dr. Beispiel"'), 'Name speichern') . '</details>'
-            . '<details class="fold"><summary><h2>Anschrift</h2></summary>' . $form('anschrift',
-                V::input('street', 'Straße und Hausnummer', 'text', $a['street'], 'maxlength="80" autocomplete="street-address"')
-                . V::input('city', 'PLZ und Ort', 'text', $a['city'], 'maxlength="80"')
-                . V::input('contact', 'Kontakt auf dem Beleg (optional, z. B. Telefon)', 'text', $a['contact'], 'maxlength="120"'), 'Anschrift speichern') . '</details>'
-            . '<details class="fold"><summary><h2>Kontodaten für Überweisungen</h2></summary>' . $form('konto',
+        $body = V::error($error) . V::notice($notice);
+        if ($bereich === 'anschrift') {
+            $body .= '<section class="card"><h2>Name der Praxis</h2>' . $form('name',
+                    V::input('praxis', 'Name der Praxis (erscheint auf Belegen, Bons und im Kopf von Praxisherz)', 'text', $this->config->practice, 'maxlength="60" placeholder="Praxis Dr. Beispiel"'), 'Name speichern') . '</section>'
+                . '<section class="card"><h2>Anschrift</h2>' . $form('anschrift',
+                    V::input('street', 'Straße und Hausnummer', 'text', $a['street'], 'maxlength="80" autocomplete="street-address"')
+                    . V::input('city', 'PLZ und Ort', 'text', $a['city'], 'maxlength="80"')
+                    . V::input('contact', 'Kontakt auf dem Beleg (optional, z. B. Telefon)', 'text', $a['contact'], 'maxlength="120"'), 'Anschrift speichern') . '</section>';
+        } elseif ($bereich === 'konto') {
+            $body .= '<section class="card"><h2>Kontodaten für Überweisungen</h2>' . $form('konto',
                 V::input('holder', 'Kontoinhaber', 'text', $m['holder'], 'maxlength="70"')
                 . V::input('iban', 'IBAN', 'text', $m['iban'], 'maxlength="42" autocapitalize="characters"')
                 . V::input('bic', 'BIC (optional)', 'text', $m['bic'], 'maxlength="11"')
-                . V::input('bank_name', 'Bank (optional)', 'text', $m['bank_name'], 'maxlength="100"'), 'Kontodaten speichern') . '</details>'
-            . '<details class="fold"><summary><h2>Steuer</h2></summary>' . $form('steuer',
+                . V::input('bank_name', 'Bank (optional)', 'text', $m['bank_name'], 'maxlength="100"'), 'Kontodaten speichern') . '</section>';
+        } else {
+            $body .= '<section class="card"><h2>Steuer</h2>' . $form('steuer',
                 V::input('tax_id', 'Steuernummer oder USt-IdNr. (steht auf der Rechnung)', 'text', $m['tax_id'], 'maxlength="40"')
-                . V::checkbox('small_business', '1', 'Kleinunternehmerregelung (§ 19 UStG): keine Umsatzsteuer ausweisen', $m['small_business']), 'Steuerangaben speichern') . '</details></section>';
+                . V::checkbox('small_business', '1', 'Kleinunternehmerregelung (§ 19 UStG): keine Umsatzsteuer ausweisen', $m['small_business']), 'Steuerangaben speichern') . '</section>';
+        }
+        $body .= '<p class="muted">Diese Angaben gelten für alle Module (Rechnungen, Belege, Überweisungs-QR, Bons).</p>';
         $filled = fn(bool $ok) => [$ok, 'ausgefüllt', 'nicht ausgefüllt'];
         V::$status = ['Name der Praxis' => [$this->config->practice !== '', 'eingetragen', 'nicht eingetragen'], 'Anschrift' => $filled($a['street'] !== '' && $a['city'] !== ''), 'Kontodaten für Überweisungen' => $filled($m['iban'] !== ''), 'Steuer' => $filled($m['tax_id'] !== '' || $m['small_business'])];
-        return Response::html(V::page('Praxis', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+        return Response::html(V::page('Praxis', $body, $this->nav(), $this->config->practice, null, ['werkzeuge' => $werkzeuge]), $error ? 422 : 200);
     }
 
     private function practiceSave(Request $r, string $admin): Response {
@@ -422,14 +446,14 @@ final class Web {
                 }
                 $this->db->store('praxis.anschrift', json_encode($in, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
                 $this->audit->write($admin, 'praxisanschrift', '');
-                return $this->practicePage(null, 'Anschrift gespeichert.');
+                return $this->practicePage(null, 'Anschrift gespeichert.', 'anschrift');
             }
             if ($kind === 'name') {
                 // Der Name steckt in der Serverkonfiguration (Root-Dienst): Servernamen bleiben unverändert, nur der Praxisname wechselt.
                 $name = trim($r->field('praxis', 200));
                 $this->srv()->save(implode("\n", $this->config->hostnames), $name, false);
                 $this->audit->write($admin, 'praxisname', $name);
-                return $this->practicePage(null, 'Name der Praxis wird übernommen und erscheint gleich überall.');
+                return $this->practicePage(null, 'Name der Praxis wird übernommen und erscheint gleich überall.', 'anschrift');
             }
             if (!in_array($kind, ['konto', 'steuer'], true)) throw new Problem('Unbekannte Aktion.', 400);
             $m = $this->master();
@@ -443,9 +467,9 @@ final class Web {
             $this->db->store('praxis.stammdaten', json_encode($m, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
             $this->audit->write($admin, 'praxisdaten-gespeichert', $kind);
         } catch (Problem $e) {
-            return $this->practicePage($e->getMessage());
+            return $this->practicePage($e->getMessage(), null, $kind === 'name' ? 'anschrift' : $kind);
         }
-        return $this->practicePage(null, $kind === 'konto' ? 'Kontodaten gespeichert.' : 'Steuerangaben gespeichert.');
+        return $this->practicePage(null, $kind === 'konto' ? 'Kontodaten gespeichert.' : 'Steuerangaben gespeichert.', $kind);
     }
 
     private static function validIban(string $iban): bool {
@@ -1343,21 +1367,41 @@ final class Web {
         throw new Problem('Seite nicht gefunden.', 404);
     }
 
+    /** Knöpfe oben rechts auf „Benutzer und Gruppen“ und den Gruppenseiten. */
+    private static function benutzerWerkzeuge(): string {
+        return '<a class="button mit-icon" href="/verwaltung/benutzer/neu">' . V::icon('st:plus') . 'Benutzer anlegen</a>'
+            . '<a class="button secondary mit-icon" href="/verwaltung/gruppen?neu=1">' . V::icon('st:plus') . 'Gruppe hinzufügen</a>';
+    }
+
+    /** Benutzer und Gruppen (Entwurf C, 28.11.2026): Benutzerliste, darunter die Gruppen als Kacheln; Anlegen oben rechts. */
     private function userList(?string $notice = null): Response {
         $rows = '';
         foreach ($this->users->all() as $u) {
             $roles = $u['admin'] ? ['Basis-Admin'] : [];
             foreach ($u['access'] as $m => $a) $roles[] = $this->modules->name($m) . ($a['admin'] ? ' (Admin)' : '');
             $icons = ($u['admin'] ? V::role('Admin') : '') . implode('', array_map([V::class, 'role'], $u['roles']));
-            $rows .= '<tr><td class="nowrap">' . V::avatar($u['display'] ?: $u['login'], $u['roles'], (bool)$u['admin'], true) . ' <a href="/verwaltung/benutzer/' . $u['id'] . '">' . V::h($u['login']) . '</a></td><td class="nowrap">' . V::h($u['display']) . '</td><td>' . $icons . ' ' . V::h(implode(', ', $roles) ?: '–')
-                . '</td><td>' . ($u['active'] ? ($u['password'] ? ($u['otp'] ? 'Passwort + App' : 'Passwort') : 'Einrichtung offen') : 'gesperrt') . '</td></tr>';
+            $gruppen = ($u['admin'] ? '<span class="tag">Basis-Admin</span> ' : '') . implode(' ', array_map(fn($g) => '<span class="tag">' . V::h($g) . '</span>', $u['roles']));
+            $rows .= '<a class="benutzer-zeile" href="/verwaltung/benutzer/' . $u['id'] . '">' . V::avatar($u['display'] ?: $u['login'], $u['roles'], (bool)$u['admin'], true)
+                . '<span><strong>' . V::h($u['login']) . '</strong><small class="muted">' . V::h($u['display']) . '</small></span>'
+                . '<span class="muted bz-zugang">' . $icons . ' ' . V::h(implode(', ', $roles) ?: '–') . '</span><span>' . ($gruppen ?: '<span class="muted">–</span>') . '</span>'
+                . '<span class="muted">' . ($u['active'] ? ($u['password'] ? ($u['otp'] ? 'Passwort + App' : 'Passwort') : '<span class="tag warn">Einrichtung offen</span>') : '<span class="tag err">gesperrt</span>') . '</span>'
+                . '<span class="muted" aria-hidden="true">›</span></a>';
         }
-        $groups = self::stripCards(self::inner($this->groupsPage()));
-        return Response::html(V::page('Benutzer und Gruppen', V::notice($notice) . '<section class="card"><details class="fold" open><summary><h2>Benutzer</h2></summary>'
-            . '<p><a class="button" href="/verwaltung/benutzer/neu">Benutzer anlegen</a></p>'
-            . '<table class="user-table"><tr><th>Anmeldename</th><th>Name</th><th>Zugang</th><th>Anmeldung</th></tr>' . $rows . '</table></details>'
-            . '<details class="fold" id="gruppen"' . (str_contains((string)($this->req?->query['bereich'] ?? ''), 'gruppen') ? ' open' : '') . '><summary><h2>Gruppen</h2></summary>' . $groups . '</details></section>',
-            $this->nav(), $this->config->practice));
+        $kacheln = '';
+        $groups = new Groups($this->db, $this->modules);
+        foreach ($groups->all() as $name => $g) {
+            $mitglieder = $this->users->members($name);
+            $module = [];
+            foreach ($g['admin'] as $mid) $module[$mid] = $this->modules->name($mid) . ' (Admin)';
+            foreach ($g['rechte'] as $r) { $mid = strtok($r, ':'); if ($mid !== 'core' && !isset($module[$mid])) $module[$mid] = $this->modules->name($mid); }
+            $kacheln .= '<a class="card gruppen-kachel" href="/verwaltung/gruppen?name=' . rawurlencode($name) . '"><span class="gk-kopf">' . V::role($name) . '<strong>' . V::h($name) . '</strong></span>'
+                . '<span class="muted">' . count($mitglieder) . ' Mitglied' . (count($mitglieder) === 1 ? '' : 'er') . ($module ? ' · ' . V::h(implode(', ', $module)) : ' · keine Modulrechte') . '</span></a>';
+        }
+        return Response::html(V::page('Benutzer und Gruppen', V::notice($notice)
+            . '<section class="card benutzer-liste"><h2>Benutzer</h2>' . $rows . '</section>'
+            . '<h2 id="gruppen">Gruppen</h2><div class="gruppen-raster">' . $kacheln . '</div>'
+            . '<p class="muted">Gruppen sind dauerhafte Rollen: Jede Änderung an einer Gruppe gilt sofort für alle Mitglieder. Beim Benutzer lassen sich einzelne Rechte abweichend erlauben oder entziehen.</p>',
+            $this->nav(), $this->config->practice, null, ['werkzeuge' => self::benutzerWerkzeuge()]));
     }
 
     private function userNew(?string $error = null): Response {
@@ -1423,7 +1467,7 @@ final class Web {
             . '<p>Anmeldename: <strong>' . V::h($user['login']) . '</strong></p>'
             . V::input('display', 'Name', 'text', $user['display'])
             . '<h2>Rollen</h2><input type="hidden" name="rollen_gesendet" value="1"><div class="rollen">' . $chips . '</div>'
-            . '<p class="muted small">Die Rolle gilt dauerhaft: Ändert sich die <a href="/verwaltung/benutzer?bereich=gruppen">Gruppe</a>, ändern sich die Rechte aller Mitglieder mit. '
+            . '<p class="muted small">Die Rolle gilt dauerhaft: Ändert sich die <a href="/verwaltung/benutzer#gruppen">Gruppe</a>, ändern sich die Rechte aller Mitglieder mit. '
             . '<span class="legende"><span class="punkt blau"></span> von der Rolle &nbsp; <span class="punkt gelb"></span> einzeln geändert</span></p>'
             . V::checkbox('admin', '1', 'Basis-Admin', (int)$user['admin'] === 1) . V::checkbox('active', '1', 'Konto aktiv', (int)$user['active'] === 1)
             . ($modules !== '' ? '<h2>Rechte</h2><p><button type="button" class="secondary" data-reset>Alle Einzeländerungen zurücknehmen (zurück auf Rolle)</button></p>' . $modules : '<p>Es sind noch keine Module installiert.</p>')
@@ -1447,20 +1491,28 @@ final class Web {
         return $out;
     }
 
-    private function groupsPage(?string $error = null, ?string $notice = null): Response {
+    /** Gruppen bearbeiten: `?name=` eine Gruppe, `?neu=1` neue Gruppe, sonst alle. */
+    private function groupsPage(?string $error = null, ?string $notice = null, ?string $nur = null): Response {
         $groups = new Groups($this->db, $this->modules);
-        $body = V::error($error) . V::notice($notice)
-            . '<p>Gruppen sind dauerhafte Rollen: Wer einer Gruppe angehört, hat ihre Rechte, und jede Änderung hier gilt sofort für alle Mitglieder. '
-            . 'Beim Benutzer lassen sich einzelne Rechte abweichend erlauben oder entziehen. Basis-Admins dürfen in allen Modulen ohnehin alles.</p>';
-        foreach ($groups->all() as $name => $g) {
-            $body .= '<form method="post" action="/verwaltung/gruppen" class="box">' . V::csrf($this->session['csrf']) . '<input type="hidden" name="aktion" value="speichern"><input type="hidden" name="name" value="' . V::h($name) . '">'
-                . '<h2>' . V::role($name) . ' ' . V::h($name) . '</h2><p class="muted small">Mitglieder: ' . V::h(implode(', ', $this->users->members($name)) ?: 'keine') . '</p>' . $this->groupBoxes($name, $g) . '<button>Speichern</button></form>'
-                . '<form method="post" action="/verwaltung/gruppen" class="inline">' . V::csrf($this->session['csrf']) . '<input type="hidden" name="aktion" value="zuruecksetzen"><input type="hidden" name="name" value="' . V::h($name) . '">'
-                . '<button class="danger">' . (isset($groups->defaults()[$name]) ? 'Auf Vorgabe zurücksetzen' : 'Gruppe löschen') . '</button></form>';
+        $nur ??= isset($this->req?->query['name']) ? (string)$this->req->query['name'] : null;
+        $neu = ($this->req?->query['neu'] ?? '') === '1' || $nur === '';
+        $body = V::error($error) . V::notice($notice);
+        if (!$neu) {
+            foreach ($groups->all() as $name => $g) {
+                if ($nur !== null && $name !== $nur) continue;
+                $body .= '<section class="card"><form method="post" action="/verwaltung/gruppen">' . V::csrf($this->session['csrf']) . '<input type="hidden" name="aktion" value="speichern"><input type="hidden" name="name" value="' . V::h($name) . '">'
+                    . '<h2>' . V::role($name) . ' ' . V::h($name) . '</h2><p class="muted small">Mitglieder: ' . V::h(implode(', ', $this->users->members($name)) ?: 'keine') . '</p>' . $this->groupBoxes($name, $g) . '<button>Speichern</button></form>'
+                    . '<form method="post" action="/verwaltung/gruppen" class="inline">' . V::csrf($this->session['csrf']) . '<input type="hidden" name="aktion" value="zuruecksetzen"><input type="hidden" name="name" value="' . V::h($name) . '">'
+                    . '<button class="danger">' . (isset($groups->defaults()[$name]) ? 'Auf Vorgabe zurücksetzen' : 'Gruppe löschen') . '</button></form></section>';
+            }
         }
-        $body .= '<h2>Neue Gruppe</h2><form method="post" action="/verwaltung/gruppen" class="box">' . V::csrf($this->session['csrf']) . '<input type="hidden" name="aktion" value="speichern">'
-            . V::input('name', 'Name der Gruppe', 'text', '', 'maxlength="30" required') . $this->groupBoxes('', ['admin' => [], 'rechte' => []]) . '<button>Anlegen</button></form>';
-        return Response::html(V::page('Gruppen', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+        if ($neu || $nur === null) {
+            $body .= '<section class="card" id="neu"><h2>Neue Gruppe</h2><form method="post" action="/verwaltung/gruppen">' . V::csrf($this->session['csrf']) . '<input type="hidden" name="aktion" value="speichern">'
+                . V::input('name', 'Name der Gruppe', 'text', '', 'maxlength="30" required') . $this->groupBoxes('', ['admin' => [], 'rechte' => []]) . '<button>Anlegen</button></form></section>';
+        }
+        $body .= '<p><a href="/verwaltung/benutzer#gruppen">← Zurück zu Benutzer und Gruppen</a></p>';
+        $titel = $neu ? 'Neue Gruppe' : ($nur !== null ? 'Gruppe ' . $nur : 'Gruppen');
+        return Response::html(V::page($titel, $body, $this->nav(), $this->config->practice, 'Benutzer und Gruppen', ['werkzeuge' => self::benutzerWerkzeuge()]), $error ? 422 : 200);
     }
 
     private function groupsAction(Request $r, string $admin): Response {
@@ -1477,10 +1529,10 @@ final class Web {
                 throw new Problem('Unbekannte Aktion.', 422);
             }
         } catch (Problem $e) {
-            return $this->groupsPage($e->getMessage());
+            return $this->groupsPage($e->getMessage(), null, $r->field('aktion', 20) === 'speichern' && (new Groups($this->db, $this->modules))->get($name) === null ? '' : $name);
         }
         $this->flash('Gespeichert.');
-        return Response::redirect('/verwaltung/benutzer?bereich=gruppen');
+        return Response::redirect('/verwaltung/benutzer#gruppen');
     }
 
     private function userSave(Request $r, int $id, string $admin): Response {
@@ -2027,7 +2079,30 @@ final class Web {
         return '<label>' . V::h($label) . $this->tip($tip) . '<input type="' . $type . '" name="' . $name . '" value="' . V::h($value) . '" ' . $extra . '></label>';
     }
 
-    private function connectionsPage(?string $error = null): Response {
+    /** Verbindungen (Entwurf A, 28.11.2026): Kacheln je Verbindung; ein Klick öffnet sie (`?v=`). Titel → [Schlüssel, Symbol, Kurztext]. */
+    private const VERBINDUNGEN = ['E-Mail-Versand' => ['mail', 'st:post', 'Einmalcodes, Benachrichtigungen, Mails der Module'],
+        'SMS (seven.io)' => ['sms', 'st:sms', 'Einmalcodes und Nachrichten an Patienten'],
+        'Letterxpress (Briefversand)' => ['letterxpress', '/verwaltung/drucker', 'Rechnungen und Briefe per Post'],
+        'Übersetzung (DeepL)' => ['uebersetzung', 'st:link', 'Vorlagen in andere Sprachen übersetzen'],
+        'Netzwerkspeicher' => ['ablage', 'st:backup', 'Ablage und Datensicherung auf dem NAS'],
+        'Wer nutzt was' => ['nutzung', 'st:liste', 'Welches Modul welche Verbindung braucht']];
+
+    /** Zu welcher Verbindung eine Aktion gehört (Rückkehr und Fehlermeldung). */
+    private static function verbindungVonAktion(Request $r): string {
+        $a = $r->field('aktion', 30);
+        $teil = in_array($a, ['pruefen', 'entfernen'], true) ? $r->field($a === 'pruefen' ? 'art' : 'was', 20) : $a;
+        return match (true) {
+            in_array($teil, ['mail', 'gmail', 'gmail-start', 'testmail'], true) => 'mail',
+            in_array($teil, ['sms', 'testsms'], true) => 'sms',
+            in_array($teil, ['letterxpress', 'guthaben'], true) => 'letterxpress',
+            $teil === 'uebersetzung' => 'uebersetzung',
+            in_array($teil, ['ziel', 'ziel-loeschen', 'hostkey-holen', 'hostkey-uebernehmen', 'ablage', 'smb', 'sftp'], true) => 'ablage',
+            default => '',
+        };
+    }
+
+    private function connectionsPage(?string $error = null, ?string $auswahl = null): Response {
+        $auswahl ??= (string)($this->req?->query['v'] ?? '');
         $st = $this->con()->status();
         $mail = $st['mail'] ?? [];
         $set = static fn(bool $on) => $on ? 'gespeichert – leer lassen für unverändert' : '';
@@ -2178,12 +2253,29 @@ final class Web {
         $done = ['E-Mail-Versand' => $mail !== null && $mail !== [],
             'SMS (seven.io)' => !empty($st['sms']), 'Letterxpress (Briefversand)' => !empty($st['letterxpress']), 'Übersetzung (DeepL)' => !empty($st['uebersetzung']), 'Netzwerkspeicher' => !empty($st['ablage'])];
         foreach ($done as $title => $ok) V::$status[$title] = [$ok, 'eingerichtet', 'nicht eingerichtet'];
-        $body = preg_replace_callback('#<section><h2>([^<]*)</h2>(.*?)</section>#s', function (array $m) use ($done): string {
+        // Kacheln: jede Verbindung mit Zustand; die gewählte (`?v=`) erscheint allein als Karte.
+        preg_match_all('#<section><h2>([^<]*)</h2>(.*?)</section>#s', $body, $teile, PREG_SET_ORDER);
+        $kopf = (string)preg_replace('#<section><h2>[^<]*</h2>.*?</section>#s', '', $body);
+        $tiles = '<a class="card verb-kachel" href="/verwaltung/t2med"><span class="gk-kopf"><span class="t-ico">' . V::icon('/verwaltung/t2med') . '</span><strong>T2med (FHIR)</strong></span>'
+            . '<span class="muted">Steht unter Praxis → T2med</span></a>';
+        $gewaehlt = '';
+        $werkzeuge = '';
+        foreach ($teile as $m) {
             $title = html_entity_decode($m[1], ENT_QUOTES, 'UTF-8');
-            $open = array_key_exists($title, $done) && !$done[$title] || str_contains($m[2], 'class="error"');
-            return '<section class="card"><details class="fold"' . ($open ? ' open' : '') . '><summary><h2>' . $m[1] . '</h2></summary>' . $m[2] . '</details></section>';
-        }, $body);
-        $response = Response::html(V::page('Verbindungen', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
+            [$key, $icon, $kurz] = self::VERBINDUNGEN[$title] ?? [substr(md5($title), 0, 8), 'st:link', ''];
+            $fehler = str_contains($m[2], 'class="error"');
+            $tag = array_key_exists($title, $done) ? ($fehler ? '<span class="tag err">Fehler</span>' : ($done[$title] ? '<span class="tag ok">✓ eingerichtet</span>' : '<span class="tag opt">nicht eingerichtet</span>')) : '';
+            $tiles .= '<a class="card verb-kachel' . ($fehler ? ' fehler' : '') . '" href="/verwaltung/verbindungen?v=' . $key . '"><span class="gk-kopf"><span class="t-ico">' . V::icon($icon) . '</span><strong>' . $m[1] . '</strong></span>'
+                . '<span class="muted">' . V::h($kurz) . '</span>' . $tag . '</a>';
+            if ($key === $auswahl) $gewaehlt = '<section class="card"><h2>' . $m[1] . '</h2>' . $m[2] . '</section>';
+        }
+        if ($gewaehlt !== '') {
+            $body = (string)preg_replace('#<section class="card"><p>Zugänge, die mehrere Module brauchen.*?</section>#s', '', $kopf) . $gewaehlt;
+            $werkzeuge = '<a class="button secondary mit-icon" href="/verwaltung/verbindungen">' . V::icon('st:liste') . 'Alle Verbindungen</a>';
+        } else {
+            $body = $kopf . '<div class="gruppen-raster verb-raster">' . $tiles . '</div>';
+        }
+        $response = Response::html(V::page('Verbindungen', $body, $this->nav(), $this->config->practice, null, ['werkzeuge' => $werkzeuge !== '' ? $werkzeuge : ' ']), $error ? 422 : 200);
         return $st['pending'] ? $response->with('Refresh', '2') : $response;
     }
 
@@ -2220,11 +2312,12 @@ final class Web {
                 default: throw new Problem('Unbekannte Aktion.', 422);
             }
         } catch (Problem $e) {
-            return $f('zurueck', 10) === 't2med' ? $this->t2medPage($e->getMessage(), 'fhir') : $this->connectionsPage($e->getMessage());
+            return $f('zurueck', 10) === 't2med' ? $this->t2medPage($e->getMessage(), 'fhir') : $this->connectionsPage($e->getMessage(), self::verbindungVonAktion($r));
         }
         $this->audit->write($admin, 'verbindung', $what);
         if ($f('zurueck', 10) !== 'start') $this->flash('Gespeichert.');
-        return Response::redirect(match ($f('zurueck', 10)) { 'start' => '/', 't2med' => '/verwaltung/t2med', default => '/verwaltung/verbindungen' });
+        $v = self::verbindungVonAktion($r);
+        return Response::redirect(match ($f('zurueck', 10)) { 'start' => '/', 't2med' => '/verwaltung/t2med', default => '/verwaltung/verbindungen' . ($v !== '' ? '?v=' . $v : '') });
     }
 
     // ---- T2med (Praxis → T2med): Reiter FHIR, GDT, Funktionsleiste ----------------------------------------------
@@ -2452,7 +2545,6 @@ final class Web {
             if (!$st->hasPrograms($key)) $missing[] = $spec['label'];
         }
         $body .= '</p>' . (!empty($missing) ? '<p class="muted">Für ' . V::h(implode(', ', $missing)) . ' liegen auf dem Server noch keine Starterprogramme; das Paket enthält dann nur die Skripte.</p>' : '');
-        $body .= $this->arbeitsplatzListe();
         $body .= '<h3>Starter-Schlüssel</h3><p class="muted">Ein Schlüssel für alle Module. Er muss nur im Fehlerfall erneuert werden, zum Beispiel wenn ein Paket in falsche Hände geraten ist.</p>'
             . '<details class="box"><summary><strong>Schlüssel erneuern (nur im Fehlerfall)</strong></summary>'
             . '<p class="error">Achtung: Nach dem Erneuern funktionieren alle bisher eingerichteten Arbeitsplätze nicht mehr. Auf jedem Arbeitsplatz muss danach ein neues Paket ausgeführt werden.</p>'
@@ -2564,21 +2656,24 @@ final class Web {
             . '<form method="post" action="/konto/arbeitsplatz">' . $csrf . '<p><label>Arbeitsplatz <select name="platz">' . $opt . '</select></label></p><button>Speichern</button></form>') . '</div>';
     }
 
+    /** Eingerichtete Arbeitsplätze als Liste (Entwurf B): Name, Rechner, Adresse, Stand, Version, „⋯“ mit Umbenennen und Entfernen. */
     private function arbeitsplatzListe(): string {
         $liste = $this->ap()->liste();
-        $o = '<h3 id="plaetze">Eingerichtete Arbeitsplätze</h3>';
-        if (!$liste) return $o . '<p class="muted">Noch keiner. Nach dem Ausführen des Pakets erscheint der PC hier mit seinem Rechnernamen.</p>';
-        $o .= '<table><thead><tr><th>Name</th><th>Rechner</th><th>Stand</th><th>Adresse</th><th>Version</th><th></th></tr></thead><tbody>';
+        if (!$liste) return '<section class="card" id="plaetze"><h2>Eingerichtete Arbeitsplätze</h2><p class="muted">Noch keiner. Oben rechts „Arbeitsplatz einrichten“ wählen; nach dem Ausführen des Pakets erscheint der PC hier mit seinem Rechnernamen.</p></section>';
+        $o = '<section class="card mod-liste" id="plaetze">';
         foreach ($liste as $p) {
             $zuletzt = (int)$p['zuletzt'] > 0 ? date('d.m.Y H:i', (int)$p['zuletzt']) : '–';
-            $o .= '<tr><td><form method="post" action="/verwaltung/arbeitsplaetze" class="inline">' . $this->hidden('platz-umbenennen') . '<input type="hidden" name="id" value="' . V::h($p['id']) . '">'
-                . '<input name="name" value="' . V::h($p['name']) . '" maxlength="40" aria-label="Name"> <button class="small secondary">Umbenennen</button></form></td>'
-                . '<td>' . V::h($p['rechner']) . '</td><td>' . ($p['online'] ? '<span class="tag ok">verbunden</span>' : '<span class="tag warn">zuletzt ' . V::h($zuletzt) . '</span>')
-                . ($p['zustand'] !== '' ? '<div class="muted small">' . V::h($p['zustand']) . '</div>' : '') . '</td><td>' . V::h($p['ip']) . '</td><td>' . V::h($p['version']) . '</td>'
-                . '<td><form method="post" action="/verwaltung/arbeitsplaetze" class="inline">' . $this->hidden('platz-entfernen')
-                . '<input type="hidden" name="id" value="' . V::h($p['id']) . '"><button class="small danger">Entfernen</button></form></td></tr>';
+            $o .= '<div class="mod-zeile platz-zeile"><span class="t-ico">' . V::icon('/hilfe/arbeitsplatz') . '</span><div><p class="mod-name">' . V::h($p['name']) . '</p><p class="muted mod-desc">' . V::h($p['rechner'])
+                . ($p['zustand'] !== '' ? ' · ' . V::h($p['zustand']) : '') . '</p></div><p class="muted mod-ver">' . V::h($p['ip']) . '</p>'
+                . '<span class="mod-zustand">' . ($p['online'] ? '<span class="pkt an"></span><span class="muted">verbunden</span>' : '<span class="pkt"></span><span class="muted">zuletzt ' . V::h($zuletzt) . '</span>') . '</span>'
+                . '<span class="muted mod-desc">Version ' . V::h($p['version'] ?: '–') . '</span>'
+                . '<details class="mod-more"><summary class="icon-btn" title="Mehr" aria-label="Mehr zu ' . V::h($p['name']) . '">' . V::icon('st:mehr') . '</summary><div class="mod-menu">'
+                . '<form method="post" action="/verwaltung/arbeitsplaetze">' . $this->hidden('platz-umbenennen') . '<input type="hidden" name="id" value="' . V::h($p['id']) . '">'
+                . '<label class="muted">Name<input name="name" value="' . V::h($p['name']) . '" maxlength="40"></label><button class="small secondary">Umbenennen</button></form>'
+                . '<form method="post" action="/verwaltung/arbeitsplaetze">' . $this->hidden('platz-entfernen') . '<input type="hidden" name="id" value="' . V::h($p['id']) . '">'
+                . '<button class="mod-item danger-text">' . V::icon('st:papierkorb') . ' Entfernen</button></form></div></details></div>';
         }
-        return $o . '</tbody></table>';
+        return $o . '</section>';
     }
 
     private function starterPage(?string $error = null, ?string $notice = null): Response {

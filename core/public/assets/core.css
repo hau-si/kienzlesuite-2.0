@@ -566,3 +566,23 @@ main.breit > details.fold { margin: 0 0 12px; }
 .basis-reiter a.button { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 7px 14px; }
 .basis-reiter a.button:not(.primary) { background: var(--soft); color: #315f53; }
 .mod-zeile.dienst-zeile { grid-template-columns: 38px minmax(0, 1fr) 200px 200px 0 32px; }
+/* Benutzer und Gruppen (Entwurf C) */
+.card.benutzer-liste { padding-bottom: 8px; }
+a.benutzer-zeile { display: grid; grid-template-columns: 34px minmax(140px, 1fr) minmax(0, 2fr) minmax(120px, auto) 140px 16px; gap: 12px; align-items: center; padding: 10px 6px; border-top: 1px solid #edf0ee; color: inherit; text-decoration: none; border-radius: 8px; }
+a.benutzer-zeile:hover { background: var(--soft); }
+a.benutzer-zeile > span:nth-child(2) { display: grid; }
+a.benutzer-zeile .bz-zugang { font-size: 13px; }
+.gruppen-raster { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin-bottom: 12px; }
+a.card.gruppen-kachel { display: grid; gap: 6px; margin: 0; color: inherit; text-decoration: none; font-size: 13px; }
+a.card.gruppen-kachel:hover { border-color: var(--teal); }
+.gk-kopf { display: flex; gap: 8px; align-items: center; font-size: 15px; }
+@media (max-width: 900px) { a.benutzer-zeile { grid-template-columns: 34px 1fr 16px; } a.benutzer-zeile > span:nth-child(n+3):not(:last-child) { display: none; } }
+/* Verbindungen (Entwurf A): Kacheln */
+a.card.verb-kachel { display: grid; gap: 8px; align-content: start; margin: 0; color: inherit; text-decoration: none; font-size: 13px; }
+a.card.verb-kachel:hover { border-color: var(--teal); }
+a.card.verb-kachel .tag { justify-self: start; }
+a.card.verb-kachel.fehler { border-color: #e7b9ad; }
+.verb-kachel .t-ico { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; background: var(--soft); color: var(--teal); }
+.verb-kachel .t-ico .ico { width: 20px; height: 20px; }
+.mod-zeile.platz-zeile { grid-template-columns: 38px minmax(0, 1fr) 130px 190px 120px 32px; }
+.mod-menu label { display: grid; gap: 4px; }

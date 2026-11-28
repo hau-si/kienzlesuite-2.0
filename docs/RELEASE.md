@@ -1,5 +1,14 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.61
+
+Neues Design, zweiter Teil (Entwürfe vom 28.11.2026):
+- **Praxis → Benutzer und Gruppen (C):** Benutzer als Liste (ganze Zeile öffnet den Benutzer, Gruppen als Marken, gesperrt/Einrichtung offen als Marke), darunter die Gruppen als Kacheln (Mitglieder, Module). Oben rechts „Benutzer anlegen“ und „Gruppe hinzufügen“. Eine Kachel öffnet nur diese Gruppe (`/verwaltung/gruppen?name=`), „Gruppe hinzufügen“ nur das Formular (`?neu=1`); nach dem Speichern zurück zur Liste.
+- **Praxis → Verbindungen (A):** Kacheln je Verbindung mit Zustand (eingerichtet, nicht eingerichtet, Fehler); ein Klick öffnet sie allein (`?v=mail|sms|letterxpress|uebersetzung|ablage|nutzung`), „Alle Verbindungen“ oben rechts führt zurück. Nach dem Speichern bleibt die Verbindung offen. Kachel T2med führt zu Praxis → T2med.
+- **Praxis → Arbeitsplätze (B, für Admins):** zuerst die Liste der eingerichteten PCs (Stand, Adresse, Version, „⋯“ mit Umbenennen und Entfernen), darunter eingeklappt Paket, Namen bekannt machen und „Von Hand einrichten“; „Arbeitsplatz einrichten“ oben rechts klappt das Paket auf. Ohne Anmeldung bleibt die Hilfeseite wie bisher.
+- **Praxis → Praxis (A):** Reiter Name und Anschrift | Konto | Steuer (`?bereich=`).
+- Mit Tests und im Browser der Vorschau (erfundene Daten) geprüft, **nicht auf der VM**.
+
 ## 0.22.0-beta.60
 
 Neues Design für weitere Seiten (Entwürfe vom 28.11.2026, Seitenkopf mit Reitern oben rechts wie bei Module/Updates):

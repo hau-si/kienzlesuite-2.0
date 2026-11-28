@@ -70,6 +70,7 @@ final class View {
         'st:plus' => '<path d="M12 5v14M5 12h14"/>',
         'st:wolke' => '<path d="M7 18h10a4 4 0 000-8 6 6 0 00-11.6 1.5A3.5 3.5 0 007 18z"/>',
         'st:link' => '<path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/>',
+        'st:euro' => '<path d="M17 6a7 7 0 100 12M4 10h9M4 14h9"/>',
         'st:liste' => '<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',
         'st:hoch' => '<path d="M12 19V5M5 12l7-7 7 7"/>',
         'st:herunter' => '<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
@@ -176,7 +177,7 @@ final class View {
         $brand = '<a class="brand" href="/" title="Start"><span class="mark" aria-hidden="true"><svg class="mark-herz" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 57C10 41 5 29 5 20 5 12 11 6 19 6c5 0 10 3 13 8 3-5 8-8 13-8 8 0 14 6 14 14 0 9-5 21-27 37z" fill="#fff"/><path d="M13 31h11l4-8 7 16 4-8h12" fill="none" stroke="#12695d" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>' . (!empty($nav['offenLogo']) ? '<span class="logo-dot" title="Die Einrichtung ist noch nicht abgeschlossen"></span>' : '') . '</span><span><strong>Praxisherz</strong>'
             . '<span class="sub">' . self::h($practice !== '' ? $practice : 'Praxis') . '</span></span></a>';
         $head = '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-            . '<title>' . self::h($title) . ' – Praxisherz</title><link rel="icon" type="image/svg+xml" href="/assets/favicon.svg"><link rel="stylesheet" href="/assets/core.css?v=46"><script src="/assets/core.js?v=8" defer></script><script src="/assets/passwort.js?v=1" defer></script>' . ($extra['kopf'] ?? '') . '</head><body'
+            . '<title>' . self::h($title) . ' – Praxisherz</title><link rel="icon" type="image/svg+xml" href="/assets/favicon.svg"><link rel="stylesheet" href="/assets/core.css?v=47"><script src="/assets/core.js?v=8" defer></script><script src="/assets/passwort.js?v=1" defer></script>' . ($extra['kopf'] ?? '') . '</head><body'
             . (self::$starterMap ? ' data-starter-map="' . self::h((string)json_encode(self::$starterMap)) . '"' : '') . ($extra['body'] ?? '') . '>';
         if (!$nav) {
             return $head . '<div class="solo">' . $brand . '<main><h1>' . self::h($title) . '</h1>' . self::cards($body) . '</main></div></body></html>';

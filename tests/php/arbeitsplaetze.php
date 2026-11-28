@@ -54,6 +54,10 @@ function test_agent(): void {
         && str_contains($setup->body, 'deinstallieren.ps1') && str_contains($setup->body, 'client.json') && str_contains((string)$setup->header('Content-Disposition'), 'Praxisherz-Setup.exe'), 'Setup-Datei');
     $hilfe = $b->get('/hilfe/arbeitsplatz')->body;
     check(str_contains($hilfe, '/verwaltung/arbeitsplaetze/Praxisherz-Setup.exe') && str_contains($hilfe, 'Deinstallieren'), 'Setup auf der Seite angeboten');
+    // Entwurf B: Liste der Arbeitsplätze zuerst, Einrichtung eingeklappt, „Arbeitsplatz einrichten“ oben rechts.
+    check(str_contains($hilfe, 'id="plaetze"') && str_contains($hilfe, '<details class="fold" id="paket">') && str_contains($hilfe, 'href="/hilfe/arbeitsplatz?einrichten=1#paket"')
+        && strpos($hilfe, 'id="plaetze"') < strpos($hilfe, 'id="paket"'), 'Arbeitsplätze: Liste zuerst, Paket eingeklappt');
+    check(str_contains($b->get('/hilfe/arbeitsplatz?einrichten=1')->body, '<details class="fold" id="paket" open>'), 'Arbeitsplatz einrichten klappt das Paket auf');
     check((new Browser($env))->get('/verwaltung/arbeitsplaetze/' . Web::SETUP_DATEI)->status !== 200, 'Setup nur für Admins');
     $k = $st->key();
     check(ap_req($b, 'POST', '/agent/anmelden', ['rechner' => 'EMPFANG-PC'], ['authorization' => 'Bearer falsch'])->status === 401, 'Anmelden mit falschem Schlüssel');
