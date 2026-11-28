@@ -15,7 +15,7 @@ $css = (string)file_get_contents(dirname(__DIR__) . '/core/public/assets/core.cs
 $env = new Env();
 // Alle echten Module aus modules/ (ohne Beispielmodul), damit Menü, Rechte und Einrichtung wie auf einem Server mit allen Modulen aussehen.
 $alle = json_decode((string)shell_exec(escapeshellarg(dirname(__DIR__) . '/core/bin/kienzle-modul-pruefen') . ' --alle --json ' . escapeshellarg(dirname(__DIR__) . '/modules')), true);
-$reihe = ['kasse', 'terminzettel', 'signatur', 'qm', 'telefon', 'fax'];
+$reihe = ['kasse', 'terminzettel', 'signatur', 'qm', 'telefon', 'fax', 'homepage'];
 $echte = array_values(array_filter($alle['modules'] ?? [], fn($m) => in_array($m['module']['id'], $reihe, true)));
 usort($echte, fn($a, $b) => array_search($a['module']['id'], $reihe, true) <=> array_search($b['module']['id'], $reihe, true));
 if (count($echte) === count($reihe)) {
@@ -28,7 +28,7 @@ foreach (array_keys($env->modules->all()) as $id) $env->users->setAccess($annaId
 [$bert] = $env->user('bert'); $env->users->setRoles($bert, ['Arzt']);
 [$clara] = $env->user('clara'); $env->users->setRoles($clara, ['MFA']);
 // Erfundene Zugänge: Arzt alle Module, MFA die Module am Empfang
-foreach (['kasse', 'signatur', 'qm', 'telefon', 'fax', 'terminzettel'] as $id) if ($env->modules->has($id)) $env->users->setAccess($bert, $id, false, $env->modules->rightIds($id));
+foreach (['kasse', 'signatur', 'qm', 'telefon', 'fax', 'terminzettel', 'homepage'] as $id) if ($env->modules->has($id)) $env->users->setAccess($bert, $id, false, $env->modules->rightIds($id));
 foreach (['kasse', 'signatur', 'telefon', 'fax'] as $id) if ($env->modules->has($id)) $env->users->setAccess($clara, $id, false, $env->modules->rightIds($id));
 $env->user('dora');
 

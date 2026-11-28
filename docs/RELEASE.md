@@ -1,5 +1,10 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.51
+
+- Bildschirmfotos: Die Seiten der Basis (Start, Benutzer, Gruppen, Einrichtung, Starter) zeigen jetzt auch das Modul Homepage im Menü und bei den Rechten (`scripts/bildschirmfotos.php`); Bilder neu erzeugt.
+- Nur Bildwerkzeuge und Bilder, keine Änderung am Server. In der lokalen Vorschau erzeugt, nicht auf der VM.
+
 ## 0.22.0-beta.50
 
 - **Alte Verweise aufgeräumt (Wunsch des Nutzers): Der Praxisherz-Agent ist der Hauptweg, Handanleitungen bleiben eingeklappt als Notweg.**
