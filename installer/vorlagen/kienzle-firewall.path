@@ -1,6 +1,6 @@
-# Kienzle-Suite: Firewall-Anfrage des Webinterfaces abarbeiten (Anfragedatei von ks-core).
+# Praxisherz: Firewall-Anfrage des Webinterfaces abarbeiten (Anfragedatei von ks-core).
 [Unit]
-Description=Kienzle-Suite Firewall-Anfragen
+Description=Praxisherz Firewall-Anfragen
 
 [Path]
 PathExists=/var/lib/kienzle/core/anfragen/firewall.json

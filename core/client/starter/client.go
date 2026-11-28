@@ -27,13 +27,13 @@ type Config struct {
 	LauncherKey string            `json:"launcher_key"`
 	CertSHA256  string            `json:"certificate_sha256"`
 	Contexts    map[string]string `json:"kontexte"`
-	// CA ist die Zertifizierungsstelle der Suite (ca.crt neben client.json). Mit ihr bleibt die Verbindung auch nach einem neuen
+	// CA ist die Zertifizierungsstelle von Praxisherz (ca.crt neben client.json). Mit ihr bleibt die Verbindung auch nach einem neuen
 	// Serverzertifikat (z. B. anderer Servername) gültig; der Fingerabdruck oben gilt weiter für ältere Pakete.
 	CA *x509.Certificate `json:"-"`
 }
 
 var (
-	schemeRe = regexp.MustCompile(`^kienzle-[a-z0-9-]{1,30}$`)
+	schemeRe = regexp.MustCompile(`^praxisherz-[a-z0-9-]{1,30}$`)
 	pathRe   = regexp.MustCompile(`^/[A-Za-z0-9._/-]{1,80}$`)
 	keyRe    = regexp.MustCompile(`^[A-Za-z0-9._~+/=-]{16,200}$`)
 )
@@ -87,7 +87,7 @@ type Launch struct {
 
 var contextRe = regexp.MustCompile(`^[A-Za-z0-9._-]{1,128}$`)
 
-// parseLaunch zerlegt kienzle-…://?kontextId=…&fhirBasisUrl=…&oAuthToken=… (Schreibweise der Namen wie in T2med; die
+// parseLaunch zerlegt praxisherz-…://?kontextId=…&fhirBasisUrl=…&oAuthToken=… (Schreibweise der Namen wie in T2med; die
 // Namen context_id usw. gehen auch). Weitere einfache Parameter werden als Extra weitergegeben (höchstens 8).
 func parseLaunch(raw string, cfg *Config) (*Launch, string, error) {
 	u, err := url.Parse(raw)
@@ -138,14 +138,14 @@ func pinnedClient(cfg *Config) *http.Client {
 					return err
 				}
 				if hex.EncodeToString(sum[:]) != cfg.CertSHA256 {
-					// Sonst muss das Zertifikat von der Zertifizierungsstelle der Suite stammen (und nur von ihr).
+					// Sonst muss das Zertifikat von der Zertifizierungsstelle von Praxisherz stammen (und nur von ihr).
 					if cfg.CA == nil {
 						return errors.New("das Zertifikat des Servers stimmt nicht mit dem eingerichteten überein")
 					}
 					pool := x509.NewCertPool()
 					pool.AddCert(cfg.CA)
 					if _, err := cert.Verify(x509.VerifyOptions{Roots: pool, DNSName: host, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}); err != nil {
-						return errors.New("das Zertifikat des Servers stammt nicht von der Zertifizierungsstelle der Suite")
+						return errors.New("das Zertifikat des Servers stammt nicht von der Zertifizierungsstelle von Praxisherz")
 					}
 				}
 				now := time.Now()

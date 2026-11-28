@@ -163,7 +163,7 @@ final class Seite {
     }
 
     /**
-     * Einrichtungs-Überblick für die Suite (docs/MODULE-TOML.md, [setup] overview). Gelesen werden nur die abgelegten Dateien:
+     * Einrichtungs-Überblick für Praxisherz (docs/MODULE-TOML.md, [setup] overview). Gelesen werden nur die abgelegten Dateien:
      * basis.json (Bondrucker, Praxisdaten) und das Druckprotokoll (ein Terminzettel aus T2med ist angekommen).
      * @return list<array{title:string,state:string,hint:string,link:string,optional?:bool}>
      */

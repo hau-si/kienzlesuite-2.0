@@ -26,7 +26,7 @@ final class Fax {
     // ---- Ordner ------------------------------------------------------------------------------------------------
     public static function ordner(string $name): string {
         $map = ['drucker' => self::$data . '/drucker', 'protokoll' => self::$data . '/protokoll', 'fehler' => self::$data . '/fehler',
-            'fehler-original' => self::$data . '/fehler/original', 'eingang' => self::$data . '/eingang'];
+            'fehler-original' => self::$data . '/fehler/original', 'protokoll-original' => self::$data . '/protokoll/original', 'eingang' => self::$data . '/eingang'];
         $d = $map[$name] ?? throw new \InvalidArgumentException('Ordner unbekannt.');
         if (!is_dir($d)) @mkdir($d, 0700, true);
         return $d;
@@ -142,10 +142,11 @@ final class Fax {
         return $n;
     }
 
-    /** Pfad einer Quelldatei (Faxdrucker oder Original eines Sendefehlers), streng geprüft. */
+    /** Pfad einer Quelldatei (Faxdrucker oder Original eines Sendefehlers/erfolgreich gesendeten Faxes), streng geprüft. */
     public static function quellPfad(string $quelle, string $datei): array {
         if (!self::dateiname($datei) || !str_ends_with($datei, '.pdf')) throw new \InvalidArgumentException('Datei ungültig.');
-        $dir = $quelle === 'sendefehler' ? self::ordner('fehler-original') : (in_array($quelle, self::quellen(), true) ? self::ordner('drucker') . '/' . $quelle : null);
+        $dir = $quelle === 'sendefehler' ? self::ordner('fehler-original') : ($quelle === 'sendeprotokoll' ? self::ordner('protokoll-original')
+            : (in_array($quelle, self::quellen(), true) ? self::ordner('drucker') . '/' . $quelle : null));
         if ($dir === null) throw new \InvalidArgumentException('Quelle unbekannt.');
         $pfad = $dir . '/' . $datei;
         if (!is_file($pfad) || is_link($pfad)) throw new \InvalidArgumentException('Datei nicht gefunden: ' . $datei);
@@ -167,7 +168,7 @@ final class Fax {
         $quelle = substr($schluessel, 0, $p);
         $datei = substr($schluessel, $p + 1);
         [$pfad] = self::quellPfad($quelle, $datei);
-        $titel = $quelle === 'sendefehler' ? (string)preg_replace('/(__JOB-.*)?\.pdf$/', '', $datei) : (self::metaTitel($pfad) ?: 'Dokument');
+        $titel = in_array($quelle, ['sendefehler', 'sendeprotokoll'], true) ? (string)preg_replace('/(__JOB-.*)?\.pdf$/', '', $datei) : (self::metaTitel($pfad) ?: 'Dokument');
         return ['pfad' => $pfad, 'quelle' => $quelle, 'datei' => $datei, 'titel' => $titel];
     }
 
@@ -422,7 +423,7 @@ final class Fax {
         if (!self::austauschBereit()) return 0;
         $n = 0;
         $neu = [];
-        foreach (['sendeberichte' => 'protokoll', 'sendefehler/berichte' => 'fehler', 'sendefehler/eingang' => 'fehler-original', 'empfang' => 'eingang'] as $von => $nach) {
+        foreach (['sendeberichte' => 'protokoll', 'sendeberichte/eingang' => 'protokoll-original', 'sendefehler/berichte' => 'fehler', 'sendefehler/eingang' => 'fehler-original', 'empfang' => 'eingang'] as $von => $nach) {
             $dir = self::ax($von);
             // Beim Eingang ist ein Fax erst mit seiner JSON-Datei vollständig (fax-empfangen schreibt sie zuletzt): PDF und JSON als Paar holen.
             $dateien = $von === 'empfang' ? array_merge(...array_map(fn($j) => is_file(substr($j, 0, -5) . '.pdf') ? [substr($j, 0, -5) . '.pdf', $j] : [], glob($dir . '/*.json') ?: []))
@@ -471,7 +472,7 @@ final class Fax {
         $anzahl = count($namen);
         $praxis = trim((string)($k->praxis()['name'] ?? ''));
         $text = ($anzahl === 1 ? 'Ein neues Fax ist eingegangen' : "$anzahl neue Faxe sind eingegangen") . ($seiten > 0 ? " ($seiten " . ($seiten === 1 ? 'Seite' : 'Seiten') . ')' : '') . ".\n\n"
-            . "Öffnen: Kienzle-Suite → Fax → Eingang.\n\nDiese Nachricht enthält aus Datenschutzgründen weder Absender noch Inhalt.\n"
+            . "Öffnen: Praxisherz → Fax → Eingang.\n\nDiese Nachricht enthält aus Datenschutzgründen weder Absender noch Inhalt.\n"
             . ($praxis !== '' ? "\n$praxis\n" : '');
         try {
             $k->mailSenden($an, $anzahl === 1 ? 'Neues Fax eingegangen' : "$anzahl neue Faxe eingegangen", $text);
@@ -503,6 +504,7 @@ final class Fax {
     /** Berichte (Protokoll oder Fehler): je JSON des Workers ein Eintrag, neueste zuerst. */
     public static function berichte(string $art, int $max = 200): array {
         $dir = self::ordner($art === 'fehler' ? 'fehler' : 'protokoll');
+        $originalDir = self::ordner($art === 'fehler' ? 'fehler-original' : 'protokoll-original');
         $out = [];
         foreach (glob($dir . '/*.json') ?: [] as $f) {
             $b = basename($f);
@@ -512,10 +514,12 @@ final class Fax {
             $pdf = substr($b, 0, -5) . ($art === 'fehler' ? '__FAILED.pdf' : '__OK.pdf');
             $ende = (string)($j['finalized_at'] ?? $j['end_time'] ?? $j['created_at'] ?? '');
             $grund = (string)($j['result']['reason'] ?? '');
+            $jobId = (string)($j['job_id'] ?? '');
             $out[] = ['json' => $b, 'pdf' => is_file($dir . '/' . $pdf) ? $pdf : '', 'zeit' => strtotime($ende) ?: (int)filemtime($f),
                 'name' => (string)($j['recipient']['name'] ?? ''), 'nummer' => (string)($j['recipient']['number'] ?? ''),
                 'datei' => (string)($j['source']['filename_original'] ?? ''), 'seiten' => self::seiten($j), 'grund' => $grund,
-                'abgebrochen' => $grund === 'cancelled' || !empty($j['cancel']['requested']), 'versuche' => (int)($j['attempt']['current'] ?? 0)];
+                'abgebrochen' => $grund === 'cancelled' || !empty($j['cancel']['requested']), 'versuche' => (int)($j['attempt']['current'] ?? 0),
+                'original' => self::jobId($jobId) && (bool)glob($originalDir . '/*__' . $jobId . '.pdf')];
         }
         usort($out, fn($a, $b) => $b['zeit'] <=> $a['zeit']);
         return array_slice($out, 0, $max);
@@ -544,6 +548,32 @@ final class Fax {
         rename("$von/$json", "$nach/$json");
         $pdf = substr($json, 0, -5) . '__FAILED.pdf';
         if (is_file("$von/$pdf")) rename("$von/$pdf", "$nach/" . substr($json, 0, -5) . '__OK.pdf');
+    }
+
+    /** Tage, die das Original eines erfolgreich gesendeten Faxes zum erneuten Senden aufbewahrt wird (danach bleibt nur der Bericht). */
+    public const PROTOKOLL_ORIGINAL_TAGE = 7;
+
+    /**
+     * Bericht (Fehlerbericht oder Sendeprotokoll) mit dem damaligen Empfänger und den damaligen Einstellungen erneut senden,
+     * solange das Original noch vorliegt (bei Sendeprotokoll höchstens PROTOKOLL_ORIGINAL_TAGE Tage, siehe aufraeumen()).
+     */
+    public static function berichtErneutSenden(string $art, string $json, string $benutzer): int {
+        if (!self::dateiname($json) || !str_ends_with($json, '.json')) throw new \InvalidArgumentException('Bericht ungültig.');
+        $dir = self::ordner($art === 'fehler' ? 'fehler' : 'protokoll');
+        if (!is_file("$dir/$json")) throw new \InvalidArgumentException('Bericht nicht gefunden.');
+        $j = json_decode((string)file_get_contents("$dir/$json"), true);
+        if (!is_array($j)) throw new \RuntimeException('Bericht nicht lesbar.');
+        $jobId = (string)($j['job_id'] ?? '');
+        if (!self::jobId($jobId)) throw new \RuntimeException('Bericht ohne gültige Auftrags-ID.');
+        $nummer = (string)($j['recipient']['number'] ?? '');
+        if ($nummer === '') throw new \RuntimeException('Bericht ohne Empfängernummer.');
+        $originalDir = self::ordner($art === 'fehler' ? 'fehler-original' : 'protokoll-original');
+        $treffer = glob($originalDir . '/*__' . $jobId . '.pdf') ?: [];
+        if (!$treffer) throw new \RuntimeException('Das Original liegt nicht mehr vor (' . ($art === 'fehler'
+            ? 'vermutlich schon erneut gesendet oder gelöscht' : 'erfolgreich gesendete Faxe werden nach ' . self::PROTOKOLL_ORIGINAL_TAGE . ' Tagen entfernt') . ').');
+        $empfaenger = [['name' => (string)($j['recipient']['name'] ?? ''), 'nummer' => $nummer, 'merken' => false]];
+        return self::senden($art === 'fehler' ? 'sendefehler' : 'sendeprotokoll', [basename($treffer[0])], $empfaenger,
+            (string)($j['options']['resolution'] ?? 'fine'), (bool)($j['options']['ecm'] ?? true), $benutzer);
     }
 
     // ---- Eingang -------------------------------------------------------------------------------------------------
@@ -1121,7 +1151,7 @@ final class Fax {
         $e = self::einstellungen();
         $n = 0;
         $ordner = [[self::ordner('eingang'), $e['eingang_tage']], [self::ordner('protokoll'), $e['protokoll_tage']], [self::ordner('fehler'), $e['protokoll_tage']],
-            [self::ordner('fehler-original'), $e['protokoll_tage']]];
+            [self::ordner('fehler-original'), $e['protokoll_tage']], [self::ordner('protokoll-original'), self::PROTOKOLL_ORIGINAL_TAGE]];
         foreach (glob(self::ordner('drucker') . '/*', GLOB_ONLYDIR) ?: [] as $d) $ordner[] = [$d, $e['drucker_tage']];   // auch Ordner entfernter Drucker
         foreach (glob(self::$data . '/vorschau/*.png') ?: [] as $f) if (filemtime($f) < $jetzt - 86400 && @unlink($f)) $n++;
         foreach (glob(self::$data . '/.zusammen-*.pdf') ?: [] as $f) if (filemtime($f) < $jetzt - 3600) @unlink($f);

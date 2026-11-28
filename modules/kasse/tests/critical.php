@@ -34,11 +34,9 @@ function prepare(App $app, array $v): array {
 final class FakeHttp extends HttpClient {
     public array $calls=[];
     public string $write='success';
-    public bool $conditional=false;
     public bool $startLost=false;
     public bool $wrongAmount=false;
     public bool $paymentFound=true;
-    public bool $existingRecord=false;
     public bool $patientUnavailable=false;
     public ?array $record=null;
     public string $reference='';
@@ -60,8 +58,7 @@ final class FakeHttp extends HttpClient {
             return ['status'=>200,'body'=>['resourceType'=>'Patient','id'=>'patient-1','name'=>[['given'=>['Erika'],'family'=>'Musterfrau']],
                 'gender'=>'female','telecom'=>[['system'=>'email','value'=>'old@example.invalid','use'=>'old','rank'=>1],['system'=>'email','value'=>'second@example.invalid','rank'=>2],['system'=>'email','value'=>'erika@example.invalid','rank'=>1],['system'=>'phone','value'=>'12345']]]];
         }
-        if (str_ends_with($url,'/metadata')) return ['status'=>200,'body'=>['resourceType'=>'CapabilityStatement','rest'=>[['mode'=>'server','resource'=>[['type'=>'Observation','conditionalCreate'=>$this->conditional]]]]]];
-        if (str_contains($url,'/Observation?')) return ['status'=>200,'body'=>['resourceType'=>'Bundle','entry'=>$this->existingRecord && $this->record ? [['resource'=>['id'=>'record-1']+$this->record]] : []]];
+        if (str_ends_with($url,'/metadata') || str_contains($url,'/Observation?')) throw new \RuntimeException('Nicht dokumentierte T2med-Funktion aufgerufen: '.$url);
         if ($method==='POST') {
             $this->record=$body['entry'][0]['resource'];
             if ($this->write==='reject') return ['status'=>422,'body'=>['resourceType'=>'OperationOutcome']];
@@ -268,9 +265,10 @@ try {
     $http->write='reject';check($app->document($v,$p['id'])['doc_status']==='failed','Klare FHIR-Ablehnung nicht wiederholbar');
     $http->write='lost';check($app->document($v,$p['id'])['doc_status']==='unknown','FHIR-Timeout fälschlich klarer Fehler');
     $before=$http->posts('t2med.test');$app->document($v,$p['id']);check($http->posts('t2med.test')===$before,'Unklarer FHIR-POST blind wiederholt');
-    $http->existingRecord=true;check($app->document($v,$p['id'])['doc_status']==='written','Vorhandener FHIR-Eintrag nicht erkannt');
-    check($http->posts('t2med.test')===$before,'Vorhandener FHIR-Eintrag doppelt geschrieben');
-    echo "OK: Verlorene SumUp-Antwort, Betragsabgleich, neutrale Referenz, FHIR-Ablehnung/Timeout/Wiedererkennung.\n";
+    $http->write='success';check($app->document($v,$p['id'],true)['doc_status']==='written','Bestätigte Wiederholung schreibt nicht');
+    check($http->posts('t2med.test')===$before+1,'Bestätigte Wiederholung nicht genau einmal geschrieben');
+    foreach ($http->calls as $call) check(!str_contains($call[1],'/metadata') && !str_contains($call[1],'/Observation?') && !str_contains(json_encode($call[3]),'ifNoneExist'),'Nicht dokumentierte T2med-Funktion');
+    echo "OK: Verlorene SumUp-Antwort, Betragsabgleich, neutrale Referenz, FHIR-Ablehnung/Timeout/bestätigte Wiederholung.\n";
 } finally {
     foreach ($dirs as $dir) {foreach (glob($dir.'/*') as $file) unlink($file); rmdir($dir);}
 }

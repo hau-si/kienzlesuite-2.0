@@ -1,6 +1,6 @@
-# Kienzle-Suite: Angebot an Modulen (mitgeliefert und GitHub) täglich neu ermitteln.
+# Praxisherz: Angebot an Modulen (mitgeliefert und GitHub) täglich neu ermitteln.
 [Unit]
-Description=Kienzle-Suite Module prüfen
+Description=Praxisherz Module prüfen
 After=network-online.target
 Wants=network-online.target
 

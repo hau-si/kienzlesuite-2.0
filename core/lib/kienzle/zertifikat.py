@@ -50,7 +50,7 @@ def split_names(names: list[str]) -> tuple[list[str], list[str]]:
                 dns.append(name)
             continue
         if not any(ip in ipaddress.ip_network(n) for n in (PRIVATE_V4 if ip.version == 4 else PRIVATE_V6)):
-            raise Fehler(f'{ip} ist keine private Adresse; die Suite ist nur im Praxisnetz erreichbar.')
+            raise Fehler(f'{ip} ist keine private Adresse; Praxisherz ist nur im Praxisnetz erreichbar.')
         if str(ip) not in ips:
             ips.append(str(ip))
     if not dns and not ips:
@@ -132,7 +132,7 @@ class Zertifikate:
             keyfile = Path(tmp) / 'ca.key'
             _write_private(keyfile, key)
             crt = _openssl('req', '-x509', '-new', '-key', str(keyfile), '-sha256', '-days', str(CA_DAYS),
-                           '-subj', f'/O=Kienzle-Suite/CN=Kienzle-Suite {practice}', '-config', str(ext), '-extensions', 'v3',
+                           '-subj', f'/O=Praxisherz/CN=Praxisherz {practice}', '-config', str(ext), '-extensions', 'v3',
                            '-set_serial', '0x' + secrets.token_hex(16))
         _write_private(self.ca_key, key)
         _write_public(self.ca_crt, crt)
@@ -151,7 +151,7 @@ class Zertifikate:
             keyfile = Path(tmp) / 'server.key'
             _write_private(keyfile, key)
             csr = Path(tmp) / 'server.csr'
-            csr.write_bytes(_openssl('req', '-new', '-key', str(keyfile), '-subj', f'/O=Kienzle-Suite/CN={cn}'))
+            csr.write_bytes(_openssl('req', '-new', '-key', str(keyfile), '-subj', f'/O=Praxisherz/CN={cn}'))
             ext = Path(tmp) / 'ext.cnf'
             ext.write_text(server_extensions(dns, ips))
             crt = _openssl('x509', '-req', '-in', str(csr), '-CA', str(self.ca_crt), '-CAkey', str(self.ca_key), '-sha256',

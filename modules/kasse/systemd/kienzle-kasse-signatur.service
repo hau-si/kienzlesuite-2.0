@@ -1,0 +1,32 @@
+# Praxisherz, Modul kasse: unterschriebene PDFs aus Signatur in die T2med-Akte schreiben (mit dem T2med-Zugang der Kasse)
+# und das Ergebnis an Signatur zurückmelden. Läuft kurz, ausgelöst von kienzle-kasse-signatur.path.
+[Unit]
+Description=Praxisherz Modul kasse (Unterschriften in T2med ablegen)
+
+[Service]
+Type=oneshot
+User=ks-kasse
+Environment=KIENZLE_DATEN=/var/lib/kienzle/kasse
+Environment=KIENZLE_AUSTAUSCH=/var/spool/kienzle/austausch/kasse_signatur
+ExecStart=/usr/bin/php /opt/kienzle/kasse/current/bin/kienzle-kasse signatur-ablage
+TimeoutStartSec=5min
+UMask=0077
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/kienzle/kasse -/var/spool/kienzle/austausch/kasse_signatur

@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Kienzle-Agent: Anmeldung der PCs, Abholen, Sollzustand, „Akte öffnen“ (GDT), Zuordnung Browser → PC, Seiten. Nur erfundene Daten.
+// Praxisherz-Agent: Anmeldung der PCs, Abholen, Sollzustand, „Akte öffnen“ (GDT), Zuordnung Browser → PC, Seiten. Nur erfundene Daten.
 require __DIR__ . '/lib.php';
 require __DIR__ . '/browser.php';
 
@@ -10,7 +10,7 @@ function st_env(): array {
     $env = new Env();
     $mods = [];
     foreach ($env->modules->all() as $id => $m) {
-        if ($id === 'kasse') $m['starters'] = [['schema' => 'kienzle-kasse', 'label' => 'Kasse']];
+        if ($id === 'kasse') $m['starters'] = [['schema' => 'praxisherz-kasse', 'label' => 'Kasse']];
         $mods[] = $m;
     }
     $env->modules = Modules::fromArray($mods);
@@ -46,8 +46,15 @@ function test_agent(): void {
     [$b] = admin_browser($env); st_web($env, $st, $b);
     Web::$clientDist = $env->dir . '/dist';
     mkdir(Web::$clientDist);
-    file_put_contents(Web::$clientDist . '/kienzle-starter-windows-amd64.exe', 'MZ-Testprogramm');
-    file_put_contents(Web::$clientDist . '/SHA256SUMS', hash('sha256', 'MZ-Testprogramm') . "  kienzle-starter-windows-amd64.exe\n" . str_repeat('a', 64) . "  kienzle-starter-gibtsnicht.exe\n");
+    file_put_contents(Web::$clientDist . '/praxisherz-starter-windows-amd64.exe', 'MZ-Testprogramm');
+    file_put_contents(Web::$clientDist . '/SHA256SUMS', hash('sha256', 'MZ-Testprogramm') . "  praxisherz-starter-windows-amd64.exe\n" . str_repeat('a', 64) . "  praxisherz-starter-gibtsnicht.exe\n");
+    // Selbstentpackendes Setup: Programm + angehängtes Paket mit Einrichtungs- und Deinstallationsskript
+    $setup = $b->get('/verwaltung/arbeitsplaetze/' . Web::SETUP_DATEI);
+    check($setup->status === 200 && str_starts_with($setup->body, 'MZ-Testprogramm' . "PK\x03\x04") && str_contains($setup->body, 'install-windows.ps1')
+        && str_contains($setup->body, 'deinstallieren.ps1') && str_contains($setup->body, 'client.json') && str_contains((string)$setup->header('Content-Disposition'), 'Praxisherz-Setup.exe'), 'Setup-Datei');
+    $hilfe = $b->get('/hilfe/arbeitsplatz')->body;
+    check(str_contains($hilfe, '/verwaltung/arbeitsplaetze/Praxisherz-Setup.exe') && str_contains($hilfe, 'Deinstallieren'), 'Setup auf der Seite angeboten');
+    check((new Browser($env))->get('/verwaltung/arbeitsplaetze/' . Web::SETUP_DATEI)->status !== 200, 'Setup nur für Admins');
     $k = $st->key();
     check(ap_req($b, 'POST', '/agent/anmelden', ['rechner' => 'EMPFANG-PC'], ['authorization' => 'Bearer falsch'])->status === 401, 'Anmelden mit falschem Schlüssel');
     $r = ap_req($b, 'POST', '/agent/anmelden', ['rechner' => 'EMPFANG-PC<script>', 'system' => 'windows'], ['authorization' => 'Bearer ' . $k]);
@@ -57,13 +64,14 @@ function test_agent(): void {
     $auth = ['authorization' => 'Bearer ' . $a['token']];
     check(ap_req($b, 'POST', '/agent/abholen', [], ['authorization' => 'Bearer ' . str_repeat('0', 64)])->status === 401, 'unbekannter Agent');
     $r = json_decode(ap_req($b, 'POST', '/agent/abholen', ['version' => '1.0.0'], $auth)->body, true);
-    check($r['auftraege'] === [] && $r['name'] === 'EMPFANG-PCscript' && isset($r['soll']['kontexte']['kienzle-kasse']), 'erste Abfrage mit Sollzustand');
-    check($r['soll']['programme'] === ['kienzle-starter-windows-amd64.exe' => hash('sha256', 'MZ-Testprogramm')] && $r['soll']['gdt']['ordner'] === 'C:\\Kienzle\\GDT', 'Programme nur mit Datei, GDT-Ordner fest');
-    $r2 = json_decode(ap_req($b, 'POST', '/agent/abholen', ['stand' => $r['stand']], $auth)->body, true);
+    check($r['auftraege'] === [] && $r['name'] === 'EMPFANG-PCscript' && $r['soll']['kontexte'] === ['praxisherz-kasse' => '/starter/kasse'], 'erste Abfrage mit Sollzustand: ' . json_encode($r['soll']['kontexte'] ?? null));
+    check($r['soll']['programme'] === ['praxisherz-starter-windows-amd64.exe' => hash('sha256', 'MZ-Testprogramm')] && $r['soll']['gdt']['ordner'] === 'C:\\Praxisherz\\GDT', 'Programme nur mit Datei, GDT-Ordner fest');
+    $r2 = json_decode(ap_req($b, 'POST', '/agent/abholen', ['version' => '1.0.0', 'stand' => $r['stand']], $auth)->body, true);
     check(!isset($r2['soll']) && $r2['stand'] === $r['stand'], 'Sollzustand nur bei Änderung');
-    $prog = ap_req($b, 'GET', '/agent/programm/kienzle-starter-windows-amd64.exe', [], $auth);
+    $prog = ap_req($b, 'GET', '/agent/programm/praxisherz-starter-windows-amd64.exe', [], $auth);
     check($prog->status === 200 && $prog->body === 'MZ-Testprogramm', 'Programm laden');
-    check(ap_req($b, 'GET', '/agent/programm/kienzle-starter-gibtsnicht.exe', [], $auth)->status === 404 && ap_req($b, 'GET', '/agent/programm/kienzle-starter-windows-amd64.exe')->status === 401, 'Programm nur vorhanden und mit Zugang');
+    check(ap_req($b, 'GET', '/agent/programm/kienzle-starter-windows-amd64.exe', [], $auth)->status === 404, 'früherer Programmname gibt es nicht mehr');
+    check(ap_req($b, 'GET', '/agent/programm/praxisherz-starter-gibtsnicht.exe', [], $auth)->status === 404 && ap_req($b, 'GET', '/agent/programm/praxisherz-starter-windows-amd64.exe')->status === 401, 'Programm nur vorhanden und mit Zugang');
     // Neuinstallation am selben PC: gleicher Eintrag, neuer Zugang
     $a2 = json_decode(ap_req($b, 'POST', '/agent/anmelden', ['rechner' => 'EMPFANG-PC<script>'], ['authorization' => 'Bearer ' . $k])->body, true);
     check($a2['id'] === $a['id'] && $a2['token'] !== $a['token'] && ap_req($b, 'POST', '/agent/abholen', [], $auth)->status === 401, 'Neuinstallation ersetzt den Zugang');

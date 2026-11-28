@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Erklärvideo der Kienzle-Suite aus den Bildschirmfotos (erfundene Daten) bauen.
-Aufruf: python3 scripts/video-bauen.py [Bilderordner, Standard docs/screenshots] [Ausgabedatei, Standard Kienzle-Suite-Ueberblick.mp4] [--probe]
+"""Erklärvideo Praxisherz aus den Bildschirmfotos (erfundene Daten) bauen.
+Aufruf: python3 scripts/video-bauen.py [Bilderordner, Standard docs/screenshots] [Ausgabedatei, Standard Praxisherz-Ueberblick.mp4] [--probe]
 Benötigt Pillow und ffmpeg. Jede Szene ist eine eigene Datei (gleiche Größe, Bildrate, Encoder), zusammengesetzt mit dem concat-Demuxer."""
 import os, subprocess, sys, tempfile
 from pathlib import Path
@@ -15,7 +15,7 @@ FONT = '/usr/share/fonts/opentype/inter/'
 
 # (Bild, Titel, Untertitel, Sekunden)
 SZENEN = [
-    ('@titel', 'Kienzle-Suite', 'Ein Server für die Praxis: Kasse, Terminzettel, Unterschrift. Alle Bilder zeigen erfundene Beispieldaten.', 6),
+    ('@titel', 'Praxisherz', 'Ein Server für die Praxis: Kasse, Terminzettel, Unterschrift, Qualitätsmanagement. Alle Bilder zeigen erfundene Beispieldaten.', 6),
     ('anmelden', 'Eine Anmeldung für alle Module', 'Passwort oder Passkey; Admins zusätzlich mit Code aus der Authenticator-App.', 6),
     ('start', 'Start: Einrichtung und Server-Zustand', 'Was noch zu tun ist, dazu Prozessor, Speicher, Festplatte und Laufzeit des Servers.', 7),
     ('einrichtung', 'Einrichtungs-Überblick', 'Jeder Schritt zeigt, wo er erledigt wird: im Webfenster, am Arbeitsplatz oder im Router.', 8),
@@ -26,15 +26,20 @@ SZENEN = [
     ('weg-der-rechnung', 'Der Weg einer Rechnung', 'Verbindungsklick, Rechnung drucken oder IGeL-Modul: alle Wege enden im Kassieren und, wenn gewünscht, als PDF im Netzwerkordner.', 10),
     ('kasse-igel', 'Kasse: IGeL ohne T2med-Rechnung', 'Leistungen aus der Liste wählen, Name und Geburtsdatum sind optional; die GOÄ-Ziffern kommen aus dem amtlichen Verzeichnis.', 9),
     ('kasse-goae', 'IGeL: Endpreis eintragen, Faktor wird errechnet', 'Ziffer wählen, gewünschten Endbetrag angeben: Die Kasse rechnet den Faktor nach § 5 GOÄ und warnt über dem Schwellenwert.', 10),
-    ('kasse-ablage', 'Kasse: PDF im Netzwerkordner', 'Jede gedruckte oder bezahlte Rechnung landet als PDF im Ordner, zum Beispiel Rechnungen/2026. Fehlende Ordner legt die Suite selbst an.', 8),
+    ('kasse-ablage', 'Kasse: PDF im Netzwerkordner', 'Jede gedruckte oder bezahlte Rechnung landet als PDF im Ordner, zum Beispiel Rechnungen/2026. Fehlende Ordner legt Praxisherz selbst an.', 8),
     ('kasse-einstellungen', 'Kasse: Einstellungen', 'Einrichtung als Ausklappzeilen, Rotes zuerst. Nur Admins sehen Schlüssel und Zugangsdaten.', 7),
     ('terminzettel', 'Terminzettel: groß, lesbar, mit QR-Code', 'Der Zettel aus T2med ist klein und ohne QR-Code. Hier steht er groß auf dem Bondrucker, mit Kalender-QR je Termin.', 10),
     ('signatur-vorgaenge', 'Signatur: Vorgang anlegen', 'IGeL-Vertrag, Aufklärung oder Datenschutz am Unterschriftenpad; der Patient wird aus T2med übernommen.', 8),
     ('signatur-pads', 'Signatur: Unterschriftenpads', 'Ein Pad je Arbeitsplatz als feste Zeile, Pad im Netzwerk suchen und Anleitung für das Servicemenü von Delta und Alpha.', 10),
     ('signatur-software', 'Signatur: Pad-Software von signotec', 'Die Bibliotheken liefern wir nicht mit: ZIP hochladen, danach steht „erledigt“.', 8),
+    ('qm-lesemappe', 'QM: Meine Lesemappe', 'Was mir zur Kenntnis vorgelegt wurde, mit Frist; Überfälliges steht rot. Suche nach Namensschnipseln und Tags.', 8),
+    ('qm-handbuch', 'QM: Handbuch mit Ordnern und Tags', 'Freigabe, Prüffrist und Lesestand je Dokument auf einen Blick; Vorschau rechts.', 8),
+    ('qm-dokument', 'QM: Lesen und bestätigen', 'Neue Fassungen zeigen die Änderungen markiert; die MFA bestätigt „gelesen und verstanden“.', 8),
+    ('qm-editor', 'QM: Einfacher Editor', 'Überschriften, Listen, Checklisten, Tabellen und Bilder. Gültig wird ein Dokument erst durch das Vidieren.', 8),
+    ('qm-import', 'QM: Musterdokumente übernehmen', 'Word-Dateien, zum Beispiel die QEP-Muster der KBV, samt Ordnern als Entwürfe übernehmen.', 7),
     ('updates', 'Updates mit Sicherung und Rücksprung', 'Kanal stabil oder beta, Schnappschuss vor jedem Update und automatischer Rücksprung bei einem Fehler.', 7),
     ('benutzer', 'Benutzer, Gruppen und Rechte', 'Gruppen sind Rollen mit Rechten je Modul. Sensible Funktionen sehen nur Admins.', 7),
-    ('@ende', 'Kienzle-Suite', 'Open Source: Quelltext, Anleitungen und Releases auf GitHub (hau-si/kienzlesuite-2.0).', 6),
+    ('@ende', 'Praxisherz', 'Open Source: Quelltext, Anleitungen und Releases auf GitHub (hau-si/praxisherz).', 6),
 ]
 
 def schrift(name, px): return ImageFont.truetype(FONT + name, px)
@@ -64,7 +69,7 @@ def kopf(titel, untertitel, gross=False):
     d.text((210, 36), titel, font=schrift('Inter-Bold.otf', 52), fill=TITEL + (255,))
     f = schrift('Inter-Regular.otf', 30)
     for i, z in enumerate(umbruch(d, untertitel, f, W - 420)[:2]): d.text((210, 102 + i * 38), z, font=f, fill=TEXT + (255,))
-    d.text((W - 180, H - 25), 'Kienzle-Suite · erfundene Beispieldaten', font=schrift('Inter-Regular.otf', 22), fill=TEXT + (255,), anchor='rm')
+    d.text((W - 180, H - 25), 'Praxisherz · erfundene Beispieldaten', font=schrift('Inter-Regular.otf', 22), fill=TEXT + (255,), anchor='rm')
     return im
 
 def seite(png):
@@ -104,7 +109,7 @@ def szene(i, bild, titel, untertitel, sek, ordner, tmp, ziel):
 
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
-    ordner = Path(args[0] if args else 'docs/screenshots'); ausgabe = Path(args[1] if len(args) > 1 else 'Kienzle-Suite-Ueberblick.mp4')
+    ordner = Path(args[0] if args else 'docs/screenshots'); ausgabe = Path(args[1] if len(args) > 1 else 'Praxisherz-Ueberblick.mp4')
     probe = '--probe' in sys.argv
     with tempfile.TemporaryDirectory() as t, tempfile.TemporaryDirectory() as z:
         tmp, ziel = Path(t), Path(z)

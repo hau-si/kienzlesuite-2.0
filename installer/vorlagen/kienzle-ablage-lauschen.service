@@ -1,6 +1,6 @@
-# Kienzle-Suite: Lauschordner auf dem Netzwerkspeicher prüfen (als ks-ablage, ohne Mount), gestartet vom Timer alle 15 Sekunden.
+# Praxisherz: Lauschordner auf dem Netzwerkspeicher prüfen (als ks-ablage, ohne Mount), gestartet vom Timer alle 15 Sekunden.
 [Unit]
-Description=Kienzle-Suite Netzwerkspeicher (Lauschordner)
+Description=Praxisherz Netzwerkspeicher (Lauschordner)
 After=network-online.target
 
 [Service]

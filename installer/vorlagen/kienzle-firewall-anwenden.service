@@ -1,6 +1,6 @@
-# Kienzle-Suite: Firewall-Anfrage prüfen, Regeln laden, auf Bestätigung warten (sonst Rücksprung).
+# Praxisherz: Firewall-Anfrage prüfen, Regeln laden, auf Bestätigung warten (sonst Rücksprung).
 [Unit]
-Description=Kienzle-Suite Firewall anwenden
+Description=Praxisherz Firewall anwenden
 
 [Service]
 Type=oneshot

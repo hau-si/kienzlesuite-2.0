@@ -79,13 +79,27 @@ class Kokoro(unittest.TestCase):
         t = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, t, True)
         fake = t / 'install.py'
-        fake.write_text('import json, os\nfrom pathlib import Path\nINSTALL_ROOT = Path("/opt/kienzlefon/kokoro")\n'
+        (t / 'model_manifest.json').write_text('{"modell": "test"}')
+        fake.write_text('import json, os\nfrom pathlib import Path\nINSTALL_ROOT = Path("/opt/kienzlefon/kokoro")\nSOURCE = Path(__file__).resolve().parent\n'
                         'def install(config):\n    if os.geteuid() != 0:\n        raise RuntimeError("root")\n'
-                        '    Path(os.environ["ERGEBNIS"]).write_text(json.dumps([str(INSTALL_ROOT), str(config)]))\n')
+                        '    pakete = (SOURCE / "requirements-cpu.lock.txt").read_text()\n'
+                        '    Path(os.environ["ERGEBNIS"]).write_text(json.dumps([str(INSTALL_ROOT), str(config), "transformers==4.57.6" in pakete,'
+                        ' (SOURCE / "model_manifest.json").read_text()]))\n')
         env = {'PATH': '/usr/bin:/bin', 'KIENZLE_DATEN': str(t / 'daten'), 'KIENZLE_KOKORO_INSTALLER': str(fake), 'ERGEBNIS': str(t / 'ergebnis.json')}
         r = subprocess.run([sys.executable, '-B', str(MODUL / 'lib/kokoro-einrichten')], env=env, capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertEqual(json.loads((t / 'ergebnis.json').read_text()), [str(t / 'daten' / 'kokoro'), str(t / 'daten' / 'kienzlefon' / 'kienzlefon.toml')])
+        self.assertEqual(json.loads((t / 'ergebnis.json').read_text()), [str(t / 'daten' / 'kokoro'), str(t / 'daten' / 'kienzlefon' / 'kienzlefon.toml'),
+                                                                         True, '{"modell": "test"}'], 'Paketliste des Moduls, Modellliste von Kienzlefon')
+
+    def test_paketliste(self):
+        """Die Paketliste des Moduls weicht von Kienzlefon nur in den Sicherheitsupdates ab."""
+        def pakete(p):
+            return dict(z.split('==', 1) for z in p.read_text().splitlines() if '==' in z and not z.startswith('#'))
+        alt = pakete(MODUL / 'kienzlefon/scripts/kokoro/requirements-cpu.lock.txt')
+        neu = pakete(MODUL / 'lib/kokoro/requirements-cpu.lock.txt')
+        self.assertEqual(set(alt), set(neu))
+        self.assertEqual({k: v for k, v in neu.items() if alt[k] != v},
+                         {'certifi': '2026.10.18', 'filelock': '4.2.1', 'setuptools': '84.1.0', 'tokenizers': '0.22.2', 'transformers': '4.57.6'})
 
     def test_entfernen(self):
         t = Path(tempfile.mkdtemp())

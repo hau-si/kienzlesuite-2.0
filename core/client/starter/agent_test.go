@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"io"
 	"math/big"
 	"net"
@@ -18,6 +19,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -26,11 +28,16 @@ import (
 
 // Ersatzplattform: merkt sich die Aufrufe.
 type testPlattform struct {
-	mu       sync.Mutex
-	ordner   string
-	schemata int
-	drucker  [][]Drucker
-	ca       int
+	symbol      int
+	alt         []string
+	altAbfragen int
+	entfernt    []string
+	mu          sync.Mutex
+	ordner      string
+	schemata    int
+	drucker     [][]Drucker
+	ca          int
+	fehler      error
 }
 
 func (p *testPlattform) Schemata(map[string]string, string) error {
@@ -43,16 +50,39 @@ func (p *testPlattform) Drucker(l []Drucker) (string, error) {
 	p.mu.Lock()
 	p.drucker = append(p.drucker, l)
 	p.mu.Unlock()
+	if p.fehler != nil {
+		return "", p.fehler
+	}
 	return "Drucker: eingerichtet", nil
 }
+func (p *testPlattform) AlteDrucker([]Drucker) ([]string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.altAbfragen++
+	return p.alt, nil
+}
+func (p *testPlattform) DruckerEntfernen(_ []Drucker, namen []string) (string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.entfernt = append(p.entfernt, namen...)
+	rest := []string{}
+	for _, n := range p.alt {
+		if !enthaelt(namen, n) {
+			rest = append(rest, n)
+		}
+	}
+	p.alt = rest
+	return "Alte Drucker entfernt: " + strings.Join(namen, ", "), nil
+}
 func (p *testPlattform) Zertifizierungsstelle([]byte) error { p.ca++; return nil }
+func (p *testPlattform) Symbol(string) error                { p.symbol++; return nil }
 func (p *testPlattform) GDTOrdner() string                  { return filepath.Join(p.ordner, "gdt") }
 
 // testCA erzeugt eine Zertifizierungsstelle und ein Serverzertifikat für 127.0.0.1.
 func testCA(t *testing.T) (caPEM []byte, server tls.Certificate) {
 	t.Helper()
 	caKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	ca := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "Kienzle-Suite Test-CA"}, NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(time.Hour),
+	ca := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "Praxisherz Test-CA"}, NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(time.Hour),
 		IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign}
 	caDER, _ := x509.CreateCertificate(rand.Reader, ca, ca, &caKey.PublicKey, caKey)
 	caCert, _ := x509.ParseCertificate(caDER)
@@ -71,25 +101,25 @@ func TestVerbindungUeberZertifizierungsstelle(t *testing.T) {
 	srv.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
 	srv.StartTLS()
 	defer srv.Close()
-	cfg := &Config{ServerURL: srv.URL, LauncherKey: "0123456789abcdef0123456789abcdef", CertSHA256: strings.Repeat("0", 64), Contexts: map[string]string{"kienzle-kasse": "/starter/kasse"}}
-	if _, err := run(cfg, "kienzle-kasse://?kontextId=a", nil); err == nil {
+	cfg := &Config{ServerURL: srv.URL, LauncherKey: "0123456789abcdef0123456789abcdef", CertSHA256: strings.Repeat("0", 64), Contexts: map[string]string{"praxisherz-kasse": "/starter/kasse"}}
+	if _, err := run(cfg, "praxisherz-kasse://?kontextId=a", nil); err == nil {
 		t.Fatal("ohne passende CA darf keine Verbindung entstehen")
 	}
 	cfg.CA = parseCA(caPEM)
 	if cfg.CA == nil {
 		t.Fatal("CA nicht gelesen")
 	}
-	if _, err := run(cfg, "kienzle-kasse://?kontextId=a", nil); err != nil {
-		t.Fatalf("mit der CA der Suite muss die Verbindung gehen: %v", err)
+	if _, err := run(cfg, "praxisherz-kasse://?kontextId=a", nil); err != nil {
+		t.Fatalf("mit der CA Praxisherz muss die Verbindung gehen: %v", err)
 	}
 	fremd, _ := testCA(t)
 	cfg.CA = parseCA(fremd)
-	if _, err := run(cfg, "kienzle-kasse://?kontextId=a", nil); err == nil {
+	if _, err := run(cfg, "praxisherz-kasse://?kontextId=a", nil); err == nil {
 		t.Fatal("fremde CA darf nicht reichen")
 	}
 }
 
-// testServer bildet die Agent-Schnittstelle der Suite nach.
+// testServer bildet die Agent-Schnittstelle von Praxisherz nach.
 type testServer struct {
 	mu        sync.Mutex
 	srv       *httptest.Server
@@ -97,6 +127,7 @@ type testServer struct {
 	auftraege []map[string]any
 	ergebnis  []map[string]any
 	abfragen  int
+	geladen   int
 }
 
 func neuerTestServer(t *testing.T, programm []byte) *testServer {
@@ -123,8 +154,8 @@ func neuerTestServer(t *testing.T, programm []byte) *testServer {
 			ts.abfragen++
 			sum := sha256.Sum256(ts.programm)
 			soll := map[string]any{"server_url": ts.srv.URL, "launcher_key": "neuer-schluessel-0123456789abcdef", "programme": map[string]string{assetName: hex.EncodeToString(sum[:])},
-				"kontexte": map[string]string{"kienzle-kasse": "/starter/kasse", "kienzle-telefon": "/starter/telefon"},
-				"drucker":  []map[string]string{{"name": "vFax", "url": "http://kienzle.example.org:631/printers/vFax"}, {"name": "bös artig", "url": "http://x:631/printers/x"}, {"name": "vKasse", "url": "file:///C:/x"}},
+				"kontexte": map[string]string{"praxisherz-kasse": "/starter/kasse", "praxisherz-telefon": "/starter/telefon"},
+				"drucker":  []map[string]string{{"name": "vFax", "url": "http://praxisherz.example.org:631/printers/vFax"}, {"name": "bös artig", "url": "http://x:631/printers/x"}, {"name": "vKasse", "url": "file:///C:/x"}},
 				"ca":       ""}
 			out := map[string]any{"auftraege": ts.auftraege, "stand": "s1"}
 			if in["stand"] != "s1" {
@@ -136,6 +167,7 @@ func neuerTestServer(t *testing.T, programm []byte) *testServer {
 			ts.ergebnis = append(ts.ergebnis, in)
 			w.Write([]byte(`{"ok":true}`))
 		case "/agent/programm/" + assetName:
+			ts.geladen++
 			w.Write(ts.programm)
 		default:
 			w.WriteHeader(404)
@@ -149,7 +181,7 @@ func agentOrdner(t *testing.T, ts *testServer) string {
 	t.Helper()
 	dir := t.TempDir()
 	sum := sha256.Sum256(ts.srv.Certificate().Raw)
-	cfg := map[string]any{"server_url": ts.srv.URL, "launcher_key": "0123456789abcdef0123456789abcdef", "certificate_sha256": hex.EncodeToString(sum[:]), "kontexte": map[string]string{"kienzle-kasse": "/starter/kasse"}}
+	cfg := map[string]any{"server_url": ts.srv.URL, "launcher_key": "0123456789abcdef0123456789abcdef", "certificate_sha256": hex.EncodeToString(sum[:]), "kontexte": map[string]string{"praxisherz-kasse": "/starter/kasse"}}
 	data, _ := json.Marshal(cfg)
 	os.WriteFile(filepath.Join(dir, "client.json"), data, 0o600)
 	return dir
@@ -165,7 +197,7 @@ func TestAnmeldenUndAngleichen(t *testing.T) {
 	if st, _ := os.Stat(filepath.Join(dir, "agent.json")); st == nil || st.Mode().Perm() != 0o600 {
 		t.Fatal("agent.json fehlt oder ist für andere lesbar")
 	}
-	exe := filepath.Join(dir, "kienzle-starter")
+	exe := filepath.Join(dir, "praxisherz-starter")
 	os.WriteFile(exe, []byte("neues Programm"), 0o755) // gleiche Prüfsumme: keine Aktualisierung
 	p := &testPlattform{ordner: dir}
 	a := &Agent{Ordner: dir, Programm: exe, Plattform: p}
@@ -179,7 +211,7 @@ func TestAnmeldenUndAngleichen(t *testing.T) {
 		t.Fatalf("Aufrufe/Drucker nicht angeglichen (ungültige Drucker müssen fehlen): %+v", p)
 	}
 	neu, _ := loadConfig(filepath.Join(dir, "client.json"))
-	if neu == nil || neu.LauncherKey != "neuer-schluessel-0123456789abcdef" || neu.Contexts["kienzle-telefon"] != "/starter/telefon" {
+	if neu == nil || neu.LauncherKey != "neuer-schluessel-0123456789abcdef" || neu.Contexts["praxisherz-telefon"] != "/starter/telefon" {
 		t.Fatalf("client.json nicht nachgeführt: %+v", neu)
 	}
 	if err := a.Schritt(); err != nil || p.schemata != 1 || len(p.drucker) != 1 || ts.abfragen != 2 {
@@ -196,7 +228,7 @@ func TestGDTAuftrag(t *testing.T) {
 	if _, err := Anmelden(dir, nil); err != nil {
 		t.Fatal(err)
 	}
-	exe := filepath.Join(dir, "kienzle-starter")
+	exe := filepath.Join(dir, "praxisherz-starter")
 	os.WriteFile(exe, []byte("x"), 0o755)
 	p := &testPlattform{ordner: dir}
 	a := &Agent{Ordner: dir, Programm: exe, Plattform: p}
@@ -226,7 +258,7 @@ func TestSelbstaktualisierung(t *testing.T) {
 	ts := neuerTestServer(t, []byte("Programm Fassung 2"))
 	dir := agentOrdner(t, ts)
 	Anmelden(dir, nil)
-	exe := filepath.Join(dir, "kienzle-starter")
+	exe := filepath.Join(dir, "praxisherz-starter")
 	os.WriteFile(exe, []byte("Programm Fassung 1"), 0o755)
 	a := &Agent{Ordner: dir, Programm: exe, Plattform: &testPlattform{ordner: dir}}
 	a.Laden()
@@ -239,6 +271,10 @@ func TestSelbstaktualisierung(t *testing.T) {
 	if b, _ := os.ReadFile(exe + ".alt"); string(b) != "Programm Fassung 1" {
 		t.Fatal("alte Fassung fehlt")
 	}
+	// status.json muss „wird aktualisiert“ zeigen, bevor der Dienst-Prozess sich beendet (Symbol: blau statt rot).
+	if s, ok := StatusLesen(dir); !ok || !s.WirdAktualisiert {
+		t.Fatalf("WirdAktualisiert nicht gesetzt: %v %+v", ok, s)
+	}
 	// Falsche Prüfsumme: nichts wird ersetzt
 	ts.mu.Lock()
 	ts.programm = []byte("Programm Fassung 3")
@@ -247,6 +283,33 @@ func TestSelbstaktualisierung(t *testing.T) {
 	a2.Laden()
 	a2.aktualisieren(strings.Repeat("0", 64))
 	if b, _ := os.ReadFile(exe); string(b) != "Programm Fassung 2" {
+		t.Fatal("Programm trotz falscher Prüfsumme ersetzt")
+	}
+}
+
+// TestWirdAktualisiertZurueckgesetztBeiFehler: Scheitert die Aktualisierung (z. B. falsche Prüfsumme aus Praxisherz),
+// bleibt der Dienst-Prozess am Leben; WirdAktualisiert darf dann nicht hängen bleiben (sonst zeigt das Symbol dauerhaft
+// „wird aktualisiert“, obwohl gar nichts mehr passiert).
+func TestWirdAktualisiertZurueckgesetztBeiFehler(t *testing.T) {
+	ts := neuerTestServer(t, []byte("Programm Fassung 1"))
+	dir := agentOrdner(t, ts)
+	if _, err := Anmelden(dir, nil); err != nil {
+		t.Fatal(err)
+	}
+	exe := filepath.Join(dir, "praxisherz-starter")
+	os.WriteFile(exe, []byte("altes Programm"), 0o755)
+	a := &Agent{Ordner: dir, Programm: exe, Plattform: &testPlattform{ordner: dir}}
+	if err := a.Laden(); err != nil {
+		t.Fatal(err)
+	}
+	err := a.angleichen(&Soll{Programme: map[string]string{assetName: strings.Repeat("0", 64)}})
+	if err == nil || !strings.Contains(err.Error(), "Aktualisierung") {
+		t.Fatalf("erwartet Fehler wegen falscher Prüfsumme, bekam %v", err)
+	}
+	if a.status.WirdAktualisiert {
+		t.Fatal("WirdAktualisiert muss nach gescheiterter Aktualisierung wieder false sein")
+	}
+	if b, _ := os.ReadFile(exe); string(b) != "altes Programm" {
 		t.Fatal("Programm trotz falscher Prüfsumme ersetzt")
 	}
 }
@@ -262,7 +325,226 @@ func TestAnmeldenMitFalschemSchluessel(t *testing.T) {
 }
 
 func TestProgrammName(t *testing.T) {
-	if programmName("windows", "amd64") != "kienzle-starter-windows-amd64.exe" || programmName("darwin", "arm64") != "kienzle-starter-darwin-arm64" {
+	if programmName("windows", "amd64") != "praxisherz-starter-windows-amd64.exe" || programmName("darwin", "arm64") != "praxisherz-starter-darwin-arm64" {
 		t.Fatal("Programmname passt nicht zu scripts/starter-bauen")
+	}
+}
+
+func TestDruckerSkriptLoeschtNie(t *testing.T) {
+	txt := druckerSkriptText()
+	einrichten := txt[strings.Index(txt, "# Erreichbarkeit vorab"):]
+	entfernen := txt[strings.Index(txt, "if ($Modus -eq 'entfernen')"):strings.Index(txt, "# Erreichbarkeit vorab")]
+	if strings.Contains(einrichten, "Remove-Printer") || strings.Count(txt, "Remove-Printer ") != 1 || !strings.Contains(entfernen, "@(Alte | Where-Object { $wunsch -contains $_ })") {
+		t.Fatal("drucker-agent.ps1 darf beim Einrichten nie löschen; entfernen nur alte und bestätigte Drucker")
+	}
+	if !strings.Contains(druckerSkriptText(), "Set-Printer -Name ([string]$n) -PortName ([string]$u)") || !strings.Contains(druckerSkriptText(), "Restart-Service Spooler") {
+		t.Fatal("vorhandene Drucker werden umgestellt, nicht neu angelegt")
+	}
+	// Jeder Schritt, der beim festhängenden Druckspooler ewig warten kann, mit eigener Frist; Internetdrucken nur einmal.
+	txt = druckerSkriptText()
+	for _, muss := range []string{"function MitFrist", "Stop-Process -Name spoolsv", "internetdrucken.ok", "$uhr.Elapsed.TotalSeconds -gt 150"} {
+		if !strings.Contains(txt, muss) {
+			t.Fatalf("drucker-agent.ps1: %q fehlt", muss)
+		}
+	}
+	for _, ohneFrist := range []string{"\n    Restart-Service Spooler -Force -ErrorAction SilentlyContinue\n    try { (Get-Service Spooler).WaitForStatus('Running', '00:00:30') } catch { }\n    Start-Sleep 3\n    Add-PrinterDriver"} {
+		if strings.Contains(txt, ohneFrist) {
+			t.Fatal("Einrichten startet den Spooler ohne Frist neu")
+		}
+	}
+}
+
+func druckerSkriptText() string { b, _ := os.ReadFile("drucker-agent.ps1"); return string(b) }
+
+func TestDruckerEntfernenRobust(t *testing.T) {
+	txt := druckerSkriptText()
+	entfernen := txt[strings.Index(txt, "if ($Modus -eq 'entfernen')"):strings.Index(txt, "# Erreichbarkeit vorab")]
+	if !strings.Contains(entfernen, "Restart-Service Spooler") {
+		t.Fatal("Entfernen muss den Spooler vorher neu starten (wie install-drucker.ps1, manuell bewährt)")
+	}
+	if !strings.Contains(entfernen, "Start-Job") || !strings.Contains(entfernen, "Wait-Job $job -Timeout") {
+		t.Fatal("jeder Drucker muss einzeln mit eigener Frist entfernt werden, sonst blockiert einer alle anderen")
+	}
+}
+
+func TestDruckerFehlerNichtBeiJederAbfrage(t *testing.T) {
+	ts := neuerTestServer(t, []byte("x"))
+	dir := agentOrdner(t, ts)
+	Anmelden(dir, nil)
+	exe := filepath.Join(dir, "praxisherz-starter")
+	os.WriteFile(exe, []byte("x"), 0o755)
+	p := &testPlattform{ordner: dir, fehler: errors.New("Drucker: 0 von 1 eingerichtet; fehlen: vFax. Windows meldet: Zugriff verweigert")}
+	a := &Agent{Ordner: dir, Programm: exe, Plattform: p}
+	a.Laden()
+	for i := 0; i < 3; i++ {
+		a.Schritt()
+	}
+	if len(p.drucker) != 1 {
+		t.Fatalf("nach einem Fehlschlag darf der Agent nicht bei jeder Abfrage neu versuchen: %d Versuche", len(p.drucker))
+	}
+	if !strings.Contains(a.zustand, "Windows meldet: Zugriff verweigert") || strings.HasPrefix(a.zustand, "Drucker: Drucker") {
+		t.Fatalf("Rückmeldung: %q", a.zustand)
+	}
+	alt := DruckerPause
+	DruckerPause = 0
+	defer func() { DruckerPause = alt }()
+	p.fehler = nil
+	a.Schritt()
+	if len(p.drucker) != 2 || a.zustand != "Drucker: eingerichtet" {
+		t.Fatalf("nach der Pause neuer Versuch: %d %q", len(p.drucker), a.zustand)
+	}
+}
+
+func TestAlteDruckerNurNachBestaetigung(t *testing.T) {
+	ts := neuerTestServer(t, []byte("x"))
+	dir := agentOrdner(t, ts)
+	Anmelden(dir, nil)
+	exe := filepath.Join(dir, "praxisherz-starter")
+	os.WriteFile(exe, []byte("x"), 0o755)
+	p := &testPlattform{ordner: dir, alt: []string{"Terminzettel", "SumUp-Rechnung"}}
+	a := &Agent{Ordner: dir, Programm: exe, Plattform: p}
+	a.Laden()
+	if err := a.Schritt(); err != nil {
+		t.Fatal(err)
+	}
+	a.alteDrucker()
+	a.alteDrucker()
+	if p.altAbfragen != 1 || len(a.status.AltDrucker) != 2 || len(p.entfernt) != 0 {
+		t.Fatalf("erkennen ohne zu löschen, höchstens alle 10 Minuten: %d %v %v", p.altAbfragen, a.status.AltDrucker, p.entfernt)
+	}
+	os.MkdirAll(filepath.Join(dir, "anstoss"), 0o755)
+	os.WriteFile(filepath.Join(dir, "anstoss", "drucker-entfernen"), []byte("Terminzettel\nvKasse\n..\\..\\x\nTerminzettel\n"), 0o644)
+	a.alteDrucker()
+	if strings.Join(p.entfernt, ",") != "Terminzettel" {
+		t.Fatalf("nur bestätigte und als alt erkannte Drucker entfernen: %v", p.entfernt)
+	}
+	if strings.Join(a.status.AltDrucker, ",") != "SumUp-Rechnung" || !strings.Contains(a.status.AltText, "Terminzettel") || p.altAbfragen != 2 {
+		t.Fatalf("nach dem Entfernen neu prüfen: %v %q", a.status.AltDrucker, a.status.AltText)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "anstoss", "drucker-entfernen")); err == nil {
+		t.Fatal("Bestätigung muss danach weg sein")
+	}
+}
+
+// Der Ausdruck in Passt (drucker-agent.ps1) erkennt Drucker, die mit Servername oder IP auf dieselbe Warteschlange zeigen.
+func TestDruckerSkriptPasstAusdruck(t *testing.T) {
+	txt := druckerSkriptText()
+	i := strings.Index(txt, "[string]$port -notmatch '")
+	if i < 0 {
+		t.Fatal("Passt fehlt")
+	}
+	roh := txt[i+len("[string]$port -notmatch '"):]
+	roh = roh[:strings.Index(roh, "'")]
+	re := regexp.MustCompile(roh)
+	for _, f := range []struct {
+		port, host, queue string
+	}{
+		{"http://192.0.2.5:631/printers/vKasse", "192.0.2.5", "vKasse"},
+		{"HTTP://praxisherz.example.org:631/printers/vTermine/", "praxisherz.example.org", "vTermine"},
+		{"http://[fe80::1]:631/printers/vFax1", "fe80::1", "vFax1"},
+		{"http://praxisherz.example.org/printers/vFax2", "praxisherz.example.org", "vFax2"},
+	} {
+		m := re.FindStringSubmatch(f.port)
+		if m == nil || m[1]+m[2] != f.host || m[4] != f.queue {
+			t.Fatalf("%s: %q", f.port, m)
+		}
+	}
+	for _, p := range []string{"IP_192.0.2.5", "http://192.0.2.5:8080/printers/vKasse", "USB001"} {
+		if re.MatchString(p) {
+			t.Fatalf("%s darf nicht passen", p)
+		}
+	}
+}
+
+func TestSkriptMitBOMUndServerIP(t *testing.T) {
+	b := skriptMitBOM("Write-Output 'unverändert'")
+	if len(b) < 3 || b[0] != 0xEF || b[1] != 0xBB || b[2] != 0xBF || string(b[3:]) != "Write-Output 'unverändert'" {
+		t.Fatal("BOM fehlt")
+	}
+	if len(skriptMitBOM(string(b))) != len(b) {
+		t.Fatal("BOM doppelt")
+	}
+	if serverIPv4("https://192.0.2.10/") != "192.0.2.10" || serverIPv4("https://localhost:8443") != "127.0.0.1" || serverIPv4("https://[2001:db8::1]/") != "" || serverIPv4("::") != "" {
+		t.Fatal("Server-IP")
+	}
+	txt := druckerSkriptText()
+	if !strings.Contains(txt, "$roh = Get-Content -Raw $Liste | ConvertFrom-Json\n$list = @($roh |") || !strings.Contains(txt, "$wunsch = @($wunschRoh)") {
+		t.Fatal("JSON-Liste muss über eine Variable laufen (PowerShell 5.1 gibt Arrays sonst als ein Objekt weiter)")
+	}
+	if !strings.Contains(txt, "[string]$ServerIp = ''") || !strings.Contains(txt, "$perIp = $true") {
+		t.Fatal("Server-IP als Ersatz für den unbekannten Namen fehlt")
+	}
+}
+
+// TestGescheiterteAktualisierungNichtDauernd: Nach einem Fehlschlag lädt der Agent dieselbe Fassung erst nach UpdatePause
+// erneut (vorher alle 2 Sekunden, das Symbol stand dadurch dauerhaft auf „wird aktualisiert“). Der Grund steht in status.json.
+func TestGescheiterteAktualisierungNichtDauernd(t *testing.T) {
+	ts := neuerTestServer(t, []byte("Programm Fassung 1"))
+	dir := agentOrdner(t, ts)
+	if _, err := Anmelden(dir, nil); err != nil {
+		t.Fatal(err)
+	}
+	exe := filepath.Join(dir, "praxisherz-starter")
+	os.WriteFile(exe, []byte("altes Programm"), 0o755)
+	a := &Agent{Ordner: dir, Programm: exe, Plattform: &testPlattform{ordner: dir}}
+	if err := a.Laden(); err != nil {
+		t.Fatal(err)
+	}
+	soll := &Soll{Programme: map[string]string{assetName: strings.Repeat("0", 64)}}
+	for i := 0; i < 3; i++ {
+		if err := a.angleichen(soll); err == nil || !strings.Contains(err.Error(), "Prüfsumme") {
+			t.Fatalf("Versuch %d: %v", i, err)
+		}
+	}
+	ts.mu.Lock()
+	geladen := ts.geladen
+	ts.mu.Unlock()
+	if geladen != 1 {
+		t.Fatalf("nach einem Fehlschlag nicht sofort erneut laden, geladen: %d", geladen)
+	}
+	a.statusSchreiben(nil)
+	s, _ := StatusLesen(dir)
+	if s.WirdAktualisiert || s.AktualisierungSeit != 0 || !strings.Contains(s.AktualisierungFehler, "Prüfsumme") {
+		t.Fatalf("status.json nach Fehlschlag: %+v", s)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "starter.log")); !strings.Contains(string(b), "Aktualisierung gescheitert") {
+		t.Fatal("Fehlschlag fehlt in starter.log")
+	}
+	// Nach der Pause wieder versuchen.
+	a.updateVersuch = time.Now().Add(-UpdatePause - time.Second)
+	a.angleichen(soll)
+	ts.mu.Lock()
+	geladen = ts.geladen
+	ts.mu.Unlock()
+	if geladen != 2 {
+		t.Fatalf("nach der Pause erneut laden, geladen: %d", geladen)
+	}
+}
+
+// TestAustauschMitBelegterAltDatei: Lässt sich die .alt-Datei nicht löschen (unter Windows: läuft noch), weicht der Agent
+// auf einen eigenen Namen aus. Hier nachgestellt mit einem Ordner namens .alt, den os.Remove nicht löschen kann.
+func TestAustauschMitBelegterAltDatei(t *testing.T) {
+	neu := []byte("Programm Fassung 2")
+	ts := neuerTestServer(t, neu)
+	dir := agentOrdner(t, ts)
+	if _, err := Anmelden(dir, nil); err != nil {
+		t.Fatal(err)
+	}
+	exe := filepath.Join(dir, "praxisherz-starter")
+	os.WriteFile(exe, []byte("altes Programm"), 0o755)
+	os.MkdirAll(filepath.Join(exe+".alt", "belegt"), 0o755)
+	a := &Agent{Ordner: dir, Programm: exe, Plattform: &testPlattform{ordner: dir}}
+	if err := a.Laden(); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(neu)
+	if err := a.aktualisieren(hex.EncodeToString(sum[:])); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(exe); string(b) != string(neu) {
+		t.Fatal("neues Programm nicht eingespielt")
+	}
+	if reste, _ := filepath.Glob(exe + ".alt-*"); len(reste) != 1 {
+		t.Fatalf("Ausweichname fehlt: %v", reste)
 	}
 }

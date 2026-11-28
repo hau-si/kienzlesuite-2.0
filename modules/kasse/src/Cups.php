@@ -11,7 +11,7 @@ final class Cups {
     public static function submit(string $server, string $queue, string $title, array $options, string $data, callable $run): string {
         $args = ['/usr/bin/lp'];
         if ($server !== '') array_push($args, '-h', $server);
-        array_push($args, '-d', $queue, '-t', $title ?: 'Kienzle-SumUp', ...$options);
+        array_push($args, '-d', $queue, '-t', $title ?: 'Praxisherz Kasse', ...$options);
         $result = $run($args, $data);
         // Ausgabe von lp: "request id is Praxisdrucker-42 (0 file(s))"
         if ($result['code'] !== 0 || !preg_match('/request id is (\S+)/', $result['output'], $m)) {

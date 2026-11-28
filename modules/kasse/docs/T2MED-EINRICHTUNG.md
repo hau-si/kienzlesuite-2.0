@@ -17,8 +17,9 @@ Die Aufruf-Adresse steht in der Kasse unter *Einstellungen → Zahlung & T2med* 
 3. Unter „Neue URL hinzufügen“ die **Adresse** (genau so, mit den Platzhaltern)
 
    ```text
-   kienzle-kasse://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}
+   praxisherz-kasse://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}
    ```
+
 
    und eine **Bezeichnung** (z. B. „Kartenzahlung“) eintragen, auf **Plus** klicken, dann oben rechts mit dem **Häkchen** speichern.
    Danach in der Liste davor die **Aktualisieren-Pfeile** anklicken.
@@ -39,8 +40,8 @@ Die Aufruf-Adresse steht in der Kasse unter *Einstellungen → Zahlung & T2med* 
 
    ![Aktion](screenshots/t2med-6-aktion.png)
 
-Jetzt erscheint die Schaltfläche beim Patienten. Ein Klick schickt die Patientendaten per FHIR an die Suite.
-Der Starter-Aufruf funktioniert erst, wenn auf dem Arbeitsplatz das Starter-Paket installiert ist (Suite: Verwaltung → Arbeitsplätze). Die FHIR-Adresse, die T2med mitgibt, muss in der Suite unter *Verwaltung → Verbindungen → T2med* bei „Erlaubte fhirBasisUrl aus T2med“ stehen; bei einer Fehlermeldung zeigt die Seite die tatsächlichen Werte.
+Jetzt erscheint die Schaltfläche beim Patienten. Ein Klick schickt die Patientendaten per FHIR an Praxisherz.
+Der Starter-Aufruf funktioniert erst, wenn auf dem Arbeitsplatz das Starter-Paket installiert ist (Praxisherz: Verwaltung → Arbeitsplätze). Die FHIR-Adresse, die T2med mitgibt, muss in Praxisherz unter *Verwaltung → Verbindungen → T2med* bei „Erlaubte fhirBasisUrl aus T2med“ stehen; bei einer Fehlermeldung zeigt die Seite die tatsächlichen Werte.
 
 ## 3. Drucker „vKasse“
 

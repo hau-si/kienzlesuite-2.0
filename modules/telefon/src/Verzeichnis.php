@@ -4,7 +4,7 @@ namespace KienzleTelefon;
 
 /**
  * Telefonverzeichnis aus T2med: Patienten mit Nummer, Name, Geburtsdatum und Telefonnummern in <daten>/t2med/patienten.sqlite (0600).
- * Geladen wird es über den Aufruf „kienzle-telefonverzeichnis://…“ aus T2med (zentraler Starter der Basis): Der Starter legt einen
+ * Geladen wird es über den Aufruf „praxisherz-telefonverzeichnis://…“ aus T2med (zentraler Starter der Basis): Der Starter legt einen
  * Ladeauftrag an (Token verschlüsselt), die Seite holt die Patienten danach schrittweise (je Anfrage einige Seiten, mit Fortschritt).
  * Erst wenn alles geladen ist, ersetzt die neue Datei die alte. Genutzt für: Suche, Namen in „Anrufe“, Anrufername am Telefon
  * (lib/anrufername.agi liest dieselbe Datei).
@@ -76,7 +76,8 @@ final class Verzeichnis {
         $url = rtrim((string)($eingabe['fhir_base_url'] ?? ''), '/');
         if (!preg_match('/^[A-Za-z0-9._-]{1,128}$/D', $kontext)) throw new \InvalidArgumentException('Ungültiger T2med-Kontext.');
         if ($token === '' || strlen($token) > 16000 || preg_match('/\s|\$\{/', $token)) throw new \InvalidArgumentException('T2med hat kein gültiges Zugriffstoken übergeben.');
-        if (!$t2med->erlaubt($url)) throw new \InvalidArgumentException('Die von T2med übergebene FHIR-Adresse ist in der Suite nicht freigegeben (Verwaltung → Verbindungen → T2med).');
+        if ($t2med->ohneSchluessel()) throw new \InvalidArgumentException(T2med::OHNE_SCHLUESSEL);
+        if (!$t2med->erlaubt($url)) throw new \InvalidArgumentException('Die von T2med übergebene FHIR-Adresse ist in Praxisherz nicht freigegeben (Verwaltung → Verbindungen → T2med).');
         if (!preg_match('/^[A-Za-z0-9.-]{1,100}(:\d{1,5})?$/D', $host)) throw new \InvalidArgumentException('Ungültiger Servername.');
         $code = bin2hex(random_bytes(32));
         @unlink(self::ordner() . '/neu.sqlite');
@@ -131,6 +132,7 @@ final class Verzeichnis {
         $pdo = self::neueDb($neu);
         $start = time();
         try {
+            $begrenzt = false;
             for ($i = 0; $i < $maxSeiten && $a['naechste'] !== '' && time() - $start < $sekunden; $i++) {
                 $bundle = $t2med->seite((string)$a['naechste'], $token);
                 $liste = T2med::patienten($bundle);
@@ -149,10 +151,11 @@ final class Verzeichnis {
             $anzahl = (int)$pdo->query('SELECT COUNT(*) FROM patienten')->fetchColumn();
             $pdo->prepare('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)')->execute(['stand', (string)time()]);
             $pdo->prepare('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)')->execute(['anzahl', (string)$anzahl]);
+            $pdo->prepare('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)')->execute(['begrenzt', $begrenzt ? '1' : '0']);
             $pdo = null;
             rename($neu, self::datei());
             @unlink(self::auftragDatei());
-            return ['fertig' => true, 'anzahl' => $anzahl, 'seiten' => (int)$a['seiten']];
+            return ['fertig' => true, 'anzahl' => $anzahl, 'seiten' => (int)$a['seiten'], 'begrenzt' => $begrenzt];
         }
         $pdo = null;
         self::auftragSchreiben($a);
@@ -181,7 +184,7 @@ final class Verzeichnis {
     private static function db(): ?\PDO {
         if (self::$lesen) return self::$lesen;
         if (!is_file(self::datei())) return null;
-        return self::$lesen = new \PDO('sqlite:file:' . self::datei() . '?mode=ro', null, null, [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION, \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC]);
+        return self::$lesen = new \PDO('sqlite:' . self::datei(), null, null, [\PDO::SQLITE_ATTR_OPEN_FLAGS => \PDO::SQLITE_OPEN_READONLY, \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION, \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC]);
     }
 
     public static function zuruecksetzen(): void { self::$lesen = null; }
@@ -189,9 +192,9 @@ final class Verzeichnis {
     /** Stand des Verzeichnisses: anzahl, zeit (0 = keins). */
     public static function stand(): array {
         $db = self::db();
-        if (!$db) return ['anzahl' => 0, 'zeit' => 0];
+        if (!$db) return ['anzahl' => 0, 'zeit' => 0, 'begrenzt' => false];
         $m = $db->query('SELECT k, v FROM meta')->fetchAll(\PDO::FETCH_KEY_PAIR);
-        return ['anzahl' => (int)($m['anzahl'] ?? 0), 'zeit' => (int)($m['stand'] ?? 0)];
+        return ['anzahl' => (int)($m['anzahl'] ?? 0), 'zeit' => (int)($m['stand'] ?? 0), 'begrenzt' => ($m['begrenzt'] ?? '0') === '1'];
     }
 
     public static function loeschen(): void { self::zuruecksetzen(); @unlink(self::datei()); self::abbrechen(); }

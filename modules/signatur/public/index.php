@@ -5,7 +5,7 @@ declare(strict_types=1);
  * (auth_request) und Benutzer, Rolle und Rechte als KIENZLE_* übergeben.
  */
 require_once dirname(__DIR__) . '/src/bootstrap.php';
-use KienzleSignatur\{Ansicht, Pad, Seite, Start};
+use KienzleSignatur\{Ablage, Ansicht, Pad, Seite, Speicher, Start};
 
 header('X-Frame-Options: DENY');
 header('X-Content-Type-Options: nosniff');
@@ -14,17 +14,6 @@ $root = dirname(__DIR__);
 $base = preg_match('#^/[a-z0-9-]{1,31}$#D', (string)($_SERVER['KIENZLE_PFAD'] ?? '')) ? (string)$_SERVER['KIENZLE_PFAD'] : '/signatur';
 $path = (string)parse_url((string)($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
 $rel = str_starts_with($path, $base . '/') ? substr($path, strlen($base)) : '/';
-
-/** T2med-Zugang der Basis (Verwaltung → Verbindungen) samt hinterlegter CA für den FHIR-Zugriff. */
-function sg_fhir(): KienzleSignatur\Fhir {
-    $verbindung = sg_modul()->verbindung('t2med') ?? [];
-    $ca = '';
-    if (trim((string)($verbindung['ca_pem'] ?? '')) !== '') {
-        $ca = KienzleSignatur\Speicher::$data . '/t2med-ca.pem';
-        if (!is_file($ca) || file_get_contents($ca) !== trim((string)$verbindung['ca_pem']) . "\n") { file_put_contents($ca, trim((string)$verbindung['ca_pem']) . "\n"); chmod($ca, 0600); }
-    }
-    return new KienzleSignatur\Fhir($verbindung, $ca);
-}
 
 if (($_SERVER['KIENZLE_OEFFENTLICH'] ?? '') === 'starter') {
     // POST /starter/signatur: nur mit der Prüfung der Basis (auth_request), nie direkt aus dem Browser.
@@ -73,6 +62,132 @@ try {
         echo json_encode($z, JSON_UNESCAPED_UNICODE);
         exit;
     }
+    if ($rel === '/zur-kasse') {
+        // Patientenübergabe an die Kasse mit dem T2med-Zugang dieses Aufrufs (Knopf „Zur Kasse“ in der Patientenkarte).
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || !$darfVorgang || !$k->csrfGueltig($_POST['kienzle-csrf'] ?? null)) { http_response_code(403); echo '{"error":"Nicht erlaubt."}'; exit; }
+        $kasse = sg_modulPfad('kasse');
+        try {
+            if ($kasse === null) throw new InvalidArgumentException('Die Kasse ist nicht installiert oder für Sie nicht freigegeben.');
+            $code = \KienzleSignatur\Uebergabe::anKasse((string)($_POST['kontext'] ?? ''));
+            echo json_encode(['url' => $kasse . '#uebergabe=' . $code]);
+        } catch (InvalidArgumentException | RuntimeException $e) {
+            http_response_code(409); echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        }
+        exit;
+    }
+    if ($rel === '/editor/speichern' || $rel === '/editor/bild') {
+        // Editor (Bausteine): Speichern als JSON, Bilder roh (nicht multipart, file_uploads ist aus). Recht „vorlagen“, Suite-CSRF im Kopf.
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        $antwort = static function (array $d, int $code = 200): never { http_response_code($code); echo json_encode($d, JSON_UNESCAPED_UNICODE); exit; };
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') $antwort(['error' => 'Nur POST.'], 405);
+        if (!$darfVorlage) $antwort(['error' => 'Keine Berechtigung für Vorlagen.'], 403);
+        if (!$k->csrfGueltig($_SERVER['HTTP_X_KIENZLE_CSRF'] ?? null)) $antwort(['error' => 'Sitzung abgelaufen. Bitte die Seite neu laden.'], 403);
+        try {
+            if ($rel === '/editor/bild') {
+                $bytes = (string)file_get_contents('php://input', false, null, 0, \KienzleSignatur\Bausteine::MAX_BILD + 1);
+                $antwort(['ok' => true, 'datei' => \KienzleSignatur\Bausteine::bildSpeichern($bytes)]);
+            }
+            $in = json_decode((string)file_get_contents('php://input', false, null, 0, 300000), true);
+            if (!is_array($in)) $antwort(['error' => 'Ungültige Anfrage.'], 400);
+            $id = Seite::vorlageSpeichern(['id' => (int)($in['id'] ?? 0), 'art' => (string)($in['art'] ?? ''), 'titel' => (string)($in['titel'] ?? ''), 'aktiv' => !empty($in['aktiv']), 'kuerzel' => (string)($in['kuerzel'] ?? ''), 'gruppen' => (string)($in['gruppen'] ?? ''), 'leistungen' => (string)($in['leistungen'] ?? ''), 'ablauf' => !empty($in['ablauf']), 'zweite' => (string)($in['zweite'] ?? ''), 'bloecke' => $in['bloecke'] ?? null]);
+            $v = Seite::vorlage($id);
+            $antwort(['ok' => true, 'id' => $id, 'version' => (int)$v['version']]);
+        } catch (InvalidArgumentException $e) {
+            $antwort(['error' => $e->getMessage()], 422);
+        } catch (Throwable $e) {
+            error_log('signatur editor: ' . get_class($e) . ': ' . $e->getMessage());
+            $antwort(['error' => 'Speichern nicht möglich (' . get_class($e) . ').'], 500);
+        }
+    }
+    if ($rel === '/editor/export') {
+        // Vorlagen als JSON-Datei herunterladen (?id=<id> eine, sonst alle). Recht „vorlagen“.
+        if (!$darfVorlage) $k->verweigern();
+        try {
+            $id = (int)($_GET['id'] ?? 0);
+            $json = Seite::vorlagenExport($id > 0 ? [$id] : []);
+        } catch (InvalidArgumentException $e) { http_response_code(404); echo sg_h($e->getMessage()); exit; }
+        $name = $id > 0 ? preg_replace('/[^A-Za-z0-9ÄÖÜäöüß_-]+/u', '-', (string)(Seite::vorlage($id)['titel'] ?? 'vorlage')) : 'alle';
+        header('Content-Type: application/json; charset=utf-8');
+        header('Content-Disposition: attachment; filename="signatur-vorlagen-' . date('Y-m-d') . '.json"; filename*=UTF-8\'\'' . rawurlencode('signatur-vorlage-' . trim((string)$name, '-') . '-' . date('Y-m-d') . '.json'));
+        header('Cache-Control: no-store');
+        header('X-Content-Type-Options: nosniff');
+        echo $json;
+        exit;
+    }
+    if ($rel === '/editor/uebersetzen') {
+        // Sprachfassung mit DeepL anlegen/erneuern (inaktiv, zum Prüfen). JSON {id, sprache}, Suite-CSRF im Kopf, Recht „vorlagen“.
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        $antwort = static function (array $d, int $code = 200): never { http_response_code($code); echo json_encode($d, JSON_UNESCAPED_UNICODE); exit; };
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') $antwort(['error' => 'Nur POST.'], 405);
+        if (!$darfVorlage) $antwort(['error' => 'Keine Berechtigung für Vorlagen.'], 403);
+        if (!$k->csrfGueltig($_SERVER['HTTP_X_KIENZLE_CSRF'] ?? null)) $antwort(['error' => 'Sitzung abgelaufen. Bitte die Seite neu laden.'], 403);
+        $in = json_decode((string)file_get_contents('php://input', false, null, 0, 1000), true);
+        try {
+            $id = sg_uebersetzung()->vorlage((int)($in['id'] ?? 0), (string)($in['sprache'] ?? ''));
+            $antwort(['ok' => true, 'id' => $id]);
+        } catch (InvalidArgumentException | RuntimeException $e) {
+            $antwort(['error' => $e->getMessage()], 422);
+        } catch (Throwable $e) {
+            error_log('signatur uebersetzen: ' . get_class($e));
+            $antwort(['error' => 'Übersetzen nicht möglich (' . get_class($e) . ').'], 500);
+        }
+    }
+    if ($rel === '/editor/import') {
+        // Exportdatei roh hochladen (nicht multipart). Legt nur neue Vorlagen an.
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        $antwort = static function (array $d, int $code = 200): never { http_response_code($code); echo json_encode($d, JSON_UNESCAPED_UNICODE); exit; };
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') $antwort(['error' => 'Nur POST.'], 405);
+        if (!$darfVorlage) $antwort(['error' => 'Keine Berechtigung für Vorlagen.'], 403);
+        if (!$k->csrfGueltig($_SERVER['HTTP_X_KIENZLE_CSRF'] ?? null)) $antwort(['error' => 'Sitzung abgelaufen. Bitte die Seite neu laden.'], 403);
+        try {
+            $titel = Seite::vorlagenImport((string)file_get_contents('php://input', false, null, 0, Seite::MAX_IMPORT + 1));
+            $antwort(['ok' => true, 'titel' => $titel]);
+        } catch (InvalidArgumentException | JsonException $e) {
+            $antwort(['error' => $e->getMessage()], 422);
+        } catch (Throwable $e) {
+            error_log('signatur import: ' . get_class($e));
+            $antwort(['error' => 'Import nicht möglich (' . get_class($e) . ').'], 500);
+        }
+    }
+    if ($rel === '/einwilligungen') {
+        // Gültige/abgelaufene Einwilligungen eines Patienten (für die Dokumentliste). Nur Lesen, nur mit Recht auf Vorgänge.
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        if (!$darfVorgang) { http_response_code(403); echo '{"error":"Keine Berechtigung."}'; exit; }
+        $s = Seite::patientSchluessel(mb_substr(trim((string)($_GET['patient_id'] ?? '')), 0, 64), mb_substr((string)($_GET['name'] ?? ''), 0, 80), mb_substr((string)($_GET['geb'] ?? ''), 0, 20));
+        echo json_encode(['einwilligungen' => array_map(fn($e) => ['vorlage' => $e['vorlage_id'], 'bis' => date('d.m.Y', $e['bis']), 'gueltig' => $e['gueltig']], Seite::einwilligungen($s))], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if ($rel === '/favorit') {
+        // Favorit einer Vorlage an/aus (für die ganze Praxis, wie im Fax). JSON {id, an}, Suite-CSRF im Kopf.
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') { http_response_code(405); echo '{"error":"Nur POST."}'; exit; }
+        if (!$darfVorgang && !$darfVorlage) { http_response_code(403); echo '{"error":"Keine Berechtigung."}'; exit; }
+        if (!$k->csrfGueltig($_SERVER['HTTP_X_KIENZLE_CSRF'] ?? null)) { http_response_code(403); echo json_encode(['error' => 'Sitzung abgelaufen. Bitte die Seite neu laden.'], JSON_UNESCAPED_UNICODE); exit; }
+        $in = json_decode((string)file_get_contents('php://input', false, null, 0, 1000), true);
+        try {
+            Seite::favorit((int)($in['id'] ?? 0), !empty($in['an']));
+            echo '{"ok":true}';
+        } catch (InvalidArgumentException $e) { http_response_code(404); echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE); }
+        exit;
+    }
+    if (preg_match('#^/bild/([0-9a-f]{64}\.(png|jpg))$#D', $rel, $m)) {
+        // Bilder der Vorlagen (Editor-Vorschau, Ansicht). Nur mit Recht auf Vorgänge oder Vorlagen.
+        if (!$darfVorgang && !$darfVorlage) $k->verweigern();
+        $datei = \KienzleSignatur\Bausteine::bildPfad($m[1]);
+        if ($datei === null) { http_response_code(404); exit; }
+        header('Content-Type: ' . ($m[2] === 'png' ? 'image/png' : 'image/jpeg'));
+        header('Cache-Control: private, max-age=86400');
+        header('X-Content-Type-Options: nosniff');
+        readfile($datei);
+        exit;
+    }
     if ($rel === '/pad-hochladen') {
         // Roher Upload (nicht multipart): Für die PHP-Instanz der Module ist file_uploads aus.
         header('Content-Type: application/json; charset=utf-8');
@@ -94,10 +209,41 @@ try {
             $antwort(['error' => 'Interner Fehler (' . get_class($e) . '): ' . $e->getMessage()], 500);
         }
     }
+    if (preg_match('#^/pad-vorschau/([1-9][0-9]{0,9})\.(png|json)$#D', $rel, $m)) {
+        // Live-Vorschau: was der Patient gerade am Pad sieht (vom Pad-Dienst geschrieben, nur während der Vorgang am Pad liegt).
+        if (!$darfVorgang) $k->verweigern();
+        $datei = Speicher::$data . '/vorschau/' . $m[1] . '.' . $m[2];
+        header('Cache-Control: no-store');
+        header('X-Content-Type-Options: nosniff');
+        if (!is_file($datei) || is_link($datei)) { http_response_code(404); exit; }
+        header('Content-Type: ' . ($m[2] === 'png' ? 'image/png' : 'application/json'));
+        readfile($datei);
+        exit;
+    }
+    if (preg_match('#^/ansehen/([1-9][0-9]{0,9})$#D', $rel, $m)) {
+        // Dokument ansehen: unterschrieben = das PDF (im Browser), sonst der eingesetzte Text des Vorgangs.
+        if (!$darfVorgang) $k->verweigern();
+        $v = Seite::vorgang((int)$m[1]);
+        if (!$v) { http_response_code(404); echo 'Vorgang nicht gefunden.'; exit; }
+        header('Cache-Control: no-store');
+        header('X-Content-Type-Options: nosniff');
+        $pdf = Seite::pdfPfad((int)$v['id']);
+        if ($pdf !== null) {
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: inline; filename="' . preg_replace('/[^A-Za-z0-9_-]+/', '-', 'vorgang-' . $v['id'] . '-' . $v['titel']) . '.pdf"');
+            header('Content-Length: ' . filesize($pdf));
+            readfile($pdf);
+            exit;
+        }
+        header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
+        echo $k->rahmen('Signatur', Ansicht::dokument($v), ['roh' => true, 'kopf' => Ansicht::kopf($base, $k->csrf())]);
+        exit;
+    }
     if ($rel === '') $rel = '/';
-    if (!in_array($rel, ['/', '/vorgaenge', '/einstellungen'], true)) { http_response_code(404); echo 'Nicht gefunden.'; exit; }
+    if (!in_array($rel, ['/', '/vorgaenge', '/editor', '/einstellungen'], true)) { http_response_code(404); echo 'Nicht gefunden.'; exit; }
     if ($rel === '/einstellungen' && !$darfVorlage && !$k->istAdmin()) $k->verweigern();
-    if ($rel !== '/einstellungen' && !$darfVorgang) $k->verweigern();
+    if ($rel === '/editor' && !$darfVorlage) $k->verweigern();
+    if (!in_array($rel, ['/einstellungen', '/editor'], true) && !$darfVorgang) $k->verweigern();
     header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
     $meldung = $fehler = null;
     $bearbeite = null;
@@ -106,8 +252,8 @@ try {
         try {
             $aktion = (string)($_POST['aktion'] ?? '');
             if ($aktion === 'neu' && $darfVorgang) {
-                Seite::vorgangAnlegen($_POST, $k->benutzer(), $k->praxis(), (string)($_POST['kontext'] ?? ''));
-                $meldung = 'Vorgang angelegt. Er wartet auf die Unterschrift.';
+                $neu = Seite::vorgangAnlegen($_POST, $k->benutzer(), $k->praxis(), (string)($_POST['kontext'] ?? ''));
+                $meldung = Seite::gleichAnsPad($neu);
             } elseif ($aktion === 'am-pad' && $darfVorgang) {
                 Seite::amPadZeigen((int)($_POST['id'] ?? 0));
                 $meldung = 'Der Vorgang erscheint jetzt am Pad.';
@@ -117,9 +263,18 @@ try {
             } elseif ($aktion === 'vorgang-loeschen' && $darfVorgang) {
                 Seite::vorgangLoeschen((int)($_POST['id'] ?? 0));
                 $meldung = 'Vorgang gelöscht.';
+            } elseif ($aktion === 'archivieren' && $darfVorgang) {
+                Seite::archivieren((int)($_POST['id'] ?? 0));
+                $meldung = 'Vorgang archiviert. Er steht weiter unter „Vorgänge“ (Filter „Archiv“).';
+            } elseif ($aktion === 'zurueckholen' && $darfVorgang) {
+                Seite::archivieren((int)($_POST['id'] ?? 0), false);
+                $meldung = 'Vorgang zurückgeholt.';
             } elseif ($aktion === 'wiederaufnehmen' && $darfVorgang) {
                 Seite::wiederaufnehmen((int)($_POST['id'] ?? 0));
                 $meldung = 'Vorgang wieder aufgenommen.';
+            } elseif ($aktion === 'ablage-erneut' && $darfVorgang) {
+                Ablage::erneut((int)($_POST['id'] ?? 0));
+                $meldung = 'Das PDF wird in wenigen Sekunden in T2med abgelegt.';
             } elseif ($aktion === 'kontakt-uebernehmen' && $darfVorgang) {
                 $meldung = Seite::kontaktUebernehmen((int)($_POST['id'] ?? 0), sg_fhir());
             } elseif ($aktion === 'abbrechen' && $darfVorgang) {
@@ -133,6 +288,9 @@ try {
                     $bearbeite = ['id' => (int)($_POST['id'] ?? 0), 'art' => (string)($_POST['art'] ?? 'sonstige'), 'titel' => (string)($_POST['titel'] ?? ''), 'text' => (string)($_POST['text'] ?? ''), 'aktiv' => !empty($_POST['aktiv']) ? 1 : 0, 'muster' => 0];
                     throw $e;
                 }
+            } elseif ($aktion === 'einwilligung-zeit' && ($darfVorlage || $k->istAdmin())) {
+                Seite::einwilligungMonateSetzen($_POST['monate'] ?? '');
+                $meldung = 'Gültigkeit von Einwilligungen gespeichert.';
             } elseif ($aktion === 'vorlage-loeschen' && $darfVorlage) {
                 Seite::vorlageLoeschen((int)($_POST['id'] ?? 0));
                 $meldung = 'Vorlage gelöscht.';
@@ -156,6 +314,7 @@ try {
         }
     }
     if ($k->istAdmin() && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') Ansicht::$padBearbeiten = (int)($_GET['pad'] ?? 0);
+    Ansicht::$editorVorlage = (string)($_GET['vorlage'] ?? '');
     Seite::aufraeumen();
     header('Content-Type: text/html; charset=utf-8');
     header('Cache-Control: no-store');

@@ -12,9 +12,9 @@ final class Starter {
     public const CERTIFICATE = '/etc/kienzle/ca/server.crt';
 
     public const SYSTEMS = [
-        'windows' => ['label' => 'Windows', 'scripts' => ['install-windows.cmd', 'install-windows.ps1', 'install-drucker.ps1'], 'assets' => ['kienzle-starter-windows-amd64.exe', 'kienzle-starter-windows-arm64.exe']],
-        'macos' => ['label' => 'macOS', 'scripts' => ['install-macos.command'], 'assets' => ['kienzle-starter-darwin-amd64', 'kienzle-starter-darwin-arm64']],
-        'linux' => ['label' => 'Linux', 'scripts' => ['install-linux.sh'], 'assets' => ['kienzle-starter-linux-amd64', 'kienzle-starter-linux-arm64', 'kienzle-starter-linux-arm']],
+        'windows' => ['label' => 'Windows', 'scripts' => ['install-windows.cmd', 'install-windows.ps1', 'install-drucker.ps1', 'deinstallieren.ps1'], 'assets' => ['praxisherz-starter-windows-amd64.exe', 'praxisherz-starter-windows-arm64.exe']],
+        'macos' => ['label' => 'macOS', 'scripts' => ['install-macos.command'], 'assets' => ['praxisherz-starter-darwin-amd64', 'praxisherz-starter-darwin-arm64']],
+        'linux' => ['label' => 'Linux', 'scripts' => ['install-linux.sh'], 'assets' => ['praxisherz-starter-linux-amd64', 'praxisherz-starter-linux-arm64', 'praxisherz-starter-linux-arm']],
     ];
 
     public function __construct(private Database $db, private Secrets $secrets, private Config $config, private string $root, private string $certificate = self::CERTIFICATE) {}
@@ -57,15 +57,15 @@ final class Starter {
         if (!$kontexte) throw new Problem('Kein installiertes Modul hat einen Startkontext.', 404);
         $pem = @file_get_contents($this->certificate);
         $ca = (string)@file_get_contents(dirname($this->certificate) . '/ca.crt');
-        if (!str_contains($ca, 'BEGIN CERTIFICATE') || str_contains($ca, 'PRIVATE KEY')) throw new Problem('Zertifizierungsstelle der Suite nicht lesbar. Bitte den Installer der Basis ausführen.', 503);
-        if (!$pem || str_contains($pem, 'PRIVATE KEY') || $this->certificateHash() === '') throw new Problem('Serverzertifikat der Suite nicht lesbar. Bitte den Installer der Basis ausführen.', 503);
+        if (!str_contains($ca, 'BEGIN CERTIFICATE') || str_contains($ca, 'PRIVATE KEY')) throw new Problem('Zertifizierungsstelle von Praxisherz nicht lesbar. Bitte den Installer der Basis ausführen.', 503);
+        if (!$pem || str_contains($pem, 'PRIVATE KEY') || $this->certificateHash() === '') throw new Problem('Serverzertifikat von Praxisherz nicht lesbar. Bitte den Installer der Basis ausführen.', 503);
         ksort($kontexte);
         $client = ['server_url' => rtrim($serverUrl, '/'), 'launcher_key' => $this->key(), 'certificate_sha256' => $this->certificateHash(), 'kontexte' => $kontexte];
         $files = [
             'client.json' => ['data' => json_encode($client, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n", 'mode' => 0600],
             'schemas.txt' => ['data' => implode("\n", array_keys($kontexte)) . "\n", 'mode' => 0644],
             'server.crt' => ['data' => $pem, 'mode' => 0644],
-            // Zertifizierungsstelle der Suite: Prüfung der Verbindung (Agent) und vertrauenswürdig für die Browser des PCs.
+            // Zertifizierungsstelle von Praxisherz: Prüfung der Verbindung (Agent) und vertrauenswürdig für die Browser des PCs.
             'ca.crt' => ['data' => (string)@file_get_contents(dirname($this->certificate) . '/ca.crt'), 'mode' => 0644],
             'LIESMICH.txt' => ['data' => self::readme($system, $client['server_url'], array_keys($kontexte), (bool)$drucker), 'mode' => 0644],
         ];
@@ -100,7 +100,7 @@ final class Starter {
         return false;
     }
 
-    public static function filename(string $system): string { return 'kienzle-starter-' . $system . '.zip'; }
+    public static function filename(string $system): string { return 'praxisherz-starter-' . $system . '.zip'; }
 
     /** ZIP ohne Kompression schreiben; liefert die Gesamtgröße. */
     public static function zip(array $files, callable $write): int {
@@ -133,11 +133,11 @@ final class Starter {
     private static function readme(string $system, string $url, array $schemas, bool $drucker = false): string {
         $nl = $system === 'windows' ? "\r\n" : "\n";
         $steps = match ($system) {
-            'windows' => ["Diese ZIP-Datei mit Rechtsklick → „Alle extrahieren …“ entpacken (nicht direkt aus der ZIP starten).", "Im entpackten Ordner „install-windows.cmd“ doppelklicken. Meldet Windows „Der Computer wurde durch Windows geschützt“: „Weitere Informationen“ → „Trotzdem ausführen“.", "Die Frage nach Administratorrechten mit „Ja“ bestätigen (das Fenster kann hinter anderen liegen).", "„Arbeitsplatz eingerichtet“ erscheint. Der Ordner kann danach gelöscht werden; Starter, Zertifikat und Drucker hält der Kienzle-Agent ab jetzt selbst aktuell."],
-            'macos' => ["Die ZIP-Datei doppelklicken (entpackt in „Downloads“).", "Im entpackten Ordner „install-macos.command“ mit Rechtsklick → „Öffnen“ starten und „Öffnen“ bestätigen.", "Für das Zertifikat das Mac-Anmeldepasswort eingeben.", "„Kienzle-Starter eingerichtet“ erscheint. Der Ordner kann danach gelöscht werden."],
-            default => ["Die ZIP-Datei entpacken (unzip kienzle-starter-linux.zip -d kienzle-starter).", "Im Terminal im entpackten Ordner:  bash install-linux.sh", "Das Zertifikat server.crt im Browser als vertrauenswürdig importieren."],
+            'windows' => ["Diese ZIP-Datei mit Rechtsklick → „Alle extrahieren …“ entpacken (nicht direkt aus der ZIP starten).", "Im entpackten Ordner „install-windows.cmd“ doppelklicken. Meldet Windows „Der Computer wurde durch Windows geschützt“: „Weitere Informationen“ → „Trotzdem ausführen“.", "Die Frage nach Administratorrechten mit „Ja“ bestätigen (das Fenster kann hinter anderen liegen).", "„Arbeitsplatz eingerichtet“ erscheint. Der Ordner kann danach gelöscht werden; Starter, Zertifikat und Drucker hält der Praxisherz-Agent ab jetzt selbst aktuell."],
+            'macos' => ["Die ZIP-Datei doppelklicken (entpackt in „Downloads“).", "Im entpackten Ordner „install-macos.command“ mit Rechtsklick → „Öffnen“ starten und „Öffnen“ bestätigen.", "Für das Zertifikat das Mac-Anmeldepasswort eingeben.", "„Praxisherz-Starter eingerichtet“ erscheint. Der Ordner kann danach gelöscht werden."],
+            default => ["Die ZIP-Datei entpacken (unzip praxisherz-starter-linux.zip -d praxisherz-starter).", "Im Terminal im entpackten Ordner:  bash install-linux.sh", "Das Zertifikat server.crt im Browser als vertrauenswürdig importieren."],
         };
-        $text = 'Kienzle-Starter – Einrichtung des Arbeitsplatzes' . $nl . $nl;
+        $text = 'Praxisherz-Starter – Einrichtung des Arbeitsplatzes' . $nl . $nl;
         foreach ($steps as $i => $s) $text .= ($i + 1) . '. ' . $s . $nl;
         return $text . $nl . 'In T2med als Eintrag „Programm/URL“ je Modul: ' . implode(', ', array_map(fn($s) => $s . '://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}', $schemas)) . $nl
             . 'Server: ' . $url . $nl . 'Diese Dateien enthalten den Starter-Schlüssel der Praxis. Nicht weitergeben, nach der Einrichtung löschen.' . $nl;

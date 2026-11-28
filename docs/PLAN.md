@@ -8,7 +8,7 @@ noch nicht. Die Tests `tests/firewall.php`, `tests/updater.php`, `tests/security
 `tests/firewall-apply.sh` dieses Stands laufen grün (PHP 8.3, geprüft am 22.11.2026).
 Dateipfade unten ohne Präfix beziehen sich auf diesen Stand.
 
-Der Code steht unter MIT (© Dr. Thomas Kienzle und Mitwirkende). Die Suite 2.0 übernimmt diese Lizenz (`LICENSE`),
+Der Code steht unter MIT (© Dr. Thomas Kienzle und Mitwirkende). Praxisherz 2.0 übernimmt diese Lizenz (`LICENSE`),
 übernommene Dateien bleiben damit unter demselben Hinweis.
 
 ## Grundentscheidungen
@@ -118,7 +118,7 @@ Die Musterprüfungen (Portbereiche, Namen) folgen `scripts/firewall-apply.py` (`
   Module prüfen die Rechte noch einmal; dafür gibt es eine kleine PHP-Hilfsdatei.
 - nginx-Vorlage und php-fpm-Pool `ks-core`, systemd-Einheiten gehärtet (`NoNewPrivileges`, `ProtectSystem=strict`, …).
 - **Lokale Zertifizierungsstelle (E9).** Sie gehört schon in M2, damit HTTPS von Anfang an mit dem endgültigen Zertifikat läuft.
-  - Der Installer erzeugt auf dem Server eine Stamm-CA „Kienzle-Suite <Praxisname>“ (ECDSA P-256, 30 Jahre).
+  - Der Installer erzeugt auf dem Server eine Stamm-CA „Praxisherz <Praxisname>“ (ECDSA P-256, 30 Jahre).
     Ihr privater Schlüssel liegt nur für root lesbar unter `/etc/kienzle/ca/` und wird nur zum Ausstellen benutzt.
   - Die CA trägt eine **Namensbeschränkung** (`nameConstraints`) auf die Namen und Adressen der Praxis
     (Servername, `*.praxis.internal` o. Ä., die privaten Netze aus der Firewall). Selbst mit gestohlenem CA-Schlüssel
@@ -214,7 +214,7 @@ landen, nach dem Start geprüft werden und bei Fehlern automatisch auf den vorhe
 
 1. **Release:** je Teil ein Archiv `<teil>-<version>.tar.gz` und ein `manifest.json`. Das Manifest enthält Teil, Version,
    Kanal, `core_api` bzw. die nötige Mindestversion der Basis und SHA-256 jeder Datei. Dazu eine Signatur
-   `manifest.json.sig`. Veröffentlicht als GitHub-Release in `hau-si/kienzlesuite-2.0`; Tags `core-v0.4.0`,
+   `manifest.json.sig`. Veröffentlicht als GitHub-Release in `hau-si/praxisherz`; Tags `core-v0.4.0`,
    `sumup-v2.0.0`; Beta = Vorabversion.
 2. **Signatur ohne externe Zertifizierungsstelle:** ein eigenes Ed25519-Schlüsselpaar, erzeugt mit `ssh-keygen -t ed25519`.
    Signiert und geprüft wird mit `ssh-keygen -Y sign/verify` (Namensraum `kienzle-release`); openssh ist auf jedem Ubuntu Server vorhanden.
@@ -399,7 +399,7 @@ SMB per `mount.cifs` braucht Kernel-Rechte; das prüft nur die Test-VM.
 **Stand:** umgesetzt in Basis 0.7.0 (`docs/RELEASE.md`). `--wiederherstellen` kam schon mit M6. Überblicke der Module sammelt
 ein eigener root-Dienst (`kienzle-ueberblick`), weil das Webinterface keine Haken als Modul-Benutzer starten darf.
 
-**Ziel:** Eine Standard-Installation von Ubuntu Server 26.04.1 wird mit einem Befehl zur Kienzle-Suite (nur Basis). Erneutes Ausführen ändert nichts Unerwünschtes.
+**Ziel:** Eine Standard-Installation von Ubuntu Server 26.04.1 wird mit einem Befehl zu Praxisherz (nur Basis). Erneutes Ausführen ändert nichts Unerwünschtes.
 
 **Ergebnis (prüfbar):**
 
@@ -472,7 +472,7 @@ Danach ist die Basis bereit für das SumUp- und das Terminzettel-Modul (Schritt 
   - Bei Installation und Update des Moduls legt der Dienst Backend und PPD aus dem Modulordner an (root, 0755 bzw. 0644).
   - Die Warteschlange wird angelegt und je nach Angabe per Samba und/oder IPP freigegeben.
   - Beim Entfernen des Moduls wird beides wieder entfernt.
-  - Entfernt werden nur Warteschlangen mit der Kennung der Suite.
+  - Entfernt werden nur Warteschlangen mit der Kennung von Praxisherz.
 - **Für Module:** Auswahlliste der Warteschlangen im Webinterface des Moduls über eine Abfrage an die Basis,
   Drucken mit `lp` als Modul-Benutzer.
 

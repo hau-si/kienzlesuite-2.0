@@ -1,5 +1,208 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.47
+
+- **Fehler behoben (Nutzer-Meldung): Webinterface ließ sich nach dem Update auf beta.46 nicht anpassen.** nginx lehnte die Konfiguration ab („fastcgi_busy_buffers_size must be less than the size of all fastcgi_buffers minus one buffer“), weil beta.46 in der Anmeldeprüfung `/_auth/` nur `fastcgi_buffer_size 32k` vergrößert hatte. Jetzt passen die Puffer zusammen (`fastcgi_buffers 8 32k`). Die alte Konfiguration blieb bis dahin aktiv; Module, die die Personenliste brauchen (QM: Vorlegen), gehen erst mit diesem Stand.
+- Neuer Test: Die erzeugte Konfiguration aller Module wird mit echtem `nginx -t` geprüft (fängt genau diesen Fehler); nginx gehört jetzt zu den Paketen der Testläufe auf GitHub.
+- Mit Tests geprüft (nginx 1.24 in der Testumgebung). Nicht auf der VM geprüft.
+
+## 0.22.0-beta.46
+
+- **Neu für Module: Personenliste (`[web] personen = true`, core_api 2).** Ein Modul, das es in `module.toml` anfordert, bekommt mit jeder Anfrage die aktiven Konten mit Zugang zu diesem Modul: Anmeldename, Anzeigename, Gruppen (Rollen) und Rechte im Modul (Kopfzeile `X-Kienzle-Personen` bzw. `KIENZLE_PERSONEN`, PHP `$k->personen()`). Keine E-Mail-Adressen, keine Rechte in anderen Modulen; die Liste wird 30 Sekunden zwischengespeichert. Erster Nutzer: Qualitätsmanagement (Dokumente an die Gruppe „MFA“ vorlegen). Andere Module bekommen die Kopfzeile nicht.
+- nginx: größerer Puffer für die Antwort der Anmeldeprüfung (`fastcgi_buffer_size 32k` in `/_auth/`), damit Menü und Personenliste sicher hineinpassen. Wirkt nach dem nächsten Erzeugen der nginx-Konfiguration (Update bzw. `install.sh`).
+- Symbol für das Modul „Qualitätsmanagement“ in Seitenleiste und Startseite.
+- Fehler behoben: Die in beta.45 angelegte `core/client/starter/.gitignore` brach den Bau des Basis-Releases (Punktdateien sind im Archiv nicht erlaubt; Test `test_bauen_und_signieren`). Die Regel steht jetzt in der obersten `.gitignore`.
+- Geprüft mit Tests (Weitergabe nur an anfordernde Module, Prüfung der Liste im PHP-Helfer, nginx-Vorlage, Manifest). **Nicht auf der VM geprüft.**
+
+## 0.22.0-beta.45
+
+- Gleicher Inhalt wie beta.44, ohne eine versehentlich mitgelieferte Programmdatei im Archiv. Die Vorabversion beta.44 bitte auf GitHub löschen (Release und Tag `core-v0.22.0-beta.44`).
+
+## 0.22.0-beta.44
+
+- **Keine Übergänge von „Kienzle“ mehr** (Wunsch des Nutzers): T2med-Aufrufe nur noch `praxisherz-…://` (die früheren `kienzle-…://` werden nicht mehr eingerichtet und vom Starter abgelehnt), kein früherer Programmname `kienzle-starter-…` für ältere Agenten, keine Ordner `C:\Kienzle` (GDT, Programm, Daten), keine alte Druckermarke „Kienzle-Suite“, keine alten Autostart- und Aufgabeneinträge, keine Ausweichsuche des Updaters und der Start-ISO nach dem früheren Repository-Namen. Zertifikate neuer Installationen heißen „Praxisherz“.
+- Agent 2.4.0. **Bestehende PCs:** einmal `Praxisherz-Setup.exe` neu ausführen; in T2med die Aufrufadressen auf `praxisherz-…://` umstellen (Verwaltung → Verbindungen → T2med) und beim GDT-Gerät `C:\Praxisherz\GDT\AUFRUFi.gdt` eintragen.
+- Mit Tests geprüft, nicht unter Windows und nicht auf der VM.
+
+## 0.22.0-beta.43
+
+- Neu veröffentlicht nach dem Bereinigen der Git-Geschichte (gleicher Inhalt wie die vorige Vorabversion). Die vorigen Vorabversionen bitte auf GitHub löschen.
+
+## 0.22.0-beta.42
+
+- Neue Verbindung **Übersetzung (DeepL)** unter Verwaltung → Verbindungen: Schlüssel der DeepL API Free (endet auf „:fx“) oder Pro, „Schlüssel prüfen“ zeigt die genutzten Zeichen des Monats. Module melden sie mit `[[connections]] id = "uebersetzung"` an (zuerst die Signatur für Sprachfassungen von Vorlagen). Mit Tests geprüft, nicht mit DeepL und nicht auf der VM.
+
+## 0.22.0-beta.41
+
+- **Fehler behoben (Nutzer-Meldung): Agent hing nach einem Neustart des PCs über 30 Minuten auf „wird aktualisiert“.** Scheiterte die Selbstaktualisierung (z. B. Laden dauerte länger als 20 Sekunden oder die alte Programmdatei ließ sich nicht austauschen), versuchte der Agent es alle 2 Sekunden erneut. Das Symbol zeigte dadurch dauerhaft den blauen Punkt, und der Grund stand nirgends. Jetzt: Laden darf bis zu 3 Minuten dauern; nach einem Fehlschlag wartet der Agent 10 Minuten bis zum nächsten Versuch; der Grund steht in `starter.log` und als gelbe Zeile „Aktualisierung“ im Statusfenster. Ist die frühere Programmdatei noch belegt, weicht der Agent auf einen eigenen Namen aus (wird beim nächsten Start aufgeräumt). Dauert eine Aktualisierung länger als 6 Minuten, zeigt das Symbol rot „Update hängt“ mit Hinweis statt endlos blau. Agent 2.3.13.
+- Der Farbpunkt am Taskleisten-Symbol und im Statusfenster ist größer und hat einen weißen Rand, damit die Farbe auch klein zu erkennen ist.
+- Mit Tests geprüft. **Nicht unter Windows geprüft.**
+
+## 0.22.0-beta.40
+
+- **Fehler behoben (Nutzer-Meldung): Drucker einrichten lief nach 3 Minuten in eine Zeitüberschreitung.** Abgleich mit dem bewährten Handskript `install-drucker.ps1`: gleiche Schritte, aber jeder Schritt, der bei einem festhängenden Druckspooler ewig warten kann (Spooler neu starten, Treiber, Anschluss, Drucker anlegen/umstellen), läuft mit eigener Frist. Hängt der Spooler, beendet der Agent ihn hart und startet ihn neu. Internetdrucken (DISM, als Systemdienst oft minutenlang) wird nur einmal eingeschaltet (`internetdrucken.ok`). Agent 2.3.12.
+- Mit Tests geprüft. **Nicht unter Windows geprüft.**
+
+## 0.22.0-beta.39
+
+- **Fehler behoben (Nutzer-Meldung): Taskleisten-Symbol hing („reagiert nicht“).** Das Fenster war nicht an einen festen Thread gebunden; Go konnte die Nachrichtenschleife auf einen anderen Thread verlegen, danach kamen keine Fensternachrichten mehr an. Jetzt `runtime.LockOSThread()` (Agent 2.3.11).
+- Mit Tests geprüft. **Nicht unter Windows geprüft.**
+
+## 0.22.0-beta.38
+
+- **Fehler behoben: Beim Setup blieb das PowerShell-Fenster leer** und schloss sich bei einem Fehler sofort. Das Setup startet die Einrichtung jetzt mit sichtbarem Fenster; bei einem Fehler bleibt es offen („FEHLER: …“), das Protokoll steht in `%TEMP%\praxisherz-einrichtung.log` (Agent 2.3.10).
+- **Einrichten → Server:** Der heutige Servername wird wieder angezeigt, auch mit einer Endung, die nicht in der Auswahl steht (z. B. eigene Domain; erscheint als „(bisher)“).
+- **Einrichten → Arbeitsplätze:** statt der Adressliste ein Verweis auf **Verwaltung → Verbindungen → T2med**. Dort stehen jetzt alle Aufrufadressen aller Module (neue Schreibweise, frühere funktioniert weiter).
+- Sichtbares „Kienzle“ entfernt: GDT-Ordner im Hilfetext `C:\Praxisherz\GDT`, Druckerbeschreibungen und Druckermodell „Praxisherz …“ (bestehende Warteschlangen werden weiter erkannt).
+- Mit Tests geprüft. **Nicht unter Windows und nicht auf der VM geprüft.**
+
+## 0.22.0-beta.37
+
+- **Fehler behoben (Nutzer-Meldung): Agent meldete „agent.json fehlt … C:\ProgramData\Praxisherz“.** Lagen im neuen Ordner schon Einstellungen, der Zugang des Agents aber nur im früheren Ordner „Kienzle“ (z. B. Paket nicht bis zum Ende gelaufen), suchte der Agent im neuen. Jetzt gilt der Ordner, in dem der Zugang liegt (Agent 2.3.9).
+- Taskleisten-Symbol und Statusfenster zeigen das Herz statt „K“.
+- Mit Tests geprüft. **Nicht unter Windows geprüft.**
+
+## 0.22.0-beta.36
+
+- **Windows: `Praxisherz-Setup.exe`** (Einrichten → Arbeitsplätze): eine Datei, Doppelklick, Windows fragt nach Administratorrechten, dann läuft die Einrichtung im eigenen Fenster. Technisch das Starterprogramm mit angehängtem Paket (entpackt in einen Temp-Ordner, der danach gelöscht wird). Das ZIP-Paket gibt es weiter. Ohne kostenpflichtige Code-Signatur warnt Windows beim ersten Start („Weitere Informationen“ → „Trotzdem ausführen“).
+- **Deinstallieren:** Die Einrichtung trägt „Praxisherz-Agent“ unter Windows-Einstellungen → Apps ein. „Deinstallieren“ entfernt Aufgabe, Symbol, Autostart, Aufrufe aus T2med, Zertifikat und Ordner; die virtuellen Drucker nur nach Rückfrage (j/n). Den Eintrag des PCs auf dem Server löscht ein Admin unter Arbeitsplätze.
+- Agent/Starter 2.3.8 mit Setup-Modus (`setup.go`, `setup_windows.go`).
+- Mit Tests geprüft (Setup-Datei, Entpacken mit Pfadprüfung). **Nicht unter Windows geprüft.**
+
+## 0.22.0-beta.35
+
+- **Überall „Praxisherz“ statt „Suite“** in Oberfläche, Hinweisen und Anleitungen; die Seite während einer Aktualisierung („Einen Moment bitte“) sagt „Praxisherz wird gerade aktualisiert“. Auf einem Server erscheint das erst nach diesem Update (die Seite kommt sonst noch aus dem alten Stand).
+- **Arbeitsplatz-Paket:** ZIP `praxisherz-starter-<system>.zip`, Programm `praxisherz-starter(.exe)`, Windows-Aufgabe „Praxisherz-Agent“, Autostart-Eintrag „Praxisherz“, Taskleisten-Knopf „Praxisherz öffnen“. Beim nächsten Ausführen des Pakets werden die alte Aufgabe „Kienzle-Agent“ und die alten Ordner entfernt.
+- Agent 2.3.8: Ältere Agenten finden die neue Fassung unter ihrem früheren Namen `kienzle-starter-…` und aktualisieren sich selbst; die Aufgabe wird unter beiden Namen gefunden.
+- Mit Tests geprüft. **Nicht unter Windows/macOS/Linux-Arbeitsplätzen, nicht auf der VM geprüft.**
+
+## 0.22.0-beta.34
+
+- **Ordner, die man sieht, heißen jetzt „Praxisherz“:**
+  - „Akte öffnen“: GDT-Datei in `C:\Praxisherz\GDT\AUFRUFi.gdt` (in T2med beim GDT-Gerät „Telefonaufruf“ umstellen). Solange `C:\Kienzle\GDT` besteht, schreibt der Agent die Datei zusätzlich dorthin; nach dem Umstellen in T2med den Ordner `C:\Kienzle` löschen.
+  - Windows: Programm in `C:\Program Files\Praxisherz`, Daten in `C:\ProgramData\Praxisherz`. Beim nächsten Ausführen des Pakets zieht der PC um und entfernt die alten Ordner „Kienzle“. Bis dahin läuft der Agent aus den alten Ordnern weiter.
+  - macOS: `~/Applications/Praxisherz-Starter.app` und `~/Library/Application Support/Praxisherz-Starter` (alte „Kienzle-Starter“ werden entfernt); Linux: `~/.local/share/praxisherz-starter`.
+  - NAS: Vorbelegung des Sicherungsordners `praxisherz-sicherung` (bestehende Ziele behalten ihren Ordner), Testdatei `praxisherz-verbindungstest-….txt`, Beispieladresse `…/praxisherz`.
+  - Downloads: Zertifikat `praxisherz-ca.crt`, Einstellungs-Export `praxisherz-einstellungen-….kse` (ältere `kienzle-einstellungen-….kse` lassen sich weiter einspielen).
+- Agent/Starter: wählt den Datenordner „Praxisherz“, sonst den früheren „Kienzle“ (PCs von vorher).
+- Unverändert (intern): geplante Aufgabe „Kienzle-Agent“, Programmname `kienzle-starter.exe`, Ordner und Dienste auf dem Server.
+- Mit Tests geprüft. **Nicht unter Windows/macOS, nicht auf der VM und nicht mit T2med geprüft.**
+
+## 0.22.0-beta.33
+
+- **Umzug des Repositorys nach `hau-si/praxisherz` vorbereitet.** Der Web-Updater (Verwaltung → Updates) und die Start-ISO fragen zuerst `hau-si/praxisherz` und, solange es das noch nicht gibt, den früheren Namen `hau-si/kienzlesuite-2.0`. Nach der Umbenennung auf GitHub funktionieren Updates also ohne weiteren Schritt; GitHub leitet zusätzlich den früheren Namen weiter.
+- Anleitungen (Installation, VM-Test) nennen die neue Adresse.
+- Mit Tests geprüft (Rückfall auf den früheren Namen). **Nicht auf der VM und nicht gegen das echte GitHub geprüft.**
+
+## 0.22.0-beta.32
+
+- **Neue Aufrufadressen aus T2med:** `praxisherz-kasse://`, `praxisherz-signatur://`, `praxisherz-telefonverzeichnis://` (Seite Einrichten → Arbeitsplätze zeigt sie). Die früheren Adressen `kienzle-…://` richtet die Basis an jedem Arbeitsplatz weiter mit ein; bestehende Einträge in T2med funktionieren also weiter und können nach und nach umgestellt werden.
+- Agent/Starter 2.3.7 kennt beide Schreibweisen. Ältere Agenten bekommen nur die früheren Adressen, bis sie sich selbst aktualisiert haben (sie würden die neuen sonst ablehnen).
+- `module.toml`: Startschemata heißen jetzt `praxisherz-<name>`; `kienzle-<name>` gilt weiter, beide zählen als dasselbe Schema.
+- **Neuer Servername bei Neuinstallation:** Vorschlag `praxisherz` **ohne Endung** (Verwaltung → Server: neue Wahl „ohne Endung“, die anderen Endungen bleiben wählbar), Rechnername der Start-ISO `praxisherz`. Der Name muss im Router/DNS der Praxis bekannt sein (FRITZ!Box meist von selbst). Bestehende Server behalten ihren Namen; ein späterer Wechsel auf einen Namen ohne Endung braucht eine neue Zertifizierungsstelle (Häkchen auf der Seite Server).
+- Reihenfolge beim Update: erst die Basis, dann die Module (eine ältere Basis lehnt Module mit `praxisherz-…`-Adressen ab).
+- Mit Tests geprüft. **Nicht auf der VM, nicht unter Windows und nicht mit T2med geprüft.**
+
+## 0.22.0-beta.31
+
+- **Neuer Name: „Praxisherz – freie Software für die Arztpraxis“** (vorher Kienzle-Suite; Wunsch von T2med nach einem unterscheidbaren Namen).
+- Oben links steht jetzt das Herz-Symbol statt des Buchstabens. Agent und Starter heißen in Texten „Praxisherz-Agent“ bzw. „Praxisherz-Starter“.
+- Interne Namen bleiben vorerst gleich, damit bestehende Installationen ohne Neueinrichtung weiterlaufen: Ordner und Dienste (`kienzle-…`, `/opt/kienzle`), die geplante Aufgabe „Kienzle-Agent“ unter Windows, die Programmordner am PC, die Aufrufadressen aus T2med (`kienzle-kasse://` usw.), Druckerkennungen und Zertifikatsfelder.
+- Ersetzt 0.22.0-beta.30 (Zwischenstand mit anderem Namen, bitte nicht verwenden).
+- Mit Tests geprüft. **Nicht auf der VM und nicht unter Windows geprüft.**
+
+## 0.22.0-beta.29
+
+- Verwaltung → Verbindungen → T2med: Hinweise auf den T2med-Demo-Schlüssel entfernt. Jede Praxis trägt ihren eigenen API-Schlüssel ein; ohne Schlüssel verbinden sich die Module nicht mit T2med.
+- Mit Tests geprüft. **Nicht auf der VM geprüft.**
+
+## 0.22.0-beta.28
+
+- Modul-Schnittstelle: neuer Abschnitt **„Patientenübergabe zwischen Modulen“** (`docs/MODUL-SCHNITTSTELLE.md`). Ein Patient mit T2med-Zugang geht über den gemeinsamen Austauschordner an ein anderes Modul (Datei `uebergabe-<ziel>/<code>.json`, höchstens 5 Minuten, einmalig, im selben Tab). Nur Dokumentation.
+
+## 0.22.0-beta.27
+
+- **Fehler behoben: Das Statusfenster des Symbols in der Taskleiste konnte beim Klick auf einen Knopf komplett hängen bleiben** (Nutzer-Meldung: „bei Neustart des PC und dann Klick auf Tray-Icon öffnet sich das Statusfenster, dieses hängt sich aber bei Klick darauf ganz oft komplett auf“). Alle Knöpfe des Fensters (Suite öffnen, Drucker prüfen, Protokoll, Alte Drucker entfernen) schrieben Dateien oder starteten Programme (Browser, `notepad.exe`) bisher direkt im Fenster-Thread; läuft `CreateProcess` oder ein Dateizugriff dabei einmal langsam (z. B. weil der Virenscanner kurz nach dem Hochfahren jede neue Datei und jedes gestartete Programm prüft), blockiert das die ganze Nachrichtenschleife des Fensters – es reagiert dann auf nichts mehr, bis der Scan durch ist, und wirkt „komplett aufgehängt“. Diese Aktionen laufen jetzt in einem eigenen Hintergrund-Thread; das Fenster bleibt dabei immer reagierfähig (die Win32-Aufrufe selbst macht weiterhin nur der Fenster-Thread, der Hintergrund-Thread meldet nur sein Ergebnis zurück). Die Rückfrage „Alte Drucker entfernen?“ bleibt bewusst wartend (soll eine Antwort abwarten), nur das Schreiben danach ist jetzt asynchron.
+- Programmversion 2.3.6. Geprüft mit Tests und Kreuz-Kompilierung für Windows. **Nicht auf einem echten Windows-PC geprüft** – die genaue Ursache des Hängens (vermutlich ein langsamer `CreateProcess`-/Dateizugriff kurz nach dem Hochfahren) ließ sich in dieser Sitzung nicht nachstellen.
+
+## 0.22.0-beta.26
+
+- **Fehler behoben: „Alte Drucker entfernen“ hängte den Agent trotz Frist weiter auf, Drucker blieben unentfernt** (Nutzer-Meldung: „bei Klick auf alte Drucker entfernen kommt jetzt die Nachfrage, bei Klick auf ja entfernen hängt sich der Agent wieder auf, Drucker sind nicht entfernt“). Die 90-Sekunden-Frist aus beta.23 schützte nur den Dienst-Prozess als Ganzes; `Remove-Printer` selbst konnte weiter unbegrenzt in Windows hängen bleiben, sodass innerhalb der Frist kein einziger Drucker entfernt wurde. Nach dem manuell bewährten Vorgehen (`install-windows.ps1`/„Gelöst“ in AGENTS.md: erst den Druckspooler neu starten, dann Drucker entfernen) startet `drucker-agent.ps1` beim Entfernen jetzt zuerst den Spooler-Dienst neu und entfernt danach jeden Drucker einzeln in einem eigenen Hintergrundauftrag mit eigener 20-Sekunden-Frist: Hängt ausgerechnet einer (z. B. noch ein Druckauftrag in seiner Warteschlange), werden die übrigen trotzdem entfernt, statt dass alles stehen bleibt. Die äußere Frist des Dienstes wurde dafür auf 180 Sekunden angehoben.
+- Programmversion 2.3.5. Geprüft mit Tests und Kreuz-Kompilierung für Windows. **Nicht auf einem echten Windows-PC geprüft** – insbesondere nicht, ob der Spooler-Neustart und die Einzel-Frist je Drucker den konkreten Hänger beheben.
+
+## 0.22.0-beta.25
+
+- Gestaltungsregel der Module ergänzt (`docs/MODUL-GESTALTUNG.md`): Entfernen als Mülltonne, Klick auf Name oder T2med-Etikett öffnet die Akte, Umschalter für zwei Arbeitsflächen (Kasse: „T2m-Rechnung“ | „IGeL“), der Name hat Vorrang. Nur Dokumentation.
+
+## 0.22.0-beta.24
+
+- **Fehler behoben:** In der Patientenkarte ließen sich Knöpfe nicht ausblenden. In Signatur standen ohne Patient trotzdem „Zur Kasse“ und „Entfernen“. `core.css?v=39`.
+- In der Vorschau geprüft. **Nicht auf der VM geprüft.**
+
+## 0.22.0-beta.23
+
+- **Fehler behoben: Der Agent konnte sich beim Entfernen alter Drucker für immer aufhängen** (Nutzer-Meldung: „bei Klick auf Alte Drucker entfernen hängt sich der Agent auf“). Das Druckerskript (Einrichten, Prüfen auf alte Drucker, Entfernen) rief PowerShell bisher ohne jede Frist auf; bleibt dort `Remove-Printer` oder der Windows-Druckspooler hängen (z. B. bei einem festsitzenden Druckauftrag auf dem zu entfernenden Drucker – ein bereits bekanntes Verhalten dieses Druckspoolers, siehe „Gelöst“ weiter unten in dieser Datei), blockierte das den ganzen Dienst-Prozess unbegrenzt: Er fragte die Suite nicht mehr ab, status.json blieb stehen, der Arbeitsplatz wirkte insgesamt hängen geblieben. Das Druckerskript bekommt jetzt eine Frist von 90 Sekunden; läuft sie ab, wird der PowerShell-Prozess beendet und der Agent macht normal weiter (Fehlermeldung „Zeitüberschreitung … Windows-Druckerverwaltung antwortet nicht; Druckspooler-Dienst neu starten“ auf der Seite „Arbeitsplätze“). Betrifft alle drei Aufrufarten (Einrichten, Prüfen, Entfernen).
+- **Fehler behoben: Windows fragte bei jeder Anmeldung erneut, ob das Programm ausgeführt werden darf** (Nutzer-Meldung). Ursache: Das aus dem heruntergeladenen Paket kopierte `kienzle-starter.exe` behielt die Kennzeichnung „Datei stammt von einem anderen Computer“ (Zone.Identifier), die Windows beim Programmstart über die Taskleiste (`HKLM…\Run`, Symbol bei jeder Anmeldung) jedes Mal neu abfragt. `install-windows.ps1` entfernt die Kennzeichnung jetzt einmalig nach dem Einspielen (`Unblock-File`); dazu muss das Installationspaket einmal erneut ausgeführt werden (neues Paket von der Seite „Arbeitsplätze“ laden).
+- Programmversion 2.3.4. Geprüft mit Kreuz-Kompilierung für Windows; beides lässt sich in dieser Sitzung nicht automatisiert testen (kein Windows vorhanden, wie der übrige Agent, und `install-windows.ps1` hat ohnehin keine Tests). **Nicht auf einem echten Windows-PC geprüft** – insbesondere nicht, ob 90 Sekunden im Einzelfall für das Druckerskript reichen.
+
+## 0.22.0-beta.22
+
+- **Neu: Gestaltungsregel für Module** (`docs/MODUL-GESTALTUNG.md`): Patient oben als Karte, Vorgänge links, der Patient bleibt im Tab erhalten (auch beim Wechsel zwischen Modulen), Wechsel zwischen Modulen im selben Tab, alle Seiten 1400 px breit, Liniensymbole statt Emojis.
+- **Neu: Patientenkarte als Bauteil** in `core.css` (`.patient-karte`, `.pk-marke` mit Herz „T2med“ oder neutral, `.pk-text`, `.pk-knoepfe`, `.pk-knopf`, `.pk-weg`), zuerst genutzt von Kasse und Signatur. `core.css?v=38`.
+- Nur Oberfläche, mit Tests und in der Vorschau geprüft. **Nicht auf der VM geprüft.** Vor Kasse und Signatur aktualisieren, sonst fehlt der Karte die Gestaltung.
+
+## 0.22.0-beta.21
+
+- **Neu: Symbol in der Taskleiste zeigt „wird aktualisiert“ (blau)**, solange der Hintergrunddienst eine neue Fassung lädt, austauscht und sich dafür beendet (Wunsch des Nutzers, nach dem Fehler in beta.20). Vorher blieb in dieser kurzen Zeit nur die Wahl zwischen „verbunden“ (veraltet) und dem alarmierenden „Agent läuft nicht“ (rot); jetzt schreibt der Dienst vor dem Laden `wird_aktualisiert: true` in status.json, das Symbol zeigt dafür bis zu 6 Minuten lang einen blauen Punkt mit dem Hinweis „lädt die neue Fassung und startet gleich neu, bitte kurz warten“ statt rot zu werden. Scheitert die Aktualisierung (z. B. falsche Prüfsumme), wird der Hinweis sofort wieder zurückgenommen. Nach Ablauf der 6 Minuten gilt wie gewohnt „Agent läuft nicht“.
+- Programmversion 2.3.3. Geprüft mit Tests (Go, neue Tests für die blaue Anzeige und das Zurücksetzen bei einer gescheiterten Aktualisierung) und Kreuz-Kompilierung für Windows. **Nicht auf einem echten Windows-PC geprüft** (wie der übrige Agent).
+
+## 0.22.0-beta.20
+
+- **Fehler behoben: Symbol in der Taskleiste blieb nach einer Selbstaktualisierung des Agents hängen** (roter Punkt, lässt sich nicht mehr anklicken), obwohl der Agent selbst (Dienst) nach der Aktualisierung einwandfrei lief (Arbeitsplatz „verbunden“, Drucker eingerichtet). Ursache: Nur der Hintergrunddienst startet sich nach einer Aktualisierung selbst neu (beta.18); das Symbol in der Taskleiste ist ein zweiter, unabhängiger Prozess, der nur beim Anmelden startet und sonst unbegrenzt mit dem alten Programmstand weiterlief. Das Symbol erkennt jetzt an `status.json` (andere Programmversion als die eigene), dass der Dienst sich inzwischen aktualisiert hat, und startet sich selbst mit der neuen Fassung neu – ohne Zutun des Benutzers, in der Regel binnen weniger Sekunden nach der Aktualisierung des Dienstes.
+- Wer gerade ein hängendes, rotes und nicht anklickbares Symbol hat: einmal abmelden und wieder anmelden (oder den PC neu starten) behebt es sofort; ab dieser Fassung tritt es nicht mehr auf.
+- Programmversion 2.3.2. Geprüft mit Tests (Go, neuer Test `TestAgentAktualisiert`) und Kreuz-Kompilierung für Windows. **Nicht auf einem echten Windows-PC geprüft** (wie der übrige Agent).
+
+## 0.22.0-beta.19
+
+- **Fehler behoben: Agent richtete keine Drucker ein** („0 von 1 eingerichtet“ bei vier Druckern, „keine MSFT_Printer-Objekte … Name gleich …“). Windows PowerShell 5.1 reichte die Druckerliste als ein einziges Objekt weiter; dadurch standen alle vier Namen in einem Eintrag. Das Skript liest die Liste jetzt über eine Variable. Derselbe Fehler steckte im Entfernen alter Drucker.
+- **Servername am PC unbekannt:** Der Agent übergibt jetzt die IP-Adresse, unter der er den Server erreicht. Kennt der PC den Namen nicht, richtet das Skript die Drucker mit dieser IP-Adresse ein, wie das bewährte Handskript. Vorhandene Drucker mit dieser Adresse gelten als eingerichtet.
+- **Umlaute in der Rückmeldung** („unverÃ¤ndert“): Das Skript wird mit UTF-8-Kennung (BOM) geschrieben.
+- Programmversion 2.3.1. Geprüft mit Tests (Go). **Nicht auf einem echten Windows-PC geprüft.**
+
+## 0.22.0-beta.18
+
+- **Fehler behoben: Agent blieb nach seiner Aktualisierung stehen** (Arbeitsplatz „zuletzt …“, alte Version). Die geplante Aufgabe startet ein Programm, das mit Fehlercode endet, nicht neu. Der Agent startet sich nach der Aktualisierung jetzt selbst neu. Zusätzlich startet die Aufgabe alle 5 Minuten; das trägt der Agent bei bestehenden Einrichtungen selbst nach. Ein benannter Mutex sorgt dafür, dass je PC nur ein Agent läuft.
+- **Fehler behoben: Drucker galten als „unverändert mit alter Adresse“,** obwohl sie funktionierten. Ein Drucker, der mit der IP-Adresse des Servers auf dieselbe Warteschlange zeigt (z. B. früher von Hand eingerichtet), gilt jetzt als eingerichtet und wird nicht umgestellt.
+- Die Prüfung von Port 631 versucht alle Adressen des Servers, IPv4 zuerst. Vorher meldete sie eine IPv6-Adresse wie `fe80::…` als nicht erreichbar.
+- Beim Umstellen eines Anschlusses werden Name und Adresse ausdrücklich als Text übergeben. Vorher meldete Windows „Argumenttransformation für den Parameter PortName“.
+- Programmversion 2.3.0. Geprüft mit Tests (Go, Ausdruck der Druckererkennung). **Nicht auf einem echten Windows-PC geprüft.** Ein Agent, der schon stehen geblieben ist, läuft erst nach einem Neustart des PCs oder einem erneuten Ausführen des Pakets wieder an.
+
+## 0.22.0-beta.17
+
+- **Neu: Alte Kienzle-Drucker entfernen, nach Rückfrage.** Der Kienzle-Agent sucht höchstens alle 10 Minuten (und nach „Drucker prüfen“) nach Druckern, die auf die Suite zeigen (Servername oder dessen IP-Adresse), deren Warteschlange es dort aber nicht mehr gibt, z. B. „Terminzettel“ oder „SumUp-Rechnung“ von früher. Das Symbol in der Taskleiste zeigt sie gelb unter „Alte Drucker“ und bietet „Alte Drucker entfernen …“ an. Gelöscht wird erst nach „Ja“ in der Rückfrage (Vorgabe ist „Nein“), und nur Drucker, die der Agent unmittelbar davor erneut als alt erkennt. Der freie Anschluss wird mit entfernt.
+- Beim Einrichten löscht der Agent weiterhin nie einen Drucker. Die aktuellen Drucker der Suite und fremde Drucker bleiben unberührt.
+- Umlaute in Druckernamen und Windows-Meldungen kommen jetzt unverfälscht an (Ausgabe des Skripts in UTF-8).
+- Programmversion 2.2.0. Geprüft mit Tests (Go). **Nicht auf einem echten Windows-PC geprüft.**
+
+## 0.22.0-beta.16
+
+- **Neu: Symbol des Kienzle-Agents in der Taskleiste** (Entwurf B). Ein Klick öffnet über der Uhr ein kleines Statusfenster mit einer Ampel je Bereich: Verbindung zur Suite, Drucker (mit fehlenden Druckern und der Windows-Meldung), Aufrufe aus T2med, Zertifikat und „Akte öffnen“. Der Punkt am Symbol zeigt den schlechtesten Zustand (grün, gelb, rot; rot auch, wenn der Agent seit 3 Minuten nichts gemeldet hat). Unten gibt es drei Knöpfe: „Suite öffnen“, „Drucker prüfen“ (der Agent richtet fehlende Drucker sofort neu ein, statt 10 Minuten zu warten) und „Protokoll“ (öffnet `starter.log`).
+- Der Agent schreibt dafür `C:\ProgramData\Kienzle\status.json` (ohne Schlüssel und ohne Patientendaten). Das Symbol läuft als angemeldeter Benutzer und liest nur diese Datei. „Drucker prüfen“ legt eine leere Datei im Ordner `anstoss` ab; nur dort dürfen Benutzer schreiben.
+- Das Symbol startet bei jeder Anmeldung (`HKLM\…\Run`, `kienzle-starter --tray`, nur einmal je Sitzung). Den Eintrag setzt der Agent selbst, also auch auf PCs, die schon eingerichtet sind, sobald er sich nach dem Basis-Update aktualisiert hat. Sichtbar wird es dort nach der nächsten Anmeldung. Das Paket startet es sofort.
+- Programmversion 2.1.0. Geprüft mit Tests (Go, Übersetzung für Windows). **Nicht auf einem echten Windows-PC geprüft**, auch nicht das Aussehen des Fensters.
+
+## 0.22.0-beta.15
+
+- **Fehler behoben: Kienzle-Agent richtete keine Drucker ein** („Drucker fehlen: vBriefversand, vFax1, vKasse, vTermine“). Anders als das bewährte `install-drucker.ps1` startete der Agent nach dem Einschalten des Windows-Internetdruckens die Druckwarteschlange nicht neu; ohne Neustart kennt Windows die `http://…`-Anschlüsse oft nicht. Der Agent geht jetzt genauso vor wie das Skript: Internetdrucken einschalten, **Spooler neu starten**, Treiber laden, je Drucker bis zu 4 Versuche mit Pausen (nur wenn etwas fehlt).
+- **Ein vorhandener Drucker wird nie gelöscht:** Hat er eine andere Adresse (z. B. früher von Hand mit der IP eingerichtet), wird nur sein Anschluss umgestellt; klappt das nicht, bleibt er unverändert.
+- Die Rückmeldung auf der Seite „Arbeitsplätze“ nennt jetzt die **Windows-Fehlermeldung** und prüft vorher, ob der Servername am PC bekannt und Port 631 erreichbar ist.
+- Nach einem Fehlschlag versucht der Agent die Drucker höchstens alle 10 Minuten erneut (vorher bei jeder Abfrage alle 2 Sekunden). Programmversion 2.0.1; der Agent aktualisiert sich nach dem Update der Basis selbst.
+- Geprüft mit Tests (Go). **Nicht auf einem echten Windows-PC geprüft.**
+
+## 0.22.0-beta.14
+
+- **Fehler behoben: Faxversand scheiterte mit „ghostscript pdf->tiff failed … Permission denied“.** Die AppArmor-Ergänzungen für `gs` und `qpdf` (Ubuntu 26.04) galten nur für den Datenordner eines Moduls, nicht für seine Austauschordner (`[[exchange]]`, z. B. `/var/spool/kienzle/austausch/fax_telefon`), in denen die Telefonanlage die Faxaufträge umwandelt. Jetzt werden sie mit eingetragen.
+- Geprüft mit Tests (`tests/core/test_apparmor.py`). **Nicht geprüft:** echter Faxversand auf der VM.
 ## 0.22.0-beta.13
 
 - **Neu: Dateifreigaben der Module (`[[fileshare]]`).** Ein Modul kann einen Ordner seines Datenverzeichnisses als Windows-Freigabe zum Ablegen anbieten. Unter Verwaltung → Drucker → „Ordner zum Ablegen“ schaltet ein Admin sie ein (Vorgabe: aus). Zugriff **mit Anmeldung**: Der Admin vergibt beim Einschalten ein Kennwort (Samba-Benutzer `ks-<modul>`, wird beim Ausschalten gelöscht), damit auch Windows 11 24H2 zugreifen kann. Nur aus den Netzen, für die die Firewall „Drucken über Windows-Freigabe (445)“ freigegeben ist; keine Symlinks, keine versteckten Dateien, Dateien gehören dem Modulbenutzer (0600). Erster Nutzer: Fax „Fax-Ausgang“ (Fax 0.1.0-beta.12). Nicht am echten Arbeitsplatz geprüft.

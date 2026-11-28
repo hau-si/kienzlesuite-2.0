@@ -1,4 +1,4 @@
-// Kienzle-Suite, Basis: Passkeys (WebAuthn) und Drucken. Keine Fremdbibliotheken, kein Inline-Skript.
+// Praxisherz, Basis: Passkeys (WebAuthn) und Drucken. Keine Fremdbibliotheken, kein Inline-Skript.
 'use strict';
 (function () {
   const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');

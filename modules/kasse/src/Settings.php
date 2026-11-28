@@ -4,10 +4,11 @@ namespace KienzleKasse;
 
 /**
  * Einstellungen aus der Weboberfläche. Sie liegen verschlüsselt in der Datenbank und
- * überlagern die Grundwerte aus der Suite (Suite::baseConfig: Vorgaben, Schlüssel, zentrale Verbindungen).
+ * überlagern die Grundwerte aus Praxisherz (Suite::baseConfig: Vorgaben, Schlüssel, zentrale Verbindungen).
  */
 final class Settings {
-    public const T2MED_DEMO_API_KEY = '7QwA7931lJSQfMKuTH4MQXLn4YEiNhE5tggnYKlY4HE';
+    /** Fehlt der T2med-API-Schlüssel, gibt es keinen Ersatz (der Schlüssel gehört der Praxis und steht nie im Quelltext). */
+    public const T2MED_OHNE_SCHLUESSEL = 'Kein T2med-API-Schlüssel eingetragen. Bitte unter Verwaltung → Verbindungen → T2med den API-Schlüssel der Praxis eintragen.';
     private const ROW = 'config_overrides';
 
     /** Felder je Abschnitt: Typ, Beschriftung, Auswahl, Hilfetext. */
@@ -25,7 +26,7 @@ final class Settings {
         ]],
         'fhir' => ['label' => 'T2med-Anbindung', 'fields' => [
             'mode' => ['type' => 'choice', 'label' => 'Anbindung', 'choices' => ['mock' => 'Testmodus (Testpatient, keine Akteneinträge)', 'live' => 'Live (echte Patientenakte)'],
-                'help' => 'Adresse, Schlüssel und Zertifikat von T2med stehen zentral unter Verwaltung → Verbindungen der Suite.'],
+                'help' => 'Adresse, Schlüssel und Zertifikat von T2med stehen zentral unter Verwaltung → Verbindungen von Praxisherz.'],
             'entry_code' => ['type' => 'string', 'label' => 'Aktenkürzel', 'default' => 'ZAHLUNG'],
         ]],
         'practice' => ['label' => 'Belege (Praxisname und Anschrift: Verwaltung → Praxis)', 'fields' => [
@@ -45,7 +46,7 @@ final class Settings {
             'small_business_note' => ['type' => 'text', 'label' => 'Hinweis bei Kleinunternehmerregelung', 'default' => 'Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.'],
         ]],
         'mail' => ['label' => 'E-Mail-Versand', 'fields' => [
-            'enabled' => ['type' => 'bool', 'label' => 'Belege per E-Mail senden', 'help' => 'Server, Zugang und Absender stehen zentral unter Verwaltung → Verbindungen der Suite.'],
+            'enabled' => ['type' => 'bool', 'label' => 'Belege per E-Mail senden', 'help' => 'Server, Zugang und Absender stehen zentral unter Verwaltung → Verbindungen von Praxisherz.'],
             'from_name' => ['type' => 'string', 'label' => 'Absendername (z. B. Praxisname)', 'optional' => true],
         ]],
         'printing' => ['label' => 'Bondrucker (welcher Drucker und welche Papierbreite: Verwaltung → Drucker → Wofür welcher Drucker?)', 'fields' => [
@@ -70,7 +71,7 @@ final class Settings {
             'label_patient' => ['type' => 'list', 'label' => 'Eigene Textschnipsel vor Patient und Geburtsdatum', 'optional' => true],
         ]],
         'letterxpress' => ['label' => 'Letterxpress (Rechnung per Post)', 'fields' => [
-            'enabled' => ['type' => 'bool', 'label' => 'Rechnungen per Post über Letterxpress versenden', 'help' => 'Benutzername, API-Key und Test/Live stehen zentral unter Verwaltung → Verbindungen der Suite (Letterxpress).'],
+            'enabled' => ['type' => 'bool', 'label' => 'Rechnungen per Post über Letterxpress versenden', 'help' => 'Benutzername, API-Key und Test/Live stehen zentral unter Verwaltung → Verbindungen von Praxisherz (Letterxpress).'],
             'color' => ['type' => 'choice', 'label' => 'Druck', 'default' => '1', 'choices' => ['1' => 'Schwarz-Weiß', '4' => 'Farbe']],
             'duplex' => ['type' => 'bool', 'label' => 'Beidseitig drucken', 'default' => false],
             'shipping' => ['type' => 'choice', 'label' => 'Versandart', 'default' => 'auto', 'choices' => ['auto' => 'Automatisch (Inland oder Ausland) – fehleranfällig', 'national' => 'Nur Inland (empfohlen)', 'international' => 'Ausland']],
@@ -78,7 +79,7 @@ final class Settings {
         ]],
         'invoice_export' => ['label' => 'Ablage im Netzwerkordner', 'fields' => [
             'enabled' => ['type' => 'bool', 'label' => 'Rechnungen als PDF in einen Netzwerkordner kopieren'],
-            'ziel' => ['type' => 'target', 'label' => 'Ziel im Netzwerkspeicher', 'help' => 'Ziele und Zugangsdaten stehen zentral unter Verwaltung → Verbindungen der Suite.'],
+            'ziel' => ['type' => 'target', 'label' => 'Ziel im Netzwerkspeicher', 'help' => 'Ziele und Zugangsdaten stehen zentral unter Verwaltung → Verbindungen von Praxisherz.'],
             'directory' => ['type' => 'string', 'label' => 'Unterordner ({jahr} und {monat} möglich)', 'default' => 'Rechnungen/{jahr}/{monat}'],
             'app_invoices' => ['type' => 'bool', 'label' => 'Auch in der App erzeugte Rechnungen ablegen'],
             'when' => ['type' => 'choice', 'label' => 'T2med-Rechnungen ablegen', 'choices' => ['paid' => 'nur per Karte bezahlte', 'received' => 'jede gedruckte']],
@@ -115,7 +116,7 @@ final class Settings {
     public static function merge(array $values, array $overrides): array {
         foreach ($overrides as $section => $keys) {
             if (!is_array($keys) || !isset(self::SCHEMA[$section]) && $section !== 'internal') continue;
-            // Nur Felder der Oberfläche: Verbindungen und Grundwerte der Suite lassen sich nicht überschreiben.
+            // Nur Felder der Oberfläche: Verbindungen und Grundwerte von Praxisherz lassen sich nicht überschreiben.
             foreach ($keys as $key => $value) if ($section === 'internal' || isset(self::SCHEMA[$section]['fields'][$key])) $values[$section][$key] = $value;
         }
         unset($values['internal']);
@@ -132,7 +133,7 @@ final class Settings {
                 if ($field['type'] === 'queue' || $field['type'] === 'target') {
                     $field['choices'] = $field['type'] === 'queue' ? self::queues() : Suite::targets();
                     if (is_string($value) && $value !== '' && !isset($field['choices'][$value])) $field['choices'][$value] = $value . ' (nicht eingerichtet)';
-                    if (!$field['choices']) $field['choices'] = ['' => $field['type'] === 'queue' ? 'Noch kein Drucker in der Suite eingerichtet' : 'Noch kein Netzwerkspeicher eingerichtet'];
+                    if (!$field['choices']) $field['choices'] = ['' => $field['type'] === 'queue' ? 'Noch kein Drucker in Praxisherz eingerichtet' : 'Noch kein Netzwerkspeicher eingerichtet'];
                     $field['type'] = 'choice';
                 }
                 if ($field['type'] === 'secret') $value = ['set' => is_string($value) && $value !== ''];
@@ -173,6 +174,7 @@ final class Settings {
         if ($section === 'fhir' && ($values['mode'] ?? '') === 'live' && !Suite::connected('t2med')) {
             throw new Problem('Für den Live-Betrieb zuerst unter Verwaltung → Verbindungen die T2med-Verbindung einrichten.', 422);
         }
+        if ($section === 'fhir' && ($values['mode'] ?? '') === 'live' && (string)(Suite::modul()->verbindung('t2med')['api_key'] ?? '') === '') throw new Problem(self::T2MED_OHNE_SCHLUESSEL, 422);
         if ($section === 'mail' && ($values['enabled'] ?? false) && !Suite::connected('mail')) {
             throw new Problem('Für den E-Mail-Versand zuerst unter Verwaltung → Verbindungen den E-Mail-Versand einrichten.', 422);
         }
@@ -201,7 +203,7 @@ final class Settings {
         return $value;
     }
 
-    /** Warteschlangen der Suite (Name → Bezeichnung), ohne die virtuellen Drucker dieses Moduls. */
+    /** Warteschlangen von Praxisherz (Name → Bezeichnung), ohne die virtuellen Drucker dieses Moduls. */
     public static function queues(): array {
         $out = [];
         try {

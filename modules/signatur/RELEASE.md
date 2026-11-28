@@ -1,5 +1,137 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.50
+
+- Hinweise auf die früheren Aufrufadressen `kienzle-signatur://` entfernt (nur noch `praxisherz-signatur://`). Mit Tests geprüft.
+
+## 0.1.0-beta.49
+
+- Neu veröffentlicht nach dem Bereinigen der Git-Geschichte (gleicher Inhalt wie die vorige Vorabversion). Die vorigen Vorabversionen bitte auf GitHub löschen.
+
+## 0.1.0-beta.48
+
+- **Kleinere PDFs in Fremdsprachen:** Statt der ganzen Schrift (etwa 0,7 MB) wird nur noch der Ausschnitt mit den benutzten Zeichen eingebettet (meist unter 30 KB). Dafür kommt das Paket `python3-fonttools` dazu (wird mit dem Modul installiert); fehlt es, wird wie bisher die ganze Schrift eingebettet.
+- Verweise auf fremde Produkte aus Code und Texten entfernt.
+- Mit Tests geprüft, nicht auf der VM.
+
+## 0.1.0-beta.47
+
+- **Vorlage je IGeL-Leistung:** Im Editor unter „Weitere Einstellungen“ GOÄ-Ziffern oder Leistungsnamen eintragen. Kommt eine dieser Leistungen aus der Kasse, ist diese Vorlage vorgewählt; sonst der Standard-IGeL-Vertrag.
+- **Gültigkeit von Einwilligungen:** Häkchen „Einwilligung mit Ablauf“ je Vorlage (Datenschutz vorbelegt), Dauer zentral unter Einstellungen (Standard 24 Monate). Bei der Dokumentwahl steht je Patient „Einwilligung gültig bis …“ bzw. „abgelaufen am …“. Gemerkt werden nur ein Schlüssel des Patienten (T2med-Nummer oder Prüfsumme aus Name und Geburtsdatum), Vorlage und Zeitraum; ein Jahr nach Ablauf gelöscht.
+- **Zweite Unterschrift** (z. B. Ärztin/Arzt bei der Aufklärung): Bezeichnung je Vorlage; am Pad folgt nach dem OK des Patienten ein zweites Feld, im PDF eine zweite Unterschriftszeile.
+- **Sprachfassungen mit DeepL:** Im Editor „Übersetzen in …“ (Englisch, Türkisch, Russisch, Ukrainisch, Polnisch, Französisch, Italienisch, Spanisch, Rumänisch, Griechisch). Platzhalter und Formatierung bleiben erhalten, der Eintrag für die Akte bleibt deutsch. Das Ergebnis ist eine eigene, zunächst nicht freigegebene Vorlage zum Prüfen; auf der Startseite wählt man die Sprache an der deutschen Vorlage. Am Pad erscheinen auch die Bedienwörter in der Sprache, im PDF wird bei Bedarf die Schrift DejaVu Sans eingebettet (dann etwa 0,7 MB je PDF). Arabisch fehlt noch (Schrift von rechts nach links).
+- Datenbank 13. Mit Tests (DeepL und Pad nachgebaut) und im Browser ohne Server geprüft, **nicht mit DeepL, nicht am Pad, nicht auf der VM**.
+
+## 0.1.0-beta.46
+
+- **Vorlagen exportieren und importieren:** Im Editor unter den Vorlagen „Alle exportieren“ und „Importieren …“, oben am Dokument ein Symbol zum Exportieren der gewählten Vorlage. Die Datei (JSON) enthält Titel, Art, Gruppen, Kürzel und Bausteine samt Bildern, keine Vorgänge und keine Patientendaten.
+- Der Import legt immer neue Vorlagen an (gleicher Titel → „(Import)“), prüft alles wie beim Speichern im Editor und übernimmt nur ganz oder gar nicht. Höchstens 20 MB, roh hochgeladen.
+- Mit Tests und im Browser (ohne Server) geprüft, nicht auf der VM.
+
+## 0.1.0-beta.45
+
+- **Dokumentliste auf der Startseite:** Suchfeld oben (Namensteile), Filter „Alle“, „★ Favoriten“ und je Gruppe, Zeile „Zuletzt“ mit den zuletzt verwendeten Vorlagen (Klick wählt sie). Stern je Vorlage: Favoriten stehen oben (gilt für die ganze Praxis, wie im Fax). Vorgewählt ist die zuletzt verwendete Vorlage.
+- **Gruppen (Tags) je Vorlage:** Feld „Gruppen“ im Editor (mit Komma trennen, Vorschläge Aufklärungen, Administratives, IGeL); bestehende Vorlagen bekommen die Gruppe aus ihrer Dokumentart. Die Vorlagenliste im Editor ist nach Gruppen geordnet und durchsuchbar.
+- Editor: Zeilen im Dokument nutzen die volle Breite (Art des Bausteins steht darüber), Titel über die ganze Zeile.
+- Datenbank 12 (`vorlagen.favorit|gruppen`). Mit Tests und im Browser (ohne Server) geprüft, nicht auf der VM.
+
+## 0.1.0-beta.44
+
+- **Eintrag in die Akte je Baustein:** Im Editor hat jeder Baustein (außer Trennlinie und Seitenumbruch) ein Feld „Eintrag in die Akte“ mit eigenem, meist kürzerem Text; `{{antwort}}` setzt die Antwort am Pad ein (ja/nein, gewählte Möglichkeit, Werte). Leer = der Baustein erscheint nicht im Eintrag.
+- **Kürzel der Vorlage** (Feld neben der Dokumentart, z. B. „EINW“; ohne Angabe „SIGN“). Nach der Unterschrift geht zuerst das PDF, dann der Eintrag als Freitext mit diesem Kürzel an T2med – direkt (Start aus T2med) oder über die Kasse. Scheitert nur der Eintrag, bleibt das PDF abgelegt und der Vorgang zeigt einen Hinweis.
+- **Neuer Vorgang:** „Leistung oder Thema“ und „Betrag in Euro“ entfallen (Inhalte stehen jetzt in der Vorlage; Werte aus der Kasse kommen weiter mit).
+- Datenbank 11 (`vorlagen.kuerzel`, `vorgaenge.kuerzel|akte`). Mit Tests geprüft, **nicht mit T2med und nicht auf der VM**.
+
+## 0.1.0-beta.43
+
+- **Bausteine am Pad:** Das Pad zeichnet die Bausteine selbst (`lib/padformular.py`): Ankreuzfelder und Auswahl durch Antippen, Text mit Formatierung, Aufzählungen, Bilder, Trennlinien, Seitenumbrüche. Fragen bleiben mit ihren Möglichkeiten auf einer Seite.
+- **Pflichtfelder:** „Weiter zur Unterschrift“ geht erst, wenn alle mit * markierten Angaben ausgefüllt sind; sonst springt das Pad zur ersten fehlenden Angabe und zeigt einen Hinweis.
+- **E-Mail und Telefon am Pad ändern:** „Ändern“ öffnet eine Bildschirmtastatur (E-Mail: Buchstaben und „123“, Telefon: Ziffern), die Eingabe wird geprüft. Geänderte Werte stehen im PDF („am Pad geändert“) und werden für T2med vorgemerkt (Knopf „Kontaktdaten in T2med übernehmen“ in der Liste, nur bei Start aus T2med).
+- **Antworten:** gespeichert am Vorgang, im PDF als „[X]“/„( )“.
+- Höchstens 32 Tastflächen je Seite (die Grenze des Pads ist nicht dokumentiert). Mit Tests (Ersatz-Pad) geprüft, **nicht am echten Pad und nicht auf der VM**.
+
+## 0.1.0-beta.42
+
+- **Neuer Editor (Entwurf C):** links die Bausteine (anklicken oder ins Dokument ziehen) und die Vorlagen, in der Mitte das Dokument als Zeilen (verschieben per Griff oder Pfeil, kopieren, entfernen), rechts die Eigenschaften der gewählten Zeile und eine Vorschau am Pad mit Beispielwerten.
+- Bausteine: **Text** mit Formatierung (fett, kursiv, unterstrichen, Aufzählung, nummerierte Liste, Überschrift, Platzhalter), **Patientendaten** (E-Mail/Telefon, „am Pad änderbar“), **Ankreuzfeld**, **Einzel-** und **Mehrfachauswahl** (je mit „Pflichtfeld“), **Aufzählung**, **Bild** (PNG/JPEG bis 3 MB, Breite wählbar), **Trennlinie**, **Seitenumbruch**.
+- **Fassungen:** Jede inhaltliche Änderung einer Vorlage zählt die Fassung hoch; der Vorgang merkt sich die unterschriebene Fassung (klein in der Liste „Vorgänge“) und den festen Stand der Bausteine.
+- Bestehende Vorlagen werden zu einem Text-Baustein (Datenbank 10). Bis der Pad-Dienst die Bausteine selbst zeichnet (nächster Schritt), zeigt das Pad sie als Text mit „[ ]“ und „( )“.
+- Mit Tests und im Browser (Editor, ohne Server) geprüft, nicht auf der VM.
+
+## 0.1.0-beta.41
+
+- **Kopf wie in der Kasse:** Reiter **Start · Vorgänge · Editor**, rechts ein kleines Zahnrad für die Einstellungen. Die Vorlagen stehen jetzt unter „Editor“ (der neue Baustein-Editor folgt), die Einstellungen enthalten die Pads.
+- **Archivieren:** In der linken Spalte der Startseite hat jeder Vorgang die Symbole **Archivieren** und **Löschen** (rot, mit Rückfrage). Archivierte Vorgänge stehen unter „Vorgänge“ mit dem Filter „Archiv“ und lassen sich zurückholen (Datenbank 9, Spalte `archiviert`).
+- Mit Tests geprüft, nicht auf der VM.
+
+## 0.1.0-beta.40
+
+- Texte: „die Suite“/„der Suite“ heißt jetzt überall „Praxisherz“. Nur Texte geändert, mit Tests geprüft, nicht auf der VM.
+
+## 0.1.0-beta.39
+
+- **Neue Aufrufadresse aus T2med: `praxisherz-signatur://…`**. Die frühere Adresse `kienzle-signatur://…` funktioniert weiter. Braucht Basis 0.22.0-beta.32. Mit Tests geprüft, nicht auf der VM und nicht mit T2med.
+
+## 0.1.0-beta.38
+
+- **Neuer Name: „Praxisherz – freie Software für die Arztpraxis“** (vorher Kienzle-Suite; Wunsch von T2med nach einem unterscheidbaren Namen).
+- Nur Texte geändert. Ersetzt 0.1.0-beta.37 (Zwischenstand mit anderem Namen, bitte nicht verwenden).
+- Mit Tests geprüft, nicht auf der VM.
+
+## 0.1.0-beta.36
+
+- **Kein Demo-Schlüssel mehr (Vorgabe von T2med).** Ohne T2med-API-Schlüssel in der Basis (Verwaltung → Verbindungen → T2med) gibt es keine Verbindung zu T2med; die Signatur meldet das klar.
+- Mit Tests geprüft. **Nicht auf der VM und nicht mit echtem T2med geprüft.**
+
+## 0.1.0-beta.35
+
+- **Neu: „Zur Kasse“ auch bei Patienten direkt aus T2med.** Der Knopf in der Patientenkarte gibt den Patienten samt T2med-Zugang an die Kasse weiter: über den gemeinsamen Ordner, einmalig, höchstens 5 Minuten, im selben Tab. Dort kann gleich kassiert werden, und die Zahlung geht in die Akte. Voraussetzung: Kasse ist installiert und für den Benutzer sichtbar, der Aufruf aus T2med ist höchstens 4 Stunden alt.
+- Mit Tests geprüft. **Nicht auf der VM und nicht mit echtem T2med geprüft.**
+
+## 0.1.0-beta.34
+
+- **Neu: Live-Vorschau des Pads** (Vorschlag A). Liegt ein Vorgang am Pad, zeigt seine Karte links in „Vorgänge“ ein kleines Bild der Seite, die der Patient gerade sieht. Darunter steht der Stand, z. B. „Live · Unterschriftsseite 3 von 3 · wird unterschrieben“; die Anzeige erneuert sich etwa alle 1,5 Sekunden. So kann man am Empfang helfen, etwa „bitte auf Weiter tippen“.
+  - Die Striche der Unterschrift selbst erscheinen nicht im Bild, nur ob schon unterschrieben wird.
+  - Bild und Stand schreibt der Pad-Dienst in den Datenordner (`vorschau/`) und löscht sie nach dem Vorgang; abrufbar nur mit dem Recht „Vorgänge“.
+- Die Seite lädt jetzt erst neu, wenn der Vorgang das Pad verlässt, statt alle 5 Sekunden.
+- Mit Tests und in der Vorschau geprüft. **Nicht am echten Pad und nicht auf der VM geprüft.**
+
+## 0.1.0-beta.33
+
+- **Patientenkarte oben (Entwurf B3, wie in der Kasse):**
+  - Etikett mit Herz „T2med“ bei Patienten aus T2med, sonst neutral; Name groß.
+  - Knopf **„Zur Kasse“** bei Übergaben aus der Kasse.
+  - Knopf **„Entfernen“** statt „Anderen Patienten wählen“.
+  - Ohne Patient trägt die Karte das Namensfeld.
+- **Der Patient bleibt erhalten** (in diesem Browser-Tab): beim Wechsel zu „Alle Vorgänge“ oder „Einstellungen“, nach dem Anlegen eines Vorgangs und beim Wechsel zur Kasse und zurück, bis „Entfernen“.
+- **Zurück zur Kasse nach der Unterschrift:** Ein Vorgang aus der Kasse springt nach der Unterschrift von selbst zur Kasse zurück, damit gleich bezahlt werden kann (IGeL mit Unterschrift). Bei Übergaben aus der Kasse ist der IGeL-Vertrag vorgewählt.
+- **Ein Klick weniger:** „Vorgang anlegen und ans Pad senden“ schickt den neuen Vorgang gleich ans Pad, wenn es frei ist; sonst wartet er wie bisher.
+- Seiten so breit wie die Kasse (1400 px).
+- In der Vorschau und mit Tests geprüft. **Nicht am Pad und nicht auf der VM geprüft.**
+
+## 0.1.0-beta.32
+
+- **Neu: Unterschriebenes PDF in die T2med-Akte.** Kurz nach „OK“ am Pad legt die Signatur das PDF als Anhang (`DocumentReference`, Profil „Anhang“) in der Akte des Patienten ab:
+  - **Vorgang aus der Kasse** („Zur Unterschrift“): Das PDF geht über einen gemeinsamen Austauschordner an die Kasse. Die Kasse schreibt es mit ihrem T2med-Zugang in die Akte und meldet das Ergebnis zurück (Entscheidung: Rückgabe an die Kasse).
+  - **Vorgang mit Start aus T2med:** Die Signatur schreibt selbst, solange der Aufruf höchstens 4 Stunden alt ist.
+  - **Ohne T2med** (Patient von Hand eingegeben): Das PDF bleibt in der Signatur („Nicht automatisch in T2med abgelegt“).
+- In der Vorgangsliste steht der Stand der Ablage. Nach einem Fehler, etwa einem abgelaufenen Zugang, gibt es „Erneut in T2med ablegen“; die Meldung nennt den Grund und die Auskunft von T2med.
+- Neu als Voraussetzung: `core_api = "2"` (Austauschordner mit der Kasse, Basis ab 0.22.0) und das Paket `php-curl`. Vorgänge, die vor diesem Update unterschrieben wurden, werden nicht von selbst abgelegt; dafür gibt es den Knopf „In T2med ablegen“.
+- Geprüft mit Tests (Aufbau der `DocumentReference` nach dem T2med-Integrationsleitfaden, Austausch mit der Kasse, Fehlerfälle). **Nicht gegen echtes T2med und nicht auf der VM geprüft: bitte zuerst mit einem Testpatienten.**
+
+## 0.1.0-beta.31
+
+- **Neu: PDF des unterschriebenen Dokuments** (Entwurf C). Kopf mit Praxis links und Patient (mit Geburtsdatum) rechts, Titel, Dokumenttext (mehrseitig mit „Seite x von y“). Unten links ein Kasten „Unterschriftsnachweis“ mit Zeitpunkt, Pad, Vorgang und Prüfsumme der Unterschriftsdaten, rechts die Unterschrift. Echtes Text-PDF (durchsuchbar, wenige KB), erzeugt vom Pad-Dienst direkt nach „OK“ und für schon unterschriebene Vorgänge nachträglich. Es liegt nur im Datenordner (0600).
+- **Neu: „Ansehen“ in der Vorgangsliste:** Unterschriebene Vorgänge öffnen das PDF in einem neuen Fenster („PDF ansehen“), alle anderen zeigen den eingesetzten Text.
+- Vorgänge merken sich Geburtsdatum und Praxisangaben für das PDF (Schema 7).
+- Löschen eines Vorgangs (von Hand oder nach 30 Tagen) entfernt auch Unterschrift, Unterschriftsdaten und PDF. Vorher blieben sie liegen.
+- Geprüft mit Tests (PDF-Aufbau, Text, Seitenumbruch, Nachholen). **Nicht am echten Pad und nicht im Browser auf der VM geprüft.** Das PDF entsteht erst, wenn der Pad-Dienst nach dem Update läuft.
+
+## 0.1.0-beta.30
+
+- **Fehler behoben: Unterschrift kam am Pad nicht an** („Stiftereignisse 0“, „Noch keine Unterschrift erkannt“ in Dauerschleife). Ursache war die Absicherung des Pad-Dienstes: Er durfte keine Netlink-Abfragen stellen (`RestrictAddressFamilies`), mit denen die signotec-Bibliothek die Netzwerkadressen des Servers ermittelt. Die Tasten kamen trotzdem an, die Stiftpunkte nicht. Jetzt ist `AF_NETLINK` erlaubt, alle anderen Schutzeinstellungen bleiben.
+- Am echten Pad (signotec Delta, Ethernet) mit dem Ablauftest unter denselben Schutzeinstellungen geprüft: ohne Netlink 0, mit Netlink 64 Stiftpunkte. Der Dienst selbst wird nach dem Update geprüft.
+
 ## 0.1.0-beta.29
 
 - Neu: `lib/padablauf.py` (Ablauftest am Pad mit mehreren Seiten, Wegwerf-Datenbank): `sudo systemctl stop kienzle-signatur-pad; sudo -u ks-signatur python3 /opt/kienzle/signatur/current/lib/padablauf.py <IP> 1002`; danach Dienst wieder starten. Zeigt im Protokoll Aufnahmestart, Stiftereignisse und Ergebnis. Mit `PADABLAUF=direkt` (vor `python3`: `sudo -u ks-signatur env PADABLAUF=direkt python3 …`) ohne Textseiten, gleich die Unterschriftsseite. Nur Werkzeug zur Fehlersuche, nicht am Pad geprüft.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Kienzle-Suite: holt die Basis aus GitHub und startet den Installer (läuft beim ersten Start des neuen Systems).
+"""Praxisherz: holt die Basis aus GitHub und startet den Installer (läuft beim ersten Start des neuen Systems).
 
   holen.py --kanal stabil|beta [--unsigniert-erlauben] [--zweig main|beta] [--ziel /opt/kienzle-installer] [--name SERVER] [--praxis NAME]
 
@@ -24,7 +24,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-REPO = os.environ.get('KIENZLE_REPO', 'hau-si/kienzlesuite-2.0')
+REPO = os.environ.get('KIENZLE_REPO', 'hau-si/praxisherz')
 API = os.environ.get('KIENZLE_API', 'https://api.github.com')
 OPENSSL = os.environ.get('KIENZLE_OPENSSL', '/usr/bin/openssl')
 SCHLUESSEL = Path('/usr/share/kienzle-iso/release-keys')
@@ -173,7 +173,7 @@ def main(argv: list[str]) -> int:
     p.add_argument('--zweig', choices=('main', 'beta'), default='')
     p.add_argument('--ziel', default='/opt/kienzle-installer')
     p.add_argument('--schluessel', default=str(SCHLUESSEL))
-    p.add_argument('--name', default='suite')
+    p.add_argument('--name', default='praxisherz')
     p.add_argument('--praxis', default='')
     p.add_argument('--ohne-installer', action='store_true', help='nur holen (Tests)')
     a = p.parse_args(argv)

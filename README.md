@@ -1,4 +1,4 @@
-# Kienzle-Suite 2.0
+# Praxisherz – freie Software für die Arztpraxis
 
 Praxis-Appliance für Hausarztpraxen mit T2med: **eine Basis**, einmal auf einer VM installiert, und **Module**, die
 einzeln dazukommen – Kasse (SumUp), Terminzettel, Signatur, später Fax, Telefon und Kienzlezeit. Verwaltung komplett im
@@ -21,7 +21,7 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 
 ![Anmeldung](docs/screenshots/anmelden.png)
 
-**Übersicht und Menü:** Die Seitenleiste der Suite führt zu den Anwendungen und zur Verwaltung; oben steht „Mein Konto“ mit dem Anmeldenamen. Die Anwendungen lassen sich per Ziehen sortieren, die Gruppen einklappen (gemerkt im Browser). Auch die Seiten der Module erscheinen im selben Rahmen.
+**Übersicht und Menü:** Die Seitenleiste von Praxisherz führt zu den Anwendungen und zur Verwaltung; oben steht „Mein Konto“ mit dem Anmeldenamen. Die Anwendungen lassen sich per Ziehen sortieren, die Gruppen einklappen (gemerkt im Browser). Auch die Seiten der Module erscheinen im selben Rahmen.
 
 ![Start](docs/screenshots/start.png)
 
@@ -51,7 +51,7 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 
 ![Kasse](docs/screenshots/kasse-start.png)
 
-**Kasse – Einstellungen:** Die Einrichtung steht als Ausklappzeilen im Stil der Suite, Rotes zuerst; am Zahnrad der Startseite zeigt eine rote Zahl, wie viel noch offen ist.
+**Kasse – Einstellungen:** Die Einrichtung steht als Ausklappzeilen im Stil von Praxisherz, Rotes zuerst; am Zahnrad der Startseite zeigt eine rote Zahl, wie viel noch offen ist.
 
 ![Kasse-Einstellungen](docs/screenshots/kasse-einstellungen.png)
 
@@ -84,6 +84,18 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 ![Signatur-Pads](docs/screenshots/signatur-pads.png)
 
 ![Signatur-Software](docs/screenshots/signatur-software.png)
+
+**Qualitätsmanagement:** QM-Handbuch mit Ordnern, Tags und Suche nach Namensschnipseln. Dokumente entstehen im einfachen Editor (Überschriften, Listen, Checklisten, Tabellen, Bilder) oder aus Word-Dateien (z. B. den QEP-Mustern der KBV), werden vidiert, den MFA zur Kenntnis vorgelegt und von ihnen als gelesen bestätigt; Wiedervorlage nach Prüffrist.
+
+![QM-Lesemappe](docs/screenshots/qm-lesemappe.png)
+
+![QM-Handbuch](docs/screenshots/qm-handbuch.png)
+
+![QM-Dokument](docs/screenshots/qm-dokument.png)
+
+![QM-Editor](docs/screenshots/qm-editor.png)
+
+![QM-Import](docs/screenshots/qm-import.png)
 
 **Updater:** Updates je Modul und Basis aus signierten Releases (Kanal stabil oder beta), Sicherung vor dem Update, automatischer Rücksprung bei einem Fehler. Kein Update, solange z. B. eine Kartenzahlung läuft.
 

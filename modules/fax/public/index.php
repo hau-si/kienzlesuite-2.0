@@ -90,7 +90,7 @@ try {
         try {
             $aktion = (string)($_POST['aktion'] ?? '');
             $braucht = match ($aktion) {
-                'senden', 'hochladen', 'quelle-loeschen', 'abbrechen', 'bericht-loeschen', 'fehler-uebernehmen' => 'senden',
+                'senden', 'hochladen', 'quelle-loeschen', 'abbrechen', 'bericht-loeschen', 'fehler-uebernehmen', 'bericht-erneut-senden' => 'senden',
                 'eingang-loeschen' => 'eingang', 'kontakt-speichern', 'kontakt-loeschen', 'kontakt-favorit' => 'telefonbuch',
                 'einstellungen-speichern', 'aufbewahrung-speichern', 'drucker-speichern', 'nas-speichern', 'benachrichtigung-speichern', 'ocr-speichern' => 'admin',
                 default => throw new InvalidArgumentException('Unbekannte Aktion.'),
@@ -115,6 +115,7 @@ try {
                 'abbrechen' => (function () { Fax::abbrechen((string)($_POST['id'] ?? '')); return 'Abbruch angefordert.'; })(),
                 'bericht-loeschen' => (function () { Fax::berichtLoeschen((string)($_POST['art'] ?? ''), (string)($_POST['json'] ?? '')); return 'Bericht gelöscht.'; })(),
                 'fehler-uebernehmen' => (function () { Fax::fehlerUebernehmen((string)($_POST['json'] ?? '')); return 'Ins Sendeprotokoll übernommen.'; })(),
+                'bericht-erneut-senden' => (function () use ($k) { Fax::berichtErneutSenden((string)($_POST['art'] ?? ''), (string)($_POST['json'] ?? ''), $k->benutzer()); return 'Fax erneut beauftragt. Der Stand steht unter „Fax senden“ bei „Laufende Aufträge“.'; })(),
                 'eingang-loeschen' => (function () { Fax::eingangLoeschen((string)($_POST['name'] ?? '')); return 'Fax gelöscht.'; })(),
                 'kontakt-speichern' => (function () { Fax::kontaktSpeichern((int)($_POST['id'] ?? 0), (string)($_POST['name'] ?? ''), (string)($_POST['nummer'] ?? ''), (string)($_POST['notiz'] ?? ''), !empty($_POST['favorit'])); return 'Eintrag gespeichert.'; })(),
                 'kontakt-favorit' => (function () { $an = !empty($_POST['an']); Fax::kontaktFavorit((int)($_POST['id'] ?? 0), $an); return $an ? 'Als Favorit markiert.' : 'Kein Favorit mehr.'; })(),

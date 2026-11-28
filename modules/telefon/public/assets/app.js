@@ -88,7 +88,7 @@ document.addEventListener('click', (e) => {
   };
   const post = (url, daten, kopf) => fetch(url, {method: 'POST', credentials: 'same-origin', headers: Object.assign({'Content-Type': 'application/json', Accept: 'application/json'}, kopf || {}), body: JSON.stringify(daten)})
     .then(r => r.text().then(t => { let j = null; try { j = JSON.parse(t); } catch (e) { j = null; } return {ok: r.ok, status: r.status, j: j || {}}; }));
-  // Akte in T2med öffnen: über die Basis an den Kienzle-Agent des eigenen PCs.
+  // Akte in T2med öffnen: über die Basis an den Praxisherz-Agent des eigenen PCs.
   const akte = (nr) => post('/arbeitsplatz/akte', {modul: 'telefon', csrf: csrf, patientennummer: String(nr)})
     .then(r => r.ok ? hinweis('Akte wird in T2med geöffnet (' + (r.j.platz || 'dieser PC') + ').') : hinweis(r.j.error || ('Akte öffnen nicht möglich (HTTP ' + r.status + ').'), true, r.j.waehlen))
     .catch(() => hinweis('Keine Verbindung zum Server.', true));
@@ -164,7 +164,10 @@ document.addEventListener('click', (e) => {
     zeige('Telefonverzeichnis wird aus T2med geladen …');
     const schritt = () => post(basis + '/verzeichnis/schritt', {code: m[1]}, {'X-Kienzle-CSRF': csrf}).then((r) => {
       if (!r.ok) { zeige(r.j.fehler || ('Laden abgebrochen (HTTP ' + r.status + ').'), true); return; }
-      if (r.j.fertig) { zeige('Fertig: ' + r.j.anzahl.toLocaleString('de-DE') + ' Patienten im Telefonverzeichnis.'); return; }
+      if (r.j.fertig) {
+        zeige('Fertig: ' + r.j.anzahl.toLocaleString('de-DE') + ' Patienten im Telefonverzeichnis.');
+        return;
+      }
       zeige('Telefonverzeichnis wird aus T2med geladen … ' + r.j.anzahl.toLocaleString('de-DE') + ' Patienten bisher. Bitte die Seite offen lassen.');
       schritt();
     }).catch(() => zeige('Keine Verbindung zum Server; Laden unterbrochen. Bitte erneut aus T2med starten.', true));

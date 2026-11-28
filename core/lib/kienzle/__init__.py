@@ -1,1 +1,1 @@
-"""Gemeinsame Python-Bibliothek der Kienzle-Suite (Basis)."""
+"""Gemeinsame Python-Bibliothek Praxisherz (Basis)."""

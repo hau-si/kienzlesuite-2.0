@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// JSON-Schnittstelle der Kasse (nur mit Anmeldung der Suite und dem Recht „kassieren“). Den Start aus T2med nimmt
+// JSON-Schnittstelle der Kasse (nur mit Anmeldung von Praxisherz und dem Recht „kassieren“). Den Start aus T2med nimmt
 // seiten/starter.php entgegen (POST /api.php ohne Anmeldung).
 use KienzleKasse\{App, Problem, Suite};
 
@@ -25,7 +25,7 @@ try {
     $vorgang = in_array($action, ['vorgaenge', 'vorgaenge_done', 'vorgaenge_post'], true) && (Suite::can('export') || Suite::can('paid') || Suite::can('periods') || Suite::can('storno'));
     $stornoRecht = $action === 'storno' && Suite::can('storno');   // Stornieren aus der Vorgänge-Liste braucht nur das Recht „Rechnungen stornieren“
     if (!$vorgang && !$stornoRecht && !Suite::can('kassieren')) throw new Problem('Für die Kasse fehlt das Recht „Kassieren“. Bitte den Admin fragen (Verwaltung → Benutzer).', 403);
-    // Marke der Suite für dieses Modul (meta kienzle-csrf der Seite) bei allem außer dem reinen Abfragen des Zustands.
+    // Marke von Praxisherz für dieses Modul (meta kienzle-csrf der Seite) bei allem außer dem reinen Abfragen des Zustands.
     if ($action !== 'state' && !Suite::modul()->csrfGueltig($_SERVER['HTTP_X_KIENZLE_CSRF'] ?? null)) throw new Problem('Sitzung abgelaufen. Bitte Seite neu laden.', 403);
     if ($action === 'demo') {
         // Nur im Testbetrieb (SumUp und T2med im Testmodus): Testpatient ohne T2med öffnen.
@@ -34,6 +34,11 @@ try {
         $result['url'] = str_replace('/#launch=', ks_url('#launch='), $result['url']);
     } elseif ($action === 'manual') {
         $result = $app->manualStart($input);
+        $result['url'] = str_replace('/#launch=', ks_url('#launch='), $result['url']);
+    } elseif ($action === 'uebergabe_einloesen') {
+        // Patient aus einem anderen Modul (z. B. Signatur nach einem Aufruf aus T2med), mit dessen T2med-Zugang.
+        $ordner = '/var/spool/kienzle/austausch/kasse_signatur';
+        $result = $app->uebergabeEinloesen(App::string($input, 'code', 32), (string)($GLOBALS['KS_TEST_AUSTAUSCH'] ?? $ordner));
         $result['url'] = str_replace('/#launch=', ks_url('#launch='), $result['url']);
     } elseif ($action === 'manual_open') {
         $result = $app->manualOpen();
@@ -99,9 +104,10 @@ try {
             'discard' => $app->discard($visit, App::string($input, 'payment_id', 32)),
             'reader_status' => $app->readerAction($visit, App::string($input, 'payment_id', 32)),
             'reader_cancel' => $app->readerAction($visit, App::string($input, 'payment_id', 32), true),
-            'document' => $app->document($visit, App::string($input, 'payment_id', 32)),
+            'document' => $app->document($visit, App::string($input, 'payment_id', 32), ($input['bestaetigt'] ?? false) === true),
             'receipt_share' => $app->receiptShare($visit, App::string($input, 'payment_id', 32)),
             'patient_kontakt' => $app->patientKontakt($visit),
+            'signatur_offen' => $app->signaturOffen($visit),
             'receipt_recipient' => $app->receiptRecipient($visit, App::string($input, 'payment_id', 32)),
             'receipt_email' => $app->receiptEmail($visit, $input),
             'receipt_print' => $app->receiptPrint($visit, $input),

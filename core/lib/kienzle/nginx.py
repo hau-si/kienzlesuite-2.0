@@ -1,4 +1,4 @@
-"""nginx-Konfiguration der Suite aus festen Vorlagen erzeugen.
+"""nginx-Konfiguration von Praxisherz aus festen Vorlagen erzeugen.
 
 Eingaben sind nur geprüfte Werte: Servernamen (wie im Zertifikat) und das Modulverzeichnis aus manifest.check_all.
 Grundsätze:
@@ -20,7 +20,8 @@ CORE_SOCKET = '/run/kienzle/core/web.sock'
 CA_DIR = '/etc/kienzle/ca'
 HOST = re.compile(r'^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$')
 FORWARD = (('benutzer', 'Benutzer'), ('name', 'Name'), ('rolle', 'Rolle'), ('rechte', 'Rechte'), ('csrf', 'Csrf'), ('bestaetigt', 'Bestaetigt'),
-           ('praxis', 'Praxis'), ('drucker', 'Drucker'), ('menue', 'Menue'), ('arbeitsplatz', 'Arbeitsplatz'))
+           ('praxis', 'Praxis'), ('drucker', 'Drucker'), ('menue', 'Menue'), ('arbeitsplatz', 'Arbeitsplatz'),
+           ('personen', 'Personen'))
 SAFE = re.compile(r'^[A-Za-z0-9_./:-]+$')
 
 
@@ -57,7 +58,7 @@ def _fastcgi_common() -> list[str]:
 WARTUNG = ("'<!doctype html><html lang=\"de\"><head><meta charset=\"utf-8\"><meta http-equiv=\"refresh\" content=\"3\">"
            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Einen Moment bitte</title></head>"
            "<body style=\"font-family:sans-serif;max-width:32em;margin:4em auto;padding:0 1em\"><h1>Einen Moment bitte</h1>"
-           "<p>Die Kienzle-Suite wird gerade aktualisiert oder neu gestartet. Diese Seite lädt sich automatisch neu.</p></body></html>'")
+           "<p>Praxisherz wird gerade aktualisiert oder neu gestartet. Diese Seite lädt sich automatisch neu.</p></body></html>'")
 
 
 def _module(m: dict) -> list[str]:
@@ -110,7 +111,7 @@ def _starter_kontext(m: dict) -> list[str]:
 
 def render(hostnames: list[str], registry: dict) -> str:
     names = server_names(hostnames)
-    out = ['# Kienzle-Suite – erzeugt von kienzle-web. Nicht von Hand ändern: Änderungen gehen beim nächsten Erzeugen verloren.',
+    out = ['# Praxisherz – erzeugt von kienzle-web. Nicht von Hand ändern: Änderungen gehen beim nächsten Erzeugen verloren.',
            '', 'server {', '    listen 443 ssl default_server;', '    listen [::]:443 ssl default_server;', '    server_tokens off;',
            f'    ssl_certificate {CA_DIR}/server.crt;', f'    ssl_certificate_key {CA_DIR}/server.key;',
            '    # Unbekannte Namen: keine Seite. Den Handshake nicht abweisen – ohne SNI (Aufruf über die IP) bräche sonst jede',
@@ -127,7 +128,10 @@ def render(hostnames: list[str], registry: dict) -> str:
            '    # Prüfung für Module (nur intern über auth_request)', '    location ^~ /_auth/ {', '        internal;',
            '        # Der Körper der Anfrage geht nicht an die Prüfung, nginx prüft aber auch hier die Größe: ohne diese Zeile gälte das Limit',
            '        # des Servers (1m) und Uploads in Modulen (bis 25m) scheiterten schon an der Anmeldeprüfung mit 413.',
-           '        client_max_body_size 25m;', '        fastcgi_pass_request_body off;', '        fastcgi_param CONTENT_LENGTH "";'] + _fastcgi_common() + [
+           '        client_max_body_size 25m;', '        fastcgi_pass_request_body off;', '        fastcgi_param CONTENT_LENGTH "";',
+           '        # Platz für die Kopfzeilen der Prüfung (Menü, Personenliste für Module mit [web] personen); fastcgi_buffers muss',
+           '        # mitwachsen, sonst lehnt nginx die Konfiguration ab (fastcgi_busy_buffers_size > Summe der Puffer).',
+           '        fastcgi_buffer_size 32k;', '        fastcgi_buffers 8 32k;'] + _fastcgi_common() + [
            '        fastcgi_param REQUEST_URI $uri;  # sonst stünde hier die ursprüngliche Adresse',
            f'        fastcgi_param SCRIPT_FILENAME {CORE_ROOT}/public/index.php;', f'        fastcgi_pass unix:{CORE_SOCKET};', '    }', '',
            '    # Prüfung des Starter-Schlüssels für /starter/<modul> (nur intern über auth_request; der Schlüssel steht im Kopf Authorization)',
@@ -137,7 +141,7 @@ def render(hostnames: list[str], registry: dict) -> str:
            '    location = /_health {', '        allow 127.0.0.1;', '        allow ::1;', '        deny all;'] + _fastcgi_common() + [
            f'        fastcgi_param SCRIPT_FILENAME {CORE_ROOT}/public/index.php;', f'        fastcgi_pass unix:{CORE_SOCKET};', '    }', '',
            '    location = /ca.crt {', f'        alias {CA_DIR}/ca.crt;', '        default_type application/x-x509-ca-cert;',
-           '        add_header Content-Disposition "attachment; filename=kienzle-suite-ca.crt" always;', '    }', '',
+           '        add_header Content-Disposition "attachment; filename=praxisherz-ca.crt" always;', '    }', '',
            '    location ^~ /assets/ {', f'        alias {CORE_ROOT}/public/assets/;', '        add_header X-Content-Type-Options nosniff always;', '    }', '']
     for m in registry.get('modules', []):
         if m.get('web'):

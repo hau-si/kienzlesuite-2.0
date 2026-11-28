@@ -27,7 +27,7 @@ function test_anfragen(): void {
     [$env, $b] = bk_env();
     check(!$b->status()['eingerichtet'] && $b->count() === 1, 'ohne Status: nicht eingerichtet mit einer Warnung');
     $b->setup(['art' => 'ziel', 'id' => 'nas', 'ordner' => ''], 'Praxis Beispiel');
-    check(req_b($env) === ['action' => 'einrichten', 'ziel' => ['art' => 'ziel', 'id' => 'nas', 'ordner' => 'kienzle-sicherung'], 'praxis' => 'Praxis Beispiel'], 'Einrichten falsch');
+    check(req_b($env) === ['action' => 'einrichten', 'ziel' => ['art' => 'ziel', 'id' => 'nas', 'ordner' => 'praxisherz-sicherung'], 'praxis' => 'Praxis Beispiel'], 'Einrichten falsch');
     $b->setup(['art' => 'rest', 'url' => ' https://nas.example.org:8000/k ', 'benutzer' => 'k', 'passwort' => 'p'], 'P');
     check(req_b($env)['ziel']['url'] === 'https://nas.example.org:8000/k', 'REST-Adresse nicht bereinigt');
     problem(fn() => $b->setup(['art' => 'ftp'], 'P'), 422, 'unbekannte Art');

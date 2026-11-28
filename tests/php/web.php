@@ -495,4 +495,32 @@ function test_keine_geheimnisse_in_seiten_und_protokoll(): void {
     check(substr(sprintf('%o', fileperms($env->audit->path())), -3) === '600', 'Protokoll nicht 0600');
 }
 
+function test_personenliste_nur_fuer_module_die_sie_anfordern(): void {
+    $env = new Env();
+    $mods = $env->modules->all();
+    $mods['kasse']['web']['personen'] = true;
+    $env->modules = \Kienzle\Core\Modules::fromArray(array_values($mods));
+    $env->users = new \Kienzle\Core\Users($env->db, $env->secrets, $env->modules);
+    [$bert] = $env->user('bert');
+    $env->users->setAccess($bert, 'kasse', false, ['paid']);
+    [$carla] = $env->user('carla');
+    $env->users->setAccess($carla, 'kasse', true, []);
+    [$dora] = $env->user('dora');
+    $env->users->setAccess($dora, 'beispiel', true, []);
+    $b = new Browser($env);
+    $b->post('/anmelden', ['login' => 'bert', 'password' => 'Wiesen-Blume-Fahrrad-7']);
+    $auth = $b->get('/_auth/kasse');
+    $k = new KienzleModul('kasse', ['KIENZLE_PERSONEN' => (string)$auth->header('X-Kienzle-Personen')]);
+    $p = $k->personen();
+    check(array_column($p, 'login') === ['bert', 'carla'] && $p[0]['rechte'] === ['paid'] && $p[1]['admin'] === true && $p[0]['name'] === 'Bert', 'Personenliste für das Modul falsch');
+    check($b->get('/_auth/beispiel')->status === 403 && (string)$auth->header('X-Kienzle-Personen') !== '', 'Personenliste fehlt');
+    $env->users->setAccess($dora, 'beispiel', false, []);
+    $env->users->setAccess($dora, 'kasse', false, ['paid']);
+    check(count((new KienzleModul('kasse', ['KIENZLE_PERSONEN' => (string)$b->get('/_auth/kasse')->header('X-Kienzle-Personen')]))->personen()) === 2, 'Liste wird kurz zwischengespeichert');
+    $env->users->setAccess($bert, 'beispiel', true, []);
+    check((string)$b->get('/_auth/beispiel')->header('X-Kienzle-Personen') === '', 'Personenliste an ein Modul ohne [web] personen');
+    check((new KienzleModul('kasse', ['KIENZLE_PERSONEN' => rawurlencode('[{"l":"../x","n":"X"},{"l":"eva","n":"","g":[1,"MFA"]}]')]))->personen()
+        === [['login' => 'eva', 'name' => 'eva', 'gruppen' => ['MFA'], 'admin' => false, 'rechte' => []]], 'Personenliste wird nicht geprüft');
+}
+
 run_tests();

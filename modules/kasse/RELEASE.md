@@ -1,5 +1,92 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.66
+
+- Hinweise auf die frühere Aufrufadresse `kienzle-kasse://` und die alte Einrichtung entfernt. Mit Tests geprüft.
+
+## 2.3.4-beta.65
+
+- Neu veröffentlicht nach dem Bereinigen der Git-Geschichte (gleicher Inhalt wie die vorige Vorabversion). Die vorigen Vorabversionen bitte auf GitHub löschen.
+
+## 2.3.4-beta.64
+
+- Ablage aus Signatur: Enthält der Auftrag einen Akteneintrag (Text und Kürzel aus der Signaturvorlage), schreibt die Kasse ihn nach dem PDF als Freitext in die T2med-Akte. Scheitert nur der Eintrag, meldet sie einen Hinweis; das PDF bleibt abgelegt. Mit Tests geprüft, nicht mit T2med.
+
+## 2.3.4-beta.63
+
+- Drucker und Excel tragen „Praxisherz“ statt „Kienzle-SumUp“ (Druckauftrag, Belegdruck, Dateieigenschaften, Druckermodell vKasse/vBriefversand). Mit Tests geprüft, nicht auf der VM.
+
+## 2.3.4-beta.62
+
+- Texte: „die Suite“/„der Suite“ heißt jetzt überall „Praxisherz“. Nur Texte geändert, mit Tests geprüft, nicht auf der VM.
+
+## 2.3.4-beta.61
+
+- Testdatei beim Verbindungstest der Ablage heißt jetzt `praxisherz-kasse-verbindungstest.txt`. Mit Tests geprüft, nicht auf der VM.
+
+## 2.3.4-beta.60
+
+- **Neue Aufrufadresse aus T2med: `praxisherz-kasse://…`** (Einstellungen, Anleitung). Die frühere Adresse `kienzle-kasse://…` funktioniert weiter. Braucht Basis 0.22.0-beta.32. Mit Tests geprüft, nicht auf der VM und nicht mit T2med.
+
+## 2.3.4-beta.59
+
+- **Neuer Name: „Praxisherz – freie Software für die Arztpraxis“** (vorher Kienzle-Suite; Wunsch von T2med nach einem unterscheidbaren Namen).
+- Nur Texte geändert, in der Kassenansicht das Herz-Symbol oben links. Ersetzt 2.3.4-beta.58 (Zwischenstand mit anderem Namen, bitte nicht verwenden).
+- Mit Tests geprüft, nicht auf der VM.
+
+## 2.3.4-beta.57
+
+- **Kein Demo-Schlüssel mehr (Vorgabe von T2med).** Fehlt der T2med-API-Schlüssel unter Verwaltung → Verbindungen → T2med, verbindet sich die Kasse nicht mit T2med und meldet das klar. Live-Betrieb lässt sich ohne Schlüssel nicht einschalten.
+- **Nur noch dokumentierte T2med-Funktionen.** Die Kasse fragt nicht mehr `GET /metadata` ab, sucht nicht mehr nach vorhandenen Zahlungseinträgen (`GET /Observation`) und legt nicht mehr bedingt an (`ifNoneExist`).
+- Ist ein Schreibversuch in die Akte ungeklärt (z. B. Antwort verloren), schreibt die Kasse erst nach Rückfrage erneut: „Akte geprüft – erneut schreiben“. Vorher bitte in der T2med-Akte nachsehen, ob der Zahlungseintrag schon da ist.
+- Mit Tests geprüft. **Nicht auf der VM und nicht mit echtem T2med geprüft.**
+
+## 2.3.4-beta.56
+
+- **Neu: Patientenübergabe aus Signatur.** Wurde ein Patient direkt aus T2med in der Signatur geöffnet, führt dort „Zur Kasse“ in die Kasse. Die Kasse übernimmt den T2med-Zugang der Signatur, legt einen Besuch an wie beim Aufruf aus T2med (Patientenkarte oben, Aktenaufruf) und schreibt die Zahlung in die Akte. Der Zugang endet spätestens 4 Stunden nach dem ursprünglichen Aufruf.
+- Die Übergabe gilt einmal und höchstens 5 Minuten (`/kasse/#uebergabe=<code>`, Datei im gemeinsamen Ordner mit Signatur, wird beim Einlösen gelöscht).
+- Mit Tests und in der Vorschau geprüft. **Nicht auf der VM und nicht mit echtem T2med geprüft.**
+
+## 2.3.4-beta.55
+
+- **„T2m-Rechnung“ und „IGeL“ oben in der Patientenkarte.** Liegt für den Patienten eine offene T2med-Rechnung vor, ist „T2m-Rechnung“ vorgewählt: Die Rechnung steht in der Mitte, wo sonst die IGeL-Liste steht. „IGeL“ zeigt dort wieder die Leistungsliste. Das gilt für Patienten aus T2med und für Rechnungen aus dem Eingang.
+- **Das Bezahlfeld steht immer rechts an derselben Stelle**, auch bei Rechnungen (Zahlart mit Symbolen, darunter der große Knopf).
+- **Akte öffnen:** Ein Klick auf den Namen oder das T2med-Etikett (Herz) öffnet die Patientenakte in T2med am eigenen PC. Das läuft über den GDT-Aufruf der Basis und den Kienzle-Agent, wie im Telefon. Dafür merkt sich die Kasse die T2med-Patientennummer (Datenbank Version 24); bei Rechnungen aus dem Eingang gibt es keinen Aktenaufruf.
+- „Entfernen“ ist nur noch eine Mülltonne, der Name hat Vorrang: Er wird nicht gekürzt, die Knöpfe rücken notfalls in eine zweite Zeile. Bei einer Rechnung eines anderen Patienten zeigt die Karte diesen, „Zum Patienten“ führt zum gemerkten Patienten zurück.
+- In der Vorschau mit erfundenen Daten geprüft (Wechsel der Knöpfe, Aktenaufruf mit nachgestellter Antwort der Basis). **Nicht auf der VM und nicht mit echtem T2med geprüft.**
+
+## 2.3.4-beta.54
+
+- **Wechsel zu Signatur im selben Tab:** „Zur Unterschrift“ öffnet Signatur jetzt im selben Tab statt in einem neuen. Der Patient bleibt oben erhalten, und Signatur springt nach der Unterschrift hierher zurück zum Bezahlen. Die gewählten Leistungen stehen dann noch da.
+- Die Patientenkarte nutzt das neue Bauteil der Basis (ab Basis 0.22.0-beta.22, `docs/MODUL-GESTALTUNG.md`).
+- **Nicht auf der VM geprüft.**
+
+## 2.3.4-beta.53
+
+- **Neu: Patient aus T2med bleibt oben (Entwurf B3).** Über der Kasse steht eine Karte mit großem Herz-Etikett „T2med“, dem Namen und dem Geburtsdatum. Sie bleibt stehen, auch wenn man eine Rechnung aus der Liste öffnet, zur freien Eingabe, zu „IGeL“, „Vorgänge“ oder „Einstellungen“ wechselt und zurückkommt; sie gilt für diesen Browser-Tab.
+  - **„Zum Patienten“** holt ihn wieder in die Kasse.
+  - **„Entfernen“** nimmt ihn heraus.
+  - Läuft der T2med-Zugang ab (4 Stunden), verschwindet die Karte von selbst. Die doppelte Namenszeile in der Kasse entfällt.
+- **Einfache Symbole auf den Zahlungsknöpfen** (Karte, Bar, Überweisung, Per Post) in der freien Eingabe und bei Rechnungen, als Linien wie die übrigen Symbole der Suite statt Emojis.
+- **Alle Seiten der Kasse sind gleich breit** wie die Startseite. „IGeL“ und „Einstellungen“ waren schmaler.
+- In der Vorschau mit erfundenen Daten geprüft (Ablauf: Patient kommt, Wechsel zu IGeL und zurück, Rechnung, „Zum Patienten“, „Entfernen“). **Nicht auf der VM geprüft.**
+
+## 2.3.4-beta.52
+
+- **Fehler behoben: Leistungen ließen sich nicht auswählen, die Zahlungsknöpfe lagen falsch,** wenn ein Patient aus T2med kam und für ihn eine offene T2med-Rechnung vorlag. Die Rechnung rutschte dann in die linke Spalte, die Leistungsliste in die schmale rechte und die Zahlung darunter. Jetzt steht die offene Rechnung in einer eigenen Zeile über „Leistungen | Zahlung“.
+- In der Vorschau mit erfundenen Daten geprüft. **Nicht auf der VM geprüft.**
+
+## 2.3.4-beta.51
+
+- **Neu: Unterschriebene Dokumente aus Signatur in die T2med-Akte.** Bei „Zur Unterschrift“ merkt sich die Kasse den T2med-Zugang dieses Besuchs. Nach der Unterschrift legt Signatur das PDF in den gemeinsamen Austauschordner (`/var/spool/kienzle/austausch/kasse_signatur`). Der neue Dienst `kienzle-kasse-signatur` (ausgelöst über `.path`) schreibt es als `DocumentReference` (Profil „Anhang“) in die Akte und meldet das Ergebnis an Signatur zurück.
+- Der T2med-Zugang bleibt dafür nach dem Kassieren erhalten, solange eine Unterschrift offen ist, höchstens bis zum Ablauf nach 4 Stunden. Danach und nach dem Ablegen wird er gelöscht. Ist er abgelaufen, nimmt die Kasse einen anderen noch gültigen Aufruf desselben Patienten.
+- Neu als Voraussetzung: `core_api = "2"` (Basis ab 0.22.0), Datenbank Version 23 (Spalte `visits.signatur_offen`).
+- Geprüft mit Tests (`tests/signatur-ablage.php`). **Nicht gegen echtes T2med und nicht auf der VM geprüft: bitte zuerst mit einem Testpatienten.**
+
+## 2.3.4-beta.50
+
+- Nur Tests: Startseite-, vBriefversand- und Letterxpress-Test rechnen das Datum in der Zeitzone der Kasse (Europe/Berlin) (scheiterte sonst zwischen 23 und 24 Uhr UTC). Keine Änderung am Programm.
+
 ## 2.3.4-beta.49
 
 - **Hinweis zur Versandart:** „Nur Inland“ ist als empfohlen gekennzeichnet, „Automatisch“ als fehleranfällig (Letterxpress erkennt die Anschrift im PDF nicht immer); die Fehlermeldung „keine lesbare Anschrift“ empfiehlt dasselbe.

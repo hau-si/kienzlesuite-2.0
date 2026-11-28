@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -IB
-"""Lokale Zertifizierungsstelle der Kienzle-Suite (nur root).
+"""Lokale Zertifizierungsstelle Praxisherz (nur root).
 
   kienzle-zertifikat einrichten     CA anlegen (einmalig) und Server-Zertifikat ausstellen
   kienzle-zertifikat erneuern       Server-Zertifikat erneuern, wenn es in 60 Tagen abläuft oder die Namen sich geändert haben

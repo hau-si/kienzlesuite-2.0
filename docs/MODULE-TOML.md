@@ -68,6 +68,7 @@ Ohne `[web]` erscheint das Modul nicht im Menü (z. B. ein reines Druckmodul).
 | `protocol` | nein | `"http"` (Vorgabe: das Modul spricht HTTP über den Socket) oder `"fastcgi"` (PHP über php-fpm) |
 | `entry` | bei `fastcgi` | Einstiegsdatei im Modulordner, z. B. `public/index.php`; alle Anfragen unter `path` gehen an sie |
 | `uploads` | nein | `true`: Formular-Uploads (`multipart/form-data`, `$_FILES`) sind erlaubt, bis 3 MB je Datei. Sonst ist `file_uploads` im Modul-Dienst aus. Nur mit `fastcgi`. Vorgabe `false` |
+| `personen` | nein | `true`: Das Modul bekommt mit jeder Anfrage die Personen mit Zugang zu diesem Modul (Anmeldename, Name, Gruppen, Rechte im Modul; `X-Kienzle-Personen`, PHP `$k->personen()`), z. B. um an eine Gruppe vorzulegen. Erst mit `core_api = "2"` (Basis ab 0.22.0-beta.46). Vorgabe `false` |
 
 ### `[[firewall]]` – optional, höchstens 20
 
@@ -140,7 +141,7 @@ Startkontexte für den zentralen Arbeitsplatz-Starter der Basis (Verwaltung → 
 
 | Feld | Pflicht | Bedeutung |
 |---|---|---|
-| `schema` | ja | URL-Schema, das T2med aufruft, `kienzle-<name>` (Kleinbuchstaben, Ziffern, Bindestrich); über alle Module eindeutig |
+| `schema` | ja | URL-Schema, das T2med aufruft, `praxisherz-<name>` (Kleinbuchstaben, Ziffern, Bindestrich); über alle Module eindeutig |
 | `label` | ja | Name des Kontexts für die Anzeige auf der Seite „Arbeitsplätze“ |
 
 Das Starterprogramm sendet `POST https://<server>/starter/<modul-id>` (JSON mit `context_id`, `fhir_base_url`, `oauth_token`, `action = "launch"`).
@@ -156,7 +157,7 @@ bekommen deren Zugangsdaten; sie sind dann nur für `ks-<id>` lesbar. Zugänge, 
 
 | Schlüssel | Pflicht | Regel |
 |---|---|---|
-| `id` | ja | `"t2med"` (FHIR-Zugang zu T2med), `"mail"` (E-Mail-Versand: `art` = `smtp` mit Server und Zugang oder `gmail` mit `client_id`, `client_secret`, `refresh_token` für die Gmail-API, Umfang gmail.send; ein Modul muss beide Arten unterstützen oder `art` prüfen), `"letterxpress"` (Briefversand: `username`, `api_key`, `modus` = `test`/`live`), `"ablage"` (Netzwerkspeicher) oder `"nachrichten"` (SMS und E-Mail über den Nachrichten-Ausgang der Basis, ohne Zugangsdaten im Modul; siehe `docs/MODUL-SCHNITTSTELLE.md`); je einmal |
+| `id` | ja | `"t2med"` (FHIR-Zugang zu T2med), `"mail"` (E-Mail-Versand: `art` = `smtp` mit Server und Zugang oder `gmail` mit `client_id`, `client_secret`, `refresh_token` für die Gmail-API, Umfang gmail.send; ein Modul muss beide Arten unterstützen oder `art` prüfen), `"letterxpress"` (Briefversand: `username`, `api_key`, `modus` = `test`/`live`), `"ablage"` (Netzwerkspeicher), `"uebersetzung"` (DeepL: `api_key`, `url` = Gratis- oder Pro-Adresse; nur Vorlagentexte, keine Patientendaten) oder `"nachrichten"` (SMS und E-Mail über den Nachrichten-Ausgang der Basis, ohne Zugangsdaten im Modul; siehe `docs/MODUL-SCHNITTSTELLE.md`); je einmal |
 | `purpose` | ja | wofür das Modul die Verbindung nutzt, höchstens 120 Zeichen; wird dem Admin angezeigt |
 | `required` | nein | `true` (Vorgabe): ohne die Verbindung arbeitet das Modul nicht; `false`: nur einzelne Funktionen fehlen |
 

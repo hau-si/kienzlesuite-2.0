@@ -321,7 +321,7 @@ def account(mid: str) -> None:
         shutil.chown(data, user, user)
     (TMPFILES).mkdir(parents=True, exist_ok=True)
     web_group = 'www-data' if not OWNER else user
-    _write(TMPFILES / f'kienzle-{mid}.conf', f'# Kienzle-Suite, Modul {mid}: Socket-Ordner (nur das Modul und nginx).\nd {RUN}/{mid} 0750 {user} {web_group} -\n', 0o644)
+    _write(TMPFILES / f'kienzle-{mid}.conf', f'# Praxisherz, Modul {mid}: Socket-Ordner (nur das Modul und nginx).\nd {RUN}/{mid} 0750 {user} {web_group} -\n', 0o644)
     run = RUN / mid
     run.mkdir(mode=0o750, parents=True, exist_ok=True)
     os.chmod(run, 0o750)
@@ -402,7 +402,7 @@ def fpm_conf(m: dict) -> str:
                 f'/var/spool/kienzle/nachrichten/{mid}/',
                 '/etc/kienzle/ca/ca.crt', '/etc/kienzle/ca/server.crt', '/tmp/', '/usr/bin/', '/usr/share/fonts/', '/usr/share/fonts-dejavu-core/']
     return '\n'.join([
-        f'; Kienzle-Suite, Modul {mid}: eigene php-fpm-Instanz als ks-{mid}. Von der Modulverwaltung geschrieben; Änderungen gehen verloren.',
+        f'; Praxisherz, Modul {mid}: eigene php-fpm-Instanz als ks-{mid}. Von der Modulverwaltung geschrieben; Änderungen gehen verloren.',
         '[global]', 'error_log = syslog', f'syslog.ident = kienzle-{mid}-php', 'log_level = notice', 'daemonize = no', '',
         f'[{mid}]', f'listen = /run/kienzle/{mid}/web.sock',
         f'; Der Ordner /run/kienzle/{mid} (0750, ks-{mid}:www-data) lässt nur das Modul und nginx hinein.', 'listen.mode = 0666',
@@ -422,8 +422,8 @@ def fpm_conf(m: dict) -> str:
 def fpm_unit(m: dict, binary: str) -> str:
     mid = m['module']['id']
     return '\n'.join([
-        f'# Kienzle-Suite, Modul {mid}: Weboberfläche (php-fpm als ks-{mid}). Von der Modulverwaltung geschrieben.',
-        '[Unit]', f'Description=Kienzle-Suite Modul {mid} (Weboberfläche)', 'After=network.target', '', '[Service]', 'Type=notify',
+        f'# Praxisherz, Modul {mid}: Weboberfläche (php-fpm als ks-{mid}). Von der Modulverwaltung geschrieben.',
+        '[Unit]', f'Description=Praxisherz Modul {mid} (Weboberfläche)', 'After=network.target', '', '[Service]', 'Type=notify',
         f'User=ks-{mid}', f'Group=ks-{mid}', f'ExecStart={binary} --nodaemonize --fpm-config {ETC}/{mid}/php-fpm.conf',
         'ExecReload=/bin/kill -USR2 $MAINPID', 'Restart=on-failure', 'UMask=0077',
         '# Härtung wie die Basis; das Modul darf ins Netz (z. B. Zahlungsdienst, T2med) und nur in seine eigenen Ordner schreiben.',

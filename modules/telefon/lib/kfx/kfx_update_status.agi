@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 # Übernommen aus Kienzlefax 3.5.0 (installer-modular/agi.sh) von Dr. Thomas Kienzle, MIT-Lizenz.
-# Kienzle-Suite, Modul telefon: Pfade über KFX_BASE (Austauschordner fax_telefon), sonst unverändert.
+# Praxisherz, Modul telefon: Pfade über KFX_BASE (Austauschordner fax_telefon), sonst unverändert.
 # -*- coding: utf-8 -*-
 """
 kfx_update_status.agi — kienzlefax

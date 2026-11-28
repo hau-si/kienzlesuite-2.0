@@ -1,5 +1,21 @@
 # Release-Notizen Fax
 
+## 0.1.0-beta.15
+
+- Texte: „die Suite“/„der Suite“ heißt jetzt überall „Praxisherz“. Nur Texte geändert, mit Tests geprüft, nicht auf der VM.
+
+## 0.1.0-beta.14
+
+- **Neuer Name: „Praxisherz – freie Software für die Arztpraxis“** (vorher Kienzle-Suite) in Texten, Hinweisen und Dienstbeschreibungen. Mit Tests geprüft, nicht auf der VM.
+
+## 0.1.0-beta.13
+
+- **„Erneut senden“ direkt in Sendeprotokoll und Fehlerberichte:** Statt wie bisher über die Dokumentliste von „Fax senden“ (Quelle „Sendefehler“) gibt es jetzt einen Knopf **„Erneut senden“** direkt an jedem Eintrag, mit Rückfrage; er sendet an denselben Empfänger mit denselben Einstellungen (Auflösung, ECM) erneut. Der Knopf erscheint nur, solange das Original noch vorliegt.
+- **Original auch bei erfolgreich gesendeten Faxen aufbewahrt:** Der Fax-Worker (Modul Telefon, ab 1.3.20) legt das Original jetzt auch bei Erfolg zusätzlich ab (`sendeberichte/eingang/`, analog zum bisherigen Verhalten bei Fehlern). Das Modul Fax hebt es **7 Tage** auf (`Fax::PROTOKOLL_ORIGINAL_TAGE`, fest, unabhängig von der Aufbewahrungsfrist des Sendeprotokolls selbst); danach bleibt nur noch der Bericht, das Original wird beim Aufräumen gelöscht.
+- Hover-Vorschau im Faxeingang vergrößert (360px → 480px Breite).
+- Drag-and-Drop-Bereich auf „Fax senden“ vergrößert (mehr Innenabstand, Mindesthöhe).
+- Braucht Modul Telefon ≥ 0.1.0-beta.21 (Worker-Änderung); mit einer älteren Version fehlt nur der Resend-Knopf im Sendeprotokoll, sonst unverändert nutzbar.
+
 ## 0.1.0-beta.12
 
 - **Windows-Freigabe „Fax-Ausgang“ für sofortige Faxübernahme:** Das Modul bietet den Ordner `ablage` als Freigabe an (`[[fileshare]]`, Basis 0.22.0-beta.13). Ein Admin schaltet sie unter Verwaltung → Drucker ein; danach genügt es, ein PDF oder Bild auf `\\<Server>\Fax-Ausgang` zu ziehen. Die Pfad-Einheit `kienzle-fax-lauschen.path` überwacht den Ordner, die Datei erscheint in „Fax senden“ (Quelle NAS) nach etwa ein bis zwei Sekunden. Dateien, die noch kopiert werden, werden erst übernommen, wenn sie sich eine Sekunde nicht mehr ändern.

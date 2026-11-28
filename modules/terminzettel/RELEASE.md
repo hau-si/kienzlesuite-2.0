@@ -1,5 +1,23 @@
 # Terminzettel – Release-Notizen
 
+## 1.3.0-beta.24
+
+- Alte Bezeichnung in einem Test entfernt (keine Änderung der Funktion).
+
+## 1.3.0-beta.23
+
+- Druckermodell vTermine heißt „Praxisherz vTermine PDF“. Nicht auf der VM geprüft.
+
+## 1.3.0-beta.22
+
+- Texte: „die Suite“/„der Suite“ heißt jetzt überall „Praxisherz“. Nur Texte geändert, mit Tests geprüft, nicht auf der VM.
+
+## 1.3.0-beta.21
+
+- **Neuer Name: „Praxisherz – freie Software für die Arztpraxis“** (vorher Kienzle-Suite; Wunsch von T2med nach einem unterscheidbaren Namen).
+- Nur Texte geändert. Ersetzt 1.3.0-beta.20 (Zwischenstand mit anderem Namen, bitte nicht verwenden).
+- Mit Tests geprüft, nicht auf der VM.
+
 ## 1.3.0-beta.19
 
 - **Neuer Standardtext der Absage-Mail:** „Guten Tag, leider muss ich meinen Termin am {{termine}} absagen. Viele Grüße, {{patient}}“, Betreff „Terminabsage {{patient}}“. Die bisherigen Standardtexte werden beim Öffnen der Einstellungen durch den neuen ersetzt; selbst geänderte Texte bleiben unverändert. Nicht auf der VM geprüft.

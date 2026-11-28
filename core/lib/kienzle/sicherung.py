@@ -144,11 +144,11 @@ def check_target(ziel: dict) -> dict:
     art = ziel.get('art')
     if art == 'ziel':
         _ablage_target(str(ziel.get('id')))
-        return {'art': 'ziel', 'id': str(ziel['id']), 'ordner': ablage.remote_dir(str(ziel.get('ordner') or 'kienzle-sicherung'))}
+        return {'art': 'ziel', 'id': str(ziel['id']), 'ordner': ablage.remote_dir(str(ziel.get('ordner') or 'praxisherz-sicherung'))}
     if art == 'rest':
         url = str(ziel.get('url', ''))
         if not REST.match(url):
-            raise Fehler('REST-Server: nur https-Adressen, z. B. https://nas.example.org:8000/kienzle')
+            raise Fehler('REST-Server: nur https-Adressen, z. B. https://nas.example.org:8000/praxisherz')
         user, pw = str(ziel.get('benutzer', '')), str(ziel.get('passwort', ''))
         if (user and not ablage.USER.match(user)) or re.search(r'[\x00-\x1f]', pw) or len(pw) > 200:
             raise Fehler('Zugangsdaten des REST-Servers ungültig.')
@@ -277,7 +277,7 @@ def key_section(ziel: dict) -> str:
             out += f'<p>Fingerabdruck des NAS ({h(target["host"])}): <code>{h(ablage.fingerprint(target["hostkey"]))}</code></p>'
     fp = _fingerprint_cert(CA_CERT)
     if fp:
-        out += f'<h2>Zertifizierungsstelle der Suite</h2><p>Fingerabdruck (SHA-256): <code style="font-size:10pt;word-break:break-all">{fp}</code></p>'
+        out += f'<h2>Zertifizierungsstelle von Praxisherz</h2><p>Fingerabdruck (SHA-256): <code style="font-size:10pt;word-break:break-all">{fp}</code></p>'
     return out
 
 
@@ -289,15 +289,15 @@ def sheet(password: str, ziel: dict, repo_id: str, practice: str) -> str:
              'lokal': f'Ordner {ziel.get("pfad")}'}[ziel['art']]
     return ('<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Schlüsselblatt</title>'
             '<style>body{font:12pt/1.5 sans-serif;max-width:42rem;margin:2rem auto}code{font-size:14pt}td{padding:.3rem .6rem;vertical-align:top}</style></head><body>'
-            f'<h1>Schlüsselblatt für den Admin – Kienzle-Suite</h1><p>{h(practice)} · erstellt {time.strftime("%d.%m.%Y %H:%M")}</p>'
+            f'<h1>Schlüsselblatt für den Admin – Praxisherz</h1><p>{h(practice)} · erstellt {time.strftime("%d.%m.%Y %H:%M")}</p>'
             '<p><strong>Im Praxistresor aufbewahren.</strong> Ohne dieses Passwort lässt sich die Sicherung nicht lesen – auch nicht vom Hersteller. '
             'Wer dieses Blatt hat, kann die Sicherung lesen.</p>'
             f'<table><tr><td>Passwort</td><td><code>{h(password)}</code></td></tr><tr><td>Ablage</td><td>{h(where)}</td></tr>'
             f'<tr><td>Repository-ID</td><td><code>{h(repo_id)}</code></td></tr><tr><td>Programm</td><td>restic (https://restic.net)</td></tr></table>'
             + key_section(ziel) +
-            '<h2>Nach einem Totalausfall</h2><ol><li>Neue VM mit Ubuntu Server 26.04 anlegen, Kienzle-Suite herunterladen.</li>'
+            '<h2>Nach einem Totalausfall</h2><ol><li>Neue VM mit Ubuntu Server 26.04 anlegen, Praxisherz herunterladen.</li>'
             '<li><code>sudo bash installer/install.sh --wiederherstellen</code> und die Angaben von diesem Blatt eingeben.</li></ol>'
-            '<h2>Von Hand (ohne Suite)</h2><p>Auf einem Rechner mit restic: <code>restic -r &lt;Ablage&gt; snapshots</code>, Passwort von oben eingeben, '
+            '<h2>Von Hand (ohne Praxisherz)</h2><p>Auf einem Rechner mit restic: <code>restic -r &lt;Ablage&gt; snapshots</code>, Passwort von oben eingeben, '
             'dann <code>restic -r &lt;Ablage&gt; restore latest --target /tmp/wiederhergestellt</code>. Die Datenbanken liegen unter '
             '<code>var/lib/kienzle/sicherung/stand/</code>.</p></body></html>')
 
@@ -353,7 +353,7 @@ def set_schedule(z: dict) -> str:
         raise Fehler('Zeitplan ungültig (Uhrzeit HH:MM, Wochentag 0–6, Tag 1–28).')
     clean = {'haeufigkeit': z['haeufigkeit'], 'uhrzeit': z['uhrzeit'], 'wochentag': z.get('wochentag', 6), 'tag': z.get('tag', 1)}
     _write(ETC / 'einstellungen.json', {**settings(), 'zeitplan': clean}, 0o600)
-    _write(TIMER_DROPIN, f'# Kienzle-Suite: Zeitplan der Sicherung (Verwaltung → Sicherung)\n[Timer]\nOnCalendar=\nOnCalendar={calendar(clean)}\n', 0o644)
+    _write(TIMER_DROPIN, f'# Praxisherz: Zeitplan der Sicherung (Verwaltung → Sicherung)\n[Timer]\nOnCalendar=\nOnCalendar={calendar(clean)}\n', 0o644)
     if Path(SYSTEMCTL).is_file():
         subprocess.run([SYSTEMCTL, 'daemon-reload'], capture_output=True, timeout=60)
         subprocess.run([SYSTEMCTL, 'restart', 'kienzle-sicherung.timer'], capture_output=True, timeout=60)
@@ -378,10 +378,10 @@ def notify(problems: list[str]) -> None:
     from . import verbindungen
     conf = KIENZLE_ETC / 'core' / 'core.json'
     host = (json.loads(conf.read_text(encoding='utf-8')).get('hostnames') or ['?'])[0] if conf.is_file() else '?'
-    body = ('Bei der Datensicherung der Kienzle-Suite ist ein Fehler aufgetreten:\n\n' + '\n'.join('- ' + p for p in problems)
+    body = ('Bei der Datensicherung Praxisherz ist ein Fehler aufgetreten:\n\n' + '\n'.join('- ' + p for p in problems)
             + f'\n\nDetails: https://{host}/verwaltung/sicherung\n\nDiese Nachricht wurde automatisch verschickt.\n')
     try:
-        verbindungen.send_mail(verbindungen.load().get('mail'), to, 'Kienzle-Suite: Fehler bei der Datensicherung', body)
+        verbindungen.send_mail(verbindungen.load().get('mail'), to, 'Praxisherz: Fehler bei der Datensicherung', body)
         set_status(letzte_mail={'ok': True, 'zeit': int(time.time())})
     except (verbindungen.Fehler, OSError, ValueError) as e:
         set_status(letzte_mail={'ok': False, 'zeit': int(time.time()), 'meldung': _clean(str(e))})
@@ -643,11 +643,11 @@ def full_restore(ziel: dict, password: str, ssh_key: str | None = None) -> list[
     if not isinstance(password, str) or not 8 <= len(password.strip()) <= 200:
         raise Fehler('Passwort ungültig.')
     if ziel.get('art') == 'ziel':
-        z = {'art': 'ziel', 'id': '', 'direkt': ablage.check_target(ziel.get('direkt')), 'ordner': ablage.remote_dir(str(ziel.get('ordner') or 'kienzle-sicherung'))}
+        z = {'art': 'ziel', 'id': '', 'direkt': ablage.check_target(ziel.get('direkt')), 'ordner': ablage.remote_dir(str(ziel.get('ordner') or 'praxisherz-sicherung'))}
     else:
         z = check_target(ziel)
     if (DATA / 'core' / 'core.sqlite').exists():
-        raise Fehler('Auf diesem Server gibt es schon Daten der Suite. Wiederherstellen nur auf einer frischen Installation.')
+        raise Fehler('Auf diesem Server gibt es schon Daten von Praxisherz. Wiederherstellen nur auf einer frischen Installation.')
     ETC.mkdir(mode=0o700, parents=True, exist_ok=True)
     if ssh_key:
         install_ssh_key(ssh_key)
@@ -758,7 +758,7 @@ def export_settings(password: str, with_backup_password: bool = False, with_user
         shutil.chown(out_dir, 'root', 'ks-core')
     for old in out_dir.glob('*.kse'):
         old.unlink()
-    name = time.strftime('kienzle-einstellungen-%Y%m%d-%H%M%S.kse')
+    name = time.strftime('praxisherz-einstellungen-%Y%m%d-%H%M%S.kse')
     target = out_dir / name
     r = subprocess.run([TRESOR, 'verschluesseln', str(target)], input=password.encode() + b'\n' + buf.getvalue(), capture_output=True, timeout=300)
     if r.returncode != 0:

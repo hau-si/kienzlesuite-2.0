@@ -3,7 +3,7 @@ declare(strict_types=1);
 namespace KienzleKasse;
 
 /**
- * JSON-Aktionen der Einstellungsseite. Angemeldet wird über die Suite: Admins des Moduls dürfen alles,
+ * JSON-Aktionen der Einstellungsseite. Angemeldet wird über Praxisherz: Admins des Moduls dürfen alles,
  * Mitarbeiter nur die Bereiche ihrer Rechte (module.toml [[rights]]). Heikle Änderungen verlangen eine
  * Bestätigung mit Passwort und OTP bzw. Passkey in den letzten 24 Stunden (Seite /bestaetigen der Basis).
  */
@@ -29,10 +29,10 @@ final class SettingsPage {
 
     private function who(): string { return (string)preg_replace('/[^A-Za-z0-9_.-]/', '', Suite::modul()->benutzer()); }
 
-    /** $csrf: Kopfzeile X-Kienzle-Csrf bzw. X-CSRF-Token des Browsers (Marke der Suite für dieses Modul). */
+    /** $csrf: Kopfzeile X-Kienzle-Csrf bzw. X-CSRF-Token des Browsers (Marke von Praxisherz für dieses Modul). */
     public function handle(string $action, array $input, ?string $csrf): array {
         $k = Suite::modul();
-        if ($k->benutzer() === '') throw new Problem('Bitte über die Kienzle-Suite anmelden.', 401);
+        if ($k->benutzer() === '') throw new Problem('Bitte über Praxisherz anmelden.', 401);
         $admin = Suite::isAdmin();
         $rights = Suite::rights();
         if ($action === 'status') return ['logged_in' => true, 'csrf' => $k->csrf(), 'role' => $admin ? 'admin' : 'staff', 'user' => $k->name() ?: $k->benutzer()];
@@ -77,7 +77,7 @@ final class SettingsPage {
         if (in_array($action, ['get'], true)) return;
         foreach ($rights as $right) if (in_array($action, self::RIGHTS[$right][1] ?? [], true)) return;
         $this->audit->write('verweigert', $action . ' ' . $this->who());
-        throw new Problem('Dafür fehlt das Recht. Bitte den Admin fragen (Verwaltung → Benutzer der Suite).', 403);
+        throw new Problem('Dafür fehlt das Recht. Bitte den Admin fragen (Verwaltung → Benutzer von Praxisherz).', 403);
     }
 
     /** Mitarbeiter sehen nur Modus, Version und die freigegebenen Bereiche – keine Einstellungen, Schlüssel oder Zugangsdaten. */
@@ -106,7 +106,7 @@ final class SettingsPage {
         $config = Settings::save($this->db, $this->base, $section, $values);
         Module::refreshOverview($config);
         $message = 'Gespeichert. Gilt ab sofort für alle Arbeitsplätze.';
-        if ($section === 'invoice_inbox' && $config->get('invoice_inbox', 'enabled', false)) $message .= ' Der Drucker „vKasse“ steht in der Suite bereit (Verwaltung → Drucker).';
+        if ($section === 'invoice_inbox' && $config->get('invoice_inbox', 'enabled', false)) $message .= ' Der Drucker „vKasse“ steht in Praxisherz bereit (Verwaltung → Drucker).';
         return $this->view() + ['message' => $message];
     }
 
@@ -119,14 +119,14 @@ final class SettingsPage {
             case 'receipt_printer':
                 if (!$config->get('printing', 'enabled', false)) throw new Problem('Bondrucker ist nicht aktiviert.', 409);
                 // ESC/POS-Text: Initialisieren, Text, Vorschub, Schnitt.
-                (new ReceiptPrinter($config))->send("\x1b@Kienzle-Suite Kasse Testdruck\n" . date('d.m.Y H:i') . "\n\n\n\n\x1dVB\x00");
+                (new ReceiptPrinter($config))->send("\x1b@Praxisherz Kasse Testdruck\n" . date('d.m.Y H:i') . "\n\n\n\n\x1dVB\x00");
                 return 'Testbon an den Bondrucker übergeben.';
             case 'office_printer':
                 $office = new OfficePrinter($config);
                 if (!$office->enabled()) throw new Problem('Praxisdrucker ist nicht aktiviert.', 409);
                 $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="210mm" height="297mm" viewBox="0 0 210 297"><rect width="210" height="297" fill="white"/>'
-                    . '<text x="20" y="30" font-family="DejaVu Sans" font-size="8">Kienzle-Suite Kasse Testseite</text><text x="20" y="42" font-family="DejaVu Sans" font-size="4">' . date('d.m.Y H:i') . '</text></svg>';
-                return 'Testseite übergeben: Auftrag ' . $office->send(ReceiptPdf::convert($svg), 'Kienzle-Suite Kasse Testseite') . '.';
+                    . '<text x="20" y="30" font-family="DejaVu Sans" font-size="8">Praxisherz Kasse Testseite</text><text x="20" y="42" font-family="DejaVu Sans" font-size="4">' . date('d.m.Y H:i') . '</text></svg>';
+                return 'Testseite übergeben: Auftrag ' . $office->send(ReceiptPdf::convert($svg), 'Praxisherz Kasse Testseite') . '.';
             case 'export':
                 return (new InvoiceExport($config))->check();
             case 'letterxpress':

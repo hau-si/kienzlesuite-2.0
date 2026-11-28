@@ -40,8 +40,15 @@ try {
             @unlink($target);
             if (is_file(Suite::$data . '/payments.sqlite')) (new Database(Suite::$data))->query('VACUUM INTO ' . "'" . str_replace("'", "''", $target) . "'");
             exit(0);
+        case 'signatur-ablage':
+            // Unterschriebene PDFs aus Signatur in T2med ablegen (Dienst kienzle-kasse-signatur, ausgelöst vom Austauschordner).
+            $ordner = (string)(getenv('KIENZLE_AUSTAUSCH') ?: '/var/spool/kienzle/austausch/kasse_signatur');
+            if (!preg_match('#^/[A-Za-z0-9/_.-]{1,200}$#D', $ordner) || str_contains($ordner, '..') || !is_dir($ordner)) exit(0);
+            (new Database(Suite::$data))->migrate();
+            foreach (ks_app()->signaturAblage($ordner) as $zeile) echo $zeile, "\n";
+            exit(0);
         default:
-            fwrite(STDERR, "Aufruf: kienzle-kasse install|update|remove|busy|health|setup-overview|backup-snapshot\n");
+            fwrite(STDERR, "Aufruf: kienzle-kasse install|update|remove|busy|health|setup-overview|backup-snapshot|signatur-ablage\n");
             exit(2);
     }
 } catch (\Throwable $e) {

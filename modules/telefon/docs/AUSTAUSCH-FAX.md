@@ -2,7 +2,7 @@
 
 Pfad: `/var/spool/kienzle/austausch/fax_telefon` (von der Basis angelegt, sobald beide Module installiert sind; root, 0770,
 ACL nur für `ks-fax` und `ks-telefon`). Das Format ist das von Kienzlefax 3.5.0 (`/srv/kienzlefax`), damit der Fax-Worker
-unverändert bleibt.
+weitgehend unverändert bleibt. Einzige Abweichung vom Original (seit Worker 1.3.20): `sendeberichte/eingang/`, siehe unten.
 
 | Ordner | Schreibt | Liest | Inhalt |
 |---|---|---|---|
@@ -10,6 +10,7 @@ unverändert bleibt.
 | `queue/<job>/` | fax, Worker | Worker, fax | `job.json`, `doc.pdf`, `source.pdf`; Abbruch: `cancel.requested = true` in `job.json` |
 | `processing/<job>/` | Worker, AGI | fax (Anzeige) | laufender Versand; `job.json` mit `status`, `attempt`, `retry`, `live` |
 | `sendeberichte/` | Worker | fax (holt ab) | `<name>__<job>.json` und `<name>__<job>__OK.pdf` (Bericht + Dokument) |
+| `sendeberichte/eingang/` | Worker (seit 1.3.20, Abweichung vom Original) | fax (holt ab) | Original des erfolgreich gesendeten Faxes zum erneuten Senden; das Modul fax hebt es nur 7 Tage auf, danach bleibt nur noch der Bericht |
 | `sendefehler/berichte/` | Worker | fax (holt ab) | `<name>__<job>.json` und `<name>__<job>__FAILED.pdf` |
 | `sendefehler/eingang/` | Worker | fax (holt ab) | Original des fehlgeschlagenen Faxes zum erneuten Senden |
 | `empfang/` | `fax-empfangen` (Asterisk) | fax (holt ab) | `<JJJJMMTT-hhmmss>_<absender>_<id>.pdf` und `.json` (`empfangen`, `absender`, `seiten`, `status`); die JSON-Datei kommt zuletzt |

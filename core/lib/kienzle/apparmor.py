@@ -1,7 +1,7 @@
 """Lokale AppArmor-Ergänzungen für Programme, die Module über `hooks.apparmor` anmelden (nur root).
 
 Ubuntu 26.04 schränkt z. B. `gs` und `qpdf` per AppArmor ein. Braucht ein Modul sie für seinen Datenordner, ergänzt die
-Basis `/etc/apparmor.d/local/<programm>` um einen eigenen, markierten Abschnitt (übernommen aus kienzle-suite-beta,
+Basis `/etc/apparmor.d/local/<programm>` (Datenordner und Austauschordner des Moduls) um einen eigenen, markierten Abschnitt (übernommen aus kienzle-suite-beta,
 scripts/install-server.sh). Andere Zeilen der Datei bleiben unberührt; ohne Bedarf wird der Abschnitt entfernt.
 """
 from __future__ import annotations
@@ -25,6 +25,9 @@ def wanted(registry: dict) -> dict[str, list[str]]:
         for prog in (m.get('hooks') or {}).get('apparmor', []):
             if prog in out:
                 out[prog].append(f'/var/lib/kienzle/{m["module"]["id"]}/** rwk,')
+                # Austauschordner ([[exchange]]): dort liegen z. B. die Faxaufträge, die die Telefonanlage mit gs/qpdf umwandelt.
+                for x in m.get('exchange', []):
+                    out[prog].append(f'{x["path"]}/** rwk,')
     return out
 
 

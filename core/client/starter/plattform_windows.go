@@ -3,31 +3,44 @@
 package main
 
 import (
+	"context"
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
+	"time"
+	"unsafe"
 )
 
 //go:embed drucker-agent.ps1
 var druckerSkript string
 
+// druckerSkriptFrist: Höchstdauer für das Druckerskript (Einrichten/Prüfen/Entfernen). Ohne Frist blockiert ein
+// hängender Windows-Druckspooler (z. B. bei Remove-Printer auf einen Drucker mit festsitzendem Druckauftrag) den
+// ganzen Dienst-Prozess für immer – er fragt dann Praxisherz nicht mehr ab und wirkt „aufgehängt“. Beim Entfernen
+// wartet das Skript je Drucker bis zu 20 s in einem eigenen Hintergrundauftrag (drucker-agent.ps1); bei mehreren
+// zu entfernenden Druckern braucht das Skript entsprechend länger als bei nur einem, daher die großzügige Frist.
+const druckerSkriptFrist = 180 * time.Second
+
 // windowsPlattform: Aufrufe in HKLM (für alle Benutzer), Zertifizierungsstelle im Speicher des Computers, Drucker per PowerShell.
-// Läuft als SYSTEM (geplante Aufgabe „Kienzle-Agent“).
+// Läuft als SYSTEM (geplante Aufgabe „Praxisherz-Agent“).
 type windowsPlattform struct{ ordner string }
 
 func neuePlattform(ordner string) Plattform { return &windowsPlattform{ordner: ordner} }
 
-// datenOrdner: C:\ProgramData\Kienzle (client.json, ca.crt, agent.json).
+// datenOrdner: C:\ProgramData\Praxisherz (client.json, ca.crt, agent.json).
 func datenOrdner() string {
-	if p := os.Getenv("ProgramData"); p != "" {
-		return filepath.Join(p, "Kienzle")
+	p := os.Getenv("ProgramData")
+	if p == "" {
+		p = `C:\ProgramData`
 	}
-	return `C:\ProgramData\Kienzle`
+	return filepath.Join(p, "Praxisherz")
 }
 
 func versteckt(cmd *exec.Cmd) *exec.Cmd {
@@ -76,17 +89,59 @@ func (w *windowsPlattform) Drucker(liste []Drucker) (string, error) {
 	if len(liste) == 0 {
 		return "", nil
 	}
+	return w.druckerSkript(liste)
+}
+
+func (w *windowsPlattform) AlteDrucker(liste []Drucker) ([]string, error) {
+	text, err := w.druckerSkript(liste, "-Modus", "alt")
+	if err != nil {
+		return nil, err
+	}
+	var namen []string
+	if err := json.Unmarshal([]byte(text), &namen); err != nil {
+		return nil, fmt.Errorf("alte Drucker: unerwartete Antwort")
+	}
+	return namen, nil
+}
+
+func (w *windowsPlattform) DruckerEntfernen(liste []Drucker, namen []string) (string, error) {
+	data, _ := json.Marshal(namen)
+	datei := filepath.Join(w.ordner, "drucker-entfernen.json")
+	if err := os.WriteFile(datei, data, 0o644); err != nil {
+		return "", err
+	}
+	defer os.Remove(datei)
+	return w.druckerSkript(liste, "-Modus", "entfernen", "-Entfernen", datei)
+}
+
+// druckerSkript schreibt Liste und Skript in den Datenordner (nur für System und Administratoren beschreibbar) und gibt die letzte
+// Zeile der Ausgabe zurück.
+func (w *windowsPlattform) druckerSkript(liste []Drucker, extra ...string) (string, error) {
 	data, _ := json.Marshal(liste)
 	datei := filepath.Join(w.ordner, "drucker.json")
 	if err := os.WriteFile(datei, data, 0o644); err != nil {
 		return "", err
 	}
 	skript := filepath.Join(w.ordner, "drucker-agent.ps1")
-	if err := os.WriteFile(skript, []byte(druckerSkript), 0o644); err != nil {
+	// Mit BOM: Windows PowerShell 5.1 liest Skripte ohne BOM als ANSI (dann werden Umlaute verfälscht, „unverÃ¤ndert“).
+	if err := os.WriteFile(skript, skriptMitBOM(druckerSkript), 0o644); err != nil {
 		return "", err
 	}
-	out, err := versteckt(exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", skript, "-Liste", datei)).CombinedOutput()
-	text := strings.TrimSpace(string(out))
+	args := append([]string{"-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", skript, "-Liste", datei}, extra...)
+	if cfg, err := loadConfig(filepath.Join(w.ordner, "client.json")); err == nil {
+		if ip := serverIPv4(cfg.ServerURL); ip != "" {
+			args = append(args, "-ServerIp", ip)
+		}
+	}
+	ctx, abbrechen := context.WithTimeout(context.Background(), druckerSkriptFrist)
+	defer abbrechen()
+	cmd := versteckt(exec.CommandContext(ctx, "powershell.exe", args...))
+	cmd.WaitDelay = 5 * time.Second // falls das Beenden allein nicht reicht, nicht trotzdem ewig auf die Ausgabe warten
+	out, err := cmd.CombinedOutput()
+	if ctx.Err() == context.DeadlineExceeded {
+		return "", fmt.Errorf("Zeitüberschreitung nach %s (Windows-Druckerverwaltung antwortet nicht; Druckspooler-Dienst neu starten)", druckerSkriptFrist)
+	}
+	text := strings.TrimSpace(strings.ToValidUTF8(string(out), "?"))
 	if i := strings.LastIndex(text, "\n"); i >= 0 {
 		text = strings.TrimSpace(text[i+1:])
 	}
@@ -96,12 +151,72 @@ func (w *windowsPlattform) Drucker(liste []Drucker) (string, error) {
 	return text, nil
 }
 
-// GDTOrdner: fester Ordner C:\Kienzle\GDT; Benutzer dürfen darin ändern (T2med liest und löscht die Datei).
+// GDTOrdner: fester Ordner C:\Praxisherz\GDT; Benutzer dürfen darin ändern (T2med liest und löscht die Datei).
 func (w *windowsPlattform) GDTOrdner() string {
-	ordner := `C:\Kienzle\GDT`
+	ordner := `C:\Praxisherz\GDT`
 	if _, err := os.Stat(ordner); err != nil {
 		_ = os.MkdirAll(ordner, 0o775)
 		_ = versteckt(exec.Command("icacls.exe", ordner, "/grant", "*S-1-5-32-545:(OI)(CI)M")).Run()
 	}
 	return ordner
+}
+
+// Symbol: Symbol in der Taskleiste beim Anmelden jedes Benutzers starten (HKLM\…\Run) und den Ordner „anstoss“ anlegen, in den
+// Benutzer für „Drucker prüfen“ eine leere Datei legen dürfen (sonst ist der Datenordner für Benutzer nur lesbar).
+func (w *windowsPlattform) Symbol(programm string) error {
+	ordner := filepath.Join(w.ordner, "anstoss")
+	if _, err := os.Stat(ordner); err != nil {
+		if err := os.MkdirAll(ordner, 0o775); err != nil {
+			return err
+		}
+		if out, err := versteckt(exec.Command("icacls.exe", ordner, "/grant", "*S-1-5-32-545:(OI)(CI)M")).CombinedOutput(); err != nil {
+			return fmt.Errorf("Rechte für %s: %v %s", ordner, err, strings.TrimSpace(string(out)))
+		}
+	}
+	if err := reg("add", `HKLM\Software\Microsoft\Windows\CurrentVersion\Run`, "/v", "Praxisherz", "/t", "REG_SZ", "/d", `"`+programm+`" --tray`, "/f"); err != nil {
+		return err
+	}
+	return aufgabeSichern()
+}
+
+// einzigerDienst: benannter Mutex für alle Sitzungen. Läuft schon ein Agent (z. B. der alte während einer Aktualisierung oder
+// ein zweiter Start der Aufgabe), höchstens eine Minute warten; der Mutex wird frei, wenn der andere endet.
+func einzigerDienst() bool {
+	runtime.LockOSThread() // der Mutex gehört dem Thread, der ihn hält; der Hauptthread bleibt bis zum Ende bestehen
+	h, _, _ := pCreateMutexW.Call(0, 0, uintptr(unsafe.Pointer(w16(`Global\KienzleAgentDienst`))))
+	if h == 0 {
+		return true
+	}
+	r, _, _ := kernel32.NewProc("WaitForSingleObject").Call(h, 60_000)
+	return r == 0 || r == 0x80 // WAIT_OBJECT_0, WAIT_ABANDONED
+}
+
+// neuStarten startet das (neue) Programm als Dienst, losgelöst von diesem Prozess; es wartet in einzigerDienst, bis dieser endet.
+func neuStarten(exe string) {
+	for _, flags := range []uint32{0x01000000 | 0x00000200 | 0x00000008, 0x00000200 | 0x00000008} { // BREAKAWAY_FROM_JOB, NEW_PROCESS_GROUP, DETACHED_PROCESS
+		cmd := exec.Command(exe, "--dienst")
+		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: flags}
+		if cmd.Start() == nil {
+			_ = cmd.Process.Release()
+			return
+		}
+	}
+}
+
+// aufgabeSichern: Die geplante Aufgabe startet zusätzlich alle 5 Minuten (läuft der Agent, beendet sich der zweite Start sofort).
+// Ältere Einrichtungen hatten nur „beim Systemstart“; dort blieb der Agent nach der ersten Aktualisierung stehen.
+const aufgabeSkript = `$n = 'Praxisherz-Agent'
+$t = Get-ScheduledTask -TaskName $n -ErrorAction Stop
+if (!(@($t.Triggers) | Where-Object { $_.Repetition -and $_.Repetition.Interval })) {
+    $neu = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5)
+    Set-ScheduledTask -TaskName $n -Trigger (@($t.Triggers) + $neu) -ErrorAction Stop | Out-Null
+    Write-Output 'ergänzt'
+}`
+
+func aufgabeSichern() error {
+	out, err := versteckt(exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", aufgabeSkript)).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("geplante Aufgabe: %v %s", err, strings.TrimSpace(strings.ToValidUTF8(string(out), "?")))
+	}
+	return nil
 }

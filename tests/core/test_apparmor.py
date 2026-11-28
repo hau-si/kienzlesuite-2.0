@@ -32,6 +32,13 @@ class AppArmor(unittest.TestCase):
             self.assertIn('/var/lib/kienzle/fax/** rwk,\n/var/lib/kienzle/kasse/** rwk,', text)
             self.assertEqual(a.apply(reg), [], 'zweiter Lauf ändert etwas')
             self.assertEqual(log.read_text().count('-r'), 1)
+            # Austauschordner: Die Telefonanlage wandelt Faxaufträge dort mit gs um (sonst „Permission denied“ unter Ubuntu 26.04).
+            reg['modules'].append({'module': {'id': 'telefon'}, 'hooks': {'apparmor': ['gs']},
+                                   'exchange': [{'module': 'fax', 'purpose': 'x', 'path': '/var/spool/kienzle/austausch/fax_telefon'}]})
+            self.assertEqual(a.apply(reg), ['gs'])
+            text = (t / 'local' / 'gs').read_text()
+            self.assertIn('/var/lib/kienzle/telefon/** rwk,', text)
+            self.assertEqual(text.count('/var/spool/kienzle/austausch/fax_telefon/** rwk,'), 1)
             self.assertEqual(a.apply({'modules': []}), ['gs'])
             self.assertEqual((t / 'local' / 'gs').read_text(), '# eigene Zeile\n/srv/eigen/** r,\n')
 

@@ -28,7 +28,7 @@ function ks_app(): KienzleKasse\App {
     return $app ??= new KienzleKasse\App(KienzleKasse\Settings::effective(ks_base_config()));
 }
 
-/** Grundwerte aus der Suite (Vorgaben, Schlüssel, Verbindungen der Basis); Weboberflächen-Einstellungen liegen darüber. */
+/** Grundwerte aus Praxisherz (Vorgaben, Schlüssel, Verbindungen der Basis); Weboberflächen-Einstellungen liegen darüber. */
 function ks_base_config(): KienzleKasse\Config {
     static $config;
     return $config ??= KienzleKasse\Suite::baseConfig();
@@ -43,7 +43,7 @@ function ks_body(int $max): string {
     return (string)file_get_contents('php://input', false, null, 0, $max);
 }
 
-// Datenordner und Hilfsdatei der Basis: Vorgaben der Suite; die Haken bekommen KIENZLE_DATEN von der Basis.
+// Datenordner und Hilfsdatei der Basis: Vorgaben von Praxisherz; die Haken bekommen KIENZLE_DATEN von der Basis.
 if (preg_match('#^/[A-Za-z0-9/_.-]{1,200}$#D', (string)getenv('KIENZLE_DATEN')) && !str_contains((string)getenv('KIENZLE_DATEN'), '..')) KienzleKasse\Suite::$data = (string)getenv('KIENZLE_DATEN');
 if (PHP_SAPI === 'cli' && is_file((string)getenv('KIENZLE_SUITE_HILFE'))) KienzleKasse\Suite::$helper = (string)getenv('KIENZLE_SUITE_HILFE');
 

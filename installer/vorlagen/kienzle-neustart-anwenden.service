@@ -1,6 +1,6 @@
-# Kienzle-Suite: Dienste oder den Server neu starten (root).
+# Praxisherz: Dienste oder den Server neu starten (root).
 [Unit]
-Description=Kienzle-Suite Neustart anwenden
+Description=Praxisherz Neustart anwenden
 
 [Service]
 Type=oneshot

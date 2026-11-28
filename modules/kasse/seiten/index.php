@@ -6,7 +6,7 @@ if (!Suite::can('kassieren')) {
     http_response_code(403);
     header('Content-Type: text/html; charset=utf-8');
     $settings = Suite::settingsRights() ? '<p><a href="' . ks_h(ks_url('settings.php')) . '">Zu den freigegebenen Bereichen der Kasse</a></p>' : '';
-    exit('<!doctype html><html lang="de"><meta charset="utf-8"><title>Kasse</title><link rel="stylesheet" href="' . ks_h(ks_url('assets/style.css')) . '"><main><section class="card"><h1>Kasse</h1><p>Für die Kasse fehlt das Recht „Kassieren“. Bitte den Admin fragen (Verwaltung → Benutzer der Suite).</p>' . $settings . '<p><a href="/">Zur Kienzle-Suite</a></p></section></main></html>');
+    exit('<!doctype html><html lang="de"><meta charset="utf-8"><title>Kasse</title><link rel="stylesheet" href="' . ks_h(ks_url('assets/style.css')) . '"><main><section class="card"><h1>Kasse</h1><p>Für die Kasse fehlt das Recht „Kassieren“. Bitte den Admin fragen (Verwaltung → Benutzer von Praxisherz).</p>' . $settings . '<p><a href="/">Zu Praxisherz</a></p></section></main></html>');
 }
 try { $demo = ks_app()->config->get('sumup', 'mode') === 'mock' && ks_app()->config->get('fhir', 'mode') === 'mock'; } catch (\Throwable) { $demo = false; }
 header('Cache-Control: no-store');
@@ -22,7 +22,7 @@ $signatur = '';
 foreach (Suite::modul()->menue()['ids'] as $href => $modulId) if ($modulId === 'signatur') $signatur = $href;
 $modus = isset($_GET['rechnung']) ? 'embed rechnung' : (isset($_GET['neu']) ? 'embed frei' : (isset($_GET['eingebettet']) ? 'embed' : ''));
 $k = Suite::modul();
-// Aufruf aus T2med und die Kassenansicht selbst: im Rahmen der Suite mit Seitenleiste. Eingebettet in der Startseite (iframe, embed) bleibt sie schlank.
+// Aufruf aus T2med und die Kassenansicht selbst: im Rahmen von Praxisherz mit Seitenleiste. Eingebettet in der Startseite (iframe, embed) bleibt sie schlank.
 $rahmen = $modus === '' && method_exists($k, 'rahmen');
 $ssl = $base . 'assets/';
 $skripte = '<script src="' . $ssl . 'tipfit.js?v=' . $version . '" defer></script><script src="' . $ssl . 'goae-calc.js?v=' . $version . '" defer></script><script src="' . $ssl . 'app.js?v=' . $version . '" defer></script>';
@@ -32,13 +32,13 @@ if ($rahmen) {
 ?>
 <!doctype html>
 <html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="kienzle-csrf" content="<?= $csrf ?>"><title>Kasse · Kienzle-Suite</title><link rel="stylesheet" href="<?= $base ?>assets/style.css?v=<?= $version ?>"><link rel="stylesheet" href="<?= $base ?>assets/embed.css?v=<?= $version ?>"><?= $skripte ?></head>
+<meta name="kienzle-csrf" content="<?= $csrf ?>"><title>Kasse · Praxisherz</title><link rel="stylesheet" href="<?= $base ?>assets/style.css?v=<?= $version ?>"><link rel="stylesheet" href="<?= $base ?>assets/embed.css?v=<?= $version ?>"><?= $skripte ?></head>
 <body class="<?= $modus ?>" data-base="<?= $base ?>" data-signatur="<?= ks_h($signatur) ?>"><main>
 <?php } ?>
 <?php if ($rahmen) { ?>
 <header class="seitenkopf"><div><p class="eyebrow">Kasse</p></div><span class="start-tools"><span id="mode" class="badge" hidden>TESTMODUS</span><a class="button secondary" href="<?= $base ?>">← Zur Kasse</a></span></header>
 <?php } else { ?>
-<header class="top"><a class="brand" href="/"><span class="mark" aria-hidden="true">K</span><div><strong>Kasse</strong><span>Kienzle-Suite · T2med</span></div></a><span id="mode" class="badge" hidden>TESTMODUS</span></header>
+<header class="top"><a class="brand" href="/"><span class="mark" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 57C10 41 5 29 5 20 5 12 11 6 19 6c5 0 10 3 13 8 3-5 8-8 13-8 8 0 14 6 14 14 0 9-5 21-27 37z" fill="#fff"/><path d="M13 31h11l4-8 7 16 4-8h12" fill="none" stroke="#12695d" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><strong>Kasse</strong><span>Praxisherz · T2med</span></div></a><span id="mode" class="badge" hidden>TESTMODUS</span></header>
 <?php } ?>
 <section id="welcome" class="card"><h1>Kartenzahlung</h1><p>Bitte diese Seite aus der Patientenakte in T2med öffnen.</p><form id="manual-form" class="manual-form" autocomplete="off"><h2>Manuelle Kartenzahlung</h2><p class="muted small">Ohne Patientenakte: Betreff und Betrag werden an SumUp übergeben und die Zahlung startet am Kartenterminal. Keine Patientendaten eintragen.</p><label for="manual-label">Betreff</label><input id="manual-label" maxlength="80" required placeholder="z. B. Selbstzahler-Leistung"><label for="manual-amount">Betrag in Euro</label><input id="manual-amount" inputmode="decimal" maxlength="12" required placeholder="z. B. 25,00"><button class="primary wide" type="submit">Kartenzahlung starten</button></form><a class="button secondary wide settings-link" href="<?= $base ?>settings.php">⚙ Einstellungen der Kasse</a><button id="demo" class="secondary"<?= $demo ? '' : ' hidden' ?>>Testpatient öffnen (Testmodus)</button></section>
 <div id="workspace" hidden>
@@ -71,7 +71,7 @@ if ($rahmen) {
 <button id="reader-cancel" class="secondary wide">Anderen Vorgang abbrechen</button>
 <button id="reader-status" class="text-button">Status prüfen</button>
 </div>
-<div id="pay-method" class="pay-method" role="radiogroup" aria-label="Zahlungsart"><label><input type="radio" name="pay-method" value="card" checked><span>Karte</span></label><label><input type="radio" name="pay-method" value="cash"><span>Bar</span></label><label id="pay-transfer-label" hidden><input type="radio" name="pay-method" value="transfer"><span>Überweisung</span></label></div><p id="pay-method-note" class="muted small" hidden></p>
+<div id="pay-method" class="pay-method" role="radiogroup" aria-label="Zahlungsart"><label><input type="radio" name="pay-method" value="card" checked><span><svg class="pay-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19M6.5 15h4"/></svg> Karte</span></label><label><input type="radio" name="pay-method" value="cash"><span><svg class="pay-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/></svg> Bar</span></label><label id="pay-transfer-label" hidden><input type="radio" name="pay-method" value="transfer"><span><svg class="pay-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10l9-6 9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/></svg> Überweisung</span></label></div><p id="pay-method-note" class="muted small" hidden></p>
 <button id="pay" class="primary wide" disabled>Karte</button></div></section>
 <section id="manager" class="card" hidden><div class="section-heading"><h2>Leistungen verwalten</h2><button id="manage-close" class="text-button">Fertig</button></div><div id="manage-list"></div>
 <form id="service-form"><input id="service-id" type="hidden"><label for="service-label">Bezeichnung</label><input id="service-label" required maxlength="160" placeholder="z. B. Attest"><label for="service-category">Gruppe <span class="muted">optional</span></label><input id="service-category" list="category-list" maxlength="40" placeholder="z. B. Blutwerte, Sonographie, Bescheinigungen" autocomplete="off"><datalist id="category-list"></datalist><label for="service-price">Preis in Euro</label><input id="service-price" required inputmode="decimal" placeholder="10,00" maxlength="12">
@@ -108,12 +108,12 @@ if ($rahmen) {
 <div class="actions"><a id="receipt-open" target="_blank" rel="noopener noreferrer">Originalbeleg öffnen</a><button id="receipt-copy" type="button" class="text-button">Link kopieren</button></div></div>
 <form id="receipt-email-form"><label for="receipt-email">E-Mail-Adresse</label><input id="receipt-email" type="email" autocomplete="off" maxlength="254" required placeholder="name@beispiel.de">
 <p class="muted">Adresse prüfen. Der Zahlungsbeleg wird als PDF-Anhang direkt an diese Adresse gesendet.</p><button id="receipt-email-send" type="submit" class="secondary">PDF per E-Mail senden</button></form>
-<p id="receipt-mail-unconfigured" class="muted" hidden>E-Mail-Versand ist noch nicht eingerichtet (Verwaltung → Verbindungen der Suite und Einstellungen der Kasse).</p></div></div>
+<p id="receipt-mail-unconfigured" class="muted" hidden>E-Mail-Versand ist noch nicht eingerichtet (Verwaltung → Verbindungen von Praxisherz und Einstellungen der Kasse).</p></div></div>
 <div id="mock-controls" class="mock-controls" hidden><span class="eyebrow">TERMINAL SIMULIEREN</span><div class="actions"><button id="mock-success" class="secondary">Zahlung erfolgreich</button><button id="mock-fail" class="secondary">Zahlung abgelehnt</button></div></div>
 <label id="mock-fhir-label" class="mock-option" hidden><input type="checkbox" id="mock-fhir-fail"> t2med-Fehler simulieren</label>
 </section></div>
 <p id="message" class="message" role="alert" hidden></p>
-<footer><a href="<?= $base ?>settings.php">Einstellungen</a> · <a href="/">Kienzle-Suite</a></footer>
+<footer><a href="<?= $base ?>settings.php">Einstellungen</a> · <a href="/">Praxisherz</a></footer>
 <?php
 if ($rahmen) {
     $inhalt = (string)ob_get_clean();

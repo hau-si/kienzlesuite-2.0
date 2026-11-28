@@ -2,17 +2,28 @@
 """Kokoro-Thorsten optional nachladen (Auftrag „kokoro-einrichten“, als ks-telefon).
 
 Ruft scripts/kokoro/install.py aus Kienzlefon 2.7 unverändert auf (feste Modell-Prüfsummen, eigene Python-Laufzeit 3.12,
-Paketliste requirements-cpu.lock.txt). Abweichend vom Original-Installer liegt alles im Datenordner des Moduls statt unter
+Paketliste: lib/kokoro/requirements-cpu.lock.txt des Moduls, die Liste von Kienzlefon mit Sicherheitsupdates). Abweichend vom Original-Installer liegt alles im Datenordner des Moduls statt unter
 /opt/kienzlefon/kokoro, und er läuft ohne root: Seine root-Prüfung schützt dort nur /opt, das hier nicht berührt wird.
 Der fertige Generator landet unter [tts] kokoro_generator (<daten>/kienzlefon/kokoro/…), das Modell unter kokoro_modellverzeichnis.
 """
 import importlib.util
 import os
+import shutil
 import sys
 from pathlib import Path
 
 DATA = Path(os.environ.get('KIENZLE_DATEN', '/var/lib/kienzle/telefon'))
 INSTALLER = Path(os.environ.get('KIENZLE_KOKORO_INSTALLER', Path(__file__).resolve().parents[1] / 'kienzlefon' / 'scripts' / 'kokoro' / 'install.py'))
+PAKETE = Path(__file__).resolve().parent / 'kokoro' / 'requirements-cpu.lock.txt'
+
+
+def quelle(original: Path) -> Path:
+    """Ordner wie scripts/kokoro von Kienzlefon (Modellliste unverändert), aber mit der Paketliste des Moduls."""
+    ziel = DATA / 'kokoro' / 'quelle'
+    ziel.mkdir(mode=0o700, parents=True, exist_ok=True)
+    shutil.copyfile(original / 'model_manifest.json', ziel / 'model_manifest.json')
+    shutil.copyfile(PAKETE, ziel / 'requirements-cpu.lock.txt')
+    return ziel
 
 
 def main() -> int:
@@ -20,6 +31,7 @@ def main() -> int:
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     mod.INSTALL_ROOT = DATA / 'kokoro'
+    mod.SOURCE = quelle(Path(mod.SOURCE))
     os.geteuid = lambda: 0  # noqa: E731 – nur in diesem Prozess; der Installer schreibt hier nur in den Datenordner
     mod.install(DATA / 'kienzlefon' / 'kienzlefon.toml')
     return 0

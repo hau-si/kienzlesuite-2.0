@@ -1,5 +1,5 @@
 [Unit]
-Description=Kienzle-Suite Druckerliste alle 5 Minuten auffrischen
+Description=Praxisherz Druckerliste alle 5 Minuten auffrischen
 
 [Timer]
 OnBootSec=2min

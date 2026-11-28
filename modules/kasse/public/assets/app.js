@@ -1,6 +1,6 @@
 'use strict';
 const $ = id => document.getElementById(id);
-// Webpfad des Moduls in der Kienzle-Suite (z. B. /kasse/) und Marke der Suite für schreibende Anfragen.
+// Webpfad des Moduls in Praxisherz (z. B. /kasse/) und Marke von Praxisherz für schreibende Anfragen.
 const BASE = document.body.dataset.base || '/';
 const SUITE_CSRF = (document.querySelector('meta[name="kienzle-csrf"]') || {}).content || '';
 const euro = cents => new Intl.NumberFormat('de-DE', {style:'currency', currency:'EUR'}).format(cents / 100);
@@ -14,6 +14,8 @@ const exportTried = new Set();
 const printTried = new Set();
 let printTouched = false;
 function message(text='', ok=false) { $('message').textContent = text; $('message').hidden = !text; $('message').classList.toggle('ok', !!ok); }
+// Einfache Symbole der Zahlungsarten (Linien wie die übrigen Symbole von Praxisherz).
+const SYMBOL = {card: '<svg class="pay-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19M6.5 15h4"/></svg>', cash: '<svg class="pay-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/></svg>', later: '<svg class="pay-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10l9-6 9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/></svg>', transfer: '<svg class="pay-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10l9-6 9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/></svg>', post: '<svg class="pay-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5"/></svg>'};
 async function api(action, data={}) {
   const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 75000);
   try {
@@ -63,11 +65,16 @@ async function signaturSenden() {
   // Kontaktdaten frisch aus T2med; ohne sie öffnet Signatur trotzdem, die Felder bleiben dann zum Ausfüllen leer.
   let kontakt = {};
   try { kontakt = await api('patient_kontakt'); } catch (e) { kontakt = {}; }
-  const roh = JSON.stringify({patient: state.patient.name, geburtsdatum: kontakt.geburtsdatum || state.patient.birthdate || '', vorname: kontakt.vorname || '', nachname: kontakt.nachname || '', geschlecht: kontakt.geschlecht || '', telefon: kontakt.telefon || '', email: kontakt.email || '', adresse: kontakt.adresse || '', ref: visitId || '', leistungen: liste});
+  const roh = JSON.stringify({patient: state.patient.name, geburtsdatum: kontakt.geburtsdatum || state.patient.birthdate || '', vorname: kontakt.vorname || '', nachname: kontakt.nachname || '', geschlecht: kontakt.geschlecht || '', telefon: kontakt.telefon || '', email: kontakt.email || '', adresse: kontakt.adresse || '', ref: visitId || '', leistungen: liste, zurueck: BASE, t2med: !!state.t2med});
   const bytes = new TextEncoder().encode(roh); let bin = ''; bytes.forEach(b => { bin += String.fromCharCode(b); });
   const kodiert = btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   if (kodiert.length > 12000) { alert('Die Liste ist für die Übergabe zu lang. Bitte weniger Positionen wählen.'); return; }
-  window.open(SIGNATUR + '#uebergabe=' + kodiert, '_blank', 'noopener');
+  // T2med-Zugang dieses Besuchs für die Ablage des unterschriebenen PDFs vormerken (bleibt auch nach dem Kassieren, höchstens 4 Stunden).
+  try { await api('signatur_offen'); } catch (e) { /* ohne T2med wird das PDF nur in Signatur abgelegt */ }
+  // Auswahl für den Rückweg merken (nach der Unterschrift wird hier bezahlt).
+  try { sessionStorage.setItem('ks-auswahl-' + visitId, JSON.stringify({services: [...selected], groups: [...selectedGroups], reasons, manual: $('manual').value, date: $('service-date').value})); } catch { /* ohne sessionStorage */ }
+  // Im selben Tab (nicht in einem neuen): So bleibt der Patient oben erhalten, und Signatur springt nach der Unterschrift hierher zurück.
+  (window.top || window).location.href = SIGNATUR + '#uebergabe=' + kodiert;
   const note = $('sign-note'); note.hidden = false; note.textContent = 'In Signatur geöffnet. Dort Dokument wählen und den Vorgang anlegen; danach hier wie gewohnt kassieren.' + (kontakt.hinweis ? ' ' + kontakt.hinweis : '');
 }
 $('sign-send').addEventListener('click', signaturSenden);
@@ -130,9 +137,9 @@ function renderInvoices() {
     // Einheitliche Zahlungswahl wie in der freien Eingabe: Chips mit Symbolen + ein Knopf. Die Einzelknöpfe bleiben (versteckt) als Auslöser.
     for (const b of [card, cash, later]) b.hidden = true;
     const chips = element('div', '', 'pay-method'); chips.setAttribute('role', 'radiogroup'); chips.setAttribute('aria-label', 'Zahlungsart');
-    const options = [['card', '💳 Karte (SumUp)'], ['cash', '💶 Bar'], ['later', '🏦 Überweisung']];
+    const options = [['card', 'Karte (SumUp)'], ['cash', 'Bar'], ['later', 'Überweisung']];
     const canPost = !!(state.letter?.enabled && invoice.letter?.postable && !invoice.letter?.locked);
-    if (canPost) options.push(['post', '✉ Per Post']);
+    if (canPost) options.push(['post', 'Per Post']);
     const go = element('button', '', 'primary wide invoice-go');
     const labels = {card: euro(invoice.amount_cents) + ' · Karte', cash: euro(invoice.amount_cents) + ' · Bar', later: 'Überweisung', post: 'Per Post senden'};
     const radios = {};
@@ -141,7 +148,8 @@ function renderInvoices() {
     for (const [value, text] of options) {
       const l = document.createElement('label'), r = document.createElement('input'); r.type = 'radio'; r.name = 'inv-method-' + invoice.id; r.value = value; r.checked = value === chosen;
       r.onchange = () => { chosenMethod.set(invoice.id, value); go.textContent = labels[value]; go.classList.toggle('cash', value !== 'card'); };
-      radios[value] = r; l.append(r, element('span', text)); chips.append(l);
+      const span = element('span', ''); span.innerHTML = SYMBOL[value]; span.append(' ' + text);   // feste Symbole aus diesem Skript, Text als Text
+      radios[value] = r; l.append(r, span); chips.append(l);
     }
     go.textContent = labels[chosen]; go.classList.toggle('cash', chosen !== 'card');
     go.onclick = () => {
@@ -149,8 +157,11 @@ function renderInvoices() {
       const target = {card, cash, later}[value] || box.querySelector('.invoice-letter');
       if (target) target.click();
     };
-    box.append(line, chips, go, card, cash, later);
-    if (invoice.printed_at) box.append(element('p', '🖨 Rechnung gedruckt am ' + new Date(invoice.printed_at * 1000).toLocaleString('de-DE', {dateStyle: 'short', timeStyle: 'short'}), 'muted invoice-letter-note'));
+    // Rechts dieselbe Stelle wie das Bezahlfeld der IGeL-Liste (Zahlart und Knopf), links die Angaben der Rechnung.
+    const rechts = element('div', '', 'invoice-pay-box');
+    rechts.append(element('div', 'Zahlungsart', 'muted small invoice-pay-head'), chips, go, card, cash, later);
+    box.append(line, rechts);
+    if (invoice.printed_at) line.append(element('p', '🖨 Rechnung gedruckt am ' + new Date(invoice.printed_at * 1000).toLocaleString('de-DE', {dateStyle: 'short', timeStyle: 'short'}), 'muted invoice-letter-note'));
     if (state.letter?.enabled && invoice.letter?.postable) {
       const sent = invoice.letter || {};
       const when = sent.sent_at ? new Date(sent.sent_at * 1000).toLocaleString('de-DE', {dateStyle: 'short', timeStyle: 'short'}) : '';
@@ -159,7 +170,7 @@ function renderInvoices() {
       if (stamp) {
         const icon = element('p', '', 'invoice-letter-note post-icon ' + (sent.status === 'unknown' ? 'post-unknown' : sent.mode === 'live' ? 'post-sent' : 'post-test'));
         icon.append(element('span', sent.status === 'unknown' ? '✉ ?' : '✉', 'post-glyph'), document.createTextNode(' ' + stamp));
-        icon.title = stamp; box.append(icon);
+        icon.title = stamp; line.append(icon);
       }
       if (!sent.locked) {
         const post = element('button', 'Per Post senden (Letterxpress)', 'text-button invoice-letter'); post.hidden = true;
@@ -171,13 +182,40 @@ function renderInvoices() {
           const result = await api('invoice_letter', {invoice_id: invoice.id});
           message(result.message, true); await load();
         });
-        box.append(post);
+        rechts.append(post);
       }
     }
     $('invoices').append(box);
   }
   updateTotal();
+  ansichtMelden();
 }
+// Eingebettet in die Startseite: Die Patientenkarte oben zeigt Name, „T2m-Rechnung“ | „IGeL“ und den Aktenaufruf; hier nur die Arbeitsfläche.
+const EINGEBETTET = window.parent !== window, AUS_EINGANG = !!new URL(location.href).searchParams.get('rechnung');
+function tabSetzen(tab) {
+  document.body.dataset.tab = tab === 'igel' ? 'igel' : 'rechnung';
+  document.querySelectorAll('.work-tab').forEach(x => x.setAttribute('aria-pressed', x.dataset.tab === document.body.dataset.tab ? 'true' : 'false'));
+}
+function ansichtMelden() {
+  if (!EINGEBETTET || !state) return;
+  const offen = (state.invoices || []).filter(i => !invoiceLater.has(i.id)).length;
+  const t2med = !!state.t2med && !AUS_EINGANG;
+  document.body.classList.toggle('t2med-patient', t2med);
+  if (t2med) {
+    // Patient aus T2med mit offener Rechnung: wie Rechnungen aus dem Eingang „T2m-Rechnung“ (vorgewählt) und „IGeL“.
+    document.body.classList.toggle('rechnung', offen > 0);
+    if (offen > 0 && !document.body.dataset.tab) tabSetzen('rechnung');
+  }
+  const daten = {visit: visitId, name: state.patient.name, geburt: state.patient.birthdate || '', nummer: t2med ? (state.patient.nummer || '') : '',
+    rechnungen: (AUS_EINGANG || t2med) ? offen : 0, tab: document.body.dataset.tab || 'rechnung'};
+  parent.postMessage(Object.assign({typ: t2med ? 'ks-patient' : AUS_EINGANG ? 'ks-ansicht' : 'ks-patient-aus'}, daten), location.origin);
+}
+window.addEventListener('message', event => {
+  if (event.origin !== location.origin || !event.data || event.data.typ !== 'ks-tab') return;
+  tabSetzen(event.data.tab);
+  if (document.body.dataset.tab === 'igel') $('service-search').focus();
+  ansichtMelden();
+});
 const chosenMethod = new Map();   // Rechnungs-ID → von Hand gewählte Zahlart (übersteht das Neuaufbauen der Liste)
 // Neue gedruckte Rechnungen erscheinen ohne Neuladen, solange kein Zahlungsvorgang angezeigt wird.
 setInterval(async () => {
@@ -391,7 +429,7 @@ function renderPayment() {
     title=p.method==='cash' ? 'Barzahlung erfasst' : p.method==='transfer' ? 'Überweisung bestätigt' : 'Zahlung erfolgreich'; symbol='✓';
     description=state.manual ? 'Mit „Vorgang abschließen“ ist die manuelle Zahlung erledigt. In T2med wird nichts dokumentiert.' : 'Mit „Dokumentation in der Akte“ wird die Zahlung in t2med dokumentiert und der Vorgang abgeschlossen.';
     $('document').hidden=false;
-    $('document').textContent=p.doc_status==='unknown' || p.doc_status==='writing' ? 'Dokumentation prüfen / erneut versuchen' : state.manual ? 'Vorgang abschließen' : 'Dokumentation in der Akte';
+    $('document').textContent=p.doc_status==='unknown' || p.doc_status==='writing' ? 'Akte geprüft – erneut schreiben' : state.manual ? 'Vorgang abschließen' : 'Dokumentation in der Akte';
     $('mock-fhir-label').hidden=!state.mock;
     $('mock-fhir-fail').checked=state.mock_document_fail;
   } else if(p.payment_status==='transfer_open') {
@@ -484,6 +522,7 @@ async function load() {
   $('service-date').max=state.today;
   renderVatOption(); renderServices(); renderInvoices(); renderPrintBox(); renderPayment(); markDirty();
   if (window.parent !== window) parent.postMessage('ks-refresh', location.origin);   // Startseite: Rechnungsliste aktualisieren
+  ansichtMelden();
 }
 async function poll() {
   if(busy) { timer=setTimeout(poll,2200); return; }
@@ -643,7 +682,9 @@ function sendReceiptEmail() {
 }
 $('receipt-email-form').onsubmit=e=>{ e.preventDefault(); sendReceiptEmail(); };
 $('document').onclick=()=>run(async()=>{
-  state.payment=await api('document',{payment_id:state.payment.id}); renderPayment();
+  const unklar=state.payment.doc_status==='unknown' || state.payment.doc_status==='writing';
+  if(unklar && !confirm('Der letzte Schreibversuch ist ungeklärt. Bitte zuerst in der T2med-Akte nachsehen.\n\nNur wenn der Zahlungseintrag dort fehlt: jetzt erneut schreiben?')) return;
+  state.payment=await api('document',{payment_id:state.payment.id,bestaetigt:unklar}); renderPayment();
   if(state.payment.doc_status==='written') { state.completed=true; setTimeout(()=>window.close(),900); }
 });
 $('mock-success').onclick=()=>run(async()=>{ await api('mock',{payment_id:state.payment.id,status:'successful'}); await load(); });
@@ -672,7 +713,7 @@ document.querySelectorAll('.work-tab').forEach(b => b.onclick = () => {
 async function init() {
   const query = new URL(location.href).searchParams, auto = {invoice: query.get('rechnung'), action: query.get('aktion')};
   if (query.get('neu') || query.get('rechnung') || query.get('eingebettet')) { $('welcome').hidden = true; document.querySelector('.top .brand').hidden = true; }   // eingebettet in der Startseite: gleich die Arbeitsfläche zeigen, nicht die Willkommenskarte
-  // Start aus T2med: #launch=<code>. Musste sich der Benutzer erst an der Suite anmelden, hat die Basis den Code im Tab gemerkt.
+  // Start aus T2med: #launch=<code>. Musste sich der Benutzer erst an Praxisherz anmelden, hat die Basis den Code im Tab gemerkt.
   let hash=location.hash.slice(1);
   try { if(!hash.startsWith('launch=')) hash=(sessionStorage.getItem('kienzle-launch')||'').slice(1); sessionStorage.removeItem('kienzle-launch'); } catch { /* ohne sessionStorage */ }
   const fragment=new URLSearchParams(hash); const ticket=fragment.get('launch');
@@ -688,6 +729,8 @@ async function init() {
   }
   if(visitId) {
     const saved=sessionStorage.getItem('ks-start-'+visitId);
+    const auswahl=sessionStorage.getItem('ks-auswahl-'+visitId);
+    if(auswahl && !saved) { try { const a=JSON.parse(auswahl); selected=new Set(a.services||[]); selectedGroups=new Set(a.groups||[]); reasons=a.reasons||{}; $('manual').value=a.manual||''; if(a.date) $('service-date').value=a.date; } catch { /* alte Auswahl verwerfen */ } sessionStorage.removeItem('ks-auswahl-'+visitId); }
     if(saved) { try { startRequest=JSON.parse(saved); selected=new Set(startRequest.services); selectedGroups=new Set(startRequest.groups || []); reasons=startRequest.reasons || {}; $('service-date').value=startRequest.service_date || ''; $('manual').value=startRequest.manual_amount; if(startRequest.method==='cash') document.querySelector('input[name="pay-method"][value="cash"]').checked=true; } catch { sessionStorage.removeItem('ks-start-'+visitId); } }
     await load();
     if(auto.invoice && auto.action) autoAction(auto.invoice, auto.action);

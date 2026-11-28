@@ -22,6 +22,67 @@ let startHash = '';
     startHash = hash; history.replaceState(null, '', location.pathname + location.search);
   }
 })();
+// Patient aus T2med (Entwurf B3): bleibt oben als Karte, auch beim Wechsel zu IGeL, Vorgängen oder Einstellungen (sessionStorage dieses
+// Tabs), bis „Entfernen“; „Zum Patienten“ holt ihn zurück, wenn rechts gerade eine Rechnung oder die freie Eingabe offen ist.
+const PK = 'ks-patient';
+function patient() { try { const p = JSON.parse(sessionStorage.getItem(PK) || 'null'); return p && /^[A-Za-z0-9_-]{1,64}$/.test(p.visit || '') ? p : null; } catch { return null; } }
+// Was rechts gerade offen ist (von der Kassenansicht gemeldet): Patient aus T2med (gemerkt) oder eine Rechnung aus dem Eingang (nur
+// solange sie offen ist). Die Karte oben zeigt das, mit „T2m-Rechnung“ | „IGeL“, wenn eine offene Rechnung da ist.
+let ansicht = null;
+function patientKarte() {
+  const p = patient(), karte = $('patient-karte');
+  const a = ansicht && (ansicht.modus === 'eingang' || (p && ansicht.visit === p.visit)) ? ansicht : null;
+  const d = a || p;
+  karte.hidden = !d; document.querySelector('.start-right').classList.toggle('mit-patient', !!d);
+  if (!d) return;
+  const ausT2med = !a || a.modus === 'patient';
+  $('pk-name').textContent = d.name || 'Patient';
+  if (!$('pk-geb').dataset.hinweis) $('pk-geb').textContent = d.geburt ? 'geb. ' + d.geburt.split('-').reverse().join('.') : '';
+  $('pk-marke').classList.toggle('neutral', !ausT2med);
+  $('pk-etikett').textContent = ausT2med ? 'T2med' : 'Rechnung';
+  const akte = ausT2med && /^[1-9][0-9]{0,11}$/.test(d.nummer || '');
+  karte.classList.toggle('mit-akte', akte);
+  $('pk-marke').disabled = $('pk-name-knopf').disabled = !akte;
+  $('pk-tabs').hidden = !(a && a.rechnungen > 0);
+  document.querySelectorAll('.pk-tab').forEach(b => b.setAttribute('aria-pressed', String(!!a && b.dataset.tab === (a.tab || 'rechnung'))));
+  $('pk-weg').hidden = !p || !ausT2med;
+  $('pk-zum').hidden = !p || aktiv === 'patient';
+  $('pk-zum').title = p ? 'Zurück zu ' + p.name : '';
+}
+async function akteOeffnen() {
+  const p = patient(), a = ansicht && ansicht.visit === (p || {}).visit ? ansicht : null, nr = (a || p || {}).nummer || '';
+  if (!/^[1-9][0-9]{0,11}$/.test(nr)) return;
+  const hinweis = text => { const g = $('pk-geb'); g.dataset.hinweis = '1'; g.textContent = text; setTimeout(() => { delete g.dataset.hinweis; patientKarte(); }, 5000); };
+  try {
+    const r = await fetch('/arbeitsplatz/akte', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', Accept: 'application/json'},
+      body: JSON.stringify({modul: 'kasse', csrf: SUITE_CSRF, patientennummer: nr})});
+    const j = await r.json().catch(() => ({}));
+    hinweis(r.ok ? 'Akte wird in T2med geöffnet (' + (j.platz || 'dieser PC') + ').' : (j.error || 'Akte öffnen nicht möglich (HTTP ' + r.status + ').'));
+  } catch { hinweis('Keine Verbindung zum Server.'); }
+}
+function zumPatienten() {
+  const p = patient(); if (!p) return;
+  aktiv = 'patient'; $('detail').hidden = true; $('work').hidden = false;
+  $('work').src = BASE + 'kassieren?eingebettet=1&v=' + encodeURIComponent(p.visit);
+  anzeigen();
+}
+function tabWaehlen(tab) {
+  if (!ansicht) return;
+  ansicht.tab = tab; patientKarte();
+  try { $('work').contentWindow.postMessage({typ: 'ks-tab', tab}, location.origin); } catch { /* Ansicht lädt noch */ }
+}
+function patientEntfernen() {
+  try { sessionStorage.removeItem(PK); } catch { /* ohne sessionStorage */ }
+  if (aktiv === 'patient' || aktiv === 'start') frei(); else patientKarte();
+}
+// Übergabe aus einem anderen Modul (#uebergabe=<code>, z. B. „Zur Kasse“ in Signatur): einmalig einlösen, dann wie ein Aufruf aus T2med.
+let uebergabe = null;
+(() => {
+  const m = /^#uebergabe=([0-9a-f]{32})$/.exec(location.hash || '');
+  if (!m) return;
+  history.replaceState(null, '', location.pathname + location.search);
+  uebergabe = api('uebergabe_einloesen', {code: m[1]}).then(r => { startHash = '#' + (r.url.split('#')[1] || ''); }).catch(e => alert(e.message));
+})();
 function startOeffnen() {
   if (!startHash) return;
   aktiv = 'start'; $('detail').hidden = true; $('work').hidden = false;
@@ -41,12 +102,12 @@ const istT2med = i => !i.erledigt || i.t2med;
 const imFilter = i => (filter === 'alle' || gruppe(i) === filter) && (art === 'alle' || (art === 't2med') === istT2med(i));
 const alter = i => { const s = Math.max(0, jetzt - zeit(i)), m = Math.floor(s / 60), h = Math.floor(m / 60); return s < 90 ? 'gerade eben' : m < 60 ? 'vor ' + m + ' Min' : h < 24 ? 'vor ' + h + ' Std' : 'vor ' + Math.floor(h / 24) + ' Tg'; };
 const frisch = i => !i.erledigt && jetzt - i.received_at <= FRISCH;
-const frei = () => { aktiv = null; $('detail').hidden = true; $('work').hidden = false; $('work').src = BASE + 'kassieren?neu=1&t=' + Date.now(); anzeigen(); };
+const frei = () => { aktiv = null; ansicht = null; $('detail').hidden = true; $('work').hidden = false; $('work').src = BASE + 'kassieren?neu=1&t=' + Date.now(); anzeigen(); };
 
 async function oeffnen(invoice, aktion) {
   try {
     const result = await api('inbox_visit', {invoice_id: invoice.id});
-    aktiv = invoice.id; $('detail').hidden = true; $('work').hidden = false;
+    aktiv = invoice.id; ansicht = null; $('detail').hidden = true; $('work').hidden = false;
     const params = new URLSearchParams({rechnung: invoice.id}); if (aktion) params.set('aktion', aktion);
     $('work').src = BASE + 'kassieren?' + params.toString() + '#' + (result.url.split('#')[1] || '');
     anzeigen();
@@ -124,11 +185,13 @@ function anzeigen() {
   $('inbox').replaceChildren(...sichtbar.map(zeile));
   $('inbox-empty').hidden = sichtbar.length > 0;
   $('free-entry').classList.toggle('aktiv', aktiv === null);
+  patientKarte();
 }
 function inArbeit() { try { return $('work').contentDocument.body.dataset.dirty === '1'; } catch { return false; } }
 async function liste() {
-  const startSeite = ersterLauf && !!startHash;
-  if (startSeite) startOeffnen();
+  if (ersterLauf && uebergabe) { await uebergabe; uebergabe = null; }
+  const startSeite = ersterLauf && (!!startHash || !!patient());
+  if (ersterLauf && startHash) startOeffnen(); else if (ersterLauf && patient()) zumPatienten();
   try {
     const result = await api('open_inbox'); items = result.items || [];
     try { const proc = await api('processed'); rechte = {...rechte, ...(proc.rights || {})}; erledigt = (proc.items || []).map(x => ({...x, erledigt: true})); } catch { erledigt = []; } letter = !!(result.letter && result.letter.enabled);
@@ -157,6 +220,28 @@ async function einrichtung() {
 $('free-entry').onclick = frei;
 $('inv-search').addEventListener('input', anzeigen);
 $('inv-refresh').addEventListener('click', () => { liste(); tag(); });
-window.addEventListener('message', event => { if (event.origin === location.origin && event.data === 'ks-refresh') { liste(); tag(); } });
+window.addEventListener('message', event => {
+  if (event.origin !== location.origin) return;
+  const d = event.data;
+  if (d === 'ks-refresh') { liste(); tag(); return; }
+  const sauber = x => ({visit: String(x.visit || ''), name: String(x.name || '').slice(0, 80), geburt: String(x.geburt || '').slice(0, 10), nummer: /^[1-9][0-9]{0,11}$/.test(String(x.nummer || '')) ? String(x.nummer) : '',
+    rechnungen: Math.max(0, Number(x.rechnungen) || 0), tab: x.tab === 'igel' ? 'igel' : 'rechnung'});
+  if (d && d.typ === 'ks-patient' && typeof d.visit === 'string') {
+    const x = sauber(d);
+    try { sessionStorage.setItem(PK, JSON.stringify({visit: x.visit, name: x.name, geburt: x.geburt, nummer: x.nummer})); } catch { /* ohne sessionStorage */ }
+    ansicht = {modus: 'patient', ...x}; aktiv = 'patient'; anzeigen();
+  } else if (d && d.typ === 'ks-ansicht' && typeof d.visit === 'string') {
+    ansicht = {modus: 'eingang', ...sauber(d)}; patientKarte();
+  } else if (d && d.typ === 'ks-patient-aus') {
+    if (ansicht && ansicht.visit === d.visit) ansicht = null;
+    if (patient() && patient().visit === d.visit) { try { sessionStorage.removeItem(PK); } catch { /* ohne sessionStorage */ } }
+    patientKarte();
+  }
+});
+$('pk-zum').onclick = zumPatienten;
+$('pk-weg').onclick = patientEntfernen;
+$('pk-marke').onclick = akteOeffnen;
+$('pk-name-knopf').onclick = akteOeffnen;
+document.querySelectorAll('.pk-tab').forEach(b => { b.onclick = () => tabWaehlen(b.dataset.tab); });
 liste(); tag(); einrichtung();
 setInterval(() => { if (!document.hidden) { liste(); tag(); } }, 15000);

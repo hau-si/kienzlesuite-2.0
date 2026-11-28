@@ -49,11 +49,15 @@ final class Modules {
         return '';
     }
 
-    /** @return list<array{modul:string,pfad:string,schema:string,label:string}> Startkontexte der Module ([[starters]] in module.toml), nach Schema sortiert */
+    /**
+     * @return list<array{modul:string,pfad:string,schema:string,label:string}> Startkontexte der Module ([[starters]] in module.toml),
+     * nach Schema sortiert.
+     */
     public function starters(): array {
         $out = [];
         foreach ($this->modules as $id => $m) foreach ($m['starters'] ?? [] as $s) {
-            $out[] = ['modul' => $id, 'pfad' => (string)($m['web']['path'] ?? ''), 'schema' => (string)$s['schema'], 'label' => (string)$s['label']];
+            $schema = (string)$s['schema'];
+            $out[] = ['modul' => $id, 'pfad' => (string)($m['web']['path'] ?? ''), 'schema' => $schema, 'label' => (string)$s['label']];
         }
         usort($out, fn($a, $b) => $a['schema'] <=> $b['schema']);
         return $out;
@@ -71,6 +75,9 @@ final class Modules {
         $w = $this->modules[$id]['web'] ?? null;
         return is_array($w) && is_string($w['einstellungen'] ?? null) ? $w['path'] . $w['einstellungen'] : null;
     }
+
+    /** Bekommt das Modul die Personenliste (`[web] personen = true`, core_api 2)? */
+    public function wantsPersons(string $id): bool { return ($this->modules[$id]['web']['personen'] ?? false) === true; }
 
     public function webPath(string $id): ?string { return $this->modules[$id]['web']['path'] ?? null; }
 

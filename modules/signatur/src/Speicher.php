@@ -7,7 +7,7 @@ final class Speicher {
     public static string $data = '/var/lib/kienzle/signatur';
     private static ?\PDO $pdo = null;
     private static string $pfad = '';
-    public const VERSION = 6;
+    public const VERSION = 13;
 
     public static function pdo(): \PDO {
         $datei = self::$data . '/signatur.db';
@@ -45,6 +45,13 @@ final class Speicher {
         $nonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
         $cipher = base64_encode($nonce . sodium_crypto_secretbox($token, $nonce, self::schluessel()));
         self::pdo()->prepare('INSERT OR REPLACE INTO tokens (kontext, cipher, bis) VALUES (?, ?, ?)')->execute([$kontext, $cipher, $bis]);
+    }
+
+    /** Ablauf des Tokens zu einem Kontext (Unix-Zeit, 0 = keins). */
+    public static function tokenBis(string $kontext): int {
+        $st = self::pdo()->prepare('SELECT bis FROM tokens WHERE kontext = ?');
+        $st->execute([$kontext]);
+        return (int)$st->fetchColumn();
     }
 
     /** Token zu einem Kontext; null, wenn es keines gibt oder es abgelaufen ist. */
@@ -107,7 +114,7 @@ final class Speicher {
             $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN pad_id INTEGER NOT NULL DEFAULT 0');
         }
         if ($v < 3) {
-            // Startcodes aus T2med (kienzle-signatur://): einmalig, 5 Minuten gültig; enthalten den Patienten für die Startseite.
+            // Startcodes aus T2med (praxisherz-signatur://): einmalig, 5 Minuten gültig; enthalten den Patienten für die Startseite.
             $pdo->exec('CREATE TABLE starts (
                 hash TEXT PRIMARY KEY,
                 patient TEXT NOT NULL,
@@ -131,6 +138,55 @@ final class Speicher {
             foreach (['vorname', 'nachname', 'geschlecht', 'pid'] as $spalte) $pdo->exec('ALTER TABLE starts ADD COLUMN ' . $spalte . ' TEXT NOT NULL DEFAULT ""');
             $pdo->exec('CREATE TABLE tokens (kontext TEXT PRIMARY KEY, cipher TEXT NOT NULL, bis INTEGER NOT NULL)');
             foreach (['patient_id', 'kontakt_alt', 'kontakt_neu', 'kontakt_status', 'kontakt_meldung'] as $spalte) $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN ' . $spalte . ' TEXT NOT NULL DEFAULT ""');
+        }
+        if ($v < 7) {
+            // Für das PDF (Entwurf C): Geburtsdatum des Patienten und Praxisangaben (Name, Anschrift) zum Zeitpunkt des Anlegens.
+            foreach (['geburtsdatum', 'praxis'] as $spalte) $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN ' . $spalte . ' TEXT NOT NULL DEFAULT ""');
+        }
+        if ($v < 8) {
+            // Ablage des PDFs in T2med (direkt oder über die Kasse): '', an_kasse, erledigt, fehler, manuell.
+            $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN ablage TEXT NOT NULL DEFAULT ""');
+            // Schon übertragene Vorgänge gelten als erledigt, schon unterschriebene ältere nicht automatisch (kein Nachholen ohne Wunsch).
+            $pdo->exec("UPDATE vorgaenge SET ablage='erledigt' WHERE status='uebertragen'");
+            $pdo->exec("UPDATE vorgaenge SET ablage='manuell' WHERE status='unterschrieben'");
+        }
+        if ($v < 9) {
+            // Archiv (Startseite: Vorgang aus der linken Spalte nehmen, bleibt unter „Vorgänge“ mit Filter „Archiv“).
+            $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN archiviert INTEGER NOT NULL DEFAULT 0');
+        }
+        if ($v < 10) {
+            // Baustein-Editor (Editor C): Bausteine als JSON, Fassung je Vorlage; der Vorgang merkt sich Fassung, Bausteine und Antworten.
+            $pdo->exec('ALTER TABLE vorlagen ADD COLUMN bloecke TEXT NOT NULL DEFAULT ""');
+            $pdo->exec('ALTER TABLE vorlagen ADD COLUMN version INTEGER NOT NULL DEFAULT 1');
+            foreach (['bloecke', 'antworten'] as $spalte) $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN ' . $spalte . ' TEXT NOT NULL DEFAULT ""');
+            $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN vorlage_version INTEGER NOT NULL DEFAULT 0');
+            $st = $pdo->prepare('UPDATE vorlagen SET bloecke=? WHERE id=?');
+            foreach ($pdo->query('SELECT id, text FROM vorlagen')->fetchAll() as $r) $st->execute([json_encode(Bausteine::ausAltemText((string)$r['text']), JSON_UNESCAPED_UNICODE), (int)$r['id']]);
+        }
+        if ($v < 11) {
+            // Akteneintrag je Baustein (Wunsch des Nutzers): Kürzel der Vorlage in T2med; der Vorgang merkt sich Kürzel und Eintragstext.
+            $pdo->exec('ALTER TABLE vorlagen ADD COLUMN kuerzel TEXT NOT NULL DEFAULT ""');
+            foreach (['kuerzel', 'akte'] as $spalte) $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN ' . $spalte . ' TEXT NOT NULL DEFAULT ""');
+        }
+        if ($v < 12) {
+            // Vorlagenliste mit Favoriten und Gruppen (Wunsch des Nutzers, wie im Fax); Gruppen aus der Dokumentart vorbelegt.
+            $pdo->exec('ALTER TABLE vorlagen ADD COLUMN favorit INTEGER NOT NULL DEFAULT 0');
+            $pdo->exec('ALTER TABLE vorlagen ADD COLUMN gruppen TEXT NOT NULL DEFAULT ""');
+            $st = $pdo->prepare('UPDATE vorlagen SET gruppen=? WHERE id=?');
+            foreach ($pdo->query('SELECT id, art FROM vorlagen')->fetchAll() as $r) $st->execute([Seite::gruppeZurArt((string)$r['art']), (int)$r['id']]);
+        }
+        if ($v < 13) {
+            // Signatur 4: Vorlage je IGeL-Leistung, Einwilligungen mit Ablauf, zweite Unterschrift, Sprachfassungen.
+            foreach (['leistungen TEXT NOT NULL DEFAULT ""', 'ablauf INTEGER NOT NULL DEFAULT 0', 'zweite TEXT NOT NULL DEFAULT ""', 'sprache TEXT NOT NULL DEFAULT "de"', 'original INTEGER NOT NULL DEFAULT 0'] as $s)
+                $pdo->exec('ALTER TABLE vorlagen ADD COLUMN ' . $s);
+            $pdo->exec("UPDATE vorlagen SET ablauf=1 WHERE art='datenschutz'");
+            foreach (['zweite TEXT NOT NULL DEFAULT ""', 'sprache TEXT NOT NULL DEFAULT "de"', 'ablauf INTEGER NOT NULL DEFAULT 0', 'patient_schluessel TEXT NOT NULL DEFAULT ""'] as $s)
+                $pdo->exec('ALTER TABLE vorgaenge ADD COLUMN ' . $s);
+            // Einwilligungen bleiben länger als die Vorgänge (30 Tage): nur Schlüssel des Patienten, Vorlage und Zeitraum, kein Inhalt.
+            $pdo->exec('CREATE TABLE einwilligungen (vorgang_id INTEGER PRIMARY KEY, schluessel TEXT NOT NULL, vorlage_id INTEGER NOT NULL, original INTEGER NOT NULL DEFAULT 0,
+                titel TEXT NOT NULL, unterschrieben INTEGER NOT NULL, bis INTEGER NOT NULL)');
+            $pdo->exec('CREATE INDEX einwilligungen_schluessel ON einwilligungen(schluessel)');
+            $pdo->exec('CREATE TABLE einstellungen (schluessel TEXT PRIMARY KEY, wert TEXT NOT NULL)');
         }
         $pdo->exec('PRAGMA user_version=' . self::VERSION);
         $pdo->commit();

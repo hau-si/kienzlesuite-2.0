@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Kienzle-Suite: kleine Start-ISO bauen (läuft auf Linux, z. B. im GitHub-Workflow .github/workflows/iso.yml).
+# Praxisherz: kleine Start-ISO bauen (läuft auf Linux, z. B. im GitHub-Workflow .github/workflows/iso.yml).
 #
 #   bash iso/bauen.sh [AUSGABE.iso]       (Standard: kienzle-suite-start.iso)
 #

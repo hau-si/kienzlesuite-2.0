@@ -1,6 +1,6 @@
-# Kienzle-Suite, Basis: Webinterface (php-fpm als ks-core). Vom Installer geschrieben.
+# Praxisherz, Basis: Webinterface (php-fpm als ks-core). Vom Installer geschrieben.
 [Unit]
-Description=Kienzle-Suite Basis (Webinterface)
+Description=Praxisherz Basis (Webinterface)
 After=network.target
 
 [Service]

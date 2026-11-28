@@ -1,13 +1,13 @@
 # Telefon: Telefonanlage (Asterisk) mit Leitungen, Nebenstellen, Warteschlange und Faxkanal für das Modul fax.
-# Auf Grundlage von Kienzlefax 3.5.0 und Kienzlefon 2.7 von Dr. Thomas Kienzle, für die Kienzle-Suite 2.0 als Modul umgebaut.
+# Auf Grundlage von Kienzlefax 3.5.0 und Kienzlefon 2.7 von Dr. Thomas Kienzle, für Praxisherz als Modul umgebaut.
 # Stufe 1: Anlage aus Kienzlefax. Sprachmenü, Transkription, Ansagen und KI aus Kienzlefon folgen (docs/PLAN-FAX-TELEFON.md).
 
 [module]
 id = "telefon"
 name = "Telefon"
-version = "0.1.0-beta.20"
+version = "0.1.0-beta.30"
 core_api = "2"
-description = "Telefonanlage: Leitungen der Anbieter, Telefone, Warteschlange, Sprachmenü (Kienzlefon) und Kanalgrenze. Stellt auch die Faxleitung für das Modul Fax bereit; Fax lässt sich erst danach installieren."
+description = "Telefonanlage: Leitungen der Anbieter, Telefone, Warteschlange, Sprachmenü und Kanalgrenze. Stellt auch die Faxleitung für das Modul Fax bereit; Fax lässt sich erst danach installieren."
 
 [system]
 packages = ["asterisk", "asterisk-modules", "asterisk-prompt-de", "php-fpm", "php-cli", "php-mbstring", "php-curl", "php-sqlite3", "python3", "python3-reportlab", "python3-pypdf", "python3-cryptography", "ghostscript", "qpdf", "libtiff-tools", "acl", "ffmpeg", "python3-venv", "espeak-ng", "libsndfile1", "libgomp1", "git"]
@@ -82,7 +82,7 @@ id = "statistik"
 label = "Telefon: Anrufstatistik sehen (ohne Nummern und Namen)"
 
 [[starters]]
-schema = "kienzle-telefonverzeichnis"
+schema = "praxisherz-telefonverzeichnis"
 label = "Telefonverzeichnis aus T2med laden"
 
 [[connections]]
@@ -112,3 +112,5 @@ update = "bin/update"
 remove = "bin/remove"
 busy = "bin/busy"
 health = "bin/health"
+# Faxversand: gs (PDF → TIFF) und qpdf (Bericht + Dokument) arbeiten im Austauschordner; Ubuntu 26.04 sperrt sie sonst per AppArmor.
+apparmor = ["gs", "qpdf"]

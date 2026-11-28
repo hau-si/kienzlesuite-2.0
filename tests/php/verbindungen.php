@@ -36,9 +36,19 @@ function test_anfragen(): void {
 
 function test_seite(): void {
     [$env, $c] = con_env();
+    $mods = [];
+    foreach ($env->modules->all() as $id => $m) {
+        if ($id === 'kasse') $m['starters'] = [['schema' => 'praxisherz-kasse', 'label' => 'Kasse'], ['schema' => 'praxisherz-igel', 'label' => 'IGeL <b>']];
+        $mods[] = $m;
+    }
+    $env->modules = Kienzle\Core\Modules::fromArray($mods);
     [$b] = admin_browser($env);
     $b->web = fn() => $b->defaultWeb(null, null, $c);
     $p = $b->get('/verwaltung/verbindungen');
+    // Einträge in T2med: alle Aufrufadressen der Module, neue Schreibweise mit Hinweis auf die frühere
+    check(str_contains($p->body, 'id="t2med"') && str_contains($p->body, 'praxisherz-kasse://?kontextId=') && str_contains($p->body, 'praxisherz-igel://'), 'Verbindungen → T2med: alle Aufrufadressen');
+    check(!str_contains($p->body, 'kienzle-') && !str_contains($p->body, 'Frühere Adresse'), 'keine früheren Adressen mehr');
+    check(!str_contains($p->body, 'IGeL <b>') && str_contains($p->body, 'IGeL &lt;b&gt;'), 'Kontext nicht maskiert');
     check($p->status === 200 && str_contains($p->body, 'value="https://t2med.example.org:16567/fhir"') && str_contains($p->body, 'gespeichert – leer lassen'), 'Seite unvollständig');
     check(!str_contains($p->body, '<script>') && !str_contains($p->body, 'Steuer<b>') && str_contains($p->body, 'Steuer&lt;b&gt;büro'), 'Inhalte nicht maskiert');
     check(str_contains($p->body, 'FHIR-Server antwortet') && str_contains($p->body, 'Patient lesen') && str_contains($p->body, 'ssh-ed25519 AAAATEST'), 'Prüfung, Nutzung oder SFTP-Schlüssel fehlen');
@@ -134,6 +144,20 @@ function test_letterxpress(): void {
     $b2->web = fn() => $b2->defaultWeb(null, null, $c2);
     $page2 = $b2->get('/verwaltung/verbindungen')->body;
     check(str_contains($page2, '<strong>12,50 €</strong>') && str_contains($page2, '(abgefragt ') && str_contains($page2, '<span class="tag warn">Testbetrieb</span>'), 'Guthaben mit Zeit oder gelbes Testbetrieb-Schild fehlt');
+}
+
+function test_uebersetzung(): void {
+    [$env, $c] = con_env(['uebersetzung' => ['anbieter' => 'deepl', 'gratis' => true, 'schluessel_gesetzt' => true]]);
+    [$b] = admin_browser($env);
+    $b->web = fn() => $b->defaultWeb(null, null, $c);
+    $page = $b->get('/verwaltung/verbindungen')->body;
+    check(str_contains($page, 'Übersetzung (DeepL)') && str_contains($page, 'DeepL API Free') && str_contains($page, 'gespeichert – leer lassen') && str_contains($page, 'Schlüssel prüfen'), 'DeepL-Abschnitt unvollständig');
+    $r = $b->post('/verwaltung/verbindungen', ['aktion' => 'uebersetzung', 'api_key' => ' 0000-beispiel:fx ']);
+    check($r->status === 303 && req_v($env) === ['action' => 'uebersetzung', 'daten' => ['api_key' => '0000-beispiel:fx']], 'DeepL: Speicher-Anfrage falsch');
+    $b->post('/verwaltung/verbindungen', ['aktion' => 'pruefen', 'art' => 'uebersetzung']);
+    check(req_v($env) === ['action' => 'pruefen', 'art' => 'uebersetzung', 'id' => ''], 'DeepL: Prüf-Anfrage falsch');
+    $b->post('/verwaltung/verbindungen', ['aktion' => 'entfernen', 'was' => 'uebersetzung']);
+    check(req_v($env) === ['action' => 'uebersetzung', 'loeschen' => true], 'DeepL: Entfernen-Anfrage falsch');
 }
 
 function test_gmail(): void {

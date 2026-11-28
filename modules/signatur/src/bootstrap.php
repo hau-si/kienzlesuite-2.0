@@ -23,10 +23,32 @@ function sg_modul(): KienzleModul {
     if (!$k) {
         if (!class_exists('KienzleModul', false)) {
             $helfer = (string)(getenv('KIENZLE_SUITE_HILFE') ?: '/opt/kienzle/core/current/php/modul/Kienzle.php');
-            if (!is_file($helfer)) throw new RuntimeException('Kienzle-Suite nicht gefunden.');
+            if (!is_file($helfer)) throw new RuntimeException('Praxisherz nicht gefunden.');
             require_once $helfer;
         }
         $k = new KienzleModul('signatur');
     }
     return $k;
+}
+
+/** T2med-Zugang aus der Verbindung „t2med“ der Basis (Web und Hintergrundlauf). */
+function sg_fhir(): KienzleSignatur\Fhir {
+    $verbindung = sg_modul()->verbindung('t2med') ?? [];
+    $ca = '';
+    if (trim((string)($verbindung['ca_pem'] ?? '')) !== '') {
+        $ca = KienzleSignatur\Speicher::$data . '/t2med-ca.pem';
+        if (!is_file($ca) || file_get_contents($ca) !== trim((string)$verbindung['ca_pem']) . "\n") { file_put_contents($ca, trim((string)$verbindung['ca_pem']) . "\n"); chmod($ca, 0600); }
+    }
+    return new KienzleSignatur\Fhir($verbindung, $ca);
+}
+
+/** Übersetzung (DeepL) aus der Verbindung „uebersetzung“ der Basis. */
+function sg_uebersetzung(): KienzleSignatur\Uebersetzung {
+    return new KienzleSignatur\Uebersetzung(sg_modul()->verbindung('uebersetzung') ?? []);
+}
+
+/** Pfad eines anderen Moduls aus dem Menü der Basis (z. B. „/kasse/“), null, wenn es fehlt oder der Benutzer es nicht sehen darf. */
+function sg_modulPfad(string $id): ?string {
+    foreach (sg_modul()->menue()['ids'] as $href => $mid) if ($mid === $id) return $href;
+    return null;
 }

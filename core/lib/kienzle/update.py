@@ -1,7 +1,7 @@
-"""Updater der Kienzle-Suite (root-Dienst, Aufruf über core/bin/kienzle-update). Konzept: docs/ARCHITEKTUR.md, „Updates“.
+"""Updater Praxisherz (root-Dienst, Aufruf über core/bin/kienzle-update). Konzept: docs/ARCHITEKTUR.md, „Updates“.
 
 Ablauf einer Aktualisierung der Basis:
- 1. Release-Liste der Quelle lesen (GitHub-Releases von hau-si/kienzlesuite-2.0), nur Kanal stabil bzw. beta.
+ 1. Release-Liste der Quelle lesen (GitHub-Releases von hau-si/praxisherz), nur Kanal stabil bzw. beta.
  2. Manifest, Signatur und Archiv laden; Signatur, Manifest und Archiv prüfen; nur neuere Versionen.
  3. Archiv in einen Arbeitsordner auspacken und jede Datei gegen das Manifest prüfen.
  4. Kein Update, solange ein Modul „beschäftigt“ meldet (hooks.busy).
@@ -40,7 +40,7 @@ CORE = Path(E('KIENZLE_UPDATE_CORE', '/opt/kienzle/core'))
 DATA = Path(E('KIENZLE_UPDATE_DATA', '/var/lib/kienzle/core'))
 SETTINGS = Path(E('KIENZLE_UPDATE_SETTINGS', '/etc/kienzle/core'))
 MODULES = Path(E('KIENZLE_UPDATE_MODULES', '/var/lib/kienzle/core/modules.json'))
-SOURCE = E('KIENZLE_UPDATE_QUELLE', 'github:hau-si/kienzlesuite-2.0')
+SOURCE = E('KIENZLE_UPDATE_QUELLE', 'github:hau-si/praxisherz')
 STOP = E('KIENZLE_UPDATE_STOP', 'systemctl stop kienzle-core-php.service')
 START = E('KIENZLE_UPDATE_START', 'systemctl restart kienzle-core-php.service nginx.service')
 HEALTH = E('KIENZLE_UPDATE_HEALTH', '')            # leer = /_health über den ersten Servernamen

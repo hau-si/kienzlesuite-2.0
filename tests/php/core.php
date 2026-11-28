@@ -6,7 +6,7 @@ require __DIR__ . '/lib.php';
 use Kienzle\Core\{Config, Modules, PasswordPolicy, Passwords, Secrets, Totp, Users};
 
 function test_totp_rfc6238_testwerte(): void {
-    // RFC 6238, Anhang B (8 Stellen; die Suite nutzt 6 Stellen mit demselben Verfahren).
+    // RFC 6238, Anhang B (8 Stellen; Praxisherz nutzt 6 Stellen mit demselben Verfahren).
     $vectors = [59 => ['94287082', '46119246', '90693936'], 1111111109 => ['07081804', '68084774', '25091201'], 1111111111 => ['14050471', '67062674', '99943326'],
         1234567890 => ['89005924', '91819424', '93441116'], 2000000000 => ['69279037', '90698825', '38618901'], 20000000000 => ['65353130', '77737706', '47863826']];
     foreach ($vectors as $t => [$sha1, $sha256, $sha512]) {
@@ -35,8 +35,8 @@ function test_totp_base32_und_uri(): void {
     check(Totp::base32Decode('mzxw 6ytb-oi') === 'foobar', 'Base32 tolerant lesen');
     $s = Totp::generateSecret();
     check(strlen($s) === 32 && Totp::base32Encode(Totp::base32Decode($s)) === $s, 'Geheimnis nicht 160 Bit');
-    $uri = Totp::uri($s, 'anna', 'Kienzle-Suite Praxis Beispiel');
-    check(str_starts_with($uri, 'otpauth://totp/Kienzle-Suite%20Praxis%20Beispiel:anna?secret=' . $s) && str_contains($uri, 'digits=6') && str_contains($uri, 'period=30'), 'otpauth-URI falsch: ' . $uri);
+    $uri = Totp::uri($s, 'anna', 'Praxisherz Praxis Beispiel');
+    check(str_starts_with($uri, 'otpauth://totp/Praxisherz%20Praxis%20Beispiel:anna?secret=' . $s) && str_contains($uri, 'digits=6') && str_contains($uri, 'period=30'), 'otpauth-URI falsch: ' . $uri);
 }
 
 function test_verschluesselung_an_zweck_gebunden(): void {

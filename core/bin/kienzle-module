@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -IB
-"""Modulverwaltung der Kienzle-Suite (nur root).
+"""Modulverwaltung Praxisherz (nur root).
 
   kienzle-module anwenden                       Anfrage des Webinterfaces verarbeiten (kienzle-module.path)
   kienzle-module pruefen [--sofort]                       Angebot (mitgeliefert, GitHub) und Bestand neu ermitteln

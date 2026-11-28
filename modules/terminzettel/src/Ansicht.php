@@ -4,7 +4,7 @@ namespace KienzleTerminzettel;
 
 /** HTML der Einstellungsseite (kein Inline-Skript, CSP script-src 'self'). */
 final class Ansicht {
-    /** Zusätzliche Tags im Kopf der Seite im Rahmen der Suite: Stil, Skript und CSRF-Marke. Dateien tragen eine Versionskennung (sonst zeigt der Browser nach einem Update eine Stunde lang das alte Skript). */
+    /** Zusätzliche Tags im Kopf der Seite im Rahmen von Praxisherz: Stil, Skript und CSRF-Marke. Dateien tragen eine Versionskennung (sonst zeigt der Browser nach einem Update eine Stunde lang das alte Skript). */
     public static function kopf(string $base, string $csrf): string {
         $v = static fn(string $f): string => '?v=' . substr((string)@md5_file(dirname(__DIR__) . '/public/assets/' . $f), 0, 8);
         return '<meta name="kienzle-csrf" content="' . tz_h($csrf) . '"><link rel="stylesheet" href="' . tz_h($base) . '/assets/style.css' . $v('style.css') . '">'

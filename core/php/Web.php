@@ -138,7 +138,7 @@ final class Web {
 
     public static string $caFile = '/etc/kienzle/ca/ca.crt';
 
-    /** Anleitung für die Arbeitsplätze: Zertifizierungsstelle und Servername. Ohne Anmeldung erreichbar (vorher vertraut der Browser der Suite noch nicht). */
+    /** Anleitung für die Arbeitsplätze: Zertifizierungsstelle und Servername. Ohne Anmeldung erreichbar (vorher vertraut der Browser von Praxisherz noch nicht). */
     private function workstationHelp(?string $error = null, ?string $notice = null): Response {
         $pem = @file_get_contents(self::$caFile);
         $fp = '';
@@ -147,7 +147,7 @@ final class Web {
             $fp = implode(':', str_split(strtoupper(hash('sha256', $der)), 2));
         }
         $ips = array_values(array_filter($this->config->hostnames, fn($n) => filter_var($n, FILTER_VALIDATE_IP)));
-        $name = array_values(array_filter($this->config->hostnames, fn($n) => !filter_var($n, FILTER_VALIDATE_IP)))[0] ?? 'kienzle.praxis.internal';
+        $name = array_values(array_filter($this->config->hostnames, fn($n) => !filter_var($n, FILTER_VALIDATE_IP)))[0] ?? 'praxisherz';
         $ip = $ips[0] ?? '192.0.2.10';
         if (str_ends_with($name, '.fritz.box')) {
             $routerText = '<p>Der Name <code>' . V::h($name) . '</code> endet auf „.fritz.box“: Eine FRITZ!Box kennt Geräte im Netz automatisch unter ihrem Rechnernamen. '
@@ -157,36 +157,36 @@ final class Web {
             $routerText = '<p>Den Namen <code>' . V::h($name) . '</code> mit der Adresse <code>' . V::h($ip) . '</code> im Router oder einem eigenen DNS-Server eintragen (meist die IT). '
                 . 'Manche Router kennen Geräte im Netz auch automatisch unter ihrem Rechnernamen mit einer eigenen Endung; dann unter Verwaltung → Server genau diesen Namen mit der Endung des Routers wählen.</p>';
         }
-        $lead = '<p class="lead">Pro PC genügt ein Paket: Es richtet den Kienzle-Agent ein (Starter für T2med, Zertifikat der Suite, virtuelle Drucker, „Akte öffnen“). Unter Windows hält der Agent danach alles selbst aktuell, auch neue Drucker und Module; ein zweites Mal ist das Paket nur zur Reparatur nötig. '
-            . 'Der PC muss außerdem den Namen der Suite kennen (Schritt 2). Klappt etwas nicht, steht unten jeder Schritt auch zum Einrichten von Hand.</p>';
+        $lead = '<p class="lead">Pro PC genügt ein Paket: Es richtet den Praxisherz-Agent ein (Starter für T2med, Zertifikat von Praxisherz, virtuelle Drucker, „Akte öffnen“). Unter Windows hält der Agent danach alles selbst aktuell, auch neue Drucker und Module; ein zweites Mal ist das Paket nur zur Reparatur nötig. '
+            . 'Der PC muss außerdem den Namen von Praxisherz kennen (Schritt 2). Klappt etwas nicht, steht unten jeder Schritt auch zum Einrichten von Hand.</p>';
         $zertifikat = ''
             . '<details class="box" id="zertifikat"><summary><strong>Zertifikat von Hand einrichten</strong></summary>'
-            . '<p>Ohne diesen Schritt zeigt der Browser „Nicht sicher“. Die Datei ist kein Programm, sondern der Ausweis der Suite.</p>'
+            . '<p>Ohne diesen Schritt zeigt der Browser „Nicht sicher“. Die Datei ist kein Programm, sondern der Ausweis von Praxisherz.</p>'
             . '<p class="row-buttons"><a class="button" href="/ca.crt">Zertifikat herunterladen</a></p>'
             . ($fp !== '' ? '<p class="muted">Zum Vergleich – so muss der Fingerabdruck (SHA-256) lauten:<br><code>' . V::h($fp) . '</code></p>' : '')
-            . '<details class="how" open><summary>Windows</summary><ol class="steps"><li>Die heruntergeladene Datei <strong>kienzle-suite-ca.crt</strong> doppelklicken.</li>'
+            . '<details class="how" open><summary>Windows</summary><ol class="steps"><li>Die heruntergeladene Datei <strong>praxisherz-ca.crt</strong> doppelklicken.</li>'
             . '<li>„Zertifikat installieren …“ → <strong>Lokaler Computer</strong> → Weiter (Admin-Bestätigung).</li>'
             . '<li>„Alle Zertifikate in folgendem Speicher speichern“ → Durchsuchen → <strong>Vertrauenswürdige Stammzertifizierungsstellen</strong> → OK → Weiter → Fertig stellen.</li>'
             . '<li>Browser ganz schließen und neu öffnen.</li></ol>'
-            . '<p class="muted">Schneller für IT: PowerShell als Administrator: <code>Import-Certificate -FilePath "$HOME\Downloads\kienzle-suite-ca.crt" -CertStoreLocation Cert:\LocalMachine\Root</code></p></details>'
+            . '<p class="muted">Schneller für IT: PowerShell als Administrator: <code>Import-Certificate -FilePath "$HOME\Downloads\praxisherz-ca.crt" -CertStoreLocation Cert:\LocalMachine\Root</code></p></details>'
             . '<details class="how"><summary>Mac</summary><ol class="steps"><li>Datei doppelklicken – die Schlüsselbundverwaltung öffnet sich, Schlüsselbund <strong>System</strong> wählen.</li>'
-            . '<li>Das Zertifikat „Kienzle-Suite …“ doppelklicken → Vertrauen → „Bei Verwendung dieses Zertifikats“: <strong>Immer vertrauen</strong>.</li></ol></details>'
+            . '<li>Das Zertifikat „Praxisherz …“ doppelklicken → Vertrauen → „Bei Verwendung dieses Zertifikats“: <strong>Immer vertrauen</strong>.</li></ol></details>'
             . '<details class="how"><summary>iPhone und iPad</summary><ol class="steps"><li>Diese Seite in Safari öffnen und das Zertifikat laden → „Zulassen“.</li>'
-            . '<li>Einstellungen → Profil geladen → Installieren.</li><li>Einstellungen → Allgemein → Info → Zertifikatsvertrauenseinstellungen → „Kienzle-Suite …“ einschalten.</li></ol></details>'
+            . '<li>Einstellungen → Profil geladen → Installieren.</li><li>Einstellungen → Allgemein → Info → Zertifikatsvertrauenseinstellungen → „Praxisherz …“ einschalten.</li></ol></details>'
             . '<details class="how"><summary>Android</summary><ol class="steps"><li>Zertifikat laden.</li><li>Einstellungen → Sicherheit → Weitere Einstellungen → Verschlüsselung und Anmeldedaten → '
             . 'Zertifikat installieren → <strong>CA-Zertifikat</strong> (Namen der Menüs je nach Hersteller etwas anders).</li></ol></details>'
             . '<details class="how"><summary>Firefox (eigener Zertifikatsspeicher)</summary><ol class="steps"><li>Einstellungen → Datenschutz &amp; Sicherheit → Zertifikate → Zertifikate anzeigen → '
             . 'Zertifizierungsstellen → Importieren → „Dieser CA vertrauen, um Websites zu identifizieren“.</li></ol></details></details>';
         $namen = ''
-            . '<h2 id="name">2. Den Namen der Suite bekannt machen (immer nötig)</h2>'
-            . '<p>Die Suite heißt <strong>' . V::h($name) . '</strong> und hat die Adresse <strong>' . V::h($ip) . '</strong>. Damit der Name funktioniert, gibt es zwei Wege:</p>'
+            . '<h2 id="name">2. Den Namen von Praxisherz bekannt machen (immer nötig)</h2>'
+            . '<p>Praxisherz heißt <strong>' . V::h($name) . '</strong> und hat die Adresse <strong>' . V::h($ip) . '</strong>. Damit der Name funktioniert, gibt es zwei Wege:</p>'
             . '<details class="how" open><summary>Einmal im Router (empfohlen, gilt für alle PCs)</summary>' . $routerText . '</details>'
             . '<details class="how"><summary>Oder auf jedem PC in der Datei hosts</summary><ol class="steps">'
             . '<li>Windows: Startmenü → „Editor“ mit der rechten Maustaste → <strong>Als Administrator ausführen</strong>.</li>'
             . '<li>Datei → Öffnen → <code>C:\Windows\System32\drivers\etc\hosts</code> (unten „Alle Dateien“ wählen).</li>'
             . '<li>Am Ende diese Zeile einfügen und speichern:<br><code>' . V::h($ip . '   ' . $name) . '</code></li>'
             . '<li>Mac: im Terminal <code>sudo nano /etc/hosts</code>, dieselbe Zeile ergänzen, speichern.</li></ol></details>'
-            . '<p>Danach die Suite unter <a href="https://' . V::h($name) . '/">https://' . V::h($name) . '/</a> öffnen.</p>';
+            . '<p>Danach Praxisherz unter <a href="https://' . V::h($name) . '/">https://' . V::h($name) . '/</a> öffnen.</p>';
         // Starter, Pakete und Schlüssel: gehören zu den Arbeitsplätzen (Admins sehen die Pakete direkt hier).
         $paket = '';
         if ($this->modules->starterPath() !== '' || $this->modules->starters()) {
@@ -205,23 +205,41 @@ final class Web {
     }
 
     /** Endungen für den Servernamen, die die Zertifizierungsstelle erlaubt (verständlich beschriftet). */
-    private const SUFFIXES = ['.praxis.internal' => '.praxis.internal (empfohlen)', '.fritz.box' => '.fritz.box (FRITZ!Box)', '.local' => '.local', '.lan' => '.lan'];
+    private const SUFFIXES = ['' => 'ohne Endung (empfohlen)', '.praxis.internal' => '.praxis.internal', '.fritz.box' => '.fritz.box (FRITZ!Box)', '.local' => '.local', '.lan' => '.lan'];
+
+    /**
+     * Wählbare Endungen: die festen und, falls der Server heute unter einer anderen Endung läuft (z. B. „.home.arpa“ oder eine
+     * eigene Domain), auch diese, damit Seite und Name zusammenpassen.
+     * @return array<string,string>
+     */
+    private function serverEndungen(): array {
+        $out = self::SUFFIXES;
+        foreach ($this->config->hostnames as $n) {
+            if (filter_var($n, FILTER_VALIDATE_IP) || !str_contains($n, '.')) continue;
+            foreach (self::SUFFIXES as $suf => $_) if ($suf !== '' && str_ends_with($n, $suf)) continue 2;
+            $eigene = substr($n, strpos($n, '.'));
+            $out[$eigene] = $eigene . ' (bisher)';
+            break;
+        }
+        return $out;
+    }
 
     private function serverPage(?string $error = null): Response {
         $st = $this->srv()->status();
+        $endungen = $this->serverEndungen();
         $ips = array_values(array_filter($st['names'], fn($n) => filter_var($n, FILTER_VALIDATE_IP)));
         $dns = array_values(array_filter($st['names'], fn($n) => !filter_var($n, FILTER_VALIDATE_IP)));
         // Erster Name mit bekannter Endung → Feld „Name“ und Auswahl der Endung; alles andere steht unter „Weitere Namen“.
-        [$short, $suffix, $extra] = ['kienzle', '.praxis.internal', []];
+        [$short, $suffix, $extra] = ['praxisherz', '', []];
         foreach ($dns as $i => $n) {
-            foreach (self::SUFFIXES as $suf => $_) {
-                if (str_ends_with($n, $suf) && strlen($n) > strlen($suf)) { [$short, $suffix] = [substr($n, 0, -strlen($suf)), $suf]; unset($dns[$i]); break 2; }
+            foreach ($endungen as $suf => $_) {
+                if ($suf === '' ? !str_contains($n, '.') : (str_ends_with($n, $suf) && strlen($n) > strlen($suf) && !str_contains(substr($n, 0, -strlen($suf)), '.'))) { [$short, $suffix] = [substr($n, 0, -strlen($suf)), $suf]; unset($dns[$i]); break 2; }
             }
         }
         $extra = array_values($dns);
         if (!$this->srv()->named() && $extra) $short = explode('.', $extra[0])[0];
         $options = '';
-        foreach (self::SUFFIXES as $suf => $label) $options .= '<option value="' . V::h($suf) . '"' . ($suf === $suffix ? ' selected' : '') . '>' . V::h($label) . '</option>';
+        foreach ($endungen as $suf => $label) $options .= '<option value="' . V::h($suf) . '"' . ($suf === $suffix ? ' selected' : '') . '>' . V::h($label) . '</option>';
         $address = 'https://' . $short . $suffix . '/';
         $body = V::error($error) . ($st['last'] ? '<p class="' . (($st['last']['ok'] ?? false) ? 'notice' : 'error') . '">' . V::h((string)($st['last']['meldung'] ?? '')) . '</p>' : '')
             . ($st['pending'] ? '<p class="notice">Wird übernommen …</p>' : '')
@@ -231,9 +249,9 @@ final class Web {
             . '<label>Name des Servers<span class="name-row">'
             . '<input type="text" name="kurzname" value="' . V::h($short) . '" required maxlength="40" pattern="[A-Za-z0-9][A-Za-z0-9-]*" aria-label="Name">'
             . '<select name="endung" aria-label="Endung">' . $options . '</select></span></label>'
-            . '<p class="muted">Unter diesem Namen öffnen die Arbeitsplätze die Suite, z. B. <strong>' . V::h($address) . '</strong>. '
-            . 'Nur Buchstaben, Ziffern und Bindestrich. Wer nicht sicher ist: „kienzle“ und „.praxis.internal“ lassen.</p>'
-            . ($ips ? '<p class="muted">Zusätzlich bleibt die Suite über ' . V::h(implode(', ', $ips)) . ' erreichbar.</p>' : '')
+            . '<p class="muted">Unter diesem Namen öffnen die Arbeitsplätze Praxisherz, z. B. <strong>' . V::h($address) . '</strong>. '
+            . 'Nur Buchstaben, Ziffern und Bindestrich. Wer nicht sicher ist: „praxisherz“ ohne Endung lassen. Ein Name ohne Endung muss im Router bzw. DNS der Praxis bekannt sein (bei der FRITZ!Box meist von selbst, wenn der Server so heißt).</p>'
+            . ($ips ? '<p class="muted">Zusätzlich bleibt Praxisherz über ' . V::h(implode(', ', $ips)) . ' erreichbar.</p>' : '')
             . '<details class="how"><summary>Weitere Namen und Fachleute-Einstellungen</summary>'
             . '<label>Weitere Namen oder Adressen (einer je Zeile)<textarea name="weitere" rows="3">' . V::h(implode("\n", $extra)) . '</textarea></label>'
             . '<p class="muted">Erlaubt sind interne Namen (.internal, .local, .lan, .home.arpa, .fritz.box …) und private IP-Adressen. '
@@ -242,7 +260,7 @@ final class Web {
             . V::checkbox('ohne_ip', '1', 'Nicht mehr über die IP-Adresse erreichbar', false) . '</details>'
             . '<button' . ($st['pending'] ? ' disabled' : '') . '>Speichern</button></form>'
             . '<h2>Danach</h2><ol class="steps"><li>Den Namen im Router eintragen – oder auf jedem PC in der Datei hosts: '
-            . '<a href="/hilfe/arbeitsplatz#name">Anleitung</a>.</li><li>Die Suite unter <strong>' . V::h($address) . '</strong> öffnen und dort neu anmelden.</li>'
+            . '<a href="/hilfe/arbeitsplatz#name">Anleitung</a>.</li><li>Praxisherz unter <strong>' . V::h($address) . '</strong> öffnen und dort neu anmelden.</li>'
             . '<li>Falls schon Passkeys eingerichtet sind: unter „Mein Konto“ neu anlegen (sie gelten für den alten Namen).</li></ol>'
             . '<p class="muted">Diese drei Schritte bestätigst du von Hand unter <a href="/verwaltung/einrichtung">Einrichtung</a>; erst dann gilt „Servername festgelegt“ als erledigt.</p>';
         $response = Response::html(V::page('Server', $body, $this->nav(), $this->config->practice), $error ? 422 : 200);
@@ -274,7 +292,7 @@ final class Web {
             . '<input type="hidden" name="aktion" value="' . $kind . '">' . $fields . '<button>' . $button . '</button></form>';
         $body = V::error($error) . V::notice($notice) . '<section class="card"><p class="muted">Diese Angaben gelten für alle Module (Rechnungen, Belege, Überweisungs-QR, Bons). </p>'
             . '<details class="fold" open><summary><h2>Name der Praxis</h2></summary>' . $form('name',
-                V::input('praxis', 'Name der Praxis (erscheint auf Belegen, Bons und im Kopf der Suite)', 'text', $this->config->practice, 'maxlength="60" placeholder="Praxis Dr. Beispiel"'), 'Name speichern') . '</details>'
+                V::input('praxis', 'Name der Praxis (erscheint auf Belegen, Bons und im Kopf von Praxisherz)', 'text', $this->config->practice, 'maxlength="60" placeholder="Praxis Dr. Beispiel"'), 'Name speichern') . '</details>'
             . '<details class="fold"><summary><h2>Anschrift</h2></summary>' . $form('anschrift',
                 V::input('street', 'Straße und Hausnummer', 'text', $a['street'], 'maxlength="80" autocomplete="street-address"')
                 . V::input('city', 'PLZ und Ort', 'text', $a['city'], 'maxlength="80"')
@@ -345,8 +363,8 @@ final class Web {
         $suffix = $r->field('endung', 30);
         $names = '';
         try {
-            if (!preg_match('/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/D', $short)) throw new Problem('Name des Servers: nur Buchstaben, Ziffern und Bindestrich, z. B. kienzle.', 422);
-            if (!isset(self::SUFFIXES[$suffix])) throw new Problem('Bitte eine Endung wählen.', 422);
+            if (!preg_match('/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/D', $short)) throw new Problem('Name des Servers: nur Buchstaben, Ziffern und Bindestrich, z. B. praxisherz.', 422);
+            if (!isset($this->serverEndungen()[$suffix])) throw new Problem('Bitte eine Endung wählen.', 422);
             $ips = $r->field('ohne_ip') === '1' ? [] : array_filter($this->config->hostnames, fn($n) => filter_var($n, FILTER_VALIDATE_IP));
             $names = implode("\n", array_merge([$short . $suffix], preg_split('/\R/', trim($r->field('weitere', 3000))) ?: [], $ips));
             $this->srv()->save($names, $this->config->practice, $r->field('neue_ca') === '1');   // Praxisname unverändert; er steht unter Praxis
@@ -385,7 +403,7 @@ final class Web {
 
     private function oidcLogoutPage(Request $r): Response {
         $target = $this->oidc->logoutTarget($r->get('client_id', 100) ?: $this->oidc->clientFromIdToken($r->get('id_token_hint', 4000)), $r->get('post_logout_redirect_uri', 300));
-        $body = '<p>Bei der Kienzle-Suite abmelden? Damit endet die Anmeldung für alle Module und Dienste auf diesem Gerät.</p>'
+        $body = '<p>Bei Praxisherz abmelden? Damit endet die Anmeldung für alle Module und Dienste auf diesem Gerät.</p>'
             . '<form method="post" action="/oidc/abmelden" class="box">' . V::csrf($this->session['csrf'])
             . '<input type="hidden" name="ziel" value="' . V::h($target ?? '') . '"><input type="hidden" name="state" value="' . V::h($r->get('state', 500)) . '">'
             . '<button>Abmelden</button></form>';
@@ -419,7 +437,7 @@ final class Web {
                 . ($created['secret'] !== '' ? '<tr><td>Client-Geheimnis</td><td><code>' . V::h($created['secret']) . '</code><br><small>Wird nur jetzt angezeigt.</small></td></tr>' : '')
                 . '</table></div>';
         }
-        $body .= '<p>Dienste mit eigener Anmeldung (z. B. Oberfläche der Telefonanlage, NAS) können Benutzer über die Suite anmelden '
+        $body .= '<p>Dienste mit eigener Anmeldung (z. B. Oberfläche der Telefonanlage, NAS) können Benutzer über Praxisherz anmelden '
             . '(OpenID Connect). Es gelten dieselben Konten, Authenticator-Apps und Passkeys. Die Arbeitsplätze müssen der '
             . '<a href="/ca.crt">Zertifizierungsstelle</a> vertrauen, der Dienst ebenfalls.</p>'
             . '<p>Anbieter: <code>' . V::h($o->issuer()) . '</code></p>';
@@ -482,7 +500,9 @@ final class Web {
         $this->claimFirstAdmin((int)$session['user_id']);
         $access = $this->users->access((int)$session['user_id'])[$module] ?? null;
         if (!$access) return new Response(403);
-        return (new Response(204))
+        $res = new Response(204);
+        if ($this->modules->wantsPersons($module)) $res = $res->with('X-Kienzle-Personen', $this->modulePersons($module));
+        return $res
             ->with('X-Kienzle-Benutzer', $session['login'])
             ->with('X-Kienzle-Name', rawurlencode($session['display'] !== '' ? $session['display'] : $session['login']))
             ->with('X-Kienzle-Rolle', $access['admin'] ? 'admin' : 'mitarbeiter')
@@ -493,6 +513,33 @@ final class Web {
             ->with('X-Kienzle-Menue', $this->moduleMenu((int)$session['user_id'], (int)$session['user_admin'] === 1, (string)$session['login']))
             ->with('X-Kienzle-Praxis', rawurlencode(json_encode(['name' => $this->config->practice] + $this->address() + $this->master(), JSON_UNESCAPED_UNICODE)))
             ->with('X-Kienzle-Arbeitsplatz', $this->arbeitsplatzKopf($r));
+    }
+
+    /**
+     * Personenliste für Module mit `[web] personen = true` (z. B. QM: Dokumente an Gruppen vorlegen): aktive Konten mit Zugang zu diesem Modul,
+     * je Anmeldename, Anzeigename, Gruppen (Rollen) und Rechte im Modul. Keine E-Mail-Adressen, keine Basis-Rechte. 30 Sekunden zwischengespeichert.
+     */
+    private function modulePersons(string $module): string {
+        $key = 'personen.' . $module;
+        try {
+            $c = json_decode((string)$this->db->setting($key), true);
+            if (is_array($c) && is_int($c['t'] ?? null) && time() - $c['t'] < 30 && is_string($c['v'] ?? null)) return $c['v'];
+        } catch (\Throwable) {
+        }
+        $out = [];
+        foreach ($this->db->query('SELECT id,login,display FROM users WHERE active=1 ORDER BY login')->fetchAll() as $u) {
+            $a = $this->users->access((int)$u['id'])[$module] ?? null;
+            if (!$a) continue;
+            $out[] = ['l' => $u['login'], 'n' => $u['display'] !== '' ? $u['display'] : $u['login'], 'g' => $this->users->roles((int)$u['id']),
+                'a' => $a['admin'], 'r' => $a['rights']];
+            if (count($out) >= 200) break;
+        }
+        $v = rawurlencode(json_encode($out, JSON_UNESCAPED_UNICODE));
+        try {
+            $this->db->store($key, json_encode(['t' => time(), 'v' => $v]));
+        } catch (\Throwable) {
+        }
+        return $v;
     }
 
     /** Arbeitsplatz des Browsers für Modulseiten (Name und ob der Agent verbunden ist; leer, wenn unbekannt). */
@@ -620,7 +667,7 @@ final class Web {
         try {
             if (!$this->smsReady($uid)) throw new Problem('SMS-Codes sind nicht eingerichtet.', 409);
             $code = $this->auth->smsCodeIssue($this->session);
-            $this->con()->sendSms($this->phoneOf($uid), 'Kienzle-Suite: Ihr Code lautet ' . $code . ' (10 Minuten gültig). Niemandem weitergeben.');
+            $this->con()->sendSms($this->phoneOf($uid), 'Praxisherz: Ihr Code lautet ' . $code . ' (10 Minuten gültig). Niemandem weitergeben.');
         } catch (Problem $e) {
             return $this->codePage($e->getMessage());
         }
@@ -857,7 +904,7 @@ final class Web {
         return [$t, $pending];
     }
 
-    /** Ist der E-Mail-Versand der Suite eingerichtet? Ohne ihn gibt es weder Bestätigung noch „Passwort vergessen“. */
+    /** Ist der E-Mail-Versand von Praxisherz eingerichtet? Ohne ihn gibt es weder Bestätigung noch „Passwort vergessen“. */
     private function mailReady(): bool {
         try { return $this->connections !== null && $this->connections->status()['mail'] !== null; } catch (Problem) { return false; }
     }
@@ -880,7 +927,7 @@ final class Web {
             // Immer dieselbe Antwort, damit sich nicht erraten lässt, welche Adressen es gibt. Admin-Konten (App-Pflicht) nur über die Konsole.
             if ($user && (int)$user['active'] === 1 && !$this->users->needsOtp($user)) {
                 $url = 'https://' . $this->config->hostnames[0] . '/einrichten?t=' . $this->users->setupToken((int)$user['id']);
-                $this->con()->sendMail($this->users->email((int)$user['id']), 'Kienzle-Suite: Passwort neu festlegen',
+                $this->con()->sendMail($this->users->email((int)$user['id']), 'Praxisherz: Passwort neu festlegen',
                     "Hallo " . ($user['display'] ?: $user['login']) . ",\n\nüber diesen Link legst du ein neues Passwort fest (3 Tage gültig, nur einmal verwendbar):\n\n" . $url
                     . "\n\nWar das nicht deine Anfrage, kannst du diese Nachricht ignorieren. Dein Passwort bleibt, solange du den Link nicht verwendest.\n");
                 $this->audit->write($user['login'], 'passwort-link-per-mail');
@@ -904,8 +951,8 @@ final class Web {
             } else {
                 if (!$this->mailReady()) throw new Problem('Der E-Mail-Versand ist nicht eingerichtet (Verwaltung → Verbindungen). Ohne ihn lässt sich die Adresse nicht bestätigen.', 409);
                 $code = $this->users->emailStart($uid, $address);
-                $this->con()->sendMail($address, 'Kienzle-Suite: E-Mail-Adresse bestätigen', "Hallo " . ($user['display'] ?: $user['login']) . ",\n\ndein Bestätigungscode für diese Adresse (1 Stunde gültig):\n\n" . $code
-                    . "\n\nGib ihn in der Kienzle-Suite unter „Mein Konto → E-Mail-Adresse“ ein. Du musst dazu angemeldet sein.\n\nWar das nicht deine Anfrage, kannst du diese Nachricht ignorieren.\n");
+                $this->con()->sendMail($address, 'Praxisherz: E-Mail-Adresse bestätigen', "Hallo " . ($user['display'] ?: $user['login']) . ",\n\ndein Bestätigungscode für diese Adresse (1 Stunde gültig):\n\n" . $code
+                    . "\n\nGib ihn in Praxisherz unter „Mein Konto → E-Mail-Adresse“ ein. Du musst dazu angemeldet sein.\n\nWar das nicht deine Anfrage, kannst du diese Nachricht ignorieren.\n");
                 $notice = 'Bestätigungscode an ' . $address . ' geschickt. Gib ihn unten ein, dann gilt die Adresse.';
             }
         } catch (Problem $e) {
@@ -1054,7 +1101,7 @@ final class Web {
 
     // ---- Passkeys -----------------------------------------------------------------------------------------------
     private function passkeysOn(): Passkeys {
-        if (!$this->passkeys) throw new Problem('Passkeys sind nicht verfügbar: Die Suite hat keinen Servernamen (nur IP-Adressen).', 409);
+        if (!$this->passkeys) throw new Problem('Passkeys sind nicht verfügbar: Praxisherz hat keinen Servernamen (nur IP-Adressen).', 409);
         if (!hash_equals($this->passkeys->rpId, strtolower((string)preg_replace('/:443$/', '', $this->req->header('host'))))) {
             throw new Problem('Passkeys funktionieren nur unter ' . $this->passkeys->origin() . '.', 409);
         }
@@ -1167,6 +1214,7 @@ final class Web {
         if ($r->path === '/verwaltung/sso') return $get ? $this->ssoPage() : $this->ssoAction($r, $admin);
         if ($r->path === '/verwaltung/arbeitsplaetze') return $get ? Response::redirect('/hilfe/arbeitsplatz#paket') : $this->starterAction($r, $admin);
         if ($get && preg_match('#^/verwaltung/arbeitsplaetze/(windows|macos|linux)\.zip$#D', $r->path, $m)) return $this->starterPaket($m[1], $admin);
+        if ($get && $r->path === '/verwaltung/arbeitsplaetze/' . self::SETUP_DATEI) return $this->starterSetup($admin);
         if ($r->path === '/verwaltung/drucker') return $get ? $this->printersPage() : $this->printersAction($r, $admin);
         if ($r->path === '/verwaltung/einrichtung') return $get ? $this->overviewPage() : $this->overviewAction($r, $admin);
         if ($r->path === '/verwaltung/sicherung') return $get ? $this->backupPage() : $this->backupAction($r, $admin);
@@ -1523,7 +1571,7 @@ final class Web {
             $ports .= V::checkbox('modules[]', $id, $p['module'] . ': ' . $p['name'] . ' (' . $p['proto'] . ' ' . $p['ports'] . ($p['scope'] === 'any' ? ', von überall' : '') . ')', in_array($id, $c['modules'], true));
         }
         $body .= '<form method="post" action="/verwaltung/firewall" class="box wide">' . $csrf
-            . '<h2>Freigegebene Netze</h2><p>Nur aus diesen Netzen ist die Suite erreichbar. Dieses Gerät: <code>' . V::h($o['client']['ip']) . '</code></p>' . $netBoxes
+            . '<h2>Freigegebene Netze</h2><p>Nur aus diesen Netzen ist Praxisherz erreichbar. Dieses Gerät: <code>' . V::h($o['client']['ip']) . '</code></p>' . $netBoxes
             . V::input('extra', 'Weitere Netze (z. B. VPN), mit Komma getrennt', 'text', (string)($input['extra'] ?? ''), 'placeholder="10.8.0.0/24"')
             . '<h2>Dienste der Basis</h2><p>HTTPS (443) ist immer aus den freigegebenen Netzen offen.</p>'
             . V::checkbox('ssh', '1', 'SSH (Fernwartung)', (bool)$c['ssh']) . V::checkbox('ipp', '1', 'Drucken über IPP (631)', (bool)$c['ipp'])
@@ -1591,7 +1639,7 @@ final class Web {
             $body .= $st['last']['ok'] ? V::notice($st['last']['message']) : V::error('Nicht erfolgreich: ' . $st['last']['message']);
         }
         if (!$st['service']) $body .= '<p class="error">Die Modulverwaltung ist nicht eingerichtet. Bitte den Installer ausführen.</p>';
-        $body .= '<p>Module erweitern die Suite um Programme wie die Kasse. Jedes Modul läuft unter einem eigenen Systembenutzer und sieht nur seine eigenen Daten. '
+        $body .= '<p>Module erweitern Praxisherz um Programme wie die Kasse. Jedes Modul läuft unter einem eigenen Systembenutzer und sieht nur seine eigenen Daten. '
             . 'Nach dem Installieren unter <a href="/verwaltung/benutzer">Benutzer</a> festlegen, wer das Modul nutzen darf.</p>';
         $post = fn(string $aktion, string $label, string $hidden = '', string $class = '', string $extra = '') => '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . $hidden
             . '<input type="hidden" name="aktion" value="' . $aktion . '">' . $extra . '<button' . ($class !== '' ? ' class="' . $class . '"' : '') . $off . '>' . $label . '</button></form>';
@@ -1724,7 +1772,7 @@ final class Web {
                 . (!$a['signed'] ? ' <span class="tag warn">nicht signiert</span>' : '') . '</h3>'
                 . ($a['published'] !== '' ? '<p>Veröffentlicht: ' . V::h($a['published']) . '</p>' : '') . '<pre class="notes">' . V::h($a['notes']) . '</pre>'
                 . '<form method="post" action="/verwaltung/updates">' . $csrf . '<input type="hidden" name="aktion" value="installieren"><input type="hidden" name="version" value="' . V::h($a['version']) . '">'
-                . '<p>Vorher wird ein Schnappschuss der Daten angelegt. Schlägt etwas fehl, springt die Suite automatisch zurück. Die Seite ist einige Minuten nicht erreichbar.</p>'
+                . '<p>Vorher wird ein Schnappschuss der Daten angelegt. Schlägt etwas fehl, springt Praxisherz automatisch zurück. Die Seite ist einige Minuten nicht erreichbar.</p>'
                 . '<button' . ($busy ? ' disabled' : '') . '>Jetzt installieren</button></form></div>';
         }
         $failed = $st['state'] === 'failed' || $st['error'];
@@ -1845,19 +1893,16 @@ final class Web {
         $body .= '<section><h2>T2med (FHIR)</h2><form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('t2med')
             . V::input('base_url', 'Adresse des FHIR-Servers', 'url', (string)($t2['base_url'] ?? ''), 'placeholder="https://t2med-server:16567/aps/fhir/api/r4"')
             . '<label>Erlaubte fhirBasisUrl aus T2med – weitere Adressen (eine je Zeile)<textarea name="launch_urls" rows="2">' . V::h(implode("\n", array_diff((array)($t2['launch_urls'] ?? []), [(string)($t2['base_url'] ?? '')]))) . '</textarea></label>'
-            . V::input('api_key', 'API-Schlüssel der FHIR-Schnittstelle', 'password', '', 'title="Beim T2med-Demo-Schlüssel hier nichts eintragen: Feld leer lassen und den gespeicherten Schlüssel entfernen. Ein eigener Schlüssel führt dort zu Fehler 403." autocomplete="new-password" placeholder="' . V::h($set((bool)($t2['api_key_gesetzt'] ?? false))) . '"')
-            . '<p class="muted small">Schlüssel der FHIR-Schnittstelle (wird als X-API-Key gesendet). Antwortet T2med mit „FHIR-API-Key fehlt oder ist ungültig“, passt der Wert nicht, z. B. wenn hier das Client Secret des Drittanbieters steht. Mit „Schlüssel entfernen“ nutzt die Kasse wie das alte Tool den hinterlegten T2med-Demo-Schlüssel. <strong>Beim Demo-Schlüssel darf hier kein eigener API-Schlüssel stehen</strong> (sonst Fehler 403): Feld leer lassen und den gespeicherten Schlüssel entfernen.</p>'
-            . V::checkbox('api_key_entfernen', '1', 'Gespeicherten Schlüssel entfernen (Kasse nimmt den T2med-Demo-Schlüssel)', false)
+            . V::input('api_key', 'API-Schlüssel der FHIR-Schnittstelle', 'password', '', 'title="API-Schlüssel der Praxis aus dem Vertrag mit T2med" autocomplete="new-password" placeholder="' . V::h($set((bool)($t2['api_key_gesetzt'] ?? false))) . '"')
+            . '<p class="muted small">Schlüssel der FHIR-Schnittstelle (wird als X-API-Key gesendet). Jede Praxis trägt hier ihren eigenen Schlüssel aus dem Vertrag mit T2med ein; ohne Schlüssel verbinden sich die Module nicht mit T2med. Antwortet T2med mit „FHIR-API-Key fehlt oder ist ungültig“, passt der Wert nicht, z. B. wenn hier das Client Secret des Drittanbieters steht.</p>'
+            . V::checkbox('api_key_entfernen', '1', 'Gespeicherten Schlüssel entfernen', false)
             . '<label>Zertifikat des T2med-Servers (PEM, optional)' . (($t2['zertifikat'] ?? '') !== '' ? ' – gespeichert, SHA-256 <code>' . V::h(substr((string)$t2['zertifikat'], 0, 16)) . '…</code>' : '')
             . '<textarea name="ca_pem" rows="3" placeholder="-----BEGIN CERTIFICATE-----"></textarea></label>'
             . V::checkbox('ca_entfernen', '1', 'Gespeichertes Zertifikat entfernen', false)
             . V::checkbox('pin', '1', 'Nur genau dieses Zertifikat annehmen (Pinning)', (bool)($t2['pin'] ?? false))
             . '<p class="muted small">Die „erlaubte fhirBasisUrl“ ist die FHIR-Adresse, die T2med beim Aufruf mitschickt (Platzhalter fhirBasisUrl). Die Adresse des FHIR-Servers oben gilt immer als erlaubt; weitere Zeilen nur, wenn T2med sich anders meldet. Bei einer Ablehnung zeigt die Kasse den tatsächlich gesendeten Wert.</p>'
             . '<button>Speichern</button></form>'
-            . '<div class="box wide"><h3>Eintrag in T2med (Drittanbieter-Zugriffe verwalten → Neue URL hinzufügen)</h3>'
-            . '<p>Als Adresse genau so eintragen, mit den Platzhaltern, und eine Bezeichnung wie „Kartenzahlung“ vergeben:</p>'
-            . '<p><code class="secret">kienzle-kasse://?kontextId=${kontextId}&amp;fhirBasisUrl=${fhirBasisUrl}&amp;oAuthToken=${oAuthToken}</code></p>'
-            . '<p class="muted small">Ausführliche Anleitung mit Bildern: in der Kasse unter Einstellungen → Zahlung &amp; T2med. Der Starter muss auf dem Arbeitsplatz installiert sein.</p></div>'
+            . $this->t2medAufrufe()
             . ($t2 ? '<p>Zertifikat: ' . (($t2['zertifikat'] ?? '') !== '' ? '<code>' . V::h((string)$t2['zertifikat']) . '</code>' . ($t2['pin'] ? ' (fest hinterlegt)' : '') : '<strong>nicht hinterlegt</strong> (nur öffentlich beglaubigte Zertifikate werden angenommen)') . '</p>'
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('zertifikat-holen') . '<button>Zertifikat des Servers abrufen</button></form> '
                 . (($st['zertifikate']['t2med']['fingerprint'] ?? '') !== '' ? '<form method="post" action="/verwaltung/verbindungen" class="box">' . $this->hidden('zertifikat-uebernehmen', ['fingerprint' => (string)$st['zertifikate']['t2med']['fingerprint']])
@@ -1886,12 +1931,12 @@ final class Web {
             . '<button>Speichern</button></form>' . '</details>'
             . '<details class="fold"' . (($gmail && !$connected) || $pending ? ' open' : '') . '><summary><h3>Gmail-Konto (OAuth, ohne Passwort im Klartext)' . ($connected ? ' <span class="tag ok">✓ eingerichtet</span>' : ' <span class="tag opt">nicht eingerichtet</span>') . '</h3></summary>'
             . ($reconnect ? '<details class="fold"><summary><h3>Erneut einrichten oder anderes Konto verbinden</h3></summary>' : '')
-            . '<p class="muted">Gilt für ein normales Gmail-Konto. Jede Praxis legt dafür einmalig einen eigenen Zugang bei Google an (kostenlos, ca. 10 Minuten). Gesendet wird nur über die Gmail-Schnittstelle mit der Berechtigung „E-Mails senden“; die Suite kann keine Postfächer lesen.</p>'
-            . '<ol class="muted"><li>Auf <strong>console.cloud.google.com</strong> mit dem Gmail-Konto anmelden und oben ein <strong>neues Projekt</strong> anlegen (Name z. B. „Kienzle-Suite“).</li>'
+            . '<p class="muted">Gilt für ein normales Gmail-Konto. Jede Praxis legt dafür einmalig einen eigenen Zugang bei Google an (kostenlos, ca. 10 Minuten). Gesendet wird nur über die Gmail-Schnittstelle mit der Berechtigung „E-Mails senden“; Praxisherz kann keine Postfächer lesen.</p>'
+            . '<ol class="muted"><li>Auf <strong>console.cloud.google.com</strong> mit dem Gmail-Konto anmelden und oben ein <strong>neues Projekt</strong> anlegen (Name z. B. „Praxisherz“).</li>'
             . '<li>Im Suchfeld oben „<strong>Gmail API</strong>“ suchen und <strong>Aktivieren</strong> klicken.</li>'
-            . '<li>Im Suchfeld „<strong>Google Auth Platform</strong>“ öffnen und <strong>Erste Schritte</strong> wählen: App-Name (z. B. „Kienzle-Suite“) und deine E-Mail-Adresse als Support-E-Mail eintragen, Zielgruppe <strong>Extern</strong>, Kontakt-E-Mail eintragen, Bedingungen bestätigen.</li>'
+            . '<li>Im Suchfeld „<strong>Google Auth Platform</strong>“ öffnen und <strong>Erste Schritte</strong> wählen: App-Name (z. B. „Praxisherz“) und deine E-Mail-Adresse als Support-E-Mail eintragen, Zielgruppe <strong>Extern</strong>, Kontakt-E-Mail eintragen, Bedingungen bestätigen.</li>'
             . '<li>Links <strong>Datenzugriff</strong> → „Bereiche hinzufügen oder entfernen“ → in „Bereiche manuell hinzufügen“ <code>https://www.googleapis.com/auth/gmail.send</code> eintragen, hinzufügen, <strong>Speichern</strong>.</li>'
-            . '<li>Für „In Produktion“ verlangt Google vorher unter <strong>Branding</strong>: gültigen App-Namen, Support-E-Mail sowie Adressen für <strong>Startseite der App</strong> und <strong>Datenschutzerklärung</strong> (zwei Webadressen, z. B. die Startseite und die Datenschutzseite der eigenen Praxis-Website). Die Domain dieser Adressen unter „Autorisierte Domains“ eintragen, dann <strong>Speichern</strong>. Die Adressen werden nur auf Googles Zustimmungsseite angezeigt, es muss keine Seite der Suite sein.</li>'
+            . '<li>Für „In Produktion“ verlangt Google vorher unter <strong>Branding</strong>: gültigen App-Namen, Support-E-Mail sowie Adressen für <strong>Startseite der App</strong> und <strong>Datenschutzerklärung</strong> (zwei Webadressen, z. B. die Startseite und die Datenschutzseite der eigenen Praxis-Website). Die Domain dieser Adressen unter „Autorisierte Domains“ eintragen, dann <strong>Speichern</strong>. Die Adressen werden nur auf Googles Zustimmungsseite angezeigt, es muss keine Seite von Praxisherz sein.</li>'
             . '<li>Links <strong>Zielgruppe</strong> → <strong>App veröffentlichen</strong> („In Produktion“ statt „Test“). Im Teststatus läuft die Anmeldung nach 7 Tagen ab. Google verlangt für diesen Bereich eine Überprüfung der App, lässt eine nicht überprüfte App für wenige Nutzer aber zu: Bei der Anmeldung erscheint „Google hat diese App nicht überprüft“ – dort <strong>Erweitert</strong> → „Weiter zu … (unsicher)“ wählen.</li>'
             . '<li>Links <strong>Clients</strong> → <strong>Client erstellen</strong> → Anwendungstyp <strong>Desktop-App</strong>, Namen vergeben, <strong>Erstellen</strong>. Client-ID und Client-Secret kopieren (das Secret wird nur direkt nach dem Erstellen angezeigt) und unten eintragen.</li></ol>'
             . '<p class="muted">Die Bezeichnungen bei Google ändern sich gelegentlich; sinngemäß gesucht werden: Branding/App-Informationen, Zielgruppe, Datenzugriff, Clients. Stimmt etwas nicht mit deiner Ansicht überein, bitte melden.</p>'
@@ -1916,7 +1961,7 @@ final class Web {
         $sms = $st['sms'] ?? [];
         $body .= '<section><h2>SMS (seven.io)</h2><p class="muted">Für Einmalcodes als Ersatz bei der Admin-Anmeldung und später für Nachrichten der kienzlefon-App. Schlüssel unter seven.io → Entwickler → API-Schlüssel anlegen.</p>'
             . '<form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('sms')
-            . $this->tipInput('api_key', 'API-Schlüssel von seven.io', 'Bei seven.io unter Entwickler → API-Schlüssel → „API-Key anlegen“: Label z. B. „Kienzle-Suite“, Umgebung Live (Sandbox verschickt nichts), Gültig bis Unbegrenzt, Zugriff auf Subaccounts aus. Berechtigungen nur „sms“ (Versand) und „balance“ (Schlüssel prüfen); alle anderen aus.', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($sms['schluessel_gesetzt'] ?? false))) . '"')
+            . $this->tipInput('api_key', 'API-Schlüssel von seven.io', 'Bei seven.io unter Entwickler → API-Schlüssel → „API-Key anlegen“: Label z. B. „Praxisherz“, Umgebung Live (Sandbox verschickt nichts), Gültig bis Unbegrenzt, Zugriff auf Subaccounts aus. Berechtigungen nur „sms“ (Versand) und „balance“ (Schlüssel prüfen); alle anderen aus.', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($sms['schluessel_gesetzt'] ?? false))) . '"')
             . $this->tipInput('absender', 'Absendername (optional, höchstens 11 Zeichen)', 'Erscheint beim Empfänger als Absender, z. B. „Praxis“. Nur Buchstaben und Ziffern, keine Leerzeichen; leer = Standard von seven.io.', 'text', (string)($sms['absender'] ?? ''), 'maxlength="16" placeholder="Praxis"')
             . '<button>Speichern</button></form>'
             . ($sms ? $this->testLine($st['tests'], 'sms') . '<div class="actions"><form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'sms']) . '<button>Schlüssel prüfen</button></form> '
@@ -1937,6 +1982,20 @@ final class Web {
                 . '<div class="actions"><form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'letterxpress']) . '<button>Zugang prüfen</button></form> '
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'guthaben']) . '<button class="secondary">' . V::symbol('coins') . ' Guthaben abfragen</button></form> '
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'letterxpress']) . '<button class="danger">Entfernen</button></form></div>' : '')
+            . '</section>';
+        // Übersetzung (DeepL)
+        $ueb = $st['uebersetzung'] ?? [];
+        $body .= '<section><h2>Übersetzung (DeepL)</h2><p class="muted">Übersetzt Vorlagen in andere Sprachen (z. B. in der Signatur: Editor → Weitere Einstellungen → „Übersetzen in …“). '
+            . 'Die Übersetzung wird als eigene Sprachfassung gespeichert und erst nach dem Prüfen freigegeben. Es gehen nur Vorlagentexte an DeepL, keine Patientendaten.</p>'
+            . '<p class="muted">Schlüssel: auf deepl.com ein Konto „DeepL API Free“ anlegen (bis 500.000 Zeichen im Monat kostenlos), dann unter Konto → API-Schlüssel den Schlüssel kopieren (endet auf „:fx“). '
+            . 'Für einen Vertrag zur Auftragsverarbeitung bietet DeepL „DeepL API Pro“ an; deren Schlüssel funktioniert hier ebenso.</p>'
+            . '<form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('uebersetzung')
+            . $this->tipInput('api_key', 'DeepL-Schlüssel', 'Authentifizierungsschlüssel aus dem DeepL-Konto (Konto → API-Schlüssel). Er liegt nur für den Systemdienst lesbar auf dem Server und wird nach dem Speichern nie wieder angezeigt; leer lassen = unverändert.', 'password', '', 'autocomplete="new-password" placeholder="' . V::h($set((bool)($ueb['schluessel_gesetzt'] ?? false))) . '"')
+            . ($ueb ? '<p>' . (($ueb['gratis'] ?? false) ? '<span class="tag ok">DeepL API Free</span>' : '<span class="tag ok">DeepL API Pro</span>') . '</p>' : '')
+            . '<button>Speichern</button></form>'
+            . ($ueb ? $this->testLine($st['tests'], 'uebersetzung')
+                . '<div class="actions"><form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'uebersetzung']) . '<button>Schlüssel prüfen</button></form> '
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'uebersetzung']) . '<button class="danger">Entfernen</button></form></div>' : '')
             . '</section>';
         // Netzwerkspeicher
         $body .= '<section><h2>Netzwerkspeicher</h2>';
@@ -1974,7 +2033,7 @@ final class Web {
             . $f('host', 'Server (Name oder IP)', 'Adresse des NAS im Praxisnetz, am besten die feste IP-Adresse (z. B. 192.0.2.20), weil Namen mit „.local“ auf dem Server oft nicht auflösbar sind.', 'text', '', 'required placeholder="192.0.2.20"')
             . $f('freigabe', 'Freigabe', 'Name des freigegebenen Ordners auf dem NAS (bei Synology: Name unter „Gemeinsamer Ordner“), z. B. „praxis“.', 'text', '', 'placeholder="praxis"', 'smb')
             . $f('port', 'Port', 'Port des SFTP-Dienstes. Meist 22; bei Synology 22, wenn nicht geändert.', 'number', '22', 'min="1" max="65535"', 'sftp')
-            . $f('ordner', 'Basisordner', 'Ordner auf dem Ziel, unter dem die Module ihre Dateien ablegen, z. B. „Kienzle“ (wird angelegt, wenn möglich). Ohne Platzhalter und ohne „..“.', 'text', '', 'placeholder="Kienzle"')
+            . $f('ordner', 'Basisordner', 'Ordner auf dem Ziel, unter dem die Module ihre Dateien ablegen, z. B. „Praxisherz“ (wird angelegt, wenn möglich). Ohne Platzhalter und ohne „..“.', 'text', '', 'placeholder="Kienzle"')
             . $f('benutzer', 'Benutzer', 'Anmeldename am NAS. Besser ein eigener Benutzer nur für diese Ablage, der nur diesen Ordner schreiben darf.', 'text', '', 'autocomplete="off"')
             . $f('passwort', 'Passwort', 'Passwort des NAS-Benutzers für SMB. Wird nach dem Speichern nie wieder angezeigt; leer lassen = unverändert. SFTP braucht kein Passwort, sondern den Schlüssel unten.', 'password', '', 'autocomplete="new-password"', 'smb')
             . $f('domaene', 'Domäne (optional)', 'Nur bei einer Windows-Domäne nötig, sonst leer lassen.', 'text', '', '', 'smb')
@@ -1984,13 +2043,13 @@ final class Web {
             . '</section>';
         // Nutzung
         $rows = '';
-        $art = ['t2med' => 'T2med', 'mail' => 'E-Mail', 'ablage' => 'Netzwerkspeicher', 'letterxpress' => 'Letterxpress', 'nachrichten' => 'SMS und E-Mail (Versand durch die Basis)'];
+        $art = ['t2med' => 'T2med', 'mail' => 'E-Mail', 'ablage' => 'Netzwerkspeicher', 'letterxpress' => 'Letterxpress', 'nachrichten' => 'SMS und E-Mail (Versand durch die Basis)', 'uebersetzung' => 'Übersetzung (DeepL)'];
         foreach ($st['nutzung'] as $u) $rows .= '<tr><td>' . V::h((string)$u['name']) . '</td><td>' . V::h($art[(string)$u['verbindung']] ?? (string)$u['verbindung']) . '</td><td>' . V::h((string)$u['zweck']) . '</td><td>' . (($u['pflicht'] ?? false) ? 'ja' : 'nein') . '</td></tr>';
         $body .= '<section><h2>Wer nutzt was</h2>' . ($rows !== '' ? '<table><tr><th>Modul</th><th>Verbindung</th><th>Wofür</th><th>Nötig</th></tr>' . $rows . '</table>' : '<p>Kein installiertes Modul nutzt eine zentrale Verbindung.</p>') . '</section>';
         $body = preg_replace('#(<p>Zugänge, die mehrere Module brauchen.*?</p>)#s', '<section class="card">$1</section>', $body, 1);
         // Jeder Abschnitt klappt zu; eingerichtete tragen ein grünes „✓ eingerichtet“, offene und fehlerhafte bleiben aufgeklappt.
         $done = ['T2med (FHIR)' => trim((string)($t2['base_url'] ?? '')) !== '', 'E-Mail-Versand' => $mail !== null && $mail !== [],
-            'SMS (seven.io)' => !empty($st['sms']), 'Letterxpress (Briefversand)' => !empty($st['letterxpress']), 'Netzwerkspeicher' => !empty($st['ablage'])];
+            'SMS (seven.io)' => !empty($st['sms']), 'Letterxpress (Briefversand)' => !empty($st['letterxpress']), 'Übersetzung (DeepL)' => !empty($st['uebersetzung']), 'Netzwerkspeicher' => !empty($st['ablage'])];
         foreach ($done as $title => $ok) V::$status[$title] = [$ok, 'eingerichtet', 'nicht eingerichtet'];
         $body = preg_replace_callback('#<section><h2>([^<]*)</h2>(.*?)</section>#s', function (array $m) use ($done): string {
             $title = html_entity_decode($m[1], ENT_QUOTES, 'UTF-8');
@@ -2015,6 +2074,7 @@ final class Web {
                     $what = 'mail'; break;
                 case 'sms': $c->saveSms(['api_key' => $f('api_key'), 'absender' => $f('absender', 20)]); $what = 'sms'; break;
                 case 'letterxpress': $c->saveLetterxpress(['username' => $f('username', 200), 'api_key' => $f('api_key', 200), 'modus' => $f('modus', 10)]); $what = 'letterxpress'; break;
+                case 'uebersetzung': $c->saveUebersetzung(['api_key' => $f('api_key', 200)]); $what = 'uebersetzung'; break;
                 case 'gmail-start': $c->gmailStart($f('client_id', 200), $f('absender', 254)); $what = 'gmail-start'; break;
                 case 'gmail': $c->saveGmail($f('client_secret', 200), $f('adresse', 2000)); $what = 'gmail'; break;
                 case 'testsms': $c->testSms($f('an', 40)); $what = 'testsms'; break;
@@ -2046,7 +2106,7 @@ final class Web {
     private function restartPage(?string $error = null, ?string $notice = null): Response {
         $art = $this->req->get('art', 10) === 'server' ? 'server' : 'dienste';
         $text = $art === 'server'
-            ? 'Der ganze Server startet neu. Alle Arbeitsplätze verlieren kurz die Verbindung (Drucken, Kasse, Terminzettel); nach etwa ein bis zwei Minuten ist die Suite wieder da und du musst dich neu anmelden.'
+            ? 'Der ganze Server startet neu. Alle Arbeitsplätze verlieren kurz die Verbindung (Drucken, Kasse, Terminzettel); nach etwa ein bis zwei Minuten ist Praxisherz wieder da und du musst dich neu anmelden.'
             : 'Webinterface und alle Module werden neu gestartet. Das dauert wenige Sekunden; laufende Anmeldungen bleiben bestehen, eine Seite lädt eventuell einmal neu.';
         $body = V::error($error) . V::notice($notice) . '<section class="card"><h2>' . ($art === 'server' ? 'Server neu starten' : 'Dienste neu starten') . '</h2><p>' . V::h($text)
             . '</p><p class="muted">Läuft gerade ein Update, eine Sicherung oder eine Zahlung an der Kasse, bitte erst warten.</p>'
@@ -2144,7 +2204,7 @@ final class Web {
         return 'https://' . $name;
     }
 
-    /** @return array<string,string> Schema → Pfad auf dem Server */
+    /** @return array<string,string> Schema (praxisherz-…) → Pfad auf dem Server. */
     private function starterKontexte(): array {
         $out = [];
         foreach ($this->modules->starters() as $s) $out[$s['schema']] = '/starter/' . $s['modul'];
@@ -2168,15 +2228,19 @@ final class Web {
         $st = $this->st();
         $list = $this->modules->starters();
         $body = V::error($error) . ($notice ? '<p class="notice">' . V::h($notice) . '</p>' : '')
-            . '<p>Ein Paket pro Arbeitsplatz richtet den <strong>Kienzle-Agent</strong> ein: ein Programm, das Module direkt aus T2med öffnet (aktueller Patient wird mitgegeben) und unter Windows als Dienst mit Systemrechten läuft. '
-            . 'Der Agent fragt die Suite alle paar Sekunden und hält Starter, Aufrufe, Zertifikat und virtuelle Drucker selbst aktuell; „Akte öffnen“ legt er als GDT-Datei in <code>C:\Kienzle\GDT</code> ab '
-            . '(in T2med beim GDT-Gerät „Telefonaufruf“ als Importdatei <code>C:\Kienzle\GDT\AUFRUFi.gdt</code> eintragen). Er führt keine Befehle der Suite aus, nur diese festen Aufgaben. macOS und Linux bekommen vorerst nur den Starter (ohne Dienst).</p>';
+            . '<p>Ein Paket pro Arbeitsplatz richtet den <strong>Praxisherz-Agent</strong> ein: ein Programm, das Module direkt aus T2med öffnet (aktueller Patient wird mitgegeben) und unter Windows als Dienst mit Systemrechten läuft. '
+            . 'Der Agent fragt Praxisherz alle paar Sekunden und hält Starter, Aufrufe, Zertifikat und virtuelle Drucker selbst aktuell; „Akte öffnen“ legt er als GDT-Datei in <code>C:\Praxisherz\GDT</code> ab '
+            . '(in T2med beim GDT-Gerät „Telefonaufruf“ als Importdatei <code>C:\Praxisherz\GDT\AUFRUFi.gdt</code> eintragen). Er führt keine Befehle von Praxisherz aus, nur diese festen Aufgaben. macOS und Linux bekommen vorerst nur den Starter (ohne Dienst).</p>';
         if (!$list) return $body . '<p class="muted">Kein installiertes Modul bietet einen Startkontext an.</p>';
-        $rows = '';
-        foreach ($list as $s) $rows .= '<tr><td>' . V::h($this->modules->name($s['modul'])) . '</td><td>' . V::h($s['label']) . '</td><td><code>' . V::h($s['schema'] . '://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}') . '</code></td></tr>';
-        $body .= '<h3>Startkontexte</h3><p class="muted">Diese Adresse in T2med als Eintrag „Programm/URL“ je Kontext anlegen.</p>'
-            . '<table><thead><tr><th>Modul</th><th>Kontext</th><th>Adresse in T2med</th></tr></thead><tbody>' . $rows . '</tbody></table>';
+        $body .= '<h3>Aufrufe aus T2med</h3><p>Die Adressen für die Einträge in T2med (je Modul) stehen unter '
+            . '<a href="/verwaltung/verbindungen#t2med">Verwaltung → Verbindungen → T2med</a>.</p>';
         $body .= '<h3>Paket laden</h3><p>Das Paket enthält Starterprogramm, Zertifikat, Starter-Schlüssel, die virtuellen Drucker der Module und das Einrichtungsskript. Schlägt die Druckereinrichtung fehl, gilt die Anleitung oben (Abschnitt „Virtuelle Drucker“). Nur für Admins, nach der Einrichtung löschen.</p><p class="row-buttons">';
+        if (is_file($this->clientDist() . '/' . self::SETUP_PROGRAMM)) {
+            $body .= '<a class="button primary" href="/verwaltung/arbeitsplaetze/' . self::SETUP_DATEI . '">Windows: ' . self::SETUP_DATEI . '</a></p>'
+                . '<p class="muted small">Herunterladen und doppelklicken, Windows fragt nach Administratorrechten; danach läuft die Einrichtung im eigenen Fenster. '
+                . 'Weil das Programm nicht kostenpflichtig signiert ist, warnt Windows beim ersten Start („Der Computer wurde durch Windows geschützt“): '
+                . '„Weitere Informationen“ → „Trotzdem ausführen“. Entfernen: Windows-Einstellungen → Apps → „Praxisherz-Agent“ → Deinstallieren.</p><p class="row-buttons">Als ZIP: ';
+        }
         foreach (Starter::SYSTEMS as $key => $spec) {
             $body .= '<a class="button" href="/verwaltung/arbeitsplaetze/' . $key . '.zip">' . V::h($spec['label']) . '</a> ';
             if (!$st->hasPrograms($key)) $missing[] = $spec['label'];
@@ -2192,7 +2256,7 @@ final class Web {
         return $body;
     }
 
-    // --- Kienzle-Agent (ein Programm am PC: Starter für T2med und Dienst mit Systemrechten) ------------------------
+    // --- Praxisherz-Agent (ein Programm am PC: Starter für T2med und Dienst mit Systemrechten) ------------------------
 
     private ?Arbeitsplaetze $ap = null;
     public static string $clientDist = '';             // Ordner der Programme (Tests); leer = <Basis>/client-dist
@@ -2205,7 +2269,7 @@ final class Web {
     private function agentProgramme(): array {
         $out = [];
         foreach (preg_split('/\r?\n/', (string)@file_get_contents($this->clientDist() . '/SHA256SUMS')) ?: [] as $z) {
-            if (preg_match('/^([0-9a-f]{64})\s+\*?(kienzle-starter-[a-z0-9-]+(?:\.exe)?)$/D', trim($z), $m) && is_file($this->clientDist() . '/' . $m[2])) $out[$m[2]] = $m[1];
+            if (preg_match('/^([0-9a-f]{64})\s+\*?(praxisherz-starter-[a-z0-9-]+(?:\.exe)?)$/D', trim($z), $m) && is_file($this->clientDist() . '/' . $m[2])) $out[$m[2]] = $m[1];
         }
         return $out;
     }
@@ -2213,7 +2277,7 @@ final class Web {
     /** Sollzustand für die Agents: Programme, Startkontexte, Drucker, Zertifizierungsstelle, Ablage der GDT-Datei. */
     private function agentSoll(): array {
         return ['server_url' => $this->serverUrl(), 'launcher_key' => $this->st()->key(), 'programme' => $this->agentProgramme(), 'kontexte' => $this->starterKontexte(), 'drucker' => $this->starterDrucker(),
-            'ca' => (string)@file_get_contents(self::$caFile), 'gdt' => ['ordner' => 'C:\\Kienzle\\GDT']];
+            'ca' => (string)@file_get_contents(self::$caFile), 'gdt' => ['ordner' => 'C:\\Praxisherz\\GDT']];
     }
 
     /** Schnittstelle der Agents (ohne Sitzung; Starter-Schlüssel bzw. eigener Zugang je PC; Fehlversuche gebremst). */
@@ -2243,7 +2307,7 @@ final class Web {
             $this->ap()->ergebnis($platz, (string)($json['auftrag'] ?? ''), ($json['ok'] ?? false) === true, (string)($json['text'] ?? ''));
             return Response::json(['ok' => true]);
         }
-        if ($r->method === 'GET' && preg_match('#^/agent/programm/(kienzle-starter-[a-z0-9-]+(?:\.exe)?)$#D', $r->path, $m) && isset($this->agentProgramme()[$m[1]])) {
+        if ($r->method === 'GET' && preg_match('#^/agent/programm/(praxisherz-starter-[a-z0-9-]+(?:\.exe)?)$#D', $r->path, $m) && isset($this->agentProgramme()[$m[1]])) {
             return new Response(200, (string)file_get_contents($this->clientDist() . '/' . $m[1]), [['Content-Type', 'application/octet-stream'], ['Cache-Control', 'no-store']]);
         }
         return Response::json(['error' => 'Unbekannt.'], 404);
@@ -2289,7 +2353,7 @@ final class Web {
         $opt = '<option value="">Automatisch (über die Adresse dieses PCs)</option>';
         foreach ($liste as $p) $opt .= '<option value="' . V::h($p['id']) . '"' . ($p['id'] === $gewaehlt ? ' selected' : '') . '>' . V::h($p['name'] . ($p['online'] ? '' : ' (nicht verbunden)')) . '</option>';
         $tag = $jetzt ? '<span class="tag ok fold-status">' . V::h($jetzt['name']) . '</span>' : '<span class="tag warn fold-status">nicht erkannt</span>';
-        return '<div id="arbeitsplatz">' . $fold('Mein Arbeitsplatz', $tag, '<p class="muted">An welchem PC dieser Browser läuft, z. B. für „Akte öffnen“ in T2med. Meist erkennt die Suite das selbst; '
+        return '<div id="arbeitsplatz">' . $fold('Mein Arbeitsplatz', $tag, '<p class="muted">An welchem PC dieser Browser läuft, z. B. für „Akte öffnen“ in T2med. Meist erkennt Praxisherz das selbst; '
             . 'bei Terminalservern oder mehreren Benutzern an einem PC hier einmal wählen (gilt nur für diesen Browser).</p>'
             . '<form method="post" action="/konto/arbeitsplatz">' . $csrf . '<p><label>Arbeitsplatz <select name="platz">' . $opt . '</select></label></p><button>Speichern</button></form>') . '</div>';
     }
@@ -2337,6 +2401,34 @@ final class Web {
         return Response::redirect('/hilfe/arbeitsplatz#paket');
     }
 
+    /** Kasten „Einträge in T2med“: je Modul mit Startkontext die Adresse. */
+    private function t2medAufrufe(): string {
+        $list = $this->modules->starters();
+        $platzhalter = '://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}';
+        $out = '<div class="box wide" id="t2med"><h3>Einträge in T2med (Drittanbieter-Zugriffe verwalten → Neue URL hinzufügen)</h3>';
+        if (!$list) return $out . '<p class="muted">Kein installiertes Modul wird aus T2med aufgerufen.</p></div>';
+        $rows = '';
+        foreach ($list as $s) $rows .= '<tr><td>' . V::h($this->modules->name($s['modul'])) . '</td><td>' . V::h($s['label']) . '</td><td><code class="secret">' . V::h($s['schema'] . $platzhalter) . '</code></td></tr>';
+        return $out . '<p>Je Eintrag die Adresse genau so eintragen, mit den Platzhaltern, und eine Bezeichnung vergeben (z. B. „Kartenzahlung“).</p>'
+            . '<table><thead><tr><th>Modul</th><th>Kontext</th><th>Adresse in T2med</th></tr></thead><tbody>' . $rows . '</tbody></table>'
+            . '<p class="muted small">Voraussetzung am PC: der Praxisherz-Agent (Einrichten → Arbeitsplätze). Anleitung mit Bildern für die Kasse: Kasse → Einstellungen → Zahlung &amp; T2med.</p></div>';
+    }
+
+    public const SETUP_DATEI = 'Praxisherz-Setup.exe';
+    private const SETUP_PROGRAMM = 'praxisherz-starter-windows-amd64.exe';
+
+    /** Selbstentpackendes Setup für Windows: Starterprogramm mit angehängtem Paket (ZIP); per Doppelklick richtet es den PC ein. */
+    private function starterSetup(string $admin): Response {
+        $exe = $this->clientDist() . '/' . self::SETUP_PROGRAMM;
+        if (!is_file($exe)) return Response::html(V::page('Arbeitsplätze', V::error('Auf dem Server liegen keine Starterprogramme für Windows. Bitte das ZIP-Paket nehmen.'), $this->nav()), 404);
+        $files = $this->st()->files('windows', $this->starterKontexte(), $this->serverUrl(), $this->starterDrucker());
+        $out = (string)file_get_contents($exe);
+        Starter::zip($files, function (string $b) use (&$out) { $out .= $b; });
+        $this->audit->write($admin, 'starter-paket-geladen', 'windows-setup');
+        return (new Response(200, $out, [['Content-Type', 'application/vnd.microsoft.portable-executable']]))
+            ->with('Content-Disposition', 'attachment; filename="' . self::SETUP_DATEI . '"')->with('Cache-Control', 'no-store');
+    }
+
     private function starterPaket(string $system, string $admin): Response {
         $files = $this->st()->files($system, $this->starterKontexte(), $this->serverUrl(), $this->starterDrucker());
         $out = '';
@@ -2363,7 +2455,7 @@ final class Web {
             if ($q['managed']) $actions .= '<form method="post" action="/verwaltung/drucker" class="inline">' . $this->hidden('entfernen', ['name' => $q['name']])
                 . '<button class="danger"' . $dis . '>Entfernen</button></form>';
             $rows .= '<tr><td><strong>' . V::h($q['name']) . '</strong><br><small>' . V::h($q['description']) . '</small></td><td>' . V::h($q['address']) . '</td><td>'
-                . V::h($q['state']) . '</td><td>' . ($q['managed'] ? 'Suite' : 'fremd') . '</td><td>' . $actions . '</td></tr>';
+                . V::h($q['state']) . '</td><td>' . ($q['managed'] ? 'Praxisherz' : 'fremd') . '</td><td>' . $actions . '</td></tr>';
         }
         $head = '<table><tr><th>Name</th><th>Adresse</th><th>Zustand</th><th>Von</th><th></th></tr>';
         $body .= '<h2>Drucker</h2><p class="muted">Echte Drucker und Bondrucker, die in der Praxis stehen.</p>' . ($rows !== '' ? $head . $rows . '</table>' : '<p>Noch keine.</p>')
@@ -2628,9 +2720,9 @@ final class Web {
                 . '<form method="post" action="/verwaltung/sicherung" class="box wide">' . $this->hidden('einrichten')
                 . '<label class="check"><input type="radio" name="art" value="ziel" checked> Netzwerkspeicher aus „Verbindungen“ (SFTP empfohlen)</label>'
                 . ($opts !== '' ? '<label>Ziel<select name="id">' . $opts . '</select></label>' : '<p class="error">Noch kein Ziel unter <a href="/verwaltung/verbindungen">Verbindungen</a> eingetragen.</p>')
-                . V::input('ordner', 'Unterordner auf dem Ziel', 'text', 'kienzle-sicherung')
+                . V::input('ordner', 'Unterordner auf dem Ziel', 'text', 'praxisherz-sicherung')
                 . '<label class="check"><input type="radio" name="art" value="rest"> restic-REST-Server (z. B. im Nur-Anfügen-Modus auf dem NAS)</label>'
-                . V::input('url', 'Adresse', 'url', '', 'placeholder="https://nas.example.org:8000/kienzle"') . V::input('benutzer', 'Benutzer (REST)', 'text')
+                . V::input('url', 'Adresse', 'url', '', 'placeholder="https://nas.example.org:8000/praxisherz"') . V::input('benutzer', 'Benutzer (REST)', 'text')
                 . V::input('passwort', 'Passwort (REST)', 'password', '', 'autocomplete="new-password"')
                 . '<label class="check"><input type="radio" name="art" value="lokal"> Ordner auf diesem Server (z. B. eingehängte USB-Platte)</label>'
                 . V::input('pfad', 'Ordner', 'text', '', 'placeholder="/media/sicherung"')
@@ -2804,7 +2896,7 @@ final class Web {
             'pfad' => $this->req?->path ?? '', 'einrichtung' => $admin ? $this->openSteps() : 0, 'offenLogo' => $admin && $this->openSteps() > 0, 'offen' => $admin ? $this->openPaths() : []];
     }
 
-    private function issuer(): string { return $this->config->practice !== '' ? 'Kienzle-Suite ' . $this->config->practice : 'Kienzle-Suite'; }
+    private function issuer(): string { return $this->config->practice !== '' ? 'Praxisherz ' . $this->config->practice : 'Praxisherz'; }
 
     /** Nur eigene, einfache Pfade als Weiterleitungsziel (keine fremden Adressen, kein „//“). */
     private function next(string $target): string {

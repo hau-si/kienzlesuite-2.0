@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nachgebautes restic für die Tests (nur die Befehle, die die Suite nutzt). Speichert Schnappschüsse als Ordner."""
+"""Nachgebautes restic für die Tests (nur die Befehle, die Praxisherz nutzt). Speichert Schnappschüsse als Ordner."""
 import json
 import os
 import secrets

@@ -1,18 +1,19 @@
 # Kasse: Kartenzahlung am SumUp Solo aus T2med, T2med-Rechnungseingang, GOÄ-Leistungen, Barzahlung, Belege,
 # Rechnung per Post (Letterxpress), Ablage für die Steuerberatung. Auf Grundlage von kienzle-sumup (Branch
-# rechnungseingang, 1.4.1-rechnung.57) von Dr. Thomas Kienzle, für die Kienzle-Suite 2.0 umgebaut.
+# rechnungseingang, 1.4.1-rechnung.57) von Dr. Thomas Kienzle, für Praxisherz 2.0 umgebaut.
 
 [module]
 id = "kasse"
 name = "Kasse"
-version = "2.3.4-beta.49"
-core_api = "1"
+version = "2.3.4-beta.66"
+core_api = "2"
 description = "Kartenzahlung am SumUp Solo aus T2med, T2med-Rechnungseingang über den Drucker „vKasse“, GOÄ-Leistungen, Barzahlung, Belege per E-Mail, Druck und Post."
 
 [system]
 packages = ["php-fpm", "php-cli", "php-curl", "php-sqlite3", "php-mbstring", "php-gd", "librsvg2-bin", "qpdf", "fonts-dejavu-core", "poppler-utils", "tesseract-ocr", "tesseract-ocr-deu", "ghostscript", "cups-client"]
 user = "ks-kasse"
 data = "/var/lib/kienzle/kasse"
+services = ["kienzle-kasse-signatur.service", "kienzle-kasse-signatur.path"]
 
 [web]
 path = "/kasse"
@@ -23,7 +24,7 @@ einstellungen = "/settings.php"
 
 # Startkontext für den zentralen Arbeitsplatz-Starter der Basis (Verwaltung → Arbeitsplätze): POST https://<server>/starter/kasse
 [[starters]]
-schema = "kienzle-kasse"
+schema = "praxisherz-kasse"
 label = "Kasse"
 
 [[rights]]
@@ -78,6 +79,10 @@ command = "printer/kienzle-letterxpress"
 formats = ["application/pdf", "application/postscript"]
 paper = "A4"
 share = ["ipp"]
+
+[[exchange]]
+module = "signatur"
+purpose = "Unterschriebene PDFs aus Signatur in die T2med-Akte schreiben (mit dem T2med-Zugang der Kasse)"
 
 [[connections]]
 id = "t2med"

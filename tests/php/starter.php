@@ -10,7 +10,7 @@ function st_env(): array {
     $env = new Env();
     $mods = [];
     foreach ($env->modules->all() as $id => $m) {
-        if ($id === 'kasse') $m['starters'] = [['schema' => 'kienzle-kasse', 'label' => 'Kasse'], ['schema' => 'kienzle-igel', 'label' => 'IGeL <b>']];
+        if ($id === 'kasse') $m['starters'] = [['schema' => 'praxisherz-kasse', 'label' => 'Kasse'], ['schema' => 'praxisherz-igel', 'label' => 'IGeL <b>']];
         $mods[] = $m;
     }
     $env->modules = Modules::fromArray($mods);
@@ -54,18 +54,18 @@ function test_seite_und_paket(): void {
     [$b] = admin_browser($env); st_web($env, $st, $b);
     check($b->get('/verwaltung/arbeitsplaetze')->status === 303, 'alte Starter-Seite leitet zu den Arbeitsplätzen');
     $page = $b->get('/hilfe/arbeitsplatz');
-    check($page->status === 200 && str_contains($page->body, 'id="paket"') && str_contains($page->body, 'kienzle-kasse://?kontextId=') && str_contains($page->body, 'kienzle-igel://'), 'Startkontexte fehlen');
-    check(!str_contains($page->body, 'IGeL <b>') && str_contains($page->body, 'IGeL &lt;b&gt;'), 'nicht maskiert');
+    check($page->status === 200 && str_contains($page->body, 'id="paket"') && str_contains($page->body, 'href="/verwaltung/verbindungen#t2med"') && !str_contains($page->body, 'kontextId='), 'Arbeitsplätze: nur Verweis auf Verbindungen → T2med');
     check(str_contains($page->body, '/verwaltung/arbeitsplaetze/windows.zip'), 'Paket-Link fehlt');
     $zip = $b->get('/verwaltung/arbeitsplaetze/linux.zip');
     check($zip->status === 200 && $zip->header('Content-Type') === 'application/zip' && str_starts_with($zip->body, "PK\x03\x04"), 'ZIP');
-    check(str_contains($zip->body, 'install-linux.sh') && str_contains($zip->body, 'schemas.txt') && str_contains($zip->body, 'kienzle-igel') && str_contains($zip->body, '"/starter/kasse"'), 'Paketinhalt');
+    check(str_contains($zip->body, 'install-linux.sh') && str_contains($zip->body, 'schemas.txt') && str_contains($zip->body, 'praxisherz-igel') && str_contains($zip->body, '"/starter/kasse"'), 'Paketinhalt');
+    check(str_contains($zip->body, '"praxisherz-kasse": "/starter/kasse"') && !str_contains($zip->body, '"kienzle-kasse"'), 'Paket richtet nur die Adresse praxisherz-… ein');
     check(str_contains($zip->body, $st->key()) && str_contains($zip->body, '"server_url": "https://kienzle.example.org"'), 'client.json');
     check(str_contains($zip->body, 'ca.crt'), 'Paket enthält die Zertifizierungsstelle');
     check($b->get('/verwaltung/arbeitsplaetze/amiga.zip')->status === 404, 'unbekanntes System');
-    $mitDrucker = $st->files('windows', ['kienzle-kasse' => '/starter/kasse'], 'https://kienzle.example.org', [['name' => 'vKasse', 'url' => 'http://kienzle.example.org:631/printers/vKasse', 'papier' => 'A4']]);
+    $mitDrucker = $st->files('windows', ['praxisherz-kasse' => '/starter/kasse'], 'https://kienzle.example.org', [['name' => 'vKasse', 'url' => 'http://kienzle.example.org:631/printers/vKasse', 'papier' => 'A4']]);
     check(($mitDrucker['drucker.txt']['data'] ?? '') === "vKasse|http://kienzle.example.org:631/printers/vKasse|A4\n" && isset($mitDrucker['install-drucker.ps1']), 'Paket ohne Druckerliste');
-    check(!isset($st->files('windows', ['kienzle-kasse' => '/starter/kasse'], 'https://kienzle.example.org')['drucker.txt']), 'drucker.txt ohne Drucker');
+    check(!isset($st->files('windows', ['praxisherz-kasse' => '/starter/kasse'], 'https://kienzle.example.org')['drucker.txt']), 'drucker.txt ohne Drucker');
     $alt = $st->key();
     $vorher = $st->key();
     check($b->post('/verwaltung/arbeitsplaetze', ['aktion' => 'erneuern'])->status >= 400 && $st->key() === $vorher, 'Erneuern ohne Bestätigung darf nichts ändern');

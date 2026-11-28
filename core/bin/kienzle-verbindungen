@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -IB
-"""Zentrale Verbindungen der Kienzle-Suite (nur root, gestartet von systemd).
+"""Zentrale Verbindungen Praxisherz (nur root, gestartet von systemd).
 
   kienzle-verbindungen anwenden    Anfrage des Webinterfaces verarbeiten (kienzle-verbindungen.path)
   kienzle-verbindungen verteilen   Zugangsdaten neu an die Module verteilen (nach Installation oder Entfernen eines Moduls)

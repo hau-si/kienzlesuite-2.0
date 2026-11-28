@@ -162,7 +162,25 @@ class Anlage(unittest.TestCase):
         e = ''.join(self.a.render_extensions(self.a.check(b)))
         self.assertNotIn('[fax-out]', e)
         self.assertNotIn('[fax-in]', e)
-        self.assertIn('[kfx-leitung-l1-in]\nexten => _+X.,1,Goto(kfx-leitung-l1-in,${EXTEN:1},1)\nexten => _X.,1,NoOp(Leitung ohne Ziel)', e)
+        block = e.split('[kfx-leitung-l1-in]')[1].split('\n\n')[0]
+        self.assertIn('exten => _X.,1,NoOp(Leitung ohne Ziel)', block)
+        self.assertIn('exten => 4930123456,1,Goto(kfx-phone-in,s,1)', block)   # Nummer einer anderen Leitung bleibt erreichbar
+
+    def test_leitungen_beim_selben_anbieter_nach_nummer(self):
+        # Zwei voip2gsm-Leitungen (gleicher Server): Asterisk ordnet den Anruf ggf. der Faxleitung zu.
+        # Die gewählte Telefonnummer muss trotzdem zum Telefon führen und umgekehrt.
+        b = beispiel()
+        for x in b['leitungen'][:2]:
+            x['anbieter'] = 'voip2gsm'
+        b['ueberlauf'] = {}
+        e = ''.join(self.a.render_extensions(self.a.check(b)))
+        fax = e.split('[kfx-leitung-l1-in]')[1].split('\n\n')[0]
+        tel = e.split('[kfx-leitung-l2-in]')[1].split('\n\n')[0]
+        self.assertIn('exten => 4930123456,1,Goto(kfx-phone-in,s,1)', fax)
+        self.assertIn('exten => _X.,1,Goto(fax-in,s,1)', fax)                   # andere Nummern weiter zum Fax
+        self.assertIn('exten => 4930123459,1,Goto(fax-in,s,1)', tel)
+        self.assertIn('exten => _X.,1,Goto(kfx-phone-in,s,1)', tel)
+        self.assertEqual(fax.count('exten => 4930123459,'), 1)
 
     def test_gemeinsame_leitung_verteilt_nach_nummer(self):
         b = beispiel()
@@ -317,6 +335,9 @@ class KienzlefonBruecke(unittest.TestCase):
         t = self.a.toml_set(t, 'b', 'y', 'neu "q"')
         t = self.a.toml_set(t, 'c', 'w', True)
         self.assertEqual(t, '[a]\n# Kommentar\nx = 5\n\n[b]\ny = "neu \\"q\\""\n\n[c]\nw = true\n')
+        t = self.a.toml_set('[w]\nf = {}\n', 'w', 'f', {'kfx-leitung-l1': 'national'})
+        self.assertEqual(t, '[w]\nf = { "kfx-leitung-l1" = "national" }\n')
+        self.assertEqual(self.a.toml_set(t, 'w', 'f', {}), '[w]\nf = {}\n')
 
     def test_google_konfiguration(self):
         b = self.cfg(tts='google')
@@ -350,6 +371,7 @@ class KienzlefonBruecke(unittest.TestCase):
         self.assertIn(f'ansagen = "{self.tmp}/kienzlefon/ansagen"', toml)
         self.assertIn('engine = "piper"', toml)
         self.assertIn('hauptausgang_endpoint = "kfx-leitung-l2"', toml)
+        self.assertIn('sip_zielformate = {}', toml)                       # Fonial: Zielnummer unverändert
         self.assertNotIn('CHANGE_ME_RED_PHONE_SECRET', toml)
         self.assertEqual(oct((self.tmp / 'kienzlefon' / 'kienzlefon.toml').stat().st_mode & 0o777), '0o600')
         # Zweiter Lauf: nichts ändert sich (das Passwort des roten Telefons bleibt).
@@ -361,6 +383,23 @@ class KienzlefonBruecke(unittest.TestCase):
         self.a.anwenden(self.cfg(aktiv=False))
         self.assertIn('same => n(accepted),Goto(kfx-phone-queue,s,1)', (etc / 'extensions-kfx-telefonie.conf').read_text())
 
+
+    def test_voip2gsm_waehlt_national(self):
+        # voip2gsm nimmt nur 0… bzw. 00… an; Kienzlefon muss „01604…“ statt „491604…“ an die Leitung geben.
+        b = self.cfg()
+        b['leitungen'][1]['anbieter'] = 'voip2gsm'
+        self.a.anwenden(b)
+        toml = (self.tmp / 'kienzlefon' / 'kienzlefon.toml').read_text()
+        self.assertIn('sip_zielformate = { "kfx-leitung-l2" = "national" }', toml)
+        sys.path.insert(0, str(HERE.parent / 'kienzlefon'))
+        try:
+            from kienzlefon.config import load_config
+            from kienzlefon.dialing import decide_number, format_sip_target
+        finally:
+            sys.path.remove(str(HERE.parent / 'kienzlefon'))
+        regeln = load_config(self.tmp / 'kienzlefon' / 'kienzlefon.toml').dial_rules
+        ziel = format_sip_target(regeln, decide_number(regeln, '01601234567'), 'kfx-leitung-l2')
+        self.assertEqual(ziel, '01601234567')
 
     @unittest.skipUnless(shutil.which('ffmpeg') and shutil.which('ffprobe'), 'ffmpeg fehlt')
     def test_wartemusik(self):

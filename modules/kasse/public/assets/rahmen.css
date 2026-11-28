@@ -1,8 +1,6 @@
-/* Kasse-Einstellungen im Rahmen der Suite: Seitenleiste, Hintergrund und Kopf kommen von core.css; hier nur Angleichungen an die Seitenstile der Kasse. */
+/* Kasse-Einstellungen im Rahmen von Praxisherz: Seitenleiste, Hintergrund und Kopf kommen von core.css; hier nur Angleichungen an die Seitenstile der Kasse. */
 main.modul { max-width: 1240px; margin: 0; padding: 32px 40px 48px; }
 main.modul .settings-main, main.modul .settings-card { max-width: none; }
-/* Einstellungsseiten haben dieselbe Breite wie die Seiten der Basis; Startseite und Vorgänge bleiben breit. */
-main.modul:has(#settings) { max-width: 940px; }
 .seitenkopf { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
 .seitenkopf h1 { margin: 6px 0 0; }
 main.modul footer { text-align: left; padding: 8px 0 0; color: #7e918a; font-size: 12px; }
@@ -68,7 +66,7 @@ main.modul { max-width: 1400px; }
 .vorgaenge td.num, .vorgaenge th.num { text-align: right; white-space: nowrap; }
 .vorgaenge tr.vg-storno td { color: #7a2e2e; }
 
-/* Die Seitenleiste der Suite darf nicht von den Kassenstilen verändert werden (sonst ist sie höher als in anderen Modulen: Scrollbalken und Sprung beim Seitenwechsel). */
+/* Die Seitenleiste Praxisherz darf nicht von den Kassenstilen verändert werden (sonst ist sie höher als in anderen Modulen: Scrollbalken und Sprung beim Seitenwechsel). */
 aside.side .brand { justify-content: flex-start; gap: 12px; }
 aside.side .brand strong { font-size: 17px; letter-spacing: -.4px; }
 aside.side .brand span:not(.mark) { margin-top: 0; }
@@ -77,5 +75,28 @@ aside.side .brand .mark span { margin-top: 0; }
 /* Tooltips in Themenblöcken nicht am Blockrand abschneiden. */
 .setup-group { overflow: visible; }
 
-/* Kassenansicht (Aufruf aus T2med) im Rahmen der Suite: schmale Spalte wie bisher */
+/* Kassenansicht (Aufruf aus T2med) im Rahmen von Praxisherz: schmale Spalte wie bisher */
 main.modul:has(#welcome) { max-width: 780px; }
+
+/* Alle Seiten der Kasse gleich breit wie die Startseite (IGeL, Einstellungen, Vorgänge; Wunsch der Praxis). */
+.layout > main, main.modul { max-width: 1400px; }
+/* Patientenkarte (Entwurf B3): Bauteil der Basis (core.css, docs/MODUL-GESTALTUNG.md); hier nur die Höhe der Kassenansicht darunter. */
+.start-right.mit-patient .work-frame { height: calc(100vh - 280px); }
+@media (max-width: 980px) { .start-right.mit-patient .work-frame { height: 85vh; } }
+
+/* Patientenkarte der Kasse: Name hat Vorrang (schrumpft nicht, die Knöpfe rücken notfalls in eine zweite Zeile), „T2m-Rechnung“ | „IGeL“,
+   Mülltonne zum Entfernen, Klick auf Name oder Etikett öffnet die Akte in T2med (GDT über den Praxisherz-Agent). */
+.patient-karte { flex-wrap: wrap; }
+.pk-text { flex: 1 0 auto; max-width: 100%; }
+button.pk-marke { border: 0; border-radius: 0; font: inherit; font-weight: 750; font-size: 13px; min-height: 0; cursor: default; }
+button.pk-name { display: block; width: auto; align-self: flex-start; border: 0; background: none; padding: 0; min-height: 0; text-align: left; font: inherit; color: inherit; cursor: default; max-width: 100%; }
+.patient-karte.mit-akte .pk-akte { cursor: pointer; }
+.patient-karte.mit-akte button.pk-name:hover strong { text-decoration: underline; }
+.patient-karte.mit-akte button.pk-marke:hover { filter: brightness(.96); }
+button.pk-marke:disabled, button.pk-name:disabled { opacity: 1; }
+.pk-tabs { display: flex; align-items: center; gap: 6px; padding: 8px 4px 8px 14px; }
+.pk-tabs[hidden] { display: none; }
+.pk-tab { display: inline-flex; align-items: center; gap: 6px; min-height: 0; padding: 7px 12px; border-radius: 10px; border: 1px solid #cad8d2; background: #fbfcfb; color: #315f53; font-size: 14px; font-weight: 650; }
+.pk-tab[aria-pressed="true"] { border: 2px solid var(--teal, #12695d); background: #e5f3ed; color: #16503f; padding: 6px 11px; }
+.pk-tab[data-tab="rechnung"] svg { color: #c0392b; }
+.pk-symbol { padding: 8px 10px; }

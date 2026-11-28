@@ -1,4 +1,4 @@
-/* Kienzle-Suite, Basis. Gestaltung wie kienzle-sumup (Beta, Zweig rechnungseingang): ruhiges Petrol, Karten, klare Knöpfe. */
+/* Praxisherz, Basis: ruhiges Petrol, Karten, klare Knöpfe. */
 :root { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #203c43; background: #f1f5f4; font-synthesis: none;
   --teal: #12695d; --line: #dce5e2; --soft: #eef4f1; --muted: #71837e; --error: #993d2b; --ok: #16503f; }
 * { box-sizing: border-box; }
@@ -10,6 +10,7 @@ a { color: var(--teal); }
 aside.side { flex: 1 1 240px; max-width: 260px; position: sticky; top: 0; height: 100vh; overflow-y: auto; box-sizing: border-box; background: #fff; border-right: 1px solid var(--line); padding: 24px 16px; display: flex; flex-direction: column; gap: 22px; }
 .brand { display: flex; align-items: center; gap: 12px; padding: 0 8px; text-decoration: none; color: inherit; }
 .mark { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 13px; background: var(--teal); color: #fff; font-size: 21px; font-weight: 700; flex: none; }
+.mark-herz { width: 26px; height: 26px; display: block; }
 .brand strong { display: block; font-size: 17px; letter-spacing: -.4px; }
 .brand span.sub { display: block; font-size: 12px; color: var(--muted); }
 nav.menu { display: flex; flex-direction: column; gap: 18px; }
@@ -113,7 +114,7 @@ ul.modules { list-style: none; padding: 0; display: grid; grid-template-columns:
 ul.modules li { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
 ul.modules li a { font-weight: 650; }
 
-/* Einrichtungs-Überblick (wie kienzle-sumup) */
+/* Einrichtungs-Überblick */
 .check-group { margin: 18px 0 2px; font-size: 15px; }
 .check-group:first-child { margin-top: 0; }
 .check-group small { font-weight: 400; color: #8a9b96; }
@@ -457,3 +458,21 @@ main.modul { max-width: 940px; }
 .warnliste { list-style: none; margin: 0 0 14px; padding: 0; }
 .warnliste li { padding: 9px 12px; border-radius: 10px; margin-bottom: 6px; background: #fff0ca; color: #6b4d00; }
 .warnliste li.rot { background: #fff3ed; color: #8a2d06; border: 1px solid #f3d8cc; }
+
+/* Patientenkarte für Module (Entwurf B3, Gestaltungsregel docs/MODUL-GESTALTUNG.md): Etikett links (Herz + „T2med“ bei Patienten aus
+   T2med, sonst neutral), Name groß, Knöpfe rechts („Zum Patienten“, „Entfernen“). Markup siehe Gestaltungsregel. */
+.patient-karte { display: flex; align-items: stretch; background: #fff; border: 1px solid #d9e3df; border-radius: 14px; overflow: hidden; margin-bottom: 10px; }
+.pk-marke { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 84px; background: #fdecea; color: #c0392b; padding: 10px 16px; font-weight: 750; font-size: 13px; }
+.pk-marke span { color: #9b2c20; }
+.pk-marke.neutral { background: #e8f1ee; color: #12695d; }
+.pk-marke.neutral span { color: #315f53; }
+.pk-marke .pk-herz, .pk-marke.neutral .pk-person { display: block; }
+.pk-marke .pk-person, .pk-marke.neutral .pk-herz { display: none; }
+.pk-text { display: flex; flex-direction: column; justify-content: center; padding: 10px 16px; flex: 1; min-width: 0; }
+.pk-text strong { font-size: 24px; letter-spacing: -.4px; color: #1d3b36; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pk-text span { font-size: 13px; color: #6c817b; }
+.pk-knoepfe { display: flex; align-items: center; gap: 8px; padding: 10px 14px; flex-wrap: wrap; justify-content: flex-end; }
+.pk-knopf, a.button.pk-knopf { display: inline-flex; align-items: center; gap: 6px; min-height: 0; padding: 8px 13px; border-radius: 9px; font-size: 14px; }
+.pk-weg { background: #fff; border: 1px solid #e6cfc6; color: #99412b; }
+.patient-karte [hidden] { display: none !important; }
+@media (max-width: 640px) { .patient-karte { flex-wrap: wrap; } .pk-knoepfe { width: 100%; justify-content: flex-start; } }

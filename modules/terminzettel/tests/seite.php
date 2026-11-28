@@ -148,7 +148,7 @@ check(str_contains($html, '<details class="fold">') && !str_contains($html, '<de
 check(Seite::pruefen(array_map(static fn($f) => $f[0] === 'choice' ? array_key_first($f[3]) : '', Seite::schema()))['enabled'] === true, 'Bondruck immer aktiv');
 $k = new KienzleModul('terminzettel', ['KIENZLE_MENUE' => rawurlencode('{"apps":{"/terminzettel/":"Terminzettel"},"ids":{"/terminzettel/":"terminzettel"},"admin":true,"login":"anna"}'), 'REQUEST_URI' => '/terminzettel/']);
 $seite = $k->rahmen('Terminzettel', $html, ['roh' => true, 'kopf' => $kopf]);
-check(str_contains($seite, '<aside class="side">') && str_contains($seite, 'href="/terminzettel/"') && str_contains($seite, 'assets/app.js?v=') && str_contains($seite, 'Bon-1'), 'Seite im Rahmen der Suite mit Seitenleiste');
+check(str_contains($seite, '<aside class="side">') && str_contains($seite, 'href="/terminzettel/"') && str_contains($seite, 'assets/app.js?v=') && str_contains($seite, 'Bon-1'), 'Seite im Rahmen von Praxisherz mit Seitenleiste');
 check(preg_match('#assets/style\.css\?v=[0-9a-f]{8}"#', $kopf) === 1 && preg_match('#assets/app\.js\?v=[0-9a-f]{8}"#', $kopf) === 1, 'Skript und Stil ohne Versionsanhang: Zwischenspeicher zeigt nach einem Update alte Dateien');
 // Neuer Standardtext der Absage-Mail; alte Standardtexte werden ersetzt.
 $alt = ['cancel_body' => "Guten Tag,\n\nich kann meinen Termin leider nicht wahrnehmen und sage ihn hiermit ab:\n{{termine}}\n\nMit freundlichen Grüßen\n{{patient}}", 'cancel_subject' => 'Terminabsage'];

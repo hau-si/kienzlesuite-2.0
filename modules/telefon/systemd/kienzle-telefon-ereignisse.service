@@ -1,7 +1,7 @@
-# Kienzle-Suite, Modul telefon: Anrufstatistik (lib/telefon-ereignisse). Hört auf Ereignisse der eigenen Anlage (AMI, nur 127.0.0.1)
+# Praxisherz, Modul telefon: Anrufstatistik (lib/telefon-ereignisse). Hört auf Ereignisse der eigenen Anlage (AMI, nur 127.0.0.1)
 # und speichert nur Zeiten, Anliegen und Wartezeiten (keine Nummern). Verbindet nach einem Neustart der Anlage von selbst neu.
 [Unit]
-Description=Kienzle-Suite Modul telefon (Anrufstatistik)
+Description=Praxisherz Modul telefon (Anrufstatistik)
 After=kienzle-telefon-asterisk.service
 ConditionPathExists=/var/lib/kienzle/telefon/ami-ereignisse.json
 

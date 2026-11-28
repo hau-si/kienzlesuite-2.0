@@ -3,7 +3,7 @@ declare(strict_types=1);
 namespace Kienzle\Core;
 
 /**
- * Arbeitsplätze mit Kienzle-Agent (ein Programm am PC: Starter für T2med und Dienst mit Systemrechten).
+ * Arbeitsplätze mit Praxisherz-Agent (ein Programm am PC: Starter für T2med und Dienst mit Systemrechten).
  *
  * Der Agent meldet sich bei der Einrichtung mit dem Starter-Schlüssel an und bekommt eine eigene Kennung mit Zugang (nur der
  * SHA-256 liegt hier). Danach fragt er etwa alle zwei Sekunden nach Aufträgen (/agent/abholen) und bekommt dabei den Sollzustand

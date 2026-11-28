@@ -12,8 +12,8 @@ function pr_env(array $status = []): array {
     Printers::$state = $env->dir . '/drucker'; mkdir(Printers::$state);
     Printers::$unit = $env->dir . '/kienzle-drucker.path'; touch(Printers::$unit);
     file_put_contents(Printers::$state . '/status.json', json_encode($status + ['warteschlangen' => [
-        ['name' => 'Bon', 'address' => '192.0.2.80', 'state' => 'bereit', 'description' => 'Kienzle-Suite Bondrucker', 'managed' => true, 'modul' => '', 'share' => ['samba']],
-        ['name' => 'Beispiel-Drucker', 'address' => 'auf diesem Server', 'state' => 'bereit', 'description' => 'Kienzle-Suite Modul beispiel: x', 'managed' => true, 'modul' => 'beispiel', 'share' => []],
+        ['name' => 'Bon', 'address' => '192.0.2.80', 'state' => 'bereit', 'description' => 'Praxisherz Bondrucker', 'managed' => true, 'modul' => '', 'share' => ['samba']],
+        ['name' => 'Beispiel-Drucker', 'address' => 'auf diesem Server', 'state' => 'bereit', 'description' => 'Praxisherz Modul beispiel: x', 'managed' => true, 'modul' => 'beispiel', 'share' => []],
         ['name' => 'Fremd', 'address' => '192.0.2.7', 'state' => 'bereit', 'description' => 'Von <b>Hand', 'managed' => false, 'modul' => '', 'share' => []],
         ['name' => '../boese', 'address' => '', 'state' => '', 'description' => '', 'managed' => true]],
         'auftraege' => [['id' => 'Bon-12', 'drucker' => 'Bon', 'benutzer' => 'ks-kasse', 'groesse' => 2048, 'zeit' => 'Sun 22 Nov'], ['id' => 'x; rm', 'drucker' => 'Bon']],
@@ -58,7 +58,7 @@ function test_seite(): void {
     check($b->post('/verwaltung/drucker', ['aktion' => 'rollen', 'buero' => 'Fremd', 'bon' => 'Bon', 'bonbreite' => '80'])->status === 303 && $env->db->setting('drucker.bonbreite') === '80', 'Papierbreite nicht gespeichert');
     check(str_contains($b->get('/verwaltung/drucker')->body, 'Papierbreite des Bondruckers') && str_contains($b->get('/verwaltung/drucker')->body, '<option value="80" selected>'), 'Papierbreite nicht angezeigt');
     check(!str_contains($page->body, '<script>') && !str_contains($page->body, 'Von <b>') && !str_contains($page->body, 'A4 <i>'), 'nicht maskiert');
-    check(substr_count($page->body, '>Entfernen<') === 1, 'Entfernen nur für eigene Drucker der Suite');
+    check(substr_count($page->body, '>Entfernen<') === 1, 'Entfernen nur für eigene Drucker von Praxisherz');
     $r = $b->post('/verwaltung/drucker', ['aktion' => 'freigabe', 'name' => 'Bon', 'samba' => '1', 'ipp' => '1']);
     check($r->status === 303 && req_p($env) === ['action' => 'freigabe', 'name' => 'Bon', 'freigabe' => ['samba', 'ipp']], 'Freigabe');
     check(str_contains(implode("\n", $env->audit->recent()), 'drucker-freigabe Bon'), 'nicht protokolliert');
@@ -82,7 +82,7 @@ function test_seite(): void {
 
 function test_modul_drucken(): void {
     $dir = tmpdir();
-    file_put_contents("$dir/status.json", json_encode(['warteschlangen' => [['name' => 'A4', 'description' => 'Kienzle-Suite Praxisdrucker', 'state' => 'bereit'], ['name' => 'x y']]]));
+    file_put_contents("$dir/status.json", json_encode(['warteschlangen' => [['name' => 'A4', 'description' => 'Praxisherz Praxisdrucker', 'state' => 'bereit'], ['name' => 'x y']]]));
     $calls = [];
     $k = new KienzleModul('kasse', ['X' => '1'], drucker: "$dir/status.json", lp: function (array $args, string $data) use (&$calls) {
         $calls[] = [$args, strlen($data)];

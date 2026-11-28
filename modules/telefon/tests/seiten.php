@@ -19,8 +19,10 @@ function aufruf(string $dir, string $uri, string $rechte, string $rolle = 'benut
         . ' require ' . var_export(dirname(__DIR__, 3) . '/core/php/modul/Kienzle.php', true) . '; require ' . var_export(dirname(__DIR__) . '/src/bootstrap.php', true) . ';'
         . ' $GLOBALS["tf_test_modul"] = new KienzleModul("telefon", $_SERVER, ' . var_export("$dir/verbindungen", true) . ', ' . var_export("$dir/schluessel", true) . ');'
         . ' register_shutdown_function(function () { echo "\n#CODE=" . (http_response_code() ?: 200); }); require ' . var_export(dirname(__DIR__) . '/public/index.php', true) . ';';
-    $env = ['KIENZLE_DATEN' => "$dir/daten", 'KIENZLE_ASTERISK' => '/bin/false', 'KIENZLE_PROGRAMM' => dirname(__DIR__), 'PATH' => '/usr/bin:/bin'];
-    $p = proc_open([PHP_BINARY, '-d', 'display_errors=stderr', '-r', $code], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $env);
+    $env = ['KIENZLE_AUSTAUSCH' => "$dir/austausch-fehlt", 'KIENZLE_DATEN' => "$dir/daten", 'KIENZLE_ASTERISK' => '/bin/false', 'KIENZLE_PROGRAMM' => dirname(__DIR__), 'PATH' => '/usr/bin:/bin'];
+    // Wie auf dem Server: open_basedir nur Programm- und Testordner (fand den Fehler mit „sqlite:file:…?mode=ro“, Telefon beta.25).
+    $ob = dirname(__DIR__, 3) . PATH_SEPARATOR . $dir . PATH_SEPARATOR . sys_get_temp_dir();
+    $p = proc_open([PHP_BINARY, '-d', 'display_errors=stderr', '-d', 'open_basedir=' . $ob, '-r', $code], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $env);
     $out = (string)stream_get_contents($pipes[1]);
     $err = (string)stream_get_contents($pipes[2]);
     proc_close($p);
@@ -227,8 +229,25 @@ $o = aufruf($dir, '/telefon/anrufe', 'anrufe,patienten,statistik');
 check(str_contains($o, 'id="tf-suche"') && str_contains($o, '/telefon/statistik') && str_contains($o, 'tf-leiste'), 'Suchfeld oben, Reiter Statistik, Leiste');
 check(!str_contains(aufruf($dir, '/telefon/anrufe', 'anrufe'), 'id="tf-suche"'), 'kein Suchfeld ohne Recht');
 check(str_contains(aufruf($dir, '/telefon/statistik', 'statistik'), 'Noch keine Anrufe') && str_contains(aufruf($dir, '/telefon/statistik', 'anrufe'), '#CODE=403'), 'Statistik-Seite und Recht');
-check(str_contains(aufruf($dir, '/telefon/einstellungen', '', 'admin'), 'T2med-Telefonverzeichnis') && str_contains(aufruf($dir, '/telefon/einstellungen', '', 'admin'), 'kienzle-telefonverzeichnis://'), 'Einstellungen Telefonverzeichnis');
+check(str_contains(aufruf($dir, '/telefon/einstellungen', '', 'admin'), 'T2med-Telefonverzeichnis') && str_contains(aufruf($dir, '/telefon/einstellungen', '', 'admin'), 'praxisherz-telefonverzeichnis://'), 'Einstellungen Telefonverzeichnis');
 $o = aufruf($dir, '/telefon/einstellungen', '', 'admin', ['aktion' => 'verzeichnis-speichern', 'kienzle-csrf' => str_repeat('a', 32), 'ortsvorwahl' => '030', 'anrufername' => '1']);
 check(str_contains($o, 'Gespeichert') && str_contains((string)file_get_contents("$dir/daten/t2med/einstellungen.json"), '"030"'), 'Ortsvorwahl speichern');
 check(str_contains(aufruf($dir, '/telefon/einstellungen', 'patienten', 'benutzer', ['aktion' => 'verzeichnis-loeschen', 'kienzle-csrf' => str_repeat('a', 32)]), '#CODE=403') && str_contains(aufruf($dir, '/telefon/einstellungen', 'nebenstellen', 'benutzer', ['aktion' => 'verzeichnis-loeschen', 'kienzle-csrf' => str_repeat('a', 32)]), 'nur Admins'), 'Verzeichnis löschen nur Admin');
+// Statistik und Telefonverzeichnis mit vorhandenen Datenbanken (nur lesend geöffnet, unter open_basedir)
+mkdir("$dir/daten/statistik", 0700, true);
+$st = new PDO("sqlite:$dir/daten/statistik/statistik.sqlite");
+$st->exec('CREATE TABLE anrufe (id TEXT PRIMARY KEY, zeit INTEGER NOT NULL, tag TEXT NOT NULL, stunde INTEGER NOT NULL, wochentag INTEGER NOT NULL);
+    CREATE TABLE routen (id TEXT NOT NULL, route TEXT NOT NULL, PRIMARY KEY (id, route));
+    CREATE TABLE warten (id TEXT PRIMARY KEY, zeit INTEGER NOT NULL, tag TEXT NOT NULL, ergebnis TEXT NOT NULL, sekunden INTEGER NOT NULL);');
+$st->prepare('INSERT INTO anrufe VALUES (?, ?, ?, ?, ?)')->execute(['c1', time(), date('Y-m-d'), 9, 1]);
+$st = null;
+@mkdir("$dir/daten/t2med", 0700, true);
+$vz = new PDO("sqlite:$dir/daten/t2med/patienten.sqlite");
+$vz->exec('CREATE TABLE patienten (rid INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, nummer TEXT NOT NULL, vorname TEXT NOT NULL, nachname TEXT NOT NULL, geburt TEXT NOT NULL, suchname TEXT NOT NULL);
+    CREATE TABLE telefone (rid INTEGER NOT NULL, original TEXT NOT NULL, schluessel TEXT NOT NULL); CREATE TABLE meta (k TEXT PRIMARY KEY, v TEXT NOT NULL);');
+$vz = null;
+$o = aufruf($dir, '/telefon/statistik', 'statistik');
+check(str_contains($o, '#CODE=200') && !str_contains($o, 'nicht erreichbar'), 'Statistik mit Datenbank unter open_basedir');
+$o = aufruf($dir, '/telefon/einstellungen', '', 'admin');
+check(str_contains($o, '#CODE=200') && str_contains($o, 'T2med-Telefonverzeichnis'), 'Einstellungen mit Verzeichnis unter open_basedir');
 echo "seiten.php (telefon): alles in Ordnung\n";

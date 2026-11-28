@@ -1,9 +1,9 @@
 #cloud-config
-# Kienzle-Suite: Vorlage für die unbeaufsichtigte Installation mit der Standard-ISO von Ubuntu Server 26.04
+# Praxisherz: Vorlage für die unbeaufsichtigte Installation mit der Standard-ISO von Ubuntu Server 26.04
 # (keine eigene ISO). Anleitung: docs/INSTALLATION.md, Abschnitt „Unbeaufsichtigt“.
 #
 # Vor der Verwendung anpassen (alles in <SPITZEN KLAMMERN>):
-#   - Rechnername, Servername der Suite, Praxisname
+#   - Rechnername, Servername von Praxisherz, Praxisname
 #   - Passwort-Hash des Konsolen-Benutzers: mkpasswd -m yescrypt   (Paket whois)
 #   - optional ein SSH-Schlüssel für die Wartung
 # Die Datei als „user-data“ (z. B. auf einem zweiten Laufwerk mit Bezeichnung CIDATA, daneben eine leere „meta-data“)
@@ -35,12 +35,13 @@ autoinstall:
     - ca-certificates
   updates: security
   late-commands:
-    # Kienzle-Suite aus dem Repository holen und beim ersten Start installieren (Netz ist dann sicher verfügbar).
-    - curtin in-target -- git clone --depth 1 https://github.com/hau-si/kienzlesuite-2.0.git /opt/kienzle-installer
+    # Praxisherz aus dem Repository holen und beim ersten Start installieren (Netz ist dann sicher verfügbar).
+    # Früherer Repo-Name: GitHub leitet nach der Umbenennung in hau-si/praxisherz weiter; gilt vorher und nachher.
+    - curtin in-target -- git clone --depth 1 https://github.com/hau-si/praxisherz.git /opt/kienzle-installer
     - |
       cat > /target/etc/systemd/system/kienzle-erstinstallation.service <<'UNIT'
       [Unit]
-      Description=Kienzle-Suite: Erstinstallation
+      Description=Praxisherz: Erstinstallation
       After=network-online.target
       Wants=network-online.target
       ConditionPathExists=!/var/lib/kienzle/core/core.sqlite

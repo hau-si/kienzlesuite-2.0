@@ -5,9 +5,11 @@ namespace KienzleKasse;
 final class FhirClient {
     public const CONTEXT = 'https://fhir.t2med.de/identifier/kontext';
     public const PAYMENT = 'https://github.com/thomaskien/t2med-sumup/identifier/payment';
+    public const NUMMER = 'https://fhir.t2med.de/identifier/patientennummer';
     public function __construct(private Config $config, private HttpClient $http) {}
 
     private function request(string $method, string $path, string $token, ?array $body = null, bool $patient = false): array {
+        if ((string)$this->config->get('fhir', 'api_key', '') === '') throw new TransportError(Settings::T2MED_OHNE_SCHLUESSEL, false);
         $headers = ['Accept: application/fhir+json', 'Content-Type: application/fhir+json',
             'Authorization: Bearer ' . $token, 'X-API-Key: ' . $this->config->get('fhir', 'api_key'),
             'X-TreatWarningAsError: true', 'Prefer: return=OperationOutcome', 'User-Agent: kienzle-kasse/' . trim(file_get_contents(dirname(__DIR__) . '/VERSION'))];
@@ -18,7 +20,7 @@ final class FhirClient {
     /** Meldung zu einem fehlgeschlagenen Patientenabruf: HTTP-Status, wahrscheinliche Ursache und ggf. die Auskunft von t2med (OperationOutcome, ohne Patientendaten). */
     private static function contextError(int $status, mixed $body): string {
         $hint = match (true) {
-            $status === 401, $status === 403 => 'T2med lehnt den Zugriff ab. Das Client Secret in der Suite (Verwaltung → Verbindungen → T2med) prüfen und ob der Drittanbieter-Zugriff in T2med noch zu diesem Secret gehört; außerdem darf der Aufruf nicht älter sein: bitte frisch aus der Patientenakte öffnen.',
+            $status === 401, $status === 403 => 'T2med lehnt den Zugriff ab. Das Client Secret in Praxisherz (Verwaltung → Verbindungen → T2med) prüfen und ob der Drittanbieter-Zugriff in T2med noch zu diesem Secret gehört; außerdem darf der Aufruf nicht älter sein: bitte frisch aus der Patientenakte öffnen.',
             $status === 404 => 'Die Adresse oder der Kontext ist T2med unbekannt. Bitte frisch aus der Patientenakte öffnen und die FHIR-Adresse prüfen.',
             $status === 0 => 'Keine Antwort von T2med.',
             default => 'Bitte erneut aus t2med öffnen.',
@@ -32,7 +34,7 @@ final class FhirClient {
         return 'Patientenkontext konnte nicht aus t2med geladen werden (HTTP ' . $status . '). ' . $hint . $detail;
     }
     public function patient(string $context, string $token): array {
-        if ($this->config->get('fhir', 'mode') === 'mock') return ['id' => 'demo-' . $context, 'name' => 'Erika Musterfrau', 'birthdate' => '1980-04-12', 'email' => 'erika@example.invalid', 'address' => ['Musterstraße 1', '12345 Musterstadt']];
+        if ($this->config->get('fhir', 'mode') === 'mock') return ['id' => 'demo-' . $context, 'nummer' => '1001', 'name' => 'Erika Musterfrau', 'birthdate' => '1980-04-12', 'email' => 'erika@example.invalid', 'address' => ['Musterstraße 1', '12345 Musterstadt']];
         try {
             $result = $this->request('GET', '/Patient?' . http_build_query(['identifier' => self::CONTEXT . '|' . $context]), $token, null, true);
         } catch (TransportError $e) {
@@ -65,7 +67,13 @@ final class FhirClient {
             $address = array_values(array_filter(array_map(static fn($line) => mb_substr(preg_replace('/[\x00-\x1f\x7f]/u', ' ', $line), 0, 200), array_slice($lines, 0, 5))));
             if ($address) break;
         }
-        return ['id' => (string)$p['id'], 'name' => $label ?: 'Patient ' . $p['id'], 'birthdate' => $p['birthDate'] ?? '', 'email' => $emails[0]['value'] ?? '', 'given' => mb_substr(trim(implode(' ', array_filter((array)($name['given'] ?? []), 'is_string'))), 0, 80), 'family' => mb_substr(is_string($name['family'] ?? null) ? trim($name['family']) : '', 0, 80), 'gender' => in_array($p['gender'] ?? '', ['male', 'female', 'other', 'unknown'], true) ? $p['gender'] : 'unknown', 'phone' => isset($phones[0]) ? trim($phones[0]['value']) : '', 'address' => $address];
+        // Patientennummer (für „Akte öffnen“ per GDT): nur eine eindeutige, gültige Nummer, sonst leer.
+        $nummern = [];
+        foreach (is_array($p['identifier'] ?? null) ? $p['identifier'] : [] as $i) {
+            if (is_array($i) && ($i['system'] ?? '') === self::NUMMER && is_string($i['value'] ?? null) && preg_match('/^[1-9][0-9]{0,11}$/D', $i['value'])) $nummern[] = $i['value'];
+        }
+        $nummern = array_values(array_unique($nummern));
+        return ['id' => (string)$p['id'], 'nummer' => count($nummern) === 1 ? $nummern[0] : '', 'name' => $label ?: 'Patient ' . $p['id'], 'birthdate' => $p['birthDate'] ?? '', 'email' => $emails[0]['value'] ?? '', 'given' => mb_substr(trim(implode(' ', array_filter((array)($name['given'] ?? []), 'is_string'))), 0, 80), 'family' => mb_substr(is_string($name['family'] ?? null) ? trim($name['family']) : '', 0, 80), 'gender' => in_array($p['gender'] ?? '', ['male', 'female', 'other', 'unknown'], true) ? $p['gender'] : 'unknown', 'phone' => isset($phones[0]) ? trim($phones[0]['value']) : '', 'address' => $address];
     }
     public function resource(array $visit, array $payment): array {
         $zone = new \DateTimeZone($this->config->get('app', 'timezone'));
@@ -87,40 +95,55 @@ final class FhirClient {
             'extension' => [['url' => 'https://fhir.t2med.de/StructureDefinition/FhirApiFreitextKuerzel', 'valueString' => $this->config->get('fhir', 'entry_code', 'ZAHLUNG')]],
             'status' => 'final', 'effectiveDateTime' => $paid->format(DATE_ATOM), 'valueString' => $text];
     }
-    public function supportsConditionalCreate(string $token): bool {
-        try {
-            $result = $this->request('GET', '/metadata', $token);
-            if ($result['status'] !== 200 || ($result['body']['resourceType'] ?? '') !== 'CapabilityStatement') return false;
-            foreach ($result['body']['rest'] ?? [] as $rest) {
-                if (($rest['mode'] ?? '') !== 'server') continue;
-                foreach ($rest['resource'] ?? [] as $resource) {
-                    if (($resource['type'] ?? '') === 'Observation' && ($resource['conditionalCreate'] ?? false) === true) return true;
-                }
-            }
-        } catch (TransportError) { /* Gewöhnliches POST bleibt nutzbar. Unklare Wiederholungen bleiben gesperrt. */ }
-        return false;
-    }
-    public function findPayment(array $visit, array $payment, string $token): ?string {
-        $result = $this->request('GET', '/Observation?' . http_build_query(['identifier' => self::PAYMENT . '|' . $payment['id']]), $token);
-        if ($result['status'] !== 200 || ($result['body']['resourceType'] ?? '') !== 'Bundle') throw new TransportError('Der vorhandene Akteneintrag konnte nicht geprüft werden.');
-        $found = [];
-        foreach ($result['body']['entry'] ?? [] as $entry) {
-            $resource = $entry['resource'] ?? [];
-            if (($resource['resourceType'] ?? '') !== 'Observation') continue;
-            $matching = false; $context = false;
-            foreach ($resource['identifier'] ?? [] as $id) {
-                if (($id['system'] ?? '') === self::PAYMENT && ($id['value'] ?? '') === $payment['id']) $matching = true;
-                if (($id['system'] ?? '') === self::CONTEXT && ($id['value'] ?? '') === $visit['context_id']) $context = true;
-            }
-            if ($matching && $context && !empty($resource['id']) && ($resource['valueString'] ?? null) === $this->resource($visit, $payment)['valueString']) $found[] = 'Observation/' . $resource['id'];
+    public const ANHANG = 'https://fhir.t2med.de/StructureDefinition/FhirApiDocumentReferenceAnhang|1.0.0';
+
+    /** Unterschriebenes PDF aus Signatur als DocumentReference (Profil „Anhang“) in die Akte des Kontexts (Integrationsleitfaden 1.10). */
+    public function dokument(string $context, string $token, string $pdf, string $titel, int $zeit): void {
+        if (!preg_match('/^[A-Za-z0-9._-]{1,128}$/D', $context)) throw new Problem('Ungültiger T2med-Kontext.');
+        $iso = date('c', $zeit);
+        $titel = trim(preg_replace('/[\x00-\x1f\x7f]+/u', ' ', $titel) ?? '') ?: 'Unterschriebenes Dokument';
+        $datei = trim(preg_replace('/[^A-Za-z0-9ÄÖÜäöüß _.-]+/u', '', $titel) ?? '') ?: 'dokument';
+        $result = $this->request('POST', '/DocumentReference', $token, ['resourceType' => 'DocumentReference', 'meta' => ['profile' => [self::ANHANG]],
+            'identifier' => [['system' => self::CONTEXT, 'value' => $context]], 'status' => 'current', 'date' => $iso,
+            'description' => mb_substr($titel . ' (unterschrieben)', 0, 200),
+            'content' => [['attachment' => ['contentType' => 'application/pdf', 'title' => mb_substr($datei, 0, 80) . '.pdf', 'creation' => $iso, 'data' => base64_encode($pdf)]]]]);
+        $code = $result['status'];
+        $detail = ''; $error = false;
+        $body = $result['body'];
+        if (is_array($body) && ($body['resourceType'] ?? '') === 'OperationOutcome') foreach ($body['issue'] ?? [] as $issue) {
+            if (!in_array($issue['severity'] ?? '', ['fatal', 'error'], true)) continue;
+            $error = true;
+            $detail = mb_substr(trim(preg_replace('/[\x00-\x1f\x7f]+/u', ' ', (string)($issue['details']['text'] ?? $issue['diagnostics'] ?? '')) ?? ''), 0, 160);
+            break;
         }
-        if (count($found) > 1) throw new TransportError('Mehrere passende Akteneinträge gefunden. Bitte in t2med prüfen.');
-        // Ein leeres Ergebnis ist KEIN Beweis, dass ein vorheriger POST nicht noch verarbeitet wird.
-        return $found[0] ?? null;
+        if ($code >= 200 && $code < 300 && !$error) return;
+        $grund = match (true) {
+            $code === 401, $code === 403 => 'T2med lehnt den Zugriff ab (Aufruf älter als 4 Stunden oder Schlüssel falsch).',
+            $code === 413 => 'Das PDF ist für T2med zu groß.',
+            default => 'T2med hat das Dokument nicht angenommen (HTTP ' . $code . ').',
+        };
+        throw new TransportError($grund . ($detail !== '' ? ' Auskunft von T2med: ' . $detail : ''), false, $code);
     }
-    public function write(array $visit, array $payment, string $token, bool $conditional): string {
+
+    /** Akteneintrag aus Signatur (Freitext mit Kürzel; Text je Baustein in der Vorlage festgelegt) als Transaktion. */
+    public function eintrag(string $context, string $token, string $kuerzel, string $text, int $zeit): void {
+        if (!preg_match('/^[A-Za-z0-9._-]{1,128}$/D', $context)) throw new Problem('Ungültiger T2med-Kontext.');
+        $result = $this->request('POST', '', $token, ['resourceType' => 'Bundle', 'type' => 'transaction', 'entry' => [['request' => ['method' => 'POST', 'url' => 'Observation'], 'resource' => [
+            'resourceType' => 'Observation', 'meta' => ['profile' => ['https://fhir.t2med.de/StructureDefinition/FhirApiObservationFreitext|1.0.0']],
+            'identifier' => [['system' => self::CONTEXT, 'value' => $context]],
+            'extension' => [['url' => 'https://fhir.t2med.de/StructureDefinition/FhirApiFreitextKuerzel', 'valueString' => $kuerzel]],
+            'status' => 'final', 'effectiveDateTime' => date(DATE_ATOM, $zeit), 'valueString' => mb_substr($text, 0, 4000)]]]]);
+        $code = $result['status'];
+        $response = is_array($result['body']) ? ($result['body']['entry'][0]['response'] ?? []) : [];
+        $status = (int)($response['status'] ?? 0);
+        $error = false;
+        foreach ($response['outcome']['issue'] ?? [] as $issue) if (in_array($issue['severity'] ?? '', ['fatal', 'error'], true)) $error = true;
+        if ($code < 200 || $code >= 300 || $status < 200 || $status >= 300 || $error) throw new TransportError('T2med hat den Akteneintrag nicht angenommen (HTTP ' . ($status ?: $code) . ').', false, $status ?: $code);
+    }
+
+    /** Akteneintrag als Transaktion (nur dokumentierte Funktionen: kein /metadata, keine Suche nach Observation, kein bedingtes Anlegen). */
+    public function write(array $visit, array $payment, string $token): string {
         $request = ['method' => 'POST', 'url' => 'Observation'];
-        if ($conditional) $request['ifNoneExist'] = http_build_query(['identifier' => self::PAYMENT . '|' . $payment['id']]);
         $result = $this->request('POST', '', $token, ['resourceType' => 'Bundle', 'type' => 'transaction',
             'entry' => [['request' => $request, 'resource' => $this->resource($visit, $payment)]]]);
         $code = $result['status'];

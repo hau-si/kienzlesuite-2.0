@@ -1,6 +1,6 @@
 """Tests für die erzeugte nginx-Konfiguration (core/lib/kienzle/nginx.py) und den Befehl kienzle-web.
 
-Die Konfiguration mit echtem nginx prüft tests/integration/nginx.sh (GitHub Actions, Ubuntu 26.04).
+Die Konfiguration mit echtem nginx prüfen `EchtesNginx` (nginx -t, wenn installiert) und tests/integration/nginx.sh (GitHub Actions, Ubuntu 26.04).
 """
 import copy
 import json
@@ -69,6 +69,7 @@ class Vorlage(unittest.TestCase):
     def test_fastcgi_modul_ohne_http_vorsilbe(self):
         b = block(self.conf, 'location ^~ /kasse/ {')
         self.assertIn('fastcgi_param KIENZLE_BENUTZER $kienzle_benutzer;', b)
+        self.assertIn('fastcgi_param KIENZLE_PERSONEN $kienzle_personen;', b)
         self.assertIn('fastcgi_param SCRIPT_FILENAME /opt/kienzle/kasse/current/public/index.php;', b)
         self.assertNotIn('HTTP_X_KIENZLE', self.conf)
 
@@ -77,7 +78,7 @@ class Vorlage(unittest.TestCase):
 
     def test_startkontexte_pruefung_durch_die_basis(self):
         reg = registry()
-        reg['modules'][1]['starters'] = [{'schema': 'kienzle-kasse', 'label': 'Kasse'}]
+        reg['modules'][1]['starters'] = [{'schema': 'praxisherz-kasse', 'label': 'Kasse'}]
         conf = nginx.render(HOSTS, reg)
         b = block(conf, 'location = /starter/kasse {')
         self.assertIn('auth_request /_starter-pruefen;', b)
@@ -89,7 +90,7 @@ class Vorlage(unittest.TestCase):
         self.assertIn('internal;', p)
         self.assertIn('fastcgi_param REQUEST_URI /_starter-pruefen;', p)
         self.assertNotIn('location = /starter/', nginx.render(HOSTS, registry()))      # ohne Startkontexte kein Ort
-        reg['modules'][0]['starters'] = [{'schema': 'kienzle-b', 'label': 'B'}]   # HTTP-Modul
+        reg['modules'][0]['starters'] = [{'schema': 'praxisherz-b', 'label': 'B'}]   # HTTP-Modul
         with self.assertRaises(nginx.Fehler):
             nginx.render(HOSTS, reg)
 
@@ -97,6 +98,8 @@ class Vorlage(unittest.TestCase):
         auth = block(self.conf, 'location ^~ /_auth/ {')
         self.assertIn('client_max_body_size 25m;', auth)  # sonst 413 schon bei der Anmeldeprüfung großer Uploads
         self.assertIn('internal;', auth)
+        self.assertIn('fastcgi_buffer_size 32k;', auth)  # Menü und Personenliste passen sonst nicht in die Kopfzeilen der Prüfung
+        self.assertIn('fastcgi_buffers 8 32k;', auth)  # ohne passende Puffer: nginx -t scheitert an fastcgi_busy_buffers_size
         self.assertGreater(auth.index('fastcgi_param REQUEST_URI $uri;'), auth.index('include fastcgi_params;'))   # überschreibt den Vorgabewert
         h = block(self.conf, 'location = /_health {')
         self.assertIn('allow 127.0.0.1;', h)
@@ -144,7 +147,7 @@ class Befehl(unittest.TestCase):
             r = self.run_cli(tmp, 'schreiben', str(ROOT / 'modules'))
             self.assertEqual(r.returncode, 0, r.stderr)
             reg = json.loads((Path(tmp) / 'modules.json').read_text())
-            self.assertEqual([m['module']['id'] for m in reg['modules']], ['beispiel', 'fax', 'kasse', 'signatur', 'telefon', 'terminzettel'])
+            self.assertEqual([m['module']['id'] for m in reg['modules']], ['beispiel', 'fax', 'kasse', 'qm', 'signatur', 'telefon', 'terminzettel'])
             self.assertIn('/_auth/beispiel', (Path(tmp) / 'kienzle.conf').read_text())
             self.assertEqual(oct((Path(tmp) / 'modules.json').stat().st_mode & 0o777), '0o640')
 
@@ -192,3 +195,22 @@ class Befehl(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+@unittest.skipUnless(Path('/usr/sbin/nginx').exists() and Path('/etc/nginx/fastcgi_params').exists(), 'nginx nicht installiert')
+class EchtesNginx(unittest.TestCase):
+    """Die erzeugte Konfiguration aller Module im Repository mit `nginx -t` (fing z. B. zu kleine fastcgi_buffers ab, beta.47)."""
+
+    def test_nginx_nimmt_die_konfiguration_an(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            t = Path(tmp)
+            subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', str(t / 'server.key'), '-out', str(t / 'server.crt'),
+                            '-days', '1', '-subj', '/CN=kienzle.example.org'], check=True, capture_output=True)
+            conf = nginx.render(HOSTS, manifest.check_all(ROOT / 'modules')).replace(nginx.CA_DIR + '/', tmp + '/')
+            # Nur für die Prüfung: hoher Port ohne IPv6 (Testumgebung), http2-Schalter erst ab nginx 1.25
+            conf = re.sub(r'\n\s*listen \[::\]:443[^\n]*', '', conf).replace('listen 443', 'listen 127.0.0.1:18443').replace('    http2 on;\n', '')
+            (t / 'site.conf').write_text(conf.replace('include fastcgi_params;', 'include /etc/nginx/fastcgi_params;'))
+            (t / 'nginx.conf').write_text(f'pid {tmp}/nginx.pid; error_log stderr; events {{}} http {{ access_log off; client_body_temp_path {tmp}; '
+                                          f'fastcgi_temp_path {tmp}; proxy_temp_path {tmp}; include /etc/nginx/mime.types; include {tmp}/site.conf; }}\n')
+            r = subprocess.run(['/usr/sbin/nginx', '-t', '-q', '-p', tmp, '-c', str(t / 'nginx.conf')], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)

@@ -1,6 +1,6 @@
-# Kienzle-Suite, Modul signatur: Pad-Dienst (zeigt Vorgänge am Unterschriftenpad und nimmt Unterschriften auf).
+# Praxisherz, Modul signatur: Pad-Dienst (zeigt Vorgänge am Unterschriftenpad und nimmt Unterschriften auf).
 [Unit]
-Description=Kienzle-Suite Modul signatur (Unterschriftenpad)
+Description=Praxisherz Modul signatur (Unterschriftenpad)
 After=network.target
 
 [Service]
@@ -8,6 +8,9 @@ Type=simple
 User=ks-signatur
 ExecStart=/usr/bin/python3 -B /opt/kienzle/signatur/current/lib/paddienst.py
 WorkingDirectory=/var/lib/kienzle/signatur
+# Für den Ablage-Lauf (lib/haken.php ablage): Datenordner und Austauschordner mit der Kasse.
+Environment=KIENZLE_DATEN=/var/lib/kienzle/signatur
+Environment=KIENZLE_AUSTAUSCH=/var/spool/kienzle/austausch/kasse_signatur
 Restart=on-failure
 RestartSec=5
 UMask=0077
@@ -22,14 +25,16 @@ ProtectKernelLogs=yes
 ProtectControlGroups=yes
 ProtectClock=yes
 ProtectHostname=yes
-RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# AF_NETLINK: Die signotec-Bibliothek fragt damit die eigenen Netzwerkadressen ab; ohne kommen beim Delta (Ethernet) die
+# Tasten an, aber keine Stiftpunkte (am Pad geprüft: ohne 0, mit 64 Stiftereignisse).
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 RestrictNamespaces=yes
 RestrictRealtime=yes
 RestrictSUIDSGID=yes
 LockPersonality=yes
 SystemCallArchitectures=native
 CapabilityBoundingSet=
-ReadWritePaths=/var/lib/kienzle/signatur
+ReadWritePaths=/var/lib/kienzle/signatur -/var/spool/kienzle/austausch/kasse_signatur
 
 [Install]
 WantedBy=multi-user.target

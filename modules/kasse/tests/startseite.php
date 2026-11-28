@@ -1,5 +1,7 @@
 <?php
 declare(strict_types=1);
+// Datumsangaben wie die Kasse (Zeitzone Europe/Berlin); sonst scheitert der Test zwischen 23 und 24 Uhr UTC.
+date_default_timezone_set('Europe/Berlin');
 // Startseite der Kasse: freie Eingabe ohne Patientenakte, Vorgang für eine Rechnung aus dem Eingang, Tageswerte, offene Rechnungen.
 require dirname(__DIR__) . '/src/bootstrap.php';
 use KienzleKasse\{App, Config, DocNumbers, Problem, Vorgaenge};

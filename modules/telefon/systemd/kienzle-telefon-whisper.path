@@ -1,6 +1,6 @@
-# Kienzle-Suite, Modul telefon: Whisper-Worker starten, sobald Whisper eingerichtet ist.
+# Praxisherz, Modul telefon: Whisper-Worker starten, sobald Whisper eingerichtet ist.
 [Unit]
-Description=Kienzle-Suite Modul telefon (Whisper bereit)
+Description=Praxisherz Modul telefon (Whisper bereit)
 
 [Path]
 PathExists=/var/lib/kienzle/telefon/whisper/bereit.json

@@ -1,8 +1,8 @@
-# Kienzle-Suite, Modul telefon: Steuerungsdienst aus Kienzlefon (Rufgruppen Normal und ROT). Hört nur auf 127.0.0.1:8767.
+# Praxisherz, Modul telefon: Steuerungsdienst aus Kienzlefon (Rufgruppen Normal und ROT). Hört nur auf 127.0.0.1:8767.
 # Mit eingeschalteten Rufgruppen trägt dieser Dienst die Telefone in die Warteschlange ein (auch nach jedem Asterisk-Neustart);
 # deshalb startet er immer wieder neu. Gestartet wird er über kienzle-telefon-steuerung.path, sobald die Rufgruppen eingeschaltet sind.
 [Unit]
-Description=Kienzle-Suite Modul telefon (Rufgruppen, Steuerungsdienst)
+Description=Praxisherz Modul telefon (Rufgruppen, Steuerungsdienst)
 After=kienzle-telefon-asterisk.service
 ConditionPathExists=/var/lib/kienzle/telefon/kienzlefon/control-ami.json
 

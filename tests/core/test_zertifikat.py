@@ -44,7 +44,7 @@ class Zertifizierungsstelle(unittest.TestCase):
         text = self.openssl('x509', '-in', str(self.ca.ca_crt), '-noout', '-text').stdout
         self.assertIn('X509v3 Name Constraints: critical', text)
         self.assertIn('pathlen:0', text)
-        self.assertRegex(text, r'CN ?= ?Kienzle-Suite Praxis Beispiel')   # Schreibweise je nach OpenSSL-Version
+        self.assertRegex(text, r'CN ?= ?Praxisherz Praxis Beispiel')   # Schreibweise je nach OpenSSL-Version
         self.assertIn('ASN1 OID: prime256v1', text)
         server = self.openssl('x509', '-in', str(self.ca.server_crt), '-noout', '-text').stdout
         self.assertIn('TLS Web Server Authentication', server)

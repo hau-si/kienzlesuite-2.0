@@ -80,7 +80,7 @@ class Holen(unittest.TestCase):
         return {'tag_name': f'core-v{version}', 'prerelease': vorab, 'draft': False, 'assets': assets}
 
     def setze(self, releases):
-        Schein.routen['/repos/hau-si/kienzlesuite-2.0/releases'] = json.dumps(releases).encode()
+        Schein.routen['/repos/hau-si/praxisherz/releases'] = json.dumps(releases).encode()
 
     def lauf(self, *args):
         ziel = Path(self.tmp.name) / ('z' + str(len(os.listdir(self.tmp.name))))
@@ -133,7 +133,7 @@ class Holen(unittest.TestCase):
     def test_kein_release_dann_zweig(self):
         self.setze([])
         inhalt = {'installer/install.sh': b'#!/bin/bash\n', 'core/VERSION': b'x'}
-        Schein.routen['/hau-si/kienzlesuite-2.0/archive/refs/heads/beta.tar.gz'] = archiv(inhalt, 'kienzlesuite-2.0-beta/')
+        Schein.routen['/hau-si/praxisherz/archive/refs/heads/beta.tar.gz'] = archiv(inhalt, 'praxisherz-beta/')
         orig = holen.holen
         holen.holen = lambda url, g=holen.MAX_ARCHIV: orig(url.replace('https://github.com', self.base), g)
         try:

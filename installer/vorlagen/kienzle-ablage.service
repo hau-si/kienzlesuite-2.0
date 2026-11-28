@@ -1,6 +1,6 @@
-# Kienzle-Suite: Dateien der Module auf den Netzwerkspeicher übertragen (als ks-ablage, ohne Mount).
+# Praxisherz: Dateien der Module auf den Netzwerkspeicher übertragen (als ks-ablage, ohne Mount).
 [Unit]
-Description=Kienzle-Suite Netzwerkspeicher
+Description=Praxisherz Netzwerkspeicher
 After=network-online.target
 
 [Service]

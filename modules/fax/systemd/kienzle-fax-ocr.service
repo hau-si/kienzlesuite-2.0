@@ -1,6 +1,6 @@
-# Kienzle-Suite, Modul fax: Texterkennung neuer Faxe (Tesseract), niedrige Priorität, höchstens 5 Faxe je Lauf (siehe .timer).
+# Praxisherz, Modul fax: Texterkennung neuer Faxe (Tesseract), niedrige Priorität, höchstens 5 Faxe je Lauf (siehe .timer).
 [Unit]
-Description=Kienzle-Suite Modul fax (Texterkennung)
+Description=Praxisherz Modul fax (Texterkennung)
 
 [Service]
 Type=oneshot

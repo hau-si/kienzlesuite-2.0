@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 // Arbeitsplatz-Starter: POST https://<server>/starter/kasse (der Starter-Schlüssel wird von der Basis geprüft, Verwaltung → Arbeitsplätze).
-// Ohne Anmeldung der Suite; erlaubt ist nur „launch“. Antwort: einmaliger Link https://<server>/#launch=<code>&m=kasse,
+// Ohne Anmeldung von Praxisherz; erlaubt ist nur „launch“. Antwort: einmaliger Link https://<server>/#launch=<code>&m=kasse,
 // den die Basis nach der Anmeldung an /kasse/ weitergibt.
 use KienzleKasse\{App, Problem};
 

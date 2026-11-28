@@ -3,8 +3,8 @@
 - Nur dieser Dienst ruft lpadmin auf. Weder das Webinterface (ks-core) noch ein Modul ist Mitglied der Gruppe lpadmin.
 - Drucker der Praxis: Bondrucker als RAW über socket://…:9100, A4-Drucker über IPP Everywhere, Suche mit lpinfo.
 - Virtuelle Drucker der Module aus [[printers]]: Backend (0755, läuft damit als Benutzer lp) und PPD (0644) aus dem
-  Programmordner des Moduls, Warteschlange mit Kennung der Suite, Freigabe per IPP und/oder Samba.
-- Entfernt werden nur Warteschlangen mit der Kennung der Suite.
+  Programmordner des Moduls, Warteschlange mit Kennung von Praxisherz, Freigabe per IPP und/oder Samba.
+- Entfernt werden nur Warteschlangen mit der Kennung von Praxisherz.
 - Samba gibt nur die Warteschlangen frei, die hier ausdrücklich dafür markiert sind (/etc/samba/kienzle-drucker.conf).
 Übernommen aus kienzle-suite-beta, src/PrinterAdmin.php (Druckerarten, Suche, URI-Prüfung, Auswertung von lpstat).
 """
@@ -51,7 +51,7 @@ if not Path(BIN['ippeveprinter']).is_file() and Path('/usr/bin/ippeveprinter').i
     BIN['ippeveprinter'] = '/usr/bin/ippeveprinter'
 JOB = re.compile(r'^[A-Za-z0-9_-]{1,40}-\d{1,9}$')
 WORKGROUP = re.compile(r'^[A-Za-z0-9][A-Za-z0-9-]{0,14}$')
-MARK = 'Kienzle-Suite'
+MARK = 'Praxisherz'
 KINDS = {
     'tm-m10': {'label': 'Bondrucker Epson TM-m10 (58 mm)', 'port': 9100, 'name': 'TM-m10'},
     'tm-m30iii': {'label': 'Bondrucker Epson TM-m30III (80 mm)', 'port': 9100, 'name': 'TM-m30III'},
@@ -91,11 +91,11 @@ def ppd_text(p: dict) -> str:
     Mit „-m everywhere“ bietet CUPS zusätzlich Raster- und Bildformate an; der Windows-IPP-Treiber wählt dann ein Bildformat,
     und das PDF hat keine Textebene mehr (Texterkennung nötig)."""
     name = re.sub(r'[^A-Za-z0-9_-]', '', str(p['name'])) or 'Drucker'
-    label = re.sub(r'[^\x20-\x7e]', '?', f'Kienzle-Suite {p["name"]}')[:60].replace('"', "'")
+    label = re.sub(r'[^\x20-\x7e]', '?', f'Praxisherz {p["name"]}')[:60].replace('"', "'")
     paper = p.get('paper') if p.get('paper') in ('A4', 'A5', 'A6') else 'A4'          # nur das Papierformat des Moduls anbieten
     sizes = tuple(s for s in (('A6', 298, 420), ('A5', 420, 595), ('A4', 595, 842)) if s[0] == paper)
     lines = ['*PPD-Adobe: "4.3"', '*FormatVersion: "4.3"', '*FileVersion: "1.0"', '*LanguageVersion: English', '*LanguageEncoding: ISOLatin1',
-             f'*PCFileName: "{name[:8].upper()}.PPD"', '*Manufacturer: "Kienzle-Suite"', f'*Product: "({label})"', f'*ModelName: "{label}"',
+             f'*PCFileName: "{name[:8].upper()}.PPD"', '*Manufacturer: "Praxisherz"', f'*Product: "({label})"', f'*ModelName: "{label}"',
              f'*ShortNickName: "{label}"', f'*NickName: "{label} (PDF/PostScript)"', '*PSVersion: "(3010.000) 0"', '*LanguageLevel: "3"',
              '*ColorDevice: False', '*DefaultColorSpace: Gray', '*FileSystem: False', '*Throughput: "1"', '*LandscapeOrientation: Plus90',
              '*TTRasterizer: Type42', '*cupsVersion: 1.1', '*cupsManualCopies: True', '*cupsMaxCopies: 99',
@@ -199,7 +199,7 @@ def probe(host: str, port: int) -> bool:
 
 # ---- Abfragen ----------------------------------------------------------------------------------------------------
 def queues() -> list[dict]:
-    """Warteschlangen mit Adresse, Zustand, Beschreibung und ob die Suite sie verwaltet (Kennung in der Beschreibung)."""
+    """Warteschlangen mit Adresse, Zustand, Beschreibung und ob Praxisherz sie verwaltet (Kennung in der Beschreibung)."""
     found: dict[str, dict] = {}
     for line in run('lpstat', '-v', timeout=15, allow_empty=True).splitlines():
         m = re.match(r'^\S+ (?:for|für) ([^:\s]+): (\S+)$', line.strip())
@@ -350,7 +350,7 @@ def add(kind: str, name: str, addr: str, share: list[str]) -> str:
     ensure_cups()
     existing = {q['name'].lower(): q for q in queues()}
     if name.lower() in existing and not existing[name.lower()]['managed']:
-        raise Fehler(f'Es gibt bereits einen Drucker „{name}“, der nicht von der Suite angelegt wurde. Bitte einen anderen Namen wählen.')
+        raise Fehler(f'Es gibt bereits einen Drucker „{name}“, der nicht von Praxisherz angelegt wurde. Bitte einen anderen Namen wählen.')
     if name.lower() in existing and existing[name.lower()]['modul']:
         raise Fehler(f'„{name}“ ist ein virtueller Drucker eines Moduls.')
     args = ['-p', name, '-v', uri, '-m', 'everywhere' if kind == 'office' else 'raw', '-D', f'{MARK} ' + ('Praxisdrucker' if kind == 'office' else 'Bondrucker'),
@@ -404,7 +404,7 @@ def set_share(name: str, share: list[str]) -> str:
     _check_share(share)
     q = {x['name']: x for x in queues()}.get(name)
     if not q or not q['managed']:
-        raise Fehler('Nur Drucker der Suite lassen sich hier freigeben.')
+        raise Fehler('Nur Drucker von Praxisherz lassen sich hier freigeben.')
     if q.get('modul'):
         share = sorted(set(share) | {'ipp'})   # virtuelle Drucker der Module: IPP ist immer an
     run('lpadmin', '-p', name, '-o', f'printer-is-shared={"true" if "ipp" in share else "false"}')
@@ -417,7 +417,7 @@ def remove(name: str) -> str:
     if not q:
         raise Fehler('Drucker nicht gefunden.')
     if not q['managed']:
-        raise Fehler('Dieser Drucker wurde nicht von der Suite angelegt und wird deshalb nicht entfernt.')
+        raise Fehler('Dieser Drucker wurde nicht von Praxisherz angelegt und wird deshalb nicht entfernt.')
     if q['modul']:
         raise Fehler('Virtuelle Drucker der Module verschwinden mit dem Modul.')
     run('lpadmin', '-x', name, timeout=30)
@@ -430,14 +430,14 @@ def test_page(name: str) -> str:
     if not q:
         raise Fehler('Drucker nicht gefunden.')
     raw = 'Bondrucker' in q['description']
-    data = (b'\x1b@Kienzle-Suite\nTestseite ' + time.strftime('%d.%m.%Y %H:%M').encode() + b'\n\n\n\n\x1dV\x00') if raw else _test_pdf()
-    out = run('lp', '-d', name, '-t', 'Kienzle-Suite Testseite', *(['-o', 'raw'] if raw else []), data=data, timeout=30)
+    data = (b'\x1b@Praxisherz\nTestseite ' + time.strftime('%d.%m.%Y %H:%M').encode() + b'\n\n\n\n\x1dV\x00') if raw else _test_pdf()
+    out = run('lp', '-d', name, '-t', 'Praxisherz Testseite', *(['-o', 'raw'] if raw else []), data=data, timeout=30)
     m = re.search(r'request id is (\S+)', out)
     return f'Testseite an „{name}“ geschickt' + (f' (Auftrag {m.group(1)}).' if m else '.')
 
 
 def _test_pdf() -> bytes:
-    text = 'Kienzle-Suite - Testseite ' + time.strftime('%d.%m.%Y %H:%M')
+    text = 'Praxisherz - Testseite ' + time.strftime('%d.%m.%Y %H:%M')
     content = f'BT /F1 18 Tf 72 760 Td ({text}) Tj ET'.encode()
     objs = [b'<< /Type /Catalog /Pages 2 0 R >>', b'<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
             b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
@@ -482,8 +482,8 @@ def unit_text(p: dict, port: int) -> str:
     mid = p['modul']
     spool = DATA / mid / 'druckauftraege'
     cmd = PROGRAMS / mid / 'current' / p['command']
-    return (f'# Kienzle-Suite: virtueller Drucker „{p["name"]}“ des Moduls {mid} (von kienzle-drucker erzeugt).\n[Unit]\n'
-            f'Description=Kienzle-Suite Drucker {p["name"]} ({mid})\nAfter=network.target avahi-daemon.service\nWants=avahi-daemon.service\n\n'
+    return (f'# Praxisherz: virtueller Drucker „{p["name"]}“ des Moduls {mid} (von kienzle-drucker erzeugt).\n[Unit]\n'
+            f'Description=Praxisherz Drucker {p["name"]} ({mid})\nAfter=network.target avahi-daemon.service\nWants=avahi-daemon.service\n\n'
             f'[Service]\nUser=ks-{mid}\nGroup=ks-{mid}\nEnvironment=KIENZLE_DRUCKER={p["name"]}\n'
             f'ExecStartPre=/usr/bin/mkdir -p {spool}\n'
             f'ExecStart={BIN["ippeveprinter"]} -p {port} -n localhost -r off -c {cmd} -f {",".join(p["formats"])} -d {spool} {p["scheme"]}\n'
@@ -723,10 +723,10 @@ def set_fileshare(key: str, on: bool, password: str = '') -> str:
 
 
 def samba() -> bool:
-    """Samba-Freigaben genau für die markierten Warteschlangen der Suite. Liefert True, wenn sich etwas änderte."""
+    """Samba-Freigaben genau für die markierten Warteschlangen von Praxisherz. Liefert True, wenn sich etwas änderte."""
     shares = _read(STATE / 'freigaben.json', {})
     known = {q['name']: q for q in queues()}
-    parts = ['# Kienzle-Suite: von kienzle-drucker erzeugt, nicht von Hand ändern.\n']
+    parts = ['# Praxisherz: von kienzle-drucker erzeugt, nicht von Hand ändern.\n']
     for name in sorted(shares):
         q = known.get(name)
         if not q or not q['managed'] or 'samba' not in shares[name] or not NAME.match(name):
@@ -759,7 +759,7 @@ def network() -> dict:
 
 
 def network_conf(n: dict) -> str:
-    head = '# Kienzle-Suite: von kienzle-drucker erzeugt (Verwaltung → Drucker → Windows-Netz), nicht von Hand ändern.\n'
+    head = '# Praxisherz: von kienzle-drucker erzeugt (Verwaltung → Drucker → Windows-Netz), nicht von Hand ändern.\n'
     return head + f'   workgroup = {n["arbeitsgruppe"].upper()}\n   server role = standalone server\n'
 
 
@@ -802,7 +802,7 @@ def set_status(**changes) -> dict:
 
 
 def heal_local() -> None:
-    """Von der Suite angelegte Warteschlangen, deren Adresse einen „.local“-Namen enthält, den der Server nicht auflöst, auf die IP umstellen."""
+    """Von Praxisherz angelegte Warteschlangen, deren Adresse einen „.local“-Namen enthält, den der Server nicht auflöst, auf die IP umstellen."""
     try:
         for q in queues():
             m = re.match(r'^((?:socket|ipp|ipps|lpd)://)([A-Za-z0-9._-]+\.local)(.*)$', q['uri'], re.I)

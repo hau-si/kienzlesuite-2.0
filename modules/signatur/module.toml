@@ -4,12 +4,12 @@
 [module]
 id = "signatur"
 name = "Signatur"
-version = "0.1.0-beta.29"
-core_api = "1"
+version = "0.1.0-beta.50"
+core_api = "2"
 description = "Verträge, Aufklärungen und Datenschutzerklärungen am Unterschriftenpad unterschreiben lassen, auch zeitversetzt, und als PDF in T2med ablegen."
 
 [system]
-packages = ["php-fpm", "php-cli", "php-sqlite3", "php-mbstring", "php-zip", "python3", "python3-pil", "fonts-dejavu-core"]
+packages = ["php-fpm", "php-cli", "php-curl", "php-sqlite3", "php-mbstring", "php-zip", "python3", "python3-pil", "python3-fonttools", "fonts-dejavu-core"]
 services = ["kienzle-signatur-pad.service"]
 user = "ks-signatur"
 data = "/var/lib/kienzle/signatur"
@@ -31,12 +31,21 @@ label = "Signatur: Vorlagen und Vertragstexte ändern"
 
 # Startkontext für den zentralen Arbeitsplatz-Starter der Basis (Verwaltung → Arbeitsplätze): POST https://<server>/starter/signatur
 [[starters]]
-schema = "kienzle-signatur"
+schema = "praxisherz-signatur"
 label = "Signatur"
+
+[[exchange]]
+module = "kasse"
+purpose = "Unterschriebene PDFs von Vorgängen aus der Kasse an die Kasse geben; die Kasse legt sie in T2med ab"
 
 [[connections]]
 id = "t2med"
 purpose = "Unterschriebenes PDF in die T2med-Akte schreiben (FHIR)"
+
+[[connections]]
+id = "uebersetzung"
+purpose = "Vorlagen in andere Sprachen übersetzen (DeepL, nur Vorlagentexte)"
+required = false
 
 [backup]
 paths = ["/var/lib/kienzle/signatur"]

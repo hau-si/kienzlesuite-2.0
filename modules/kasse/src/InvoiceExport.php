@@ -3,7 +3,7 @@ declare(strict_types=1);
 namespace KienzleKasse;
 
 /**
- * Legt die Original-PDF einer Rechnung im Netzwerkspeicher der Suite ab (z. B. für die Steuerberatung).
+ * Legt die Original-PDF einer Rechnung im Netzwerkspeicher von Praxisherz ab (z. B. für die Steuerberatung).
  * Das Modul kennt die Zugangsdaten nicht: Es übergibt einen Auftrag an die Basis (KienzleModul::ablegen); der Dienst
  * ks-ablage überträgt ihn, prüft die Datei und versucht es bei Fehlern erneut (docs/MODUL-SCHNITTSTELLE.md).
  * Dateiname ohne Patientendaten. Übernommen aus kienzle-suite-beta (vorher direkt per smbclient).
@@ -34,7 +34,7 @@ class InvoiceExport {
 
     public function target(): string { return (string)$this->config->get('invoice_export', 'ziel', ''); }
 
-    /** Auftrag an den Netzwerkspeicher der Suite; liefert den Pfad unter dem Ziel. */
+    /** Auftrag an den Netzwerkspeicher von Praxisherz; liefert den Pfad unter dem Ziel. */
     public function export(array $invoice, string $pdf, bool|string $paid): string {
         if (!$this->enabled()) throw new Problem('Ablage im Netzwerkordner ist deaktiviert.', 409);
         if (!str_starts_with($pdf, '%PDF-')) throw new Problem('Original-PDF der Rechnung fehlt.', 409);
@@ -50,7 +50,7 @@ class InvoiceExport {
         if (!$this->enabled()) throw new Problem('Ablage im Netzwerkordner ist deaktiviert.', 409);
         $targets = Suite::targets();
         if (!isset($targets[$this->target()])) throw new Problem('Das gewählte Ziel gibt es nicht (mehr). Bitte unter Verwaltung → Verbindungen prüfen und hier neu wählen.', 409);
-        $this->deliver("Kienzle-Suite Kasse: Verbindungstest\n", 'kienzle-kasse-verbindungstest.txt', '');
+        $this->deliver("Praxisherz Kasse: Verbindungstest\n", 'praxisherz-kasse-verbindungstest.txt', '');
         return 'Testdatei an „' . $targets[$this->target()] . '“ übergeben. Ob sie angekommen ist, zeigt Verwaltung → Verbindungen der Basis.';
     }
 

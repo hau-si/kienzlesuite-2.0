@@ -5,6 +5,7 @@ Rechtecke bei jeder Seite, damit der Arbeitsprozess sie dem Pad melden kann."""
 from __future__ import annotations
 
 from PIL import Image, ImageDraw, ImageFont
+from padtexte import t
 
 BREITE, HOEHE = 1280, 800
 RAND = 48
@@ -52,7 +53,7 @@ def knopf(d: ImageDraw.ImageDraw, rechteck: tuple[int, int, int, int], text: str
     l, o, b, h = rechteck
     d.rounded_rectangle((l, o, l + b, o + h), radius=18, fill=GRUEN if hauptknopf else HELL, outline=GRUEN, width=3)
     f = schrift(32, True)
-    d.text((l + b / 2, o + h / 2), text, font=f, fill=(255, 255, 255) if hauptknopf else GRUEN, anchor='mm')
+    d.text((l + b / 2, o + h / 2), t(text), font=f, fill=(255, 255, 255) if hauptknopf else GRUEN, anchor='mm')
 
 
 def _knopfreihe(namen: list[str], haupt: str) -> dict[str, tuple[int, int, int, int]]:
@@ -75,7 +76,7 @@ def textseiten(titel: str, text: str) -> list[dict]:
     for i, zeilen in enumerate(teile):
         bild = Image.new('RGB', (BREITE, HOEHE), 'white')
         d = ImageDraw.Draw(bild)
-        kopfzeile(d, titel, f'Seite {i + 1} von {len(teile)}')
+        kopfzeile(d, titel, t('Seite {a} von {b}', a=i + 1, b=len(teile)))
         f = schrift(TEXT_GROESSE)
         y = KOPF
         for z in zeilen:
@@ -89,18 +90,18 @@ def textseiten(titel: str, text: str) -> list[dict]:
     return out
 
 
-def unterschriftsseite(titel: str, patient: str) -> dict:
+def unterschriftsseite(titel: str, patient: str, beschriftung: str = 'Unterschrift', zurueck: bool = True) -> dict:
     """Seite mit Unterschriftsfeld: 'feld' ist das Rechteck für die Unterschrift."""
     bild = Image.new('RGB', (BREITE, HOEHE), 'white')
     d = ImageDraw.Draw(bild)
     kopfzeile(d, titel, patient)
-    d.text((RAND, KOPF + 6), 'Bitte unterschreiben Sie im Feld und bestätigen Sie mit „OK“.', font=schrift(30), fill=DUNKEL)
+    d.text((RAND, KOPF + 6), t('Bitte unterschreiben Sie im Feld und bestätigen Sie mit „OK“.'), font=schrift(30), fill=DUNKEL)
     feld = (RAND, KOPF + 70, BREITE - 2 * RAND, HOEHE - KOPF - FUSS - 100)
     d.rounded_rectangle((feld[0], feld[1], feld[0] + feld[2], feld[1] + feld[3]), radius=16, outline=GRUEN, width=4, fill=(250, 252, 252))
     ly = feld[1] + feld[3] - 70
     d.line((feld[0] + 30, ly, feld[0] + feld[2] - 30, ly), fill=GRAU, width=2)
-    d.text((feld[0] + 34, ly + 8), 'Unterschrift', font=schrift(22), fill=GRAU)
-    namen = ['Abbrechen', 'Zurück', 'Löschen', 'OK']
+    d.text((feld[0] + 34, ly + 8), t(beschriftung), font=schrift(22), fill=GRAU)
+    namen = ['Abbrechen', 'Zurück', 'Löschen', 'OK'] if zurueck else ['Abbrechen', 'Löschen', 'OK']
     rechtecke = _knopfreihe(namen, 'OK')
     for n, r in rechtecke.items():
         knopf(d, r, n, n == 'OK')
@@ -110,5 +111,5 @@ def unterschriftsseite(titel: str, patient: str) -> dict:
 def hinweisseite(text: str) -> Image.Image:
     bild = Image.new('RGB', (BREITE, HOEHE), 'white')
     d = ImageDraw.Draw(bild)
-    d.text((BREITE / 2, HOEHE / 2), text, font=schrift(44, True), fill=GRUEN, anchor='mm')
+    d.text((BREITE / 2, HOEHE / 2), t(text), font=schrift(44, True), fill=GRUEN, anchor='mm')
     return bild

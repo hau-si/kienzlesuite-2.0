@@ -5,7 +5,7 @@ use KienzleKasse\Suite;
 if (!in_array('catalog', Suite::settingsRights(), true)) {
     http_response_code(403);
     header('Content-Type: text/plain; charset=utf-8');
-    exit("Für die Leistungsliste der Kasse fehlt das Recht „Leistungen bearbeiten“. Bitte den Admin fragen (Verwaltung → Benutzer der Suite).\n");
+    exit("Für die Leistungsliste der Kasse fehlt das Recht „Leistungen bearbeiten“. Bitte den Admin fragen (Verwaltung → Benutzer von Praxisherz).\n");
 }
 header('Cache-Control: no-store');
 header('Referrer-Policy: no-referrer');

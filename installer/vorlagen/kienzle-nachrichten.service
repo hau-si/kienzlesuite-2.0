@@ -1,6 +1,6 @@
-# Kienzle-Suite: SMS und E-Mails der Module verschicken (als ks-nachrichten; nur dieser Dienst kennt die Zugänge).
+# Praxisherz: SMS und E-Mails der Module verschicken (als ks-nachrichten; nur dieser Dienst kennt die Zugänge).
 [Unit]
-Description=Kienzle-Suite Nachrichten-Ausgang
+Description=Praxisherz Nachrichten-Ausgang
 After=network-online.target
 
 [Service]

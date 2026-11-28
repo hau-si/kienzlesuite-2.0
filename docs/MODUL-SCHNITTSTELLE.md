@@ -30,6 +30,7 @@ und für dieses Modul Admin ist oder mindestens ein Recht hat. Ein Basis-Admin h
 | `X-Kienzle-Drucker` | `KIENZLE_DRUCKER` | Zuordnung der Drucker aus Verwaltung → Drucker (URL-kodiertes JSON: buero, bon); im PHP-Helfer `druckerRollen()` |
 | `X-Kienzle-Praxis` | `KIENZLE_PRAXIS` | Praxisname und Anschrift (URL-kodiertes JSON: name, street, city, contact); im PHP-Helfer `praxis()` |
 | `X-Kienzle-Pfad` | `KIENZLE_PFAD` | Webpfad des Moduls, z. B. `/kasse` |
+| `X-Kienzle-Personen` | `KIENZLE_PERSONEN` | nur mit `[web] personen = true` (core_api 2): aktive Konten mit Zugang zu diesem Modul (URL-kodiertes JSON: `l` Anmeldename, `n` Name, `g` Gruppen, `a` Modul-Admin, `r` Rechte im Modul); im PHP-Helfer `personen()`, 30 Sekunden zwischengespeichert |
 
 **Fälschungssicher:** Bei HTTP-Modulen ersetzt nginx gleichnamige Kopfzeilen des Browsers. Bei FastCGI tragen die
 Werte keine `HTTP_`-Vorsilbe; Kopfzeilen eines Browsers kommen in PHP immer als `HTTP_…` an und können
@@ -58,9 +59,9 @@ Der Starter öffnet nach dem Aufruf `https://<server>/#launch=<64 Hexzeichen>&m=
 Die Basis gibt diesen Teil nach der Anmeldung an `<web.path>/#launch=…` weiter (core.js, über `sessionStorage` im selben Tab,
 falls erst angemeldet werden muss). Der Code verlässt den Browser dabei nicht.
 
-## Arbeitsplatz und „Akte öffnen“ (Kienzle-Agent)
+## Arbeitsplatz und „Akte öffnen“ (Praxisherz-Agent)
 
-Die Basis weiß, an welchem PC der Browser sitzt, wenn dort der Kienzle-Agent läuft (gleiche Adresse oder unter Mein Konto gewählt).
+Die Basis weiß, an welchem PC der Browser sitzt, wenn dort der Praxisherz-Agent läuft (gleiche Adresse oder unter Mein Konto gewählt).
 PHP: `$k->arbeitsplatz()` liefert `['id', 'name', 'online']` oder `null`.
 
 Den Patienten in T2med öffnen (GDT-Satz 6301 an den Agent des PCs): aus der Modulseite per JavaScript
@@ -177,11 +178,30 @@ ein (leeres Ziel schaltet aus). `ks-ablage` holt neue Dateien mit den genannten 
 `$k->lauschenEingang()`, prüft sie durch zweites Lesen und löscht sie erst danach auf dem NAS. Das Modul liest und löscht die Dateien dort
 selbst. Dateien mit gleichem Namen werden nicht überschrieben (Vorsatz `1-`, `2-` …).
 
-## Seiten im Rahmen der Suite
+## Seiten im Rahmen von Praxisherz
 
-Ein PHP-Modul kann eine Seite in den Rahmen der Suite setzen (Seitenleiste, Kopf, Praxisname): Inhalt mit `ob_start()` sammeln und
+Ein PHP-Modul kann eine Seite in den Rahmen von Praxisherz setzen (Seitenleiste, Kopf, Praxisname): Inhalt mit `ob_start()` sammeln und
 `echo $k->rahmen('Titel', $inhalt, ['roh' => true, 'kopf' => '<link …><script …>', 'body' => ' data-x="…"']);` ausgeben.
 `roh` lässt den Inhalt unverändert (sonst setzt die Basis Überschrift und Karten), `kopf` hängt Stylesheets und Skripte des Moduls an
 (Inhalt der Seite bekommt `<main class="modul">`). Das Menü kommt mit der ohnehin laufenden Anmelde-Prüfung (Kopfzeile `X-Kienzle-Menue`),
 es entsteht also keine zusätzliche Anfrage. Die Sitzungs-Marke der Basis erhält das Modul nicht: Abmelden führt deshalb über „Mein Konto“.
 Schlanke Seiten (z. B. die Kassieren-Ansicht in T2med) bleiben ohne Rahmen.
+
+## Patientenübergabe zwischen Modulen
+
+Ein Patient, der in einem Modul aus T2med geöffnet wurde (mit T2med-Kontext und Zugriffstoken), lässt sich an ein anderes Modul
+weitergeben, damit dieses ebenfalls in die Akte schreiben kann (z. B. Signatur → Kasse: Zahlung dokumentieren). Weg und Regeln:
+
+- **Gemeinsamer Austauschordner** beider Module (`[[exchange]]` in beiden `module.toml`, z. B. `/var/spool/kienzle/austausch/kasse_signatur`).
+  Nur die beiden Modulbenutzer haben Zugriff (ACL der Basis).
+- Das abgebende Modul schreibt `uebergabe-<ziel>/<code>.json` mit `code` = 32 Hex-Zeichen (zufällig), Inhalt
+  `{"kontext", "token", "bis", "zeit", "von"}`, Dateirechte 0660 (das Ziel muss lesen und löschen), erst unter einem Punktnamen schreiben,
+  dann umbenennen. Alte Übergaben (älter als 5 Minuten) räumt es selbst weg.
+- Der Browser geht **im selben Tab** zu `/<ziel>/#uebergabe=<code>` (Fragment, geht nicht an den Server und nicht ins Protokoll).
+- Das Zielmodul löst einmalig ein: Datei lesen und sofort löschen, nur annehmen, wenn `zeit` höchstens 5 Minuten alt ist, dann wie beim
+  Aufruf aus T2med den Patienten über FHIR lesen (prüft Kontext und Token) und einen eigenen Vorgang anlegen. Der Zugang endet spätestens
+  zu `bis` (ursprünglicher Aufruf plus 4 Stunden).
+- Ohne T2med-Zugang (Patient von Hand) gibt es keine Übergabe mit Token; dann reicht die Übergabe der Angaben (z. B. Kasse → Signatur mit
+  `#uebergabe=<base64url-JSON>`).
+
+Umgesetzt: Signatur → Kasse (Knopf „Zur Kasse“ in der Patientenkarte, Signatur `src/Uebergabe.php`, Kasse `App::uebergabeEinloesen`).

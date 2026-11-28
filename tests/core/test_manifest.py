@@ -270,7 +270,7 @@ class Web(Fehler):
         up = 'upstream = "unix:/run/kienzle/beispiel/web.sock"'
         m = manifest.check_text(replace(up, up + '\nprotocol = "fastcgi"\nentry = "public/index.php"'))
         self.assertEqual(m['web'], {'path': '/beispiel', 'upstream': 'unix:/run/kienzle/beispiel/web.sock', 'protocol': 'fastcgi', 'entry': 'public/index.php',
-                          'einstellungen': None, 'uploads': False})
+                          'einstellungen': None, 'uploads': False, 'personen': False})
         self.assertEqual(manifest.check_text(BEISPIEL)['web']['protocol'], 'http')
         self.invalid(replace(up, up + '\nprotocol = "fastcgi"'), 'web', '„entry“ fehlt')
         self.invalid(replace(up, up + '\nprotocol = "uwsgi"'), 'web.protocol')
@@ -285,14 +285,17 @@ class Web(Fehler):
 
     def test_startkontexte(self):
         fcgi = replace('upstream = "unix:/run/kienzle/beispiel/web.sock"\n', 'upstream = "unix:/run/kienzle/beispiel/web.sock"\nprotocol = "fastcgi"\nentry = "public/index.php"\n')
-        m = manifest.check_text(fcgi + '\n[[starters]]\nschema = "kienzle-beispiel"\nlabel = "Beispiel"\n')
-        self.assertEqual(m['starters'], [{'schema': 'kienzle-beispiel', 'label': 'Beispiel'}])
+        m = manifest.check_text(fcgi + '\n[[starters]]\nschema = "praxisherz-beispiel"\nlabel = "Beispiel"\n')
+        self.assertEqual(m['starters'], [{'schema': 'praxisherz-beispiel', 'label': 'Beispiel'}])
         self.assertEqual(manifest.check_text(BEISPIEL)['starters'], [])
-        self.invalid(fcgi + '\n[[starters]]\nschema = "Fremd"\nlabel = "x"\n', 'starters[1].schema', 'kienzle-')
-        self.invalid(fcgi + '\n[[starters]]\nschema = "kienzle-a"\nlabel = "x"\n[[starters]]\nschema = "kienzle-a"\nlabel = "y"\n', 'starters[2].schema', 'doppelt')
-        self.invalid(fcgi + '\n[[starters]]\nschema = "kienzle-a"\n', 'starters[1]', 'label')
-        self.invalid(BEISPIEL + '\n[[starters]]\nschema = "kienzle-a"\nlabel = "x"\n', 'starters', 'fastcgi')
-        self.invalid(drop_section('web', BEISPIEL) + '\n[[starters]]\nschema = "kienzle-a"\nlabel = "x"\n', 'starters', 'fastcgi')
+        m = manifest.check_text(fcgi + '\n[[starters]]\nschema = "praxisherz-beispiel"\nlabel = "Beispiel"\n')
+        self.assertEqual(m['starters'], [{'schema': 'praxisherz-beispiel', 'label': 'Beispiel'}])
+        self.invalid(fcgi + '\n[[starters]]\nschema = "Fremd"\nlabel = "x"\n', 'starters[1].schema', 'praxisherz-')
+        self.invalid(fcgi + '\n[[starters]]\nschema = "kienzle-a"\nlabel = "x"\n', 'starters[1].schema', 'praxisherz-')
+        self.invalid(fcgi + '\n[[starters]]\nschema = "praxisherz-a"\nlabel = "x"\n[[starters]]\nschema = "praxisherz-a"\nlabel = "y"\n', 'starters[2].schema', 'doppelt')
+        self.invalid(fcgi + '\n[[starters]]\nschema = "praxisherz-a"\n', 'starters[1]', 'label')
+        self.invalid(BEISPIEL + '\n[[starters]]\nschema = "praxisherz-a"\nlabel = "x"\n', 'starters', 'fastcgi')
+        self.invalid(drop_section('web', BEISPIEL) + '\n[[starters]]\nschema = "praxisherz-a"\nlabel = "x"\n', 'starters', 'fastcgi')
 
 
 class Firewall(Fehler):

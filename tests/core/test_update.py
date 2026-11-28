@@ -424,6 +424,20 @@ class Updater(Umgebung):
         self.assertEqual(self.status()['message'], 'Anfrage ungültig.')
         self.assertFalse((self.t / 'daten/anfragen/update.json').exists())
 
+    def test_quelle_ist_praxisherz(self):
+        # Releases nur aus hau-si/praxisherz (kein Rückfall auf frühere Namen).
+        gh = self.up.GitHub('hau-si/praxisherz')
+        gefragt = []
+
+        def get(url, limit, accept):
+            gefragt.append(url)
+            return json.dumps([{'tag_name': 'core-v1.2.3', 'assets': []}]).encode()
+        gh._get = get
+        self.assertEqual([r['version'] for r in gh.releases()], ['1.2.3'])
+        self.assertEqual(gefragt, ['https://api.github.com/repos/hau-si/praxisherz/releases?per_page=100'])
+        self.assertNotIn('kienzlesuite', (ROOT / 'core' / 'lib' / 'kienzle' / 'update.py').read_text())
+        self.assertIn("'KIENZLE_UPDATE_QUELLE', 'github:hau-si/praxisherz'", (ROOT / 'core' / 'lib' / 'kienzle' / 'update.py').read_text())
+
     def test_befehl(self):
         cli = [sys.executable, '-IB', str(ROOT / 'core' / 'bin' / 'kienzle-update')]
         self.assertEqual(subprocess.run(cli, capture_output=True).returncode, 2)

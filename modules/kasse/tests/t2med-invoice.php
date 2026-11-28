@@ -48,7 +48,7 @@ final class InvoiceFakeHttp extends HttpClient {
     }
 }
 
-/** Statt des Netzwerkspeichers der Suite: Aufträge merken; $failures lässt die nächsten Übergaben scheitern. */
+/** Statt des Netzwerkspeichers von Praxisherz: Aufträge merken; $failures lässt die nächsten Übergaben scheitern. */
 final class FakeExport extends InvoiceExport {
     public array $commands = [], $files = [], $folders = [];
     public int $failures = 0;

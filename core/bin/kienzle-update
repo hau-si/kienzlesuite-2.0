@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -IB
-"""Updater der Kienzle-Suite (nur root, gestartet von systemd).
+"""Updater Praxisherz (nur root, gestartet von systemd).
 
   kienzle-update anwenden    Anfrage des Webinterfaces verarbeiten (kienzle-update.path)
   kienzle-update pruefen     nach neuen Versionen sehen (kienzle-update-pruefen.timer, täglich)

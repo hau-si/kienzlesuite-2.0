@@ -1,11 +1,11 @@
 # Fax: Faxe senden über virtuelle Faxdrucker, Telefonbuch, Sendeprotokoll, Fehlerberichte und Faxeingang.
-# Auf Grundlage von Kienzlefax 3.5.0 (kienzlefax.php) von Dr. Thomas Kienzle, für die Kienzle-Suite 2.0 als Modul umgebaut.
+# Auf Grundlage von Kienzlefax 3.5.0 (kienzlefax.php) von Dr. Thomas Kienzle, für Praxisherz als Modul umgebaut.
 # Gesendet und empfangen wird über die Telefonanlage des Moduls telefon (gemeinsamer Austauschordner).
 
 [module]
 id = "fax"
 name = "Fax"
-version = "0.1.0-beta.12"
+version = "0.1.0-beta.15"
 core_api = "2"
 description = "Papierloses Fax: am PC auf einen Faxdrucker drucken, Empfänger wählen, senden; Sendeprotokoll, Fehlerberichte, Faxeingang. Braucht das Modul Telefon (Telefonanlage); eine Praxis nur mit Fax richtet dort nur die Faxleitung ein."
 requires = ["telefon"]

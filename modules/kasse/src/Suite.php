@@ -3,12 +3,12 @@ declare(strict_types=1);
 namespace KienzleKasse;
 
 /**
- * Anbindung an die Kienzle-Suite 2.0 (docs/MODUL-SCHNITTSTELLE.md der Basis):
+ * Anbindung an Praxisherz 2.0 (docs/MODUL-SCHNITTSTELLE.md der Basis):
  * - Anmeldung, Rolle und Rechte kommen von der Basis (nginx → KIENZLE_* in $_SERVER), keine eigene Anmeldung.
  * - T2med (FHIR), E-Mail und Netzwerkspeicher sind zentrale Verbindungen der Basis; das Modul liest nur seine eigene Datei.
  * - Grundwerte (Starter-Schlüssel, Schlüssel der Einstellungen) liegen im eigenen Datenordner (grundwerte.json, 0600),
  *   angelegt vom Haken bin/install.
- * Daraus entsteht dieselbe Config wie früher aus /etc/kienzle-kasse/kienzle-kasse.toml; die Einstellungen der
+ * Daraus entsteht die Config der Kasse; die Einstellungen der
  * Weboberfläche (Settings) liegen weiter verschlüsselt in der Datenbank darüber.
  */
 final class Suite {
@@ -25,7 +25,7 @@ final class Suite {
     public static function modul(): \KienzleModul {
         if (self::$modul === null) {
             if (!class_exists('KienzleModul', false)) {
-                if (!is_file(self::$helper)) throw new \RuntimeException('Kienzle-Suite nicht gefunden (' . self::$helper . ').');
+                if (!is_file(self::$helper)) throw new \RuntimeException('Praxisherz nicht gefunden (' . self::$helper . ').');
                 require_once self::$helper;
             }
             self::$modul = new \KienzleModul(self::ID);
@@ -45,7 +45,7 @@ final class Suite {
         return preg_match('#^/[a-z0-9-]{1,31}$#D', $p) ? $p : self::PATH;
     }
 
-    /** Servername der Anfrage (nginx lässt nur die Namen der Suite durch); ohne Anfrage „localhost“. */
+    /** Servername der Anfrage (nginx lässt nur die Namen von Praxisherz durch); ohne Anfrage „localhost“. */
     public static function host(): string {
         $h = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
         $h = (string)preg_replace('/:443$/', '', $h);
@@ -164,7 +164,6 @@ final class Suite {
         $v['fhir']['launch_urls'] = $t ? array_values(array_map(static fn($u) => rtrim((string)$u, '/'), (array)($t['launch_urls'] ?? []))) : [];
         if ($t && !$v['fhir']['launch_urls'] && $v['fhir']['base_url'] !== '') $v['fhir']['launch_urls'] = [$v['fhir']['base_url']];
         $v['fhir']['api_key'] = $t ? (string)($t['api_key'] ?? '') : '';
-        if ($t && $v['fhir']['api_key'] === '') $v['fhir']['api_key'] = Settings::T2MED_DEMO_API_KEY;   // wie im alten Tool: leer = T2med-Demo-Schlüssel
         $v['fhir']['ca_file'] = $t ? self::caFile((string)($t['ca_pem'] ?? '')) : '';
         $v['fhir']['pin_certificate'] = $t && !empty($t['pin']) && $v['fhir']['ca_file'] !== '';
         $m = $k->verbindung('mail');

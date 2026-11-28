@@ -52,7 +52,7 @@ final class Config {
         if ($this->get('fhir', 'mode') === 'live') {
             $fhir = parse_url((string)$this->get('fhir', 'base_url'));
             if (!$fhir || ($fhir['scheme'] ?? '') !== 'https' || empty($fhir['host']) || isset($fhir['user']) || isset($fhir['query']) || isset($fhir['fragment'])) throw new \RuntimeException('FHIR benötigt eine feste HTTPS-Basisadresse.');
-            if (!$this->get('fhir', 'api_key') || !is_array($this->get('fhir', 'launch_urls')) || !$this->get('fhir', 'launch_urls')) throw new \RuntimeException('FHIR-Schlüssel oder erlaubte Aufrufadressen fehlen.');
+            if (!is_array($this->get('fhir', 'launch_urls')) || !$this->get('fhir', 'launch_urls')) throw new \RuntimeException('Erlaubte Aufrufadressen für T2med fehlen.');
         }
         $pin = $this->get('fhir', 'pin_certificate', false);
         if (!is_bool($pin)) throw new \RuntimeException('fhir.pin_certificate muss true oder false sein.');
@@ -114,7 +114,7 @@ final class Config {
             if (!is_bool($this->get('invoice_export', 'app_invoices', false))) throw new \RuntimeException('invoice_export.app_invoices muss true oder false sein.');
             if (!is_bool($this->get('invoice_export', 'letter', false))) throw new \RuntimeException('invoice_export.letter muss true oder false sein.');
             if (!$this->get('invoice_inbox', 'enabled', false) && !$this->get('invoice_export', 'app_invoices', false) && !$this->get('invoice_export', 'letter', false)) throw new \RuntimeException('Ablage der Rechnungs-PDF benötigt den Rechnungseingang oder invoice_export.app_invoices = true.');
-            // Ziel des Netzwerkspeichers der Suite (Verbindung „ablage“); die Zugangsdaten kennt nur die Basis.
+            // Ziel des Netzwerkspeichers von Praxisherz (Verbindung „ablage“); die Zugangsdaten kennt nur die Basis.
             $target = $this->get('invoice_export', 'ziel', '');
             if (!is_string($target) || !preg_match('/^[a-z][a-z0-9-]{1,30}$/D', $target)) throw new \RuntimeException('Für die Ablage zuerst unter Verwaltung → Verbindungen einen Netzwerkspeicher einrichten und hier als Ziel wählen.');
             $dir = $this->get('invoice_export', 'directory', '');

@@ -1,6 +1,6 @@
-# Kienzle-Suite, Modul fax: jede Minute (Export auf das NAS, Lauschordner, Faxe mit fester Nummer).
+# Praxisherz, Modul fax: jede Minute (Export auf das NAS, Lauschordner, Faxe mit fester Nummer).
 [Unit]
-Description=Kienzle-Suite Modul fax (Pflege, jede Minute)
+Description=Praxisherz Modul fax (Pflege, jede Minute)
 
 [Timer]
 OnBootSec=2min

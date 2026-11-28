@@ -48,9 +48,9 @@ RESERVED_RIGHTS = frozenset({'admin'})
 APPARMOR = frozenset({'gs', 'qpdf'})
 HOOKS = ('install', 'update', 'remove', 'busy', 'health')
 # Zentrale Verbindungen der Basis, die ein Modul anmelden kann (Zugangsdaten bekommen nur anmeldende Module).
-CONNECTIONS = ('t2med', 'mail', 'ablage', 'letterxpress', 'nachrichten')
+CONNECTIONS = ('t2med', 'mail', 'ablage', 'letterxpress', 'nachrichten', 'uebersetzung')
 SHARES = ('samba', 'ipp')
-STARTER_SCHEMA = re.compile(r'^kienzle-[a-z0-9-]{1,30}$')
+STARTER_SCHEMA = re.compile(r'^praxisherz-[a-z0-9-]{1,30}$')
 # Dienste aus Ubuntu-Paketen, die die Basis abschalten darf, weil das Modul sie selbst betreibt ([system] disables).
 DISABLES = frozenset({'asterisk.service'})
 # Gemeinsame Austauschordner zweier Module ([[exchange]]): /var/spool/kienzle/austausch/<a>_<b> (IDs sortiert).
@@ -65,7 +65,7 @@ LIMITS = {'exchange': 5, 'starters': 5, 'packages': 50, 'services': 20, 'firewal
 SCHEMA_SECTIONS = {
     'module': {'id', 'name', 'version', 'core_api', 'description', 'requires'},
     'system': {'packages', 'services', 'user', 'data', 'disables'},
-    'web': {'path', 'upstream', 'protocol', 'entry', 'starter', 'einstellungen', 'uploads'},   # starter: alter Schlüssel, wird nur noch angenommen und ignoriert
+    'web': {'path', 'upstream', 'protocol', 'entry', 'starter', 'einstellungen', 'uploads', 'personen'},   # starter: alter Schlüssel, wird nur noch angenommen und ignoriert
     'firewall': {'name', 'port', 'proto', 'scope'},
     'rights': {'id', 'label'},
     'backup': {'paths', 'snapshot', 'settings'},
@@ -210,6 +210,8 @@ class _Checker:
         out['fileshares'] = self.fileshares(data.get('fileshare', []), out['system'])
         if (out['exchange'] or out['system']['disables'] or out['fileshares']) and module.get('core_api') == '1':
             self.error('module.core_api', '[[exchange]], [[fileshare]] und [system] disables gibt es erst mit core_api = "2".')
+        if out['web'] and out['web']['personen'] and module.get('core_api') == '1':
+            self.error('web.personen', 'gibt es erst mit core_api = "2".')
         out['setup'] = self.setup(data.get('setup', {}))
         out['hooks'] = self.hooks(data.get('hooks', {}))
         return None if self.errors else out
@@ -289,11 +291,15 @@ class _Checker:
         if not isinstance(uploads, bool):
             self.error('web.uploads', 'muss true oder false sein.')
             uploads = False
+        personen = t.get('personen', False)
+        if not isinstance(personen, bool):
+            self.error('web.personen', 'muss true oder false sein.')
+            personen = False
         settings = t.get('einstellungen')
         if settings is not None and (not isinstance(settings, str) or not re.fullmatch(r'/|/[A-Za-z0-9][A-Za-z0-9._-]{0,60}(/[A-Za-z0-9][A-Za-z0-9._-]{0,60}){0,3}', settings)):
             self.error('web.einstellungen', 'muss ein Pfad unter dem Webpfad sein, z. B. „/settings.php“.')
             settings = None
-        return {'path': path, 'upstream': upstream, 'protocol': protocol, 'entry': entry, 'einstellungen': settings, 'uploads': uploads}
+        return {'path': path, 'upstream': upstream, 'protocol': protocol, 'entry': entry, 'einstellungen': settings, 'uploads': uploads, 'personen': personen}
 
     def firewall(self, items: list) -> list:
         if len(items) > LIMITS['firewall']:
@@ -469,7 +475,7 @@ class _Checker:
         return out
 
     def starters(self, items: list, web: dict | None) -> list:
-        """Startkontexte für den Arbeitsplatz-Starter: je Eintrag ein URL-Schema (kienzle-…://), das T2med aufruft. Der Starter
+        """Startkontexte für den Arbeitsplatz-Starter: je Eintrag ein URL-Schema (praxisherz-…://), das T2med aufruft. Der Starter
         schickt den Kontext an https://<server>/starter/<modul-id>; dort liegt das Modul (nur FastCGI)."""
         if not items:
             return []
@@ -484,11 +490,11 @@ class _Checker:
             where = f'starters[{n}]'
             schema = t.get('schema')
             if not isinstance(schema, str) or not STARTER_SCHEMA.match(schema):
-                self.error(f'{where}.schema', 'muss mit „kienzle-“ beginnen, danach Kleinbuchstaben, Ziffern und Bindestriche (z. B. kienzle-signatur).')
+                self.error(f'{where}.schema', 'muss mit „praxisherz-“ beginnen, danach Kleinbuchstaben, Ziffern und Bindestriche (z. B. praxisherz-signatur).')
                 schema = None
             elif schema in seen:
                 self.error(f'{where}.schema', f'„{schema}“ ist doppelt.')
-            seen.add(schema)
+            seen.add(schema or '')
             out.append({'schema': schema, 'label': self.text(t, 'label', where, limit=60)})
         return out
 

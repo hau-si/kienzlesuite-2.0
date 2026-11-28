@@ -1,5 +1,5 @@
 [Unit]
-Description=Kienzle-Suite nach Updates sehen
+Description=Praxisherz nach Updates sehen
 After=network-online.target
 Wants=network-online.target
 

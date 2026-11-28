@@ -54,7 +54,7 @@ final class App {
                 throw new Problem("Die von t2med übergebene FHIR-Adresse ist nicht freigegeben.\n" .
                     'Von t2med (fhirBasisUrl): ' . self::diagnosticAddress($url) . "\n" .
                     'Im Server erlaubt (launch_urls): ' . implode(', ', $shown) . "\n" .
-                    'Bitte unter Verwaltung → Verbindungen der Suite bei T2med „Erlaubte fhirBasisUrl aus T2med“ prüfen. Gemeint ist die FHIR-Adresse, nicht die Adresse der Zahlungswebseite.');
+                    'Bitte unter Verwaltung → Verbindungen von Praxisherz bei T2med „Erlaubte fhirBasisUrl aus T2med“ prüfen. Gemeint ist die FHIR-Adresse, nicht die Adresse der Zahlungswebseite.');
             }
         }
         $patient = $this->fhir->patient($context, $token);
@@ -67,12 +67,12 @@ final class App {
             $visit = $this->db->one('SELECT * FROM visits WHERE context_id=? AND patient_id=? AND completed_at IS NULL ORDER BY created_at DESC LIMIT 1', [$context, $patient['id']]);
             $id = $visit['id'] ?? self::id();
             if ($visit) {
-                $this->db->query('UPDATE visits SET oauth_cipher=?, expires_at=?, patient_name=?, patient_birthdate=?, patient_address=? WHERE id=?', [$this->encrypt($token), $expires, $patient['name'], $patient['birthdate'], json_encode($patient['address'] ?? [], JSON_THROW_ON_ERROR), $id]);
+                $this->db->query('UPDATE visits SET oauth_cipher=?, expires_at=?, patient_name=?, patient_birthdate=?, patient_address=?, patient_nummer=? WHERE id=?', [$this->encrypt($token), $expires, $patient['name'], $patient['birthdate'], json_encode($patient['address'] ?? [], JSON_THROW_ON_ERROR), (string)($patient['nummer'] ?? ''), $id]);
             } else {
-                $this->db->query('INSERT INTO visits(id,context_id,patient_id,patient_name,patient_birthdate,patient_address,oauth_cipher,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?)', [$id, $context, $patient['id'], $patient['name'], $patient['birthdate'], json_encode($patient['address'] ?? [], JSON_THROW_ON_ERROR), $this->encrypt($token), time(), $expires]);
+                $this->db->query('INSERT INTO visits(id,context_id,patient_id,patient_name,patient_birthdate,patient_address,oauth_cipher,created_at,expires_at,patient_nummer) VALUES(?,?,?,?,?,?,?,?,?,?)', [$id, $context, $patient['id'], $patient['name'], $patient['birthdate'], json_encode($patient['address'] ?? [], JSON_THROW_ON_ERROR), $this->encrypt($token), time(), $expires, (string)($patient['nummer'] ?? '')]);
             }
             $ticket = bin2hex(random_bytes(32));
-            $this->db->query('INSERT INTO launch_tickets(hash,visit_id,expires_at) VALUES(?,?,?)', [hash('sha256', $ticket), $id, time() + 300]);   // 5 Minuten: Zeit für die Anmeldung an der Suite
+            $this->db->query('INSERT INTO launch_tickets(hash,visit_id,expires_at) VALUES(?,?,?)', [hash('sha256', $ticket), $id, time() + 300]);   // 5 Minuten: Zeit für die Anmeldung an Praxisherz
             // Fragment wird weder an nginx übertragen noch in Zugriffslogs gespeichert.
             return ['url' => rtrim($this->config->get('app', 'base_url'), '/') . '/#launch=' . $ticket];
         });
@@ -119,7 +119,7 @@ final class App {
     public function state(array $visit, array $browser): array {
         $payment = $this->db->one("SELECT * FROM payments WHERE visit_id=? AND payment_status<>'discarded' ORDER BY rowid DESC LIMIT 1", [$visit['id']]);
         return ['visit_id' => $visit['id'], 'csrf' => $browser['csrf'], 'manual' => self::isManual($visit),
-            'patient' => ['name' => $visit['patient_name'], 'birthdate' => $visit['patient_birthdate']],
+            'patient' => ['name' => $visit['patient_name'], 'birthdate' => $visit['patient_birthdate'], 'nummer' => (string)($visit['patient_nummer'] ?? '')],
             'completed' => $visit['completed_at'] !== null,
             't2med' => !self::isManual($visit) && $visit['patient_id'] !== 'inbox' && $visit['oauth_cipher'] !== '',
             'services' => array_map(static fn($s) => ['vat' => (bool)$s['vat'], 'signature' => (bool)$s['signature']] + $s, $this->db->query('SELECT id,label,category,price_cents,goae_code,factor,fee_type,on_request,vat,base_cents,default_reason,signature FROM services WHERE active=1 ORDER BY LENGTH(category)=0, category COLLATE NOCASE, label COLLATE NOCASE')->fetchAll()),
@@ -150,6 +150,28 @@ final class App {
      * Leerer Vorgang ohne Patientenakte für die Startseite der Kasse: Leistungen (GOÄ/IGeL) oder ein freier Betrag, Karte, Bar oder Überweisung.
      * Name und Geburtsdatum des Patienten sind beim Bezahlen optional (siehe start()).
      */
+    /**
+     * Patientenübergabe aus einem anderen Modul (zuerst Signatur, docs/MODUL-SCHNITTSTELLE.md): Dort liegt im gemeinsamen Austauschordner
+     * uebergabe-kasse/<code>.json mit T2med-Kontext und Zugriffstoken (höchstens 5 Minuten alt). Einmalig einlösen (Datei wird gelöscht)
+     * und damit einen Besuch anlegen wie beim Aufruf aus T2med; der Zugang endet spätestens mit dem ursprünglichen Aufruf (4 Stunden).
+     */
+    public function uebergabeEinloesen(string $code, string $ordner, ?int $jetzt = null): array {
+        $jetzt ??= time();
+        if (!preg_match('/^[0-9a-f]{32}$/D', $code)) throw new Problem('Ungültige Übergabe.');
+        $datei = $ordner . '/uebergabe-kasse/' . $code . '.json';
+        $roh = is_file($datei) && !is_link($datei) && filesize($datei) <= 20000 ? (string)file_get_contents($datei) : '';
+        @unlink($datei);
+        $d = json_decode($roh, true);
+        if (!is_array($d) || !is_string($d['kontext'] ?? null) || !is_string($d['token'] ?? null) || (int)($d['zeit'] ?? 0) < $jetzt - 300 || (int)($d['zeit'] ?? 0) > $jetzt + 60) {
+            throw new Problem('Die Übergabe ist abgelaufen oder schon verwendet. Bitte im anderen Modul erneut „Zur Kasse“ wählen.', 410);
+        }
+        $basis = $this->config->get('fhir', 'launch_urls', [])[0] ?? $this->config->get('fhir', 'base_url', '');
+        $result = $this->launch(['context_id' => $d['kontext'], 'oauth_token' => $d['token'], 'fhir_base_url' => (string)$basis]);
+        $bis = (int)($d['bis'] ?? 0);
+        // Gebundene Werte sind Text: deshalb kein MIN(), sondern Vergleich mit der Spalte (INTEGER-Affinität).
+        if ($bis > $jetzt) $this->db->query('UPDATE visits SET expires_at=? WHERE context_id=? AND expires_at>?', [$bis, $d['kontext'], $bis]);
+        return $result;
+    }
     public function manualOpen(): array {
         $id = self::id();
         $this->db->query('INSERT INTO visits(id,context_id,patient_id,patient_name,patient_birthdate,patient_address,oauth_cipher,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?)',
@@ -893,6 +915,71 @@ final class App {
             default => 'Druckübergabe nicht bestätigt. Drucker und Warteschlange prüfen, bevor erneut gedruckt wird.',
         }];
     }
+    /** Übergabe an Signatur: T2med-Zugang dieses Besuchs für die Ablage des unterschriebenen PDFs vormerken. */
+    public function signaturOffen(array $visit): array {
+        if (self::isManual($visit) || $visit['patient_id'] === 'inbox' || $visit['oauth_cipher'] === '') return ['ablage' => false];
+        $this->db->query('UPDATE visits SET signatur_offen=1 WHERE id=?', [$visit['id']]);
+        return ['ablage' => true];
+    }
+
+    /**
+     * Unterschriebene PDFs aus Signatur (Austauschordner an-kasse/) in die T2med-Akte schreiben und das Ergebnis zurückmelden
+     * (von-kasse/<vorgang>.json). Zugang: der Besuch, aus dem die Übergabe kam, sonst ein noch gültiger Besuch desselben Patienten.
+     * @return list<string> Protokollzeilen ohne Patientendaten
+     */
+    public function signaturAblage(string $ordner, ?int $jetzt = null): array {
+        $jetzt ??= time();
+        $log = [];
+        $aus = $ordner . '/von-kasse';
+        if (!is_dir($aus)) { @mkdir($aus, 0770); @chmod($aus, 0770); }
+        foreach (array_slice(glob($ordner . '/an-kasse/*.json') ?: [], 0, 20) as $datei) {
+            if (!preg_match('#/([1-9][0-9]{0,9})\.json$#D', $datei, $m)) { @unlink($datei); continue; }
+            $vid = (int)$m[1];
+            $pdfDatei = $ordner . '/an-kasse/' . $vid . '.pdf';
+            $antwort = static function (bool $ok, string $meldung) use ($aus, $vid, $datei, $pdfDatei): void {
+                $tmp = $aus . '/.' . $vid . '.' . bin2hex(random_bytes(4));
+                file_put_contents($tmp, json_encode(['vorgang' => $vid, 'ok' => $ok, 'meldung' => mb_substr($meldung, 0, 250)], JSON_UNESCAPED_UNICODE));
+                @chmod($tmp, 0660);
+                rename($tmp, $aus . '/' . $vid . '.json');
+                @unlink($datei);
+                @unlink($pdfDatei);
+            };
+            try {
+                $a = is_link($datei) || filesize($datei) > 65536 ? null : json_decode((string)file_get_contents($datei), true);
+                if (!is_array($a) || (int)($a['vorgang'] ?? 0) !== $vid || !is_string($a['ref'] ?? null) || !preg_match('/^[A-Za-z0-9_-]{1,64}$/D', $a['ref'])) throw new Problem('Auftrag der Signatur ist ungültig.');
+                $pdf = !is_link($pdfDatei) && is_file($pdfDatei) && filesize($pdfDatei) <= 10 * 1024 * 1024 ? (string)file_get_contents($pdfDatei) : '';
+                if (!str_starts_with($pdf, '%PDF-')) throw new Problem('Das PDF fehlt oder ist zu groß.');
+                $visit = $this->db->one('SELECT * FROM visits WHERE id=?', [$a['ref']]);
+                if (!$visit) throw new Problem('Der Kassenvorgang ist nicht mehr vorhanden.');
+                $zugang = $visit['oauth_cipher'] !== '' && (int)$visit['expires_at'] > $jetzt ? $visit
+                    : $this->db->one("SELECT * FROM visits WHERE patient_id=? AND oauth_cipher<>'' AND expires_at>? AND patient_id NOT IN ('manual','inbox') AND context_id NOT LIKE 'manual-%' AND context_id NOT LIKE 'inbox-%' ORDER BY created_at DESC LIMIT 1", [$visit['patient_id'], $jetzt]);
+                if (!$zugang) throw new Problem('Der T2med-Zugang der Kasse ist abgelaufen (höchstens 4 Stunden). Bitte den Patienten frisch aus T2med in der Kasse öffnen und in Signatur „Erneut in T2med ablegen“ wählen.');
+                $titel = is_string($a['titel'] ?? null) ? $a['titel'] : 'Unterschriebenes Dokument';
+                $echt = $this->config->get('fhir', 'mode') !== 'mock';
+                $token = $this->decrypt($zugang['oauth_cipher']);
+                if ($echt) $this->fhir->dokument((string)$zugang['context_id'], $token, $pdf, $titel, (int)($a['zeit'] ?? $jetzt));
+                // Akteneintrag (Text je Baustein aus der Signaturvorlage) erst nach dem PDF; scheitert er, bleibt das PDF abgelegt.
+                $hinweis = '';
+                $akte = is_string($a['akte'] ?? null) ? mb_substr(trim($a['akte']), 0, 4000) : '';
+                $kuerzel = is_string($a['kuerzel'] ?? null) && preg_match('/^[A-Za-z0-9ÄÖÜäöüß_-]{1,12}$/uD', $a['kuerzel']) ? $a['kuerzel'] : 'SIGN';
+                if ($akte !== '' && $echt) {
+                    try { $this->fhir->eintrag((string)$zugang['context_id'], $token, $kuerzel, $akte, (int)($a['zeit'] ?? $jetzt)); }
+                    catch (Problem | TransportError $e) { $hinweis = 'PDF abgelegt, Akteneintrag nicht: ' . $e->getMessage(); }
+                }
+                $this->db->query("UPDATE visits SET signatur_offen=0, oauth_cipher=CASE WHEN completed_at IS NOT NULL THEN '' ELSE oauth_cipher END WHERE id=?", [$visit['id']]);
+                $antwort(true, $hinweis);
+                $log[] = "Vorgang $vid: in T2med abgelegt";
+            } catch (Problem | TransportError $e) {
+                $antwort(false, $e->getMessage());
+                $log[] = "Vorgang $vid: nicht abgelegt";
+            } catch (\Throwable $e) {
+                $antwort(false, 'Interner Fehler der Kasse (' . get_class($e) . ').');
+                $log[] = "Vorgang $vid: interner Fehler";
+            }
+        }
+        return $log;
+    }
+
     /** Kontaktdaten des Patienten (Telefon, E-Mail, Anschrift) für die Übergabe an Signatur, frisch aus T2med; ohne T2med leer. */
     public function patientKontakt(array $visit): array {
         $leer = ['vorname' => '', 'nachname' => '', 'geschlecht' => 'unknown', 'telefon' => '', 'email' => '', 'adresse' => '', 'geburtsdatum' => (string)$visit['patient_birthdate'], 'hinweis' => ''];
@@ -1047,8 +1134,12 @@ final class App {
             return ['reader_payment' => $current, 'message' => $message];
         }));
     }
-    public function document(array $visit, string $id): array {
-        return $this->db->locked('payment-' . $id, function () use ($visit, $id): array {
+    /**
+     * Zahlung in die Akte schreiben. Ist ein früherer Versuch ungeklärt (writing/unknown), schreibt die Kasse erst nach Bestätigung
+     * erneut ($bestaetigt): T2med erlaubt keine Suche nach vorhandenen Einträgen, die Mitarbeiterin prüft die Akte selbst.
+     */
+    public function document(array $visit, string $id, bool $bestaetigt = false): array {
+        return $this->db->locked('payment-' . $id, function () use ($visit, $id, $bestaetigt): array {
             $p = $this->payment($visit, $id);
             if ($p['doc_status'] === 'written') return $this->publicPayment($p);
             if ($p['payment_status'] !== 'successful') throw new Problem('Die Zahlung ist noch nicht als erfolgreich bestätigt.', 409);
@@ -1056,19 +1147,9 @@ final class App {
             if (self::isManual($visit)) return $this->finish($p, 'manuell');
             if ($this->config->get('fhir', 'mode') === 'live' && $p['invoice_json'] && json_decode($p['invoice_json'], true, 32, JSON_THROW_ON_ERROR)['mock']) throw new Problem('Ein Testbeleg darf nicht in eine echte Patientenakte geschrieben werden.', 409);
             $token = $this->decrypt($visit['oauth_cipher']);
-            $conditional = false;
-            if ($this->config->get('fhir', 'mode') === 'live') {
-                $conditional = $this->fhir->supportsConditionalCreate($token);
-                if (in_array($p['doc_status'], ['writing', 'unknown'], true)) {
-                    try {
-                        $found = $this->fhir->findPayment($visit, $p, $token);
-                        if ($found) return $this->finish($p, $found);
-                    } catch (TransportError) { /* Nur ein garantiert bedingtes POST darf noch schreiben. */ }
-                    if (!$conditional) {
-                        $this->db->query("UPDATE payments SET doc_status='unknown',error_message=? WHERE id=?", ['Der letzte Schreibversuch ist ungeklärt. Bitte Akte prüfen. Erneutes Klicken prüft zunächst auf den vorhandenen Eintrag.', $id]);
-                        return $this->publicPayment($this->payment($visit, $id));
-                    }
-                }
+            if ($this->config->get('fhir', 'mode') === 'live' && in_array($p['doc_status'], ['writing', 'unknown'], true) && !$bestaetigt) {
+                $this->db->query("UPDATE payments SET doc_status='unknown',error_message=? WHERE id=?", ['Der letzte Schreibversuch ist ungeklärt. Bitte in der T2med-Akte nachsehen, ob der Eintrag schon da ist. Nur wenn nicht: erneut schreiben.', $id]);
+                return $this->publicPayment($this->payment($visit, $id));
             }
             $this->db->query("UPDATE payments SET doc_status='writing',error_message='' WHERE id=?", [$id]);
             try {
@@ -1076,7 +1157,7 @@ final class App {
                     if ($visit['mock_document_fail']) throw new TransportError('Simulierter t2med-Fehler. Testfehler ausschalten und erneut klicken.', false, 503);
                     $this->db->query('INSERT OR IGNORE INTO mock_records(payment_id,resource_json,created_at) VALUES(?,?,?)', [$id, json_encode($this->fhir->resource($visit, $p), JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE), time()]);
                     $resource = 'MockObservation/' . $id;
-                } else $resource = $this->fhir->write($visit, $p, $token, $conditional);
+                } else $resource = $this->fhir->write($visit, $p, $token);
                 return $this->finish($p, $resource);
             } catch (TransportError $e) {
                 $this->db->query('UPDATE payments SET doc_status=?,error_message=? WHERE id=?', [$e->ambiguous ? 'unknown' : 'failed', $e->getMessage(), $id]);
@@ -1087,7 +1168,9 @@ final class App {
     private function finish(array $payment, string $resource): array {
         $this->db->transaction(function () use ($payment, $resource): void {
             $this->db->query("UPDATE payments SET doc_status='written',fhir_written_at=?,fhir_resource_id=?,error_message='' WHERE id=?", [time(), $resource, $payment['id']]);
-            $this->db->query("UPDATE visits SET completed_at=?,oauth_cipher='' WHERE id=?", [time(), $payment['visit_id']]);
+            // Liegt ein Dokument noch zur Unterschrift in Signatur, bleibt der T2med-Zugang (höchstens bis zum Ablauf nach 4 Stunden),
+            // damit die Kasse das unterschriebene PDF danach in die Akte schreiben kann.
+            $this->db->query("UPDATE visits SET completed_at=?,oauth_cipher=CASE WHEN signatur_offen=1 THEN oauth_cipher ELSE '' END WHERE id=?", [time(), $payment['visit_id']]);
         });
         // Spätestens beim Abschluss die Rechnungs-PDF ablegen; ein Fehler blockiert die Dokumentation nicht.
         $this->exportPayment($this->db->one('SELECT * FROM payments WHERE id=?', [$payment['id']]));

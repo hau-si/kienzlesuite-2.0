@@ -1,5 +1,57 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.30
+
+- Texte ohne „Kienzle“ (Modulbeschreibung, Sprachmenü-Hinweis, Kennung der Telefon-Einrichtung). Mit Tests geprüft, nicht auf der VM.
+
+## 0.1.0-beta.29
+
+- Texte: „die Suite“/„der Suite“ heißt jetzt überall „Praxisherz“. Nur Texte geändert, mit Tests geprüft, nicht auf der VM.
+
+## 0.1.0-beta.28
+
+- **Neue Aufrufadresse aus T2med: `praxisherz-telefonverzeichnis://…`** (Einstellungen). Die frühere Adresse `kienzle-telefonverzeichnis://…` funktioniert weiter. Braucht Basis 0.22.0-beta.32. Mit Tests geprüft, nicht auf der VM und nicht mit T2med.
+
+## 0.1.0-beta.27
+
+- **Neuer Name: „Praxisherz – freie Software für die Arztpraxis“** (vorher Kienzle-Suite) in Texten, Hinweisen und Dienstbeschreibungen; der Agent heißt „Praxisherz-Agent“. Programmteile von Thomas Kienzle (Kienzlefon) unverändert. Mit Tests geprüft, nicht auf der VM.
+
+## 0.1.0-beta.26
+
+- **Kein Demo-Schlüssel mehr (Vorgabe von T2med).** Ohne T2med-API-Schlüssel in der Basis lädt das Telefonverzeichnis nicht und meldet das klar; die Begrenzung für den Demo-Schlüssel entfällt.
+- Mit Tests geprüft. **Nicht auf der VM und nicht mit echtem T2med geprüft.**
+
+## 0.1.0-beta.25
+
+- **Fehler behoben: „Einstellungen“ und „Statistik“ ließen sich nicht öffnen** („Die Telefon-Seite ist gerade nicht erreichbar“). Statistik und Telefonverzeichnis öffneten ihre Datenbanken über eine `file:…?mode=ro`-Adresse. Die Schutzeinstellung `open_basedir` der Module lehnt solche Adressen ab, sobald die Datenbank existiert. Jetzt wird die Datei normal geöffnet und nur lesend gekennzeichnet (`SQLITE_OPEN_READONLY`).
+- Die Seitentests laufen jetzt mit `open_basedir` wie auf dem Server und mit vorhandenen Datenbanken; so wäre der Fehler aufgefallen.
+- **Nicht auf der VM geprüft.**
+
+## 0.1.0-beta.24
+
+- **Fax-Worker (`kienzlefax-worker.py`) auf 1.3.20:** Bei erfolgreich gesendeten Faxen wird das Original jetzt zusätzlich nach `sendeberichte/eingang/` kopiert (`copy_original_to_ok_in`, analog zum bestehenden `copy_original_to_fail_in` bei Fehlern), damit das Modul Fax erfolgreich gesendete Faxe für begrenzte Zeit erneut senden kann (Wunsch des Nutzers). Einzige bewusste Abweichung vom unveränderten Original-Worker von Dr. Thomas Kienzle, siehe Kommentar im Dateikopf. Zugleich trägt der Dateiname eines zum erneuten Senden aufbewahrten Originals (Erfolg wie Fehler) jetzt immer die Auftrags-ID, nicht nur bei einer Namenskollision, damit das Modul Fax das richtige Original eindeutig findet.
+- Format des Austauschordners entsprechend ergänzt (`modules/telefon/docs/AUSTAUSCH-FAX.md`).
+
+## 0.1.0-beta.23
+
+- **Sicherheitsupdates für die optionale Sprachausgabe Kokoro** (GitHub-Sicherheitswarnungen): Das Modul lädt Kokoro jetzt mit einer eigenen Paketliste `lib/kokoro/requirements-cpu.lock.txt` – die Liste von Kienzlefon mit neueren Fassungen von `certifi` (2026.10.18), `filelock` (4.2.1), `setuptools` (84.1.0), `transformers` (4.57.6) und dazu `tokenizers` (0.22.2). Die Liste von Thomas bleibt unverändert (übernommener Code); die Modellliste mit den Prüfsummen kommt weiter von dort.
+- Verbleibende Hinweise zu `transformers` betreffen nur das Laden fremder, manipulierter Modelle oder Konfigurationen; Kokoro lädt ausschließlich feste Modelle mit geprüften Prüfsummen. Ein Wechsel auf `transformers` 5 würde sie beheben, ist aber ein großer Versionssprung und erst nach einem echten Test sinnvoll.
+- Wer Kokoro schon eingerichtet hat: unter „Sprachmenü“ Kokoro einmal neu laden, dann entsteht eine neue Umgebung mit den aktualisierten Paketen. Piper (Standard) und Whisper waren nicht betroffen.
+- Geprüft mit Tests (Paketliste, Aufruf des Installers mit der Liste des Moduls) und einer Abhängigkeitsprüfung mit pip (Auflösung ohne Konflikt). **Nicht geprüft:** echte Kokoro-Installation und Ansagen mit den neuen Paketen (PyTorch-Quelle aus der Sitzung nicht erreichbar), VM.
+
+## 0.1.0-beta.22
+
+- **Schutz des T2med-Demo-Schlüssels:** Ist in der Basis kein eigener T2med-API-Schlüssel hinterlegt (öffentlicher Demo-Schlüssel), lädt das Telefonverzeichnis je Aufruf höchstens 3 Seiten, also höchstens 3 Anfragen an T2med. So wird der Demo-Schlüssel nicht wegen zu vieler Anfragen gesperrt. Die Einstellungen und die Meldung nach dem Laden weisen darauf hin; mit eigenem Schlüssel wird wie bisher alles geladen.
+- Geprüft mit Tests (nachgestelltes T2med mit 6 Seiten: Demo 3 Anfragen, eigener Schlüssel alle). **Nicht mit echtem T2med geprüft.**
+
+## 0.1.0-beta.21
+
+- **Fehler behoben: Anrufe auf die Telefonnummer landeten beim Fax (Faxton).** Melden sich Telefon- und Faxleitung beim selben Anbieter-Server an (z. B. zwei voip2gsm-Leitungen), kann Asterisk einen eingehenden Anruf nicht sicher der richtigen Leitung zuordnen und nahm die Faxleitung. Jetzt kennt jede Leitung alle eingetragenen Rufnummern; die gewählte Nummer entscheidet, ob der Anruf zum Telefon, zum Fax oder in den Überlauf geht.
+- **Fehler behoben: Mit Sprachmenü (Kienzlefon) ging kein Anruf nach draußen über voip2gsm** („Everyone is busy/congested“). Kienzlefon wählte die Nummer als „49…“; voip2gsm nimmt nur „0…“ bzw. „00…“ an. Die Anlage setzt dafür jetzt `sip_zielformate` (Format `national`) für jede voip2gsm-Leitung in `kienzlefon.toml`.
+- **Fehler behoben: Faxversand mit „Permission denied“** (Ghostscript/qpdf unter AppArmor): Das Modul meldet `gs` und `qpdf` jetzt bei der Basis an (`apparmor = ["gs", "qpdf"]`); zusammen mit Basis 0.22.0-beta.14 dürfen beide im Austauschordner arbeiten.
+- Nach dem Update werden die Dateien der Anlage automatisch neu erzeugt; nichts neu einzustellen.
+- Geprüft mit Tests (Dialplan, Zielformat über die Wahlprüfung von Kienzlefon). **Nicht geprüft:** echte Anrufe über voip2gsm auf der VM.
+
 ## 0.1.0-beta.20
 
 - **Telefonverzeichnis aus T2med** (Einstellungen → „T2med-Telefonverzeichnis“): In T2med einen Drittanbieter-Eintrag `kienzle-telefonverzeichnis://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}` anlegen und aufrufen. Die Suite lädt dann alle Patienten (Name, Geburtsdatum, Telefonnummern, Patientennummer) Schritt für Schritt mit Fortschritt oben auf der Seite; die alte Fassung bleibt bis zum Ende gültig. Nur die in der Basis freigegebene FHIR-Adresse wird angefragt; das Token liegt nur verschlüsselt und höchstens 4 Stunden auf dem Server. Datei `<daten>/t2med/patienten.sqlite` (0600). Einstellbar: Ortsvorwahl (für Nummern ohne Vorwahl), Anrufername an/aus, Verzeichnis löschen.

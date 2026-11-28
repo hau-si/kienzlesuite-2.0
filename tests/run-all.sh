@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Alle Tests der Kienzle-Suite. Muss vor jedem Commit grün sein (AGENTS.md).
+# Alle Tests Praxisherz. Muss vor jedem Commit grün sein (AGENTS.md).
 #   bash tests/run-all.sh
 set -euo pipefail
 cd -- "$(dirname -- "$0")/.."
@@ -61,7 +61,7 @@ step 'PHP: Basis (tests/php)'
 for t in tests/php/core.php tests/php/passkeys.php tests/php/web.php tests/php/cli.php tests/php/firewall.php tests/php/updates.php tests/php/verbindungen.php tests/php/sicherung.php tests/php/einrichtung.php tests/php/drucker.php tests/php/oidc.php tests/php/server.php tests/php/uhrzeit.php tests/php/module.php tests/php/startseite.php tests/php/konto_mail.php tests/php/starter.php tests/php/arbeitsplaetze.php; do echo "-- $t"; php "$t"; done
 
 step 'Modul Kasse (modules/kasse/tests)'
-for t in critical reader-cancel invoice t2med-invoice letterxpress letterdrucker auto-print settings tax goae-t2med cash transfer print-format mail-mime suite fhir-error startseite review discard goae-verzeichnis; do
+for t in critical reader-cancel invoice t2med-invoice letterxpress letterdrucker auto-print settings tax goae-t2med cash transfer print-format mail-mime suite fhir-error startseite review discard goae-verzeichnis signatur-ablage; do
   echo "-- $t"; php "modules/kasse/tests/$t.php"
 done
 grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/kasse/module.toml | head -1)" modules/kasse/VERSION || { echo 'modules/kasse/VERSION passt nicht zu module.toml'; exit 1; }
@@ -103,6 +103,12 @@ php modules/fax/tests/fax.php
 php modules/fax/tests/seiten.php
 grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/fax/module.toml | head -1)" modules/fax/VERSION || { echo 'modules/fax/VERSION passt nicht zu module.toml'; exit 1; }
 for h in modules/fax/bin/* modules/fax/printer/*; do sh -n "$h"; done
+
+step 'Modul Qualitätsmanagement (modules/qm/tests)'
+php modules/qm/tests/qm.php
+php modules/qm/tests/seiten.php
+grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/qm/module.toml | head -1)" modules/qm/VERSION || { echo 'modules/qm/VERSION passt nicht zu module.toml'; exit 1; }
+for h in modules/qm/bin/*; do sh -n "$h"; done
 
 step 'Arbeitsplatz-Starter (core/client/starter)'
 if command -v go >/dev/null; then (cd core/client/starter && go vet ./... && go test ./...); else echo 'go nicht installiert – Starter-Tests übersprungen.'; fi

@@ -1,4 +1,4 @@
-/* Signatur im Rahmen der Suite: Seitenleiste, Karten und Knöpfe kommen von core.css; hier nur die Teile dieser Seite. */
+/* Signatur im Rahmen von Praxisherz: Seitenleiste, Karten und Knöpfe kommen von core.css; hier nur die Teile dieser Seite. */
 main.modul { max-width: 940px; margin: 0; padding: 32px 40px 48px; }
 .seitenkopf { margin-bottom: 8px; }
 .seitenkopf h1 { margin: 6px 0 0; }
@@ -62,7 +62,7 @@ main.modul { max-width: 940px; margin: 0; padding: 32px 40px 48px; }
 .us-platz { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 2px 0 6px; }
 .us-platz button { font-family: ui-monospace, monospace; }
 
-.us-gewaehlt { border-left: 4px solid var(--teal, #12695d); }
+.us-gewaehlt { border-left: 0; }
 .us-gewaehlt .us-patient { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 
 .button.mit-icon { display: inline-flex; align-items: center; gap: 8px; }
@@ -85,3 +85,121 @@ main.modul { max-width: 1180px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .us-gewaehlt #n-patient-feld { min-width: 280px; flex: 1; }
 .us-gewaehlt #n-patient-feld input { width: 100%; font-size: 20px; }
+a.button.small { min-height: 0; padding: 4px 10px; font-size: 13px; }
+.us-dokument { white-space: pre-wrap; line-height: 1.55; max-width: 820px; }
+
+/* Gleiche Seitenbreite wie die Kasse (Gestaltungsregel der Module). */
+main.modul { max-width: 1400px; }
+/* Patientenkarte: Grundlage in core.css; ohne Patient trägt sie das Namensfeld. */
+.us-gewaehlt #n-patient-feld input { margin: 0; }
+.us-pk-anzeige { display: flex; flex-direction: column; }
+.us-pk-anzeige[hidden] { display: none; }
+
+/* Live-Vorschau des Pads in der Vorgangskarte */
+.us-padvorschau { margin: 8px 0 4px; }
+.us-padvorschau img { display: block; width: 100%; border-radius: 8px; border: 1px solid #cfdcd7; background: #fff; }
+.us-pv-stand { display: flex; align-items: center; gap: 7px; margin-top: 5px; }
+.us-pv-punkt { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #9aa5a2; }
+.us-padvorschau.live .us-pv-punkt { background: #2fb36b; }
+
+/* Kopf: kleines Zahnrad rechts (nur Symbol), Symbol-Knöpfe in der linken Spalte (Archivieren, Löschen rot) */
+.us-zahnrad { padding: 0; width: 42px; }
+.us-zahnrad svg { margin: 0; width: 20px; height: 20px; }
+button.us-symbol, a.us-symbol { display: inline-grid; place-items: center; min-height: 30px; width: 32px; padding: 0; background: var(--soft); color: #315f53; border-radius: 8px; }
+button.us-symbol.rot { background: #fdecea; color: #b42318; }
+button.us-symbol svg, a.us-symbol svg { width: 16px; height: 16px; }
+
+/* Editor (Entwurf C): Bausteine | Dokument | Eigenschaften + Vorschau am Pad */
+.ed-grid { display: grid; grid-template-columns: 210px minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
+@media (max-width: 1100px) { .ed-grid { grid-template-columns: 1fr; } }
+.ed-links h2, .ed-rechts h2 { font-size: 16px; margin: 0 0 8px; }
+.ed-abstand { margin-top: 20px !important; }
+.ed-palette { display: flex; flex-direction: column; gap: 6px; }
+button.ed-baustein { justify-content: flex-start; gap: 8px; min-height: 38px; background: #fff; color: #203c43; border: 1px solid var(--line); font-weight: 600; cursor: grab; }
+button.ed-baustein:hover { border-color: var(--teal); filter: none; }
+.ed-vorlagen { display: flex; flex-direction: column; gap: 4px; }
+.ed-vorlage { display: block; padding: 8px 10px; border-radius: 9px; border: 1px solid transparent; color: #203c43; text-decoration: none; font-weight: 600; font-size: 14px; }
+.ed-vorlage small { display: block; color: var(--muted); font-weight: 400; font-size: 12px; }
+.ed-vorlage:hover { background: var(--soft); }
+.ed-vorlage.an { border-color: var(--teal); background: #f2f9f7; }
+.ed-vorlage.aus { opacity: .7; }
+.ed-vorlage.neu { color: var(--teal); }
+.ed-kopf { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.ed-dok { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; flex: 1; }
+.ed-dok input#ed-titel { flex: 1 1 100%; font-size: 18px; font-weight: 650; }
+.ed-dok select { width: auto; }
+.ed-aktionen { display: flex; gap: 8px; align-items: center; }
+#ed-speichern.ed-ungespeichert::after { content: " •"; }
+.ed-meldung.ok { color: var(--ok); } .ed-meldung.fehler { color: var(--error); }
+.ed-zeile { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; grid-template-areas: 'griff typ knoepfe' 'griff inhalt inhalt'; gap: 4px 10px; align-items: start; padding: 10px 12px; margin: 8px 0; border: 1px solid var(--line); border-radius: 12px; background: #fbfcfb; cursor: pointer; }
+.ed-zeile.an { border-color: var(--teal); box-shadow: 0 0 0 2px #a3d0c2; background: #fff; }
+.ed-zeile.ziel, .ed-ende.ziel { border-color: var(--teal); border-style: dashed; background: #f2f9f7; }
+.ed-griff { grid-area: griff; color: #a6b5b0; cursor: grab; user-select: none; line-height: 1.4; }
+.ed-typ { grid-area: typ; font-size: 10.5px; font-weight: 750; letter-spacing: .4px; overflow-wrap: anywhere; color: var(--teal); text-transform: uppercase; padding-top: 3px; }
+.ed-inhalt { grid-area: inhalt; font-size: 14px; overflow-wrap: anywhere; }
+.ed-inhalt p, .ed-inhalt h3, .ed-inhalt ul, .ed-inhalt ol { margin: 0 0 4px; }
+.ed-inhalt h3 { font-size: 16px; }
+.ed-zknoepfe { grid-area: knoepfe; display: flex; gap: 4px; }
+button.ed-mini { min-height: 28px; min-width: 28px; padding: 0 7px; font-size: 13px; background: var(--soft); color: #315f53; border-radius: 7px; }
+button.ed-mini.rot { background: #fdecea; color: #b42318; }
+button.ed-mini.breit { padding: 0 9px; }
+.ed-ende { border: 1.5px dashed #a3d0c2; border-radius: 12px; padding: 12px; text-align: center; color: var(--teal); font-weight: 600; font-size: 14px; margin-top: 8px; }
+.ed-chip { font-size: 11px; background: var(--soft); border-radius: 6px; padding: 1px 7px; color: #315f53; font-weight: 600; }
+.ed-kasten, .ed-kreis { display: inline-block; width: 13px; height: 13px; border: 2px solid #315f53; margin-right: 6px; vertical-align: -2px; }
+.ed-kasten { border-radius: 3px; } .ed-kreis { border-radius: 50%; }
+.ed-feld { border: 1px solid #cad8d2; border-radius: 6px; padding: 4px 8px; margin: 3px 0; }
+.ed-feld em { color: var(--teal); font-style: normal; font-weight: 650; font-size: 12px; float: right; }
+.ed-typkopf { font-weight: 750; color: var(--teal); margin: 0 0 8px; }
+.ed-label { display: block; margin: 10px 0 4px; font-size: 14px; }
+.ed-label input, .ed-label textarea { display: block; width: 100%; margin-top: 4px; }
+.ed-leiste { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; align-items: center; }
+.ed-platzhalter { width: auto; font-size: 13px; min-height: 28px; padding: 2px 6px; }
+#ed-eigenschaften textarea { width: 100%; font-family: inherit; }
+.ed-bild { display: block; max-width: 100%; height: auto; }
+.ed-bild.b20 { width: 20%; } .ed-bild.b30 { width: 30%; } .ed-bild.b40 { width: 40%; } .ed-bild.b50 { width: 50%; } .ed-bild.b60 { width: 60%; }
+.ed-bild.b70 { width: 70%; } .ed-bild.b80 { width: 80%; } .ed-bild.b90 { width: 90%; } .ed-bild.b100 { width: 100%; }
+.ed-pad { background: #1f2a28; border-radius: 16px; padding: 14px; }
+.ed-padscreen { background: #fff; border-radius: 6px; padding: 14px; font-size: 12px; line-height: 1.5; min-height: 260px; max-height: 560px; overflow-y: auto; }
+.ed-padscreen p, .ed-padscreen h3 { margin: 0 0 6px; } .ed-padscreen h3 { font-size: 14px; }
+.ed-pt { font-weight: 700; font-size: 13px; margin-bottom: 8px; color: var(--teal); }
+.ed-seitenwechsel { text-align: center; color: var(--muted); border-top: 1px dashed var(--line); margin: 8px 0; font-size: 11px; }
+.ed-pknoepfe { display: flex; gap: 8px; margin-top: 10px; }
+.ed-pknoepfe span { flex: 1; text-align: center; padding: 6px; border-radius: 6px; background: var(--soft); font-size: 11px; }
+.ed-pknoepfe span.h { background: var(--teal); color: #fff; }
+/* Eintrag in die T2med-Akte je Baustein */
+.ed-akte { margin-top: 14px; border-top: 1px solid var(--line, #dde3ea); padding-top: 8px; }
+.ed-akte summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.ed-akte textarea { display: block; width: 100%; margin: 6px 0; }
+#ed-kuerzel { width: 90px; }
+/* Dokumentliste: Suche, Gruppen, Favoriten, zuletzt gewählte */
+.us-dokwerkzeug { display: grid; gap: 8px; margin-bottom: 8px; }
+.us-dokwerkzeug input[type=search] { width: 100%; }
+.us-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.us-chip { border: 1px solid #d5dde3; background: #fff; border-radius: 999px; padding: 4px 12px; font-size: 14px; cursor: pointer; color: inherit; }
+.us-chip.an { background: var(--teal, #0f766e); border-color: var(--teal, #0f766e); color: #fff; }
+.us-zuletzt .us-chip { background: #f4f7f6; }
+.us-dokzeile { display: flex; align-items: center; border-bottom: 1px solid #edf0ee; }
+.us-dokzeile .us-dok { flex: 1; border-bottom: 0 !important; }
+.us-stern { background: none; border: 0; padding: 8px; color: #9aa6ae; cursor: pointer; }
+.us-stern.an { color: #d99a00; }
+.us-stern.an svg { fill: currentColor; }
+#ed-vsuche { width: 100%; margin-bottom: 6px; }
+.ed-vgkopf { margin: 10px 0 2px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #6b7780; font-weight: 600; }
+.ed-fav { color: #d99a00; }
+#ed-gruppen { width: 220px; }
+.ed-platzhalter { max-width: 100%; }
+.ed-austausch { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.ed-austausch .button.klein { display: inline-flex; align-items: center; font-size: 13px; font-weight: 600; padding: 6px 10px; min-height: 0; border-radius: 8px; cursor: pointer; background: var(--soft); color: #315f53; text-decoration: none; margin: 0; }
+/* Weitere Einstellungen der Vorlage, Gültigkeit von Einwilligungen */
+.ed-mehr { margin: 0 0 12px; border: 1px solid var(--line, #dde3ea); border-radius: 10px; padding: 6px 12px; background: #fbfcfb; }
+.ed-mehr summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.ed-mehr-felder { padding: 4px 0 8px; }
+.us-gueltig { justify-self: start; margin-top: 3px; font-size: 12px; }
+.us-reihe { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+.us-reihe input[type=number] { width: 120px; }
+/* Sprachfassungen */
+.ed-reihe { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ed-reihe select { width: auto; }
+.ed-fassungen { margin: 4px 0 8px; padding-left: 18px; font-size: 14px; }
+.ed-hinweis { background: #fff7e0; border: 1px solid #f0d58a; border-radius: 8px; padding: 8px 10px; font-size: 14px; }
+select.us-sprache { width: auto; min-height: 34px; padding: 2px 6px; font-size: 13px; margin-right: 4px; }

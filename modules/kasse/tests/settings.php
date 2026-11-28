@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Einstellungen im Browser: verschlüsselte Überlagerung der Grundwerte, Anmeldung und Rechte über die Suite.
+// Einstellungen im Browser: verschlüsselte Überlagerung der Grundwerte, Anmeldung und Rechte über Praxisherz.
 require __DIR__ . '/lib.php';
 use KienzleKasse\{Config, Database, Problem, Settings, SettingsPage};
 
@@ -47,20 +47,20 @@ try {
     Settings::save($db, $base, 'sumup', ['api_key' => ''] + $sumup);
     check(Settings::effective($base)->get('sumup', 'api_key') === 'sup-geheim', 'Leeres Geheimnisfeld hat den Schlüssel gelöscht');
 
-    // T2med live ohne Verbindung der Suite: abgelehnt.
+    // T2med live ohne Verbindung von Praxisherz: abgelehnt.
     problem(fn() => Settings::save($db, $base, 'fhir', ['mode' => 'live', 'entry_code' => 'ZAHLUNG']), 'T2med live ohne Verbindung', 422);
     // Ungültige Eingaben: Klartext-Fehler, nichts gespeichert.
     problem(fn() => Settings::save($db, $base, 'app', ['max_amount_cents' => 'viel']), 'Ungültiger Betrag akzeptiert', 422);
     problem(fn() => Settings::save($db, $base, 'unbekannt', []), 'Unbekannter Bereich akzeptiert', 404);
     check(Settings::effective($base)->get('app', 'max_amount_cents') === 25000, 'Fehlerhafte Eingabe teilweise gespeichert');
 
-    // Bondrucker TM-m30III: Breite nach Modell (Drucker der Suite folgt unten).
+    // Bondrucker TM-m30III: Breite nach Modell (Drucker von Praxisherz folgt unten).
     Settings::save($db, $base, 'printing', ['enabled' => true, 'model' => 'tm-m30iii']);
     check(Settings::effective($base)->get('printing', 'model') === $base->get('printing', 'model'), 'Modell darf nicht mehr in der Kasse einstellbar sein (kommt aus der Basis)');
     // Überlagerung kann Grundwerte und Verbindungen nicht ersetzen (nur Felder der Oberfläche).
     check(Settings::merge(['fhir' => ['api_key' => 'aus-der-suite']], ['fhir' => ['api_key' => 'fremd'], 'app' => ['launcher_key' => 'x']]) === ['fhir' => ['api_key' => 'aus-der-suite']], 'Überlagerung ersetzt Grundwerte');
 
-    // Anmeldung über die Suite: ohne Benutzer nichts, Admin des Moduls alles, Mitarbeiter nur ihre Bereiche.
+    // Anmeldung über Praxisherz: ohne Benutzer nichts, Admin des Moduls alles, Mitarbeiter nur ihre Bereiche.
     $root = suite(['KIENZLE_PFAD' => '/kasse'], [], []); $dirs[] = $root;
     $page = new SettingsPage(KienzleKasse\Suite::baseConfig());
     problem(fn() => $page->handle('get', [], TEST_CSRF), 'Einstellungen ohne Anmeldung lesbar', 401);
@@ -68,19 +68,19 @@ try {
         [['name' => 'Praxisdrucker', 'description' => 'Empfang', 'state' => 'bereit'], ['name' => 'TM-m30III', 'description' => '', 'state' => 'bereit']]); $dirs[] = $root;
     $page = new SettingsPage(KienzleKasse\Suite::baseConfig());
     $st = $page->handle('status', [], null);
-    check($st['logged_in'] === true && $st['role'] === 'admin' && $st['csrf'] === TEST_CSRF, 'Status der Suite-Anmeldung falsch');
+    check($st['logged_in'] === true && $st['role'] === 'admin' && $st['csrf'] === TEST_CSRF, 'Status von Praxisherz-Anmeldung falsch');
     $view = $page->handle('get', [], null);
     check(isset($view['sections']) && !str_contains(json_encode($view), 'k-geheim') && !str_contains(json_encode($view), 'sup-geheim'), 'Geheimnis in der Ansicht');
     $printing = array_values(array_filter($view['sections'], fn($x) => $x['id'] === 'printing'))[0]['fields'];
     check(!array_filter($printing, fn($f) => $f['key'] === 'queue'), 'Druckerwahl gehört in die Basis, nicht in die Kasse');
-    problem(fn() => $page->handle('save', ['section' => 'practice', 'values' => ['name' => 'X']], 'falsch'), 'Speichern ohne CSRF-Marke der Suite', 403);
+    problem(fn() => $page->handle('save', ['section' => 'practice', 'values' => ['name' => 'X']], 'falsch'), 'Speichern ohne CSRF-Marke von Praxisherz', 403);
     $page->handle('save', ['section' => 'office_printing', 'values' => ['enabled' => true, 'media' => 'A4', 'duplex' => false]], TEST_CSRF);
     check(Settings::effective(KienzleKasse\Suite::baseConfig())->get('office_printing', 'enabled') === true, 'Praxisdrucker nicht gespeichert');
-    // T2med live: Adresse und Schlüssel kommen aus der Verbindung der Suite.
+    // T2med live: Adresse und Schlüssel kommen aus der Verbindung von Praxisherz.
     $page->handle('save', ['section' => 'sumup', 'values' => ['mode' => 'live'] + $sumup], TEST_CSRF);
     $page->handle('save', ['section' => 'fhir', 'values' => ['mode' => 'live', 'entry_code' => 'ZAHLUNG']], TEST_CSRF);
     $eff = Settings::effective(KienzleKasse\Suite::baseConfig());
-    check($eff->get('fhir', 'api_key') === 'k-geheim' && $eff->get('fhir', 'launch_urls') === ['https://t2med.example.org/aps/fhir/api/r4'], 'T2med-Verbindung der Suite nicht übernommen');
+    check($eff->get('fhir', 'api_key') === 'k-geheim' && $eff->get('fhir', 'launch_urls') === ['https://t2med.example.org/aps/fhir/api/r4'], 'T2med-Verbindung von Praxisherz nicht übernommen');
     problem(fn() => $page->handle('save', ['section' => 'mail', 'values' => ['enabled' => true]], TEST_CSRF), 'E-Mail ohne Verbindung eingeschaltet', 422);
     // Heikle Änderung ohne frische Bestätigung: Hinweis auf /bestaetigen.
     $root = suite(admin_server(['KIENZLE_BESTAETIGT' => (string)(time() - 90000)]), [], []); $dirs[] = $root;
@@ -113,7 +113,7 @@ try {
     // Kaputte Überlagerung (z. B. andere Version): Datei gilt weiter.
     $db->query("UPDATE settings SET value='kaputt' WHERE key='config_overrides'");
     check(Settings::effective($base) === $base, 'Unlesbare Einstellungen nicht ignoriert');
-    echo "Einstellungen, Anmeldung und Rechte über die Suite ok\n";
+    echo "Einstellungen, Anmeldung und Rechte über Praxisherz ok\n";
 } finally {
     foreach ($dirs as $dir) rmtree($dir);
 }

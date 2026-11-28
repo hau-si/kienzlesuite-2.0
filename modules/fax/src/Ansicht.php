@@ -59,7 +59,7 @@ final class Ansicht {
         if ($d['meldung']) $o .= '<p class="ok" role="status">' . fx_h($d['meldung']) . '</p>';
         if ($d['fehler']) $o .= '<p class="fehler" role="alert">' . fx_h($d['fehler']) . '</p>';
         if (!$d['telefon'] && in_array($route, ['/', '/eingang'], true)) {
-            $o .= '<p class="fehler">Das Modul <strong>Telefon</strong> fehlt oder ist noch nicht verbunden. Ohne es kann die Suite keine Faxe senden oder empfangen (Verwaltung → Module).</p>';
+            $o .= '<p class="fehler">Das Modul <strong>Telefon</strong> fehlt oder ist noch nicht verbunden. Ohne es kann Praxisherz keine Faxe senden oder empfangen (Verwaltung → Module).</p>';
         }
         return $o . match ($route) {
             '/' => self::senden($d), '/eingang' => self::eingang($d), '/protokoll' => self::berichte($d, 'protokoll'), '/fehler' => self::berichte($d, 'fehler'),
@@ -183,13 +183,15 @@ final class Ansicht {
         $b = fx_h(fx_basis());
         $liste = $d['berichte'];
         if (!$liste) return '<section class="card"><p class="muted">' . ($art === 'fehler' ? 'Keine Fehlerberichte.' : 'Noch keine gesendeten Faxe.') . '</p></section>';
-        $o = '<section class="card">' . ($art === 'fehler' ? '<p class="muted">Das Original eines fehlgeschlagenen Faxes steht unter „Fax senden“ in der Dokumentliste (Quelle „Sendefehler“) und lässt sich dort erneut senden.</p>' : '')
+        $o = '<section class="card">' . ($art === 'protokoll' ? '<p class="muted klein">Das Original eines erfolgreich gesendeten Faxes lässt sich hier ' . Fax::PROTOKOLL_ORIGINAL_TAGE . ' Tage lang erneut senden, danach bleibt nur noch der Bericht.</p>' : '')
             . '<table class="fx-tabelle"><tr><th>Zeit</th><th>Empfänger</th><th>Dokument</th><th>Seiten</th><th>' . ($art === 'fehler' ? 'Grund' : '') . '</th><th></th></tr>';
         foreach ($liste as $r) {
             $grund = $r['abgebrochen'] ? self::tag('warn', 'abgebrochen') : ($art === 'fehler' ? fx_h(self::grund($r['grund'])) : self::tag('ok', 'gesendet'));
             $o .= '<tr><td>' . self::zeit($r['zeit']) . '</td><td>' . fx_h($r['name']) . '<div class="muted klein">' . fx_h(Fax::anzeige($r['nummer'])) . '</div></td><td>' . fx_h($r['datei'])
                 . '</td><td>' . fx_h($r['seiten']) . '</td><td>' . $grund . ($r['versuche'] > 1 ? '<div class="muted klein">' . $r['versuche'] . ' Versuche</div>' : '') . '</td><td class="fx-knoepfe">'
                 . ($r['pdf'] !== '' ? '<a class="button small secondary" href="' . $b . '/pdf?art=' . $art . '&amp;datei=' . fx_h($r['pdf']) . '" target="_blank" rel="noopener">Bericht</a>' : '')
+                . ($r['original'] ? '<form method="post" data-confirm="Fax an ' . fx_h($r['name'] !== '' ? $r['name'] : Fax::anzeige($r['nummer'])) . ' erneut senden?">' . self::csrf($d['csrf'])
+                    . '<input type="hidden" name="aktion" value="bericht-erneut-senden"><input type="hidden" name="art" value="' . $art . '"><input type="hidden" name="json" value="' . fx_h($r['json']) . '"><button class="small primary" type="submit">Erneut senden</button></form>' : '')
                 . ($art === 'fehler' ? '<form method="post">' . self::csrf($d['csrf']) . '<input type="hidden" name="aktion" value="fehler-uebernehmen"><input type="hidden" name="json" value="' . fx_h($r['json']) . '"><button class="small" type="submit" title="Als erledigt ins Sendeprotokoll">Erledigt</button></form>' : '')
                 . '<form method="post" data-confirm="Diesen Bericht löschen?">' . self::csrf($d['csrf']) . '<input type="hidden" name="aktion" value="bericht-loeschen"><input type="hidden" name="art" value="' . $art . '"><input type="hidden" name="json" value="' . fx_h($r['json']) . '"><button class="small danger" type="submit">Löschen</button></form></td></tr>';
         }
@@ -278,7 +280,7 @@ final class Ansicht {
 
         $o .= '<section class="card"><h2>Netzwerkspeicher (NAS)</h2>';
         if (!$d['nasZiele']) {
-            $o .= '<p class="muted">Dafür braucht die Suite einen Netzwerkspeicher: Verwaltung → Verbindungen → Netzwerkspeicher einrichten und für das Modul Fax freigeben. Danach lässt sich hier der Export und ein Lauschordner einstellen.</p></section>';
+            $o .= '<p class="muted">Dafür braucht Praxisherz einen Netzwerkspeicher: Verwaltung → Verbindungen → Netzwerkspeicher einrichten und für das Modul Fax freigeben. Danach lässt sich hier der Export und ein Lauschordner einstellen.</p></section>';
         } else {
             $opt = static function (array $ziele, string $gewaehlt): string {
                 $r = '<option value="">– aus –</option>';

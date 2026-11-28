@@ -3,13 +3,13 @@ declare(strict_types=1);
 namespace KienzleSignatur;
 
 /**
- * Patient aus T2med lesen (FHIR), nur für den Start aus T2med (kienzle-signatur://…). Verbindungsdaten liefert die Basis
+ * Patient aus T2med lesen (FHIR), nur für den Start aus T2med (praxisherz-signatur://…). Verbindungsdaten liefert die Basis
  * (Verwaltung → Verbindungen → T2med). Keine Weiterleitungen, nur HTTPS; Fehlermeldungen enthalten keine Zugangsdaten.
  */
 class Fhir {
     public const KONTEXT = 'https://fhir.t2med.de/identifier/kontext';
-    /** Öffentlicher Demo-Schlüssel von T2med (github.com/T2med/fhir-demoapplication); gilt wie in der Kasse, wenn in der Basis kein Schlüssel hinterlegt ist. */
-    public const DEMO_SCHLUESSEL = '7QwA7931lJSQfMKuTH4MQXLn4YEiNhE5tggnYKlY4HE';
+    /** Ohne API-Schlüssel der Praxis gibt es keinen Ersatz (der Schlüssel steht nie im Quelltext). */
+    public const OHNE_SCHLUESSEL = 'Kein T2med-API-Schlüssel eingetragen. Bitte unter Verwaltung → Verbindungen → T2med den API-Schlüssel der Praxis eintragen.';
 
     /** @param array<string,mixed> $v Verbindung „t2med“ der Basis */
     public function __construct(private array $v, private string $caDatei = '') {}
@@ -102,15 +102,88 @@ class Fhir {
         return $geaendert;
     }
 
+    public const ANHANG = 'https://fhir.t2med.de/StructureDefinition/FhirApiDocumentReferenceAnhang|1.0.0';
+
+    /**
+     * DocumentReference (Profil „Anhang“) für ein PDF in der Akte des Kontexts, wie im T2med-Integrationsleitfaden (1.10).
+     * Gleicher Aufbau wie in der Kasse (dort für Vorgänge, die aus der Kasse kamen).
+     */
+    public static function dokumentRessource(string $kontext, string $pdf, string $titel, int $zeit): array {
+        $iso = date('c', $zeit);
+        $titel = trim(preg_replace('/[\x00-\x1f\x7f]+/u', ' ', $titel) ?? '') ?: 'Unterschriebenes Dokument';
+        $datei = trim(preg_replace('/[^A-Za-z0-9ÄÖÜäöüß _.-]+/u', '', $titel) ?? '') ?: 'dokument';
+        return ['resourceType' => 'DocumentReference', 'meta' => ['profile' => [self::ANHANG]],
+            'identifier' => [['system' => self::KONTEXT, 'value' => $kontext]], 'status' => 'current', 'date' => $iso,
+            'description' => mb_substr($titel . ' (unterschrieben)', 0, 200),
+            'content' => [['attachment' => ['contentType' => 'application/pdf', 'title' => mb_substr($datei, 0, 80) . '.pdf', 'creation' => $iso, 'data' => base64_encode($pdf)]]]];
+    }
+
+    /** Legt das unterschriebene PDF in der T2med-Akte ab (POST DocumentReference). Wirft mit verständlicher Meldung. */
+    public function dokumentAblegen(string $kontext, string $token, string $pdf, string $titel, int $zeit): void {
+        if (!preg_match('/^[A-Za-z0-9._-]{1,128}$/D', $kontext)) throw new \InvalidArgumentException('Ungültiger T2med-Kontext.');
+        if (!str_starts_with($pdf, '%PDF-') || strlen($pdf) > 10 * 1024 * 1024) throw new \InvalidArgumentException('Das PDF ist ungültig oder zu groß.');
+        $basis = rtrim((string)($this->v['base_url'] ?? ''), '/');
+        if ($basis === '') throw new \RuntimeException('T2med ist in der Basis nicht eingerichtet (Verwaltung → Verbindungen).');
+        $a = $this->anfrage($basis . '/DocumentReference', $token, 'POST', self::dokumentRessource($kontext, $pdf, $titel, $zeit), ['Content-Type: application/fhir+json'], '');
+        self::antwortPruefen($a['status'], $a['body']);
+    }
+
+    /** Akteneintrag (Freitext mit Kürzel) als Transaktion – wie die Kasse ihre Zahlungen dokumentiert (nur dokumentierte Funktionen). */
+    public static function eintragRessource(string $kontext, string $kuerzel, string $text, int $zeit): array {
+        return ['resourceType' => 'Bundle', 'type' => 'transaction', 'entry' => [['request' => ['method' => 'POST', 'url' => 'Observation'], 'resource' => [
+            'resourceType' => 'Observation', 'meta' => ['profile' => ['https://fhir.t2med.de/StructureDefinition/FhirApiObservationFreitext|1.0.0']],
+            'identifier' => [['system' => self::KONTEXT, 'value' => $kontext]],
+            'extension' => [['url' => 'https://fhir.t2med.de/StructureDefinition/FhirApiFreitextKuerzel', 'valueString' => $kuerzel]],
+            'status' => 'final', 'effectiveDateTime' => date(DATE_ATOM, $zeit), 'valueString' => mb_substr($text, 0, 4000)]]]];
+    }
+
+    /** Schreibt den Akteneintrag des Vorgangs in die T2med-Akte. Wirft mit verständlicher Meldung. */
+    public function eintragAblegen(string $kontext, string $token, string $kuerzel, string $text, int $zeit): void {
+        if (!preg_match('/^[A-Za-z0-9._-]{1,128}$/D', $kontext)) throw new \InvalidArgumentException('Ungültiger T2med-Kontext.');
+        $basis = rtrim((string)($this->v['base_url'] ?? ''), '/');
+        if ($basis === '') throw new \RuntimeException('T2med ist in der Basis nicht eingerichtet (Verwaltung → Verbindungen).');
+        $a = $this->anfrage($basis, $token, 'POST', self::eintragRessource($kontext, $kuerzel, $text, $zeit), ['Content-Type: application/fhir+json'], '');
+        $body = $a['body'];
+        $antwort = is_array($body) && ($body['resourceType'] ?? '') === 'Bundle' ? ($body['entry'][0]['response'] ?? []) : null;
+        if ($a['status'] >= 200 && $a['status'] < 300 && is_array($antwort)) {
+            $status = (int)($antwort['status'] ?? 0);
+            self::antwortPruefen($status ?: 500, $antwort['outcome'] ?? null);
+            return;
+        }
+        self::antwortPruefen($a['status'] >= 200 && $a['status'] < 300 ? 502 : $a['status'], $body);
+    }
+
+    /** 2xx ohne Fehler im OperationOutcome = abgelegt; sonst Ausnahme mit Grund (ohne Patientendaten, höchstens 160 Zeichen von T2med). */
+    public static function antwortPruefen(int $status, mixed $body): void {
+        $detail = '';
+        $fehler = false;
+        if (is_array($body) && ($body['resourceType'] ?? '') === 'OperationOutcome') {
+            foreach ((array)($body['issue'] ?? []) as $i) {
+                if (!is_array($i) || !in_array($i['severity'] ?? '', ['fatal', 'error'], true)) continue;
+                $fehler = true;
+                $t = (string)($i['details']['text'] ?? $i['diagnostics'] ?? '');
+                $detail = mb_substr(trim(preg_replace('/[\x00-\x1f\x7f]+/u', ' ', $t) ?? ''), 0, 160);
+                break;
+            }
+        }
+        if ($status >= 200 && $status < 300 && !$fehler) return;
+        $grund = match (true) {
+            $status === 401, $status === 403 => 'T2med lehnt den Zugriff ab (Aufruf älter als 4 Stunden oder API-Schlüssel falsch). Bitte frisch aus der Patientenakte öffnen und erneut ablegen.',
+            $status === 413 => 'Das PDF ist für T2med zu groß.',
+            default => 'T2med hat den Eintrag nicht angenommen (HTTP ' . $status . ').',
+        };
+        throw new \RuntimeException($grund . ($detail !== '' ? ' Auskunft von T2med: ' . $detail : ''));
+    }
+
     /** @return array{status:int,body:mixed} */
-    protected function anfrage(string $url, string $token, string $methode = 'GET', ?array $body = null, array $mehr = []): array {
+    protected function anfrage(string $url, string $token, string $methode = 'GET', ?array $body = null, array $mehr = [], string $profil = 'https://fhir.t2med.de/StructureDefinition/FhirApiPatient|1.0.0'): array {
         $key = (string)($this->v['api_key'] ?? '');
-        if ($key === '') $key = self::DEMO_SCHLUESSEL;
-        $kopf = array_merge(['Accept: application/fhir+json', 'Authorization: Bearer ' . $token, 'X-API-Key: ' . $key, 'X-FHIR-Profile: https://fhir.t2med.de/StructureDefinition/FhirApiPatient|1.0.0',
-            'X-TreatWarningAsError: true', 'Prefer: return=OperationOutcome', 'User-Agent: kienzle-signatur'], $mehr);
+        if ($key === '') throw new \RuntimeException(self::OHNE_SCHLUESSEL);
+        $kopf = array_merge(['Accept: application/fhir+json', 'Authorization: Bearer ' . $token, 'X-API-Key: ' . $key],
+            $profil !== '' ? ['X-FHIR-Profile: ' . $profil] : [], ['X-TreatWarningAsError: true', 'Prefer: return=OperationOutcome', 'User-Agent: kienzle-signatur'], $mehr);
         $roh = ''; $zuGross = false;
         $curl = curl_init($url);
-        $opt = [CURLOPT_HTTPHEADER => $kopf, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 20, CURLOPT_FOLLOWLOCATION => false, CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
+        $opt = [CURLOPT_HTTPHEADER => $kopf, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => $methode === 'GET' ? 20 : 60, CURLOPT_FOLLOWLOCATION => false, CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
             CURLOPT_SSL_VERIFYPEER => true, CURLOPT_SSL_VERIFYHOST => 2,
             CURLOPT_WRITEFUNCTION => static function ($ch, string $c) use (&$roh, &$zuGross): int {
                 if (strlen($roh) + strlen($c) > 1024 * 1024) { $zuGross = true; return 0; }

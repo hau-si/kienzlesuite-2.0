@@ -86,7 +86,7 @@ class Praxisdrucker(Umgebung):
 
     def test_fremde_drucker_bleiben(self):
         (self.t / 'cups.json').write_text(json.dumps({'queues': {'Fremd': {'uri': 'ipp://192.0.2.7/ipp', 'desc': 'Von Hand', 'options': []}}, 'jobs': [], 'calls': []}))
-        with self.assertRaisesRegex(self.d.Fehler, 'nicht von der Suite'):
+        with self.assertRaisesRegex(self.d.Fehler, 'nicht von Praxisherz'):
             self.d.remove('Fremd')
         with self.assertRaisesRegex(self.d.Fehler, 'bereits'):
             self.d.add('bon', 'fremd', '192.0.2.80', [])
@@ -136,7 +136,7 @@ class Virtuell(Umgebung):
         self.assertEqual(stat.S_IMODE((self.t / 'ppd' / 'kienzle-beispiel-beispiel-drucker.ppd').stat().st_mode), 0o644)
         q = self.cups()['queues']['Beispiel-Drucker']
         self.assertEqual(q['uri'], 'kienzle-beispiel-beispiel-drucker:/Beispiel-Drucker')
-        self.assertTrue(q['desc'].startswith('Kienzle-Suite Modul beispiel:'))
+        self.assertTrue(q['desc'].startswith('Praxisherz Modul beispiel:'))
         self.assertIn('printer-is-shared=true', q['options'])
         self.assertIn('[Beispiel-Drucker]', (self.t / 'kienzle-drucker.conf').read_text())
         calls = len(self.cups()['calls'])

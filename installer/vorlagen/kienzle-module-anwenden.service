@@ -1,7 +1,7 @@
-# Kienzle-Suite: Module installieren, aktualisieren, entfernen (root). Haken der Module laufen als ks-<id>, nie als root.
+# Praxisherz: Module installieren, aktualisieren, entfernen (root). Haken der Module laufen als ks-<id>, nie als root.
 # Ohne ProtectSystem: Der Dienst installiert Pakete, legt Benutzer an und schreibt Einheiten und die nginx-Konfiguration.
 [Unit]
-Description=Kienzle-Suite Module anwenden
+Description=Praxisherz Module anwenden
 After=network-online.target
 Wants=network-online.target
 

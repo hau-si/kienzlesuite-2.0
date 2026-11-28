@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Kienzle-Suite: Installer der Basis für Ubuntu Server 26.04 LTS.
+# Praxisherz: Installer der Basis für Ubuntu Server 26.04 LTS.
 #
 #   sudo bash installer/install.sh                         (Erstinstallation; Name und Praxis danach im Webinterface)
-#   sudo bash installer/install.sh --name kienzle.praxis.internal [--name 192.0.2.10] [--praxis "Praxis Dr. Muster"]
+#   sudo bash installer/install.sh --name praxisherz [--name 192.0.2.10] [--praxis "Praxis Dr. Muster"]
 #   sudo bash installer/install.sh --wiederherstellen     (neue VM nach Totalausfall: alles aus der Sicherung holen)
 #   sudo bash installer/install.sh --admin-reset NAME     (Admin-Zugang an der Konsole zurücksetzen, wie kienzle-admin)
 #   sudo bash installer/install.sh --kanal beta           (Update-Kanal festlegen: stabil oder beta)
@@ -38,7 +38,7 @@ done
 [ "$EUID" -eq 0 ] || { echo 'Bitte mit sudo ausführen.'; exit 1; }
 . /etc/os-release
 if [ "${ID:-}" != ubuntu ] || [ "${VERSION_ID:-}" != 26.04 ]; then
-  echo "Die Kienzle-Suite unterstützt nur Ubuntu Server 26.04 LTS (gefunden: ${PRETTY_NAME:-unbekannt})."; exit 1
+  echo "Praxisherz unterstützt nur Ubuntu Server 26.04 LTS (gefunden: ${PRETTY_NAME:-unbekannt})."; exit 1
 fi
 [ -n "$nosystemd" ] || command -v systemctl >/dev/null || { echo 'systemd wird benötigt.'; exit 1; }
 [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ ]] || { echo 'core/VERSION ungültig.'; exit 1; }
@@ -57,7 +57,7 @@ fi
 
 conf=/etc/kienzle/core/core.json
 if [ -n "$restore" ] && [ -f /var/lib/kienzle/core/core.sqlite ]; then
-  echo 'Auf diesem Server ist die Suite schon eingerichtet. Wiederherstellen nur auf einer frischen VM.'; exit 2
+  echo 'Auf diesem Server ist Praxisherz schon eingerichtet. Wiederherstellen nur auf einer frischen VM.'; exit 2
 fi
 if [ ${#names[@]} -eq 0 ] && [ -z "$restore" ]; then
   if [ -f "$conf" ]; then
@@ -91,7 +91,7 @@ wait_apt() {
   done
   echo 'Paketsperre nach 10 Minuten noch belegt.'; return 1
 }
-echo "== Kienzle-Suite Basis $version"
+echo "== Praxisherz Basis $version"
 wait_apt
 DEBIAN_FRONTEND=noninteractive apt-get update -q
 wait_apt
@@ -111,7 +111,7 @@ if [ -z "$nosystemd" ] && command -v timedatectl >/dev/null; then
   timedatectl set-ntp true >/dev/null 2>&1 || true
   for _ in $(seq 1 20); do [ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" = yes ] && break; sleep 1; done
   if [ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" = yes ]; then echo "Uhrzeit synchronisiert: $(date '+%d.%m.%Y %H:%M:%S')"
-  else echo "Hinweis: Uhrzeit nicht synchronisiert (Server: $(date '+%d.%m.%Y %H:%M:%S')). Bei der Einrichtung der Authenticator-App bietet die Suite an, die Uhr zu stellen."; fi
+  else echo "Hinweis: Uhrzeit nicht synchronisiert (Server: $(date '+%d.%m.%Y %H:%M:%S')). Bei der Einrichtung der Authenticator-App bietet Praxisherz an, die Uhr zu stellen."; fi
 fi
 echo '== Benutzer und Ordner'
 id ks-core >/dev/null 2>&1 || useradd --system --home-dir /var/lib/kienzle/core --no-create-home --shell /usr/sbin/nologin ks-core
@@ -232,7 +232,7 @@ echo '== Automatische Sicherheitsupdates'
 if ! grep -rqs 'APT::Periodic::Unattended-Upgrade' /etc/apt/apt.conf.d/; then
   printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' > /etc/apt/apt.conf.d/20auto-upgrades
 fi
-printf '// Kienzle-Suite: Neustarts plant die Praxis selbst.\nUnattended-Upgrade::Automatic-Reboot "false";\n' > /etc/apt/apt.conf.d/52kienzle-unattended
+printf '// Praxisherz: Neustarts plant die Praxis selbst.\nUnattended-Upgrade::Automatic-Reboot "false";\n' > /etc/apt/apt.conf.d/52kienzle-unattended
 
 if [ -n "$kanal" ]; then
   python3 - "$kanal" <<'PY'
@@ -276,7 +276,7 @@ install -m 0644 "$vorlagen/kienzle-zertifikat.service" "$vorlagen/kienzle-zertif
   /etc/systemd/system/
 chmod 0644 /etc/systemd/system/kienzle-core-php.service
 
-# nginx: nur die Suite. Die Beispielseite der Distribution wird abgeschaltet (nur der mitgelieferte Verweis).
+# nginx: nur Praxisherz. Die Beispielseite der Distribution wird abgeschaltet (nur der mitgelieferte Verweis).
 if [ -L /etc/nginx/sites-enabled/default ] && [ "$(readlink /etc/nginx/sites-enabled/default)" = /etc/nginx/sites-available/default ]; then
   rm -f /etc/nginx/sites-enabled/default
 fi
@@ -303,7 +303,7 @@ if [ -z "$nosystemd" ]; then
   done
   systemctl start avahi-daemon.service cups.service smbd.service >/dev/null 2>&1 || true
   if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q 'Status: active'; then
-    echo 'Hinweis: ufw ist aktiv. Die Firewall der Suite (Verwaltung → Firewall) arbeitet unabhängig davon; bitte nur eine von beiden verwenden.'
+    echo 'Hinweis: ufw ist aktiv. Die Firewall von Praxisherz (Verwaltung → Firewall) arbeitet unabhängig davon; bitte nur eine von beiden verwenden.'
   fi
   systemctl restart kienzle-core-php.service
   # Modul-Dienste (php-fpm) neu starten, sonst liefern sie nach einem Basis-Update noch den alten Rahmen (Seitenleiste) aus dem Zwischenspeicher.
@@ -320,7 +320,7 @@ if [ -z "$nosystemd" ]; then
 fi
 
 echo
-echo "Kienzle-Suite Basis $version ist installiert: https://${names[0]}/"
+echo "Praxisherz Basis $version ist installiert: https://${names[0]}/"
 echo 'Zertifizierungsstelle für die Arbeitsplätze: https://'"${names[0]}"'/ca.crt'
 echo "Einrichtungs-Überblick: https://${names[0]}/verwaltung/einrichtung"
 echo "Fingerabdruck zum Vergleich: $(/opt/kienzle/core/current/bin/kienzle-zertifikat status | sed -n 's/^CA (SHA-256): //p')"

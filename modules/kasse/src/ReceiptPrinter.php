@@ -54,7 +54,7 @@ class ReceiptPrinter {
             if ($this->config->get('printing', 'transport', 'samba') === 'cups') {
                 // RAW-Warteschlange (z. B. TM-m30III per LAN): ESC/POS unverändert durchreichen.
                 Cups::submit($this->config->get('printing', 'cups_server', ''), $this->config->get('printing', 'queue'),
-                    'Kienzle-SumUp Beleg', ['-o', 'raw'], $data, fn(array $args, string $input) => $this->cups($args, $input));
+                    'Praxisherz Beleg', ['-o', 'raw'], $data, fn(array $args, string $input) => $this->cups($args, $input));
                 return;
             }
             $result = $this->transfer($data);

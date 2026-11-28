@@ -17,7 +17,7 @@ final class Connections {
         $s = json_decode((string)@file_get_contents(self::$state . '/status.json'), true);
         $s = is_array($s) ? $s : [];
         return ['t2med' => is_array($s['t2med'] ?? null) ? $s['t2med'] : null, 'mail' => is_array($s['mail'] ?? null) ? $s['mail'] : null, 'sms' => is_array($s['sms'] ?? null) ? $s['sms'] : null,
-            'letterxpress' => is_array($s['letterxpress'] ?? null) ? $s['letterxpress'] : null,
+            'letterxpress' => is_array($s['letterxpress'] ?? null) ? $s['letterxpress'] : null, 'uebersetzung' => is_array($s['uebersetzung'] ?? null) ? $s['uebersetzung'] : null,
             'ablage' => array_values(array_filter((array)($s['ablage'] ?? []), 'is_array')), 'tests' => (array)($s['tests'] ?? []), 'guthaben' => (array)($s['guthaben'] ?? []),
             'hostkeys' => (array)($s['hostkeys'] ?? []), 'zertifikate' => (array)($s['zertifikate'] ?? []), 'nutzung' => array_values(array_filter((array)($s['nutzung'] ?? []), 'is_array')),
             'hinweise' => array_values(array_filter((array)($s['hinweise'] ?? []), 'is_string')), 'letzte' => is_array($s['letzte'] ?? null) ? View::frisch($s['letzte']) : null,
@@ -36,6 +36,10 @@ final class Connections {
     public function saveLetterxpress(array $in): void {
         $this->write(['action' => 'letterxpress', 'daten' => ['username' => trim((string)($in['username'] ?? '')), 'api_key' => trim((string)($in['api_key'] ?? '')),
             'modus' => ($in['modus'] ?? '') === 'live' ? 'live' : 'test']]);
+    }
+
+    public function saveUebersetzung(array $in): void {
+        $this->write(['action' => 'uebersetzung', 'daten' => ['api_key' => trim((string)($in['api_key'] ?? ''))]]);
     }
 
     private const GMAIL_KEY = 'gmail_offen';
@@ -121,7 +125,7 @@ final class Connections {
     public function removeTarget(string $id): void { $this->write(['action' => 'ziel-loeschen', 'id' => $id]); }
 
     public function remove(string $what): void {
-        if (!in_array($what, ['t2med', 'mail', 'sms', 'letterxpress'], true)) throw new Problem('Unbekannte Verbindung.', 422);
+        if (!in_array($what, ['t2med', 'mail', 'sms', 'letterxpress', 'uebersetzung'], true)) throw new Problem('Unbekannte Verbindung.', 422);
         $this->write(['action' => $what, 'loeschen' => true]);
     }
 
@@ -132,7 +136,7 @@ final class Connections {
     }
 
     public function test(string $art, string $id = ''): void {
-        if (!in_array($art, ['t2med', 'mail', 'sms', 'letterxpress', 'guthaben', 'ziel'], true)) throw new Problem('Unbekannte Prüfung.', 422);
+        if (!in_array($art, ['t2med', 'mail', 'sms', 'letterxpress', 'uebersetzung', 'guthaben', 'ziel'], true)) throw new Problem('Unbekannte Prüfung.', 422);
         $this->write(['action' => 'pruefen', 'art' => $art, 'id' => $id]);
     }
 
