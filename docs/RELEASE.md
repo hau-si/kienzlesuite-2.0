@@ -1,8 +1,12 @@
 # Basis – Release-Notizen
 
-## 0.22.0-beta.56
+## 0.22.0-beta.57
 
 - Ende-zu-Ende-Prüfung mit nginx: Die Seitenprüfungen lasen die Antwort mit `grep -q` aus einer Pipe; bei großen Seiten (Druckerseite) bricht `curl` dann mit einem Schreibfehler ab, und die Prüfung meldete einen Fehler, obwohl der Text da war. Jetzt wird die ganze Ausgabe gelesen. Am Programm ändert sich nichts. Sicherung, Servername und Drucker liefen im Container bereits durch.
+
+## 0.22.0-beta.56
+
+- Dokumentation: `docs/MODUL-GESTALTUNG.md` beschreibt jetzt zentral Seitenbreite, Seitenkopf (Titel, Knopfleiste mit Symbolen, Zähler, Einstellungen zuletzt), Symbole und Meldungen für alle Module. Am Programm ändert sich nichts.
 
 ## 0.22.0-beta.55
 

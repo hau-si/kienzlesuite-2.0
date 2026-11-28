@@ -4,7 +4,7 @@ Praxis-Appliance für Hausarztpraxen mit T2med: **eine Basis**, einmal auf einer
 einzeln dazukommen. Verwaltung komplett im Webinterface; Anmeldung, Benutzer und Rechte, Firewall, Admin-Zugang mit OTP,
 Updates, verschlüsselte Sicherung und die Verbindungen zu T2med, E-Mail, SMS und Netzwerkspeicher gibt es nur einmal, in der Basis.
 
-Stand (28.11.2026, Zweig `beta`): **Basis 0.22.0-beta.56** mit den Modulen
+Stand (28.11.2026, Zweig `beta`): **Basis 0.22.0-beta.57** mit den Modulen
 
 | Modul | Version | Was es kann |
 |---|---|---|

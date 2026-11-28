@@ -29,20 +29,50 @@ final class Ansicht {
 
     private static function tag(string $art, string $text): string { return '<span class="tag ' . $art . '">' . tf_h($text) . '</span>'; }
 
-    private static function kopfzeile(string $route, bool $einstellungen): string {
+    /** Recht „nebenstellen“: Knopf „Einstellungen“ im Seitenkopf. */
+    public static bool $einstellungen = false;
+
+    public const SEITEN = ['/' => 'Telefonanlage', '/anrufe' => 'Anrufe', '/vorgaenge' => 'Vorgänge', '/rufgruppen' => 'Rufgruppen',
+        '/sprachmenue' => 'Sprachmenü', '/statistik' => 'Statistik', '/einstellungen' => 'Einstellungen'];
+    private const KNOPF = ['/' => 'Übersicht'];
+
+    private const SVG = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">';
+
+    /** Symbole der Unterseiten (Liniensymbole wie in Kasse, Signatur und Fax, docs/MODUL-GESTALTUNG.md). */
+    public static function symbol(string $route): string {
+        return self::SVG . match ($route) {
+            '/' => '<path d="M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10"/>',
+            '/anrufe' => '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>',
+            '/vorgaenge' => '<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',
+            '/rufgruppen' => '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',
+            '/sprachmenue' => '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2zM8 9h8M8 13h5"/>',
+            '/statistik' => '<path d="M18 20V10M12 20V4M6 20v-6"/>',
+            '/einstellungen' => '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
+            default => '',
+        } . '</svg>';
+    }
+
+    /** Darf der Benutzer die Unterseite sehen (Knopf im Seitenkopf)? */
+    private static function sichtbar(string $route): bool {
+        return match ($route) {
+            '/' => true, '/anrufe' => self::$anrufe, '/vorgaenge' => self::$vorgaenge !== null, '/rufgruppen' => self::$rufgruppen,
+            '/sprachmenue' => self::$sprachmenue, '/statistik' => self::$statistik, '/einstellungen' => self::$einstellungen, default => false,
+        };
+    }
+
+    /** Seitenkopf wie in Kasse, Signatur und Fax: auf jeder Seite dieselben Knöpfe mit Symbol, die aktuelle Seite ist hervorgehoben. */
+    private static function kopfzeile(string $route): string {
         $b = tf_h(tf_basis());
-        $titel = ['/einstellungen' => 'Einstellungen', '/sprachmenue' => 'Sprachmenü', '/vorgaenge' => 'Vorgänge', '/rufgruppen' => 'Rufgruppen', '/anrufe' => 'Anrufe', '/statistik' => 'Statistik'][$route] ?? 'Telefonanlage';
-        $link = $route !== '/' ? '<a class="button secondary" href="' . $b . '/">← Übersicht</a>'
-              . (self::$anrufe && $route !== '/anrufe' ? '<a class="button secondary" href="' . $b . '/anrufe">Anrufe</a>' : '')
-              . (self::$statistik ? '<a class="button ' . ($route === '/statistik' ? 'primary' : 'secondary') . '" href="' . $b . '/statistik"' . ($route === '/statistik' ? ' aria-current="page"' : '') . '>Statistik</a>' : '')
-            : (self::$vorgaenge !== null ? '<a class="button' . (self::$vorgaenge ? '' : ' secondary') . '" href="' . $b . '/vorgaenge">Vorgänge'
-                . (self::$vorgaenge ? ' (' . self::$vorgaenge . ')' : '') . '</a>' : '')
-              . (self::$anrufe ? '<a class="button secondary" href="' . $b . '/anrufe">Anrufe</a>' : '')
-              . (self::$statistik ? '<a class="button secondary" href="' . $b . '/statistik">Statistik</a>' : '')
-              . (self::$rufgruppen ? '<a class="button secondary" href="' . $b . '/rufgruppen">Rufgruppen</a>' : '')
-              . (self::$sprachmenue ? '<a class="button secondary" href="' . $b . '/sprachmenue">Sprachmenü</a>' : '')
-              . ($einstellungen ? '<a class="button secondary" href="' . $b . '/einstellungen">Einstellungen</a>' : '');
-        return '<header class="seitenkopf"><div><p class="eyebrow">Telefon</p><h1>' . $titel . '</h1></div><span class="start-tools">' . $link . '</span>' . self::suchfeld() . '</header>'
+        $links = '';
+        foreach (self::SEITEN as $r => $titel) {
+            if (!self::sichtbar($r) && $r !== $route) continue;
+            $aktuell = $r === $route;
+            $zahl = $r === '/vorgaenge' && self::$vorgaenge ? '<span class="zaehler">' . self::$vorgaenge . '</span>' : '';
+            $links .= '<a class="button ' . ($aktuell ? 'primary' : 'secondary') . ' mit-icon" href="' . $b . $r . '"' . ($aktuell ? ' aria-current="page"' : '') . '>'
+                . self::symbol($r) . tf_h(self::KNOPF[$r] ?? $titel) . $zahl . '</a>';
+        }
+        return '<header class="seitenkopf"><div><p class="eyebrow">Telefon</p><h1>' . tf_h(self::SEITEN[$route] ?? 'Telefonanlage') . '</h1></div>'
+            . '<nav class="start-tools" aria-label="Telefon">' . $links . '</nav>' . self::suchfeld() . '</header>'
             . '<div id="tf-laden" class="tf-laden" hidden role="status"></div>';
     }
 
@@ -79,7 +109,7 @@ final class Ansicht {
 
     public static function uebersicht(array $cfg, array $status, bool $einstellungen, bool $faxBereit, ?string $meldung, ?string $fehler): string {
         $h = 'tf_h';
-        $o = '<div class="tf">' . self::kopfzeile('/', $einstellungen) . self::meldungen($meldung, $fehler);
+        $o = '<div class="tf">' . self::kopfzeile('/') . self::meldungen($meldung, $fehler);
         $laeuft = (bool)($status['laeuft'] ?? false);
         $o .= '<section class="card"><h2>Anlage</h2><p>' . ($laeuft ? self::tag('ok', 'läuft') : self::tag('err', 'läuft nicht'))
             . ($laeuft ? ' <span class="muted">Gespräche gerade: ' . (int)($status['gespraeche'] ?? 0) . ' · in der Warteschlange: ' . (int)($status['wartend'] ?? 0) . '</span>' : '')
@@ -262,7 +292,7 @@ final class Ansicht {
 
     public static function sprachmenue(array $d, string $csrf, ?string $meldung, ?string $fehler, string $wartemusik = 'klingelzeichen'): string {
         $h = 'tf_h';
-        $o = '<div class="tf">' . self::kopfzeile('/sprachmenue', true) . self::meldungen($meldung, $fehler);
+        $o = '<div class="tf">' . self::kopfzeile('/sprachmenue') . self::meldungen($meldung, $fehler);
         if (!($d['bereit'] ?? false)) {
             return $o . '<section class="card"><p>Das Sprachmenü ist noch nicht eingeschaltet.</p><p class="muted">Ein Admin schaltet es unter Einstellungen → Sprachmenü ein.</p></section></div>';
         }
@@ -389,7 +419,7 @@ final class Ansicht {
         if (is_int($anzahl)) $anzahl = ['neu' => $anzahl, 'bearbeitung' => 0, 'erledigt' => 0, 'papierkorb' => 0];
         $offen = in_array($bereich, ['neu', 'bearbeitung', 'offen'], true);
         $ziel = $b . '/vorgaenge?bereich=' . $h($bereich);
-        $o = '<div class="tf" id="tf-vorgaenge" data-anzahl="' . $b . '/vorgaenge/anzahl" data-neu="' . (int)$anzahl['neu'] . '">' . self::kopfzeile('/vorgaenge', true) . self::meldungen($meldung, $fehler)
+        $o = '<div class="tf" id="tf-vorgaenge" data-anzahl="' . $b . '/vorgaenge/anzahl" data-neu="' . (int)$anzahl['neu'] . '">' . self::kopfzeile('/vorgaenge') . self::meldungen($meldung, $fehler)
             . '<p class="tf-neu-hinweis" hidden role="status"><strong>Neuer Vorgang eingegangen.</strong> <a href="' . $b . '/vorgaenge?bereich=neu">Jetzt anzeigen</a></p><nav class="tf-reiter">';
         foreach (Vorgaenge::BEREICHE as $k => $titel) {
             $zahl = in_array($k, ['neu', 'bearbeitung'], true) || $anzahl[$k] > 0 ? ' (' . (int)$anzahl[$k] . ')' : '';
@@ -477,7 +507,7 @@ final class Ansicht {
     public static function rufgruppen(array $d, string $csrf, bool $admin, ?string $meldung, ?string $fehler): string {
         $h = 'tf_h';
         $b = $h(tf_basis());
-        $o = '<div class="tf">' . self::kopfzeile('/rufgruppen', true) . self::meldungen($meldung, $fehler);
+        $o = '<div class="tf">' . self::kopfzeile('/rufgruppen') . self::meldungen($meldung, $fehler);
         if (!($d['bereit'] ?? false)) {
             return $o . '<section class="card"><p>Die Rufgruppen sind noch nicht eingeschaltet.</p><p class="muted">Ein Admin schaltet sie unter Einstellungen → Sprachmenü ein (das Sprachmenü muss an sein).</p></section></div>';
         }
@@ -526,7 +556,7 @@ final class Ansicht {
         $h = 'tf_h';
         $b = $h(tf_basis());
         $verborgen = '<input type="hidden" name="kienzle-csrf" value="' . $h($csrf) . '">';
-        $o = '<div class="tf">' . self::kopfzeile('/anrufe', true) . self::meldungen($meldung, $fehler) . '<div class="tf-waehlen">';
+        $o = '<div class="tf">' . self::kopfzeile('/anrufe') . self::meldungen($meldung, $fehler) . '<div class="tf-waehlen">';
         if ($waehlen) {
             $o .= '<form method="post" action="' . $b . '/anrufe" class="tf-waehlfeld">' . $verborgen . '<input type="hidden" name="aktion" value="anrufen">'
                 . '<input name="nummer" inputmode="tel" maxlength="30" required placeholder="Nummer wählen …" aria-label="Nummer"' . ($mein === '' ? ' disabled' : '') . '>'
@@ -576,7 +606,7 @@ final class Ansicht {
     public static function statistik(array $a, string $zeitraum): string {
         $h = 'tf_h';
         $b = $h(tf_basis());
-        $o = '<div class="tf">' . self::kopfzeile('/statistik', false);
+        $o = '<div class="tf">' . self::kopfzeile('/statistik');
         $o .= '<nav class="tf-reiter" aria-label="Zeitraum">';
         foreach (['woche' => 'Letzte 7 Tage', 'monat' => 'Letzte 30 Tage', 'quartal' => 'Letzte 3 Monate'] as $z => $t) {
             $o .= '<a class="button small ' . ($z === $zeitraum ? 'primary' : 'secondary') . '" href="' . $b . '/statistik?zeitraum=' . $z . '"' . ($z === $zeitraum ? ' aria-current="page"' : '') . '>' . $t . '</a>';
@@ -661,7 +691,7 @@ final class Ansicht {
 
     public static function einstellungen(array $cfg, array $status, string $csrf, bool $admin, ?string $leitung, ?array $zugang, string $server, ?string $meldung, ?string $fehler): string {
         $h = 'tf_h';
-        $o = '<div class="tf">' . self::kopfzeile('/einstellungen', true) . self::meldungen($meldung, $fehler);
+        $o = '<div class="tf">' . self::kopfzeile('/einstellungen') . self::meldungen($meldung, $fehler);
         $leitungen = ['' => '– keine –'];
         foreach ($cfg['leitungen'] as $l) $leitungen[$l['id']] = $l['name'] ?: $l['id'];
         if ($admin) {

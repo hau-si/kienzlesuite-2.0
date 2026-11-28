@@ -38,7 +38,7 @@ Oberfläche, Hilfetexte, Dokumentation und Commit-Nachrichten auf Deutsch.
 
 ## Hinweise für neue Sitzungen (Stand 28.11.2026)
 
-**Stand:** Basis 0.22.0-beta.56, Kasse (`kasse`) 2.3.4-beta.67, Terminzettel 1.3.0-beta.25, Signatur 0.1.0-beta.51, Telefon 0.1.0-beta.32, Fax 0.1.0-beta.16, QM (`qm`) 0.1.0-beta.2, Homepage (`homepage`) 0.1.0-beta.3, Beispiel 0.2.1-beta.1; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
+**Stand:** Basis 0.22.0-beta.57, Kasse (`kasse`) 2.3.4-beta.67, Terminzettel 1.3.0-beta.25, Signatur 0.1.0-beta.51, Telefon 0.1.0-beta.33, Fax 0.1.0-beta.16, QM (`qm`) 0.1.0-beta.2, Homepage (`homepage`) 0.1.0-beta.3, Beispiel 0.2.1-beta.1; Zweig `beta` ist aktuell, `main` steht auf einem älteren Endstand
 (Basis 0.19.1). Der Nutzer testet auf einer echten Ubuntu-26.04-VM (Aktualisierung dort: `cd ~/praxisherz && git pull && sudo bash installer/install.sh`,
 oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nicht ins Repository.
 
@@ -49,7 +49,7 @@ oder in der Weboberfläche unter „Updates“). Die Adresse der VM gehört nich
 - Gepusht wird nur auf `beta`. `main`, Tags und Endversionen macht der Nutzer (Ablauf: `docs/RELEASE-ABLAUF.md`).
 - Bei jeder Änderung Version **und** Release-Notiz des betroffenen Teils: Basis `core/VERSION` + `docs/RELEASE.md`; Modul `modules/<id>/module.toml` + `VERSION` (müssen übereinstimmen) + `modules/<id>/RELEASE.md`.
 - Tests grün vor dem Push: `bash tests/run-all.sh` (über zwei Minuten, Tool-Timeout hoch setzen; enthält `ruff` mit Zeilenlänge 180 und alle PHP-Tests). Ein `BrokenPipeError`-Traceback eines Python-Testservers im Log ist bekanntes Rauschen. Während eines Testlaufs nichts anderes bearbeiten. „Pushe direkt“ heißt: Tests dürfen entfallen, das aber in der Antwort sagen.
-- **Gestaltung:** Gestaltungsregel der Module: `docs/MODUL-GESTALTUNG.md` (Patientenkarte B3 als Bauteil in `core.css`, Patient im `sessionStorage` des Tabs, Modulwechsel im selben Tab, 1400 px). Bei Design-Aufgaben zuerst drei Vorschläge als Bildentwürfe zeigen (Visualisierung im Chat), den Nutzer wählen lassen, dann bauen. Neue Oberflächen immer im Stil der Basis (`core/public/assets/core.css`: Karten, `details.fold`, `tag ok/warn/err`, `mark-icon`).
+- **Gestaltung:** Gestaltungsregel der Module: `docs/MODUL-GESTALTUNG.md` (**vor jeder neuen Modulseite lesen**: 1400 px, Seitenkopf mit Knopfleiste – auf jeder Seite dieselben Knöpfe mit Symbol, aktuelle `primary`, Einstellungen zuletzt, Zähler `.zaehler` –, Symboltabelle; Patientenkarte B3 als Bauteil in `core.css`, Patient im `sessionStorage` des Tabs, Modulwechsel im selben Tab, 1400 px). Bei Design-Aufgaben zuerst drei Vorschläge als Bildentwürfe zeigen (Visualisierung im Chat), den Nutzer wählen lassen, dann bauen. Neue Oberflächen immer im Stil der Basis (`core/public/assets/core.css`: Karten, `details.fold`, `tag ok/warn/err`, `mark-icon`).
 - Nie echte Daten (Namen, Adressen, IBAN, Praxisbilder) in Repository, Tests oder Bildern; nur erfundene Beispiele (`example.org`, 192.0.2.0/24, „Max Mustermann“, „Dr. med. Erika Beispiel“).
 - Keine `rm -rf *`-artigen Befehle (die Sicherheitsprüfung blockiert sie); gezielt löschen.
 - „MFA“ in Gruppen heißt Medizinische Fachangestellte (nicht Multi-Faktor).

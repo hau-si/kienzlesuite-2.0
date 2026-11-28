@@ -133,14 +133,20 @@ check(str_contains($o, 'Wartemusik gelöscht') && !is_dir("$dir/daten/kienzlefon
 check(is_file("$dir/daten/vorgaenge-schluessel") && is_file("$dir/daten/kienzlefon/telepraxis-public.pem"), 'Schlüsselpaar beim Anwenden angelegt');
 check(str_contains(aufruf($dir, '/telefon/vorgaenge', 'sprachmenue'), '#CODE=403'), 'Vorgänge ohne Recht');
 check(str_contains(aufruf($dir, '/telefon/vorgaenge', 'vorgaenge'), 'Keine neuen Vorgänge'), 'Vorgänge leer');
-check(str_contains(aufruf($dir, '/telefon/', 'vorgaenge'), '/telefon/vorgaenge">Vorgänge</a>'), 'Knopf Vorgänge in der Übersicht');
+$o = aufruf($dir, '/telefon/', 'vorgaenge');
+check(str_contains($o, 'class="button secondary mit-icon" href="/telefon/vorgaenge"><svg') && str_contains($o, '</svg>Vorgänge</a>'), 'Knopf Vorgänge mit Symbol in der Übersicht');
+check(str_contains($o, 'class="button primary mit-icon" href="/telefon/" aria-current="page"><svg') && !str_contains($o, '← Übersicht'), 'Übersicht hervorgehoben');
+$o = aufruf($dir, '/telefon/vorgaenge', 'vorgaenge');
+check(str_contains($o, 'href="/telefon/"><svg') && str_contains($o, 'href="/telefon/vorgaenge" aria-current="page"') && str_contains($o, '<h1>Vorgänge</h1>'), 'Gleiche Knöpfe auf der Unterseite');
+check(!str_contains(aufruf($dir, '/telefon/', 'vorgaenge'), 'href="/telefon/einstellungen"'), 'Kein Knopf Einstellungen ohne Recht');
 $py = 'import sys; from pathlib import Path; from zoneinfo import ZoneInfo; sys.path.insert(0, sys.argv[1]); from kienzlefon.crypto import TelepraxisEncryptor;'
     . ' TelepraxisEncryptor(Path(sys.argv[2]), Path(sys.argv[3]), ZoneInfo("Europe/Berlin")).write_payload({"typ": "termin", "id": "+4930123456", "telefon": "+4930123456",'
     . ' "vorname": "Max", "nachname": "Mustermann", "grund": "Impfung", "_kienzlefon": {"erstellt_am": "2026-11-26T09:14:00+01:00"}}, "20261126_091400_000001")';
 exec(implode(' ', array_map('escapeshellarg', ['python3', '-c', $py, dirname(__DIR__) . '/kienzlefon', "$dir/daten/kienzlefon/telepraxis-public.pem", "$dir/daten/kienzlefon/vorgaenge"])), $aus, $rc);
 $o = aufruf($dir, '/telefon/vorgaenge', 'vorgaenge');
 check($rc === 0 && str_contains($o, 'Max Mustermann') && str_contains($o, 'Impfung') && str_contains($o, 'Neu (1)') && str_contains($o, 'data-anzahl='), 'Vorgang auf der Seite');
-check(str_contains(aufruf($dir, '/telefon/', 'vorgaenge'), 'Vorgänge (1)'), 'Zähler in der Übersicht');
+check(str_contains(aufruf($dir, '/telefon/', 'vorgaenge'), 'Vorgänge<span class="zaehler">1</span></a>'), 'Zähler in der Übersicht');
+check(str_contains(aufruf($dir, '/telefon/anrufe', 'anrufe'), 'Vorgänge<span class="zaehler">') === false, 'Ohne Recht kein Vorgänge-Knopf');
 check(str_contains(aufruf($dir, '/telefon/vorgaenge', 'sprachmenue', 'benutzer', ['aktion' => 'vorgang-erledigt', 'kienzle-csrf' => $csrf, 'id' => '20261126_091400_000001']), '#CODE=403'), 'Erledigen ohne Recht');
 $o = aufruf($dir, '/telefon/vorgaenge', 'vorgaenge', 'benutzer', ['aktion' => 'vorgang-erledigt', 'kienzle-csrf' => $csrf, 'id' => '20261126_091400_000001']);
 check(str_contains($o, 'Als erledigt markiert') && str_contains($o, 'Neu (0)'), 'Erledigt');
@@ -193,7 +199,7 @@ check(str_contains($o, 'Gespeichert.') && str_contains((string)file_get_contents
 $o = aufruf($dir, '/telefon/rufgruppen', 'rufgruppen');
 check(str_contains($o, 'Steuerung startet') && str_contains($o, 'name="aktion" value="rufgruppe-schalten"') && str_contains($o, 'ROT') && !str_contains($o, 'Standards speichern'), 'Rufgruppen-Seite für MFA');
 check(str_contains(aufruf($dir, '/telefon/rufgruppen', '', 'admin'), 'Standards speichern'), 'Standards für Admins');
-check(str_contains(aufruf($dir, '/telefon/', 'rufgruppen'), '/telefon/rufgruppen">Rufgruppen</a>'), 'Knopf Rufgruppen');
+check(str_contains(aufruf($dir, '/telefon/', 'rufgruppen'), '/telefon/rufgruppen"><svg'), 'Knopf Rufgruppen');
 $o = aufruf($dir, '/telefon/rufgruppen', 'rufgruppen', 'benutzer', ['aktion' => 'rufgruppe-schalten', 'kienzle-csrf' => $csrf, 'gruppe' => 'normal', 'nummer' => '202', 'an' => '0', 'revision' => 'r1:x:1']);
 check(str_contains($o, 'class="fehler"'), 'Schalten ohne Anlage meldet Fehler');
 check(str_contains(aufruf($dir, '/telefon/rufgruppen', 'rufgruppen', 'benutzer', ['aktion' => 'rufgruppen-speichern', 'kienzle-csrf' => $csrf]), 'nur Admins'), 'Standards nur Admin');
@@ -224,7 +230,7 @@ check(str_contains(aufruf($dir, '/telefon/anrufe', 'vorgaenge'), '#CODE=403'), '
 $o = aufruf($dir, '/telefon/anrufe', 'anrufe,waehlen');
 check(str_contains($o, 'Mein Telefon') && str_contains($o, 'keine Verbindung') && str_contains($o, 'data-quelle="/telefon/anrufe/stand"') && str_contains($o, 'Nummer wählen'), 'Anrufe-Seite');
 check(str_contains(aufruf($dir, '/telefon/anrufe/stand', 'anrufe'), 'keine Verbindung') && str_contains(aufruf($dir, '/telefon/anrufe/stand', 'waehlen'), '#CODE=403'), 'Live-Teil nur mit Recht');
-check(str_contains(aufruf($dir, '/telefon/', 'anrufe'), '/telefon/anrufe">Anrufe</a>'), 'Knopf Anrufe');
+check(str_contains(aufruf($dir, '/telefon/', 'anrufe'), '/telefon/anrufe"><svg'), 'Knopf Anrufe');
 $o = aufruf($dir, '/telefon/anrufe', 'anrufe,waehlen', 'benutzer', ['aktion' => 'anrufen', 'kienzle-csrf' => $csrf, 'nummer' => '0301234567']);
 check(str_contains($o, 'zuerst oben „Mein Telefon“'), 'Wählen ohne eigenes Telefon');
 $tel = json_decode((string)file_get_contents("$dir/daten/anlage.json"), true)['nebenstellen'][0]['nummer'];

@@ -1,5 +1,9 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.33
+
+- Gestaltung wie Kasse, Signatur und Fax (`docs/MODUL-GESTALTUNG.md`): Seiten 1400 px breit; im Seitenkopf auf jeder Seite dieselben Knöpfe mit Symbol (Übersicht, Anrufe, Vorgänge, Rufgruppen, Sprachmenü, Statistik, Einstellungen), die aktuelle Seite ist hervorgehoben; „← Übersicht“ entfällt. Offene Vorgänge als roter Zähler am Knopf. Mit Tests und im Browser der Vorschau geprüft, nicht auf der VM.
+
 ## 0.1.0-beta.32
 
 - **Öffnungszeiten aus der Basis im Sprachmenü** (Verbindung `zeiten`, Praxis → Öffnungszeiten): Öffnungs- und Telefonzeiten kommen von dort und sind auf der Seite „Sprachmenü“ nur noch zu sehen (Link zur Basis); Speichern überschreibt sie nicht.

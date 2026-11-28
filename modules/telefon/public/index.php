@@ -290,7 +290,12 @@ try {
     header('Content-Type: text/html; charset=utf-8');
     header('Cache-Control: no-store');
     if ($rel === '/einstellungen' && in_array(Anlage::auftragStatus()['stand'] ?? '', ['laeuft', 'wartet'], true)) header('Refresh: 5');
+    // Knöpfe im Seitenkopf: auf jeder Seite dieselben (docs/MODUL-GESTALTUNG.md).
     Ansicht::$sprachmenue = $darfSprachmenue && (bool)($cfg['kienzlefon']['aktiv'] ?? false);
+    Ansicht::$anrufe = $darfAnrufe;
+    Ansicht::$rufgruppen = $darfRufgruppen && (bool)($cfg['kienzlefon']['rufgruppen'] ?? false);
+    Ansicht::$vorgaenge = $darfVorgaenge && (bool)($cfg['kienzlefon']['aktiv'] ?? false) ? Vorgaenge::anzahlOffen() : null;
+    Ansicht::$einstellungen = $darfNebenstellen;
     if ($rel === '/statistik') {
         $zeitraum = isset(Statistik::ZEITRAUM[(string)($_GET['zeitraum'] ?? '')]) ? (string)$_GET['zeitraum'] : 'woche';
         $inhalt = Ansicht::statistik(Statistik::auswerten($zeitraum), $zeitraum);
@@ -336,9 +341,6 @@ try {
         Ansicht::$t2med = ['eingerichtet' => trim((string)($tv['base_url'] ?? '')) !== '', 'ohne_schluessel' => trim((string)($tv['base_url'] ?? '')) !== '' && trim((string)($tv['api_key'] ?? '')) === ''];
         $inhalt = Ansicht::einstellungen($cfg, $status, $k->csrf(), $admin, $leitung, $zugang, (string)$server, $meldung, $fehler);
     } else {
-        Ansicht::$anrufe = $darfAnrufe;
-        Ansicht::$rufgruppen = $darfRufgruppen && (bool)($cfg['kienzlefon']['rufgruppen'] ?? false);
-        Ansicht::$vorgaenge = $darfVorgaenge && (bool)($cfg['kienzlefon']['aktiv'] ?? false) ? Vorgaenge::anzahlOffen() : null;
         $inhalt = Ansicht::uebersicht($cfg, $status, $darfNebenstellen, tf_fax_bereit(), $meldung, $fehler);
     }
     echo $k->rahmen('Telefon', $inhalt, ['roh' => true, 'kopf' => Ansicht::kopf($base) . '<script src="' . tf_h($base) . '/assets/app.js" defer></script>']);
