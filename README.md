@@ -50,6 +50,12 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 
 ![Starter](docs/screenshots/starter.png)
 
+**Öffnungszeiten:** Unter Praxis → Öffnungszeiten pflegt die Praxis (auch die MFA mit dem Recht „Öffnungszeiten pflegen“) Sprech- und Telefonzeiten, Urlaub, Fortbildung und Sonderöffnungen mit Vertretung je Zeitraum sowie die Feiertage des Bundeslands, einzeln an- und abwählbar. Homepage und Telefon übernehmen alles von selbst: Mitteilung auf der Homepage, Ansage mit Vertretung am Telefon.
+
+![Öffnungszeiten](docs/screenshots/zeiten.png)
+
+![Feiertage](docs/screenshots/feiertage.png)
+
 **Verbindungen:** Zugänge, die mehrere Module brauchen (T2med, E-Mail, SMS, Letterxpress, Ablage per SFTP oder SMB), werden einmal eingetragen; ein Modul bekommt nur die, die es anmeldet.
 
 ![Verbindungen](docs/screenshots/verbindungen.png)

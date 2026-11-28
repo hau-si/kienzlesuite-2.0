@@ -1,0 +1,30 @@
+# Praxisherz, Modul homepage: neue Öffnungszeiten (Schließungen, Feiertage, Vertretungen) an die WordPress-Homepage schicken.
+[Unit]
+Description=Praxisherz Modul homepage (Öffnungszeiten übertragen)
+
+[Service]
+Type=oneshot
+User=ks-homepage
+Environment=KIENZLE_DATEN=/var/lib/kienzle/homepage
+ExecStart=/usr/bin/php /opt/kienzle/homepage/current/lib/haken.php zeiten
+TimeoutStartSec=120
+UMask=0077
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/kienzle/homepage

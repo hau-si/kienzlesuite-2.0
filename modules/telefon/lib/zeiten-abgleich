@@ -1,0 +1,207 @@
+#!/usr/bin/python3 -B
+"""Öffnungszeiten der Basis (Praxis → Öffnungszeiten, Verbindung „zeiten“) ins Sprachmenü übernehmen (Dienst kienzle-telefon-zeiten, als ks-telefon).
+
+- Wochenzeiten: [oeffnungszeiten] und [telefonzeiten] in kienzlefon.toml (Telefonzeiten leer = wie Sprechzeiten, löst die Basis auf).
+- Schließungen, Feiertage und Sonderöffnungen mit Haken „Telefon“: je Eintrag eine geplante Sonderansage von Kienzlefon
+  (<ansagen-master>/sonderansagen/<32 Hex>/metadata.json + tts.wav) mit Gültigkeit von Beginn bis Ende, bei Schließungen mit Sperre der
+  Telefonzeiten (Anrufer werden nicht durchgestellt). Eigene Einträge tragen „quelle“: „praxisherz-zeiten“; andere Sonderansagen bleiben unberührt.
+- Neue Ansagen werden erst nach dem Erzeugen der Ansagedateien eingeschaltet (wie die Weboberfläche von Kienzlefon).
+
+Angestoßen von kienzle-telefon-zeiten.path (Verbindungsdatei neu geschrieben) und einmal täglich (Timer). Ohne Sprachmenü passiert nichts.
+"""
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import sys
+from datetime import date, datetime, timedelta
+from pathlib import Path
+
+DATA = Path(os.environ.get('KIENZLE_DATEN', '/var/lib/kienzle/telefon'))
+# Piper (optional nachgeladen) liegt in einer eigenen Umgebung; Kienzlefon ruft es mit dem laufenden Interpreter auf.
+_venv = DATA / 'piper' / 'venv' / 'bin' / 'python'
+if _venv.is_file() and not os.environ.get('KIENZLE_PIPER_UMGEBUNG'):
+    os.environ['KIENZLE_PIPER_UMGEBUNG'] = '1'
+    os.execv(str(_venv), [str(_venv), '-B', *sys.argv])
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import anlage  # noqa: E402
+
+VERBINDUNG = Path(os.environ.get('KIENZLE_VERBINDUNG', '/etc/kienzle/verbindungen/module/telefon.json'))
+STAND = anlage.KZF_DATA / 'zeiten-stand.json'
+QUELLE = 'praxisherz-zeiten'
+TAGE = {'mo': 'montag', 'di': 'dienstag', 'mi': 'mittwoch', 'do': 'donnerstag', 'fr': 'freitag', 'sa': 'samstag', 'so': 'sonntag'}
+MAX = 40              # höchstens so viele Ansagen aus den Öffnungszeiten
+TAGE_VORAUS = 400     # weiter in der Zukunft liegende Einträge kommen später
+
+
+def paket() -> dict | None:
+    try:
+        p = json.loads(VERBINDUNG.read_text(encoding='utf-8')).get('zeiten')
+    except (OSError, ValueError, AttributeError):
+        return None
+    return p if isinstance(p, dict) and p.get('format') == 1 and isinstance(p.get('ereignisse'), list) else None
+
+
+def _fenster(liste) -> list[str]:
+    return [str(x) for x in liste if isinstance(x, str) and len(x) == 11][:4] if isinstance(liste, list) else []
+
+
+def woche_setzen(text: str, p: dict) -> str:
+    w = p.get('woche') if isinstance(p.get('woche'), dict) else {}
+    for teil, abschnitt in (('sprech', 'oeffnungszeiten'), ('telefon', 'telefonzeiten')):
+        tage = w.get(teil) if isinstance(w.get(teil), dict) else None
+        if not tage:
+            continue
+        for kurz, lang in TAGE.items():
+            text = anlage.toml_set(text, abschnitt, lang, _fenster(tage.get(kurz)))
+    return text
+
+
+def kennung(eid: str) -> str:
+    return hashlib.sha256(f'{QUELLE}:{eid}'.encode()).hexdigest()[:32]
+
+
+def gewuenscht(p: dict, heute: date, belegt: set[int]) -> dict[str, dict]:
+    """Sonderansagen, die es geben soll: Kennung → Metadaten (ohne „active“ und „updated_at“)."""
+    out = {}
+    zu, feier = 899, 699                       # Schließungen haben Vorrang vor Feiertagen (höhere Priorität gewinnt)
+    for e in p['ereignisse']:
+        if not isinstance(e, dict) or e.get('telefon') is not True or not isinstance(e.get('ansage'), str) or not e['ansage'].strip():
+            continue
+        try:
+            von, bis = date.fromisoformat(str(e.get('von'))), date.fromisoformat(str(e.get('bis')))
+        except ValueError:
+            continue
+        if bis < heute or von > heute + timedelta(days=TAGE_VORAUS) or bis < von or len(out) >= MAX:
+            continue
+        art = str(e.get('art', ''))
+        if art == 'feiertag':
+            while feier in belegt:
+                feier -= 1
+            prio, feier = feier, feier - 1
+        else:
+            while zu in belegt:
+                zu -= 1
+            prio, zu = zu, zu - 1
+        name = f'Praxisherz: {str(e.get("titel") or "Schließung")[:60]} ({von.strftime("%d.%m.%Y")})'
+        out[kennung(str(e.get('id', '')))] = {
+            'name': name[:100], 'announcement': e['ansage'].strip()[:2000], 'priority': prio,
+            'valid_from': datetime.combine(von, datetime.min.time()).isoformat(timespec='seconds'),
+            'expires_at': datetime.combine(bis + timedelta(days=1), datetime.min.time()).isoformat(timespec='seconds'),
+            'block_phone_hours': art != 'sonder', 'position': 'vor_begruessung' if art == 'sonder' else 'statt_begruessung',
+            'source': 'tts', 'quelle': QUELLE}
+    return out
+
+
+def _json_schreiben(path: Path, data: dict, mode: int = 0o640) -> None:
+    tmp = path.with_name(f'.{path.name}.{os.getpid()}.neu')
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, mode)
+    with os.fdopen(fd, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.chmod(tmp, mode)
+    os.replace(tmp, path)
+
+
+def _lesen(path: Path) -> dict:
+    try:
+        d = json.loads(path.read_text(encoding='utf-8'))
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def ansagen_erzeugen() -> None:
+    cmd = [str(HERE / 'kzf-bin' / 'kienzlefon-ansagen'), '--config', str(anlage.KZF_CONFIG)]
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=3600, env={**os.environ, 'KIENZLE_DATEN': str(DATA)})
+    if r.returncode != 0:
+        raise RuntimeError('Ansagen erzeugen: ' + ((r.stderr or r.stdout).strip()[-300:] or f'Rückgabe {r.returncode}'))
+
+
+def abgleich(heute: date | None = None) -> str:
+    if not anlage.KZF_CONFIG.is_file():
+        return 'Sprachmenü aus – nichts zu tun.'
+    p = paket()
+    stand = str(p.get('stand', '')) if p else ''
+    heute = heute or date.today()
+    if _lesen(STAND).get('stand') == stand and _lesen(STAND).get('tag') == heute.isoformat():
+        return 'unverändert'
+    webadmin, _, load_config, *_ = anlage._kienzlefon()
+    meldungen = []
+    if p:
+        text = anlage.KZF_CONFIG.read_text(encoding='utf-8')
+        neu = woche_setzen(text, p)
+        if neu != text:
+            tmp = anlage.KZF_DATA / '.kienzlefon.toml.zeiten'
+            anlage.write(tmp, neu, 0o600)
+            try:
+                load_config(tmp)
+            except Exception as e:  # noqa: BLE001 – Konfigurationsfehler von Kienzlefon
+                tmp.unlink(missing_ok=True)
+                raise RuntimeError(f'Wochenzeiten nicht übernommen: {str(e)[:200]}') from None
+            os.replace(tmp, anlage.KZF_CONFIG)
+            meldungen.append('Wochenzeiten übernommen')
+    config = load_config(anlage.KZF_CONFIG)
+    root = config.paths.prompt_masters / 'sonderansagen'
+    if root.is_symlink():
+        raise RuntimeError('Ablage der Sonderansagen ist unsicher.')
+    root.mkdir(mode=0o750, parents=True, exist_ok=True)
+    eigene, belegt = {}, set()
+    for d in root.iterdir():
+        meta = _lesen(d / 'metadata.json') if d.is_dir() and not d.is_symlink() else {}
+        if meta.get('quelle') == QUELLE:
+            eigene[d.name] = meta
+        elif meta.get('active') is True and isinstance(meta.get('priority'), int):
+            belegt.add(meta['priority'])
+    soll = gewuenscht(p, heute, belegt) if p else {}
+    neu_an, geaendert = [], False
+    from kienzlefon.prompts import PromptGenerator
+    for pid, meta in soll.items():
+        alt = eigene.get(pid)
+        ziel = root / pid
+        if alt and {k: alt.get(k) for k in meta} == meta and alt.get('active') is True:
+            continue
+        geaendert = True
+        if alt and alt.get('announcement') == meta['announcement'] and (ziel / 'tts.wav').is_file():
+            # Nur Zeitraum/Priorität geändert: Ton bleibt; eingeschaltet wird nach dem Erzeugen der Ansagen.
+            _json_schreiben(ziel / 'metadata.json', {**meta, 'active': alt.get('active') is True and alt.get('priority') == meta['priority'],
+                                                     'updated_at': datetime.now().isoformat(timespec='seconds')})
+            neu_an.append(pid)
+            continue
+        bau = root / f'.neu-{pid}'               # Name passt nicht zu den Kennungen: Kienzlefon übersieht den halben Ordner
+        shutil.rmtree(bau, ignore_errors=True)
+        bau.mkdir(mode=0o750)
+        PromptGenerator(config).synthesize_text_file(meta['announcement'], bau / 'tts.wav', f'zeiten-{pid[:8]}')
+        os.chmod(bau / 'tts.wav', 0o640)
+        _json_schreiben(bau / 'metadata.json', {**meta, 'active': False, 'updated_at': datetime.now().isoformat(timespec='seconds')})
+        if ziel.exists():
+            weg = root / f'.alt-{pid}'
+            shutil.rmtree(weg, ignore_errors=True)
+            os.replace(ziel, weg)
+            shutil.rmtree(weg, ignore_errors=True)
+        os.replace(bau, ziel)
+        neu_an.append(pid)
+    for pid in set(eigene) - set(soll):
+        geaendert = True
+        weg = root / f'.alt-{pid}'
+        shutil.rmtree(weg, ignore_errors=True)
+        os.replace(root / pid, weg)
+        shutil.rmtree(weg, ignore_errors=True)
+    if geaendert:
+        ansagen_erzeugen()
+        for pid in neu_an:
+            meta = _lesen(root / pid / 'metadata.json')
+            _json_schreiben(root / pid / 'metadata.json', {**meta, 'active': True})
+        meldungen.append(f'{len(soll)} Ansagen aus den Öffnungszeiten')
+    _json_schreiben(STAND, {'stand': stand, 'tag': heute.isoformat(), 'ansagen': len(soll), 'zeit': int(datetime.now().timestamp())}, 0o600)
+    return ', '.join(meldungen) or 'aktuell'
+
+
+if __name__ == '__main__':
+    try:
+        print(abgleich())
+    except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as e:
+        print(f'Fehler: {e}', file=sys.stderr)
+        sys.exit(1)

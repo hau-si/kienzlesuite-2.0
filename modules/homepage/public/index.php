@@ -5,7 +5,7 @@ declare(strict_types=1);
  * und Benutzer, Rolle und Rechte als KIENZLE_* übergeben.
  */
 require_once dirname(__DIR__) . '/src/bootstrap.php';
-use KienzleHomepage\{Ansicht, Homepage, Mitteilungen, Praxen};
+use KienzleHomepage\{Ansicht, Homepage, Mitteilungen, Praxen, Zeiten};
 
 header('X-Frame-Options: DENY');
 header('X-Content-Type-Options: nosniff');
@@ -39,6 +39,8 @@ try {
     Ansicht::$r = $r;
     Ansicht::$csrf = $k->csrf();
     Ansicht::$praxisName = $k->praxis()['name'];
+    Ansicht::$zeiten = Zeiten::hinweise($k);
+    Ansicht::$zeitenDa = Zeiten::paket($k) !== null;
     // Schreibende Anfragen nur von dieser Seite (zusätzlich zur CSRF-Marke).
     $fremd = !in_array((string)($_SERVER['HTTP_SEC_FETCH_SITE'] ?? 'same-origin'), ['same-origin', 'none'], true);
 
@@ -119,6 +121,11 @@ try {
                     $darf($r['mitteilungen'] || $r['admin']);
                     $s = Homepage::uebertragen($k);
                     hp_weiter($hier, $s['ok'] ? 'uebertragen' : '', $s['ok'] ? '' : $s['meldung']);
+                case 'zeiten':
+                    $darf($r['mitteilungen']);
+                    Zeiten::speichern($_POST);
+                    Homepage::nachAenderung($k);
+                    hp_weiter($base . '/', 'zeiten');
                 case 'praxis-speichern':
                     $darf($r['praxen']);
                     $pid = Praxen::speichern($id, $_POST);

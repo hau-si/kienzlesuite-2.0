@@ -61,6 +61,20 @@ $st = new Starter($env->db, $env->secrets, $env->config, dirname(__DIR__) . '/co
 $admin->web = fn() => new Web($env->config, $env->db, $env->users, new Kienzle\Core\Auth($env->db, $env->users, $env->audit, $admin->ip), $env->passkeys, $env->modules, $env->audit,
     static fn(string $uri) => '<svg/>', null, null, null, null, null, null, null, null, null, $st);
 $r = $admin->get('/hilfe/arbeitsplatz'); echo str_pad('starter', 14) . $r->status . "\n"; if ($r->status === 200) seite('starter', $r->body, $out, $css);
+// Öffnungszeiten: erfundene Vertretungspraxen, Weihnachtsurlaub mit zwei Vertretungen, Feiertage Baden-Württemberg
+Kienzle\Core\Zeiten::$heute = '2026-12-01';
+$zt = new Kienzle\Core\Zeiten($env->db);
+$zt->wocheSpeichern(['mo' => '08:00-12:00, 14:00-18:00', 'di' => '08:00-12:00, 14:00-18:00', 'mi' => '08:00-12:00', 'do' => '08:00-12:00, 14:00-19:00', 'fr' => '08:00-13:00'],
+    ['mo' => '08:00-11:30, 14:00-17:00', 'di' => '08:00-11:30, 14:00-17:00', 'mi' => '08:00-11:30', 'do' => '08:00-11:30, 14:00-18:00', 'fr' => '08:00-12:00']);
+$pa = $zt->praxisSpeichern(['name' => 'Praxis Dr. med. Erika Beispiel', 'strasse' => 'Musterstraße 1', 'ort' => '12345 Musterstadt', 'telefon' => '01234 56789']);
+$pb = $zt->praxisSpeichern(['name' => 'Hausarztpraxis Max Mustermann', 'strasse' => 'Beispielweg 7', 'ort' => '12345 Musterstadt', 'telefon' => '01234 98765']);
+$zid = $zt->ereignisSpeichern(['art' => 'urlaub', 'titel' => 'Weihnachtsurlaub', 'von' => '2026-12-23', 'bis' => '2027-01-03', 'homepage' => '1', 'telefon' => '1',
+    'v_von' => ['2026-12-23', '2027-01-02'], 'v_bis' => ['2026-12-31', '2027-01-03'], 'v_praxis' => [$pa, $pb]]);
+$zt->ereignisSpeichern(['art' => 'fortbildung', 'titel' => 'Fortbildung Dr. Beispiel', 'von' => '2026-12-11', 'homepage' => '1', 'telefon' => '1', 'v_praxis' => [$pb]]);
+$zt->feiertageSpeichern('BW', [], [], true, true);
+$admin->web = null;
+$r = $admin->get('/verwaltung/zeiten?e=' . $zid); echo str_pad('zeiten', 14) . $r->status . "\n"; if ($r->status === 200) seite('zeiten', $r->body, $out, $css);
+$r = $admin->get('/verwaltung/zeiten?ansicht=feiertage&jahr=2027'); echo str_pad('feiertage', 14) . $r->status . "\n"; if ($r->status === 200) seite('feiertage', $r->body, $out, $css);
 $anon = new Browser($env);
 seite('anmelden', $anon->get('/anmelden')->body, $out, $css);
 echo "Seiten in $out\n";

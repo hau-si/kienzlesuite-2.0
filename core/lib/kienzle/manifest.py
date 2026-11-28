@@ -48,7 +48,7 @@ RESERVED_RIGHTS = frozenset({'admin'})
 APPARMOR = frozenset({'gs', 'qpdf'})
 HOOKS = ('install', 'update', 'remove', 'busy', 'health')
 # Zentrale Verbindungen der Basis, die ein Modul anmelden kann (Zugangsdaten bekommen nur anmeldende Module).
-CONNECTIONS = ('t2med', 'mail', 'ablage', 'letterxpress', 'nachrichten', 'uebersetzung')
+CONNECTIONS = ('t2med', 'mail', 'ablage', 'letterxpress', 'nachrichten', 'uebersetzung', 'zeiten')
 SHARES = ('samba', 'ipp')
 STARTER_SCHEMA = re.compile(r'^praxisherz-[a-z0-9-]{1,30}$')
 # Dienste aus Ubuntu-Paketen, die die Basis abschalten darf, weil das Modul sie selbst betreibt ([system] disables).

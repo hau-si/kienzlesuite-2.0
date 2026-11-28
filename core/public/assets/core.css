@@ -474,3 +474,47 @@ main.modul { max-width: 940px; }
 .pk-weg { background: #fff; border: 1px solid #e6cfc6; color: #99412b; }
 .patient-karte [hidden] { display: none !important; }
 @media (max-width: 640px) { .patient-karte { flex-wrap: wrap; } .pk-knoepfe { width: 100%; justify-content: flex-start; } }
+/* Praxis → Öffnungszeiten (Basis beta.52, Entwurf B mit Feiertagsteil aus A) */
+.zt-kopf { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; }
+.zt-kopf a.button:last-child { margin-left: auto; }
+.zt-grid { display: grid; grid-template-columns: minmax(280px, 340px) 1fr; gap: 18px; align-items: start; }
+.zt-monat { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.zt-monat h2 { flex: 1; text-align: center; margin: 0; }
+.zt-monat a.button.small { min-height: 32px; padding: 4px 12px; }
+.zt-kal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; font-size: 13px; }
+.zt-kal .h { color: var(--muted); font-size: 11px; font-weight: 600; padding: 4px 0; }
+.zt-kal a.t { display: block; padding: 8px 0; border-radius: 8px; background: #f7faf9; color: #203c43; text-decoration: none; }
+.zt-kal a.t:hover { outline: 1px solid var(--teal); }
+.zt-kal a.we { background: transparent; color: #a5b3af; }
+.zt-kal a.u { background: #fbe9e4; color: #993d2b; font-weight: 700; }
+.zt-kal a.f { background: #fff0ca; color: #886100; font-weight: 700; }
+.zt-kal a.s { background: #e6eefb; color: #1d4f91; font-weight: 700; }
+.zt-kal a.heute { box-shadow: inset 0 -3px 0 var(--teal); }
+.zt-kal a.sel { outline: 2px solid var(--teal); }
+.zt-leg { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); margin: 10px 0 0; }
+.zt-leg i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; }
+.zt-leg i.u { background: #fbe9e4; } .zt-leg i.f { background: #fff0ca; } .zt-leg i.s { background: #e6eefb; }
+.tag.zt-zu { background: #fbe9e4; color: #993d2b; } .tag.zt-sonder { background: #e6eefb; color: #1d4f91; }
+ul.zt-liste { list-style: none; margin: 0; padding: 0; }
+ul.zt-liste li { padding: 8px 0; border-bottom: 1px solid #edf0ee; font-size: 14px; }
+ul.zt-liste li:last-child { border-bottom: 0; }
+.zt-titel { display: flex; align-items: center; gap: 10px; }
+.zt-titel h2 { margin: 0; }
+.zt-reihe { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+table.zt-tab { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.zt-tab th { text-align: left; color: var(--muted); font-weight: 600; font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+table.zt-tab th[scope=row] { color: #203c43; font-size: 14px; width: 110px; }
+table.zt-tab td { padding: 6px 8px; border-bottom: 1px solid #edf0ee; }
+table.zt-tab input, table.zt-tab select { margin: 0; width: 100%; min-width: 0; }
+.zt-vzeile { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; padding: 8px 0; border-bottom: 1px solid #edf0ee; }
+.zt-vzeile label { margin: 0; font-size: 12px; color: var(--muted); font-weight: 600; }
+.zt-vzeile label.zt-vp { grid-column: 1 / -1; }
+.zt-vzeile input, .zt-vzeile select { margin: 2px 0 0; }
+blockquote.zt-ansage { margin: 0 0 12px; background: #f7faf9; border-left: 4px solid var(--teal); padding: 12px 14px; border-radius: 8px; font-size: 14px; line-height: 1.5; }
+ul.zt-feiertage { list-style: none; margin: 8px 0 12px; padding: 0; columns: 2; column-gap: 28px; }
+ul.zt-feiertage li { break-inside: avoid; border-bottom: 1px solid #edf0ee; }
+ul.zt-feiertage label.check { margin: 6px 0; }
+ul.zt-feiertage .d { color: var(--muted); min-width: 88px; display: inline-block; }
+ul.zt-feiertage li.aus .n { color: #8a9b96; text-decoration: line-through; }
+.zt-jahre { display: flex; gap: 8px; }
+@media (max-width: 900px) { .zt-grid, .zt-reihe { grid-template-columns: 1fr; } ul.zt-feiertage { columns: 1; } .zt-kopf a.button:last-child { margin-left: 0; } }
