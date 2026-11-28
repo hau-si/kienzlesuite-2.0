@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.45
+
+- Gleicher Inhalt wie beta.44, ohne eine versehentlich mitgelieferte Programmdatei im Archiv. Die Vorabversion beta.44 bitte auf GitHub löschen (Release und Tag `core-v0.22.0-beta.44`).
+
 ## 0.22.0-beta.44
 
 - **Keine Übergänge von „Kienzle“ mehr** (Wunsch des Nutzers): T2med-Aufrufe nur noch `praxisherz-…://` (die früheren `kienzle-…://` werden nicht mehr eingerichtet und vom Starter abgelehnt), kein früherer Programmname `kienzle-starter-…` für ältere Agenten, keine Ordner `C:\Kienzle` (GDT, Programm, Daten), keine alte Druckermarke „Kienzle-Suite“, keine alten Autostart- und Aufgabeneinträge, keine Ausweichsuche des Updaters und der Start-ISO nach dem früheren Repository-Namen. Zertifikate neuer Installationen heißen „Praxisherz“.
