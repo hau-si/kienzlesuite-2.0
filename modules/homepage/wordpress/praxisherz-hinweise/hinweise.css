@@ -1,28 +1,30 @@
 /* Praxisherz-Hinweise: ruhige Farben je Art; Schrift kommt vom Theme. */
 .ph-hinweis[hidden] { display: none !important; }
 .ph-block-leiste { position: relative; z-index: 9999; }
-.ph-leiste { padding: 10px 16px; text-align: center; font-size: 15px; line-height: 1.45; color: #fff; background: #1f4f82; }
+.ph-leiste { display: flex; justify-content: center; align-items: center; gap: 8px; padding: 10px 16px; text-align: center; font-size: 15px; line-height: 1.45; color: #fff; background: var(--ph-c, #1f4f82); }
 .ph-leiste + .ph-leiste { border-top: 1px solid rgba(255, 255, 255, .35); }
-.ph-leiste.ph-art-impfstoff { background: #12695d; }
-.ph-leiste.ph-art-oeffnungszeiten { background: #7a5200; }
-.ph-leiste.ph-art-frei { background: #2f4a52; }
+.ph-symbol { flex: none; width: 20px; height: 20px; vertical-align: -4px; }
+
+/* Farben (gleiche Werte im Modul Homepage) */
+.ph-farbe-blau { --ph-c: #1f4f82; --ph-bg: #f2f6fb; }
+.ph-farbe-gruen { --ph-c: #2e7d32; --ph-bg: #eff7ef; }
+.ph-farbe-petrol { --ph-c: #12695d; --ph-bg: #eef7f3; }
+.ph-farbe-ocker { --ph-c: #8a5a00; --ph-bg: #fff8e6; }
+.ph-farbe-rot { --ph-c: #a32d2d; --ph-bg: #fdf0ef; }
+.ph-farbe-violett { --ph-c: #5b3c99; --ph-bg: #f4f0fb; }
+.ph-farbe-grau { --ph-c: #2f4a52; --ph-bg: #f2f5f5; }
 
 .ph-kasten, .ph-kurzcode, .ph-fenster-box { color: #1e2b30; font-size: 16px; line-height: 1.5; }
-.ph-kasten, .ph-kurzcode { margin: 0 0 16px; padding: 12px 16px; border-left: 4px solid #1f4f82; border-radius: 4px; background: #f2f6fb; }
-.ph-art-impfstoff.ph-kasten, .ph-art-impfstoff.ph-kurzcode { border-color: #12695d; background: #eef7f3; }
-.ph-art-oeffnungszeiten.ph-kasten, .ph-art-oeffnungszeiten.ph-kurzcode { border-color: #b07a00; background: #fff8e6; }
-.ph-art-frei.ph-kasten, .ph-art-frei.ph-kurzcode { border-color: #2f4a52; background: #f2f5f5; }
-.ph-titel { display: block; margin: 0 0 4px; font-weight: 700; }
+.ph-kasten, .ph-kurzcode { margin: 0 0 16px; padding: 12px 16px; border-left: 4px solid var(--ph-c, #1f4f82); border-radius: 4px; background: var(--ph-bg, #f2f6fb); }
+.ph-nachreichen-kasten { box-sizing: border-box; width: 100%; max-width: 1200px; margin: 16px auto; padding: 0 16px; }
+.ph-titel { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font-weight: 700; color: var(--ph-c, inherit); }
 .ph-punkte { margin: 4px 0 4px 20px; padding: 0; }
 .ph-punkte li { margin: 2px 0; }
 .ph-text { margin: 6px 0 0; }
 
 .ph-fenster { position: fixed; inset: 0; z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(0, 0, 0, .45); }
-.ph-fenster-box { position: relative; width: 100%; max-width: 520px; max-height: 90vh; overflow: auto; padding: 24px 26px 20px; border-top: 6px solid #1f4f82; border-radius: 10px;
+.ph-fenster-box { position: relative; width: 100%; max-width: 520px; max-height: 90vh; overflow: auto; padding: 24px 26px 20px; border-top: 6px solid var(--ph-c, #1f4f82); border-radius: 10px;
   background: #fff; box-shadow: 0 12px 40px rgba(0, 0, 0, .3); }
-.ph-art-impfstoff .ph-fenster-box { border-top-color: #12695d; }
-.ph-art-oeffnungszeiten .ph-fenster-box { border-top-color: #b07a00; }
-.ph-art-frei .ph-fenster-box { border-top-color: #2f4a52; }
 .ph-fenster .ph-titel { padding-right: 28px; font-size: 19px; }
 .ph-zu { position: absolute; top: 6px; right: 10px; padding: 0 6px; border: 0; background: none; color: #555; font-size: 28px; line-height: 1; cursor: pointer; }
 .ph-zu:focus-visible { outline: 3px solid #a3d0c2; }

@@ -10,6 +10,7 @@ $GLOBALS['wp_routen'] = [];
 $GLOBALS['wp_kurzcodes'] = [];
 $GLOBALS['wp_optionen_speicher'] = null;
 $GLOBALS['wp_ist_startseite'] = true;
+$GLOBALS['wp_ist_seite'] = true;
 
 function wp_optionen(): array {
     $f = getenv('WP_OPTIONEN');
@@ -41,7 +42,10 @@ function current_time($f) { return date($f); }
 function plugins_url($p, $f) { return 'https://www.example.org/wp-content/plugins/praxisherz-hinweise/' . $p; }
 function plugin_basename($f) { return 'praxisherz-hinweise/praxisherz-hinweise.php'; }
 function is_front_page() { return $GLOBALS['wp_ist_startseite']; }
+function is_page() { return $GLOBALS['wp_ist_seite']; }
 function in_the_loop() { return true; }
+function selected($a, $b, $echo = true) { return $a === $b ? ' selected="selected"' : ''; }
+function wp_unslash($w) { return $w; }
 function is_main_query() { return true; }
 function wp_enqueue_style(...$a) {}
 function wp_enqueue_script(...$a) {}

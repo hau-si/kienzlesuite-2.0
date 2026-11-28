@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Praxisherz-Hinweise
  * Description: Zeigt Mitteilungen aus Praxisherz (Vertretung, Impfstoff lieferbar, Sonderöffnungszeiten, freier Text) auf der Homepage an: als Leiste oben, Kasten auf der Startseite, Fenster beim Öffnen oder an der Stelle des Kurzcodes [praxisherz_hinweise].
- * Version: 0.1.0
+ * Version: 0.2.0
  * Requires at least: 5.3
  * Requires PHP: 7.4
  * Author: Praxisherz
@@ -17,10 +17,26 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('PRAXISHERZ_HINWEISE_VERSION', '0.1.0');
+define('PRAXISHERZ_HINWEISE_VERSION', '0.2.0');
 define('PRAXISHERZ_HINWEISE_ARTEN', ['vertretung', 'impfstoff', 'oeffnungszeiten', 'frei']);
 define('PRAXISHERZ_HINWEISE_ORTE', ['leiste', 'kasten', 'fenster', 'kurzcode']);
 define('PRAXISHERZ_HINWEISE_MAX_KOERPER', 262144);
+define('PRAXISHERZ_HINWEISE_FARBEN', ['blau', 'gruen', 'petrol', 'ocker', 'rot', 'violett', 'grau']);
+define('PRAXISHERZ_HINWEISE_FARBE_ZUR_ART', ['vertretung' => 'blau', 'impfstoff' => 'gruen', 'oeffnungszeiten' => 'ocker', 'frei' => 'grau']);
+define('PRAXISHERZ_HINWEISE_SYMBOL_ZUR_ART', ['vertretung' => 'praxis', 'impfstoff' => 'spritze', 'oeffnungszeiten' => 'uhr', 'frei' => 'info']);
+/** Symbole (gleiche Namen und Pfade wie im Modul Homepage von Praxisherz). */
+define('PRAXISHERZ_HINWEISE_SYMBOLE', [
+    'keins' => '',
+    'info' => '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+    'achtung' => '<path d="M12 3.5 21.5 20h-19z"/><path d="M12 9.5v5M12 17.2v.1"/>',
+    'praxis' => '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M12 11v6M9 14h6"/>',
+    'spritze' => '<path d="M18 2l4 4M20 4l-3 3"/><path d="M17 7l-9.5 9.5-3-3L14 4z"/><path d="M11 7l2 2M8 10l2 2M4.5 19.5l2-2"/>',
+    'kalender' => '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>',
+    'uhr' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    'telefon' => '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2"/>',
+    'urlaub' => '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+    'herz' => '<path d="M12 20s-7-4.4-9-8.6A4.8 4.8 0 0112 7a4.8 4.8 0 019 4.4C19 15.6 12 20 12 20z"/>',
+]);
 
 // ---- Schlüssel ---------------------------------------------------------------------------------------------------------
 
@@ -38,7 +54,7 @@ register_activation_hook(__FILE__, 'praxisherz_hinweise_schluessel');
 register_uninstall_hook(__FILE__, 'praxisherz_hinweise_entfernen');
 
 function praxisherz_hinweise_entfernen(): void {
-    foreach (['praxisherz_hinweise_schluessel', 'praxisherz_hinweise', 'praxisherz_hinweise_zuletzt'] as $o) delete_option($o);
+    foreach (['praxisherz_hinweise_schluessel', 'praxisherz_hinweise', 'praxisherz_hinweise_zuletzt', 'praxisherz_hinweise_kasten_ziel', 'praxisherz_hinweise_kasten_lage'] as $o) delete_option($o);
 }
 
 // ---- Empfang ------------------------------------------------------------------------------------------------------------
@@ -88,7 +104,9 @@ function praxisherz_hinweise_bereinigen($daten): ?array {
         }
         $out[] = ['id' => $h['id'], 'art' => $h['art'], 'titel' => praxisherz_hinweise_text($h['titel'] ?? '', 200), 'kurz' => praxisherz_hinweise_text($h['kurz'] ?? '', 600),
             'text' => praxisherz_hinweise_text($h['text'] ?? '', 1000), 'punkte' => $punkte, 'von' => praxisherz_hinweise_datum($h['von'] ?? ''),
-            'bis' => praxisherz_hinweise_datum($h['bis'] ?? ''), 'orte' => $orte];
+            'bis' => praxisherz_hinweise_datum($h['bis'] ?? ''), 'orte' => $orte,
+            'farbe' => in_array($h['farbe'] ?? '', PRAXISHERZ_HINWEISE_FARBEN, true) ? $h['farbe'] : PRAXISHERZ_HINWEISE_FARBE_ZUR_ART[$h['art']],
+            'symbol' => is_string($h['symbol'] ?? null) && array_key_exists($h['symbol'], PRAXISHERZ_HINWEISE_SYMBOLE) ? $h['symbol'] : PRAXISHERZ_HINWEISE_SYMBOL_ZUR_ART[$h['art']]];
     }
     return $out;
 }
@@ -135,14 +153,22 @@ function praxisherz_hinweise_sichtbar(array $h, string $heute): bool {
     return ($h['von'] === '' || $h['von'] <= $heute) && ($h['bis'] === '' || $h['bis'] >= $heute);
 }
 
+function praxisherz_hinweise_svg(string $symbol): string {
+    $pfad = PRAXISHERZ_HINWEISE_SYMBOLE[$symbol] ?? '';
+    return $pfad === '' ? '' : '<svg class="ph-symbol" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' . $pfad . '</svg>';
+}
+
 function praxisherz_hinweise_html(array $h, string $ort, ?string $heute = null): string {
     $heute = $heute ?? praxisherz_hinweise_heute();
-    $attr = ' class="ph-hinweis ph-' . esc_attr($ort) . ' ph-art-' . esc_attr($h['art']) . '" data-id="' . esc_attr($h['id']) . '" data-von="' . esc_attr($h['von'])
+    // Ältere Übertragungen (Plugin 0.1) ohne Farbe und Symbol: passend zur Art.
+    $farbe = $h['farbe'] ?? (PRAXISHERZ_HINWEISE_FARBE_ZUR_ART[$h['art']] ?? 'grau');
+    $svg = praxisherz_hinweise_svg($h['symbol'] ?? (PRAXISHERZ_HINWEISE_SYMBOL_ZUR_ART[$h['art']] ?? 'keins'));
+    $attr = ' class="ph-hinweis ph-' . esc_attr($ort) . ' ph-art-' . esc_attr($h['art']) . ' ph-farbe-' . esc_attr($farbe) . '" data-id="' . esc_attr($h['id']) . '" data-von="' . esc_attr($h['von'])
         // Fenster erst durch das Skript (Schließen braucht es ohnehin).
         . '" data-bis="' . esc_attr($h['bis']) . '"' . ($ort !== 'fenster' && praxisherz_hinweise_sichtbar($h, $heute) ? '' : ' hidden');
-    if ($ort === 'leiste') return '<div' . $attr . ' role="note"><span class="ph-kurz">' . esc_html($h['kurz']) . '</span></div>';
+    if ($ort === 'leiste') return '<div' . $attr . ' role="note">' . $svg . '<span class="ph-kurz">' . esc_html($h['kurz']) . '</span></div>';
     $inhalt = '';
-    if ($h['titel'] !== '') $inhalt .= '<strong class="ph-titel" id="ph-titel-' . esc_attr($ort . '-' . $h['id']) . '">' . esc_html($h['titel']) . '</strong>';
+    if ($h['titel'] !== '') $inhalt .= '<strong class="ph-titel" id="ph-titel-' . esc_attr($ort . '-' . $h['id']) . '">' . $svg . '<span>' . esc_html($h['titel']) . '</span></strong>';
     if ($h['punkte']) $inhalt .= '<ul class="ph-punkte"><li>' . implode('</li><li>', array_map('esc_html', $h['punkte'])) . '</li></ul>';
     if ($h['text'] !== '') $inhalt .= '<p class="ph-text">' . nl2br(esc_html($h['text'])) . '</p>';
     if ($ort === 'fenster') {
@@ -153,12 +179,19 @@ function praxisherz_hinweise_html(array $h, string $ort, ?string $heute = null):
     return '<div' . $attr . '>' . $inhalt . '</div>';
 }
 
-function praxisherz_hinweise_block(string $ort, string $klasse = ''): string {
+function praxisherz_hinweise_block(string $ort, string $klasse = '', string $attribute = ''): string {
     $liste = praxisherz_hinweise_fuer($ort);
     if (!$liste) return '';
     $html = '';
     foreach ($liste as $h) $html .= praxisherz_hinweise_html($h, $ort);
-    return '<div class="ph-block ph-block-' . esc_attr($ort) . ($klasse !== '' ? ' ' . esc_attr($klasse) : '') . '">' . $html . '</div>';
+    return '<div class="ph-block ph-block-' . esc_attr($ort) . ($klasse !== '' ? ' ' . esc_attr($klasse) : '') . '"' . $attribute . '>' . $html . '</div>';
+}
+
+/** Stelle für den Kasten: CSS-Selektor (leer = automatisch) und Lage dazu. */
+function praxisherz_hinweise_kasten_stelle(): array {
+    $ziel = (string)get_option('praxisherz_hinweise_kasten_ziel', '');
+    $lage = (string)get_option('praxisherz_hinweise_kasten_lage', 'anfang');
+    return [preg_match('/^[A-Za-z0-9#.\-_ >:\[\]=",*]{0,200}$/D', $ziel) ? $ziel : '', in_array($lage, ['vor', 'anfang', 'ende', 'nach'], true) ? $lage : 'anfang'];
 }
 
 add_action('wp_enqueue_scripts', function () {
@@ -178,11 +211,19 @@ add_action('wp_footer', function () {
     // Themes ohne wp_body_open: Leiste hier ausgeben, das Skript setzt sie an den Anfang der Seite.
     if (!$GLOBALS['praxisherz_hinweise_leiste']) echo praxisherz_hinweise_block('leiste', 'ph-nachreichen'); // phpcs:ignore WordPress.Security.EscapeOutput
     echo praxisherz_hinweise_block('fenster'); // phpcs:ignore WordPress.Security.EscapeOutput
+    // Startseiten, die das Theme selbst zusammenbaut (ohne den Inhalt einer Seite): Kasten hier ausgeben, das Skript setzt ihn an
+    // die eingestellte Stelle bzw. automatisch nach den ersten Abschnitt.
+    if (!$GLOBALS['praxisherz_hinweise_kasten'] && is_front_page()) {
+        $GLOBALS['praxisherz_hinweise_kasten'] = true;
+        [$ziel, $lage] = praxisherz_hinweise_kasten_stelle();
+        echo praxisherz_hinweise_block('kasten', 'ph-nachreichen-kasten', ' hidden data-ziel="' . esc_attr($ziel) . '" data-lage="' . esc_attr($lage) . '"'); // phpcs:ignore WordPress.Security.EscapeOutput
+    }
 });
 
 $GLOBALS['praxisherz_hinweise_kasten'] = false;
 add_filter('the_content', function ($inhalt) {
-    if ($GLOBALS['praxisherz_hinweise_kasten'] || !is_front_page() || !in_the_loop() || !is_main_query()) return $inhalt;
+    // Nur auf einer statischen Startseite (Seite) und ohne eingestellte Stelle; sonst setzt das Skript den Kasten.
+    if ($GLOBALS['praxisherz_hinweise_kasten'] || !is_front_page() || !is_page() || !in_the_loop() || !is_main_query() || praxisherz_hinweise_kasten_stelle()[0] !== '') return $inhalt;
     $GLOBALS['praxisherz_hinweise_kasten'] = true;
     return praxisherz_hinweise_block('kasten') . $inhalt;
 }, 5);
@@ -211,12 +252,26 @@ add_action('admin_post_praxisherz_hinweise_neuer_schluessel', function () {
     exit;
 });
 
+add_action('admin_post_praxisherz_hinweise_stelle', function () {
+    if (!current_user_can('manage_options')) wp_die('Keine Berechtigung.');
+    check_admin_referer('praxisherz_hinweise_stelle');
+    $ziel = trim(wp_unslash((string)($_POST['ziel'] ?? '')));
+    if (!preg_match('/^[A-Za-z0-9#.\-_ >:\[\]=",*]{0,200}$/D', $ziel)) $ziel = '';
+    $lage = (string)($_POST['lage'] ?? 'anfang');
+    update_option('praxisherz_hinweise_kasten_ziel', $ziel, true);
+    update_option('praxisherz_hinweise_kasten_lage', in_array($lage, ['vor', 'anfang', 'ende', 'nach'], true) ? $lage : 'anfang', true);
+    praxisherz_hinweise_cache_leeren();
+    wp_safe_redirect(admin_url('options-general.php?page=praxisherz-hinweise&stelle=1'));
+    exit;
+});
+
 function praxisherz_hinweise_seite(): void {
     if (!current_user_can('manage_options')) return;
     $d = get_option('praxisherz_hinweise', []);
     $liste = is_array($d['hinweise'] ?? null) ? $d['hinweise'] : [];
     $orte = ['leiste' => 'Leiste oben', 'kasten' => 'Kasten Startseite', 'fenster' => 'Fenster', 'kurzcode' => 'Kurzcode'];
     echo '<div class="wrap"><h1>Praxisherz-Hinweise</h1>';
+    if (!empty($_GET['stelle'])) echo '<div class="notice notice-success"><p>Stelle für den Kasten gespeichert.</p></div>';
     if (!empty($_GET['neu'])) echo '<div class="notice notice-warning"><p>Neuer Schlüssel erzeugt. Bitte in Praxisherz unter Homepage → Einrichtung neu eintragen.</p></div>';
     echo '<h2>Schlüssel für Praxisherz</h2><p>In Praxisherz unter <strong>Homepage → Einrichtung</strong> zusammen mit der Adresse dieser Homepage eintragen.</p>'
         . '<p><input type="text" class="large-text code" readonly value="' . esc_attr(praxisherz_hinweise_schluessel()) . '" onfocus="this.select()"></p>'
@@ -236,9 +291,20 @@ function praxisherz_hinweise_seite(): void {
             echo '</tbody></table>';
         }
     }
+    [$ziel, $lage] = praxisherz_hinweise_kasten_stelle();
+    $lagen = ['vor' => 'vor dem Element', 'anfang' => 'am Anfang im Element', 'ende' => 'am Ende im Element', 'nach' => 'nach dem Element'];
+    echo '<h2>Stelle für den Kasten auf der Startseite</h2><p>Leer lassen: automatisch (über dem Inhalt der Startseite bzw. nach dem ersten Abschnitt der Seite). '
+        . 'Sonst den CSS-Selektor eines Elements der Startseite eintragen, z. B. <code>#aktuelles</code>.</p>'
+        . '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '"><input type="hidden" name="action" value="praxisherz_hinweise_stelle">';
+    wp_nonce_field('praxisherz_hinweise_stelle');
+    echo '<p><input type="text" name="ziel" class="regular-text code" maxlength="200" value="' . esc_attr($ziel) . '" placeholder="automatisch"> <select name="lage">';
+    foreach ($lagen as $w => $t) echo '<option value="' . esc_attr($w) . '"' . selected($lage, $w, false) . '>' . esc_html($t) . '</option>';
+    echo '</select> ';
+    submit_button('Speichern', 'secondary', 'submit', false);
+    echo '</p></form>';
     echo '<h2>Orte auf der Homepage</h2><ul style="list-style:disc;padding-left:20px">'
         . '<li><strong>Leiste oben:</strong> auf allen Seiten ganz oben.</li>'
-        . '<li><strong>Kasten Startseite:</strong> über dem Inhalt der Startseite.</li>'
+        . '<li><strong>Kasten Startseite:</strong> über dem Inhalt der Startseite oder an der eingestellten Stelle.</li>'
         . '<li><strong>Fenster:</strong> öffnet sich beim Besuch einmal je Sitzung.</li>'
         . '<li><strong>Kurzcode:</strong> an der Stelle, an der <code>[praxisherz_hinweise]</code> in einer Seite oder einem Widget steht.</li></ul></div>';
 }

@@ -16,6 +16,28 @@
   }
   var nach = document.querySelector('.ph-nachreichen');
   if (nach && document.body.firstChild !== nach) document.body.insertBefore(nach, document.body.firstChild);
+  // Kasten, den das Theme nicht über den Seiteninhalt ausgibt: an die eingestellte Stelle oder automatisch setzen.
+  var kasten = document.querySelector('.ph-nachreichen-kasten');
+  if (kasten) {
+    var ziel = null, lage = kasten.getAttribute('data-lage') || 'anfang', sel = kasten.getAttribute('data-ziel') || '';
+    if (sel) { try { ziel = document.querySelector(sel); } catch (e) { ziel = null; } }
+    if (!ziel) {
+      ziel = document.querySelector('main, [role="main"], #main, .site-main, #content');
+      lage = 'anfang';
+      if (!ziel) {
+        // Erster Abschnitt nach Kopf und Leisten (z. B. der große Willkommensbereich), sonst der Kopf der Seite
+        ziel = document.querySelector('body > section, body > div > section, header');
+        lage = 'nach';
+      }
+    }
+    if (ziel) {
+      if (lage === 'vor') ziel.parentNode.insertBefore(kasten, ziel);
+      else if (lage === 'nach') ziel.parentNode.insertBefore(kasten, ziel.nextSibling);
+      else if (lage === 'ende') ziel.appendChild(kasten);
+      else ziel.insertBefore(kasten, ziel.firstChild);
+      kasten.hidden = false;
+    }
+  }
   // Fenster: nur das erste sichtbare zeigen, die weiteren nach dem Schließen
   var fenster = Array.prototype.filter.call(document.querySelectorAll('.ph-fenster'), function (f) { return !f.hidden; });
   function zeigen(n) {

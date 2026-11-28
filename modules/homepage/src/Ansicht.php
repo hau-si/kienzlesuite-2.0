@@ -132,6 +132,7 @@ final class Ansicht {
                 . ($m['aktiv'] ? 'Ausschalten' : 'Einschalten') . '"><span class="hp-unsichtbar">' . ($m['aktiv'] ? 'Ausschalten' : 'Einschalten') . '</span></button>';
         }
         $o .= '<details class="fold hp-zeile" id="m' . $m['id'] . '" data-id="' . $m['id'] . '"' . ($offen === $m['id'] ? ' open' : '') . '><summary>' . $schalter
+            . '<span class="hp-punkt hp-f-' . Mitteilungen::farbe($m) . '">' . Mitteilungen::svg(Mitteilungen::symbol($m)) . '</span>'
             . '<b class="hp-zeilentitel">' . self::h(Mitteilungen::titel($m)) . '</b>' . $marke . '<span class="tag ' . self::TAG[$m['art']] . '">' . self::h(Mitteilungen::ARTEN[$m['art']]) . '</span>'
             . '<span class="muted hp-zeitraum">' . self::h(Mitteilungen::zeitraumKurz($m)) . '</span></summary><div class="box">';
         if (self::$r['mitteilungen']) $o .= self::formular($m);
@@ -144,7 +145,7 @@ final class Ansicht {
 
     private static function formular(?array $m): string {
         $neu = $m === null;
-        $m ??= ['id' => 0, 'art' => 'vertretung', 'titel' => '', 'text' => '', 'praxen' => [], 'tage' => [], 'von' => '', 'bis' => '', 'orte' => ['leiste', 'kasten'], 'aktiv' => true];
+        $m ??= ['id' => 0, 'art' => 'vertretung', 'titel' => '', 'text' => '', 'praxen' => [], 'tage' => [], 'von' => '', 'bis' => '', 'orte' => ['leiste', 'kasten'], 'aktiv' => true, 'farbe' => 'standard', 'symbol' => 'standard'];
         $p = 'f' . $m['id'] . '-';
         $o = '<form method="post" class="hp-form" data-id="' . ($neu ? 'neu' : $m['id']) . '">' . self::csrfFeld() . '<input type="hidden" name="id" value="' . $m['id'] . '">';
         $o .= '<fieldset class="hp-wahl"><legend>Art</legend><div class="hp-chips">';
@@ -181,6 +182,19 @@ final class Ansicht {
             . '<div><label for="' . $p . 'bis">Bis <span class="muted">(leer = ohne Ende)</span></label><input type="date" id="' . $p . 'bis" name="bis" value="' . self::h($m['bis']) . '"></div></div>';
         $o .= '<label for="' . $p . 'text">Text <span class="muted">(optional)</span></label><textarea id="' . $p . 'text" name="text" maxlength="1000" rows="3" placeholder="z. B. Bitte vereinbaren Sie einen Termin.">'
             . self::h($m['text']) . '</textarea>';
+        $farbe = (string)($m['farbe'] ?? 'standard');
+        $o .= '<fieldset class="hp-wahl"><legend>Farbe</legend><div class="hp-chips">';
+        foreach (Mitteilungen::FARBEN as $f => $text) {
+            $o .= '<label class="hp-chip hp-farbwahl"><input type="radio" name="farbe" value="' . $f . '"' . ($farbe === $f ? ' checked' : '') . '><span class="hp-farbfleck hp-f-' . $f . '"></span>' . self::h($text) . '</label>';
+        }
+        $symbol = (string)($m['symbol'] ?? 'standard');
+        $o .= '</div></fieldset><fieldset class="hp-wahl"><legend>Symbol</legend><div class="hp-chips">'
+            . '<label class="hp-chip"><input type="radio" name="symbol" value="standard"' . ($symbol === 'standard' ? ' checked' : '') . '>Passend zur Art</label>';
+        foreach (Mitteilungen::SYMBOLE as $sy => [$text]) {
+            $o .= '<label class="hp-chip hp-symbolwahl" title="' . self::h($text) . '"><input type="radio" name="symbol" value="' . $sy . '"' . ($symbol === $sy ? ' checked' : '') . '>'
+                . ($sy === 'keins' ? self::h($text) : Mitteilungen::svg($sy) . '<span class="hp-unsichtbar">' . self::h($text) . '</span>') . '</label>';
+        }
+        $o .= '</div></fieldset>';
         $o .= '<fieldset class="hp-wahl"><legend>Wo erscheinen?</legend><div class="hp-chips">';
         foreach (Mitteilungen::ORTE as $ort => $text) {
             $o .= '<label class="hp-chip"><input type="checkbox" name="orte[]" value="' . $ort . '"' . (in_array($ort, $m['orte'], true) ? ' checked' : '') . '>' . self::h($text) . '</label>';
@@ -195,15 +209,15 @@ final class Ansicht {
     /** Nachgebaute Homepage mit allen sichtbaren Mitteilungen an ihren Orten. */
     public static function vorschau(array $liste, string $datum): string {
         $nach = static fn(string $ort) => array_values(array_filter($liste, fn($d) => in_array($ort, $d['orte'], true)));
-        $klasse = static fn(array $d, string $ort) => 'hp-v-' . $ort . ' hp-v-' . $d['art'] . (!empty($d['bearbeitet']) ? ' hp-v-bearbeitet' : '');
+        $klasse = static fn(array $d, string $ort) => 'hp-v-' . $ort . ' hp-f-' . $d['farbe'] . (!empty($d['bearbeitet']) ? ' hp-v-bearbeitet' : '');
         $block = static function (array $d, string $ort) use ($klasse): string {
-            $o = '<div class="' . $klasse($d, $ort) . '">' . ($d['titel'] !== '' ? '<strong>' . hp_h($d['titel']) . '</strong>' : '');
+            $o = '<div class="' . $klasse($d, $ort) . '">' . ($d['titel'] !== '' ? '<strong>' . Mitteilungen::svg($d['symbol'], 'hp-v-symbol') . hp_h($d['titel']) . '</strong>' : '');
             if ($d['punkte']) $o .= '<ul><li>' . implode('</li><li>', array_map('hp_h', $d['punkte'])) . '</li></ul>';
             if ($d['text'] !== '') $o .= '<p>' . nl2br(hp_h($d['text'])) . '</p>';
             return $o . '</div>';
         };
         $o = '<div class="hp-seite">';
-        foreach ($nach('leiste') as $d) $o .= '<div class="' . $klasse($d, 'leiste') . '">' . hp_h($d['kurz']) . '</div>';
+        foreach ($nach('leiste') as $d) $o .= '<div class="' . $klasse($d, 'leiste') . '">' . Mitteilungen::svg($d['symbol'], 'hp-v-symbol') . hp_h($d['kurz']) . '</div>';
         $o .= '<div class="hp-v-menue">Start · Praxis · Leistungen · Kontakt</div><div class="hp-v-inhalt"><b class="hp-v-gruss">Willkommen' . (self::$praxisName !== '' ? ' in der ' . hp_h(self::$praxisName) : ' in unserer Praxis') . '</b>';
         foreach ($nach('kasten') as $d) $o .= $block($d, 'kasten');
         $o .= '<p class="hp-v-blind">Unsere Sprechzeiten …</p>';
@@ -216,7 +230,7 @@ final class Ansicht {
         $o .= '</div>';
         $fenster = $nach('fenster');
         if ($fenster) {
-            $o .= '<div class="hp-v-schleier"><div class="hp-v-fensterbox"><span class="hp-v-zu" aria-hidden="true">×</span>' . $block($fenster[0], 'fenster')
+            $o .= '<div class="hp-v-schleier"><div class="hp-v-fensterbox hp-f-' . $fenster[0]['farbe'] . '"><span class="hp-v-zu" aria-hidden="true">×</span>' . $block($fenster[0], 'fenster')
                 . (count($fenster) > 1 ? '<p class="hp-v-mehr">danach ' . (count($fenster) - 1) . ' weiteres Fenster</p>' : '') . '</div></div>';
         }
         $o .= '</div>';

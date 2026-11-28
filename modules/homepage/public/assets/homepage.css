@@ -64,29 +64,21 @@ button.hp-klein-knopf { min-height: 32px; padding: 4px 12px; font-size: 13px; ma
 
 /* Vorschau: nachgebaute Homepage */
 .hp-seite { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: #fff; font-family: Georgia, "Times New Roman", serif; min-height: 260px; }
-.hp-v-leiste { padding: 8px 14px; color: #fff; background: #1f4f82; font: 13px/1.4 Inter, sans-serif; text-align: center; }
+.hp-v-leiste { display: flex; justify-content: center; align-items: center; gap: 7px; padding: 8px 14px; color: #fff; background: var(--hp-c); font: 13px/1.4 Inter, sans-serif; text-align: center; }
 .hp-v-leiste + .hp-v-leiste { border-top: 1px solid #ffffff59; }
-.hp-v-leiste.hp-v-impfstoff { background: #12695d; }
-.hp-v-leiste.hp-v-oeffnungszeiten { background: #7a5200; }
-.hp-v-leiste.hp-v-frei { background: #2f4a52; }
 .hp-v-menue { padding: 9px 14px; border-bottom: 1px solid #eee; color: #555; font: 13px Inter, sans-serif; }
 .hp-v-inhalt { padding: 14px; color: #444; font-size: 13px; }
 .hp-v-gruss { display: block; margin-bottom: 8px; font-size: 16px; color: #333; }
 .hp-v-blind { margin: 8px 0; color: #888; }
 .hp-v-kasten, .hp-v-kurzcode, .hp-v-fenster { font: 13px/1.45 Inter, sans-serif; color: #1e2b30; }
-.hp-v-kasten, .hp-v-kurzcode { margin: 8px 0; padding: 10px 12px; border-left: 4px solid #1f4f82; background: #f2f6fb; }
-.hp-v-impfstoff.hp-v-kasten, .hp-v-impfstoff.hp-v-kurzcode { border-color: #12695d; background: #eef7f3; }
-.hp-v-oeffnungszeiten.hp-v-kasten, .hp-v-oeffnungszeiten.hp-v-kurzcode { border-color: #b07a00; background: #fff8e6; }
-.hp-v-frei.hp-v-kasten, .hp-v-frei.hp-v-kurzcode { border-color: #2f4a52; background: #f2f5f5; }
+.hp-v-kasten, .hp-v-kurzcode { margin: 8px 0; padding: 10px 12px; border-left: 4px solid var(--hp-c); background: var(--hp-bg); }
 .hp-seite strong { display: block; }
 .hp-seite ul { margin: 4px 0 0; padding-left: 18px; }
 .hp-seite p { margin: 4px 0 0; }
 .hp-v-kurzstelle { margin-top: 10px; padding: 6px 8px 2px; border: 1px dashed #b9c8c3; border-radius: 8px; }
 .hp-v-marke { font: 600 11px Inter, sans-serif; color: var(--muted); letter-spacing: .5px; text-transform: uppercase; }
 .hp-v-schleier { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 18px; background: #00000059; }
-.hp-v-fensterbox { position: relative; width: 100%; max-width: 330px; padding: 14px 16px 12px; border-top: 5px solid #1f4f82; border-radius: 8px; background: #fff; box-shadow: 0 8px 26px #0004; }
-.hp-v-fensterbox:has(.hp-v-impfstoff) { border-top-color: #12695d; }
-.hp-v-fensterbox:has(.hp-v-oeffnungszeiten) { border-top-color: #b07a00; }
+.hp-v-fensterbox { position: relative; width: 100%; max-width: 330px; padding: 14px 16px 12px; border-top: 5px solid var(--hp-c); border-radius: 8px; background: #fff; box-shadow: 0 8px 26px #0004; }
 .hp-v-zu { position: absolute; top: 2px; right: 9px; color: #666; font: 20px Inter, sans-serif; }
 .hp-v-mehr { color: var(--muted); font: 12px Inter, sans-serif; }
 .hp-v-bearbeitet { outline: 2px dashed #e0a100; outline-offset: 2px; }
@@ -108,3 +100,22 @@ button.hp-klein-knopf { min-height: 32px; padding: 4px 12px; font-size: 13px; ma
 .hp-orte { padding-left: 20px; }
 .hp-orte li { margin: 4px 0; }
 @media (max-width: 700px) { .hp-reihe, .hp-raster { grid-template-columns: 1fr; } .hp-tag { grid-template-columns: 1fr; } }
+
+/* Farben je Mitteilung (gleiche Werte im Plugin) */
+.hp-f-blau { --hp-c: #1f4f82; --hp-bg: #f2f6fb; }
+.hp-f-gruen { --hp-c: #2e7d32; --hp-bg: #eff7ef; }
+.hp-f-petrol { --hp-c: #12695d; --hp-bg: #eef7f3; }
+.hp-f-ocker { --hp-c: #8a5a00; --hp-bg: #fff8e6; }
+.hp-f-rot { --hp-c: #a32d2d; --hp-bg: #fdf0ef; }
+.hp-f-violett { --hp-c: #5b3c99; --hp-bg: #f4f0fb; }
+.hp-f-grau { --hp-c: #2f4a52; --hp-bg: #f2f5f5; }
+.hp-v-symbol { flex: none; width: 15px; height: 15px; vertical-align: -2px; margin-right: 5px; }
+.hp-v-leiste .hp-v-symbol { margin-right: 0; }
+.hp-v-kasten strong, .hp-v-kurzcode strong, .hp-v-fenster strong { color: var(--hp-c); }
+.hp-punkt { display: inline-grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 50%; color: #fff; background: var(--hp-c); }
+.hp-punkt svg { width: 15px; height: 15px; }
+.hp-farbfleck { display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: var(--hp-c); }
+.hp-farbfleck.hp-f-standard { background: conic-gradient(#1f4f82 0 25%, #2e7d32 0 50%, #8a5a00 0 75%, #2f4a52 0); }
+label.hp-symbolwahl { padding: 5px 9px; }
+label.hp-symbolwahl:has(input:checked)::before { content: none; }
+label.hp-symbolwahl svg { width: 18px; height: 18px; }

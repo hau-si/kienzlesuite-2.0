@@ -1,5 +1,14 @@
 # Release-Notizen Homepage
 
+## 0.1.0-beta.2
+
+- **Fehler behoben (Meldung des Nutzers): „Kasten auf der Startseite“ erschien nicht**, wenn das Theme die Startseite selbst zusammenbaut (feste Abschnitte statt des Inhalts einer Seite, z. B. Startseite als Beitragsliste). Das Plugin gibt den Kasten dann am Seitenende aus, und ein kleines Skript setzt ihn an die richtige Stelle: automatisch über den Inhalt bzw. unter den Kopf der Seite, oder an eine Stelle, die man in WordPress unter **Einstellungen → Praxisherz-Hinweise → „Stelle für den Kasten“** einträgt (CSS-Selektor wie `#aktuelles`, davor/am Anfang/am Ende/danach). Auf statischen Startseiten bleibt es beim Kasten über dem Seiteninhalt.
+- **Farbe je Mitteilung:** Blau, Grün, Petrol, Gelb, Rot, Violett, Grau oder „Passend zur Art“ (wie bisher).
+- **Symbol je Mitteilung:** Hinweis, Achtung, Praxis, Impfung, Kalender, Uhr, Telefon, Urlaub, Herz, kein Symbol oder „Passend zur Art“. Symbole stehen in der Leiste, im Kasten, im Fenster und in der Liste der Mitteilungen.
+- **Plugin „Praxisherz-Hinweise“ 0.2.0** – bitte in WordPress ersetzen (Homepage → Einrichtung → Plugin herunterladen, dann in WordPress hochladen und „Ersetzen“ wählen). Ältere Übertragungen ohne Farbe und Symbol zeigt es passend zur Art.
+- Datenbank des Moduls: Spalten `farbe` und `symbol` (Schema 2, wird beim Start ergänzt).
+- Geprüft mit Tests und Chromium, der Ausweichweg mit dem HTML der Test-Homepage des Nutzers (lokal nachgestellt, nicht auf dem Webserver installiert). **Nicht mit echtem WordPress und nicht auf der VM geprüft.**
+
 ## 0.1.0-beta.1
 
 Erste Fassung des Moduls `homepage` (Webpfad `/homepage`), Konzept B (Plugin in WordPress, Praxisserver schickt) und Entwurf B2 (Liste links, Vorschau rechts) vom 28.11.2026.

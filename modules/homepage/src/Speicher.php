@@ -7,7 +7,7 @@ final class Speicher {
     public static string $data = '/var/lib/kienzle/homepage';
     private static ?\PDO $pdo = null;
     private static string $pfad = '';
-    public const VERSION = 1;
+    public const VERSION = 2;
 
     public static function pdo(): \PDO {
         $datei = self::$data . '/homepage.db';
@@ -67,6 +67,11 @@ final class Speicher {
                 geaendert_von TEXT NOT NULL DEFAULT \'\'
             )');
             $pdo->exec('CREATE TABLE einstellungen (name TEXT PRIMARY KEY, wert TEXT NOT NULL)');
+        }
+        if ($v < 2) {
+            // Farbe und Symbol je Mitteilung („standard“ = passend zur Art)
+            $pdo->exec('ALTER TABLE mitteilungen ADD COLUMN farbe TEXT NOT NULL DEFAULT \'standard\'');
+            $pdo->exec('ALTER TABLE mitteilungen ADD COLUMN symbol TEXT NOT NULL DEFAULT \'standard\'');
         }
         $pdo->exec('PRAGMA user_version = ' . self::VERSION);
         $pdo->commit();

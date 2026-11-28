@@ -1,7 +1,7 @@
 === Praxisherz-Hinweise ===
 Requires at least: 5.3
 Requires PHP: 7.4
-Stable tag: 0.1.0
+Stable tag: 0.2.0
 License: MIT
 
 Zeigt Mitteilungen aus Praxisherz (Vertretung, Impfstoff lieferbar, Sonderöffnungszeiten, freier Text) auf der Homepage der Praxis an.

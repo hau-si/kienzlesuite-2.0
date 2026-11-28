@@ -76,7 +76,7 @@ $m = db($dir)->query('SELECT * FROM mitteilungen')->fetch();
 check(str_contains(ort($o), 'ok=angelegt') && str_ends_with(ort($o), '#m' . $m['id']) && (int)$m['aktiv'] === 1 && $m['praxen'] === json_encode([(int)$ids[0], (int)$ids[1]]), 'angelegt');
 $o = aufruf($dir, '/homepage/?ok=angelegt', 'mitteilungen');
 check(str_contains($o, 'Mitteilung angelegt.') && str_contains($o, 'Jetzt auf der Homepage') && str_contains($o, 'hp-schalter an') && str_contains($o, 'Urlaubsvertretung'), 'Zeile mit Schalter');
-check(str_contains($o, 'class="hp-v-leiste hp-v-vertretung"') && str_contains($o, 'Hausarztpraxis Max Mustermann (Tel. 01234 98765)') && str_contains($o, 'Willkommen in der Praxis Dr. med. Erika Beispiel'), 'Vorschau mit Leiste');
+check(str_contains($o, 'class="hp-v-leiste hp-f-blau"') && str_contains($o, 'Hausarztpraxis Max Mustermann (Tel. 01234 98765)') && str_contains($o, 'Willkommen in der Praxis Dr. med. Erika Beispiel'), 'Vorschau mit Leiste');
 check(str_contains($o, 'Noch nicht übertragen') === false && str_contains($o, 'Homepage noch nicht verbunden'), 'ohne Verbindung nur vorgemerkt');
 // Fehler beim Speichern bleibt an der Zeile
 $o = aufruf($dir, '/homepage/', 'mitteilungen', 'mitarbeiter', ['aktion' => 'speichern', 'id' => $m['id'], 'art' => 'vertretung', 'praxen' => [], 'orte' => ['leiste'], 'kienzle-csrf' => $csrf]);
@@ -93,8 +93,8 @@ check(str_contains(ort(aufruf($dir, '/homepage/praxen', 'praxen', 'mitarbeiter',
 
 // Vorschau beim Tippen (noch nicht gespeichert)
 $vor = static fn(array $post, array $kopf = ['HTTP_X_KIENZLE_CSRF' => 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb']) => aufruf($dir, '/homepage/vorschau', 'mitteilungen', 'mitarbeiter', $post, $kopf);
-$o = $vor(['art' => 'impfstoff', 'titel' => 'Grippeimpfstoff <b>da</b>', 'orte' => ['fenster'], 'id' => '0', 'datum' => date('Y-m-d')]);
-check(str_contains($o, 'hp-v-fenster hp-v-impfstoff hp-v-bearbeitet') && str_contains($o, 'Grippeimpfstoff &lt;b&gt;da&lt;/b&gt;') && str_contains($o, 'Urlaubsvertretung'), 'Vorschau mit ungespeicherter Mitteilung, maskiert');
+$o = $vor(['art' => 'impfstoff', 'titel' => 'Grippeimpfstoff <b>da</b>', 'orte' => ['fenster'], 'farbe' => 'rot', 'symbol' => 'spritze', 'id' => '0', 'datum' => date('Y-m-d')]);
+check(str_contains($o, 'hp-v-fenster hp-f-rot hp-v-bearbeitet') && str_contains($o, 'Grippeimpfstoff &lt;b&gt;da&lt;/b&gt;') && str_contains($o, 'Urlaubsvertretung'), 'Vorschau mit ungespeicherter Mitteilung, maskiert');
 check(db($dir)->query('SELECT COUNT(*) FROM mitteilungen')->fetchColumn() === 1, 'Vorschau speichert nichts');
 $o = $vor(['datum' => date('Y-m-d', strtotime('+30 days'))]);
 check(str_contains($o, 'erscheint keine Mitteilung'), 'Vorschau an einem späteren Tag');

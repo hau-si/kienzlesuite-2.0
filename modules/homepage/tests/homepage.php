@@ -75,6 +75,15 @@ check(str_contains(Mitteilungen::darstellung(Mitteilungen::eine($v), $pn)['kurz'
 check(Mitteilungen::eine($v)['geaendert_von'] === 'ben', 'Bearbeiter vermerkt');
 $d = Mitteilungen::darstellung(Mitteilungen::eine($i), $pn);
 check($d['kurz'] === 'Grippeimpfstoff ist lieferbar. Bitte vereinbaren Sie einen Termin.', 'Leiste Impfstoff: ' . $d['kurz']);
+check($d['farbe'] === 'gruen' && $d['symbol'] === 'spritze', 'Farbe und Symbol passend zur Art');
+Mitteilungen::speichern($i, ['art' => 'impfstoff', 'titel' => 'Grippeimpfstoff ist lieferbar', 'text' => 'Bitte vereinbaren Sie einen Termin.', 'orte' => ['kasten'], 'farbe' => 'rot', 'symbol' => 'achtung'], 'anna');
+$d = Mitteilungen::darstellung(Mitteilungen::eine($i), $pn);
+check($d['farbe'] === 'rot' && $d['symbol'] === 'achtung', 'Farbe und Symbol gewählt');
+$f = Mitteilungen::ausFormular(['art' => 'frei', 'titel' => 'X', 'orte' => ['leiste'], 'farbe' => 'pink', 'symbol' => '<svg>']);
+check($f['farbe'] === 'standard' && $f['symbol'] === 'standard' && Mitteilungen::darstellung(['id' => 1, 'praxen' => [], 'tage' => []] + $f, [])['farbe'] === 'grau', 'unbekannte Farbe/Symbol = passend zur Art');
+check(Mitteilungen::svg('keins') === '' && str_contains(Mitteilungen::svg('uhr'), '<svg') && array_keys(Mitteilungen::SYMBOLE) === array_keys(PRAXISHERZ_HINWEISE_SYMBOLE)
+    && array_column(Mitteilungen::SYMBOLE, 1) === array_values(PRAXISHERZ_HINWEISE_SYMBOLE) && array_values(array_diff(array_keys(Mitteilungen::FARBEN), ['standard'])) === PRAXISHERZ_HINWEISE_FARBEN
+    && Mitteilungen::FARBE_ZUR_ART === PRAXISHERZ_HINWEISE_FARBE_ZUR_ART && Mitteilungen::SYMBOL_ZUR_ART === PRAXISHERZ_HINWEISE_SYMBOL_ZUR_ART, 'Farben und Symbole gleich in Modul und Plugin');
 $d = Mitteilungen::darstellung(Mitteilungen::eine($o), $pn);
 check($d['titel'] === 'Geänderte Öffnungszeiten' && $d['punkte'] === ['Do, 31.12.2026: 8–12 Uhr'] && $d['kurz'] === 'Geänderte Öffnungszeiten: Do, 31.12.2026: 8–12 Uhr.', 'Öffnungszeiten: ' . $d['kurz']);
 check(array_column(Mitteilungen::fuerHomepage(), 'id') === ['m' . $i, 'm' . $v], 'an die Homepage: eingeschaltete, nicht abgelaufene (auch geplante)');
@@ -162,6 +171,20 @@ check(str_contains($kasten, 'Grippeimpfstoff ist lieferbar') && str_ends_with($k
 check(str_contains(($GLOBALS['wp_kurzcodes']['praxisherz_hinweise'])(), 'Geänderte Öffnungszeiten'), 'Kurzcode');
 ob_start(); do_action('wp_footer'); $fuss = ob_get_clean();
 check(str_contains($fuss, 'ph-nachreichen') && str_contains($fuss, 'ph-fenster'), 'Leiste ohne wp_body_open im Fuß, Fenster im Fuß');
+check(str_contains($kasten, 'ph-farbe-rot') && str_contains($kasten, '<svg class="ph-symbol"') && !str_contains($fuss, 'ph-nachreichen-kasten'), 'Farbe und Symbol in WordPress, Kasten nicht doppelt');
+// Startseite ohne Seiteninhalt (Theme baut sie selbst): Kasten im Fuß, das Skript setzt ihn
+$GLOBALS['praxisherz_hinweise_kasten'] = false;
+$GLOBALS['wp_ist_seite'] = false;
+check(apply_filters('the_content', 'x') === 'x', 'Beitragsliste: kein Kasten im Beitrag');
+ob_start(); do_action('wp_footer'); $fuss = ob_get_clean();
+check(str_contains($fuss, 'ph-nachreichen-kasten" hidden data-ziel="" data-lage="anfang"') && str_contains($fuss, 'Grippeimpfstoff ist lieferbar'), 'Kasten im Fuß: ' . substr($fuss, 0, 300));
+update_option('praxisherz_hinweise_kasten_ziel', '#aktuelles .liste');
+update_option('praxisherz_hinweise_kasten_lage', 'vor');
+$GLOBALS['praxisherz_hinweise_kasten'] = false;
+ob_start(); do_action('wp_footer'); $fuss = ob_get_clean();
+check(str_contains($fuss, 'data-ziel="#aktuelles .liste" data-lage="vor"'), 'eingestellte Stelle');
+update_option('praxisherz_hinweise_kasten_ziel', '"><script>');
+check(praxisherz_hinweise_kasten_stelle()[0] === '', 'ungültiger Selektor verworfen');
 
 Homepage::einrichten($k, "http://127.0.0.1:$port", str_repeat('ab', 32));
 $st = Homepage::uebertragen($k);

@@ -10,6 +10,23 @@ final class Mitteilungen {
     public const ARTEN = ['vertretung' => 'Vertretung', 'impfstoff' => 'Impfstoff lieferbar', 'oeffnungszeiten' => 'Sonderöffnungszeiten', 'frei' => 'Freier Text'];
     public const VORGABE_TITEL = ['vertretung' => 'Vertretung', 'impfstoff' => 'Impfstoff ist lieferbar', 'oeffnungszeiten' => 'Geänderte Öffnungszeiten', 'frei' => ''];
     public const ORTE = ['leiste' => 'Leiste oben (alle Seiten)', 'kasten' => 'Kasten auf der Startseite', 'fenster' => 'Fenster beim Öffnen', 'kurzcode' => 'Kurzcode-Stelle'];
+    /** Farben (feste Auswahl, auch im Plugin); „standard“ = passend zur Art. */
+    public const FARBEN = ['standard' => 'Passend zur Art', 'blau' => 'Blau', 'gruen' => 'Grün', 'petrol' => 'Petrol', 'ocker' => 'Gelb', 'rot' => 'Rot', 'violett' => 'Violett', 'grau' => 'Grau'];
+    public const FARBE_ZUR_ART = ['vertretung' => 'blau', 'impfstoff' => 'gruen', 'oeffnungszeiten' => 'ocker', 'frei' => 'grau'];
+    /** Symbole (Linien, 24er-Raster; dieselben Namen und Pfade im Plugin). „standard“ = passend zur Art. */
+    public const SYMBOLE = [
+        'keins' => ['Kein Symbol', ''],
+        'info' => ['Hinweis', '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>'],
+        'achtung' => ['Achtung', '<path d="M12 3.5 21.5 20h-19z"/><path d="M12 9.5v5M12 17.2v.1"/>'],
+        'praxis' => ['Praxis', '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M12 11v6M9 14h6"/>'],
+        'spritze' => ['Impfung', '<path d="M18 2l4 4M20 4l-3 3"/><path d="M17 7l-9.5 9.5-3-3L14 4z"/><path d="M11 7l2 2M8 10l2 2M4.5 19.5l2-2"/>'],
+        'kalender' => ['Kalender', '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>'],
+        'uhr' => ['Uhr', '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
+        'telefon' => ['Telefon', '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2"/>'],
+        'urlaub' => ['Urlaub', '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'],
+        'herz' => ['Herz', '<path d="M12 20s-7-4.4-9-8.6A4.8 4.8 0 0112 7a4.8 4.8 0 019 4.4C19 15.6 12 20 12 20z"/>'],
+    ];
+    public const SYMBOL_ZUR_ART = ['vertretung' => 'praxis', 'impfstoff' => 'spritze', 'oeffnungszeiten' => 'uhr', 'frei' => 'info'];
     public const MAX = 50;
     public const MAX_TAGE = 31;
     private const WOCHENTAGE = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
@@ -43,7 +60,7 @@ final class Mitteilungen {
 
     /**
      * Formulardaten prüfen und vereinheitlichen. $streng = false (Vorschau beim Tippen): nichts ablehnen, nur säubern.
-     * @return array{art:string,titel:string,text:string,praxen:list<int>,tage:list<array{0:string,1:string}>,von:string,bis:string,orte:list<string>}
+     * @return array{art:string,titel:string,text:string,praxen:list<int>,tage:list<array{0:string,1:string}>,von:string,bis:string,orte:list<string>,farbe:string,symbol:string}
      */
     public static function ausFormular(array $e, bool $streng = true): array {
         $fehler = static function (string $text) use ($streng): void { if ($streng) throw new \InvalidArgumentException($text); };
@@ -89,7 +106,11 @@ final class Mitteilungen {
         $orte = [];
         foreach (is_array($e['orte'] ?? null) ? $e['orte'] : [] as $o) if (isset(self::ORTE[$o]) && !in_array($o, $orte, true)) $orte[] = (string)$o;
         if (!$orte) $fehler('Bitte wählen, wo die Mitteilung erscheinen soll.');
-        return ['art' => $art, 'titel' => $titel, 'text' => $text, 'praxen' => $praxen, 'tage' => $tage, 'von' => $von, 'bis' => $bis, 'orte' => $orte];
+        $farbe = (string)($e['farbe'] ?? 'standard');
+        if (!isset(self::FARBEN[$farbe])) $farbe = 'standard';
+        $symbol = (string)($e['symbol'] ?? 'standard');
+        if ($symbol !== 'standard' && !isset(self::SYMBOLE[$symbol])) $symbol = 'standard';
+        return ['art' => $art, 'titel' => $titel, 'text' => $text, 'praxen' => $praxen, 'tage' => $tage, 'von' => $von, 'bis' => $bis, 'orte' => $orte, 'farbe' => $farbe, 'symbol' => $symbol];
     }
 
     private static function datum(string $w, callable $fehler): string {
@@ -105,15 +126,15 @@ final class Mitteilungen {
         $m = self::ausFormular($e);
         $pdo = Speicher::pdo();
         $werte = [$m['art'], $m['titel'], $m['text'], json_encode($m['praxen']), json_encode($m['tage'], JSON_UNESCAPED_UNICODE), $m['von'], $m['bis'],
-            json_encode($m['orte']), time(), mb_substr($wer, 0, 80)];
+            json_encode($m['orte']), $m['farbe'], $m['symbol'], time(), mb_substr($wer, 0, 80)];
         if ($id > 0) {
             if (!self::eine($id)) throw new \InvalidArgumentException('Mitteilung nicht gefunden.');
-            $pdo->prepare('UPDATE mitteilungen SET art = ?, titel = ?, text = ?, praxen = ?, tage = ?, von = ?, bis = ?, orte = ?, geaendert = ?, geaendert_von = ? WHERE id = ?')
+            $pdo->prepare('UPDATE mitteilungen SET art = ?, titel = ?, text = ?, praxen = ?, tage = ?, von = ?, bis = ?, orte = ?, farbe = ?, symbol = ?, geaendert = ?, geaendert_von = ? WHERE id = ?')
                 ->execute([...$werte, $id]);
             return $id;
         }
         if ((int)$pdo->query('SELECT COUNT(*) FROM mitteilungen')->fetchColumn() >= self::MAX) throw new \InvalidArgumentException('Höchstens ' . self::MAX . ' Mitteilungen. Bitte alte löschen.');
-        $pdo->prepare('INSERT INTO mitteilungen (art, titel, text, praxen, tage, von, bis, orte, geaendert, geaendert_von, aktiv, erstellt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        $pdo->prepare('INSERT INTO mitteilungen (art, titel, text, praxen, tage, von, bis, orte, farbe, symbol, geaendert, geaendert_von, aktiv, erstellt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
             ->execute([...$werte, $aktiv ? 1 : 0, time()]);
         return (int)$pdo->lastInsertId();
     }
@@ -135,6 +156,24 @@ final class Mitteilungen {
         if (!$m['aktiv']) return 'aus';
         if ($m['von'] !== '' && $m['von'] > $d) return 'geplant';
         return 'aktiv';
+    }
+
+    /** Tatsächliche Farbe (aus „standard“ wird die Farbe der Art). */
+    public static function farbe(array $m): string {
+        $f = (string)($m['farbe'] ?? 'standard');
+        return $f !== 'standard' && isset(self::FARBEN[$f]) ? $f : self::FARBE_ZUR_ART[$m['art']] ?? 'grau';
+    }
+
+    /** Tatsächliches Symbol („keins“ = ohne). */
+    public static function symbol(array $m): string {
+        $s = (string)($m['symbol'] ?? 'standard');
+        return $s !== 'standard' && isset(self::SYMBOLE[$s]) ? $s : self::SYMBOL_ZUR_ART[$m['art']] ?? 'info';
+    }
+
+    /** SVG eines Symbols (leer bei „keins“). */
+    public static function svg(string $symbol, string $klasse = ''): string {
+        $pfad = self::SYMBOLE[$symbol][1] ?? '';
+        return $pfad === '' ? '' : '<svg' . ($klasse !== '' ? ' class="' . $klasse . '"' : '') . ' viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' . $pfad . '</svg>';
     }
 
     public static function titel(array $m): string {
@@ -198,7 +237,7 @@ final class Mitteilungen {
                 $kurz = $m['titel'] === '' && $m['art'] === 'frei' ? $erste : trim(self::satz($titel) . ' ' . $erste);
         }
         return ['id' => 'm' . $m['id'], 'art' => $m['art'], 'titel' => $titel, 'kurz' => $kurz, 'text' => $m['text'], 'punkte' => $punkte,
-            'von' => $m['von'], 'bis' => $m['bis'], 'orte' => $m['orte']];
+            'von' => $m['von'], 'bis' => $m['bis'], 'orte' => $m['orte'], 'farbe' => self::farbe($m), 'symbol' => self::symbol($m)];
     }
 
     /** @return array<int,array> */
