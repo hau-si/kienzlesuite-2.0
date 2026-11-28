@@ -36,6 +36,8 @@ praxisherz/
   modules/
     kasse/              Kasse (Kartenzahlung, Rechnungseingang); ab Basis 0.16.0 mitgeliefert, Webpfad /kasse
     terminzettel/
+    signatur/
+    qm/                 Qualitätsmanagement
     fax/
     telefon/
     kienzlezeit/

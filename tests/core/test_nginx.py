@@ -69,6 +69,7 @@ class Vorlage(unittest.TestCase):
     def test_fastcgi_modul_ohne_http_vorsilbe(self):
         b = block(self.conf, 'location ^~ /kasse/ {')
         self.assertIn('fastcgi_param KIENZLE_BENUTZER $kienzle_benutzer;', b)
+        self.assertIn('fastcgi_param KIENZLE_PERSONEN $kienzle_personen;', b)
         self.assertIn('fastcgi_param SCRIPT_FILENAME /opt/kienzle/kasse/current/public/index.php;', b)
         self.assertNotIn('HTTP_X_KIENZLE', self.conf)
 
@@ -97,6 +98,7 @@ class Vorlage(unittest.TestCase):
         auth = block(self.conf, 'location ^~ /_auth/ {')
         self.assertIn('client_max_body_size 25m;', auth)  # sonst 413 schon bei der Anmeldeprüfung großer Uploads
         self.assertIn('internal;', auth)
+        self.assertIn('fastcgi_buffer_size 32k;', auth)  # Menü und Personenliste passen sonst nicht in die Kopfzeilen der Prüfung
         self.assertGreater(auth.index('fastcgi_param REQUEST_URI $uri;'), auth.index('include fastcgi_params;'))   # überschreibt den Vorgabewert
         h = block(self.conf, 'location = /_health {')
         self.assertIn('allow 127.0.0.1;', h)
@@ -144,7 +146,7 @@ class Befehl(unittest.TestCase):
             r = self.run_cli(tmp, 'schreiben', str(ROOT / 'modules'))
             self.assertEqual(r.returncode, 0, r.stderr)
             reg = json.loads((Path(tmp) / 'modules.json').read_text())
-            self.assertEqual([m['module']['id'] for m in reg['modules']], ['beispiel', 'fax', 'kasse', 'signatur', 'telefon', 'terminzettel'])
+            self.assertEqual([m['module']['id'] for m in reg['modules']], ['beispiel', 'fax', 'kasse', 'qm', 'signatur', 'telefon', 'terminzettel'])
             self.assertIn('/_auth/beispiel', (Path(tmp) / 'kienzle.conf').read_text())
             self.assertEqual(oct((Path(tmp) / 'modules.json').stat().st_mode & 0o777), '0o640')
 

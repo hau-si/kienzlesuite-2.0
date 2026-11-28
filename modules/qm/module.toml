@@ -1,0 +1,51 @@
+# Qualitätsmanagement: QM-Handbuch der Praxis mit Freigabe (Vidieren), Vorlegen und Lesebestätigung, Ordnern, Tags, Suche,
+# einfachem Editor mit Bildern und Import von Word-Dateien (z. B. QEP-Musterdokumente der KBV).
+
+[module]
+id = "qm"
+name = "Qualitätsmanagement"
+version = "0.1.0-beta.1"
+core_api = "2"
+description = "QM-Handbuch: Dokumente schreiben, vidieren, den Mitarbeitenden zur Kenntnis vorlegen und das Lesen bestätigen lassen. Ordner, Tags, Suche, Wiedervorlage, Import von Word-Dateien (QEP)."
+
+[system]
+packages = ["php-fpm", "php-cli", "php-sqlite3", "php-mbstring", "php-zip", "php-xml"]
+user = "ks-qm"
+data = "/var/lib/kienzle/qm"
+
+[web]
+path = "/qm"
+upstream = "unix:/run/kienzle/qm/web.sock"
+protocol = "fastcgi"
+entry = "public/index.php"
+# Personen mit Zugang samt Gruppen (zum Vorlegen an „MFA“ usw.); gibt es ab Basis 0.22.0-beta.46.
+personen = true
+
+[[rights]]
+id = "lesen"
+label = "QM: Handbuch lesen und Lesebestätigungen abgeben"
+
+[[rights]]
+id = "schreiben"
+label = "QM: Dokumente anlegen und bearbeiten, Ordner, Import"
+
+[[rights]]
+id = "vidieren"
+label = "QM: Dokumente prüfen und vidieren (freigeben), archivieren"
+
+[[rights]]
+id = "vorlegen"
+label = "QM: Dokumente zur Kenntnis vorlegen und den Lesestand sehen"
+
+[backup]
+paths = ["/var/lib/kienzle/qm"]
+
+[setup]
+overview = "bin/setup-overview"
+
+[hooks]
+install = "bin/install"
+update = "bin/update"
+remove = "bin/remove"
+busy = "bin/busy"
+health = "bin/health"

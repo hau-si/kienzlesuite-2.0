@@ -46,6 +46,22 @@ final class KienzleModul {
     }
 
     /**
+     * Personen mit Zugang zu diesem Modul (nur mit `[web] personen = true` in module.toml, core_api 2), z. B. zum Vorlegen an eine Gruppe.
+     * @return list<array{login:string, name:string, gruppen:list<string>, admin:bool, rechte:list<string>}> leer, wenn die Basis nichts mitgeliefert hat
+     */
+    public function personen(): array {
+        $d = json_decode(rawurldecode((string)($this->server['KIENZLE_PERSONEN'] ?? '')), true);
+        $out = [];
+        foreach (is_array($d) ? $d : [] as $p) {
+            if (!is_array($p) || !is_string($p['l'] ?? null) || !preg_match('/^[a-z0-9][a-z0-9._-]{0,63}$/D', $p['l'])) continue;
+            $txt = static fn($v): array => array_values(array_filter(is_array($v) ? $v : [], fn($x) => is_string($x) && $x !== '' && mb_strlen($x) <= 60));
+            $out[] = ['login' => $p['l'], 'name' => mb_substr(is_string($p['n'] ?? null) && $p['n'] !== '' ? $p['n'] : $p['l'], 0, 100),
+                'gruppen' => $txt($p['g'] ?? []), 'admin' => ($p['a'] ?? false) === true, 'rechte' => $txt($p['r'] ?? [])];
+        }
+        return $out;
+    }
+
+    /**
      * Seite im Rahmen von Praxisherz (Seitenleiste, Kopf, Praxisname) mit dem Inhalt des Moduls. $extra: 'kopf' (Stylesheets/Skripte des Moduls),
      * 'roh' (Inhalt unverändert statt Überschrift und Karten). Ohne die Basis-Klasse gibt es nur den Inhalt zurück.
      */

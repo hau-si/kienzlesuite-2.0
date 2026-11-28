@@ -68,6 +68,7 @@ Ohne `[web]` erscheint das Modul nicht im Menü (z. B. ein reines Druckmodul).
 | `protocol` | nein | `"http"` (Vorgabe: das Modul spricht HTTP über den Socket) oder `"fastcgi"` (PHP über php-fpm) |
 | `entry` | bei `fastcgi` | Einstiegsdatei im Modulordner, z. B. `public/index.php`; alle Anfragen unter `path` gehen an sie |
 | `uploads` | nein | `true`: Formular-Uploads (`multipart/form-data`, `$_FILES`) sind erlaubt, bis 3 MB je Datei. Sonst ist `file_uploads` im Modul-Dienst aus. Nur mit `fastcgi`. Vorgabe `false` |
+| `personen` | nein | `true`: Das Modul bekommt mit jeder Anfrage die Personen mit Zugang zu diesem Modul (Anmeldename, Name, Gruppen, Rechte im Modul; `X-Kienzle-Personen`, PHP `$k->personen()`), z. B. um an eine Gruppe vorzulegen. Erst mit `core_api = "2"` (Basis ab 0.22.0-beta.46). Vorgabe `false` |
 
 ### `[[firewall]]` – optional, höchstens 20
 

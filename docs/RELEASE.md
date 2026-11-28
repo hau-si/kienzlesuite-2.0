@@ -1,5 +1,13 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.46
+
+- **Neu für Module: Personenliste (`[web] personen = true`, core_api 2).** Ein Modul, das es in `module.toml` anfordert, bekommt mit jeder Anfrage die aktiven Konten mit Zugang zu diesem Modul: Anmeldename, Anzeigename, Gruppen (Rollen) und Rechte im Modul (Kopfzeile `X-Kienzle-Personen` bzw. `KIENZLE_PERSONEN`, PHP `$k->personen()`). Keine E-Mail-Adressen, keine Rechte in anderen Modulen; die Liste wird 30 Sekunden zwischengespeichert. Erster Nutzer: Qualitätsmanagement (Dokumente an die Gruppe „MFA“ vorlegen). Andere Module bekommen die Kopfzeile nicht.
+- nginx: größerer Puffer für die Antwort der Anmeldeprüfung (`fastcgi_buffer_size 32k` in `/_auth/`), damit Menü und Personenliste sicher hineinpassen. Wirkt nach dem nächsten Erzeugen der nginx-Konfiguration (Update bzw. `install.sh`).
+- Symbol für das Modul „Qualitätsmanagement“ in Seitenleiste und Startseite.
+- Fehler behoben: Die in beta.45 angelegte `core/client/starter/.gitignore` brach den Bau des Basis-Releases (Punktdateien sind im Archiv nicht erlaubt; Test `test_bauen_und_signieren`). Die Regel steht jetzt in der obersten `.gitignore`.
+- Geprüft mit Tests (Weitergabe nur an anfordernde Module, Prüfung der Liste im PHP-Helfer, nginx-Vorlage, Manifest). **Nicht auf der VM geprüft.**
+
 ## 0.22.0-beta.45
 
 - Gleicher Inhalt wie beta.44, ohne eine versehentlich mitgelieferte Programmdatei im Archiv. Die Vorabversion beta.44 bitte auf GitHub löschen (Release und Tag `core-v0.22.0-beta.44`).

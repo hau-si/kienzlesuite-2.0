@@ -85,6 +85,18 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 
 ![Signatur-Software](docs/screenshots/signatur-software.png)
 
+**Qualitätsmanagement:** QM-Handbuch mit Ordnern, Tags und Suche nach Namensschnipseln. Dokumente entstehen im einfachen Editor (Überschriften, Listen, Checklisten, Tabellen, Bilder) oder aus Word-Dateien (z. B. den QEP-Mustern der KBV), werden vidiert, den MFA zur Kenntnis vorgelegt und von ihnen als gelesen bestätigt; Wiedervorlage nach Prüffrist.
+
+![QM-Lesemappe](docs/screenshots/qm-lesemappe.png)
+
+![QM-Handbuch](docs/screenshots/qm-handbuch.png)
+
+![QM-Dokument](docs/screenshots/qm-dokument.png)
+
+![QM-Editor](docs/screenshots/qm-editor.png)
+
+![QM-Import](docs/screenshots/qm-import.png)
+
 **Updater:** Updates je Modul und Basis aus signierten Releases (Kanal stabil oder beta), Sicherung vor dem Update, automatischer Rücksprung bei einem Fehler. Kein Update, solange z. B. eine Kartenzahlung läuft.
 
 ![Updates](docs/screenshots/updates.png)

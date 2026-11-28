@@ -1,0 +1,139 @@
+/* Qualitätsmanagement – im Stil der Basis (core.css); nur Ergänzungen. Keine Inline-Stile (CSP). */
+main.modul { max-width: 1400px; }   /* docs/MODUL-GESTALTUNG.md */
+.qm h2 { font-size: 16px; }
+.qm-kopf { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; margin-bottom: 14px; }
+.qm-kopf h1 { margin-bottom: 4px; }
+.qm-kopf .eyebrow a { color: inherit; text-decoration: none; }
+.qm-kopf .eyebrow a:hover { color: var(--teal); text-decoration: underline; }
+.qm-werkzeuge { display: flex; flex-wrap: wrap; gap: 8px; }
+.qm-tags { margin: 0; }
+a.tag.qm-tag, span.tag.qm-tag { text-decoration: none; font-weight: 600; letter-spacing: 0; }
+.tag.ok { background: #e3f3ea; color: #16503f; }
+.tag.err { background: #f9e4df; color: #993d2b; }
+.qm-unsichtbar { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.qm-abstand { margin-top: 22px; }
+.qm-rot { color: #993d2b; }
+.qm-rechts { text-align: right; font-size: 13px; }
+
+/* Startseite */
+.qm-zahlen { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 4px; }
+.qm-zahlen .qm-suche { grid-column: span 2; }
+a.qm-zahl { text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 2px; }
+a.qm-zahl:hover { border-color: var(--teal); }
+.qm-zahl strong { font-size: 30px; line-height: 1.1; }
+.qm-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+a.qm-chip { display: inline-block; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: #315f53; font-weight: 600; font-size: 13px; text-decoration: none; }
+a.qm-chip:hover { border-color: var(--teal); }
+a.qm-chip.an { background: var(--teal); border-color: var(--teal); color: #fff; }
+a.qm-chip.an small { color: #d7efe7; }
+.qm-zwei { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.qm-eintrag { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid #edf0ee; }
+.qm-eintrag:last-child { border-bottom: 0; }
+.qm-eintrag a:not(.button) { color: #203c43; }
+
+/* Handbuch */
+.qm-drei { display: grid; grid-template-columns: 250px minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
+.qm-baum nav { display: flex; flex-direction: column; gap: 1px; }
+a.qm-ordner { display: block; padding: 6px 9px; border-radius: 8px; color: #315f53; font-weight: 600; text-decoration: none; font-size: 14px; }
+a.qm-ordner::before { content: "▸ "; color: #9db3ac; }
+a.qm-ordner:hover { background: var(--soft); }
+a.qm-ordner.aktiv { background: #e5f3ed; color: #16503f; }
+a.qm-ordner.tiefe-1 { padding-left: 24px; font-weight: 500; }
+a.qm-ordner.tiefe-2 { padding-left: 38px; font-weight: 500; }
+a.qm-ordner.tiefe-3, a.qm-ordner.tiefe-4 { padding-left: 52px; font-weight: 500; }
+.qm-verwalten { margin-top: 12px; font-size: 14px; }
+.qm-verwalten form { margin-bottom: 10px; }
+.qm-mitte .card { margin-bottom: 14px; }
+.qm-suchzeile { display: flex; gap: 8px; }
+.qm-suchzeile input { flex: 1; }
+.qm-filter label.check { margin: 8px 0 0; font-size: 14px; }
+table.qm-liste a.qm-titel { font-weight: 650; color: #203c43; text-decoration: none; }
+table.qm-liste a.qm-titel:hover { color: var(--teal); text-decoration: underline; }
+table.qm-liste tr.gewaehlt td { background: #f2f8f5; }
+table.qm-liste mark, .qm-liste small mark { background: #fff0ca; color: inherit; padding: 0 1px; border-radius: 3px; }
+.qm-vorschau { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: auto; }
+.qm-vorschau .qm-text { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; max-height: 300px; overflow: auto; margin-bottom: 12px; }
+.qm-hinweis { color: var(--muted); }
+.qm-klein { font-size: 13px; }
+
+/* Dokument */
+.qm-schritte { list-style: none; display: flex; gap: 6px; padding: 0; margin: 0 0 14px; flex-wrap: wrap; }
+.qm-schritte li { flex: 1 1 140px; padding: 8px 11px; border-radius: 10px; background: #fff; border: 1px solid var(--line); font-weight: 600; font-size: 13px; color: #55706a; }
+.qm-schritte li.fertig { background: #e3f3ea; border-color: #bfe0cd; color: #16503f; }
+.qm-schritte li.jetzt { background: var(--teal); border-color: var(--teal); color: #fff; }
+.qm-schritte li.faellig { background: #f9e4df; border-color: #ecc3b8; color: #993d2b; }
+.qm-reiter { display: flex; gap: 4px; margin-bottom: 10px; }
+.qm-reiter a { padding: 7px 13px; border-radius: 9px 9px 0 0; border: 1px solid var(--line); border-bottom: 0; background: var(--soft); color: #315f53; font-weight: 600; text-decoration: none; font-size: 14px; }
+.qm-reiter a.an { background: #fff; color: #203c43; }
+.qm-zwei-schmal { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
+.qm-seite .card { margin-bottom: 14px; }
+.qm-aktionen form.inline { margin: 6px 6px 0 0; }
+.qm-aktionen details.fold { margin-top: 10px; }
+.qm-vidieren { margin-top: 10px; padding-top: 6px; border-top: 1px solid var(--line); }
+.qm-vidieren input[name="kuerzel"] { max-width: 8rem; }
+.qm-vorlegen fieldset { max-height: 260px; overflow: auto; }
+.qm-vorlegen label.check small { margin-left: 4px; }
+.qm-hinweisbalken { background: #fff7e3; border: 1px solid #f0dca8; color: #6b5210; padding: 10px 12px; border-radius: 10px; }
+form.qm-lesen { background: #e5f3ed; border: 1px solid #c7e3d7; border-radius: 12px; padding: 14px 16px; margin-bottom: 18px; }
+form.qm-lesen.spaet { background: #fff3ed; border-color: #f3d8cc; }
+form.qm-lesen p { margin-bottom: 6px; }
+table.qm-klein-tabelle td { padding: 6px 4px; }
+ul.qm-versionen { list-style: none; padding: 0; margin: 0; font-size: 14px; }
+ul.qm-versionen li { padding: 6px 0; border-bottom: 1px solid #edf0ee; }
+ul.qm-versionen li:last-child { border-bottom: 0; }
+
+/* Inhalt der Dokumente (Ansicht, Editor, Vorschau) */
+.qm-text { line-height: 1.6; overflow-wrap: anywhere; }
+.qm-text h2 { font-size: 20px; margin: 20px 0 8px; }
+.qm-text h3 { font-size: 16.5px; margin: 16px 0 6px; }
+.qm-text h4 { font-size: 15px; margin: 14px 0 6px; }
+.qm-text > :first-child { margin-top: 0; }
+.qm-text img { max-width: 100%; height: auto; border-radius: 6px; }
+.qm-text table { margin: 10px 0 14px; border: 1px solid var(--line); }
+.qm-text td, .qm-text th { border: 1px solid var(--line); padding: 6px 8px; white-space: normal; }
+.qm-text th { background: #f3f7f5; }
+.qm-text blockquote { margin: 10px 0; padding: 4px 14px; border-left: 3px solid var(--line); color: #55706a; }
+.qm-text ul.checkliste { list-style: none; padding-left: 4px; }
+.qm-text ul.checkliste > li { position: relative; padding-left: 28px; margin: 4px 0; }
+.qm-text ul.checkliste > li::before { content: "☐"; position: absolute; left: 0; top: -1px; font-size: 18px; color: var(--teal); }
+.qm-text ul.checkliste > li.erledigt::before { content: "☑"; }
+.qm-text .neu { background: #fff4cc; box-shadow: -8px 0 0 #fff4cc, 8px 0 0 #fff4cc; border-radius: 3px; }
+.qm-text table.neu, .qm-text ul.neu, .qm-text ol.neu { outline: 3px solid #ffe28a; }
+
+/* Editor */
+.qm-felder { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0 14px; }
+.qm-leiste { display: flex; flex-wrap: wrap; gap: 3px; padding: 6px; margin-top: 14px; border: 1px solid var(--line); border-radius: 10px 10px 0 0; background: #fbfcfb; position: sticky; top: 0; z-index: 2; }
+.qm-leiste button { min-height: 32px; padding: 3px 9px; background: transparent; color: #315f53; font-weight: 700; font-size: 13px; }
+.qm-leiste button:hover { background: var(--soft); filter: none; }
+.qm-trenner { width: 1px; background: var(--line); margin: 3px 4px; }
+.qm-editor { border: 1px solid var(--line); border-top: 0; border-radius: 0 0 10px 10px; padding: 16px 18px; min-height: 360px; background: #fff; outline: none; }
+.qm-editor:focus { box-shadow: inset 0 0 0 2px #a3d0c2; }
+
+/* Import */
+.qm-import input[type=file] { padding: 8px; }
+ul.qm-ergebnis { list-style: none; padding: 0; font-size: 14px; }
+ul.qm-ergebnis li { padding: 5px 0 5px 24px; position: relative; border-bottom: 1px solid #edf0ee; }
+ul.qm-ergebnis li::before { position: absolute; left: 2px; }
+ul.qm-ergebnis li.ok::before { content: "✓"; color: var(--ok); }
+ul.qm-ergebnis li.fehler::before { content: "✕"; color: var(--error); }
+ul.qm-ergebnis li.hinweis::before { content: "i"; color: var(--muted); font-style: italic; }
+ul.qm-quellen { padding-left: 18px; }
+ul.qm-quellen li { margin-bottom: 10px; }
+
+@media (max-width: 1180px) {
+  .qm-drei { grid-template-columns: 220px minmax(0, 1fr); }
+  .qm-drei .qm-vorschau { grid-column: 1 / -1; position: static; max-height: none; }
+  .qm-drei .qm-hinweis { display: none; }
+}
+@media (max-width: 900px) {
+  .qm-zwei, .qm-zwei-schmal, .qm-drei { grid-template-columns: minmax(0, 1fr); }
+  .qm-zahlen .qm-suche { grid-column: 1 / -1; }
+}
+@media print {
+  .qm-werkzeuge, .qm-seite, .qm-schritte, .qm-reiter, form.qm-lesen { display: none !important; }
+  .qm-zwei-schmal { display: block; }
+}
+textarea[hidden], .qm [hidden] { display: none !important; }
+table.qm-liste td:nth-child(2), table.qm-liste td:nth-child(3), table.qm-liste .tag { white-space: nowrap; }
+.qm-zahlen { align-items: start; }
+.qm-leiste svg { width: 16px; height: 16px; margin-right: 4px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }

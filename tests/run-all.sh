@@ -104,6 +104,12 @@ php modules/fax/tests/seiten.php
 grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/fax/module.toml | head -1)" modules/fax/VERSION || { echo 'modules/fax/VERSION passt nicht zu module.toml'; exit 1; }
 for h in modules/fax/bin/* modules/fax/printer/*; do sh -n "$h"; done
 
+step 'Modul Qualitätsmanagement (modules/qm/tests)'
+php modules/qm/tests/qm.php
+php modules/qm/tests/seiten.php
+grep -qx "$(sed -nE 's/^version = "([^"]+)"$/\1/p' modules/qm/module.toml | head -1)" modules/qm/VERSION || { echo 'modules/qm/VERSION passt nicht zu module.toml'; exit 1; }
+for h in modules/qm/bin/*; do sh -n "$h"; done
+
 step 'Arbeitsplatz-Starter (core/client/starter)'
 if command -v go >/dev/null; then (cd core/client/starter && go vet ./... && go test ./...); else echo 'go nicht installiert – Starter-Tests übersprungen.'; fi
 for h in core/client/install-linux.sh core/client/install-macos.command; do bash -n "$h"; done

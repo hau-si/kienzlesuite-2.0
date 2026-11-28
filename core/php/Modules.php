@@ -76,6 +76,9 @@ final class Modules {
         return is_array($w) && is_string($w['einstellungen'] ?? null) ? $w['path'] . $w['einstellungen'] : null;
     }
 
+    /** Bekommt das Modul die Personenliste (`[web] personen = true`, core_api 2)? */
+    public function wantsPersons(string $id): bool { return ($this->modules[$id]['web']['personen'] ?? false) === true; }
+
     public function webPath(string $id): ?string { return $this->modules[$id]['web']['path'] ?? null; }
 
     /** Modul, zu dessen Webpfad die angefragte Adresse gehört (genau der Pfad oder darunter), sonst null. */

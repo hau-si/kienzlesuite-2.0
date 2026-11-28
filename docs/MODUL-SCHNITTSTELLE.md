@@ -30,6 +30,7 @@ und für dieses Modul Admin ist oder mindestens ein Recht hat. Ein Basis-Admin h
 | `X-Kienzle-Drucker` | `KIENZLE_DRUCKER` | Zuordnung der Drucker aus Verwaltung → Drucker (URL-kodiertes JSON: buero, bon); im PHP-Helfer `druckerRollen()` |
 | `X-Kienzle-Praxis` | `KIENZLE_PRAXIS` | Praxisname und Anschrift (URL-kodiertes JSON: name, street, city, contact); im PHP-Helfer `praxis()` |
 | `X-Kienzle-Pfad` | `KIENZLE_PFAD` | Webpfad des Moduls, z. B. `/kasse` |
+| `X-Kienzle-Personen` | `KIENZLE_PERSONEN` | nur mit `[web] personen = true` (core_api 2): aktive Konten mit Zugang zu diesem Modul (URL-kodiertes JSON: `l` Anmeldename, `n` Name, `g` Gruppen, `a` Modul-Admin, `r` Rechte im Modul); im PHP-Helfer `personen()`, 30 Sekunden zwischengespeichert |
 
 **Fälschungssicher:** Bei HTTP-Modulen ersetzt nginx gleichnamige Kopfzeilen des Browsers. Bei FastCGI tragen die
 Werte keine `HTTP_`-Vorsilbe; Kopfzeilen eines Browsers kommen in PHP immer als `HTTP_…` an und können

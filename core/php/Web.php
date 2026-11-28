@@ -500,7 +500,9 @@ final class Web {
         $this->claimFirstAdmin((int)$session['user_id']);
         $access = $this->users->access((int)$session['user_id'])[$module] ?? null;
         if (!$access) return new Response(403);
-        return (new Response(204))
+        $res = new Response(204);
+        if ($this->modules->wantsPersons($module)) $res = $res->with('X-Kienzle-Personen', $this->modulePersons($module));
+        return $res
             ->with('X-Kienzle-Benutzer', $session['login'])
             ->with('X-Kienzle-Name', rawurlencode($session['display'] !== '' ? $session['display'] : $session['login']))
             ->with('X-Kienzle-Rolle', $access['admin'] ? 'admin' : 'mitarbeiter')
@@ -511,6 +513,33 @@ final class Web {
             ->with('X-Kienzle-Menue', $this->moduleMenu((int)$session['user_id'], (int)$session['user_admin'] === 1, (string)$session['login']))
             ->with('X-Kienzle-Praxis', rawurlencode(json_encode(['name' => $this->config->practice] + $this->address() + $this->master(), JSON_UNESCAPED_UNICODE)))
             ->with('X-Kienzle-Arbeitsplatz', $this->arbeitsplatzKopf($r));
+    }
+
+    /**
+     * Personenliste für Module mit `[web] personen = true` (z. B. QM: Dokumente an Gruppen vorlegen): aktive Konten mit Zugang zu diesem Modul,
+     * je Anmeldename, Anzeigename, Gruppen (Rollen) und Rechte im Modul. Keine E-Mail-Adressen, keine Basis-Rechte. 30 Sekunden zwischengespeichert.
+     */
+    private function modulePersons(string $module): string {
+        $key = 'personen.' . $module;
+        try {
+            $c = json_decode((string)$this->db->setting($key), true);
+            if (is_array($c) && is_int($c['t'] ?? null) && time() - $c['t'] < 30 && is_string($c['v'] ?? null)) return $c['v'];
+        } catch (\Throwable) {
+        }
+        $out = [];
+        foreach ($this->db->query('SELECT id,login,display FROM users WHERE active=1 ORDER BY login')->fetchAll() as $u) {
+            $a = $this->users->access((int)$u['id'])[$module] ?? null;
+            if (!$a) continue;
+            $out[] = ['l' => $u['login'], 'n' => $u['display'] !== '' ? $u['display'] : $u['login'], 'g' => $this->users->roles((int)$u['id']),
+                'a' => $a['admin'], 'r' => $a['rights']];
+            if (count($out) >= 200) break;
+        }
+        $v = rawurlencode(json_encode($out, JSON_UNESCAPED_UNICODE));
+        try {
+            $this->db->store($key, json_encode(['t' => time(), 'v' => $v]));
+        } catch (\Throwable) {
+        }
+        return $v;
     }
 
     /** Arbeitsplatz des Browsers für Modulseiten (Name und ob der Agent verbunden ist; leer, wenn unbekannt). */

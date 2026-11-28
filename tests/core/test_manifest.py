@@ -270,7 +270,7 @@ class Web(Fehler):
         up = 'upstream = "unix:/run/kienzle/beispiel/web.sock"'
         m = manifest.check_text(replace(up, up + '\nprotocol = "fastcgi"\nentry = "public/index.php"'))
         self.assertEqual(m['web'], {'path': '/beispiel', 'upstream': 'unix:/run/kienzle/beispiel/web.sock', 'protocol': 'fastcgi', 'entry': 'public/index.php',
-                          'einstellungen': None, 'uploads': False})
+                          'einstellungen': None, 'uploads': False, 'personen': False})
         self.assertEqual(manifest.check_text(BEISPIEL)['web']['protocol'], 'http')
         self.invalid(replace(up, up + '\nprotocol = "fastcgi"'), 'web', '„entry“ fehlt')
         self.invalid(replace(up, up + '\nprotocol = "uwsgi"'), 'web.protocol')

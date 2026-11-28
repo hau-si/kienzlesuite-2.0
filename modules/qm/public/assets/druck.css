@@ -1,0 +1,21 @@
+/* Druckansicht eines QM-Dokuments (eigenständige Seite ohne Rahmen). */
+body.qm-druck { font-family: Inter, -apple-system, "Segoe UI", Arial, sans-serif; color: #1d2b2f; background: #fff; max-width: 820px; margin: 24px auto; padding: 0 20px; font-size: 14px; line-height: 1.55; }
+.nicht-drucken button { font: inherit; font-weight: 650; padding: 9px 16px; border: 0; border-radius: 9px; background: #12695d; color: #fff; cursor: pointer; }
+table.kopf { width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 12.5px; }
+table.kopf td { border: 1px solid #9fb2ac; padding: 6px 8px; vertical-align: top; }
+table.kopf td.praxis { width: 45%; font-weight: 650; }
+table.kopf small { font-weight: 400; color: #55706a; }
+h1 { font-size: 22px; margin: 0 0 12px; }
+.qm-text h2 { font-size: 17px; margin: 18px 0 6px; }
+.qm-text h3 { font-size: 15px; margin: 14px 0 5px; }
+.qm-text h4 { font-size: 14px; margin: 12px 0 4px; }
+.qm-text img { max-width: 100%; height: auto; }
+.qm-text table { width: 100%; border-collapse: collapse; margin: 8px 0 12px; }
+.qm-text td, .qm-text th { border: 1px solid #9fb2ac; padding: 5px 7px; text-align: left; vertical-align: top; }
+.qm-text th { background: #eef3f1; }
+.qm-text ul.checkliste { list-style: none; padding-left: 4px; }
+.qm-text ul.checkliste > li::before { content: "☐  "; }
+.qm-text ul.checkliste > li.erledigt::before { content: "☑  "; }
+p.fuss { margin-top: 28px; padding-top: 8px; border-top: 1px solid #9fb2ac; font-size: 11.5px; color: #55706a; }
+@media print { .nicht-drucken { display: none; } body.qm-druck { margin: 0; max-width: none; padding: 0; } tr, img { page-break-inside: avoid; } h2, h3 { page-break-after: avoid; } }
+@page { size: A4; margin: 18mm 16mm; }

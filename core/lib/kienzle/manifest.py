@@ -65,7 +65,7 @@ LIMITS = {'exchange': 5, 'starters': 5, 'packages': 50, 'services': 20, 'firewal
 SCHEMA_SECTIONS = {
     'module': {'id', 'name', 'version', 'core_api', 'description', 'requires'},
     'system': {'packages', 'services', 'user', 'data', 'disables'},
-    'web': {'path', 'upstream', 'protocol', 'entry', 'starter', 'einstellungen', 'uploads'},   # starter: alter Schlüssel, wird nur noch angenommen und ignoriert
+    'web': {'path', 'upstream', 'protocol', 'entry', 'starter', 'einstellungen', 'uploads', 'personen'},   # starter: alter Schlüssel, wird nur noch angenommen und ignoriert
     'firewall': {'name', 'port', 'proto', 'scope'},
     'rights': {'id', 'label'},
     'backup': {'paths', 'snapshot', 'settings'},
@@ -210,6 +210,8 @@ class _Checker:
         out['fileshares'] = self.fileshares(data.get('fileshare', []), out['system'])
         if (out['exchange'] or out['system']['disables'] or out['fileshares']) and module.get('core_api') == '1':
             self.error('module.core_api', '[[exchange]], [[fileshare]] und [system] disables gibt es erst mit core_api = "2".')
+        if out['web'] and out['web']['personen'] and module.get('core_api') == '1':
+            self.error('web.personen', 'gibt es erst mit core_api = "2".')
         out['setup'] = self.setup(data.get('setup', {}))
         out['hooks'] = self.hooks(data.get('hooks', {}))
         return None if self.errors else out
@@ -289,11 +291,15 @@ class _Checker:
         if not isinstance(uploads, bool):
             self.error('web.uploads', 'muss true oder false sein.')
             uploads = False
+        personen = t.get('personen', False)
+        if not isinstance(personen, bool):
+            self.error('web.personen', 'muss true oder false sein.')
+            personen = False
         settings = t.get('einstellungen')
         if settings is not None and (not isinstance(settings, str) or not re.fullmatch(r'/|/[A-Za-z0-9][A-Za-z0-9._-]{0,60}(/[A-Za-z0-9][A-Za-z0-9._-]{0,60}){0,3}', settings)):
             self.error('web.einstellungen', 'muss ein Pfad unter dem Webpfad sein, z. B. „/settings.php“.')
             settings = None
-        return {'path': path, 'upstream': upstream, 'protocol': protocol, 'entry': entry, 'einstellungen': settings, 'uploads': uploads}
+        return {'path': path, 'upstream': upstream, 'protocol': protocol, 'entry': entry, 'einstellungen': settings, 'uploads': uploads, 'personen': personen}
 
     def firewall(self, items: list) -> list:
         if len(items) > LIMITS['firewall']:

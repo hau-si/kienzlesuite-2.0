@@ -15,7 +15,7 @@ FONT = '/usr/share/fonts/opentype/inter/'
 
 # (Bild, Titel, Untertitel, Sekunden)
 SZENEN = [
-    ('@titel', 'Praxisherz', 'Ein Server für die Praxis: Kasse, Terminzettel, Unterschrift. Alle Bilder zeigen erfundene Beispieldaten.', 6),
+    ('@titel', 'Praxisherz', 'Ein Server für die Praxis: Kasse, Terminzettel, Unterschrift, Qualitätsmanagement. Alle Bilder zeigen erfundene Beispieldaten.', 6),
     ('anmelden', 'Eine Anmeldung für alle Module', 'Passwort oder Passkey; Admins zusätzlich mit Code aus der Authenticator-App.', 6),
     ('start', 'Start: Einrichtung und Server-Zustand', 'Was noch zu tun ist, dazu Prozessor, Speicher, Festplatte und Laufzeit des Servers.', 7),
     ('einrichtung', 'Einrichtungs-Überblick', 'Jeder Schritt zeigt, wo er erledigt wird: im Webfenster, am Arbeitsplatz oder im Router.', 8),
@@ -32,6 +32,11 @@ SZENEN = [
     ('signatur-vorgaenge', 'Signatur: Vorgang anlegen', 'IGeL-Vertrag, Aufklärung oder Datenschutz am Unterschriftenpad; der Patient wird aus T2med übernommen.', 8),
     ('signatur-pads', 'Signatur: Unterschriftenpads', 'Ein Pad je Arbeitsplatz als feste Zeile, Pad im Netzwerk suchen und Anleitung für das Servicemenü von Delta und Alpha.', 10),
     ('signatur-software', 'Signatur: Pad-Software von signotec', 'Die Bibliotheken liefern wir nicht mit: ZIP hochladen, danach steht „erledigt“.', 8),
+    ('qm-lesemappe', 'QM: Meine Lesemappe', 'Was mir zur Kenntnis vorgelegt wurde, mit Frist; Überfälliges steht rot. Suche nach Namensschnipseln und Tags.', 8),
+    ('qm-handbuch', 'QM: Handbuch mit Ordnern und Tags', 'Freigabe, Prüffrist und Lesestand je Dokument auf einen Blick; Vorschau rechts.', 8),
+    ('qm-dokument', 'QM: Lesen und bestätigen', 'Neue Fassungen zeigen die Änderungen markiert; die MFA bestätigt „gelesen und verstanden“.', 8),
+    ('qm-editor', 'QM: Einfacher Editor', 'Überschriften, Listen, Checklisten, Tabellen und Bilder. Gültig wird ein Dokument erst durch das Vidieren.', 8),
+    ('qm-import', 'QM: Musterdokumente übernehmen', 'Word-Dateien, zum Beispiel die QEP-Muster der KBV, samt Ordnern als Entwürfe übernehmen.', 7),
     ('updates', 'Updates mit Sicherung und Rücksprung', 'Kanal stabil oder beta, Schnappschuss vor jedem Update und automatischer Rücksprung bei einem Fehler.', 7),
     ('benutzer', 'Benutzer, Gruppen und Rechte', 'Gruppen sind Rollen mit Rechten je Modul. Sensible Funktionen sehen nur Admins.', 7),
     ('@ende', 'Praxisherz', 'Open Source: Quelltext, Anleitungen und Releases auf GitHub (hau-si/praxisherz).', 6),

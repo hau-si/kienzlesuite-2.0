@@ -4,3 +4,6 @@ dist/
 *.pem
 !installer/release-keys/*.pub.pem
 core/client-dist/
+# Ergebnis von „go build“ im Starter-Ordner (die Pakete baut scripts/starter-bauen nach core/client-dist); nicht in core/client/starter/.gitignore, weil Releases keine Punktdateien enthalten dürfen
+core/client/starter/praxisherz-starter
+core/client/starter/praxisherz-starter.exe
