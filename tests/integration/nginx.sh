@@ -25,8 +25,8 @@ nginx
 sleep 1
 
 echo '== Zertifikat und Servername'
-c "https://$host/_health" | grep -q '"status":"ok"' || fail 'Gesundheitsprüfung'
-c "https://$host/anmelden" | grep -q '<h1>Anmelden</h1>' || fail 'Anmeldeseite'
+c "https://$host/_health" | grep -- '"status":"ok"' >/dev/null || fail 'Gesundheitsprüfung'
+c "https://$host/anmelden" | grep -- '<h1>Anmelden</h1>' >/dev/null || fail 'Anmeldeseite'
 [ "$(curl -s -o /dev/null -w "%{http_code}" --noproxy "*" --max-time 5 -k --resolve "evil.example:443:127.0.0.1" https://evil.example/)" = 421 ] || fail "fremder Servername bekommt eine Seite"
 [ "$(code "https://$host/_auth/beispiel")" = '404 ' ] || fail '/_auth von außen erreichbar'
 heads=$(c -I "https://$host/anmelden" | tr -d '\r')   # Kopfzeilen enden auf \r\n
@@ -110,7 +110,7 @@ cmp -s /etc/cups/cupsd.conf /opt/kienzle/core/current/installer/vorlagen/cupsd.c
 cmp -s /etc/samba/smb.conf /opt/kienzle/core/current/installer/vorlagen/smb.conf || fail 'smb.conf nicht aus der Vorlage'
 [ -f /etc/kienzle/original/smb.conf ] || fail 'ursprüngliche smb.conf nicht gesichert'
 ls /etc/cups/cupsd.conf.kienzle-vorher /etc/samba/smb.conf.kienzle-vorher >/dev/null 2>&1 && fail 'Zwischenkopien bleiben liegen'
-if testparm -s --suppress-prompt /etc/samba/smb.conf 2>/dev/null | grep -E '^\[' | grep -qv '^\[global\]'; then fail 'Samba hat Freigaben ohne Auftrag'; fi
+if testparm -s --suppress-prompt /etc/samba/smb.conf 2>/dev/null | grep -E '^\[' | grep -v -- '^\[global\]' >/dev/null; then fail 'Samba hat Freigaben ohne Auftrag'; fi
 grep -q 'Automatic-Reboot "false"' /etc/apt/apt.conf.d/52kienzle-unattended || fail 'unattended-upgrades ohne Neustart-Sperre'
 [ -d /var/lib/kienzle/ueberblick ] || fail 'Ordner für Überblicke fehlt'
 for u in kienzle-ueberblick.path kienzle-ueberblick.service kienzle-ueberblick.timer; do [ -f "/etc/systemd/system/$u" ] || fail "$u fehlt"; done
@@ -124,20 +124,20 @@ $id = $u->create("dora", "", true); $u->setPassword($id, "Sonnen-Uhr-Garten-3");
 code=$(php -r 'require "/opt/kienzle/core/current/php/bootstrap.php"; echo Kienzle\Core\Totp::code("JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP", Kienzle\Core\Totp::step());')
 [ "$(code -c "$T/dora" -b "$T/dora" -H "Origin: https://$host" -d login=dora -d 'password=Sonnen-Uhr-Garten-3' "https://$host/anmelden")" = "303 https://$host/anmelden/code" ] || fail 'Admin-Anmeldung'
 [ "$(code -c "$T/dora" -b "$T/dora" -H "Origin: https://$host" -d "code=$code" "https://$host/anmelden/code")" = "303 https://$host/" ] || fail 'Admin-Code'
-c -b "$T/dora" "https://$host/verwaltung/updates" | grep -q 'Installiert: Basis ' || fail 'Update-Seite'
-c -b "$T/dora" "https://$host/verwaltung/firewall" | grep -q 'Freigegebene Netze' || fail 'Firewall-Seite'
-c -b "$T/dora" "https://$host/verwaltung/verbindungen" | grep -q 'T2med (FHIR)' || fail 'Verbindungsseite'
-c -b "$T/dora" "https://$host/verwaltung/einrichtung" | grep -q 'Admin mit Authenticator-App' || fail 'Einrichtungsseite'
-c "https://$host/.well-known/openid-configuration" | grep -qF "\"issuer\":\"https://$host\"" || fail 'OIDC-Discovery über nginx'
-c "https://$host/oidc/jwks" | grep -q '"crv":"P-256"' || fail 'OIDC-JWKS über nginx'
+c -b "$T/dora" "https://$host/verwaltung/updates" | grep -- 'Installiert: Basis ' >/dev/null || fail 'Update-Seite'
+c -b "$T/dora" "https://$host/verwaltung/firewall" | grep -- 'Freigegebene Netze' >/dev/null || fail 'Firewall-Seite'
+c -b "$T/dora" "https://$host/verwaltung/verbindungen" | grep -- 'T2med (FHIR)' >/dev/null || fail 'Verbindungsseite'
+c -b "$T/dora" "https://$host/verwaltung/einrichtung" | grep -- 'Admin mit Authenticator-App' >/dev/null || fail 'Einrichtungsseite'
+c "https://$host/.well-known/openid-configuration" | grep -F -- "\"issuer\":\"https://$host\"" >/dev/null || fail 'OIDC-Discovery über nginx'
+c "https://$host/oidc/jwks" | grep -- '"crv":"P-256"' >/dev/null || fail 'OIDC-JWKS über nginx'
 [ "$(code -X POST "https://$host/oidc/token" -d grant_type=authorization_code -d code=x -d client_id=unbekannt)" = '401 ' ] || fail 'OIDC-Token ohne Client nicht 401'
-c -b "$T/dora" "https://$host/verwaltung/sso" | grep -q 'Dienst hinzufügen' || fail 'Seite Dienste'
-c "https://$host/hilfe/arbeitsplatz" | grep -q "$(openssl x509 -in /etc/kienzle/ca/ca.crt -noout -fingerprint -sha256 | cut -d= -f2)" || fail 'Hilfe Arbeitsplätze ohne Fingerabdruck'
+c -b "$T/dora" "https://$host/verwaltung/sso" | grep -- 'Dienst hinzufügen' >/dev/null || fail 'Seite Dienste'
+c "https://$host/hilfe/arbeitsplatz" | grep -- "$(openssl x509 -in /etc/kienzle/ca/ca.crt -noout -fingerprint -sha256 | cut -d= -f2)" >/dev/null || fail 'Hilfe Arbeitsplätze ohne Fingerabdruck'
 # Die Seiten müssen Status und Einheiten der root-Dienste sehen (open_basedir von php-fpm).
 for p in firewall updates verbindungen sicherung einrichtung drucker sso module; do
-  if c -b "$T/dora" "https://$host/verwaltung/$p" | grep -q 'Bitte den Installer ausführen'; then fail "Seite $p sieht ihren Dienst nicht"; fi
+  if c -b "$T/dora" "https://$host/verwaltung/$p" | grep -- 'Bitte den Installer ausführen' >/dev/null; then fail "Seite $p sieht ihren Dienst nicht"; fi
 done
-c -b "$T/dora" "https://$host/verwaltung/verbindungen" | grep -q 'ssh-ed25519 ' || fail 'Verbindungsseite zeigt den SSH-Schlüssel nicht (Status unlesbar)'
+c -b "$T/dora" "https://$host/verwaltung/verbindungen" | grep -- 'ssh-ed25519 ' >/dev/null || fail 'Verbindungsseite zeigt den SSH-Schlüssel nicht (Status unlesbar)'
 runuser -u ks-core -- php -d open_basedir="$(sed -n 's/^php_admin_value\[open_basedir\] = //p' /etc/kienzle/core/php-fpm.conf)" -r 'exit(is_executable("/usr/bin/qrencode") ? 0 : 1);' \
   || fail 'qrencode unter open_basedir nicht erreichbar (QR-Code für OTP)'
 
@@ -161,10 +161,10 @@ sicher "{\"action\":\"wiederherstellen\",\"teil\":\"core\",\"snapshot\":\"$snap\
 [ "$(sql "SELECT count(*) FROM settings WHERE key = 'test_nach_sicherung'")" = 0 ] || fail 'Wiederherstellung hat den späteren Eintrag nicht entfernt'
 [ "$(sql "SELECT count(*) FROM users WHERE login = 'dora'")" = 1 ] || fail 'Benutzer nach Wiederherstellung fehlt'
 [ "$(stat -c '%U' /var/lib/kienzle/core/core.sqlite)" = ks-core ] || fail 'Datenbank nach Wiederherstellung nicht ks-core'
-c -b "$T/dora" "https://$host/verwaltung/sicherung" | grep -q 'Letzte Sicherung' || fail 'Sicherungsseite'
+c -b "$T/dora" "https://$host/verwaltung/sicherung" | grep -- 'Letzte Sicherung' >/dev/null || fail 'Sicherungsseite'
 sicher '{"action":"export","passwort":"Ein-langes-Export-Passwort"}'
 c -b "$T/dora" -o "$T/export.kse" "https://$host/verwaltung/sicherung/export" || fail 'Export herunterladen'
-head -c 24 "$T/export.kse" | grep -q '^KIENZLE-EINSTELLUNGEN 1 ' || fail 'Export-Datei falsch'
+head -c 24 "$T/export.kse" | grep -- '^KIENZLE-EINSTELLUNGEN 1 ' >/dev/null || fail 'Export-Datei falsch'
 if grep -qa 'BEGIN' "$T/export.kse"; then fail 'Export enthält Klartext'; fi
 python3 -I -c 'import sys; sys.path.insert(0, "/opt/kienzle/core/current/lib"); from pathlib import Path; from kienzle import sicherung as s
 f = s.import_settings(Path(sys.argv[1]), "Ein-langes-Export-Passwort", False, Path(sys.argv[2])); sys.exit(0 if f else 1)' "$T/export.kse" "$T/ansicht" || fail 'Export entschlüsseln'
@@ -175,11 +175,11 @@ sicher '{"action":"blatt-gedruckt"}'
 
 echo '== Servername ändern (Einrichten → Server)'
 [ -f /etc/systemd/system/kienzle-servername.path ] || fail 'kienzle-servername.path fehlt'
-c -b "$T/dora" -H "Origin: https://$host" "https://$host/verwaltung/server" | grep -q 'Name des Servers' || fail 'Seite Server'
+c -b "$T/dora" -H "Origin: https://$host" "https://$host/verwaltung/server" | grep -- 'Name des Servers' >/dev/null || fail 'Seite Server'
 runuser -u ks-core -- sh -c "umask 077; printf '%s' '{\"namen\":[\"$host\",\"kienzle.praxis.internal\",\"10.11.12.13\"],\"praxis\":\"Praxis Test\"}' > /var/lib/kienzle/core/anfragen/servername.json"
 KIENZLE_NGINX_RELOAD='nginx -s reload' /opt/kienzle/core/current/bin/kienzle-servername anwenden
 python3 -c 'import json,sys; s=json.load(open("/var/lib/kienzle/servername/status.json"))["letzte"]; print(s["meldung"]); sys.exit(0 if s["ok"] else 1)' || fail 'Servername nicht übernommen'
-openssl x509 -in /etc/kienzle/ca/server.crt -noout -ext subjectAltName | grep -q 'DNS:kienzle.praxis.internal' || fail 'Zertifikat ohne neuen Namen'
+openssl x509 -in /etc/kienzle/ca/server.crt -noout -ext subjectAltName | grep -- 'DNS:kienzle.praxis.internal' >/dev/null || fail 'Zertifikat ohne neuen Namen'
 sleep 1
 curl -fsS --noproxy '*' --max-time 10 --cacert /etc/kienzle/ca/ca.crt --resolve "kienzle.praxis.internal:443:127.0.0.1" -o /dev/null https://kienzle.praxis.internal/anmelden || fail 'neuer Name nicht erreichbar'
 # Aufruf über die IP: Browser schicken dabei kein SNI – muss trotzdem gehen.
@@ -200,8 +200,8 @@ if id -nG ks-core | grep -qw lpadmin; then fail 'ks-core ist in der Gruppe lpadm
 drucker() { runuser -u ks-core -- sh -c "umask 077; printf '%s' '$1' > /var/lib/kienzle/core/anfragen/drucker.json"; /opt/kienzle/core/current/bin/kienzle-drucker anwenden
   python3 -c 'import json,sys; s=json.load(open("/var/lib/kienzle/drucker/status.json"))["letzte"]; print(s["meldung"]); sys.exit(0 if s["ok"] else 1)' || fail "Drucker: $1"; }
 drucker '{"action":"anlegen","art":"bon","name":"Bon-Test","adresse":"socket://192.0.2.50:9100","freigabe":["samba"]}'
-lpstat -v Bon-Test | grep -q 'socket://192.0.2.50:9100' || fail 'Warteschlange fehlt in CUPS'
-testparm -s --suppress-prompt 2>/dev/null | grep -q '^\[Bon-Test\]' || fail 'Samba-Freigabe fehlt'
+lpstat -v Bon-Test | grep -- 'socket://192.0.2.50:9100' >/dev/null || fail 'Warteschlange fehlt in CUPS'
+testparm -s --suppress-prompt 2>/dev/null | grep -- '^\[Bon-Test\]' >/dev/null || fail 'Samba-Freigabe fehlt'
 # Programmordner wie bei einer echten Installation: root-eigene Kopie (der Arbeitsordner der CI ist für ks-beispiel nicht lesbar).
 install -d -m 0755 /opt/kienzle/beispiel/releases && rm -rf /opt/kienzle/beispiel/releases/test && cp -r "$repo/modules/beispiel" /opt/kienzle/beispiel/releases/test
 chmod -R u=rwX,go=rX /opt/kienzle/beispiel/releases/test && ln -sfn releases/test /opt/kienzle/beispiel/current
@@ -211,25 +211,25 @@ grep -q 'include = /etc/samba/kienzle-netz.conf' /etc/samba/smb.conf || fail 'sm
 [ "$(testparm -s --suppress-prompt --parameter-name=workgroup 2>/dev/null)" = WORKGROUP ] || fail 'Arbeitsgruppe fehlt'
 # Der zweite Lauf des Installers hat das Modulverzeichnis geleert; kienzle-web schreiben gleicht die Drucker mit ab.
 KIENZLE_NGINX_RELOAD='' /opt/kienzle/core/current/bin/kienzle-web schreiben "$T/module" || fail 'kienzle-web mit Modul'
-lpstat -v Beispiel-Drucker | grep -q 'kienzle-beispiel-beispiel-drucker:/Beispiel-Drucker' || fail 'virtueller Drucker fehlt'
+lpstat -v Beispiel-Drucker | grep -- 'kienzle-beispiel-beispiel-drucker:/Beispiel-Drucker' >/dev/null || fail 'virtueller Drucker fehlt'
 [ "$(stat -c '%a %U' /usr/lib/cups/backend/kienzle-beispiel-beispiel-drucker)" = '755 root' ] || fail 'Backend falsch geschützt'
 # IPP-Everywhere-Drucker des Moduls (ippeveprinter als ks-beispiel, nur localhost)
 grep -q '^User=ks-beispiel' /etc/systemd/system/kienzle-drucker-beispiel-beispiel-pdf.service || fail 'Einheit des IPP-Druckers fehlt'
-if ! lpstat -v Beispiel-PDF 2>/dev/null | grep -q 'ipp://localhost:471'; then
+if ! lpstat -v Beispiel-PDF 2>/dev/null | grep -- 'ipp://localhost:471' >/dev/null; then
   ls -l /usr/sbin/ippeveprinter 2>&1 || true; cat /var/lib/kienzle/drucker/*.log 2>&1 | tail -n 20 || true; env | grep -c KIENZLE_OHNE_SYSTEMD || true
   runuser -u ks-beispiel -- test -x /opt/kienzle/beispiel/current/printer/kienzle-beispiel-druck || echo 'ks-beispiel kann das Programm nicht ausführen'
   fail 'IPP-Everywhere-Drucker fehlt in CUPS'
 fi
 pgrep -u ks-beispiel -f ippeveprinter >/dev/null || fail 'ippeveprinter läuft nicht als ks-beispiel'
-lp -d Beispiel-PDF "$repo/tests/integration/test.pdf" | grep -q 'request id is Beispiel-PDF-' || fail 'Auftrag an den IPP-Drucker'
+lp -d Beispiel-PDF "$repo/tests/integration/test.pdf" | grep -- 'request id is Beispiel-PDF-' >/dev/null || fail 'Auftrag an den IPP-Drucker'
 for _ in $(seq 1 30); do [ -s /var/lib/kienzle/beispiel/letzter-auftrag ] && break; sleep 0.5; done
 [ -s /var/lib/kienzle/beispiel/letzter-auftrag ] && echo "IPP-Drucker hat den Auftrag erhalten ($(cat /var/lib/kienzle/beispiel/letzter-auftrag) Byte)." \
   || echo 'Hinweis: Der Auftrag kam (noch) nicht beim Programm des Moduls an (Filter von CUPS im Container?).'
 drucker '{"action":"arbeitsgruppe","arbeitsgruppe":"PRAXIS"}'
 [ "$(testparm -s --suppress-prompt --parameter-name=workgroup 2>/dev/null)" = PRAXIS ] || fail 'Arbeitsgruppe nicht übernommen'
 runuser -u ks-beispiel -- php -r 'require "/opt/kienzle/core/current/php/modul/Kienzle.php"; $k = new KienzleModul("beispiel", ["X" => "1"]);
-  echo $k->drucken("Beispiel-Drucker", "%PDF-1.4 erfunden", "Test"), "\n";' | grep -q '^Beispiel-Drucker-' || fail 'Modul druckt nicht'
-c -b "$T/dora" "https://$host/verwaltung/drucker" | grep -q 'Bon-Test' || fail 'Druckerseite'
+  echo $k->drucken("Beispiel-Drucker", "%PDF-1.4 erfunden", "Test"), "\n";' | grep -- '^Beispiel-Drucker-' >/dev/null || fail 'Modul druckt nicht'
+c -b "$T/dora" "https://$host/verwaltung/drucker" | grep -- 'Bon-Test' >/dev/null || fail 'Druckerseite'
 drucker '{"action":"entfernen","name":"Bon-Test"}'
 if lpstat -v Bon-Test >/dev/null 2>&1; then fail 'Warteschlange nicht entfernt'; fi
 rm -rf /opt/kienzle/beispiel
@@ -243,7 +243,7 @@ pkill -u ks-beispiel -f ippeveprinter || true
 echo '== Modul Kasse über die Modulverwaltung'
 [ -f /opt/kienzle/core/current/modules/kasse/module.toml ] || fail 'Kasse nicht mit der Basis geliefert'
 [ ! -e /opt/kienzle/core/current/modules/beispiel ] || fail 'Beispielmodul mitgeliefert'
-/opt/kienzle/core/current/bin/kienzle-module liste | grep -q '^verfügbar *kasse' || fail 'Kasse nicht im Angebot'
+/opt/kienzle/core/current/bin/kienzle-module liste | grep -- '^verfügbar *kasse' >/dev/null || fail 'Kasse nicht im Angebot'
 /opt/kienzle/core/current/bin/kienzle-module installieren kasse > "$T/kasse-installieren.log" 2>&1 || fail 'Kasse installieren'
 [ "$(stat -c '%a %U' /var/lib/kienzle/kasse)" = '700 ks-kasse' ] || fail 'Datenordner der Kasse'
 [ "$(stat -c '%a %U %G' /run/kienzle/kasse)" = '750 ks-kasse www-data' ] || fail 'Socket-Ordner der Kasse'
@@ -268,8 +268,8 @@ kcsrf=$(sed -n 's/.*name="kienzle-csrf" content="\([0-9a-f]*\)".*/\1/p' <<< "$pa
 r=$(c -b "$T/bert" -H "Origin: https://$host" -H "X-Kienzle-Csrf: $kcsrf" -H 'Content-Type: application/json' -d '{"action":"demo"}' "https://$host/kasse/api.php")
 python3 -c 'import json,sys; u=json.loads(sys.argv[1])["url"]; sys.exit(0 if u.startswith("https://"+sys.argv[2]+"/kasse/#launch=") else 1)' "$r" "$host" || fail "Testpatient in der Kasse: $r"
 [ "$(c -b "$T/bert" -o /dev/null -w '%{http_code}' "https://$host/kasse/settings.php")" = 403 ] || fail 'Einstellungen ohne Recht'
-lpstat -v vKasse 2>/dev/null | grep -q 'ipp://localhost:471' || echo 'Hinweis: Drucker „vKasse“ im Container nicht angelegt.'
-c -b "$T/dora" "https://$host/verwaltung/module" | grep -q '<p class="mod-name">Kasse</p><p class="muted mod-sub">Version 2\.' || fail 'Seite Module'
+lpstat -v vKasse 2>/dev/null | grep -- 'ipp://localhost:471' >/dev/null || echo 'Hinweis: Drucker „vKasse“ im Container nicht angelegt.'
+c -b "$T/dora" "https://$host/verwaltung/module" | grep -- '<p class="mod-name">Kasse</p><p class="muted mod-sub">Version 2\.' >/dev/null || fail 'Seite Module'
 /opt/kienzle/core/current/bin/kienzle-module entfernen kasse > /dev/null || fail 'Kasse entfernen'
 [ ! -e /opt/kienzle/kasse ] && [ -d /var/lib/kienzle/kasse ] || fail 'Entfernen: Programm noch da oder Daten weg'
 pkill -u ks-kasse -f php-fpm || true

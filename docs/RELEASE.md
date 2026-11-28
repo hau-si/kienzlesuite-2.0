@@ -1,5 +1,9 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.55
+
+- Ende-zu-Ende-Prüfung mit nginx: Die Seitenprüfungen lasen die Antwort mit `grep -q` aus einer Pipe; bei großen Seiten (Druckerseite) bricht `curl` dann mit einem Schreibfehler ab, und die Prüfung meldete einen Fehler, obwohl der Text da war. Jetzt wird die ganze Ausgabe gelesen. Am Programm ändert sich nichts. Sicherung, Servername und Drucker liefen im Container bereits durch.
+
 ## 0.22.0-beta.54
 
 - Ende-zu-Ende-Prüfung mit echtem nginx (`tests/integration/nginx.sh`, Container Ubuntu 26.04 auf GitHub) auf den heutigen Stand gebracht: Sie erwartete auf der Update-Seite und der Modulseite noch Texte einer älteren Gestaltung. Seit dem Test der Start-ISO war der Container-Lauf vorher abgebrochen, deshalb fiel das nicht auf. Am Programm ändert sich nichts.
