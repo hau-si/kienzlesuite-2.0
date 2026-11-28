@@ -167,7 +167,7 @@ final class Web {
                         $text = 'Regelmäßige Zeiten gespeichert.';
                         break;
                     case 'feiertage':
-                        $z->feiertageSpeichern($r->field('land', 4), $r->list('gezeigt'), $r->list('haken'), $r->field('f_telefon') === '1', $r->field('f_homepage') === '1');
+                        $z->feiertageSpeichern($r->field('land', 4), $r->list('gezeigt'), $r->list('haken'), $r->field('f_telefon') === '1', $r->field('f_homepage') === '1', $r->field('f_google') === '1');
                         $ziel .= '?ansicht=feiertage' . (ctype_digit($r->field('jahr', 4)) ? '&jahr=' . $r->field('jahr', 4) : '');
                         $text = 'Feiertage gespeichert.';
                         break;
@@ -192,7 +192,8 @@ final class Web {
                     'woche' => ['sprech' => $this->tageListe($r->list('sprech')), 'telefon' => $this->tageListe($r->list('telefon'))],
                     'praxis' => ['id' => $r->field('id', 40), 'name' => $r->field('name', 120), 'strasse' => $r->field('strasse', 100), 'ort' => $r->field('ort', 100), 'telefon' => $r->field('telefon', 60), 'zusatz' => $r->field('zusatz', 150)],
                     'ereignis' => ['id' => $r->field('id', 40), 'art' => $r->field('art', 20), 'titel' => $r->field('titel', 100), 'von' => $r->field('von', 20), 'bis' => $r->field('bis', 20),
-                        'zeiten' => $r->field('zeiten', 80), 'hinweis' => $r->field('hinweis', 220), 'homepage' => $r->field('homepage') === '1', 'telefon' => $r->field('telefon') === '1', 'vertretung' => []],
+                        'zeiten' => $r->field('zeiten', 80), 'hinweis' => $r->field('hinweis', 220), 'homepage' => $r->field('homepage') === '1', 'telefon' => $r->field('telefon') === '1',
+                        'google' => $r->field('google') === '1', 'vertretung' => []],
                     default => null };
                 return $this->zeitenSeite($z, new Request('GET', $r->path, $q), $e->getMessage(), $ein);
             }
@@ -211,13 +212,15 @@ final class Web {
 
     private function zeitenSeite(Zeiten $z, Request $r, ?string $fehler, ?array $eingabe): Response {
         // Wartende Verteilung (anderer Auftrag lief gerade) oder neuer Tag: still nachholen.
-        if ($this->connections && ($z->ausstehend() || $this->db->setting('zeiten.verteilt') === null) && $this->zeitenNutzer()) $z->verteilen($this->connections, $this->config->practice);
+        $googleDa = $this->connections && is_array($this->connections->status()['google']) && ($this->connections->status()['google']['ort'] ?? '') !== '';
+        if ($this->connections && ($z->ausstehend() || $this->db->setting('zeiten.verteilt') === null) && ($this->zeitenNutzer() || $googleDa)) $z->verteilen($this->connections, $this->config->practice);
         $verteilt = null;
         if ($this->connections && $this->connections->status()['service']) {
             $st = $this->connections->status()['zeiten'];
             $verteilt = !$z->ausstehend() && is_array($st) && ($st['stand'] ?? '') === $z->paket($this->config->practice)['stand'];
         }
-        $seite = new ZeitenSeite($z, (string)$this->session['csrf'], $this->zeitenNutzer(), $verteilt);
+        $g = $this->connections ? $this->connections->status()['google'] : null;
+        $seite = new ZeitenSeite($z, (string)$this->session['csrf'], $this->zeitenNutzer(), $verteilt, is_array($g) && ($g['ort'] ?? '') !== '', is_array($g['letzte'] ?? null) ? $g['letzte'] : null);
         $ansicht = $r->get('ansicht', 20);
         $body = match ($ansicht) {
             'woche' => $seite->wocheSeite($fehler, $eingabe),
@@ -2085,6 +2088,7 @@ final class Web {
         'Letterxpress (Briefversand)' => ['letterxpress', '/verwaltung/drucker', 'Rechnungen und Briefe per Post'],
         'Übersetzung (DeepL)' => ['uebersetzung', 'st:link', 'Vorlagen in andere Sprachen übersetzen'],
         'Netzwerkspeicher' => ['ablage', 'st:backup', 'Ablage und Datensicherung auf dem NAS'],
+        'Google-Unternehmensprofil' => ['google', '/verwaltung/zeiten', 'Öffnungszeiten und Schließtage bei Google'],
         'Wer nutzt was' => ['nutzung', 'st:liste', 'Welches Modul welche Verbindung braucht']];
 
     /** Zu welcher Verbindung eine Aktion gehört (Rückkehr und Fehlermeldung). */
@@ -2094,8 +2098,10 @@ final class Web {
         return match (true) {
             in_array($teil, ['mail', 'gmail', 'gmail-start', 'testmail'], true) => 'mail',
             in_array($teil, ['sms', 'testsms'], true) => 'sms',
-            in_array($teil, ['letterxpress', 'guthaben'], true) => 'letterxpress',
+            $teil === 'guthaben' => $r->field('id', 40) === 'sms' ? 'sms' : 'letterxpress',
+            $teil === 'letterxpress' => 'letterxpress',
             $teil === 'uebersetzung' => 'uebersetzung',
+            str_starts_with($teil, 'google') => 'google',
             in_array($teil, ['ziel', 'ziel-loeschen', 'hostkey-holen', 'hostkey-uebernehmen', 'ablage', 'smb', 'sftp'], true) => 'ablage',
             default => '',
         };
@@ -2158,7 +2164,7 @@ final class Web {
             . ($mail ? $this->testLine($st['tests'], 'mail') . '<div class="actions"><form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('pruefen', ['art' => 'mail']) . '<button>Anmeldung prüfen</button></form> '
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline grp">' . $this->hidden('testmail') . '<input type="email" name="an" placeholder="empfaenger@example.org" required maxlength="254" aria-label="Empfänger der Testnachricht"> <button>Testnachricht senden</button></form> '
                 . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'mail']) . '<button class="danger">Entfernen</button></form></div>' : '')
-            . '</section>';
+            . '</section>' . $this->googleAbschnitt($st);
         // SMS
         $sms = $st['sms'] ?? [];
         $body .= '<section><h2>SMS (seven.io)</h2><p class="muted">Für Einmalcodes als Ersatz bei der Admin-Anmeldung und später für Nachrichten der kienzlefon-App. Schlüssel unter seven.io → Entwickler → API-Schlüssel anlegen.</p>'
@@ -2245,7 +2251,7 @@ final class Web {
             . '</section>';
         // Nutzung
         $rows = '';
-        $art = ['t2med' => 'T2med', 'mail' => 'E-Mail', 'ablage' => 'Netzwerkspeicher', 'letterxpress' => 'Letterxpress', 'nachrichten' => 'SMS und E-Mail (Versand durch die Basis)', 'uebersetzung' => 'Übersetzung (DeepL)'];
+        $art = ['t2med' => 'T2med', 'mail' => 'E-Mail', 'ablage' => 'Netzwerkspeicher', 'letterxpress' => 'Letterxpress', 'nachrichten' => 'SMS und E-Mail (Versand durch die Basis)', 'uebersetzung' => 'Übersetzung (DeepL)', 'zeiten' => 'Öffnungszeiten'];
         foreach ($st['nutzung'] as $u) $rows .= '<tr><td>' . V::h((string)$u['name']) . '</td><td>' . V::h($art[(string)$u['verbindung']] ?? (string)$u['verbindung']) . '</td><td>' . V::h((string)$u['zweck']) . '</td><td>' . (($u['pflicht'] ?? false) ? 'ja' : 'nein') . '</td></tr>';
         $body .= '<section><h2>Wer nutzt was</h2>' . ($rows !== '' ? '<table><tr><th>Modul</th><th>Verbindung</th><th>Wofür</th><th>Nötig</th></tr>' . $rows . '</table>' : '<p>Kein installiertes Modul nutzt eine zentrale Verbindung.</p>') . '</section>';
         $body = preg_replace('#(<p>Zugänge, die mehrere Module brauchen.*?</p>)#s', '<section class="card">$1</section>', $body, 1);
@@ -2279,6 +2285,59 @@ final class Web {
         return $st['pending'] ? $response->with('Refresh', '2') : $response;
     }
 
+    /** Praxis → Verbindungen: Google-Unternehmensprofil (Öffnungszeiten und Schließtage aus Praxis → Öffnungszeiten). */
+    private function googleAbschnitt(array $st): string {
+        $g = $st['google'] ?? null;
+        $pending = $this->con()->googlePending();
+        $ort = (string)($g['ort'] ?? '');
+        $letzte = is_array($g['letzte'] ?? null) ? $g['letzte'] : null;
+        $fehler = ($g && $ort === '') || ($letzte && !$letzte['ok']);   // dann rot bzw. offen
+        V::$status['Google-Unternehmensprofil'] = [$g && $ort !== '' && !$fehler, 'eingerichtet', !$g ? 'nicht eingerichtet' : ($ort === '' ? 'Standort wählen' : 'Fehler')];
+        // Offen bleibt der Abschnitt (wie die anderen) bei einer Fehlermeldung darin: Standort fehlt, letzte Übertragung gescheitert, Anmeldung läuft.
+        $o = '<section><h2>Google-Unternehmensprofil</h2>' . ($g && $ort === '' ? '<p class="error">Bitte unten den Standort wählen.</p>' : '')
+            . ($pending ? '<p class="error">Anmeldung läuft: bitte Schritt 2 unten ausführen.</p>' : '')
+            . '<p class="muted">Überträgt die Öffnungszeiten und die Schließ- und Sondertage aus <a href="/verwaltung/zeiten">Praxis → Öffnungszeiten</a> in den Google-Eintrag der Praxis '
+            . '(Google Suche und Maps), automatisch nach jeder Änderung. Vertretungen kennt Google nicht; sie stehen weiter auf der Homepage und in der Telefonansage.</p>';
+        if ($g && $ort !== '') {
+            $o .= '<div class="status-ok">Verbunden mit: ' . V::h((string)$g['titel']) . '</div>'
+                . ($letzte ? '<p class="' . ($letzte['ok'] ? 'muted' : 'error') . '">Zuletzt ' . V::h(V::date((int)$letzte['zeit'])) . ': ' . V::h((string)$letzte['meldung']) . '</p>' : '<p class="muted">Noch nicht übertragen.</p>');
+        }
+        if ($g && ($g['orte'] ?? [])) {
+            $wahl = '';
+            foreach ($g['orte'] as $x) $wahl .= '<label class="check"><input type="radio" name="ort" value="' . V::h((string)$x['name']) . '"' . ($x['name'] === $ort ? ' checked' : '') . ' required> '
+                . V::h((string)$x['titel']) . ' <small class="muted">' . V::h((string)$x['adresse']) . '</small></label>';
+            $o .= '<form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('google-ort') . '<h3>Standort und Umfang</h3>' . $wahl
+                . V::checkbox('regular', '1', 'Öffnungszeiten (Sprechzeiten der Woche) übertragen', (bool)($g['regular'] ?? true))
+                . V::checkbox('special', '1', 'Schließtage, Feiertage und Sonderöffnungen übertragen (nur Einträge mit Haken „Google“)', (bool)($g['special'] ?? true))
+                . '<button>Speichern und übertragen</button></form>'
+                . '<div class="actions"><form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('google-sync') . '<button>Jetzt übertragen</button></form> '
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('google-orte') . '<button>Standorte neu laden</button></form> '
+                . '<form method="post" action="/verwaltung/verbindungen" class="inline">' . $this->hidden('entfernen', ['was' => 'google']) . '<button class="danger">Trennen</button></form></div>';
+        }
+        $o .= ($g ? '<details class="fold"><summary><h3>Erneut verbinden oder anderes Google-Konto</h3></summary>' : '')
+            . '<p><strong>Vorher bei Google beantragen (einmalig):</strong> Google gibt die Schnittstellen für Unternehmensprofile nur auf Antrag frei. Voraussetzung: '
+            . 'das Profil ist seit mindestens 60 Tagen bestätigt, die Praxis hat eine Website. Antrag über das Kontaktformular der „Business Profile APIs“ (Suchbegriff „GBP API contact form“), '
+            . 'Auswahl „Application for Basic API Access“, mit der Projektnummer aus Schritt 1. Google prüft bis zu 14 Tage.</p>'
+            . '<ol class="muted"><li>Auf <strong>console.cloud.google.com</strong> mit dem Google-Konto anmelden, das das Unternehmensprofil verwaltet, und ein <strong>neues Projekt</strong> anlegen (z. B. „Praxisherz“). '
+            . 'Die <strong>Projektnummer</strong> (Dashboard) für den Antrag notieren.</li>'
+            . '<li>Nach der Freigabe im Suchfeld nacheinander „<strong>My Business Account Management API</strong>“ und „<strong>My Business Business Information API</strong>“ suchen und jeweils <strong>Aktivieren</strong>.</li>'
+            . '<li><strong>Google Auth Platform</strong> → Erste Schritte (App-Name, Support-E-Mail, Zielgruppe <strong>Extern</strong>), unter <strong>Datenzugriff</strong> den Bereich '
+            . '<code>https://www.googleapis.com/auth/business.manage</code> hinzufügen, unter <strong>Zielgruppe</strong> die App veröffentlichen (sonst läuft die Anmeldung nach 7 Tagen ab).</li>'
+            . '<li><strong>Clients</strong> → <strong>Client erstellen</strong> → Anwendungstyp <strong>Desktop-App</strong>. Client-ID und Client-Secret unten eintragen. '
+            . 'Hat die Praxis schon einen Client für Gmail, kann sie denselben verwenden (Bereich und Schnittstellen dazu einrichten).</li></ol>'
+            . '<form method="post" action="/verwaltung/verbindungen" class="box wide">' . $this->hidden('google-start') . '<h4>Schritt 1: bei Google anmelden</h4>'
+            . $this->tipInput('client_id', 'Client-ID', 'Endet meist auf .apps.googleusercontent.com.', 'text', (string)($pending['client_id'] ?? ''), 'autocomplete="off" maxlength="200" required')
+            . '<button>Weiter</button></form>'
+            . ($pending ? '<div class="box wide"><h4>Schritt 2: Code übernehmen</h4><p><a href="' . V::h($this->con()->googleUrl($pending)) . '" target="_blank" rel="noopener">Hier bei Google anmelden und den Zugriff erlauben</a> (öffnet in neuem Tab). '
+                . 'Danach zeigt der Browser eine Fehlerseite unter <code>localhost</code> – das ist richtig. Die <strong>ganze Adresse aus der Adresszeile</strong> kopieren und hier einfügen:</p>'
+                . '<form method="post" action="/verwaltung/verbindungen">' . $this->hidden('google')
+                . '<label>Adresse aus der Adresszeile<input type="text" name="adresse" required maxlength="2000" autocomplete="off" placeholder="http://localhost/?state=…&amp;code=…"></label>'
+                . V::input('client_secret', 'Client-Secret', 'password', '', 'autocomplete="new-password" required maxlength="200"')
+                . '<button>Verbinden</button></form><p class="muted">Die Anmeldung ist 30 Minuten gültig.</p></div>' : '')
+            . ($g ? '</details>' : '');
+        return $o . '</section>';
+    }
+
     private function connectionsAction(Request $r, string $admin): Response {
         $c = $this->con();
         $f = fn(string $k, int $n = 300) => $r->field($k, $n);
@@ -2296,6 +2355,11 @@ final class Web {
                 case 'uebersetzung': $c->saveUebersetzung(['api_key' => $f('api_key', 200)]); $what = 'uebersetzung'; break;
                 case 'gmail-start': $c->gmailStart($f('client_id', 200), $f('absender', 254)); $what = 'gmail-start'; break;
                 case 'gmail': $c->saveGmail($f('client_secret', 200), $f('adresse', 2000)); $what = 'gmail'; break;
+                case 'google-start': $c->googleStart($f('client_id', 200)); $what = 'google-start'; break;
+                case 'google': $c->saveGoogle($f('client_secret', 200), $f('adresse', 2000)); $what = 'google'; break;
+                case 'google-ort': $c->googleOrt($f('ort', 60), $f('regular') === '1', $f('special') === '1'); $what = 'google-ort'; break;
+                case 'google-sync': $c->googleSync(); $what = 'google-sync'; break;
+                case 'google-orte': $c->googleSync(true); $what = 'google-orte'; break;
                 case 'testsms': $c->testSms($f('an', 40)); $what = 'testsms'; break;
                 case 'ziel':
                     $c->saveTarget(['id' => $f('id', 40), 'name' => $f('name', 80), 'art' => $f('art', 10), 'host' => $f('host'), 'freigabe' => $f('freigabe', 100), 'port' => $f('port', 10),

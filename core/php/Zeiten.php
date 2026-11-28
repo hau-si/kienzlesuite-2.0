@@ -69,12 +69,12 @@ final class Zeiten {
         return null;
     }
 
-    /** @return array{land:string, an:list<string>, aus:list<string>, telefon:bool, homepage:bool} */
+    /** @return array{land:string, an:list<string>, aus:list<string>, telefon:bool, homepage:bool, google:bool} */
     public function feiertage(): array {
         $d = $this->lesen('feiertage', []);
         return ['land' => is_string($d['land'] ?? null) && isset(Feiertage::LAENDER[$d['land']]) ? $d['land'] : '',
             'an' => array_values(array_filter((array)($d['an'] ?? []), 'is_string')), 'aus' => array_values(array_filter((array)($d['aus'] ?? []), 'is_string')),
-            'telefon' => ($d['telefon'] ?? true) === true, 'homepage' => ($d['homepage'] ?? true) === true];
+            'telefon' => ($d['telefon'] ?? true) === true, 'homepage' => ($d['homepage'] ?? true) === true, 'google' => ($d['google'] ?? true) === true];
     }
 
     /** Feiertage eines Jahres mit Feld „aktiv“ (geschlossen). */
@@ -169,7 +169,7 @@ final class Zeiten {
         $e = ['id' => $id !== '' ? $id : bin2hex(random_bytes(8)), 'art' => $art, 'titel' => self::text($in['titel'] ?? '', 'Bezeichnung', 80), 'von' => $von, 'bis' => $bis,
             'zeiten' => $art === 'sonder' ? implode(', ', self::fenster((string)($in['zeiten'] ?? ''), 'Geöffnet')) : '',
             'hinweis' => self::text($in['hinweis'] ?? '', 'Zusätzlicher Hinweis', 200), 'homepage' => ($in['homepage'] ?? '') === '1', 'telefon' => ($in['telefon'] ?? '') === '1',
-            'vertretung' => []];
+            'google' => ($in['google'] ?? '') === '1', 'vertretung' => []];
         if ($art === 'sonder' && $e['zeiten'] === '') throw new Problem('Sonderöffnung: bitte die Zeiten eintragen.', 422);
         $abschnitte = [];
         $vv = (array)($in['v_von'] ?? []); $vb = (array)($in['v_bis'] ?? []); $vp = (array)($in['v_praxis'] ?? []);
@@ -200,7 +200,7 @@ final class Zeiten {
     }
 
     /** Bundesland und Auswahl speichern. $haken = Kennungen, die im angezeigten Jahr angehakt sind; $gezeigt = alle angezeigten Kennungen. */
-    public function feiertageSpeichern(string $land, array $gezeigt, array $haken, bool $telefon, bool $homepage): void {
+    public function feiertageSpeichern(string $land, array $gezeigt, array $haken, bool $telefon, bool $homepage, bool $google = true): void {
         if ($land !== '' && !isset(Feiertage::LAENDER[$land])) throw new Problem('Bundesland: bitte wählen.', 422);
         $f = $this->feiertage();
         $an = $f['an']; $aus = $f['aus'];
@@ -220,7 +220,7 @@ final class Zeiten {
         } else {
             $an = []; $aus = [];   // anderes Land: Vorgaben des Landes
         }
-        $this->schreiben('feiertage', ['land' => $land, 'an' => array_values(array_unique($an)), 'aus' => array_values(array_unique($aus)), 'telefon' => $telefon, 'homepage' => $homepage]);
+        $this->schreiben('feiertage', ['land' => $land, 'an' => array_values(array_unique($an)), 'aus' => array_values(array_unique($aus)), 'telefon' => $telefon, 'homepage' => $homepage, 'google' => $google]);
     }
 
     // ---- Texte ------------------------------------------------------------------------------------------------------
@@ -334,14 +334,14 @@ final class Zeiten {
             for ($j = $jahr; $j < $jahr + self::JAHRE; $j++) foreach ($this->feiertagsliste($j) as $t) {
                 if (!$t['aktiv'] || $t['datum'] < $heute || isset($geschlossen[$t['datum']])) continue;
                 $liste[] = ['id' => 'f-' . $t['id'] . '-' . $j, 'art' => 'feiertag', 'titel' => $t['name'], 'von' => $t['datum'], 'bis' => $t['datum'], 'zeiten' => '', 'hinweis' => '',
-                    'homepage' => $f['homepage'], 'telefon' => $f['telefon'], 'vertretung' => []];
+                    'homepage' => $f['homepage'], 'telefon' => $f['telefon'], 'google' => $f['google'], 'vertretung' => []];
             }
         }
         usort($liste, fn($a, $b) => [$a['von'], $a['id']] <=> [$b['von'], $b['id']]);
         $out = [];
         foreach ($liste as $e) {
             $out[] = ['id' => $e['id'], 'art' => $e['art'], 'titel' => self::titel($e), 'von' => $e['von'], 'bis' => $e['bis'],
-                'zeiten' => $e['zeiten'] !== '' ? explode(', ', $e['zeiten']) : [], 'homepage' => $e['homepage'], 'telefon' => $e['telefon'],
+                'zeiten' => $e['zeiten'] !== '' ? explode(', ', $e['zeiten']) : [], 'homepage' => $e['homepage'], 'telefon' => $e['telefon'], 'google' => ($e['google'] ?? false) === true,
                 'satz' => self::satz($e), 'hinweis' => $e['hinweis'], 'ansage' => $this->ansage($e, $praxen),
                 'vertretung' => array_map(fn($v) => ['von' => $v['von'], 'bis' => $v['bis'], 'praxen' => array_values(array_map(
                     fn($id) => array_intersect_key($praxen[$id], array_flip(['name', 'strasse', 'ort', 'telefon', 'zusatz'])), array_filter($v['praxen'], fn($id) => isset($praxen[$id]))))], $e['vertretung'])];

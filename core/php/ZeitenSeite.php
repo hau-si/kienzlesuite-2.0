@@ -16,7 +16,7 @@ final class ZeitenSeite {
 
     /** @param array<string,string> $nutzer Modul-ID → Name der Module, die die Zeiten bekommen */
     /** @param ?bool $verteilt true = Module haben den aktuellen Stand, false = Verteilung läuft, null = unbekannt (kein Dienst) */
-    public function __construct(private Zeiten $z, private string $csrf, private array $nutzer = [], private ?bool $verteilt = null) {}
+    public function __construct(private Zeiten $z, private string $csrf, private array $nutzer = [], private ?bool $verteilt = null, private bool $google = false, private ?array $googleStand = null) {}
 
     private function form(string $aktion, string $inhalt, string $klasse = ''): string {
         return '<form method="post" action="' . self::PFAD . '"' . ($klasse !== '' ? ' class="' . $klasse . '"' : '') . '>' . V::csrf($this->csrf)
@@ -38,6 +38,10 @@ final class ZeitenSeite {
                 . ($this->verteilt === true ? '<span class="tag ok">✓ verteilt</span>' : ($this->verteilt === false ? '<span class="tag warn">wird verteilt …</span>' : '')) . '</p>';
         } else {
             $stand = '<p class="muted small">Noch nutzt kein installiertes Modul die Öffnungszeiten (z. B. Homepage oder Telefon).</p>';
+        }
+        if ($this->google) {
+            $l = $this->googleStand;
+            $stand .= '<p class="muted small">Google-Unternehmensprofil: ' . ($l ? ($l['ok'] ? '<span class="tag ok">✓</span> ' : '<span class="tag err">Fehler</span> ') . V::h((string)$l['meldung']) . ' (' . V::h(V::date((int)$l['zeit'])) . ')' : 'noch nicht übertragen') . '</p>';
         }
         return $k . $stand;
     }
@@ -126,6 +130,7 @@ final class ZeitenSeite {
         $hp = isset($this->nutzer['homepage']); $tel = isset($this->nutzer['telefon']);
         $wo = '<h3>Wo erscheint es?</h3>'
             . V::checkbox('homepage', '1', 'Homepage (Mitteilung; Ort, Farbe und Symbol stellt man im Modul Homepage ein)' . ($hp ? '' : ' – Modul nicht installiert'), $e['homepage'])
+            . V::checkbox('google', '1', 'Google-Unternehmensprofil (Schließ- bzw. Sondertage)' . ($this->google ? '' : ' – nicht verbunden (Praxis → Verbindungen)'), (bool)($e['google'] ?? false))
             . V::checkbox('telefon', '1', 'Telefonansage statt Begrüßung' . ($e['art'] === 'sonder' ? '' : ', Anrufer werden nicht durchgestellt') . ($tel ? '' : ' – Modul nicht installiert'), $e['telefon']);
         $titel = $neu ? 'Neue Schließung' : Zeiten::titel($e);
         $o = '<section class="card"><div class="zt-titel"><h2>' . V::h($titel) . '</h2>' . ($neu ? '' : self::artTag($e['art'])) . '</div>'
@@ -154,7 +159,7 @@ final class ZeitenSeite {
         if (!$gewaehlt && !$neu) foreach ($this->z->ereignisse() as $e) if ($e['bis'] >= $heute) { $gewaehlt = $e; break; }
         if (!$gewaehlt) $neu = true;
         $leer = ['id' => '', 'art' => 'urlaub', 'titel' => '', 'von' => $tag !== '' ? $tag : $heute, 'bis' => $tag !== '' ? $tag : '', 'zeiten' => '', 'hinweis' => '',
-            'homepage' => true, 'telefon' => true, 'vertretung' => []];
+            'homepage' => true, 'telefon' => true, 'google' => $this->google, 'vertretung' => []];
         $e = $eingabe ?? ($neu ? $leer : $gewaehlt);
         $monat = preg_match('/^\d{4}-\d{2}$/D', (string)($q['monat'] ?? '')) ? (string)$q['monat'] : substr($tag !== '' ? $tag : ($gewaehlt['von'] ?? $heute), 0, 7);
         return $this->kopf('') . V::error($fehler) . '<div class="zt-grid"><div>' . $this->kalender($monat, $neu ? null : $gewaehlt) . $this->naechste() . '</div><div>'
@@ -200,7 +205,8 @@ final class ZeitenSeite {
             $liste .= '</ul>';
         }
         $optionen = V::checkbox('f_telefon', '1', 'An Feiertagen Ansage am Telefon (statt Begrüßung, mit Bereitschaftsdienst 116 117)', $f['telefon'])
-            . V::checkbox('f_homepage', '1', 'Feiertage auf der Homepage ankündigen', $f['homepage']);
+            . V::checkbox('f_homepage', '1', 'Feiertage auf der Homepage ankündigen', $f['homepage'])
+            . V::checkbox('f_google', '1', 'Feiertage im Google-Unternehmensprofil als geschlossen eintragen', $f['google']);
         return $this->kopf('feiertage') . V::error($fehler) . '<section class="card"><h2>Feiertage</h2><p class="muted">Haken = Praxis an diesem Tag geschlossen. Die Wahl gilt für jedes Jahr '
             . '(z. B. Rosenmontag immer zu). Gesetzliche Feiertage sind vorgewählt; regionale Feiertage, Brückentage, Heiligabend und Silvester bitte selbst anhaken. '
             . 'Liegt ein Feiertag in einem Urlaub, gilt die Ansage des Urlaubs.</p>' . $jahre

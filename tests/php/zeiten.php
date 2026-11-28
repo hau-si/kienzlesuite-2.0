@@ -129,4 +129,41 @@ function test_seite_und_recht(): void {
     Zeiten::$heute = null;
 }
 
+function test_google(): void {
+    [$env, $c] = con_env(['google' => ['ort' => 'locations/222', 'titel' => 'Praxis <b>Beispiel', 'orte' => [['name' => 'locations/222', 'titel' => 'Praxis <b>Beispiel', 'adresse' => 'Musterstraße 1']],
+        'regular' => true, 'special' => true, 'letzte' => ['ok' => false, 'meldung' => 'Google lehnt ab (HTTP 403).', 'zeit' => time()]]]);
+    Zeiten::$heute = '2026-11-28';
+    problem(fn() => $c->googleStart('x'), 422, 'Client-ID kurz');
+    $c->googleStart('1234567890.apps.googleusercontent.com');
+    $p = $c->googlePending();
+    check(str_contains($c->googleUrl($p), 'scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fbusiness.manage') && str_contains($c->googleUrl($p), 'redirect_uri=http%3A%2F%2Flocalhost'), 'Anmeldeadresse');
+    problem(fn() => $c->saveGoogle('geheim', 'http://localhost/?state=falsch&code=4%2Fabc'), 422, 'fremder Zustand');
+    $c->saveGoogle('geheim', 'http://localhost/?state=' . $p['state'] . '&code=4%2Fabc');
+    $q = req_v($env);
+    check($q === ['action' => 'google', 'daten' => ['client_id' => '1234567890.apps.googleusercontent.com', 'client_secret' => 'geheim', 'code' => '4/abc']] && $c->googlePending() === null, 'Anfrage Anmeldung');
+    problem(fn() => $c->googleOrt('../x', true, true), 422, 'Standort geprüft');
+    $c->googleOrt('locations/222', true, false);
+    check(req_v($env)['daten'] === ['ort' => 'locations/222', 'regular' => true, 'special' => false], 'Standort');
+    $c->googleSync(true);
+    check(req_v($env) === ['action' => 'google-sync', 'orte' => true], 'Standorte laden');
+    [$b] = admin_browser($env);
+    $b->web = fn() => $b->defaultWeb(null, null, $c);
+    $v = $b->get('/verwaltung/verbindungen?v=google')->body;
+    check(str_contains($v, 'Google-Unternehmensprofil') && str_contains($v, 'Praxis &lt;b&gt;Beispiel') && str_contains($v, '>Fehler</span>') && str_contains($v, '<section class="card"><h2><svg class="h-ico"') && str_contains($v, 'Application for Basic API Access'), 'Abschnitt Verbindungen');
+    $r = $b->post('/verwaltung/verbindungen', ['aktion' => 'google-sync']);
+    check($r->status === 303 && req_v($env)['action'] === 'google-sync', 'Jetzt übertragen');
+    $b->post('/verwaltung/verbindungen', ['aktion' => 'entfernen', 'was' => 'google']);
+    check(req_v($env) === ['action' => 'google', 'loeschen' => true], 'Trennen');
+    $z = $b->get('/verwaltung/zeiten?neu=1')->body;
+    @unlink($env->dir . '/anfragen/verbindungen.json');
+    check(str_contains($z, 'name="google" value="1" checked') && str_contains($z, 'Google-Unternehmensprofil: <span class="tag err">'), 'Haken Google und Stand');
+    $zt = new Zeiten($env->db);
+    $id = $zt->ereignisSpeichern(['art' => 'urlaub', 'von' => '2026-12-23', 'google' => '1']);
+    $zt->feiertageSpeichern('BW', [], [], true, true, false);
+    $paket = $zt->paket();
+    $e = array_values(array_filter($paket['ereignisse'], fn($x) => $x['id'] === $id))[0];
+    check($e['google'] === true && $zt->feiertage()['google'] === false && array_values(array_filter($paket['ereignisse'], fn($x) => $x['art'] === 'feiertag'))[0]['google'] === false, 'Google im Paket');
+    Zeiten::$heute = null;
+}
+
 run_tests();

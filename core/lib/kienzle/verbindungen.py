@@ -76,7 +76,7 @@ def load() -> dict:
     except FileNotFoundError:
         data = {}
     return {'t2med': data.get('t2med'), 'mail': data.get('mail'), 'sms': data.get('sms'), 'letterxpress': data.get('letterxpress'), 'uebersetzung': data.get('uebersetzung'),
-            'ablage': data.get('ablage', []), 'zeiten': data.get('zeiten')}
+            'ablage': data.get('ablage', []), 'zeiten': data.get('zeiten'), 'google': data.get('google')}
 
 
 def save(config: dict) -> None:
@@ -615,6 +615,181 @@ def set_gmail(config: dict, d: dict) -> None:
     config['mail'] = {'art': 'gmail', 'client_id': cid, 'client_secret': secret, 'refresh_token': refresh, 'absender': sender}
 
 
+# ---- Google-Unternehmensprofil (Öffnungszeiten und Schließtage aus Praxis → Öffnungszeiten) ------------------------
+# Eigener Google-Client der Praxis (Desktop-App), Bereich business.manage. Die Business-Profile-Schnittstellen muss die Praxis bei Google
+# beantragen (Profil seit über 60 Tagen bestätigt, Antrag „Application for Basic API Access“). Übertragen werden nur Öffnungszeiten
+# (regularHours) und Sonderzeiten (specialHours: geschlossene Tage, Sonderöffnungen); Vertretungen kennt das Profil nicht.
+GBP_SCOPE = 'https://www.googleapis.com/auth/business.manage'
+GBP_KONTEN = 'https://mybusinessaccountmanagement.googleapis.com/v1/accounts'
+GBP_INFO = 'https://mybusinessbusinessinformation.googleapis.com/v1/'
+GBP_ORT = re.compile(r'^locations/[0-9]{1,30}$')
+GBP_KONTO = re.compile(r'^accounts/[0-9]{1,30}$')
+GBP_TAGE = {'mo': 'MONDAY', 'di': 'TUESDAY', 'mi': 'WEDNESDAY', 'do': 'THURSDAY', 'fr': 'FRIDAY', 'sa': 'SATURDAY', 'so': 'SUNDAY'}
+GBP_VORAUS = 400            # Sondertage so viele Tage im Voraus
+
+
+def _google_json(method: str, url: str, token: str, body: dict | None = None) -> dict:
+    """GET/PATCH an die Business-Profile-Schnittstellen; Fehler mit kurzer Begründung, ohne Token."""
+    import urllib.error
+    import urllib.request
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(url, data=data, method=method, headers={'Authorization': 'Bearer ' + token, 'Accept': 'application/json',
+                                                                       **({'Content-Type': 'application/json'} if data else {})})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:  # noqa: S310 (feste https-Adressen)
+            out = json.loads(r.read(2_000_000).decode('utf-8', 'replace') or '{}')
+    except urllib.error.HTTPError as e:
+        try:
+            err = json.loads(e.read(20000).decode('utf-8', 'replace')).get('error', {})
+        except (ValueError, AttributeError):
+            err = {}
+        why = err.get('message', '') if isinstance(err, dict) else ''
+        if e.code == 403 and ('disabled' in why or 'has not been used' in why or 'quota' in why.lower()):
+            why = 'Schnittstelle nicht freigeschaltet – Zugang bei Google beantragen und die Business-Profile-Schnittstellen im Projekt aktivieren'
+        raise Fehler(f'Google lehnt ab (HTTP {e.code})' + (f': {CONTROL.sub(" ", str(why))[:200]}' if why else '') + '.') from None
+    except (OSError, ValueError) as e:
+        raise Fehler(f'Google nicht erreichbar: {str(e)[:100]}') from None
+    return out if isinstance(out, dict) else {}
+
+
+def set_google(config: dict, d: dict) -> None:
+    """Anmeldung abschließen: Code gegen ein Dauer-Token tauschen, danach die Standorte des Kontos laden (Auswahl auf der Seite)."""
+    cid = _text(d.get('client_id'), 'Client-ID', 200)
+    if not CLIENT_ID.match(cid):
+        raise Fehler('Client-ID ungültig (sie endet meist auf .apps.googleusercontent.com).')
+    secret, code = d.get('client_secret', ''), d.get('code', '')
+    for wert, name in ((secret, 'Client-Secret'), (code, 'Code')):
+        if not isinstance(wert, str) or not wert or len(wert) > 500 or CONTROL.search(wert) or ' ' in wert:
+            raise Fehler(f'{name} ungültig.')
+    data = urllib.parse.urlencode({'code': code, 'client_id': cid, 'client_secret': secret, 'redirect_uri': GOOGLE_REDIRECT, 'grant_type': 'authorization_code'}).encode()
+    out = _google_post(GOOGLE_TOKEN, data, {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'})
+    refresh = out.get('refresh_token', '')
+    if not refresh:
+        raise Fehler('Google hat kein Dauer-Token geliefert. Bitte die Anmeldung wiederholen und den Zugriff bestätigen.')
+    alt = config.get('google') or {}
+    config['google'] = {'client_id': cid, 'client_secret': secret, 'refresh_token': refresh, 'ort': '', 'titel': '', 'orte': [],
+                        'regular': alt.get('regular', True), 'special': alt.get('special', True), 'letzte': None}
+    google_orte(config)
+
+
+def _google_access(g: dict) -> str:
+    return _gmail_access(g)
+
+
+def google_orte(config: dict) -> None:
+    """Standorte aller Konten lesen (Name, Anschrift) und merken; ohne Freigabe der Schnittstellen meldet Google 403."""
+    g = config.get('google')
+    if not g:
+        raise Fehler('Google-Unternehmensprofil ist nicht verbunden.')
+    token = _google_access(g)
+    orte = []
+    for konto in _google_json('GET', GBP_KONTEN, token).get('accounts', [])[:20]:
+        kname = str(konto.get('name', ''))
+        if not GBP_KONTO.match(kname):
+            continue
+        url = GBP_INFO + kname + '/locations?' + urllib.parse.urlencode({'readMask': 'name,title,storefrontAddress', 'pageSize': 100})
+        for o in _google_json('GET', url, token).get('locations', [])[:100]:
+            if not GBP_ORT.match(str(o.get('name', ''))):
+                continue
+            adr = o.get('storefrontAddress') or {}
+            zeilen = [*(adr.get('addressLines') or [])[:2], ' '.join(x for x in (adr.get('postalCode', ''), adr.get('locality', '')) if x)]
+            orte.append({'name': o['name'], 'titel': CONTROL.sub(' ', str(o.get('title', '')))[:120], 'adresse': CONTROL.sub(' ', ', '.join(z for z in zeilen if z))[:200]})
+    if not orte:
+        raise Fehler('Im Google-Konto wurde kein Unternehmensprofil gefunden. Bitte mit dem Konto anmelden, das das Profil verwaltet.')
+    g['orte'] = orte
+    if len(orte) == 1 and not g.get('ort'):
+        g['ort'], g['titel'] = orte[0]['name'], orte[0]['titel']
+
+
+def set_google_ort(config: dict, d: dict) -> None:
+    g = config.get('google')
+    if not g:
+        raise Fehler('Google-Unternehmensprofil ist nicht verbunden.')
+    ort = next((o for o in g.get('orte', []) if o['name'] == d.get('ort')), None)
+    if not ort:
+        raise Fehler('Bitte einen Standort aus der Liste wählen.')
+    g['ort'], g['titel'] = ort['name'], ort['titel']
+    g['regular'], g['special'] = d.get('regular') is True, d.get('special') is True
+
+
+def _zeit(hm: str) -> dict:
+    h, m = (int(x) for x in hm.split(':'))
+    return {'hours': h} if not m else {'hours': h, 'minutes': m}
+
+
+def _datum(d) -> dict:
+    return {'year': d.year, 'month': d.month, 'day': d.day}
+
+
+def google_inhalt(zeiten: dict, heute=None) -> dict:
+    """regularHours aus den Sprechzeiten, specialHours aus Schließungen/Feiertagen (geschlossen) und Sonderöffnungen (Zeiten) mit Haken „Google“."""
+    from datetime import date, timedelta
+    heute = heute or date.today()
+    perioden = []
+    for kurz, tag in GBP_TAGE.items():
+        for f in (zeiten.get('woche', {}).get('sprech', {}) or {}).get(kurz, []) or []:
+            if isinstance(f, str) and re.fullmatch(r'\d{2}:\d{2}-\d{2}:\d{2}', f):
+                a, b = f.split('-')
+                perioden.append({'openDay': tag, 'openTime': _zeit(a), 'closeDay': tag, 'closeTime': _zeit(b)})
+    sonder, belegt = [], {}
+    for e in zeiten.get('ereignisse', []):
+        if not isinstance(e, dict) or e.get('google') is not True:
+            continue
+        try:
+            von, bis = date.fromisoformat(str(e.get('von'))), date.fromisoformat(str(e.get('bis')))
+        except ValueError:
+            continue
+        tag = max(von, heute)
+        while tag <= min(bis, heute + timedelta(days=GBP_VORAUS)):
+            offen = e.get('art') == 'sonder'
+            if not offen or tag not in belegt:          # Schließung geht vor Sonderöffnung am selben Tag
+                belegt[tag] = 'sonder' if offen else 'zu'
+                sonder = [s for s in sonder if s['_tag'] != tag]
+                if offen:
+                    for f in [x for x in e.get('zeiten', []) if isinstance(x, str) and re.fullmatch(r'\d{2}:\d{2}-\d{2}:\d{2}', x)][:4]:
+                        a, b = f.split('-')
+                        sonder.append({'_tag': tag, 'startDate': _datum(tag), 'openTime': _zeit(a), 'endDate': _datum(tag), 'closeTime': _zeit(b)})
+                else:
+                    sonder.append({'_tag': tag, 'startDate': _datum(tag), 'endDate': _datum(tag), 'closed': True})
+            tag += timedelta(days=1)
+    sonder.sort(key=lambda s: s['_tag'])
+    return {'regularHours': {'periods': perioden}, 'specialHours': {'specialHourPeriods': [{k: v for k, v in s.items() if k != '_tag'} for s in sonder]}}
+
+
+def google_sync(config: dict) -> str:
+    """Öffnungszeiten an den gewählten Standort schicken; Ergebnis (ohne Inhalte) in config['google']['letzte']."""
+    g = config.get('google')
+    if not g or not g.get('ort'):
+        raise Fehler('Google-Unternehmensprofil: noch kein Standort gewählt.')
+    z = config.get('zeiten')
+    if not z:
+        raise Fehler('Noch keine Öffnungszeiten gespeichert (Praxis → Öffnungszeiten).')
+    inhalt = google_inhalt(z)
+    maske = []
+    if g.get('regular') and inhalt['regularHours']['periods']:   # leere Woche nie schicken (würde alle Zeiten bei Google löschen)
+        maske.append('regularHours')
+    if g.get('special'):
+        maske.append('specialHours')
+    if not maske:
+        return 'Nichts zu übertragen.'
+    try:
+        _google_json('PATCH', GBP_INFO + g['ort'] + '?' + urllib.parse.urlencode({'updateMask': ','.join(maske)}), _google_access(g), {k: inhalt[k] for k in maske})
+    except Fehler as e:
+        g['letzte'] = {'ok': False, 'meldung': str(e)[:300], 'zeit': int(time.time()), 'stand': z.get('stand', '')}
+        raise
+    n = len(inhalt['specialHours']['specialHourPeriods'])
+    g['letzte'] = {'ok': True, 'meldung': ('Öffnungszeiten' if 'regularHours' in maske else '') + (' und ' if len(maske) == 2 else '')
+                   + (f'{n} Sondertage' if 'specialHours' in maske else '') + ' übertragen.', 'zeit': int(time.time()), 'stand': z.get('stand', '')}
+    return 'Google: ' + g['letzte']['meldung']
+
+
+def _google_status(g: dict | None) -> dict | None:
+    if not g:
+        return None
+    return {'ort': g.get('ort', ''), 'titel': g.get('titel', ''), 'orte': g.get('orte', []), 'regular': g.get('regular', True), 'special': g.get('special', True),
+            'letzte': g.get('letzte')}
+
+
 def _gmail_access(c: dict) -> str:
     data = urllib.parse.urlencode({'client_id': c['client_id'], 'client_secret': c['client_secret'], 'refresh_token': c['refresh_token'], 'grant_type': 'refresh_token'}).encode()
     out = _google_post(GOOGLE_TOKEN, data, {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'})
@@ -709,6 +884,7 @@ def view(config: dict, extra: dict | None = None) -> dict:
            'ablage': [{**{k: v for k, v in t.items() if k != 'passwort'}, 'passwort_gesetzt': bool(t.get('passwort')),
                        'fingerprint': ablage.fingerprint(t['hostkey']) if t.get('hostkey') else ''} for t in config['ablage']],
            'zeiten': {'stand': config['zeiten'].get('stand', '')} if config.get('zeiten') else None,
+           'google': _google_status(config.get('google')),
            'nutzung': usage, 'sftp_schluessel': ABLAGE_PUB.read_text(encoding='utf-8').strip() if ABLAGE_PUB.is_file() else ''}
     out.update(extra or {})
     _write(STATE / 'status.json', out, 0o644)
@@ -806,8 +982,45 @@ def dispatch(config: dict, req: dict) -> str:
     if action == 'zeiten':
         set_zeiten(config, d)
         save(config)
+        meldung = 'Öffnungszeiten an die Module verteilt.'
+        if (config.get('google') or {}).get('ort'):
+            try:
+                meldung += ' ' + google_sync(config)
+            except Fehler as e:
+                meldung += f' Google: {e}'
+            save(config)
         view(config, {'hinweise': distribute(config)})
-        return 'Öffnungszeiten an die Module verteilt.'
+        return meldung
+    if action == 'google':
+        if req.get('loeschen') is True:
+            config['google'] = None
+            save(config)
+            view(config)
+            return 'Google-Unternehmensprofil getrennt.'
+        set_google(config, d)
+        save(config)
+        view(config)
+        return 'Mit Google verbunden.' + (' Bitte den Standort wählen.' if not config['google']['ort'] else '')
+    if action == 'google-ort':
+        set_google_ort(config, d)
+        save(config)
+        try:
+            meldung = google_sync(config) if config.get('zeiten') else 'Standort gespeichert.'
+        finally:
+            save(config)
+            view(config)
+        return meldung
+    if action == 'google-sync':
+        if req.get('orte') is True:
+            google_orte(config)
+            save(config)
+            view(config)
+            return 'Standorte neu geladen.'
+        try:
+            return google_sync(config)
+        finally:
+            save(config)
+            view(config)
     if action == 'sms-senden':
         send_sms(config.get('sms'), req.get('an'), req.get('text'))
         return 'SMS verschickt.'

@@ -1,6 +1,6 @@
 # Basis – Release-Notizen
 
-## 0.22.0-beta.61
+## 0.22.0-beta.62
 
 Neues Design, zweiter Teil (Entwürfe vom 28.11.2026):
 - **Praxis → Benutzer und Gruppen (C):** Benutzer als Liste (ganze Zeile öffnet den Benutzer, Gruppen als Marken, gesperrt/Einrichtung offen als Marke), darunter die Gruppen als Kacheln (Mitglieder, Module). Oben rechts „Benutzer anlegen“ und „Gruppe hinzufügen“. Eine Kachel öffnet nur diese Gruppe (`/verwaltung/gruppen?name=`), „Gruppe hinzufügen“ nur das Formular (`?neu=1`); nach dem Speichern zurück zur Liste.
@@ -8,6 +8,14 @@ Neues Design, zweiter Teil (Entwürfe vom 28.11.2026):
 - **Praxis → Arbeitsplätze (B, für Admins):** zuerst die Liste der eingerichteten PCs (Stand, Adresse, Version, „⋯“ mit Umbenennen und Entfernen), darunter eingeklappt Paket, Namen bekannt machen und „Von Hand einrichten“; „Arbeitsplatz einrichten“ oben rechts klappt das Paket auf. Ohne Anmeldung bleibt die Hilfeseite wie bisher.
 - **Praxis → Praxis (A):** Reiter Name und Anschrift | Konto | Steuer (`?bereich=`).
 - Mit Tests und im Browser der Vorschau (erfundene Daten) geprüft, **nicht auf der VM**.
+
+## 0.22.0-beta.61
+
+- **Google-Unternehmensprofil angebunden** (Praxis → Verbindungen → „Google-Unternehmensprofil“): Anmeldung wie bei Gmail mit dem eigenen Google-Zugang der Praxis (Desktop-App, Berechtigung `business.manage`, Code aus der Adresszeile), danach Standort wählen. Übertragen werden die **Öffnungszeiten** (Sprechzeiten der Woche) und die **Schließ-, Feier- und Sondertage** der nächsten gut 13 Monate als Sonderzeiten, automatisch nach jeder Änderung unter Praxis → Öffnungszeiten (und beim ersten Öffnen der Seite an einem neuen Tag); dazu „Jetzt übertragen“ und „Standorte neu laden“. Eine leere Woche wird nie geschickt, damit bei Google nichts gelöscht wird. Vertretungen kennt Google nicht.
+- Öffnungszeiten: neuer Haken **„Google-Unternehmensprofil“** je Schließung/Sonderöffnung (bei verbundenem Google vorgewählt) und bei den Feiertagen; im Kopf der Seite steht das Ergebnis der letzten Übertragung.
+- **Voraussetzung bei Google:** Die Schnittstellen für Unternehmensprofile gibt Google nur auf Antrag frei (Profil seit mindestens 60 Tagen bestätigt, Website der Praxis; Kontaktformular „Application for Basic API Access“; Prüfung bis zu 14 Tage). Die Anleitung steht im Abschnitt.
+- Übertragung macht der root-Dienst `kienzle-verbindungen` (das Webinterface hat kein Netz); Zugangsdaten nur in `/etc/kienzle/verbindungen/konfiguration.json`, nie in der Anzeige.
+- Geprüft mit Tests (Google-Schnittstelle nachgestellt); **nicht mit echtem Google-Konto, nicht auf der VM geprüft.**
 
 ## 0.22.0-beta.60
 

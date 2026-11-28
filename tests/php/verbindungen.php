@@ -11,7 +11,7 @@ use Kienzle\Core\Connections;
 /** Seit Basis beta.61 zeigt /verwaltung/verbindungen Kacheln; jede Verbindung steht unter ?v=… . Für die Prüfungen alles zusammen. */
 function verb_alle(Browser $b): string {
     $o = $b->get('/verwaltung/verbindungen')->body;
-    foreach (['mail', 'sms', 'letterxpress', 'uebersetzung', 'ablage', 'nutzung'] as $v) $o .= $b->get('/verwaltung/verbindungen?v=' . $v)->body;
+    foreach (['mail', 'sms', 'letterxpress', 'uebersetzung', 'ablage', 'google', 'nutzung'] as $v) $o .= $b->get('/verwaltung/verbindungen?v=' . $v)->body;
     return $o;
 }
 
