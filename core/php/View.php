@@ -64,6 +64,8 @@ final class View {
         'st:start' => '<path d="M7 4l13 8-13 8z"/>',
         'st:mehr' => '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
         'st:papierkorb' => '<path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"/>',
+        'st:liste' => '<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',
+        'st:hoch' => '<path d="M12 19V5M5 12l7-7 7 7"/>',
         'st:herunter' => '<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
         'st:server' => '<rect x="3" y="4" width="18" height="6" rx="1"/><rect x="3" y="14" width="18" height="6" rx="1"/><path d="M7 7h.01M7 17h.01"/>',
     ];
@@ -135,6 +137,18 @@ final class View {
     public static function symbol(string $name): string {
         $paths = ['coins' => '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/>'];
         return '<svg class="h-ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . ($paths[$name] ?? '') . '</svg>';
+    }
+
+    /** Knopf der Knopfleiste im Seitenkopf: Symbol und Text, die aktuelle Seite hervorgehoben, Zähler rot. */
+    public static function reiter(string $href, string $label, string $icon, bool $aktuell, int $zaehler = 0): string {
+        return '<a class="button ' . ($aktuell ? 'primary' : 'secondary') . ' mit-icon" href="' . self::h($href) . '"' . ($aktuell ? ' aria-current="page"' : '') . '>' . self::icon($icon) . self::h($label)
+            . ($zaehler > 0 ? '<span class="zaehler">' . $zaehler . '</span>' : '') . '</a>';
+    }
+
+    /** Runder Drehpfeil im Seitenkopf (POST mit Aktion); $csrf ist das fertige Feld aus csrf(). */
+    public static function drehpfeil(string $action, string $aktion, string $titel, string $csrf, bool $aus = false): string {
+        return '<form method="post" action="' . self::h($action) . '" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="' . self::h($aktion) . '">'
+            . '<button class="secondary dreh" title="' . self::h($titel) . '" aria-label="' . self::h($titel) . '"' . ($aus ? ' disabled' : '') . '>' . self::icon('st:aktualisieren') . '</button></form>';
     }
 
     public static function icon(string $href, string $fallback = 'app'): string {
@@ -209,8 +223,12 @@ final class View {
         // Anmeldename steht bei „Mein Konto“, Abmelden auf der Seite „Mein Konto“.
         $foot = '<div class="side-foot">' . $restart . '</div>';
         $eyebrow ??= $group;
-        $inner = !empty($extra['roh']) ? $body : ($eyebrow ? '<p class="eyebrow">' . self::h($eyebrow) . '</p>' : '') . '<h1>' . self::h($title) . '</h1>' . self::cards($body);
-        return $head . '<div class="layout"><aside class="side">' . $brand . $menu . $foot . '</aside><main' . (!empty($extra['roh']) ? ' class="modul"' : '') . '>' . $inner . '</main></div></body></html>';
+        // 'werkzeuge': Knopfleiste rechts im Seitenkopf (docs/MODUL-GESTALTUNG.md); solche Seiten sind breit wie die Module.
+        $werkzeuge = (string)($extra['werkzeuge'] ?? '');
+        $titel = ($eyebrow ? '<p class="eyebrow">' . self::h($eyebrow) . '</p>' : '') . '<h1>' . self::h($title) . '</h1>';
+        $inner = !empty($extra['roh']) ? $body : ($werkzeuge !== '' ? '<header class="seitenkopf"><div>' . $titel . '</div><nav class="start-tools" aria-label="' . self::h($title) . '">' . $werkzeuge . '</nav></header>' : $titel) . self::cards($body);
+        $klasse = !empty($extra['roh']) ? ' class="modul"' : ($werkzeuge !== '' ? ' class="breit"' : '');
+        return $head . '<div class="layout"><aside class="side">' . $brand . $menu . $foot . '</aside><main' . $klasse . '>' . $inner . '</main></div></body></html>';
     }
 
     /** Inhalt in Karten aufteilen: Jede Überschrift h2 beginnt eine neue Karte; Meldungen am Anfang bleiben darüber. */

@@ -40,7 +40,14 @@ Gemeinsame Regeln für die Oberfläche aller Module Praxisherz. Sie gelten zusä
 - Eine Funktion `kopfzeile(string $route)` je Modul baut den Kopf aus **einer** Tabelle der Seiten (Pfad → Titel), damit Titel, Knöpfe
   und Rechte nicht auseinanderlaufen (Beispiele: `Ansicht::SEITEN` in Fax und Telefon, `Kopf::knoepfe` in der Kasse).
 
-CSS (bis es in `core.css` liegt, steht es in der Stildatei jedes Moduls):
+- **Protokolle** stehen nicht unten auf der Seite, sondern in einem eigenen Reiter „Protokoll“ rechts oben (`?ansicht=protokoll`).
+- **Aktualisieren/Nach Updates sehen** ist ein runder Drehpfeil ganz rechts in der Knopfleiste (`button.dreh`, Titel und `aria-label`
+  sagen, was er tut), kein Textknopf am Seitenende.
+- **Basis-Seiten** bekommen denselben Kopf über `V::page($titel, $inhalt, $nav, $praxis, $gruppe, ['werkzeuge' => …])` mit
+  `V::reiter($href, $text, $symbol, $aktuell, $zaehler)` und `V::drehpfeil($action, $aktion, $titel, $csrf)`; die Seite wird dann
+  1400 px breit (`main.breit`). Vorbild: Betrieb → Module und Updates (Basis 0.22.0-beta.57).
+
+CSS (Basis: in `core.css`; Module tragen es bis auf Weiteres in ihrer eigenen Stildatei):
 
 ```css
 .seitenkopf { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }

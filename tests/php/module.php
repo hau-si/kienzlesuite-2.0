@@ -76,8 +76,14 @@ function test_seite_menue_und_rechte(): void {
     $b = module_browser($env, $m);
     $page = $b->get('/verwaltung/module');
     check($page->status === 200 && str_contains($page->body, 'Neue Version <strong>2.1.0</strong> (GitHub, nicht signiert)') && str_contains($page->body, 'Telefon &lt;b&gt;'), 'Seite unvollständig oder nicht maskiert');
-    check(str_contains($page->body, 'class="mod-grid"') && str_contains($page->body, 'mod-tile available') && str_contains($page->body, '<span class="tag">verfügbar</span>') && str_contains($page->body, 'class="mod-remove"')
-        && str_contains($page->body, '<button class="danger">') && str_contains($page->body, 'Auf 2.1.0 aktualisieren') && str_contains($page->body, ' Installieren</button>'), 'Modulkacheln: installiert, verfügbar, Update, rotes Entfernen');
+    check(str_contains($page->body, 'class="card mod-liste"') && str_contains($page->body, 'mod-zeile available') && str_contains($page->body, '<span class="tag">verfügbar</span>') && str_contains($page->body, 'class="mod-remove"')
+        && str_contains($page->body, '<button class="danger">') && str_contains($page->body, 'Auf 2.1.0 aktualisieren') && str_contains($page->body, ' Installieren</button>'), 'Modulliste: installiert, verfügbar, Update, rotes Entfernen');
+    // Entwurf B: Seitenkopf mit Reitern und Drehpfeil, Hinweis auf Updates, Protokoll als eigener Reiter, Schalter für automatische Updates.
+    check(str_contains($page->body, '<header class="seitenkopf">') && str_contains($page->body, '<main class="breit">') && str_contains($page->body, 'href="/verwaltung/module" aria-current="page"')
+        && str_contains($page->body, 'Module<span class="zaehler">1</span>') && str_contains($page->body, 'href="/verwaltung/module?ansicht=protokoll"') && str_contains($page->body, 'class="secondary dreh"'), 'Seitenkopf der Modulseite');
+    check(str_contains($page->body, '1 Update verfügbar') && str_contains($page->body, 'button class="schalter') && !str_contains($page->body, 'Nach Modulen sehen') && !str_contains($page->body, 'Protokoll</h2>'), 'Banner, Schalter, keine Knöpfe unten');
+    $prot = $b->get('/verwaltung/module?ansicht=protokoll')->body;
+    check(str_contains($prot, 'Protokoll</h2>') && str_contains($prot, 'href="/verwaltung/module?ansicht=protokoll" aria-current="page"') && !str_contains($prot, 'mod-liste'), 'Reiter Protokoll');
     check(str_contains($b->get('/')->body, 'title="Neue Modulversion verfügbar">1</span>'), 'Hinweis im Menü fehlt');
     $r = $b->post('/verwaltung/module', ['aktion' => 'installieren', 'id' => 'telefon']);
     check($r->status === 303 && mreq($env)['id'] === 'telefon', 'Installieren über die Seite');

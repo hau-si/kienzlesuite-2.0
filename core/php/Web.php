@@ -61,7 +61,7 @@ final class Web {
         $f = json_decode($raw, true);
         if (!is_array($f) || time() - (int)($f['at'] ?? 0) > 120 || !is_string($f['t'] ?? null) || $f['t'] === '') return $response;
         $meldung = V::notice($f['t']);
-        $response->body = (string)preg_replace_callback('/<main\b[^>]*>/', static fn(array $m): string => $m[0] . $meldung, $response->body, 1);
+        $response->body = (string)preg_replace_callback('#<main\b[^>]*>(?:<header class="seitenkopf">.*?</header>)?#s', static fn(array $m): string => $m[0] . $meldung, $response->body, 1);
         return $response;
     }
 
@@ -1300,8 +1300,8 @@ final class Web {
         if ($r->path === '/verwaltung/firewall') return $get ? $this->firewallPage() : $this->firewallApply($r, $admin);
         if ($r->path === '/verwaltung/firewall/bestaetigen' && !$get) return $this->firewallConfirm($admin);
         if ($r->path === '/verwaltung/firewall/aus' && !$get) return $this->firewallOff($admin);
-        if ($r->path === '/verwaltung/updates') return $get ? $this->updatesPage() : $this->updatesAction($r, $admin);
-        if ($r->path === '/verwaltung/module') return $get ? $this->modulesPage() : $this->modulesAction($r, $admin);
+        if ($r->path === '/verwaltung/updates') return $get ? $this->updatesPage(null, null, $r) : $this->updatesAction($r, $admin);
+        if ($r->path === '/verwaltung/module') return $get ? $this->modulesPage(null, $r) : $this->modulesAction($r, $admin);
         if ($r->path === '/verwaltung/verbindungen') return $get ? $this->connectionsPage() : $this->connectionsAction($r, $admin);
         if ($r->path === '/verwaltung/neustart') return $get ? $this->restartPage() : $this->restartDo($r, $admin);
         if ($r->path === '/verwaltung/praxis') return $get ? $this->practicePage() : $this->practiceSave($r, $admin);
@@ -1724,11 +1724,17 @@ final class Web {
         return $this->store;
     }
 
-    private function modulesPage(?string $error = null): Response {
+    /** Betrieb → Module (Entwurf B, 28.11.2026): Liste der Module, oben Reiter „Module“/„Protokoll“ und Drehpfeil. */
+    private function modulesPage(?string $error = null, ?Request $req = null): Response {
         $st = $this->store()->status();
         $csrf = V::csrf($this->session['csrf']);
         $busy = $st['pending'] || $st['running'] !== null;
         $off = $busy ? ' disabled' : '';
+        $protokoll = ($req?->query['ansicht'] ?? '') === 'protokoll';
+        $updates = array_values(array_filter($st['installed'], fn($m) => !empty($m['update'])));
+        $werkzeuge = V::reiter('/verwaltung/module', 'Module', '/verwaltung/module', !$protokoll, count($updates))
+            . V::reiter('/verwaltung/module?ansicht=protokoll', 'Protokoll', 'st:liste', $protokoll)
+            . V::drehpfeil('/verwaltung/module', 'pruefen', 'Nach Updates sehen und Zustand der Dienste aktualisieren', $csrf, $busy);
         $actions = ['installieren' => 'Installation', 'aktualisieren' => 'Aktualisierung', 'entfernen' => 'Entfernen'];
         $body = V::error($error);
         if ($busy) {
@@ -1739,31 +1745,36 @@ final class Web {
             $body .= $st['last']['ok'] ? V::notice($st['last']['message']) : V::error('Nicht erfolgreich: ' . $st['last']['message']);
         }
         if (!$st['service']) $body .= '<p class="error">Die Modulverwaltung ist nicht eingerichtet. Bitte den Installer ausführen.</p>';
-        $body .= '<p>Module erweitern Praxisherz um Programme wie die Kasse. Jedes Modul läuft unter einem eigenen Systembenutzer und sieht nur seine eigenen Daten. '
-            . 'Nach dem Installieren unter <a href="/verwaltung/benutzer">Benutzer</a> festlegen, wer das Modul nutzen darf.</p>';
-        $post = fn(string $aktion, string $label, string $hidden = '', string $class = '', string $extra = '') => '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . $hidden
-            . '<input type="hidden" name="aktion" value="' . $aktion . '">' . $extra . '<button' . ($class !== '' ? ' class="' . $class . '"' : '') . $off . '>' . $label . '</button></form>';
-        $tiles = '';
+        $opts = ['werkzeuge' => $werkzeuge];
+        if ($protokoll) {
+            $body .= '<section class="card"><h2>Protokoll</h2>' . ($st['log'] ? '<pre class="notes">' . V::h(implode("\n", $st['log'])) . '</pre>' : '<p class="muted">Noch keine Einträge.</p>') . '</section>';
+            $response = Response::html(V::page('Module', $body, $this->nav(), $this->config->practice, 'Betrieb', $opts), $error ? 409 : 200);
+            return $busy ? $response->with('Refresh', '4') : $response;
+        }
         // Abhängigkeiten (module.toml: requires): Namen der Module, installierte IDs, wer welches Modul braucht.
         $namen = [];
         foreach ([...$st['installed'], ...$st['available']] as $x) $namen[(string)$x['id']] = (string)$x['name'];
         $da = array_map(fn($x) => (string)$x['id'], $st['installed']);
         $nameVon = fn(array $ids) => implode(', ', array_map(fn($i) => $namen[$i] ?? $i, $ids));
+        $zeilen = '';
         foreach ($st['installed'] as $m) {
             $hidden = '<input type="hidden" name="id" value="' . V::h($m['id']) . '">';
             $nutzer = array_values(array_map(fn($x) => (string)$x['id'], array_filter($st['installed'], fn($x) => in_array($m['id'], (array)($x['requires'] ?? []), true))));
-            $state = '';
+            $zustand = '<span class="muted">–</span>';
             $stopped = false;
             if ($m['dienste']) {
                 $active = count(array_filter($m['dienste'], fn($d) => $d['aktiv'] === true));
                 $unknown = count(array_filter($m['dienste'], fn($d) => $d['aktiv'] === null)) > 0;
                 $all = $active === count($m['dienste']);
                 $stopped = !$all && !$unknown;
-                $state = $unknown ? '<span class="tag">Status unbekannt</span>' : ($all ? '<span class="tag ok">✓ läuft</span>' : '<span class="tag warn">' . ($active === 0 ? 'gestoppt' : 'teilweise gestoppt') . '</span>');
+                $zustand = $unknown ? '<span class="pkt"></span><span class="muted">unbekannt</span>'
+                    : ($all ? '<span class="pkt an"></span><span class="muted">läuft</span>' : '<span class="pkt aus"></span><span class="muted">' . ($active === 0 ? 'gestoppt' : 'teilweise gestoppt') . '</span>');
             }
             $menuItem = fn(string $aktion, string $label, string $icon) => '<form method="post" action="/verwaltung/module">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="' . $aktion . '">'
                 . '<button class="mod-item"' . $off . '>' . V::icon($icon) . ' ' . $label . '</button></form>';
             $more = '<details class="mod-more"><summary class="icon-btn" title="Mehr" aria-label="Mehr zu ' . V::h($m['name']) . '">' . V::icon('st:mehr') . '</summary><div class="mod-menu">'
+                . ($m['update'] ? '<small class="muted">Neue Version <strong>' . V::h($m['update']['version']) . '</strong>' . ($m['update']['source'] === 'github' ? ' (GitHub' . ($m['update']['signed'] === false ? ', nicht signiert' : '') . ')' : ' (mit der Basis geliefert)')
+                    . '. Vorher wird ein Schnappschuss der Moduldaten angelegt; schlägt etwas fehl, springt das Modul zurück.</small>' : '')
                 . ($m['dienste'] ? '<small class="muted">Dienste: ' . V::h(implode(', ', array_map(fn($d) => preg_replace('/^kienzle-|\.service$/', '', $d['name']) . ($d['aktiv'] === true ? ' ✓' : ($d['aktiv'] === false ? ' ✗' : ' ?')), $m['dienste']))) . '</small>' : '')
                 . ($stopped ? $menuItem('dienst-start', 'Starten', 'st:start') : '')
                 . ($m['dienste'] ? $menuItem('dienst-neustart', 'Neu starten', 'st:neustart') : '')
@@ -1774,30 +1785,25 @@ final class Web {
                 . '<label class="muted">Zur Bestätigung den Namen „' . V::h($m['name']) . '“ eintippen<input name="bestaetigung" autocomplete="off" required maxlength="80" placeholder="' . V::h($m['name']) . '"></label>'
                 . ($nutzer ? '<small class="error">Wird noch gebraucht von: ' . V::h($nameVon($nutzer)) . '. Erst dieses Modul entfernen.</small>' : '')
                 . '<button class="danger"' . ($nutzer ? ' disabled' : $off) . '>' . V::icon('st:papierkorb') . ' Modul entfernen</button></form></details></div></details>';
-            $formUpd = fn(string $aktion, string $label, string $class, string $icon, string $title = '') => '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="' . $aktion . '">'
-                . '<button class="' . $class . '" title="' . V::h($title ?: strip_tags($label)) . '"' . $off . '>' . V::icon($icon) . ($label !== '' ? ' ' . $label : '') . '</button></form>';
-            // Ein rundes Pfeil-Symbol für beides: Update einspielen (wenn eins da ist) oder nach einem Update suchen.
-            $upd = $m['update']
-                ? '<div class="mod-upd">' . $formUpd('aktualisieren', 'Auf ' . V::h($m['update']['version']) . ' aktualisieren', 'upd-pill', 'st:aktualisieren', 'Update auf ' . $m['update']['version'] . ' installieren') . '</div>'
-                : '<div class="mod-upd"><span class="tag">aktuell</span>' . $formUpd('pruefen', '', 'icon-btn round', 'st:aktualisieren', 'Nach Update suchen') . '</div>';
-            $logo = $m['path'] ? '<a class="t-ico mod-open" href="' . V::h($m['path']) . '/" title="' . V::h($m['name']) . ' öffnen" aria-label="' . V::h($m['name']) . ' öffnen">' . V::icon('modul:' . $m['id']) . '<span class="go">' . V::icon('st:oeffnen') . '</span></a>'
+            // Eine Pille für beides: „↑ Auf x.y“ spielt das Update ein, „✓ aktuell ⟳“ sieht nach einem Update.
+            $pille = $m['update']
+                ? '<form method="post" action="/verwaltung/module">' . $csrf . $hidden . '<input type="hidden" name="aktion" value="aktualisieren"><button class="pille neu" title="Update auf ' . V::h($m['update']['version']) . ' installieren"' . $off . '>'
+                    . V::icon('st:hoch') . ' Auf ' . V::h($m['update']['version']) . ' aktualisieren</button></form>'
+                : '<form method="post" action="/verwaltung/module"><input type="hidden" name="aktion" value="pruefen">' . $csrf . '<button class="pille ok" title="Aktuell – klicken, um nach einem Update zu sehen"' . $off . '>✓ aktuell ' . V::icon('st:aktualisieren') . '</button></form>';
+            $logo = $m['path'] ? '<a class="t-ico mod-open" href="' . V::h($m['path']) . '/" title="' . V::h($m['name']) . ' öffnen" aria-label="' . V::h($m['name']) . ' öffnen">' . V::icon('modul:' . $m['id']) . '</a>'
                 : '<span class="t-ico">' . V::icon('modul:' . $m['id']) . '</span>';
-            $tiles .= '<div class="mod-tile"><div class="mod-head">' . $logo . $state . '</div>'
-                . '<p class="mod-name">' . V::h($m['name']) . '</p><p class="muted mod-sub">Version ' . V::h($m['version']) . '</p>' . ($m['description'] !== '' ? '<p class="muted mod-desc">' . V::h($m['description']) . '</p>' : '')
-                . $upd
-                . ($m['update'] ? '<p class="muted mod-desc">Neue Version <strong>' . V::h($m['update']['version']) . '</strong>' . ($m['update']['source'] === 'github' ? ' (GitHub' . ($m['update']['signed'] === false ? ', nicht signiert' : '') . ')' : ' (mit der Basis geliefert)')
-                    . '. Vorher wird ein Schnappschuss der Moduldaten angelegt; schlägt etwas fehl, springt das Modul zurück.</p>' : '')
-                . '<div class="mod-foot">' . $more . '</div></div>';
+            $zeilen .= '<div class="mod-zeile">' . $logo . '<div><p class="mod-name">' . V::h($m['name']) . '</p>' . ($m['description'] !== '' ? '<p class="muted mod-desc">' . V::h($m['description']) . '</p>' : '') . '</div>'
+                . '<p class="muted mod-ver">' . V::h($m['version']) . '</p><span class="mod-zustand">' . $zustand . '</span><div class="mod-rechts">' . $pille . '</div>' . $more . '</div>';
         }
+        $weitere = '';
         foreach ($st['available'] as $m) {
             $fehlt = array_values(array_filter((array)($m['requires'] ?? []), fn($r) => !in_array($r, $da, true)));
-            $tiles .= '<div class="mod-tile available"><div class="mod-head"><span class="t-ico">' . V::icon('modul:' . $m['id']) . '</span><span class="tag">verfügbar</span></div>'
-                . '<p class="mod-name">' . V::h($m['name']) . '</p><p class="muted mod-sub">Version ' . V::h($m['version']) . ($m['signed'] === false ? ' <span class="tag warn">nicht signiert</span>' : '') . '</p>'
-                . ($m['description'] !== '' ? '<p class="muted mod-desc">' . V::h($m['description']) . '</p>' : '')
-                . '<p class="muted mod-desc">' . ($m['source'] === 'github' ? 'Von GitHub' : 'Mit der Basis geliefert') . ($m['path'] ? ' · Adresse ' . V::h($m['path']) : '') . '</p>'
-                . '<div class="mod-foot"><form method="post" action="/verwaltung/module">' . $csrf . '<input type="hidden" name="aktion" value="installieren"><input type="hidden" name="id" value="' . V::h($m['id']) . '">'
-                . ($fehlt ? '<p class="muted mod-desc">Braucht zuerst: <strong>' . V::h($nameVon($fehlt)) . '</strong></p>' : '')
-                . '<button' . ($fehlt ? ' disabled title="Erst ' . V::h($nameVon($fehlt)) . ' installieren"' : $off) . '>' . V::icon('st:herunter') . ' Installieren</button></form></div></div>';
+            $weitere .= '<div class="mod-zeile available"><span class="t-ico">' . V::icon('modul:' . $m['id']) . '</span><div><p class="mod-name">' . V::h($m['name']) . '</p>'
+                . '<p class="muted mod-desc">' . ($m['description'] !== '' ? V::h($m['description']) . ' · ' : '') . ($m['source'] === 'github' ? 'von GitHub' : 'mit der Basis geliefert') . ($m['path'] ? ' · Adresse ' . V::h($m['path']) : '') . '</p>'
+                . ($fehlt ? '<p class="muted mod-desc">Braucht zuerst: <strong>' . V::h($nameVon($fehlt)) . '</strong></p>' : '') . '</div>'
+                . '<p class="muted mod-ver">' . V::h($m['version']) . ($m['signed'] === false ? ' <span class="tag warn">nicht signiert</span>' : '') . '</p><span class="mod-zustand"><span class="tag">verfügbar</span></span>'
+                . '<div class="mod-rechts"><form method="post" action="/verwaltung/module">' . $csrf . '<input type="hidden" name="aktion" value="installieren"><input type="hidden" name="id" value="' . V::h($m['id']) . '">'
+                . '<button' . ($fehlt ? ' disabled title="Erst ' . V::h($nameVon($fehlt)) . ' installieren"' : $off) . '>' . V::icon('st:herunter') . ' Installieren</button></form></div><span></span></div>';
         }
         // Erklärung zum blauen Punkt: offene Einrichtungspunkte, die hier (oder bei einem Modul) zu erledigen sind.
         $hinweise = '';
@@ -1812,15 +1818,15 @@ final class Web {
                     . ($u !== null ? ' – <a href="' . V::h($u) . '">Einstellungen öffnen</a>' : '') . '.</p>';
             }
         }
-        $body .= $hinweise . '<h2>Module</h2>' . ($tiles !== '' ? '<div class="mod-grid">' . $tiles . '</div>' : '<p>Noch keine Module installiert, und es sind keine weiteren verfügbar.</p>');
-        $body .= '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="status"><button class="secondary"' . $off . '>Status der Dienste aktualisieren</button></form> '
-            . '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="pruefen"><button class="secondary"' . $off . '>Nach Modulen sehen</button></form> '
-            . '<form method="post" action="/verwaltung/module" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="automatisch"><input type="hidden" name="an" value="' . ($st['auto'] ? '0' : '1') . '">'
-            . '<button class="secondary"' . $off . '>' . ($st['auto'] ? 'Automatische Updates ausschalten' : 'Automatische Updates einschalten') . '</button></form>'
-            . '<p class="muted">' . ($st['auto'] ? 'Neue Modulversionen werden täglich nachts installiert, nicht während einer Zahlung.' : 'Modul-Updates nur von Hand.') . '</p>'
-            . '<p class="muted">Zuletzt geprüft: ' . V::date($st['checked_at']) . ($st['error'] ? ' – GitHub nicht erreichbar: ' . V::h($st['error']) : '') . '</p>';
-        if ($st['log']) $body .= '<h2>Protokoll</h2><pre class="notes">' . V::h(implode("\n", $st['log'])) . '</pre>';
-        $response = Response::html(V::page('Module', $body, $this->nav(), $this->config->practice, 'Betrieb'), $error ? 409 : 200);
+        $body .= $hinweise . '<div class="autozeile"><form method="post" action="/verwaltung/module">' . $csrf . '<input type="hidden" name="aktion" value="automatisch"><input type="hidden" name="an" value="' . ($st['auto'] ? '0' : '1') . '">'
+            . '<button class="schalter' . ($st['auto'] ? ' an' : '') . '" role="switch" aria-checked="' . ($st['auto'] ? 'true' : 'false') . '" title="' . ($st['auto'] ? 'Automatische Updates ausschalten' : 'Automatische Updates einschalten') . '"' . $off . '></button></form>'
+            . '<div><strong>Automatische Updates</strong> <span class="muted">· ' . ($st['auto'] ? 'nachts, nicht während einer Zahlung' : 'aus, nur von Hand') . ' · zuletzt geprüft: ' . V::date($st['checked_at'])
+            . ($st['error'] ? ' – GitHub nicht erreichbar: ' . V::h($st['error']) : '') . '</span></div></div>';
+        if ($updates) $body .= '<div class="upd-banner"><strong>' . count($updates) . ' Update' . (count($updates) === 1 ? '' : 's') . ' verfügbar</strong><span class="muted">– ' . V::h(implode(', ', array_map(fn($m) => (string)$m['name'], $updates))) . '</span></div>';
+        $body .= $zeilen !== '' ? '<section class="card mod-liste">' . $zeilen . '</section>' : '<section class="card"><p>Noch keine Module installiert. Module erweitern Praxisherz um Programme wie die Kasse; jedes läuft unter einem eigenen Systembenutzer und sieht nur seine eigenen Daten.</p></section>';
+        if ($weitere !== '') $body .= '<details class="fold"' . ($zeilen === '' ? ' open' : '') . '><summary><h2>Weitere Module <span class="tag">' . count($st['available']) . ' verfügbar</span></h2></summary><div class="card mod-liste">' . $weitere . '</div></details>';
+        $body .= '<p class="muted">Wer ein Modul nutzen darf, steht unter <a href="/verwaltung/benutzer">Benutzer und Gruppen</a>.</p>';
+        $response = Response::html(V::page('Module', $body, $this->nav(), $this->config->practice, 'Betrieb', $opts), $error ? 409 : 200);
         return $busy ? $response->with('Refresh', '4') : $response;
     }
 
@@ -1858,14 +1864,25 @@ final class Web {
         return $this->updates;
     }
 
-    private function updatesPage(?string $error = null, ?string $notice = null): Response {
+    private function updatesPage(?string $error = null, ?string $notice = null, ?Request $req = null): Response {
         $st = $this->up()->status();
         $csrf = V::csrf($this->session['csrf']);
         $busy = in_array($st['state'], ['running', 'requested'], true);
+        $protokoll = ($req?->query['ansicht'] ?? '') === 'protokoll';
+        $werkzeuge = V::reiter('/verwaltung/updates', 'Updates', 'st:hoch', !$protokoll, count($st['available']))
+            . V::reiter('/verwaltung/updates?ansicht=protokoll', 'Protokoll', 'st:liste', $protokoll)
+            . V::drehpfeil('/verwaltung/updates', 'pruefen', 'Jetzt nach Updates sehen', $csrf, $busy);
         $labels = ['idle' => 'bereit', 'requested' => 'Auftrag wird übernommen …', 'running' => 'Aktualisierung läuft (' . $st['step'] . ') …', 'done' => 'fertig', 'failed' => 'nicht erfolgreich'];
         $working = $busy ? '<div class="working" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><div><strong>Update läuft – bitte nicht erneut starten und nichts anderes anklicken.</strong>'
             . '<p>' . V::h($st['state'] === 'requested' ? 'Der Auftrag wird übernommen …' : 'Aktueller Schritt: ' . $st['step']) . '. Die Seite lädt sich alle 5 Sekunden selbst neu und kann zwischendurch kurz nicht erreichbar sein. '
             . 'Erst wenn hier „fertig“ steht, ist das Update ganz durchgelaufen.</p></div></div>' : '';
+        $opts = ['werkzeuge' => $werkzeuge];
+        if ($protokoll) {
+            $body = $working . V::error($error) . V::notice($notice) . '<section class="card"><h2>Protokoll</h2>'
+                . ($st['log'] ? '<pre class="notes">' . V::h(implode("\n", $st['log'])) . '</pre>' : '<p class="muted">Noch keine Einträge.</p>') . '</section>';
+            $response = Response::html(V::page('Updates', $body, $this->nav(), $this->config->practice, null, $opts), $error ? 409 : 200);
+            return $busy ? $response->with('Refresh', '5') : $response;
+        }
         $rows = '';
         foreach ($st['available'] as $a) {
             $rows .= '<div class="box wide"><h3>Basis ' . V::h($a['version']) . ($a['prerelease'] ? ' <span class="tag">beta</span>' : '')
@@ -1879,15 +1896,15 @@ final class Web {
         $kind = $failed ? 'err' : ($st['available'] ? 'new' : 'ok');
         $head = $failed ? 'Nicht erfolgreich' : ($st['available'] ? 'Neue Version verfügbar: Basis ' . $st['available'][0]['version'] : 'Aktuell – keine neuere Version');
         $body = $working . V::error($error) . V::notice($notice)
-            . '<div class="update-state ' . $kind . '"><span class="big" aria-hidden="true">' . ($failed ? '!' : ($st['available'] ? '↑' : '✓')) . '</span><div><strong>' . V::h($head) . '</strong>'
+            . (!$st['service'] ? '<p class="error">Der Update-Dienst ist nicht eingerichtet. Bitte den Installer ausführen.</p>' : '')
+            . '<section class="card"><div class="update-state ' . $kind . '"><span class="big" aria-hidden="true">' . ($failed ? '!' : ($st['available'] ? '↑' : '✓')) . '</span><div><strong>' . V::h($head) . '</strong>'
             . '<span class="muted">Installiert: Basis ' . V::h($st['installed']) . ' · Zustand: ' . V::h($labels[$st['state']] ?? $st['state'])
             . ($st['message'] !== '' ? ' (' . V::h($st['message']) . ')' : '') . ' · Zuletzt geprüft: ' . V::date($st['checked_at']) . '</span></div></div>'
             . ($st['error'] ? '<p class="error">' . V::h($st['error']) . '</p>' : '')
-            . (!$st['service'] ? '<p class="error">Der Update-Dienst ist nicht eingerichtet. Bitte den Installer ausführen.</p>' : '')
-            . '<form method="post" action="/verwaltung/updates" class="inline">' . $csrf . '<input type="hidden" name="aktion" value="pruefen"><button class="secondary"' . ($busy ? ' disabled' : '') . '>Jetzt nach Updates sehen</button></form>'
             . $rows
-            . '<p class="muted">Module werden beim Update der Basis automatisch mit aktualisiert, sofern unter <a href="/verwaltung/module">Module</a> die automatische Aktualisierung eingeschaltet ist; das geschieht täglich nach der Prüfung. Ein gerade beschäftigtes Modul (z. B. bei laufender Zahlung) wird dabei übersprungen und am nächsten Tag erneut versucht.</p>';
-        $body .= '<h2>Kanal</h2><form method="post" action="/verwaltung/updates" class="box">' . $csrf . '<input type="hidden" name="aktion" value="kanal">'
+            . '<p class="muted">Module werden mit aktualisiert, sofern unter <a href="/verwaltung/module">Module</a> die automatischen Updates eingeschaltet sind (täglich nach der Prüfung; ein gerade beschäftigtes Modul, z. B. bei laufender Zahlung, kommt am nächsten Tag dran).</p></section>';
+        $kanalName = $st['channel'] === 'beta' ? 'Beta' : 'Stabil';
+        $body .= '<details class="fold"><summary><h2>Kanal und Signaturprüfung <span class="tag">' . $kanalName . '</span></h2></summary><form method="post" action="/verwaltung/updates" class="box">' . $csrf . '<input type="hidden" name="aktion" value="kanal">'
             . '<label class="check"><input type="radio" name="kanal" value="stabil"' . ($st['channel'] === 'stabil' ? ' checked' : '') . '> Stabil (empfohlen)</label>'
             . '<label class="check"><input type="radio" name="kanal" value="beta"' . ($st['channel'] === 'beta' ? ' checked' : '') . '> Beta (Vorabversionen zum Testen)</label>'
             . '<h3>Signaturprüfung</h3>'
@@ -1897,16 +1914,15 @@ final class Web {
             . '<p>Ohne Signatur ist nicht gesichert, dass eine Version vom Herausgeber stammt: Wer das Repository auf GitHub verändern kann, '
             . 'könnte dann Programme mit root-Rechten auf diesen Server bringen. Geprüft wird weiter gegen Beschädigung (Manifest, SHA-256), und eine '
             . 'vorhandene, aber falsche Signatur wird immer abgelehnt.</p>'
-            . '<button' . ($busy ? ' disabled' : '') . '>Kanal speichern</button></form>';
+            . '<button' . ($busy ? ' disabled' : '') . '>Kanal speichern</button></form></details>';
         $older = array_filter($st['local'], fn($v) => $v !== $st['installed']);
         if ($older) {
-            $body .= '<h2>Zurück auf eine frühere Version</h2><form method="post" action="/verwaltung/updates" class="box">' . $csrf . '<input type="hidden" name="aktion" value="zurueck">'
+            $body .= '<details class="fold"><summary><h2>Zurück auf eine frühere Version</h2></summary><form method="post" action="/verwaltung/updates" class="box">' . $csrf . '<input type="hidden" name="aktion" value="zurueck">'
                 . '<p><strong>Achtung:</strong> Die Daten werden auf den Stand beim damaligen Update zurückgesetzt; spätere Änderungen gehen verloren.</p>';
             foreach ($older as $v) $body .= '<label class="check"><input type="radio" name="version" value="' . V::h($v) . '"> Basis ' . V::h($v) . '</label>';
-            $body .= '<button class="danger"' . ($busy ? ' disabled' : '') . '>Zurück auf diese Version</button></form>';
+            $body .= '<button class="danger"' . ($busy ? ' disabled' : '') . '>Zurück auf diese Version</button></form></details>';
         }
-        if ($st['log']) $body .= '<h2>Protokoll</h2><pre class="notes">' . V::h(implode("\n", $st['log'])) . '</pre>';
-        $response = Response::html(V::page('Updates', $body, $this->nav(), $this->config->practice), $error ? 409 : 200);
+        $response = Response::html(V::page('Updates', $body, $this->nav(), $this->config->practice, null, $opts), $error ? 409 : 200);
         return $busy ? $response->with('Refresh', '5') : $response;
     }
 

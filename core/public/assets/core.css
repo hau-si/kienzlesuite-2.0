@@ -518,3 +518,43 @@ ul.zt-feiertage .d { color: var(--muted); min-width: 88px; display: inline-block
 ul.zt-feiertage li.aus .n { color: #8a9b96; text-decoration: line-through; }
 .zt-jahre { display: flex; gap: 8px; }
 @media (max-width: 900px) { .zt-grid, .zt-reihe { grid-template-columns: 1fr; } ul.zt-feiertage { columns: 1; } .zt-kopf a.button:last-child { margin-left: 0; } }
+/* Seitenkopf mit Knopfleiste (docs/MODUL-GESTALTUNG.md) – für Basis-Seiten mit V::page(…, ['werkzeuge' => …]); Module haben dieselben Klassen. */
+main.breit { max-width: 1400px; }
+main > .seitenkopf { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+main > .seitenkopf h1 { margin: 6px 0 0; }
+main > .seitenkopf .start-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+main > .seitenkopf .start-tools form.inline { margin: 0; }
+.button.mit-icon { display: inline-flex; align-items: center; gap: 8px; }
+.button.mit-icon .ico { width: 18px; height: 18px; }
+.zaehler { display: inline-block; min-width: 18px; padding: 0 6px; border-radius: 9px; background: #c0392b; color: #fff; font-size: 12px; text-align: center; }
+button.dreh, form.inline > button.dreh { width: 42px; height: 42px; min-height: 0; padding: 0; display: inline-grid; place-items: center; border-radius: 50%; background: #fff; border: 1px solid var(--line); color: #315f53; }
+button.dreh:hover { background: #e0efe8; }
+button.dreh .ico { width: 20px; height: 20px; }
+/* Module (Entwurf B, 28.11.2026): eine Liste, Update und „aktuell“ als eine Pille */
+.autozeile { display: flex; gap: 12px; align-items: center; margin: 0 0 14px; flex-wrap: wrap; }
+.autozeile form { margin: 0; }
+button.schalter { position: relative; width: 44px; height: 24px; min-height: 0; padding: 0; border-radius: 99px; background: #b9c7c3; }
+button.schalter.an { background: var(--teal); }
+button.schalter::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left .15s; }
+button.schalter.an::after { left: 23px; }
+.upd-banner { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 12px 16px; border-radius: 12px; background: #eef5fc; border: 1px solid #cfe1f3; margin: 0 0 14px; }
+.card.mod-liste { padding: 6px 18px; }
+.mod-zeile { display: grid; grid-template-columns: 38px minmax(0, 1fr) 130px 150px 280px 32px; gap: 14px; align-items: center; padding: 12px 0; border-bottom: 1px solid #edf0ee; }
+.mod-zeile:last-child { border-bottom: 0; }
+.mod-zeile .t-ico { position: relative; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; background: var(--soft); color: var(--teal); }
+.mod-zeile .t-ico .ico { width: 20px; height: 20px; }
+.mod-zeile .mod-name { margin: 0; font-weight: 700; }
+.mod-zeile .mod-desc, .mod-zeile .mod-ver, .mod-zeile .mod-zustand { margin: 0; font-size: 13px; }
+.mod-zeile .mod-more { margin-left: 0; }
+.mod-zeile .mod-rechts { justify-self: end; display: flex; gap: 8px; align-items: center; }
+.mod-zeile form { margin: 0; }
+.mod-zeile.available .t-ico { color: var(--muted); }
+.pkt { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; background: #9aa9a5; }
+.pkt.an { background: #2f9e6f; } .pkt.aus { background: #c0392b; }
+.pille { display: inline-flex; align-items: center; gap: 6px; min-height: 0; padding: 5px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; border: 1px solid; }
+.pille .ico { width: 15px; height: 15px; }
+.pille.ok { background: #e5f3ed; color: #16503f; border-color: #c7e3d7; }
+.pille.neu { background: #e5f0fb; color: #1b4f86; border-color: #b7d3ef; }
+@media (max-width: 900px) { .mod-zeile { grid-template-columns: 38px minmax(0, 1fr) 32px; } .mod-zeile .mod-ver, .mod-zeile .mod-zustand { display: none; } .mod-zeile .mod-rechts { grid-column: 2 / 4; justify-self: start; } }
+.mod-zeile .mod-menu { bottom: auto; top: 38px; }
+main.breit > details.fold { margin: 0 0 12px; }

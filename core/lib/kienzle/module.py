@@ -803,7 +803,8 @@ def dispatch(req: dict) -> str:
     action = req.get('action')
     if action == 'pruefen':
         check()
-        return 'Angebot aktualisiert.'
+        refresh_states()   # der Drehpfeil der Modulseite erneuert beides
+        return 'Angebot und Zustand der Dienste aktualisiert.'
     if action == 'status':
         refresh_states()
         return 'Status der Module aktualisiert.'

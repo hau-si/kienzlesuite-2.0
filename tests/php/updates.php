@@ -63,12 +63,15 @@ function test_seite_und_menue(): void {
     check($page->status === 200 && str_contains($page->body, 'Basis 9.0.0') && str_contains($page->body, 'Zurück auf eine frühere Version'), 'Seite unvollständig');
     check(str_contains($page->body, 'update-state new') && str_contains($page->body, 'Neue Version verfügbar: Basis 9.0.0') && !str_contains($page->body, '<h2>Verfügbar</h2>'), 'Statussymbol „neue Version“ fehlt oder eigene Karte „Verfügbar“');
     check(!str_contains($page->body, '<script>x') && str_contains($page->body, '&lt;script&gt;x'), 'Release-Notizen nicht maskiert');
+    check(str_contains($page->body, 'Updates<span class="zaehler">1</span>') && str_contains($page->body, 'class="secondary dreh"') && str_contains($page->body, '<summary><h2>Kanal und Signaturprüfung')
+        && !str_contains($page->body, 'Jetzt nach Updates sehen</button>'), 'Seitenkopf mit Reitern und Drehpfeil, Kanal eingeklappt');
+    check(str_contains($b->get('/verwaltung/updates?ansicht=protokoll')->body, 'href="/verwaltung/updates?ansicht=protokoll" aria-current="page"'), 'Reiter Protokoll');
     check(str_contains($b->get('/')->body, '<span class="badge" title="Neue Version verfügbar">1</span>'), 'Hinweis im Menü fehlt');
     $r = $b->post('/verwaltung/updates', ['aktion' => 'installieren', 'version' => '9.0.0']);
     check($r->status === 303 && req($env)['version'] === '9.0.0', 'Installieren über die Seite');
     $g = $b->get('/verwaltung/updates');
     check($g->header('Refresh') === '5', 'Seite lädt beim Warten nicht neu');
-    check(preg_match('#<main[^>]*><p class="notice" role="status">Update gestartet#', $g->body) === 1, 'Rückmeldung nach „Jetzt installieren“ fehlt');
+    check(preg_match('#<main[^>]*>(<header class="seitenkopf">.*?</header>)?<p class="notice" role="status">Update gestartet#s', $g->body) === 1, 'Rückmeldung nach „Jetzt installieren“ fehlt');
     check(!str_contains($b->get('/verwaltung/updates')->body, 'Update gestartet. Die Seite'), 'Rückmeldung nur einmal zeigen');
     check(str_contains(implode("\n", $env->audit->recent()), 'update-installieren 9.0.0'), 'nicht protokolliert');
     unlink($env->dir . '/anfragen/update.json');
