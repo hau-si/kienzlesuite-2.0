@@ -129,7 +129,9 @@ def render(hostnames: list[str], registry: dict) -> str:
            '        # Der Körper der Anfrage geht nicht an die Prüfung, nginx prüft aber auch hier die Größe: ohne diese Zeile gälte das Limit',
            '        # des Servers (1m) und Uploads in Modulen (bis 25m) scheiterten schon an der Anmeldeprüfung mit 413.',
            '        client_max_body_size 25m;', '        fastcgi_pass_request_body off;', '        fastcgi_param CONTENT_LENGTH "";',
-           '        # Platz für die Kopfzeilen der Prüfung (Menü, Personenliste für Module mit [web] personen)', '        fastcgi_buffer_size 32k;'] + _fastcgi_common() + [
+           '        # Platz für die Kopfzeilen der Prüfung (Menü, Personenliste für Module mit [web] personen); fastcgi_buffers muss',
+           '        # mitwachsen, sonst lehnt nginx die Konfiguration ab (fastcgi_busy_buffers_size > Summe der Puffer).',
+           '        fastcgi_buffer_size 32k;', '        fastcgi_buffers 8 32k;'] + _fastcgi_common() + [
            '        fastcgi_param REQUEST_URI $uri;  # sonst stünde hier die ursprüngliche Adresse',
            f'        fastcgi_param SCRIPT_FILENAME {CORE_ROOT}/public/index.php;', f'        fastcgi_pass unix:{CORE_SOCKET};', '    }', '',
            '    # Prüfung des Starter-Schlüssels für /starter/<modul> (nur intern über auth_request; der Schlüssel steht im Kopf Authorization)',

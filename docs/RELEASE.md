@@ -1,5 +1,11 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.47
+
+- **Fehler behoben (Nutzer-Meldung): Webinterface ließ sich nach dem Update auf beta.46 nicht anpassen.** nginx lehnte die Konfiguration ab („fastcgi_busy_buffers_size must be less than the size of all fastcgi_buffers minus one buffer“), weil beta.46 in der Anmeldeprüfung `/_auth/` nur `fastcgi_buffer_size 32k` vergrößert hatte. Jetzt passen die Puffer zusammen (`fastcgi_buffers 8 32k`). Die alte Konfiguration blieb bis dahin aktiv; Module, die die Personenliste brauchen (QM: Vorlegen), gehen erst mit diesem Stand.
+- Neuer Test: Die erzeugte Konfiguration aller Module wird mit echtem `nginx -t` geprüft (fängt genau diesen Fehler); nginx gehört jetzt zu den Paketen der Testläufe auf GitHub.
+- Mit Tests geprüft (nginx 1.24 in der Testumgebung). Nicht auf der VM geprüft.
+
 ## 0.22.0-beta.46
 
 - **Neu für Module: Personenliste (`[web] personen = true`, core_api 2).** Ein Modul, das es in `module.toml` anfordert, bekommt mit jeder Anfrage die aktiven Konten mit Zugang zu diesem Modul: Anmeldename, Anzeigename, Gruppen (Rollen) und Rechte im Modul (Kopfzeile `X-Kienzle-Personen` bzw. `KIENZLE_PERSONEN`, PHP `$k->personen()`). Keine E-Mail-Adressen, keine Rechte in anderen Modulen; die Liste wird 30 Sekunden zwischengespeichert. Erster Nutzer: Qualitätsmanagement (Dokumente an die Gruppe „MFA“ vorlegen). Andere Module bekommen die Kopfzeile nicht.
