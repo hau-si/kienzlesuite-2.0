@@ -1,7 +1,7 @@
 import asyncio, pathlib, sys
 from playwright.async_api import async_playwright
 # Bildschirmfotos aller Seiten mit erfundenen Daten (Aufruf durch scripts/bildschirmfotos.sh): python3 scripts/bildschirmfotos-seiten.py <Zielordner> <Ordner der Basis-Seiten> [Name …]
-# Benötigt Playwright für Python und Chrome/Chromium. Kasse läuft auf Port 8099, Terminzettel, Signatur, QM, Fax und Telefon auf 8098 (Vorschau-Server des Skripts).
+# Benötigt Playwright für Python und Chrome/Chromium. Kasse läuft auf Port 8099, Terminzettel, Signatur, QM, Fax, Telefon und Homepage auf 8098 (Vorschau-Server des Skripts).
 import os
 OUT = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else 'docs/screenshots')
 B = 'file://' + (sys.argv[2] if len(sys.argv) > 2 else '/tmp/basis').rstrip('/') + '/'
@@ -21,6 +21,7 @@ shots = [
   ('fax-senden', M+'/fax/', 1280, 980), ('fax-eingang', M+'/fax/eingang', 1280, 560),
   ('telefon-vorgaenge', M+'/telefon/vorgaenge', 1280, 1000), ('telefon-statistik', M+'/telefon/statistik', 1280, 1130),
   ('telefon-anlage', M+'/telefon/', 1280, 860),
+  ('homepage-mitteilungen', M+'/homepage/', 1440, 900), ('homepage-praxen', M+'/homepage/praxen', 1280, 640),
 ]
 
 # Schaubild „Weg der Rechnung“: drei Wege (T2med-Verbindungsklick, Rechnung drucken, IGeL-Modul) → Kassieren → Netzwerkordner

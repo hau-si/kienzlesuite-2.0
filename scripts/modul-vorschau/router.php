@@ -1,5 +1,5 @@
 <?php
-// Terminzettel, Signatur, QM, Fax und Telefon lokal ansehen (nur für Bildschirmfotos, erfundene Daten): php -S 127.0.0.1:8098 scripts/modul-vorschau/router.php
+// Terminzettel, Signatur, QM, Fax, Telefon und Homepage lokal ansehen (nur für Bildschirmfotos, erfundene Daten): php -S 127.0.0.1:8098 scripts/modul-vorschau/router.php
 // Daten je Modul in $VORSCHAU_DATEN/<modul> (Standard /tmp/modul-vorschau), angelegt mit scripts/modul-vorschau/init.php.
 $root = dirname(__DIR__, 2);
 $daten = rtrim(getenv('VORSCHAU_DATEN') ?: '/tmp/modul-vorschau', '/');
@@ -8,10 +8,10 @@ if (str_starts_with($path, '/assets/')) {
     $f = $root . '/core/public' . $path;
     if (is_file($f)) { header('Content-Type: ' . (str_ends_with($f, '.css') ? 'text/css' : (str_ends_with($f, '.svg') ? 'image/svg+xml' : 'text/javascript'))); readfile($f); return true; }
 }
-if (!preg_match('#^/(terminzettel|signatur|qm|fax|telefon)(/|$)#', $path, $m)) { http_response_code(404); echo 'nur /terminzettel, /signatur, /qm, /fax und /telefon'; return true; }
+if (!preg_match('#^/(terminzettel|signatur|qm|fax|telefon|homepage)(/|$)#', $path, $m)) { http_response_code(404); echo 'nur /terminzettel, /signatur, /qm, /fax, /telefon und /homepage'; return true; }
 $modul = $m[1];
-$menu = rawurlencode(json_encode(['apps' => ['/kasse/' => 'Kasse', '/terminzettel/' => 'Terminzettel', '/signatur/' => 'Signatur', '/qm/' => 'Qualitätsmanagement', '/fax/' => 'Fax', '/telefon/' => 'Telefon'],
-    'ids' => ['/kasse/' => 'kasse', '/terminzettel/' => 'terminzettel', '/signatur/' => 'signatur', '/qm/' => 'qm', '/fax/' => 'fax', '/telefon/' => 'telefon'], 'admin' => true, 'login' => 'anna']));
+$menu = rawurlencode(json_encode(['apps' => ['/kasse/' => 'Kasse', '/terminzettel/' => 'Terminzettel', '/signatur/' => 'Signatur', '/qm/' => 'Qualitätsmanagement', '/fax/' => 'Fax', '/telefon/' => 'Telefon', '/homepage/' => 'Homepage'],
+    'ids' => ['/kasse/' => 'kasse', '/terminzettel/' => 'terminzettel', '/signatur/' => 'signatur', '/qm/' => 'qm', '/fax/' => 'fax', '/telefon/' => 'telefon', '/homepage/' => 'homepage'], 'admin' => true, 'login' => 'anna']));
 // Erfundene Personen für „Vorlegen“ (QM); Anmeldung als „anna“ bzw. mit ?als=carla als MFA ohne Schreibrechte.
 $_SERVER['KIENZLE_PERSONEN'] = rawurlencode(json_encode([['l' => 'anna', 'n' => 'Dr. med. Erika Beispiel', 'g' => ['Arzt'], 'a' => true, 'r' => []],
     ['l' => 'ben', 'n' => 'Ben Beispiel', 'g' => ['MFA'], 'a' => false, 'r' => ['lesen', 'schreiben']], ['l' => 'carla', 'n' => 'Carla Muster', 'g' => ['MFA'], 'a' => false, 'r' => ['lesen']],

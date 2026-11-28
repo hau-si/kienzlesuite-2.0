@@ -1,5 +1,12 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.49
+
+- Neues Modul **Homepage** (`modules/homepage`, 0.1.0-beta.1) wird mitgeliefert: Mitteilungen (Vertretung, Impfstoff lieferbar, Sonderöffnungszeiten, freier Text) auf die WordPress-Homepage der Praxis, mit Plugin „Praxisherz-Hinweise“. Details in `modules/homepage/RELEASE.md`.
+- Globus-Symbol für das Modul „Homepage“ in Seitenleiste und Startseite.
+- Lokale Vorschau (`scripts/modul-vorschau`) und Bildschirmfotos um die Homepage erweitert.
+- Mit Tests geprüft. Nicht auf der VM geprüft.
+
 ## 0.22.0-beta.48
 
 - **README und Bilder aktualisiert:** Übersicht aller Module mit Stand und Funktionen (Kasse, Terminzettel, Signatur, Qualitätsmanagement, Telefon, Fax), neue Abschnitte und Bilder für Telefon (Vorgänge, Statistik, Anlage), Fax (Senden, Eingang) und den Signatur-Editor; alle vorhandenen Bilder neu erzeugt. Das Erklärvideo bekommt die neuen Szenen (`scripts/video-bauen.py`).

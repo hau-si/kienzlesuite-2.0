@@ -1,8 +1,8 @@
 <?php
-// Legt erfundene Beispieldaten für die Vorschau von Terminzettel, Signatur, QM, Fax und Telefon an: php scripts/modul-vorschau/init.php  (Ziel $VORSCHAU_DATEN, Standard /tmp/modul-vorschau)
+// Legt erfundene Beispieldaten für die Vorschau von Terminzettel, Signatur, QM, Fax, Telefon und Homepage an: php scripts/modul-vorschau/init.php  (Ziel $VORSCHAU_DATEN, Standard /tmp/modul-vorschau)
 $root = dirname(__DIR__, 2);
 $ziel = rtrim(getenv('VORSCHAU_DATEN') ?: '/tmp/modul-vorschau', '/');
-foreach (['signatur', 'terminzettel', 'qm', 'fax', 'telefon', 'austausch', 'schluessel'] as $m) if (!is_dir("$ziel/$m")) mkdir("$ziel/$m", 0755, true);
+foreach (['signatur', 'terminzettel', 'qm', 'fax', 'telefon', 'homepage', 'austausch', 'schluessel'] as $m) if (!is_dir("$ziel/$m")) mkdir("$ziel/$m", 0755, true);
 putenv("KIENZLE_DATEN=$ziel/signatur");
 require $root . '/modules/signatur/src/bootstrap.php';
 use KienzleSignatur\{Pad, Seite, Speicher};
@@ -79,3 +79,19 @@ if (!(int)KienzleQm\Speicher::pdo()->query('SELECT COUNT(*) FROM dokumente')->fe
 }
 require __DIR__ . '/init-fax-telefon.php';
 echo "Daten in $ziel\n";
+
+// Homepage: Vertretungspraxen und Mitteilungen (erfunden)
+require $root . '/modules/homepage/src/bootstrap.php';
+KienzleHomepage\Speicher::$data = "$ziel/homepage";
+if (!KienzleHomepage\Praxen::alle()) {
+    $hp = 'KienzleHomepage\Praxen';
+    $a = $hp::speichern(0, ['name' => 'Praxis Dr. med. Erika Beispiel', 'strasse' => 'Musterstraße 1', 'ort' => '12345 Musterstadt', 'telefon' => '01234 56789']);
+    $b = $hp::speichern(0, ['name' => 'Hausarztpraxis Max Mustermann', 'strasse' => 'Beispielweg 7', 'ort' => '12345 Musterstadt', 'telefon' => '01234 98765', 'zusatz' => 'Mo–Fr 8–12 Uhr']);
+    $hp::speichern(0, ['name' => 'Praxis Dr. med. Anna Muster', 'strasse' => 'Am Beispielplatz 3', 'ort' => '12345 Musterstadt', 'telefon' => '01234 55555']);
+    $mt = 'KienzleHomepage\Mitteilungen';
+    $heute = date('Y-m-d');
+    $mt::speichern(0, ['art' => 'vertretung', 'titel' => 'Urlaubsvertretung', 'praxen' => [$a, $b], 'von' => date('Y-m-d', strtotime('-1 day')), 'bis' => date('Y-m-d', strtotime('+12 days')), 'orte' => ['leiste', 'kasten']], 'anna');
+    $mt::speichern(0, ['art' => 'impfstoff', 'titel' => 'Grippeimpfstoff ist lieferbar', 'text' => 'Bitte vereinbaren Sie einen Termin.', 'orte' => ['kasten']], 'anna');
+    $mt::speichern(0, ['art' => 'oeffnungszeiten', 'titel' => 'Silvester nur bis 12 Uhr geöffnet', 'orte' => ['fenster'], 'tage_datum' => [date('Y') . '-12-31'], 'tage_zeit' => ['8–12 Uhr']], 'anna', false);
+    $mt::speichern(0, ['art' => 'frei', 'titel' => 'Praxis wegen Fortbildung geschlossen', 'von' => date('Y-m-d', strtotime('+20 days')), 'bis' => date('Y-m-d', strtotime('+20 days')), 'orte' => ['leiste']], 'anna');
+}

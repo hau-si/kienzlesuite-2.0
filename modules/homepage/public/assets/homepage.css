@@ -1,0 +1,110 @@
+/* Homepage – im Stil der Basis (core.css); nur Ergänzungen. Keine Inline-Stile (CSP). */
+main.modul { max-width: 1400px; }   /* docs/MODUL-GESTALTUNG.md */
+.hp h2 { font-size: 16px; }
+.hp-kopf { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; margin-bottom: 14px; }
+.hp-kopf h1 { margin-bottom: 4px; }
+.hp-werkzeuge { display: flex; flex-wrap: wrap; gap: 8px; }
+.hp-mit-symbol { gap: 7px; }
+.hp-unsichtbar { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.hp-klein { font-size: 13px; }
+.tag.ok { background: #e3f3ea; color: #16503f; }
+.tag.err { background: #f9e4df; color: #993d2b; }
+.tag.hp-vert { background: #eaf2fb; color: #1f4f82; }
+.tag.hp-impf { background: #e5f3ed; color: #16503f; }
+.tag.hp-zeit { background: #fff0ca; color: #886100; }
+.hp-status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 14px; }
+.hp-status form.inline { margin: 0; }
+.hp-status button { min-height: 32px; padding: 4px 12px; font-size: 13px; }
+.hp-fehlertext { color: var(--error); font-size: 14px; }
+
+/* Zwei Spalten: links Mitteilungen, rechts die mitlaufende Vorschau (Entwurf B2) */
+.hp-zwei { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.hp-zwei.hp-gleich { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.hp-vorschau-karte { position: sticky; top: 16px; }
+@media (max-width: 1000px) { .hp-zwei, .hp-zwei.hp-gleich { grid-template-columns: minmax(0, 1fr); } .hp-vorschau-karte { position: static; } }
+
+/* Neue Mitteilung (aufklappbare Karte) */
+details.hp-neu > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; }
+details.hp-neu > summary::-webkit-details-marker { display: none; }
+details.hp-neu > summary::before { content: "+"; color: var(--teal); font-weight: 700; font-size: 18px; }
+details.hp-neu[open] > summary::before { content: "–"; }
+details.hp-neu > summary h2 { margin: 0; }
+details.hp-neu[open] > summary { margin-bottom: 10px; }
+
+/* Zeilen mit Schalter */
+.hp-zeile > summary { flex-wrap: wrap; }
+.hp-zeilentitel { flex: 1 1 12rem; }
+.hp-zeitraum { white-space: nowrap; font-size: 14px; }
+.hp-zeile .box { margin-top: 0; }
+button.hp-schalter { position: relative; flex: none; width: 42px; min-height: 0; height: 24px; padding: 0; border-radius: 12px; background: #cad8d2; }
+button.hp-schalter::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px #0003; transition: left .15s; }
+button.hp-schalter.an { background: var(--teal); }
+button.hp-schalter.an::after { left: 21px; }
+
+/* Formular */
+.hp-form fieldset.hp-wahl { border: 0; margin: 12px 0 0; padding: 0; }
+.hp-form legend { padding: 0; margin: 0 0 6px; font-weight: 600; font-size: 14px; }
+.hp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+label.hp-chip { display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 6px 13px; border: 1px solid #cad8d2; border-radius: 20px; background: #fff; color: #315f53;
+  font-size: 13px; font-weight: 600; cursor: pointer; }
+label.hp-chip input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+label.hp-chip:has(input:checked) { background: #e5f3ed; border-color: var(--teal); color: #16503f; }
+label.hp-chip:has(input:checked)::before { content: "✓"; }
+label.hp-chip:has(input:focus-visible) { outline: 3px solid #a3d0c2; outline-offset: 2px; }
+label.hp-praxis { display: flex; gap: 10px; align-items: flex-start; margin: 6px 0; padding: 9px 11px; border: 1px solid #cad8d2; border-radius: 10px; background: #fff; font-weight: 400; cursor: pointer; }
+label.hp-praxis:has(input:checked) { border-color: var(--teal); background: #f3faf7; }
+label.hp-praxis input { width: 18px; height: 18px; margin: 2px 0 0; flex: none; accent-color: var(--teal); }
+label.hp-praxis b { display: block; font-size: 14px; }
+label.hp-praxis small { display: block; }
+.hp-reihe { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.hp-tage { display: flex; flex-direction: column; gap: 6px; }
+.hp-tag { display: grid; grid-template-columns: 11rem 1fr; gap: 8px; }
+button.hp-klein-knopf { min-height: 32px; padding: 4px 12px; font-size: 13px; margin-top: 8px; }
+.hp-form [data-art][hidden] { display: none; }
+
+/* Vorschau: nachgebaute Homepage */
+.hp-seite { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: #fff; font-family: Georgia, "Times New Roman", serif; min-height: 260px; }
+.hp-v-leiste { padding: 8px 14px; color: #fff; background: #1f4f82; font: 13px/1.4 Inter, sans-serif; text-align: center; }
+.hp-v-leiste + .hp-v-leiste { border-top: 1px solid #ffffff59; }
+.hp-v-leiste.hp-v-impfstoff { background: #12695d; }
+.hp-v-leiste.hp-v-oeffnungszeiten { background: #7a5200; }
+.hp-v-leiste.hp-v-frei { background: #2f4a52; }
+.hp-v-menue { padding: 9px 14px; border-bottom: 1px solid #eee; color: #555; font: 13px Inter, sans-serif; }
+.hp-v-inhalt { padding: 14px; color: #444; font-size: 13px; }
+.hp-v-gruss { display: block; margin-bottom: 8px; font-size: 16px; color: #333; }
+.hp-v-blind { margin: 8px 0; color: #888; }
+.hp-v-kasten, .hp-v-kurzcode, .hp-v-fenster { font: 13px/1.45 Inter, sans-serif; color: #1e2b30; }
+.hp-v-kasten, .hp-v-kurzcode { margin: 8px 0; padding: 10px 12px; border-left: 4px solid #1f4f82; background: #f2f6fb; }
+.hp-v-impfstoff.hp-v-kasten, .hp-v-impfstoff.hp-v-kurzcode { border-color: #12695d; background: #eef7f3; }
+.hp-v-oeffnungszeiten.hp-v-kasten, .hp-v-oeffnungszeiten.hp-v-kurzcode { border-color: #b07a00; background: #fff8e6; }
+.hp-v-frei.hp-v-kasten, .hp-v-frei.hp-v-kurzcode { border-color: #2f4a52; background: #f2f5f5; }
+.hp-seite strong { display: block; }
+.hp-seite ul { margin: 4px 0 0; padding-left: 18px; }
+.hp-seite p { margin: 4px 0 0; }
+.hp-v-kurzstelle { margin-top: 10px; padding: 6px 8px 2px; border: 1px dashed #b9c8c3; border-radius: 8px; }
+.hp-v-marke { font: 600 11px Inter, sans-serif; color: var(--muted); letter-spacing: .5px; text-transform: uppercase; }
+.hp-v-schleier { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 18px; background: #00000059; }
+.hp-v-fensterbox { position: relative; width: 100%; max-width: 330px; padding: 14px 16px 12px; border-top: 5px solid #1f4f82; border-radius: 8px; background: #fff; box-shadow: 0 8px 26px #0004; }
+.hp-v-fensterbox:has(.hp-v-impfstoff) { border-top-color: #12695d; }
+.hp-v-fensterbox:has(.hp-v-oeffnungszeiten) { border-top-color: #b07a00; }
+.hp-v-zu { position: absolute; top: 2px; right: 9px; color: #666; font: 20px Inter, sans-serif; }
+.hp-v-mehr { color: var(--muted); font: 12px Inter, sans-serif; }
+.hp-v-bearbeitet { outline: 2px dashed #e0a100; outline-offset: 2px; }
+.hp-datum { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 6px; font-size: 13px; color: var(--muted); }
+.hp-datum label { margin: 0; font-weight: 500; }
+.hp-datum input { width: auto; min-height: 34px; padding: 4px 8px; }
+.hp-datum button { min-height: 32px; padding: 4px 12px; font-size: 13px; }
+.js .hp-ohne-js { display: none; }
+
+/* Vertretungspraxen */
+.hp-listenkopf { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 8px; }
+.hp-listenkopf h2 { margin-bottom: 2px; }
+.hp-raster { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.hp-praxisform h3 { margin-top: 0; }
+.hp-tabelle td { vertical-align: middle; }
+.hp-aktionen { white-space: nowrap; text-align: right; }
+.hp-aktionen .button, .hp-aktionen button { min-height: 32px; padding: 4px 12px; font-size: 13px; }
+.hp-aktionen form.inline { margin: 0 0 0 6px; }
+.hp-orte { padding-left: 20px; }
+.hp-orte li { margin: 4px 0; }
+@media (max-width: 700px) { .hp-reihe, .hp-raster { grid-template-columns: 1fr; } .hp-tag { grid-template-columns: 1fr; } }
