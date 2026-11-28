@@ -30,7 +30,6 @@ final class Web {
 
     public function handle(Request $req): Response {
         $this->req = $req;
-        V::$starter = $this->modules->starterPath();
         V::$starterMap = $this->modules->starterMap();
         try {
             $response = $this->route($req);
@@ -151,11 +150,11 @@ final class Web {
         $ip = $ips[0] ?? '192.0.2.10';
         if (str_ends_with($name, '.fritz.box')) {
             $routerText = '<p>Der Name <code>' . V::h($name) . '</code> endet auf „.fritz.box“: Eine FRITZ!Box kennt Geräte im Netz automatisch unter ihrem Rechnernamen. '
-                . 'Dann muss der Rechnername des Servers genau zu diesem Namen passen (Verwaltung → Server).</p>'
+                . 'Dann muss der Rechnername des Servers genau zu diesem Namen passen (Einrichten → Server).</p>'
                 . '<p>Anderer Router oder ein eigener DNS-Server: den Namen <code>' . V::h($name) . '</code> mit der Adresse <code>' . V::h($ip) . '</code> eintragen (meist die IT).</p>';
         } else {
             $routerText = '<p>Den Namen <code>' . V::h($name) . '</code> mit der Adresse <code>' . V::h($ip) . '</code> im Router oder einem eigenen DNS-Server eintragen (meist die IT). '
-                . 'Manche Router kennen Geräte im Netz auch automatisch unter ihrem Rechnernamen mit einer eigenen Endung; dann unter Verwaltung → Server genau diesen Namen mit der Endung des Routers wählen.</p>';
+                . 'Manche Router kennen Geräte im Netz auch automatisch unter ihrem Rechnernamen mit einer eigenen Endung; dann unter Einrichten → Server genau diesen Namen mit der Endung des Routers wählen.</p>';
         }
         $lead = '<p class="lead">Pro PC genügt ein Paket: Es richtet den Praxisherz-Agent ein (Starter für T2med, Zertifikat von Praxisherz, virtuelle Drucker, „Akte öffnen“). Unter Windows hält der Agent danach alles selbst aktuell, auch neue Drucker und Module; ein zweites Mal ist das Paket nur zur Reparatur nötig. '
             . 'Der PC muss außerdem den Namen von Praxisherz kennen (Schritt 2). Klappt etwas nicht, steht unten jeder Schritt auch zum Einrichten von Hand.</p>';
@@ -187,9 +186,9 @@ final class Web {
             . '<li>Am Ende diese Zeile einfügen und speichern:<br><code>' . V::h($ip . '   ' . $name) . '</code></li>'
             . '<li>Mac: im Terminal <code>sudo nano /etc/hosts</code>, dieselbe Zeile ergänzen, speichern.</li></ol></details>'
             . '<p>Danach Praxisherz unter <a href="https://' . V::h($name) . '/">https://' . V::h($name) . '/</a> öffnen.</p>';
-        // Starter, Pakete und Schlüssel: gehören zu den Arbeitsplätzen (Admins sehen die Pakete direkt hier).
+        // Paket je PC (Praxisherz-Agent), sobald ein Modul aus T2med gestartet wird. Admins sehen die Pakete direkt hier.
         $paket = '';
-        if ($this->modules->starterPath() !== '' || $this->modules->starters()) {
+        if ($this->modules->starters()) {
             $paket = '<h2 id="paket">1. Paket für einen Arbeitsplatz (Starter, Zertifikat, Drucker)</h2>';
             $admin = ($this->session['stage'] ?? '') === 'full' && (int)($this->session['user_admin'] ?? 0) === 1 && $this->starter !== null;
             $paket .= $admin ? $this->starterAbschnitt($error, $notice)
@@ -255,7 +254,7 @@ final class Web {
             . '<details class="how"><summary>Weitere Namen und Fachleute-Einstellungen</summary>'
             . '<label>Weitere Namen oder Adressen (einer je Zeile)<textarea name="weitere" rows="3">' . V::h(implode("\n", $extra)) . '</textarea></label>'
             . '<p class="muted">Erlaubt sind interne Namen (.internal, .local, .lan, .home.arpa, .fritz.box …) und private IP-Adressen. '
-            . 'Für andere Namen braucht es eine neue Zertifizierungsstelle – dann müssen alle Arbeitsplätze sie neu einspielen.</p>'
+            . 'Für andere Namen braucht es eine neue Zertifizierungsstelle – dann müssen alle Arbeitsplätze sie neu einspielen (das Paket unter Einrichten → Arbeitsplätze noch einmal ausführen oder von Hand).</p>'
             . V::checkbox('neue_ca', '1', 'Falls nötig: neue Zertifizierungsstelle erstellen', false)
             . V::checkbox('ohne_ip', '1', 'Nicht mehr über die IP-Adresse erreichbar', false) . '</details>'
             . '<button' . ($st['pending'] ? ' disabled' : '') . '>Speichern</button></form>'
@@ -949,7 +948,7 @@ final class Web {
                 $this->users->emailRemove($uid);
                 $notice = 'E-Mail-Adresse entfernt.';
             } else {
-                if (!$this->mailReady()) throw new Problem('Der E-Mail-Versand ist nicht eingerichtet (Verwaltung → Verbindungen). Ohne ihn lässt sich die Adresse nicht bestätigen.', 409);
+                if (!$this->mailReady()) throw new Problem('Der E-Mail-Versand ist nicht eingerichtet (Praxis → Verbindungen). Ohne ihn lässt sich die Adresse nicht bestätigen.', 409);
                 $code = $this->users->emailStart($uid, $address);
                 $this->con()->sendMail($address, 'Praxisherz: E-Mail-Adresse bestätigen', "Hallo " . ($user['display'] ?: $user['login']) . ",\n\ndein Bestätigungscode für diese Adresse (1 Stunde gültig):\n\n" . $code
                     . "\n\nGib ihn in Praxisherz unter „Mein Konto → E-Mail-Adresse“ ein. Du musst dazu angemeldet sein.\n\nWar das nicht deine Anfrage, kannst du diese Nachricht ignorieren.\n");
@@ -1006,7 +1005,7 @@ final class Web {
         $folds = $fold('E-Mail-Adresse', $ok($mail !== '', 'bestätigt', $pending !== '' ? 'wartet auf Bestätigung' : 'nicht hinterlegt'),
             '<p class="muted">Mit einer bestätigten Adresse kannst du dir auf der Anmeldeseite selbst einen Link zum Neusetzen des Passworts schicken lassen'
             . ($needsOtp ? ' (für Admin-Konten mit Authenticator-App gilt das nicht: sie werden an der Server-Konsole zurückgesetzt)' : '') . '.'
-            . ($this->mailReady() ? '' : ' <strong>Der E-Mail-Versand ist noch nicht eingerichtet</strong> (Verwaltung → Verbindungen).') . '</p>'
+            . ($this->mailReady() ? '' : ' <strong>Der E-Mail-Versand ist noch nicht eingerichtet</strong> (Praxis → Verbindungen).') . '</p>'
             . ($pending !== '' ? '<p class="notice">Wartet auf Bestätigung: ' . V::h($pending) . '. Den Code aus der E-Mail hier eingeben.</p><form method="post" action="/konto/email-code" class="box">' . $csrf
                 . V::input('code', 'Bestätigungscode (z. B. 1234-5678-9012-3456)', 'text', '', 'inputmode="numeric" autocomplete="one-time-code" maxlength="24" required placeholder="0000-0000-0000-0000"') . '<button>Code bestätigen</button></form>' : '')
             . '<form method="post" action="/konto/email" class="box">' . $csrf . V::input('email', 'E-Mail-Adresse (leer lassen zum Entfernen)', 'email', $mail !== '' ? $mail : $pending, 'maxlength="254" autocomplete="email" placeholder="name@praxis.de"')
@@ -1017,7 +1016,7 @@ final class Web {
             . V::input('password2', 'Neues Passwort wiederholen', 'password', '', 'autocomplete="new-password" required')
             . '<button>Ändern</button></form>');
         if ($needsOtp) $folds .= $fold('Handynummer für SMS-Code (Ersatz)', $ok($phone !== '', 'hinterlegt', 'nicht hinterlegt'),
-            '<p class="muted">Hast du die Authenticator-App nicht dabei, kann ein Code per SMS geschickt werden. Das geht nur, wenn unter Verwaltung → Verbindungen SMS eingerichtet ist.</p>'
+            '<p class="muted">Hast du die Authenticator-App nicht dabei, kann ein Code per SMS geschickt werden. Das geht nur, wenn unter Praxis → Verbindungen SMS eingerichtet ist.</p>'
             . '<form method="post" action="/konto/telefon" class="box">' . $csrf . V::input('telefon', 'Handynummer (leer lassen zum Entfernen)', 'tel', $phone, 'maxlength="30" placeholder="01701234567" autocomplete="tel"')
             . '<button>Speichern</button></form>');
         $folds .= $fold('Authenticator-App', $ok($otp, 'eingerichtet', 'nicht eingerichtet'),
@@ -2174,7 +2173,7 @@ final class Web {
     /** Papierbreite des Bondruckers in mm (58 oder 80); gilt für alle Module. */
     private function bonWidth(): int { return (int)$this->db->setting('drucker.bonbreite') === 80 ? 80 : 58; }
 
-    /** Zuordnung Rolle → Warteschlange (Verwaltung → Drucker); nur noch vorhandene Warteschlangen. */
+    /** Zuordnung Rolle → Warteschlange (Praxis → Drucker); nur noch vorhandene Warteschlangen. */
     private function printerRoles(): array {
         $d = json_decode((string)$this->db->setting('drucker.rollen'), true);
         $names = $this->printers ? array_column($this->printers->status()['queues'], 'name') : [];
@@ -2231,10 +2230,9 @@ final class Web {
             . '<p>Ein Paket pro Arbeitsplatz richtet den <strong>Praxisherz-Agent</strong> ein: ein Programm, das Module direkt aus T2med öffnet (aktueller Patient wird mitgegeben) und unter Windows als Dienst mit Systemrechten läuft. '
             . 'Der Agent fragt Praxisherz alle paar Sekunden und hält Starter, Aufrufe, Zertifikat und virtuelle Drucker selbst aktuell; „Akte öffnen“ legt er als GDT-Datei in <code>C:\Praxisherz\GDT</code> ab '
             . '(in T2med beim GDT-Gerät „Telefonaufruf“ als Importdatei <code>C:\Praxisherz\GDT\AUFRUFi.gdt</code> eintragen). Er führt keine Befehle von Praxisherz aus, nur diese festen Aufgaben. macOS und Linux bekommen vorerst nur den Starter (ohne Dienst).</p>';
-        if (!$list) return $body . '<p class="muted">Kein installiertes Modul bietet einen Startkontext an.</p>';
-        $body .= '<h3>Aufrufe aus T2med</h3><p>Die Adressen für die Einträge in T2med (je Modul) stehen unter '
-            . '<a href="/verwaltung/verbindungen#t2med">Verwaltung → Verbindungen → T2med</a>.</p>';
-        $body .= '<h3>Paket laden</h3><p>Das Paket enthält Starterprogramm, Zertifikat, Starter-Schlüssel, die virtuellen Drucker der Module und das Einrichtungsskript. Schlägt die Druckereinrichtung fehl, gilt die Anleitung oben (Abschnitt „Virtuelle Drucker“). Nur für Admins, nach der Einrichtung löschen.</p><p class="row-buttons">';
+        if ($list) $body .= '<h3>Aufrufe aus T2med</h3><p>Die Adressen für die Einträge in T2med (je Modul) stehen unter '
+            . '<a href="/verwaltung/verbindungen#t2med">Praxis → Verbindungen → T2med</a>.</p>';
+        $body .= '<h3>Paket laden</h3><p>Das Paket enthält Starterprogramm, Zertifikat, Starter-Schlüssel, die virtuellen Drucker der Module und das Einrichtungsskript. Schlägt etwas fehl, steht jeder Schritt unten unter „Von Hand einrichten“. Nur für Admins, nach der Einrichtung löschen.</p><p class="row-buttons">';
         if (is_file($this->clientDist() . '/' . self::SETUP_PROGRAMM)) {
             $body .= '<a class="button primary" href="/verwaltung/arbeitsplaetze/' . self::SETUP_DATEI . '">Windows: ' . self::SETUP_DATEI . '</a></p>'
                 . '<p class="muted small">Herunterladen und doppelklicken, Windows fragt nach Administratorrechten; danach läuft die Einrichtung im eigenen Fenster. '
@@ -2420,7 +2418,7 @@ final class Web {
     /** Selbstentpackendes Setup für Windows: Starterprogramm mit angehängtem Paket (ZIP); per Doppelklick richtet es den PC ein. */
     private function starterSetup(string $admin): Response {
         $exe = $this->clientDist() . '/' . self::SETUP_PROGRAMM;
-        if (!is_file($exe)) return Response::html(V::page('Arbeitsplätze', V::error('Auf dem Server liegen keine Starterprogramme für Windows. Bitte das ZIP-Paket nehmen.'), $this->nav()), 404);
+        if (!is_file($exe)) return Response::html(V::page('Arbeitsplätze einrichten', V::error('Auf dem Server liegen keine Starterprogramme für Windows. Bitte das ZIP-Paket nehmen.'), $this->nav()), 404);
         $files = $this->st()->files('windows', $this->starterKontexte(), $this->serverUrl(), $this->starterDrucker());
         $out = (string)file_get_contents($exe);
         Starter::zip($files, function (string $b) use (&$out) { $out .= $b; });
@@ -2648,7 +2646,7 @@ final class Web {
             . ($again ? '<div class="notice warn"><p><strong>Der Servername wurde geändert.</strong> ' . $again . ' Punkt' . ($again === 1 ? '' : 'e') . ' unten stehen deshalb wieder rot und müssen erneut erledigt werden.</p></div>' : '')
             . '<p class="legend"><span class="lg done">✓ erledigt</span><span class="lg open">○ offen</span><span class="lg error">! Fehler oder erneut nötig</span><span class="lg info">i optional</span>'
             . ' · Orte: ' . implode(', ', array_map(fn($p) => '<strong>' . V::h($p[0]) . '</strong> (' . V::h($p[1]) . ')', Overview::PLACES)) . '</p>'
-            . ($this->virtualPrinterHelp($this->printers ? $this->printers->status()['queues'] : [], true) !== '' ? '<p class="muted">Arbeitsplätze: Zertifikat, Name und die virtuellen Drucker der Module (für T2med) richtest du auf jedem PC nach <a href="/hilfe/arbeitsplatz#drucker">Arbeitsplatz einrichten</a> ein.</p>' : '');
+            . ($this->virtualPrinterHelp($this->printers ? $this->printers->status()['queues'] : [], true) !== '' ? '<p class="muted">Arbeitsplätze: Zertifikat, Starter und die virtuellen Drucker der Module (für T2med) richtet der Praxisherz-Agent ein – ein Paket je PC unter <a href="/hilfe/arbeitsplatz#paket">Einrichten → Arbeitsplätze</a>; dort steht auch der Weg von Hand.</p>' : '');
         foreach (Overview::GROUPS as $gid => $glabel) {
             $part = array_values(array_filter($core, fn($i) => ($i['gruppe'] ?? 'betrieb') === $gid));
             if (!$part) continue;

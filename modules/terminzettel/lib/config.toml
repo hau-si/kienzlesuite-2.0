@@ -1,4 +1,4 @@
-# Grundwerte des Moduls terminzettel (Layout: Einstellungsseite, Drucker: Verwaltung → Drucker)
+# Grundwerte des Moduls terminzettel (Layout: Einstellungsseite, Drucker: Praxis → Drucker)
 # T2med-Terminbeleg -> 58-mm-Terminbon -> lokale CUPS-Warteschlange
 
 [input]
@@ -8,7 +8,7 @@ text_encoding = "utf-8"
 ocr_if_needed = true
 
 [output]
-# Warteschlange: Zuordnung „Bondrucker“ unter Verwaltung → Drucker.
+# Warteschlange: Zuordnung „Bondrucker“ unter Praxis → Drucker.
 format = "escpos"  # escpos | text
 text_encoding = "utf-8"
 

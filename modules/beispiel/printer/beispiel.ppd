@@ -4,11 +4,11 @@
 *LanguageVersion: German
 *LanguageEncoding: ISOLatin1
 *PCFileName: "BEISPIEL.PPD"
-*Manufacturer: "Kienzle-Suite"
+*Manufacturer: "Praxisherz"
 *Product: "(Beispiel)"
-*ModelName: "Kienzle-Suite Beispiel-Drucker"
-*ShortNickName: "Kienzle-Suite Beispiel"
-*NickName: "Kienzle-Suite Beispiel-Drucker"
+*ModelName: "Praxisherz Beispiel-Drucker"
+*ShortNickName: "Praxisherz Beispiel"
+*NickName: "Praxisherz Beispiel-Drucker"
 *PSVersion: "(3010.000) 0"
 *LanguageLevel: "3"
 *ColorDevice: False

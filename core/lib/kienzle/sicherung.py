@@ -185,7 +185,7 @@ class Repo:
             base = '/'.join(p for p in (t['ordner'], z['ordner']) if p)
             if t['art'] == 'sftp':
                 if not t.get('hostkey'):
-                    raise Fehler('Schlüssel des SFTP-Servers noch nicht bestätigt (Verwaltung → Verbindungen).')
+                    raise Fehler('Schlüssel des SFTP-Servers noch nicht bestätigt (Praxis → Verbindungen).')
                 known = self.work / 'known_hosts'
                 known.write_text(t['hostkey'].replace(t['hostkey'].split(' ', 1)[0], t['host'] if t['port'] == 22 else f'[{t["host"]}]:{t["port"]}', 1) + '\n')
                 ssh = (f'ssh -F /dev/null -i {IDENTITY} -p {t["port"]} -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes '
@@ -353,7 +353,7 @@ def set_schedule(z: dict) -> str:
         raise Fehler('Zeitplan ungültig (Uhrzeit HH:MM, Wochentag 0–6, Tag 1–28).')
     clean = {'haeufigkeit': z['haeufigkeit'], 'uhrzeit': z['uhrzeit'], 'wochentag': z.get('wochentag', 6), 'tag': z.get('tag', 1)}
     _write(ETC / 'einstellungen.json', {**settings(), 'zeitplan': clean}, 0o600)
-    _write(TIMER_DROPIN, f'# Praxisherz: Zeitplan der Sicherung (Verwaltung → Sicherung)\n[Timer]\nOnCalendar=\nOnCalendar={calendar(clean)}\n', 0o644)
+    _write(TIMER_DROPIN, f'# Praxisherz: Zeitplan der Sicherung (Betrieb → Sicherung)\n[Timer]\nOnCalendar=\nOnCalendar={calendar(clean)}\n', 0o644)
     if Path(SYSTEMCTL).is_file():
         subprocess.run([SYSTEMCTL, 'daemon-reload'], capture_output=True, timeout=60)
         subprocess.run([SYSTEMCTL, 'restart', 'kienzle-sicherung.timer'], capture_output=True, timeout=60)

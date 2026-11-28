@@ -43,12 +43,6 @@ final class Modules {
     /** @return list<array{id:string,label:string}> */
     public function rights(string $id): array { return $this->modules[$id]['rights'] ?? []; }
 
-    /** Webpfad des ersten Moduls mit Startkontexten für den Arbeitsplatz-Starter ([[starters]]), sonst leer. */
-    public function starterPath(): string {
-        foreach ($this->modules as $m) if (!empty($m['starters'])) return (string)$m['web']['path'];
-        return '';
-    }
-
     /**
      * @return list<array{modul:string,pfad:string,schema:string,label:string}> Startkontexte der Module ([[starters]] in module.toml),
      * nach Schema sortiert.

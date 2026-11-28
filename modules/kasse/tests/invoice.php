@@ -61,7 +61,7 @@ try {
     foreach($oldPaymentRow as $key=>$value) check($migrated[$key]===$value,'Historische Zahlung bei Migration verändert');
     check($migrated['invoice_json']===null,'Nachträglich neue Rechnung für Altzahlung erzeugt');
     $values=Config::parse(file_get_contents(dirname(__DIR__).'/config/kienzle-kasse.example.toml'));
-    $values['app']['state_dir']=$dir; $values['app']['launcher_key']=str_repeat('a',64); $values['app']['encryption_key']=str_repeat('b',64);
+    $values['app']['state_dir']=$dir; $values['app']['encryption_key']=str_repeat('b',64);
     $values['sumup']=['mode'=>'live','api_key'=>'test','affiliate_key'=>'test','app_id'=>'test.app','merchant_code'=>'MTEST','reader_id'=>'reader-test'];
     $values['practice']=['name'=>'Testpraxis Dr. Muster','street'=>'Praxisstraße 12','city'=>'12345 Musterstadt','contact'=>'Telefon 01234 56789'];
     $values['printing']=['enabled'=>true,'share'=>'//kienzlebox/TMm10','width_dots'=>420,'cut'=>true];

@@ -2,6 +2,7 @@
 """Erklärvideo Praxisherz aus den Bildschirmfotos (erfundene Daten) bauen.
 Aufruf: python3 scripts/video-bauen.py [Bilderordner, Standard docs/screenshots] [Ausgabedatei, Standard Praxisherz-Ueberblick.mp4] [--probe]
 Benötigt Pillow und ffmpeg. Jede Szene ist eine eigene Datei (gleiche Größe, Bildrate, Encoder), zusammengesetzt mit dem concat-Demuxer."""
+import math
 import os, subprocess, sys, tempfile
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
@@ -15,11 +16,11 @@ FONT = '/usr/share/fonts/opentype/inter/'
 
 # (Bild, Titel, Untertitel, Sekunden)
 SZENEN = [
-    ('@titel', 'Praxisherz', 'Ein Server für die Praxis: Kasse, Terminzettel, Unterschrift, Qualitätsmanagement. Alle Bilder zeigen erfundene Beispieldaten.', 6),
+    ('@titel', 'Praxisherz', 'Ein Server für die Praxis: Kasse, Terminzettel, Signatur, Qualitätsmanagement, Telefon und Fax. Alle Bilder zeigen erfundene Beispieldaten.', 6),
     ('anmelden', 'Eine Anmeldung für alle Module', 'Passwort oder Passkey; Admins zusätzlich mit Code aus der Authenticator-App.', 6),
     ('start', 'Start: Einrichtung und Server-Zustand', 'Was noch zu tun ist, dazu Prozessor, Speicher, Festplatte und Laufzeit des Servers.', 7),
     ('einrichtung', 'Einrichtungs-Überblick', 'Jeder Schritt zeigt, wo er erledigt wird: im Webfenster, am Arbeitsplatz oder im Router.', 8),
-    ('starter', 'Zentraler Arbeitsplatz-Starter', 'Ein Programm je PC und ein Schlüssel für alle Module. T2med öffnet Kasse und Signatur mit dem aktuellen Patienten.', 8),
+    ('starter', 'Arbeitsplätze: ein Paket je PC', 'Der Praxisherz-Agent öffnet die Module aus T2med mit dem aktuellen Patienten und richtet Zertifikat und Drucker selbst ein.', 8),
     ('verbindungen', 'Verbindungen einmal eintragen', 'T2med, E-Mail, SMS, Letterxpress und der Netzwerkspeicher; Module bekommen nur, was sie anmelden.', 7),
     ('kasse-start', 'Kasse: Rechnungen aus T2med kassieren', 'In T2med auf „vKasse“ drucken, in der Kasse ein Klick: Karte, bar oder Überweisung.', 8),
     ('kasse-vorgaenge', 'Kasse: Vorgänge', 'Tag, Woche, Monat, Jahr mit Filtern, Abhaken in T2med und Excel-Liste für die Steuerberatung.', 8),
@@ -52,13 +53,21 @@ def umbruch(d, text, font, breite):
         else: zeilen.append(zeile); zeile = wort
     return zeilen + [zeile]
 
+def herz(d, cx, cy, r):
+    """Logo von Praxisherz (wie favicon.svg): Herz mit weißer Pulslinie, Mitte cx/cy, halbe Breite r."""
+    k = r / 16
+    punkte = [(cx + k * 16 * math.sin(t) ** 3, cy - k * (13 * math.cos(t) - 5 * math.cos(2 * t) - 2 * math.cos(3 * t) - math.cos(4 * t)) - k * 2)
+              for t in (i * 2 * math.pi / 200 for i in range(200))]
+    d.polygon(punkte, fill=AKZENT + (255,))
+    puls = [(-0.6, 0.15), (-0.2, 0.15), (-0.05, -0.2), (0.2, 0.45), (0.35, 0.15), (0.65, 0.15)]
+    d.line([(cx + x * r, cy + y * r) for x, y in puls], fill=(255, 255, 255, 255), width=max(3, round(r / 9)), joint='curve')
+
 def kopf(titel, untertitel, gross=False):
     """Beschriftung als RGBA-Bild in voller Größe (oben), unten eine feine Fußzeile."""
     im = Image.new('RGBA', (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
     if gross:
         d.rectangle([0, 0, W, H], fill=BG + (255,))
-        d.rounded_rectangle([W // 2 - 60, 250, W // 2 + 60, 370], radius=28, fill=AKZENT + (255,))
-        d.text((W // 2, 310), 'K', font=schrift('Inter-Bold.otf', 84), fill=(255, 255, 255, 255), anchor='mm')
+        herz(d, W // 2, 310, 66)
         d.text((W // 2, 470), titel, font=schrift('Inter-Bold.otf', 96), fill=TITEL + (255,), anchor='mm')
         f = schrift('Inter-Regular.otf', 38)
         for i, z in enumerate(umbruch(d, untertitel, f, 1300)): d.text((W // 2, 570 + i * 54), z, font=f, fill=TEXT + (255,), anchor='mm')

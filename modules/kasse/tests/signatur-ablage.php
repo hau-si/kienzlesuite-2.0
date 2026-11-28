@@ -20,7 +20,7 @@ final class AblageHttp extends HttpClient {
 
 $v = Config::parse(file_get_contents(dirname(__DIR__) . '/config/kienzle-kasse.example.toml'));
 $v['app']['state_dir'] = sys_get_temp_dir() . '/ks-sig-' . bin2hex(random_bytes(5));
-$v['app']['launcher_key'] = str_repeat('a', 64); $v['app']['encryption_key'] = str_repeat('b', 64);
+$v['app']['encryption_key'] = str_repeat('b', 64);
 $v['sumup'] = ['mode' => 'live', 'api_key' => 'sumup-test', 'affiliate_key' => 'affiliate-test', 'app_id' => 'test.app', 'merchant_code' => 'MTEST', 'reader_id' => 'reader-test'];
 $v['fhir'] = ['mode' => 'live', 'base_url' => 'https://t2med.example.org/aps/fhir/api/r4', 'launch_urls' => ['https://t2med.example.org/aps/fhir/api/r4'], 'api_key' => 'fhir-test', 'entry_code' => 'ZAHLUNG', 'ca_file' => ''];
 $http = new AblageHttp();

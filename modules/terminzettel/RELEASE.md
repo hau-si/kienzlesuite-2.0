@@ -1,5 +1,10 @@
 # Terminzettel – Release-Notizen
 
+## 1.3.0-beta.25
+
+- Drucker „vTermine“: Der Hinweis nennt jetzt den Praxisherz-Agenten (Einrichten → Arbeitsplätze), der den Drucker auf jedem Windows-PC selbst einrichtet; die Handanleitung (Windows, PowerShell, Mac) steht als Notweg eingeklappt darunter. Der Verweis auf den entfallenen Schritt „Virtuelle Drucker“ ist weg. Ohne angekommenen Auftrag verweist der Hinweis auf „Drucker prüfen“ im Praxisherz-Symbol der Taskleiste.
+- Menüwege nach der neuen Seitenleiste (Praxis → Drucker, Betrieb → Sicherheit), Herstellerzeile der PPD „Praxisherz“, ungenutzte Stilregel entfernt. Mit Tests geprüft, nicht auf der VM.
+
 ## 1.3.0-beta.24
 
 - Alte Bezeichnung in einem Test entfernt (keine Änderung der Funktion).

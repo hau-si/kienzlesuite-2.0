@@ -6,7 +6,7 @@ $k = Suite::modul();
 if (!Suite::can('kassieren') && !Suite::can('export') && !Suite::can('paid') && !Suite::can('periods') && !Suite::can('storno')) {
     http_response_code(403);
     header('Content-Type: text/plain; charset=utf-8');
-    exit("Für die Vorgänge fehlt ein Recht der Kasse (z. B. „Kassieren“). Bitte den Admin fragen (Verwaltung → Benutzer von Praxisherz).\n");
+    exit("Für die Vorgänge fehlt ein Recht der Kasse (z. B. „Kassieren“). Bitte den Admin fragen (Praxis → Benutzer und Gruppen von Praxisherz).\n");
 }
 header('Cache-Control: no-store');
 header('Referrer-Policy: no-referrer');

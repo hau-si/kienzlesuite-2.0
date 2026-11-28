@@ -27,7 +27,7 @@ if ($todo.Count) {
         if (Get-Printer -Name $d.Name -ErrorAction SilentlyContinue) { Say ($(if ($had) { 'aktualisiert' } else { 'neu' })) ('Drucker ' + $d.Name) }
         else {
             $server = ''
-            try { Invoke-WebRequest -Uri $d.Url -UseBasicParsing -TimeoutSec 10 | Out-Null } catch { $server = ' Die Adresse ' + $d.Url + ' antwortet nicht (' + $_.Exception.Message + '): Gibt es den Drucker auf dem Server (Verwaltung → Drucker, ggf. „Virtuelle Drucker der Module abgleichen“) und ist Port 631 in der Firewall frei?' }
+            try { Invoke-WebRequest -Uri $d.Url -UseBasicParsing -TimeoutSec 10 | Out-Null } catch { $server = ' Die Adresse ' + $d.Url + ' antwortet nicht (' + $_.Exception.Message + '): Gibt es den Drucker auf dem Server (Praxis → Drucker, ggf. „Virtuelle Drucker der Module abgleichen“) und ist Port 631 in der Firewall frei?' }
             Write-Warning ('Drucker ' + $d.Name + ' nicht angelegt: ' + $fehler + '.' + $server + ' (Anleitung auf der Seite „Arbeitsplätze“ von Praxisherz)')
         }
     }

@@ -24,21 +24,25 @@ Prüfliste für die Test-VM: `docs/VM-TEST.md`.
    ```
 
    Der Installer nimmt die IP-Adresse(n) und den Rechnernamen der VM. Den endgültigen Namen und den Praxisnamen legt
-   ein Admin danach unter **Verwaltung → Server** fest. Wer es gleich richtig haben will, kann beides auch mitgeben:
+   ein Admin danach unter **Einrichten → Server** fest. Wer es gleich richtig haben will, kann beides auch mitgeben:
    `--name praxisherz --name 192.0.2.10 --praxis "Praxis Dr. Beispiel"`.
 3. Am Ende zeigt der Installer
    - die Adresse(n), unter denen Praxisherz erreichbar ist (zunächst über die IP),
    - den **Fingerabdruck der Zertifizierungsstelle** (zum Vergleich auf den Arbeitsplätzen),
    - den **einmaligen Einrichtungslink** für den ersten Admin (gilt 24 Stunden).
-4. Auf einem Arbeitsplatz `https://<IP-der-VM>/ca.crt` laden und als **vertrauenswürdige
+4. Auf dem ersten Arbeitsplatz `https://<IP-der-VM>/ca.crt` laden und als **vertrauenswürdige
    Stammzertifizierungsstelle** eintragen (Windows: Doppelklick → Zertifikat installieren → Lokaler Computer →
-   „Vertrauenswürdige Stammzertifizierungsstellen“). Fingerabdruck vergleichen.
+   „Vertrauenswürdige Stammzertifizierungsstellen“). Fingerabdruck vergleichen. Das ist nur für diesen ersten Zugriff
+   nötig: Weitere PCs bekommen das Zertifikat mit dem Paket unter **Einrichten → Arbeitsplätze** (siehe Schritt 8).
 5. Einrichtungslink öffnen, Passwort setzen, Authenticator-App einrichten, Wiederherstellungscodes ausdrucken.
-6. **Verwaltung → Server:** Namen festlegen, unter dem die Arbeitsplätze Praxisherz erreichen (z. B. `praxisherz`,
+6. **Einrichten → Server:** Namen festlegen, unter dem die Arbeitsplätze Praxisherz erreichen (z. B. `praxisherz`,
    Eintrag im DNS bzw. Router nötig), dazu den Praxisnamen. Das Server-Zertifikat wird dabei neu ausgestellt; die
    Zertifizierungsstelle bleibt. Passkeys funktionieren nur über diesen Namen.
-7. **Verwaltung → Einrichtung** zeigt, was noch fehlt: zweiter Admin, Firewall, Netzwerkspeicher, Sicherung,
+7. **Startseite → Einrichtung** zeigt, was noch fehlt: zweiter Admin, Firewall, Netzwerkspeicher, Sicherung,
    Schlüsselblatt, Schnappschüsse am NAS, Probe-Wiederherstellung – und darunter die Punkte der Module.
+8. **Einrichten → Arbeitsplätze:** Auf jedem Windows-PC einmal `Praxisherz-Setup.exe` ausführen. Der Praxisherz-Agent
+   richtet Zertifikat, Starter für T2med und die virtuellen Drucker der Module ein und hält sie aktuell. Für Mac, Linux
+   oder wenn etwas schiefgeht, steht dort jeder Schritt eingeklappt unter „Von Hand einrichten“.
 
 ## Unbeaufsichtigt (autoinstall)
 
@@ -60,7 +64,7 @@ davon starten.
 - **Voraussetzungen:** Internet per DHCP beim Start und rund **6 GB Arbeitsspeicher** oder mehr: Ubuntu Server 26.04.1 wird beim Start geladen
   (2,7 GB) und im Arbeitsspeicher gehalten. Eine feste Adresse für den Download: Menüeintrag mit „e“ bearbeiten (Hinweis steht in der Menüdatei).
 - **Eingaben:** Nur drei Ubuntu-Bildschirme bleiben: **Netzwerk** (DHCP oder feste Adresse), **Datenträger** (Platte und Größe, Rest bleibt frei)
-  und **Benutzer/Passwort** (Servername mit `suite` vorbelegt). Sprache, Tastatur (de), Zeitzone, SSH-Server und Sicherheitsupdates laufen ohne Rückfrage.
+  und **Benutzer/Passwort** (Servername `praxisherz` und Benutzer `praxisadmin` vorbelegt). Sprache, Tastatur (de), Zeitzone, SSH-Server und Sicherheitsupdates laufen ohne Rückfrage.
 - **Startmenü:** *stabil (signiert)*, *Beta (unsignierte Vorabversionen erlaubt)*, *Zweig main* oder *Zweig beta* (nur wenn es kein Release gibt).
   Unsignierte Stände gibt es nur durch ausdrückliche Menüwahl; bei Releases schützt dann noch die Prüfsumme des Manifests, beim Zweig nichts.
 - **Danach** holt `kienzle-holen` beim ersten Start das neueste Release des Kanals, prüft die Ed25519-Signatur mit den Schlüsseln aus
@@ -77,8 +81,8 @@ davon starten.
 - Dienste der Basis: Firewall, Updates, Verbindungen, Netzwerkspeicher, Sicherung, Einrichtungs-Überblick.
 - **CUPS und Samba als Druckserver** aus festen Vorlagen. Vorher werden die Vorlagen geprüft (`cupsd -t`, `testparm`),
   die ursprünglichen Dateien liegen unter `/etc/kienzle/original/`. Samba hat keine Dateifreigaben, nur SMB 3, kein NetBIOS.
-  Aus dem Praxisnetz erreichbar erst nach Freigabe in **Verwaltung → Firewall** (IPP 631, Windows-Freigabe 445).
-  Arbeitsgruppe: **Verwaltung → Drucker → Windows-Netz**. Windows 11 Pro (ab 24H2) lässt Gastzugriff auf
+  Aus dem Praxisnetz erreichbar erst nach Freigabe in **Betrieb → Sicherheit → Firewall** (IPP 631, Windows-Freigabe 445).
+  Arbeitsgruppe: **Praxis → Drucker → Windows-Netz**. Windows 11 Pro (ab 24H2) lässt Gastzugriff auf
   Windows-Freigaben nicht mehr zu: dort über IPP drucken.
 - Automatische Sicherheitsupdates der Distribution **ohne automatischen Neustart**.
 - AppArmor-Ergänzungen für Programme, die Module anmelden (`gs`, `qpdf`).
@@ -93,7 +97,7 @@ Mehrfaches Ausführen ist erlaubt; Schlüssel, Zertifizierungsstelle, Daten und 
 | `sudo bash installer/install.sh --kanal beta` | Update-Kanal festlegen (`stabil` oder `beta`) |
 | `sudo bash installer/install.sh --wiederherstellen` | Neue VM nach Totalausfall: Angaben vom Schlüsselblatt eingeben, alles kommt zurück |
 | `sudo kienzle-sicherung einstellungen-einspielen DATEI` | Export der Einstellungen zurücklegen, danach Installer erneut ausführen |
-| `sudo kienzle-module liste` | Installierte und verfügbare Module (sonst Verwaltung → Module im Webinterface) |
+| `sudo kienzle-module liste` | Installierte und verfügbare Module (sonst Betrieb → Module im Webinterface) |
 | `sudo kienzle-module installieren kasse` / `entfernen kasse [--daten-loeschen]` | Modul an der Konsole installieren bzw. entfernen |
 
 ## Nach einem Totalausfall

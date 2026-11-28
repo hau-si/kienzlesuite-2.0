@@ -29,7 +29,7 @@ final class LxpFakeHttp extends HttpClient {
 function values(array $lxp = []): array {
     $v = Config::parse(file_get_contents(dirname(__DIR__) . '/config/kienzle-kasse.example.toml'));
     $v['app']['state_dir'] = sys_get_temp_dir() . '/ks-lxp-' . bin2hex(random_bytes(6));
-    $v['app']['launcher_key'] = str_repeat('a', 64); $v['app']['encryption_key'] = str_repeat('b', 64);
+    $v['app']['encryption_key'] = str_repeat('b', 64);
     $v['invoice_inbox'] = ['enabled' => true, 'key' => str_repeat('c', 64), 'max_age_days' => 14];
     if ($lxp) $v['letterxpress'] = $lxp + ['enabled' => true, 'username' => 'praxis-test', 'api_key' => 'lxp-secret-key', 'mode' => 'test'];
     return $v;

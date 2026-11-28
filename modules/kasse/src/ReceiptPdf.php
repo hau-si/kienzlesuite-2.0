@@ -23,7 +23,7 @@ final class ReceiptPdf {
         foreach (['/usr/bin/rsvg-convert', '/opt/homebrew/bin/rsvg-convert', '/usr/local/bin/rsvg-convert'] as $path) {
             if (is_executable($path)) { $binary = $path; break; }
         }
-        if (!$binary) throw new Problem('PDF-Konverter fehlt. Bitte das Modul unter Verwaltung → Module neu installieren (Paket librsvg2-bin).', 503);
+        if (!$binary) throw new Problem('PDF-Konverter fehlt. Bitte das Modul unter Betrieb → Module neu installieren (Paket librsvg2-bin).', 503);
         // stdin hat keine Basis-URL: librsvg lädt keine lokalen/externen Dateien.
         $result = Command::run([$binary, ...$options], $source);
         if ($result['code'] !== 0 || !str_starts_with($result['output'], $signature)) {

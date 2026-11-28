@@ -1,7 +1,7 @@
 #!/usr/bin/php
 <?php
 declare(strict_types=1);
-// Verschlüsselung für den Export der Einstellungen (Verwaltung → Sicherung → Einstellungen exportieren).
+// Verschlüsselung für den Export der Einstellungen (Betrieb → Sicherung → Einstellungen exportieren).
 //
 //   kienzle-tresor verschluesseln AUSGABE     stdin: erste Zeile Passwort, danach die Daten (tar.gz)
 //   kienzle-tresor entschluesseln DATEI AUSGABE    stdin: erste Zeile Passwort

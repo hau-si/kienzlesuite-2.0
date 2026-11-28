@@ -16,7 +16,7 @@ seine Ausgabe (`--alle --json`), die die Basis als `/var/lib/kienzle/core/module
 
 ## Installation
 
-Module installiert, aktualisiert und entfernt die Basis (Verwaltung → Module bzw. `sudo kienzle-module …`). Quellen: die mit
+Module installiert, aktualisiert und entfernt die Basis (Betrieb → Module bzw. `sudo kienzle-module …`). Quellen: die mit
 der Basis gelieferten Module (`modules/<id>/` im Release der Basis, ohne `beispiel`) und GitHub-Releases `<id>-v<version>`
 mit dem Archiv `modules/<id>/…` (`scripts/release-bauen <id>`). Das Programm landet in `/opt/kienzle/<id>/releases/<version>/<id>/`
 (nur root beschreibbar), aktiv über `/opt/kienzle/<id>/current`. FastCGI-Module bekommen eine eigene php-fpm-Instanz
@@ -100,7 +100,7 @@ Rechte, die der Admin Mitarbeitern als Kästchen zuweist. Admin-Rechte je Modul 
 |---|---|---|
 | `paths` | ja | 1–20 absolute Pfade innerhalb von `/var/lib/kienzle/<id>` |
 | `snapshot` | nein | Haken, der vor der Sicherung eine stimmige Kopie erzeugt (z. B. SQLite per `VACUUM INTO`) |
-| `settings` | nein | 0–20 Dateien oder Ordner mit den Einstellungen des Moduls (innerhalb von `/var/lib/kienzle/<id>`); kommen in den verschlüsselten Export der Einstellungen (Verwaltung → Sicherung) |
+| `settings` | nein | 0–20 Dateien oder Ordner mit den Einstellungen des Moduls (innerhalb von `/var/lib/kienzle/<id>`); kommen in den verschlüsselten Export der Einstellungen (Betrieb → Sicherung) |
 
 ### `[[printers]]` – optional, höchstens 10
 
@@ -115,12 +115,12 @@ Virtuelle Drucker des Moduls. Die Druckerverwaltung der Basis legt sie an und en
 | `formats` | nein | nur mit `command`: angenommene Dateitypen, Vorgabe `["application/pdf"]`, höchstens 5 |
 | `ppd` | eins von beiden | Ältere Art: CUPS-Warteschlange mit PPD-Datei aus dem Modulordner (CUPS behandelt PPDs als veraltet) |
 | `backend` | nein | nur mit `ppd`: CUPS-Backend im Modulordner (ausführbar, läuft als Benutzer `lp`). Ohne Backend verwirft die Warteschlange die Ausgabe der Filter (Backend `kienzle-leer` der Basis) |
-| `share` | nein | Liste aus `"samba"` und `"ipp"`: wie die Arbeitsplätze den Drucker erreichen. IPP ist bei virtuellen Druckern immer an (Standardweg für alle Betriebssysteme), auch wenn es hier fehlt; Samba (alte Windows-Freigabe) ist nur eine Vorgabe für neue Drucker, der Admin schaltet es unter Verwaltung → Drucker ein oder aus |
+| `share` | nein | Liste aus `"samba"` und `"ipp"`: wie die Arbeitsplätze den Drucker erreichen. IPP ist bei virtuellen Druckern immer an (Standardweg für alle Betriebssysteme), auch wenn es hier fehlt; Samba (alte Windows-Freigabe) ist nur eine Vorgabe für neue Drucker, der Admin schaltet es unter Praxis → Drucker ein oder aus |
 
 ### `[printer_list]` – optional
 
 Veränderbare Druckerliste (z. B. Faxdrucker, die der Admin in den Einstellungen des Moduls erweitert). Das Modul schreibt die Namen
-nach `/var/lib/kienzle/<id>/<file>` (`{"drucker": [{"name": "vFax"}, …]}`); die Basis legt beim Abgleichen (Verwaltung → Drucker →
+nach `/var/lib/kienzle/<id>/<file>` (`{"drucker": [{"name": "vFax"}, …]}`); die Basis legt beim Abgleichen (Praxis → Drucker →
 „Virtuelle Drucker der Module abgleichen“, auch bei Installieren und Aktualisieren des Moduls) für jeden Namen einen virtuellen Drucker an.
 Alle Drucker der Liste teilen sich Programm, Beschreibung und Papier. Das Programm bekommt den Druckernamen in der Umgebungsvariablen
 `KIENZLE_DRUCKER`. Zusammen mit `[[printers]]` höchstens 10 Drucker.
@@ -137,12 +137,12 @@ Alle Drucker der Liste teilen sich Programm, Beschreibung und Papier. Das Progra
 
 ### `[[starters]]` – optional
 
-Startkontexte für den zentralen Arbeitsplatz-Starter der Basis (Verwaltung → Arbeitsplätze). Nur mit `[web] protocol = "fastcgi"`. Höchstens 5 Einträge je Modul.
+Startkontexte für den zentralen Arbeitsplatz-Starter der Basis (Einrichten → Arbeitsplätze). Nur mit `[web] protocol = "fastcgi"`. Höchstens 5 Einträge je Modul.
 
 | Feld | Pflicht | Bedeutung |
 |---|---|---|
 | `schema` | ja | URL-Schema, das T2med aufruft, `praxisherz-<name>` (Kleinbuchstaben, Ziffern, Bindestrich); über alle Module eindeutig |
-| `label` | ja | Name des Kontexts für die Anzeige auf der Seite „Arbeitsplätze“ |
+| `label` | ja | Name des Kontexts für die Anzeige der T2med-Einträge (Praxis → Verbindungen → T2med) |
 
 Das Starterprogramm sendet `POST https://<server>/starter/<modul-id>` (JSON mit `context_id`, `fhir_base_url`, `oauth_token`, `action = "launch"`).
 Die Basis prüft vorher den Starter-Schlüssel; das Modul sieht `KIENZLE_OEFFENTLICH=starter` und `KIENZLE_STARTER_GEPRUEFT=1` und antwortet mit
@@ -179,7 +179,7 @@ installiert sind und einander anmelden: `/var/spool/kienzle/austausch/<a>_<b>` (
 
 ### `[[fileshare]]` – optional, höchstens 3, nur `core_api = "2"`
 
-Ordner im Datenverzeichnis des Moduls, den ein Admin unter Verwaltung → Drucker als **Windows-Freigabe zum Ablegen** einschalten kann
+Ordner im Datenverzeichnis des Moduls, den ein Admin unter Praxis → Drucker als **Windows-Freigabe zum Ablegen** einschalten kann
 (Vorgabe: aus). Beim Einschalten vergibt der Admin ein Kennwort (8 bis 64 Zeichen); angemeldet wird mit dem Samba-Benutzer `ks-<id>`, Gastzugriff gibt es nicht (Windows 11 24H2 verlangt eine Anmeldung). Dateien gehören `ks-<id>` (Modus 0600, Ordner 0700); beim Ausschalten wird der Samba-Zugang gelöscht. Erreichbar
 nur, wenn die Firewall „Drucken über Windows-Freigabe (445)“ für das Netz freigegeben ist. Das Modul überwacht den Ordner selbst
 (z. B. mit einer `.path`-Einheit) und muss unvollständig kopierte Dateien abwarten.
@@ -231,7 +231,7 @@ Entspricht `modules/beispiel/module.toml`; die Tests prüfen, dass dieses Beispi
 [module]
 id = "beispiel"
 name = "Beispielmodul"
-version = "0.2.0"
+version = "0.2.1-beta.1"
 core_api = "1"
 description = "Zeigt alle Felder der Modul-Beschreibung; nur für Tests."
 

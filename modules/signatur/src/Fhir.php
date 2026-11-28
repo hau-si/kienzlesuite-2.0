@@ -4,12 +4,12 @@ namespace KienzleSignatur;
 
 /**
  * Patient aus T2med lesen (FHIR), nur für den Start aus T2med (praxisherz-signatur://…). Verbindungsdaten liefert die Basis
- * (Verwaltung → Verbindungen → T2med). Keine Weiterleitungen, nur HTTPS; Fehlermeldungen enthalten keine Zugangsdaten.
+ * (Praxis → Verbindungen → T2med). Keine Weiterleitungen, nur HTTPS; Fehlermeldungen enthalten keine Zugangsdaten.
  */
 class Fhir {
     public const KONTEXT = 'https://fhir.t2med.de/identifier/kontext';
     /** Ohne API-Schlüssel der Praxis gibt es keinen Ersatz (der Schlüssel steht nie im Quelltext). */
-    public const OHNE_SCHLUESSEL = 'Kein T2med-API-Schlüssel eingetragen. Bitte unter Verwaltung → Verbindungen → T2med den API-Schlüssel der Praxis eintragen.';
+    public const OHNE_SCHLUESSEL = 'Kein T2med-API-Schlüssel eingetragen. Bitte unter Praxis → Verbindungen → T2med den API-Schlüssel der Praxis eintragen.';
 
     /** @param array<string,mixed> $v Verbindung „t2med“ der Basis */
     public function __construct(private array $v, private string $caDatei = '') {}
@@ -25,10 +25,10 @@ class Fhir {
     /** @return array{id:string,name:string,vorname:string,nachname:string,geschlecht:string,geburtsdatum:string,telefon:string,email:string,adresse:string} */
     public function patient(string $kontext, string $token): array {
         $basis = rtrim((string)($this->v['base_url'] ?? ''), '/');
-        if ($basis === '') throw new \RuntimeException('T2med ist in der Basis nicht eingerichtet (Verwaltung → Verbindungen).');
+        if ($basis === '') throw new \RuntimeException('T2med ist in der Basis nicht eingerichtet (Praxis → Verbindungen).');
         $antwort = $this->anfrage($basis . '/Patient?' . http_build_query(['identifier' => self::KONTEXT . '|' . $kontext]), $token);
         if ($antwort['status'] !== 200) throw new \RuntimeException('Patient konnte nicht aus T2med geladen werden (HTTP ' . $antwort['status'] . '). ' . match (true) {
-            $antwort['status'] === 401, $antwort['status'] === 403 => 'T2med lehnt den Zugriff ab: den API-Schlüssel (Verwaltung → Verbindungen → T2med) und den Drittanbieter-Zugriff in T2med prüfen; außerdem muss der Aufruf frisch aus der Patientenakte kommen.',
+            $antwort['status'] === 401, $antwort['status'] === 403 => 'T2med lehnt den Zugriff ab: den API-Schlüssel (Praxis → Verbindungen → T2med) und den Drittanbieter-Zugriff in T2med prüfen; außerdem muss der Aufruf frisch aus der Patientenakte kommen.',
             $antwort['status'] === 404 => 'Die Adresse oder der Kontext ist T2med unbekannt. Bitte frisch aus der Patientenakte öffnen und die FHIR-Adresse prüfen.',
             default => 'Bitte frisch aus der Patientenakte öffnen.',
         });
@@ -73,7 +73,7 @@ class Fhir {
     public function kontaktSchreiben(string $patientId, string $token, string $telefon, string $email): array {
         if (!preg_match('/^[A-Za-z0-9._-]{1,64}$/D', $patientId)) throw new \InvalidArgumentException('Ungültige Patienten-ID.');
         $basis = rtrim((string)($this->v['base_url'] ?? ''), '/');
-        if ($basis === '') throw new \RuntimeException('T2med ist in der Basis nicht eingerichtet (Verwaltung → Verbindungen).');
+        if ($basis === '') throw new \RuntimeException('T2med ist in der Basis nicht eingerichtet (Praxis → Verbindungen).');
         $url = $basis . '/Patient/' . rawurlencode($patientId);
         $alt = $this->anfrage($url, $token);
         if ($alt['status'] !== 200 || !is_array($alt['body']) || ($alt['body']['resourceType'] ?? '') !== 'Patient' || ($alt['body']['id'] ?? '') !== $patientId) {
@@ -123,7 +123,7 @@ class Fhir {
         if (!preg_match('/^[A-Za-z0-9._-]{1,128}$/D', $kontext)) throw new \InvalidArgumentException('Ungültiger T2med-Kontext.');
         if (!str_starts_with($pdf, '%PDF-') || strlen($pdf) > 10 * 1024 * 1024) throw new \InvalidArgumentException('Das PDF ist ungültig oder zu groß.');
         $basis = rtrim((string)($this->v['base_url'] ?? ''), '/');
-        if ($basis === '') throw new \RuntimeException('T2med ist in der Basis nicht eingerichtet (Verwaltung → Verbindungen).');
+        if ($basis === '') throw new \RuntimeException('T2med ist in der Basis nicht eingerichtet (Praxis → Verbindungen).');
         $a = $this->anfrage($basis . '/DocumentReference', $token, 'POST', self::dokumentRessource($kontext, $pdf, $titel, $zeit), ['Content-Type: application/fhir+json'], '');
         self::antwortPruefen($a['status'], $a['body']);
     }
@@ -141,7 +141,7 @@ class Fhir {
     public function eintragAblegen(string $kontext, string $token, string $kuerzel, string $text, int $zeit): void {
         if (!preg_match('/^[A-Za-z0-9._-]{1,128}$/D', $kontext)) throw new \InvalidArgumentException('Ungültiger T2med-Kontext.');
         $basis = rtrim((string)($this->v['base_url'] ?? ''), '/');
-        if ($basis === '') throw new \RuntimeException('T2med ist in der Basis nicht eingerichtet (Verwaltung → Verbindungen).');
+        if ($basis === '') throw new \RuntimeException('T2med ist in der Basis nicht eingerichtet (Praxis → Verbindungen).');
         $a = $this->anfrage($basis, $token, 'POST', self::eintragRessource($kontext, $kuerzel, $text, $zeit), ['Content-Type: application/fhir+json'], '');
         $body = $a['body'];
         $antwort = is_array($body) && ($body['resourceType'] ?? '') === 'Bundle' ? ($body['entry'][0]['response'] ?? []) : null;
@@ -202,7 +202,7 @@ class Fhir {
         curl_exec($curl);
         $fehler = curl_errno($curl); $status = (int)curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
         $curl = null;
-        if ($fehler || $zuGross) throw new \RuntimeException('T2med ist nicht erreichbar oder das Zertifikat passt nicht (cURL ' . $fehler . '). Verbindung unter Verwaltung → Verbindungen prüfen.');
+        if ($fehler || $zuGross) throw new \RuntimeException('T2med ist nicht erreichbar oder das Zertifikat passt nicht (cURL ' . $fehler . '). Verbindung unter Praxis → Verbindungen prüfen.');
         $json = json_decode($roh, true);
         return ['status' => $status, 'body' => is_array($json) ? $json : null];
     }

@@ -1,5 +1,10 @@
 # Release-Notizen Fax
 
+## 0.1.0-beta.16
+
+- Faxdrucker: Der Hinweis nennt jetzt den Praxisherz-Agenten (Einrichten → Arbeitsplätze), der die Faxdrucker auf jedem Windows-PC selbst einrichtet und neue Drucker selbst übernimmt; die Handeinrichtung steht als Notweg eingeklappt darunter. Nach einer Änderung der Druckerliste bleibt der Abgleich unter Praxis → Drucker nötig.
+- Menüwege nach der neuen Seitenleiste (Praxis → Drucker/Verbindungen/Praxis, Betrieb → Module), ungenutzte Stilregeln entfernt. Mit Tests geprüft, nicht auf der VM.
+
 ## 0.1.0-beta.15
 
 - Texte: „die Suite“/„der Suite“ heißt jetzt überall „Praxisherz“. Nur Texte geändert, mit Tests geprüft, nicht auf der VM.

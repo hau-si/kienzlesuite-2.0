@@ -64,7 +64,7 @@ if [ ${#names[@]} -eq 0 ] && [ -z "$restore" ]; then
     mapfile -t names < <(python3 -c 'import json,sys; print("\n".join(json.load(open(sys.argv[1]))["hostnames"]))' "$conf")
   else
     # Erstinstallation ohne Angaben: Rechnername und alle IPv4-Adressen der VM. Den endgültigen Namen legt ein Admin
-    # danach unter Verwaltung → Server fest (dort auch Praxisname); das Zertifikat wird dann neu ausgestellt.
+    # danach unter Einrichten → Server fest (dort auch Praxisname); das Zertifikat wird dann neu ausgestellt.
     # Zuerst die IP-Adressen: Unter ihnen erreichen die Arbeitsplätze den Server sicher schon jetzt (Einrichtungslink).
     for ip in $(hostname -I 2>/dev/null); do
       if [[ $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] && [[ ! $ip =~ ^127\. ]]; then names+=("$ip"); fi
@@ -128,7 +128,7 @@ install -d -m 0700 -o ks-nachrichten -g ks-nachrichten /var/lib/kienzle/nachrich
 install -d -m 0700 -o root -g root /etc/kienzle/sicherung /var/cache/kienzle-sicherung
 install -d -m 0755 -o root -g root /var/lib/kienzle/sicherung /var/lib/kienzle/ueberblick /var/lib/kienzle/servername /var/lib/kienzle/module /etc/kienzle/module
 install -d -m 0700 -o ks-ablage -g ks-ablage /var/lib/kienzle/ablage/.ssh
-# Eigener SSH-Schlüssel des Netzwerkspeicher-Dienstes (für SFTP-Ziele; der öffentliche Teil steht unter Verwaltung → Verbindungen).
+# Eigener SSH-Schlüssel des Netzwerkspeicher-Dienstes (für SFTP-Ziele; der öffentliche Teil steht unter Praxis → Verbindungen).
 if [ ! -f /var/lib/kienzle/ablage/.ssh/id_ed25519 ] && command -v ssh-keygen >/dev/null; then
   runuser -u ks-ablage -- ssh-keygen -q -t ed25519 -N '' -C "ks-ablage@$(hostname)" -f /var/lib/kienzle/ablage/.ssh/id_ed25519
 fi
@@ -139,7 +139,7 @@ tmp=$(mktemp -d /opt/kienzle/core/releases/.neu.XXXXXX)
 cp -r -- "$src/." "$tmp/"
 # Installer mit ablegen: Damit kann der Updater später auf genau diese Version zurückspringen.
 rm -rf -- "$tmp/installer"; mkdir "$tmp/installer"; cp -r -- "$here/installer/." "$tmp/installer/"
-# Mitgelieferte Module (ohne Beispielmodul): installierbar über Verwaltung → Module.
+# Mitgelieferte Module (ohne Beispielmodul): installierbar über Betrieb → Module.
 if [ "$src" != "$here" ] && [ -d "$here/modules" ]; then
   rm -rf -- "$tmp/modules"; mkdir "$tmp/modules"
   for m in "$here"/modules/*/; do
@@ -303,7 +303,7 @@ if [ -z "$nosystemd" ]; then
   done
   systemctl start avahi-daemon.service cups.service smbd.service >/dev/null 2>&1 || true
   if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q 'Status: active'; then
-    echo 'Hinweis: ufw ist aktiv. Die Firewall von Praxisherz (Verwaltung → Firewall) arbeitet unabhängig davon; bitte nur eine von beiden verwenden.'
+    echo 'Hinweis: ufw ist aktiv. Die Firewall von Praxisherz (Betrieb → Sicherheit → Firewall) arbeitet unabhängig davon; bitte nur eine von beiden verwenden.'
   fi
   systemctl restart kienzle-core-php.service
   # Modul-Dienste (php-fpm) neu starten, sonst liefern sie nach einem Basis-Update noch den alten Rahmen (Seitenleiste) aus dem Zwischenspeicher.
@@ -321,15 +321,16 @@ fi
 
 echo
 echo "Praxisherz Basis $version ist installiert: https://${names[0]}/"
+echo 'Arbeitsplätze einrichten (Paket je PC, Zertifikat von Hand): https://'"${names[0]}"'/hilfe/arbeitsplatz'
 echo 'Zertifizierungsstelle für die Arbeitsplätze: https://'"${names[0]}"'/ca.crt'
 echo "Einrichtungs-Überblick: https://${names[0]}/verwaltung/einrichtung"
 echo "Fingerabdruck zum Vergleich: $(/opt/kienzle/core/current/bin/kienzle-zertifikat status | sed -n 's/^CA (SHA-256): //p')"
 if [ -n "$auto_names" ]; then
   echo "Erreichbar unter: ${names[*]}. Den endgültigen Namen (für Passkeys nötig) und den Praxisnamen bitte unter"
-  echo "Verwaltung → Server festlegen."
+  echo "Einrichten → Server festlegen."
 fi
 /opt/kienzle/core/current/bin/kienzle-ueberblick sammeln >/dev/null || echo 'Hinweis: Einrichtungs-Überblicke der Module nicht lesbar.'
-/opt/kienzle/core/current/bin/kienzle-module pruefen --sofort >/dev/null 2>&1 || true   # Angebot für Verwaltung → Module (GitHub darf fehlen)
+/opt/kienzle/core/current/bin/kienzle-module pruefen --sofort >/dev/null 2>&1 || true   # Angebot für Betrieb → Module (GitHub darf fehlen)
 if [ -n "$admin_reset" ]; then /opt/kienzle/core/current/bin/kienzle-admin zuruecksetzen "$admin_reset"; fi
 if [ -n "$nosystemd" ] || [ -n "$update" ]; then exit 0; fi
 if ! /opt/kienzle/core/current/bin/kienzle-admin benutzer 2>/dev/null | grep -q 'Basis-Admin'; then

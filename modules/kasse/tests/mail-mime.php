@@ -4,7 +4,7 @@ require dirname(__DIR__) . '/src/bootstrap.php';
 use KienzleKasse\{Config,ReceiptMailer,ReceiptPdf};
 
 $values = Config::parse(file_get_contents(dirname(__DIR__).'/config/kienzle-kasse.example.toml'));
-$values['app']['launcher_key'] = str_repeat('a',64); $values['app']['encryption_key'] = str_repeat('b',64);
+$values['app']['encryption_key'] = str_repeat('b',64);
 $values['mail'] = ['enabled'=>true,'host'=>'smtp.example.invalid','port'=>587,'encryption'=>'starttls',
     'username'=>'smtp-test','password'=>'smtp-secret','from_address'=>'praxis@example.invalid','from_name'=>'Musterpraxis'];
 $pdf = ReceiptPdf::convert('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="100"><text x="20" y="40">TESTBELEG 16,00 EUR</text></svg>');

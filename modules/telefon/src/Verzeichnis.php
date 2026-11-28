@@ -77,7 +77,7 @@ final class Verzeichnis {
         if (!preg_match('/^[A-Za-z0-9._-]{1,128}$/D', $kontext)) throw new \InvalidArgumentException('Ungültiger T2med-Kontext.');
         if ($token === '' || strlen($token) > 16000 || preg_match('/\s|\$\{/', $token)) throw new \InvalidArgumentException('T2med hat kein gültiges Zugriffstoken übergeben.');
         if ($t2med->ohneSchluessel()) throw new \InvalidArgumentException(T2med::OHNE_SCHLUESSEL);
-        if (!$t2med->erlaubt($url)) throw new \InvalidArgumentException('Die von T2med übergebene FHIR-Adresse ist in Praxisherz nicht freigegeben (Verwaltung → Verbindungen → T2med).');
+        if (!$t2med->erlaubt($url)) throw new \InvalidArgumentException('Die von T2med übergebene FHIR-Adresse ist in Praxisherz nicht freigegeben (Praxis → Verbindungen → T2med).');
         if (!preg_match('/^[A-Za-z0-9.-]{1,100}(:\d{1,5})?$/D', $host)) throw new \InvalidArgumentException('Ungültiger Servername.');
         $code = bin2hex(random_bytes(32));
         @unlink(self::ordner() . '/neu.sqlite');

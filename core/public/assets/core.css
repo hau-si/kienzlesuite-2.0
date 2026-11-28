@@ -392,8 +392,6 @@ ol.checklist li:last-child { border-bottom: 1px solid transparent; }
 .tag.rollentag .rolle { color: #1f4f82; margin: 0; }
 .tag.rollentag .ico { width: 14px; height: 14px; }
 
-/* Abmelden-Link in Modulseiten (dort gibt es keine Sitzungs-Marke für ein Formular) */
-.side-foot a.link { display: block; padding: 8px 6px; font-size: 13px; font-weight: 600; text-decoration: none; color: var(--teal); }
 main.modul { max-width: 940px; }
 
 /* Mein Konto: Profil mit änderbarem Namen, Sicherheit als Ausklappzeilen mit Statusmarke */

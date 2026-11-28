@@ -54,7 +54,7 @@ final class ReaderHttp extends HttpClient {
 $dir = sys_get_temp_dir() . '/ks-reader-test-' . bin2hex(random_bytes(6));
 try {
     $values = Config::parse(file_get_contents(dirname(__DIR__) . '/config/kienzle-kasse.example.toml'));
-    $values['app']['state_dir']=$dir; $values['app']['launcher_key']=str_repeat('a',64); $values['app']['encryption_key']=str_repeat('b',64);
+    $values['app']['state_dir']=$dir; $values['app']['encryption_key']=str_repeat('b',64);
     $values['sumup']=['mode'=>'live','api_key'=>'test','affiliate_key'=>'test','app_id'=>'test.app','merchant_code'=>'MTEST','reader_id'=>'reader-test'];
     $http=new ReaderHttp(); $app=new App(new Config($values),$http); $app->db->migrate();
     [$v1,$b1]=visit($app,'first'); [$v2,$b2]=visit($app,'second'); [$v3,$b3]=visit($app,'third');

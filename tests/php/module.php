@@ -124,12 +124,13 @@ function test_modulsymbole_vorhanden(): void {
 function test_starter_weiterleitung_im_seitenkopf(): void {
     [$env, $m] = mod_env();
     $b = module_browser($env, $m);
-    check(!str_contains($b->get('/')->body, 'data-starter='), 'Starter ohne Modul angekündigt');
+    check(!str_contains($b->get('/')->body, 'data-starter-map='), 'Starter ohne Modul angekündigt');
     $mods = $env->modules->all();
-    $mods['kasse']['starters'] = [['schema' => 'kienzle-kasse', 'label' => 'Kasse']];
+    $mods['kasse']['starters'] = [['schema' => 'praxisherz-kasse', 'label' => 'Kasse']];
     $env->modules = Kienzle\Core\Modules::fromArray(array_values($mods));
-    check(str_contains($b->get('/')->body, '<body data-starter="/kasse"'), 'Starter-Ziel fehlt im Seitenkopf');
-    check(str_contains($b->get('/anmelden')->body, 'data-starter="/kasse"') || $b->get('/anmelden')->status === 303, 'Anmeldeseite ohne Starter-Ziel');
+    $seite = $b->get('/')->body;
+    check(str_contains($seite, 'data-starter-map=') && str_contains($seite, '/kasse'), 'Starter-Ziel fehlt im Seitenkopf');
+    check(!str_contains($seite, 'data-starter="'), 'alte Weiterleitung ohne Modulangabe noch da');
 }
 
 run_tests();

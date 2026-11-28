@@ -18,7 +18,7 @@ final class PdfText {
     /** Hat die erste Seite lesbaren Text? (Buchstaben und Ziffern, nicht nur Leerraum.) */
     public static function hasText(string $pdf): bool {
         $binary = self::tool('pdftotext');
-        if (!$binary) throw new Problem('pdftotext fehlt. Bitte das Modul unter Verwaltung → Module neu installieren (Paket poppler-utils).', 503);
+        if (!$binary) throw new Problem('pdftotext fehlt. Bitte das Modul unter Betrieb → Module neu installieren (Paket poppler-utils).', 503);
         $result = Command::run([$binary, '-l', '1', '-enc', 'UTF-8', 'fd://0', '-'], $pdf, 20, 2 * 1024 * 1024);
         return $result['code'] === 0 && preg_match_all('/[\p{L}\p{N}]/u', $result['output']) >= self::MIN_CHARS;
     }
@@ -28,7 +28,7 @@ final class PdfText {
         if (self::hasText($pdf)) return [$pdf, false];
         $tools = [];
         foreach (['pdftoppm', 'tesseract', 'qpdf'] as $name) {
-            $tools[$name] = self::tool($name) ?? throw new Problem('Das PDF hat keinen lesbaren Text und die Texterkennung ist nicht eingerichtet. Bitte das Modul unter Verwaltung → Module neu installieren (Pakete tesseract-ocr, tesseract-ocr-deu, poppler-utils, qpdf).', 503);
+            $tools[$name] = self::tool($name) ?? throw new Problem('Das PDF hat keinen lesbaren Text und die Texterkennung ist nicht eingerichtet. Bitte das Modul unter Betrieb → Module neu installieren (Pakete tesseract-ocr, tesseract-ocr-deu, poppler-utils, qpdf).', 503);
         }
         $directory = sys_get_temp_dir() . '/ks-lxp-ocr-' . bin2hex(random_bytes(8));
         if (!mkdir($directory, 0700)) throw new Problem('Die Texterkennung konnte nicht vorbereitet werden.', 500);

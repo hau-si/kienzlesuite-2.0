@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Praxisherz: kleine Start-ISO bauen (läuft auf Linux, z. B. im GitHub-Workflow .github/workflows/iso.yml).
 #
-#   bash iso/bauen.sh [AUSGABE.iso]       (Standard: kienzle-suite-start.iso)
+#   bash iso/bauen.sh [AUSGABE.iso]       (Standard: praxisherz-start.iso)
 #
 # Vorgehen: Die offizielle Ubuntu-Server-ISO wird geladen und gegen SHA256SUMS samt GPG-Signatur geprüft. Dann entfernt xorriso das große
 # Dateisystem (Pakete, Squashfs) und behält Kernel, Initrd und die BIOS/UEFI-Startdateien von Ubuntu (Secure Boot bleibt gültig). Dazu kommen
@@ -9,7 +9,7 @@
 # Braucht: xorriso, gnupg, curl, python3.
 set -euo pipefail
 here=$(cd -- "$(dirname -- "$0")" && pwd)
-ziel=${1:-kienzle-suite-start.iso}
+ziel=${1:-praxisherz-start.iso}
 punkt=${UBUNTU_PUNKT:-26.04.1}
 reihe=${punkt%.*}
 basis=${UBUNTU_BASIS:-https://releases.ubuntu.com/$reihe}

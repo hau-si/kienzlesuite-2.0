@@ -5,13 +5,13 @@ namespace KienzleTelefon;
 /**
  * T2med lesen (FHIR) für das Telefonverzeichnis, wie kienzlefon-t2med (fhir-importer) und das Modul Signatur: GET {basis}/Patient,
  * Weiterblättern nur über Bundle.link „next“ auf demselben Server. Verbindungsdaten (Adresse, API-Schlüssel, Zertifikat) liefert die
- * Basis (Verwaltung → Verbindungen → T2med); das Zugriffstoken kommt beim Aufruf aus T2med und wird nie gespeichert außer verschlüsselt
+ * Basis (Praxis → Verbindungen → T2med); das Zugriffstoken kommt beim Aufruf aus T2med und wird nie gespeichert außer verschlüsselt
  * für die Dauer des Ladens.
  */
 class T2med {
     public const PATIENTENNUMMER = 'https://fhir.t2med.de/identifier/patientennummer';
     /** Ohne API-Schlüssel der Praxis gibt es keinen Ersatz (der Schlüssel steht nie im Quelltext). */
-    public const OHNE_SCHLUESSEL = 'Kein T2med-API-Schlüssel eingetragen. Bitte unter Verwaltung → Verbindungen → T2med den API-Schlüssel der Praxis eintragen.';
+    public const OHNE_SCHLUESSEL = 'Kein T2med-API-Schlüssel eingetragen. Bitte unter Praxis → Verbindungen → T2med den API-Schlüssel der Praxis eintragen.';
 
     /** @param array<string,mixed> $v Verbindung „t2med“ der Basis */
     public function __construct(private array $v, private string $caDatei = '') {}
@@ -75,7 +75,7 @@ class T2med {
     /** Eine Seite der Patientenliste (erste: {basis}/Patient). */
     public function seite(string $url, string $token): array {
         $a = $this->anfrage($url, $token);
-        if ($a['status'] === 401 || $a['status'] === 403) throw new \RuntimeException('T2med lehnt den Zugriff ab (HTTP ' . $a['status'] . '). Den API-Schlüssel (Verwaltung → Verbindungen → T2med) und den Drittanbieter-Zugriff in T2med prüfen; das Telefonverzeichnis frisch aus T2med aktualisieren.');
+        if ($a['status'] === 401 || $a['status'] === 403) throw new \RuntimeException('T2med lehnt den Zugriff ab (HTTP ' . $a['status'] . '). Den API-Schlüssel (Praxis → Verbindungen → T2med) und den Drittanbieter-Zugriff in T2med prüfen; das Telefonverzeichnis frisch aus T2med aktualisieren.');
         if ($a['status'] !== 200 || !is_array($a['body']) || ($a['body']['resourceType'] ?? '') !== 'Bundle') throw new \RuntimeException('T2med hat keine Patientenliste geliefert (HTTP ' . $a['status'] . ').');
         return $a['body'];
     }
@@ -103,7 +103,7 @@ class T2med {
         curl_exec($curl);
         $fehler = curl_errno($curl); $status = (int)curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
         $curl = null;
-        if ($fehler || $zuGross) throw new \RuntimeException('T2med ist nicht erreichbar oder das Zertifikat passt nicht (cURL ' . $fehler . '). Verbindung unter Verwaltung → Verbindungen prüfen.');
+        if ($fehler || $zuGross) throw new \RuntimeException('T2med ist nicht erreichbar oder das Zertifikat passt nicht (cURL ' . $fehler . '). Verbindung unter Praxis → Verbindungen prüfen.');
         $json = json_decode($roh, true);
         return ['status' => $status, 'body' => is_array($json) ? $json : null];
     }

@@ -54,7 +54,7 @@ try {
 
     $v = Config::parse(file_get_contents(dirname(__DIR__) . '/config/kienzle-kasse.example.toml'));
     $v['app']['state_dir'] = $state = sys_get_temp_dir() . '/ks-goae-' . bin2hex(random_bytes(6)); $dirs[] = $state; mkdir($state, 0700);
-    $v['app']['launcher_key'] = str_repeat('a', 64); $v['app']['encryption_key'] = str_repeat('b', 64);
+    $v['app']['encryption_key'] = str_repeat('b', 64);
     $v['sumup'] = ['mode' => 'mock']; $v['fhir'] = ['mode' => 'mock', 'entry_code' => 'ZAHLUNG'];
     $v['practice'] = ['name' => 'Praxis Beispiel', 'street' => 'Musterstraße 1', 'city' => '12345 Musterstadt'];
     $app = new App(new Config($v)); $app->db->migrate();

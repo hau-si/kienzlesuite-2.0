@@ -2,7 +2,7 @@
 
 Der Haken `[setup] overview` läuft als Modul-Benutzer (`ks-<id>`), nie als root und nie im Webinterface. Seine Ausgabe
 wird geprüft (Format: docs/MODULE-TOML.md) und als /var/lib/kienzle/ueberblick/<id>.json abgelegt; die Seite
-Verwaltung → Einrichtung liest nur diese Dateien.
+Startseite → Einrichtung liest nur diese Dateien.
 """
 from __future__ import annotations
 

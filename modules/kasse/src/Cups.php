@@ -5,7 +5,7 @@ namespace KienzleKasse;
 /** Gemeinsamer Aufruf von lp für Praxis- und Bondrucker. */
 final class Cups {
     public static function run(array $args, string $data, int $timeout): array {
-        if (!is_executable('/usr/bin/lp')) throw new Problem('CUPS-Client fehlt. Bitte den Installer der Basis ausführen (cups-client).', 503);
+        if (!is_executable('/usr/bin/lp')) throw new Problem('CUPS-Client fehlt. Bitte den Installer von Praxisherz ausführen (cups-client).', 503);
         return Command::run($args, $data, $timeout, 65536);
     }
     public static function submit(string $server, string $queue, string $title, array $options, string $data, callable $run): string {

@@ -78,7 +78,7 @@ final class KienzleModul {
         return \Kienzle\Core\View::page($titel, $inhalt, $nav, $this->praxis()['name'], null, $extra);
     }
 
-    /** Praxisdaten der Basis (Verwaltung → Praxis): name, street, city, contact; leer, wenn keine mitgeliefert wurden. */
+    /** Praxisdaten der Basis (Praxis → Praxis): name, street, city, contact; leer, wenn keine mitgeliefert wurden. */
     public function praxis(): array {
         $d = json_decode(rawurldecode((string)($this->server['KIENZLE_PRAXIS'] ?? '')), true);
         $out = [];
@@ -96,7 +96,7 @@ final class KienzleModul {
         return is_array($d) && is_string($d['id'] ?? null) && is_string($d['name'] ?? null) ? ['id' => $d['id'], 'name' => $d['name'], 'online' => ($d['online'] ?? false) === true] : null;
     }
 
-    /** Kontodaten und Steuerangaben der Basis (Verwaltung → Praxis): holder, iban, bic, bank_name, tax_id, small_business. */
+    /** Kontodaten und Steuerangaben der Basis (Praxis → Praxis): holder, iban, bic, bank_name, tax_id, small_business. */
     public function stammdaten(): array {
         $d = json_decode(rawurldecode((string)($this->server['KIENZLE_PRAXIS'] ?? '')), true);
         $out = [];
@@ -105,7 +105,7 @@ final class KienzleModul {
         return $out;
     }
 
-    /** Zuordnung der Drucker (Verwaltung → Drucker): buero = Praxisdrucker (A4), bon = Bondrucker; leer = nicht zugeordnet. */
+    /** Zuordnung der Drucker (Praxis → Drucker): buero = Praxisdrucker (A4), bon = Bondrucker; leer = nicht zugeordnet. */
     public function druckerRollen(): array {
         $d = json_decode(rawurldecode((string)($this->server['KIENZLE_DRUCKER'] ?? '')), true);
         $out = [];
@@ -113,7 +113,7 @@ final class KienzleModul {
         return $out;
     }
 
-    /** Papierbreite des Bondruckers in Millimetern (58 oder 80), zentral unter Verwaltung → Drucker eingestellt. */
+    /** Papierbreite des Bondruckers in Millimetern (58 oder 80), zentral unter Praxis → Drucker eingestellt. */
     public function bonBreite(): int {
         $d = json_decode(rawurldecode((string)($this->server['KIENZLE_DRUCKER'] ?? '')), true);
         return is_array($d) && ($d['bonbreite'] ?? null) === 80 ? 80 : 58;
@@ -183,8 +183,8 @@ final class KienzleModul {
     private function nachrichtAblegen(array $auftrag): string {
         $n = $this->verbindung('nachrichten');
         if (!$n || !is_dir((string)($n['ausgang'] ?? ''))) throw new RuntimeException('Der Nachrichten-Ausgang der Basis ist für dieses Modul nicht eingerichtet.');
-        if (!($n[$auftrag['art']] ?? false)) throw new RuntimeException($auftrag['art'] === 'sms' ? 'SMS ist in der Basis nicht eingerichtet (Verwaltung → Verbindungen).'
-            : 'E-Mail ist in der Basis nicht eingerichtet (Verwaltung → Verbindungen).');
+        if (!($n[$auftrag['art']] ?? false)) throw new RuntimeException($auftrag['art'] === 'sms' ? 'SMS ist in der Basis nicht eingerichtet (Praxis → Verbindungen).'
+            : 'E-Mail ist in der Basis nicht eingerichtet (Praxis → Verbindungen).');
         $job = date('Ymd-His') . '-' . bin2hex(random_bytes(6));
         $dir = (string)$n['ausgang'];
         $json = (string)json_encode($auftrag, JSON_UNESCAPED_UNICODE);
@@ -255,7 +255,7 @@ final class KienzleModul {
         return sodium_crypto_generichash('modul:' . $this->id . ':' . $zweck, sodium_hex2bin($hex), SODIUM_CRYPTO_SECRETBOX_KEYBYTES);
     }
 
-    // ---- Drucken (Druckerverwaltung der Basis, Verwaltung → Drucker) ------------------------------------------------
+    // ---- Drucken (Druckerverwaltung der Basis, Praxis → Drucker) ------------------------------------------------
 
     /** Warteschlangen von Praxisherz zur Auswahl im Modul: Liste aus name, description, state. */
     public function drucker(): array {

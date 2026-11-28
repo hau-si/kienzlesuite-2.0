@@ -6,13 +6,13 @@ Ergebnis je Punkt hier abhaken und in `docs/RELEASE.md` bei der Version vermerke
 ## Vorbereitung
 
 - VM: 2 Kerne, 4 GB RAM, 100 GB, Standard-ISO Ubuntu Server 26.04.1, OpenSSH-Server.
-- Ein Name im Praxisnetz, der auf die VM zeigt (Router-DNS oder Hosts-Datei der Arbeitsplätze), z. B. `kienzle-test.praxis.internal`.
+- Ein Name im Praxisnetz, der auf die VM zeigt (Router-DNS oder Hosts-Datei der Arbeitsplätze), z. B. `praxisherz-test.praxis.internal`.
 - Zwei Arbeitsplätze zum Testen: Windows 11 (Edge/Chrome) und macOS (Safari), ein Telefon mit Authenticator-App.
 
 ## Meilenstein 2 – Anmeldung, Benutzer, Rechte, OTP, Passkeys, Zertifikat (Basis 0.2.0)
 
 1. [ ] `git clone https://github.com/hau-si/praxisherz && cd praxisherz`
-       `sudo bash installer/install.sh --name kienzle-test.praxis.internal --name <IP der VM> --praxis "Testpraxis"` läuft ohne Fehler;
+       `sudo bash installer/install.sh --name praxisherz-test.praxis.internal --name <IP der VM> --praxis "Testpraxis"` läuft ohne Fehler;
        am Ende stehen Adresse, Fingerabdruck der CA und ein Einrichtungslink.
 2. [ ] `systemctl status kienzle-core-php nginx` aktiv; `systemctl status php*-fpm` (Distribution) aus.
 3. [ ] `https://<server>/ca.crt` auf Windows herunterladen, unter „Vertrauenswürdige Stammzertifizierungsstellen“ (Computer) einspielen;
@@ -39,7 +39,7 @@ Ergebnis je Punkt hier abhaken und in `docs/RELEASE.md` bei der Version vermerke
 Zweites Gerät bereithalten, das **nicht** im freigegebenen Netz liegt (z. B. Telefon im Gäste-WLAN), und eine Konsole an der VM
 (Hypervisor), falls man sich doch aussperrt: `sudo nft delete table inet kienzle` hebt die Firewall sofort auf.
 
-1. [ ] Verwaltung → Firewall: vorgeschlagen ist das Netz dieses Arbeitsplatzes, SSH an, „Alles andere gesperrt“.
+1. [ ] Betrieb → Sicherheit → Firewall: vorgeschlagen ist das Netz dieses Arbeitsplatzes, SSH an, „Alles andere gesperrt“.
 2. [ ] Ein Netz wählen, in dem dieser Arbeitsplatz nicht liegt: Die Seite lehnt ab („wäre ausgesperrt“).
 3. [ ] Laden, **nicht** bestätigen: Nach 2 Minuten ist der vorherige Zustand zurück (`sudo nft list ruleset`).
 4. [ ] Laden und bestätigen: Zustand „aktiv“. Vom Gerät außerhalb ist weder 443 noch SSH erreichbar, vom Arbeitsplatz beides.
@@ -54,7 +54,7 @@ Vorbereitung: Test-Schlüssel erzeugen (`scripts/schluessel-erzeugen kienzle-tes
 auf der VM `KIENZLE_UPDATE_QUELLE=github:<fork>` in `kienzle-update-anwenden.service` und `kienzle-update-pruefen.service` setzen
 (`systemctl edit`).
 
-1. [ ] Verwaltung → Updates → „Jetzt nach Updates sehen“: 0.4.1 erscheint mit Notizen, im Menü steht eine 1.
+1. [ ] Betrieb → Updates → „Jetzt nach Updates sehen“: 0.4.1 erscheint mit Notizen, im Menü steht eine 1.
 2. [ ] Installieren: Seite ist kurz weg, danach „Aktualisiert auf 0.4.1“; `readlink /opt/kienzle/core/current` zeigt 0.4.1.
 3. [ ] Eine 0.4.2 veröffentlichen, deren Signatur von einem fremden Schlüssel stammt: „Signatur ungültig“, nichts geändert.
 4. [ ] Eine 0.4.3 mit absichtlich kaputtem Webinterface (z. B. Syntaxfehler in `index.php`): Rücksprung auf 0.4.1, Daten unverändert.
@@ -66,7 +66,7 @@ auf der VM `KIENZLE_UPDATE_QUELLE=github:<fork>` in `kienzle-update-anwenden.ser
 
 Test-NAS oder zweite VM mit Samba-Freigabe und SFTP; ein Test-SMTP-Konto; wenn möglich ein T2med-Testserver.
 
-1. [ ] Verwaltung → Verbindungen → Ziel (SMB) anlegen, „Verbindung prüfen“: erfolgreich, auf dem NAS bleibt nichts liegen.
+1. [ ] Praxis → Verbindungen → Ziel (SMB) anlegen, „Verbindung prüfen“: erfolgreich, auf dem NAS bleibt nichts liegen.
 2. [ ] Falsches Passwort: verständliche Meldung (z. B. `NT_STATUS_LOGON_FAILURE`).
 3. [ ] Ziel (SFTP): öffentlichen Schlüssel von der Seite beim NAS-Benutzer eintragen, „Schlüssel des Servers abrufen“,
        Fingerabdruck mit dem NAS vergleichen, übernehmen, prüfen.
@@ -80,7 +80,7 @@ Test-NAS oder zweite VM mit Samba-Freigabe und SFTP; ein Test-SMTP-Konto; wenn m
 
 Test-NAS mit SFTP und SMB-Freigabe aus M5.
 
-1. [ ] Verwaltung → Sicherung → Ziel (SFTP aus „Verbindungen“) einrichten. Blatt öffnen, drucken, „Blatt ist gedruckt“.
+1. [ ] Betrieb → Sicherung → Ziel (SFTP aus „Verbindungen“) einrichten. Blatt öffnen, drucken, „Blatt ist gedruckt“.
        Danach liefert `/verwaltung/sicherung/blatt` 404.
 2. [ ] „Jetzt sichern“: Erfolg, Größe plausibel. Auf dem NAS liegt nur verschlüsseltes (`config`, `data/`, `keys/` …).
 3. [ ] „Prüfen und 5 % lesen“, „Probe-Wiederherstellung“: beides in Ordnung.
@@ -100,14 +100,14 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
 4. [ ] Von Windows `\\praxisherz\` öffnen: nur Drucker, keine Ordner; Gastzugriff auf Drucker geht.
 5. [ ] `http://localhost:631/admin` vom Arbeitsplatz aus verweigert.
 6. [ ] `/etc/apt/apt.conf.d/52kienzle-unattended` vorhanden; `unattended-upgrade --dry-run` läuft.
-7. [ ] Verwaltung → Einrichtung: Punkte stimmen mit dem Zustand überein; „Erledigt“ für die Zertifizierungsstelle.
+7. [ ] Startseite → Einrichtung: Punkte stimmen mit dem Zustand überein; „Erledigt“ für die Zertifizierungsstelle.
 8. [ ] autoinstall: zweite VM mit `installer/autoinstall.yaml` (angepasst) und Standard-ISO, nach dem ersten Start
        ist Praxisherz erreichbar, Link über `journalctl -u kienzle-erstinstallation`.
 9. [ ] `--admin-reset NAME` und `--kanal beta` ausprobieren.
 
 ## Meilenstein 8 – Drucker (Basis 0.8.0)
 
-1. [ ] Verwaltung → Drucker → „Netzwerk und USB durchsuchen“: Bondrucker und A4-Drucker erscheinen mit passender Art.
+1. [ ] Praxis → Drucker → „Netzwerk und USB durchsuchen“: Bondrucker und A4-Drucker erscheinen mit passender Art.
 2. [ ] Bondrucker übernehmen, Testseite: Bon kommt mit Schnitt.
 3. [ ] A4-Drucker (IPP Everywhere) anlegen, Testseite: A4-Seite.
 4. [ ] Freigabe „Windows“ für den A4-Drucker, Firewall „Windows-Freigabe 445“ an: Drucker erscheint unter `\\praxisherz\`
@@ -118,7 +118,7 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
 
 ## Meilenstein 9 – Anmeldung für Dienste (Basis 0.11.0)
 
-1. [ ] Verwaltung → Dienste: Testdienst anlegen (z. B. Synology DSM „SSO-Client“ oder ein OIDC-Testprogramm), Weiterleitung eintragen.
+1. [ ] Praxis → Dienste: Testdienst anlegen (z. B. Synology DSM „SSO-Client“ oder ein OIDC-Testprogramm), Weiterleitung eintragen.
 2. [ ] Im Dienst Discovery-Adresse, Client-ID und Geheimnis eintragen; der Dienst vertraut der Zertifizierungsstelle von Praxisherz.
 3. [ ] Anmelden im Dienst führt zu Praxisherz, nach Passwort+OTP bzw. Passkey zurück; Benutzername stimmt.
 4. [ ] Dienst auf „nur Admins“ stellen: Mitarbeiter wird abgewiesen.
@@ -127,38 +127,49 @@ Test-NAS mit SFTP und SMB-Freigabe aus M5.
 ## Basis 0.12.0 – Erstinstallation und Servername
 
 1. [ ] Frische VM: `sudo bash installer/install.sh` ohne Angaben; Ausgabe nennt die IP, Einrichtungslink über die IP funktioniert.
-2. [ ] Verwaltung → Server: Namen `praxisherz` (Eintrag im DNS/Router bzw. hosts-Datei) und Praxisname setzen;
+2. [ ] Einrichten → Server: Namen `praxisherz` (Eintrag im DNS/Router bzw. hosts-Datei) und Praxisname setzen;
        danach unter dem Namen erreichbar, ohne Zertifikatswarnung.
 3. [ ] Passkey unter dem Namen anlegen und damit anmelden.
 4. [ ] Ungültigen Namen eingeben: Fehlermeldung, nichts geändert.
 
+## Arbeitsplätze: Praxisherz-Agent (Basis ab 0.22.0)
+
+1. [ ] Einrichten → Arbeitsplätze: `Praxisherz-Setup.exe` laden, am Windows-PC doppelklicken (Warnung „Der Computer wurde durch Windows geschützt“ →
+       „Weitere Informationen“ → „Trotzdem ausführen“), Administratorrechte bestätigen. „Arbeitsplatz eingerichtet“ erscheint.
+2. [ ] Der PC erscheint unter Einrichten → Arbeitsplätze mit seinem Rechnernamen; Taskleistensymbol „Praxisherz“ zeigt alles grün.
+3. [ ] Ohne weiteres Zutun: keine Zertifikatswarnung im Browser, die virtuellen Drucker der installierten Module (z. B. vKasse, vTermine, vFax1)
+       stehen unter Windows → Drucker, die Aufrufadressen `praxisherz-…://` sind registriert.
+4. [ ] Ein Modul neu installieren: Dessen Drucker kommt am PC nach kurzer Zeit von selbst dazu.
+5. [ ] „Akte öffnen“ aus einem Modul (z. B. Telefon): T2med öffnet die Akte (GDT-Datei in `C:\Praxisherz\GDT`).
+6. [ ] Entfernen: Windows-Einstellungen → Apps → „Praxisherz-Agent“ → Deinstallieren; Aufgabe und Symbol sind weg.
+7. [ ] Notweg: Auf einem PC ohne Agent die eingeklappten Schritte unter „Von Hand einrichten“ (Zertifikat, Drucker) durchgehen.
+
 ## Basis 0.16.0 – Module über das Webinterface, Kasse (sumup 2.0)
 
 1. [ ] Basis auf 0.16.0 bringen (dieses Mal noch an der Konsole: `git pull && sudo bash installer/install.sh`).
-2. [ ] Verwaltung → Module: „Kasse 2.0.x – Mit der Basis geliefert“ steht unter „Verfügbar“. „Installieren“ (Bestätigung
+2. [ ] Betrieb → Module: „Kasse 2.0.x – Mit der Basis geliefert“ steht unter „Verfügbar“. „Installieren“ (Bestätigung
        mit Passwort und Code). Die Seite aktualisiert sich; nach einigen Minuten (Pakete) steht die Kasse unter „Installiert“.
        Bei Fehlern: Protokoll auf der Seite, `journalctl -u kienzle-module-anwenden`.
 3. [ ] `systemctl status kienzle-kasse-php` läuft als `ks-kasse`; `ls -ld /var/lib/kienzle/kasse` zeigt `drwx------ ks-kasse`.
-4. [ ] Verwaltung → Benutzer: einem Mitarbeiter das Recht „Kasse: Kartenzahlung …“ geben; sich als dieser anmelden:
+4. [ ] Praxis → Benutzer und Gruppen: einem Mitarbeiter das Recht „Kasse: Kartenzahlung …“ geben; sich als dieser anmelden:
        Start zeigt „Kasse“, `/kasse/` öffnet die Kasse, „Testpatient öffnen (Testmodus)“ funktioniert, Mock-Zahlung gelingt.
 5. [ ] Als Admin des Moduls: `/kasse/settings.php` (Einstellungen). Praxisdaten speichern verlangt einmal die Bestätigung
        von Praxisherz und kehrt danach zurück. Einrichtungs-Überblick Praxisherz zeigt die Punkte der Kasse.
-6. [ ] Verwaltung → Verbindungen: T2med eintragen (Adresse, API-Key, erlaubte fhirBasisUrl aus T2med). In der Kasse „T2med-Anbindung“
+6. [ ] Praxis → Verbindungen: T2med eintragen (Adresse, API-Key, erlaubte fhirBasisUrl aus T2med). In der Kasse „T2med-Anbindung“
        auf Live: kein Fehler; „T2med-Verbindung von Praxisherz vorhanden“ im Überblick.
-7. [ ] Verwaltung → Drucker: „vKasse“ erscheint als Drucker des Moduls. Am Windows-PC als IPP-Drucker hinzufügen
-       (`http://<server>:631/printers/vKasse`, Papier A4), aus T2med eine Testrechnung (Testpatient) drucken:
-       erscheint im Rechnungseingang der Kasse.
-8. [ ] Kassen-PC: Zertifikat von Praxisherz einrichten (Arbeitsplatz einrichten), in der Kasse unter Einstellungen → Arbeitsplätze das
-       Paket für Windows laden (Bestätigung), installieren. In T2med den Button „Kartenzahlung“ anlegen (Anleitung in der Kasse).
-       Klick beim Patienten: Browser öffnet Praxisherz, nach der Anmeldung (falls nötig) die Kasse mit dem Patienten.
-9. [ ] Verwaltung → Module → Kasse → Entfernen ohne Häkchen: Kasse weg, `/var/lib/kienzle/kasse` bleibt; erneut installieren:
+7. [ ] Praxis → Drucker: „vKasse“ erscheint als Drucker des Moduls. Nach dem Praxisherz-Agent (Abschnitt unten) ist er am Windows-PC
+       vorhanden; aus T2med eine Testrechnung (Testpatient) drucken: erscheint im Rechnungseingang der Kasse.
+       Notweg ohne Agent: als IPP-Drucker `http://<server>:631/printers/vKasse` (Papier A4) von Hand hinzufügen.
+8. [ ] In T2med den Eintrag „Kartenzahlung“ anlegen (Adresse unter Praxis → Verbindungen → T2med). Klick beim Patienten:
+       Browser öffnet Praxisherz, nach der Anmeldung (falls nötig) die Kasse-Startseite mit dem Patienten.
+9. [ ] Betrieb → Module → Kasse → Entfernen ohne Häkchen: Kasse weg, `/var/lib/kienzle/kasse` bleibt; erneut installieren:
        Einstellungen und Leistungen sind wieder da.
 
 ## Modul Terminzettel 1.0.0 (Basis ab 0.19.0)
 
-1. [ ] Verwaltung → Module → Terminzettel installieren (apt: Python-Pakete, Tesseract, Ghostscript). Danach erscheint „Terminzettel“ in der Seitenleiste unter „Anwendungen“ und „Einstellungen“.
-2. [ ] Verwaltung → Drucker: Bondrucker (Epson) einrichten, bei „Wofür welcher Drucker?“ als Bondrucker zuordnen. „vTermine“ erscheint als Drucker des Moduls.
+1. [ ] Betrieb → Module → Terminzettel installieren (apt: Python-Pakete, Tesseract, Ghostscript). Danach erscheint „Terminzettel“ in der Seitenleiste unter „Anwendungen“ und „Einstellungen“.
+2. [ ] Praxis → Drucker: Bondrucker (Epson) einrichten, bei „Wofür welcher Drucker?“ als Bondrucker zuordnen. „vTermine“ erscheint als Drucker des Moduls.
 3. [ ] Einstellungen → Terminzettel: Vorschau erscheint und folgt den Änderungen; „Beispiel-Terminzettel drucken“ druckt einen Bon.
-4. [ ] Arbeitsplatz: Drucker „vTermine“ hinzufügen (Windows IPP `http://<server>:631/printers/vTermine`, Mac mit dem PDF-Treiber der Seite). In T2med ein Terminblatt drucken: Bon mit Terminen und Kalender-QR. Mit Handy-QR prüfen.
+4. [ ] Arbeitsplatz: Drucker „vTermine“ ist nach dem Praxisherz-Agent vorhanden (Notweg: Windows IPP `http://<server>:631/printers/vTermine`, Mac mit dem PDF-Treiber der Seite). In T2med ein Terminblatt drucken: Bon mit Terminen und Kalender-QR. Mit Handy-QR prüfen.
 5. [ ] Bild-PDF (Terminblatt als Scan) druckt über die Texterkennung; Firewall lässt Port 631 aus dem Praxisnetz zu.
 6. [ ] Modul entfernen: Drucker „vTermine“ verschwindet; Daten bleiben. Erneut installieren: Layout ist wieder da.

@@ -20,7 +20,7 @@ final class FhirClient {
     /** Meldung zu einem fehlgeschlagenen Patientenabruf: HTTP-Status, wahrscheinliche Ursache und ggf. die Auskunft von t2med (OperationOutcome, ohne Patientendaten). */
     private static function contextError(int $status, mixed $body): string {
         $hint = match (true) {
-            $status === 401, $status === 403 => 'T2med lehnt den Zugriff ab. Das Client Secret in Praxisherz (Verwaltung → Verbindungen → T2med) prüfen und ob der Drittanbieter-Zugriff in T2med noch zu diesem Secret gehört; außerdem darf der Aufruf nicht älter sein: bitte frisch aus der Patientenakte öffnen.',
+            $status === 401, $status === 403 => 'T2med lehnt den Zugriff ab. Das Client Secret in Praxisherz (Praxis → Verbindungen → T2med) prüfen und ob der Drittanbieter-Zugriff in T2med noch zu diesem Secret gehört; außerdem darf der Aufruf nicht älter sein: bitte frisch aus der Patientenakte öffnen.',
             $status === 404 => 'Die Adresse oder der Kontext ist T2med unbekannt. Bitte frisch aus der Patientenakte öffnen und die FHIR-Adresse prüfen.',
             $status === 0 => 'Keine Antwort von T2med.',
             default => 'Bitte erneut aus t2med öffnen.',

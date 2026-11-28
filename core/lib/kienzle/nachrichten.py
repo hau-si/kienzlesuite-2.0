@@ -144,8 +144,8 @@ def abarbeiten(now: float | None = None, send=senden) -> dict:
                 log(f'{mid}: Auftrag abgelehnt.')
                 continue
             if not cfg.get(job['art']):
-                meldung = 'SMS ist in der Basis nicht eingerichtet (Verwaltung → Verbindungen).' if job['art'] == 'sms' else \
-                    'E-Mail ist in der Basis nicht eingerichtet (Verwaltung → Verbindungen).'
+                meldung = 'SMS ist in der Basis nicht eingerichtet (Praxis → Verbindungen).' if job['art'] == 'sms' else \
+                    'E-Mail ist in der Basis nicht eingerichtet (Praxis → Verbindungen).'
                 _ergebnis(ordner, name, 'fehler', meldung)
                 p.unlink(missing_ok=True)
                 out['fehler'] += 1

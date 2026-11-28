@@ -6,7 +6,7 @@ if (!Suite::can('kassieren')) {
     http_response_code(403);
     header('Content-Type: text/html; charset=utf-8');
     $settings = Suite::settingsRights() ? '<p><a href="' . ks_h(ks_url('settings.php')) . '">Zu den freigegebenen Bereichen der Kasse</a></p>' : '';
-    exit('<!doctype html><html lang="de"><meta charset="utf-8"><title>Kasse</title><link rel="stylesheet" href="' . ks_h(ks_url('assets/style.css')) . '"><main><section class="card"><h1>Kasse</h1><p>Für die Kasse fehlt das Recht „Kassieren“. Bitte den Admin fragen (Verwaltung → Benutzer von Praxisherz).</p>' . $settings . '<p><a href="/">Zu Praxisherz</a></p></section></main></html>');
+    exit('<!doctype html><html lang="de"><meta charset="utf-8"><title>Kasse</title><link rel="stylesheet" href="' . ks_h(ks_url('assets/style.css')) . '"><main><section class="card"><h1>Kasse</h1><p>Für die Kasse fehlt das Recht „Kartenzahlung und Barzahlung aus T2med“. Bitte den Admin fragen (Praxis → Benutzer und Gruppen von Praxisherz).</p>' . $settings . '<p><a href="/">Zu Praxisherz</a></p></section></main></html>');
 }
 try { $demo = ks_app()->config->get('sumup', 'mode') === 'mock' && ks_app()->config->get('fhir', 'mode') === 'mock'; } catch (\Throwable) { $demo = false; }
 header('Cache-Control: no-store');
@@ -56,7 +56,7 @@ if ($rahmen) {
 <div id="invoices-section" class="invoices" hidden><h2>Offene T2med-Rechnung</h2><div id="invoices"></div><p class="muted">Rechnungsnummer und Betrag stammen aus der in T2med auf „vKasse“ gedruckten Rechnung. Nur Betrag und Rechnungsnummer gehen an SumUp.</p></div>
 <div class="col-left"><div class="section-heading"><h2>Leistungen</h2><a id="catalog-gear" class="gear" href="<?= $base ?>igel" target="_top" title="Leistungsliste bearbeiten" aria-label="Leistungsliste bearbeiten">⚙</a><button type="button" id="manage-toggle" class="text-button" aria-expanded="false">Leistungen verwalten</button></div>
 <input id="service-search" class="service-search" type="search" placeholder="Suchen: Ziffer oder Name" autocomplete="off" aria-label="Leistungen suchen">
-<p id="practice-hint" class="muted" hidden>Für eigene Leistungsbelege und GOÄ-Rechnungen bitte Praxisname und Anschrift in den Einstellungen eintragen.</p>
+<p id="practice-hint" class="muted" hidden>Für eigene Leistungsbelege und GOÄ-Rechnungen bitte Praxisname und Anschrift in Praxisherz unter Praxis → Praxis eintragen.</p>
 <div id="groups-section" hidden><h3>Kombinationen</h3><div id="groups"></div><p class="muted">Gemeinsame Einzelleistungen werden nur einmal berechnet.</p><h3>Einzelleistungen</h3></div>
 <div id="services"></div><p id="empty" class="muted" hidden>Noch keine Leistungen angelegt. Über „Leistungen verwalten“ kannst du beginnen.</p>
 </div><div class="col-right"><div id="basket" class="basket" hidden><h3>Ausgewählte Positionen</h3><div id="basket-lines"></div></div>
@@ -108,7 +108,7 @@ if ($rahmen) {
 <div class="actions"><a id="receipt-open" target="_blank" rel="noopener noreferrer">Originalbeleg öffnen</a><button id="receipt-copy" type="button" class="text-button">Link kopieren</button></div></div>
 <form id="receipt-email-form"><label for="receipt-email">E-Mail-Adresse</label><input id="receipt-email" type="email" autocomplete="off" maxlength="254" required placeholder="name@beispiel.de">
 <p class="muted">Adresse prüfen. Der Zahlungsbeleg wird als PDF-Anhang direkt an diese Adresse gesendet.</p><button id="receipt-email-send" type="submit" class="secondary">PDF per E-Mail senden</button></form>
-<p id="receipt-mail-unconfigured" class="muted" hidden>E-Mail-Versand ist noch nicht eingerichtet (Verwaltung → Verbindungen von Praxisherz und Einstellungen der Kasse).</p></div></div>
+<p id="receipt-mail-unconfigured" class="muted" hidden>E-Mail-Versand ist noch nicht eingerichtet (Praxis → Verbindungen von Praxisherz und Einstellungen der Kasse).</p></div></div>
 <div id="mock-controls" class="mock-controls" hidden><span class="eyebrow">TERMINAL SIMULIEREN</span><div class="actions"><button id="mock-success" class="secondary">Zahlung erfolgreich</button><button id="mock-fail" class="secondary">Zahlung abgelehnt</button></div></div>
 <label id="mock-fhir-label" class="mock-option" hidden><input type="checkbox" id="mock-fhir-fail"> t2med-Fehler simulieren</label>
 </section></div>

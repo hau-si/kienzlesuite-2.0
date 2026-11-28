@@ -121,7 +121,7 @@ try {
                 'kontakt-favorit' => (function () { $an = !empty($_POST['an']); Fax::kontaktFavorit((int)($_POST['id'] ?? 0), $an); return $an ? 'Als Favorit markiert.' : 'Kein Favorit mehr.'; })(),
                 'kontakt-loeschen' => (function () { Fax::kontaktLoeschen((int)($_POST['id'] ?? 0)); return 'Eintrag gelöscht.'; })(),
                 'einstellungen-speichern', 'aufbewahrung-speichern' => (function () { Fax::aufbewahrungSpeichern($_POST); return 'Aufbewahrung gespeichert.'; })(),
-                'drucker-speichern' => (function () { Fax::druckerSpeichern((array)($_POST['drucker'] ?? [])); return 'Druckerliste gespeichert. Jetzt unter Verwaltung → Drucker „Virtuelle Drucker der Module abgleichen“ wählen (oder das Modul Fax neu installieren), damit neue Drucker erscheinen und entfernte verschwinden.'; })(),
+                'drucker-speichern' => (function () { Fax::druckerSpeichern((array)($_POST['drucker'] ?? [])); return 'Druckerliste gespeichert. Jetzt unter Praxis → Drucker „Virtuelle Drucker der Module abgleichen“ wählen (oder das Modul Fax neu installieren), damit neue Drucker erscheinen und entfernte verschwinden.'; })(),
                 'benachrichtigung-speichern' => (function () { Fax::benachrichtigungSpeichern($_POST); return 'Benachrichtigung gespeichert.'; })(),
                 'ocr-speichern' => (function () { Fax::ocrSpeichern(!empty($_POST['ocr'])); return !empty($_POST['ocr']) ? 'Texterkennung ist an. Neue Faxe werden in den nächsten Minuten gelesen.' : 'Texterkennung ist aus; erkannte Texte wurden gelöscht.'; })(),
                 'nas-speichern' => (function () use ($k) { Fax::nasSpeichern($k, $_POST); return 'NAS-Einstellungen gespeichert.'; })(),

@@ -26,9 +26,15 @@ try {
 
     // Grundwerte: einmal erzeugt, 0600, und Basis-Konfiguration aus den Verbindungen von Praxisherz.
     $g = Suite::grundwerte();
-    check(preg_match('/^[a-f0-9]{64}$/D', $g['launcher_key']) === 1 && (fileperms(Suite::$data . '/grundwerte.json') & 0777) === 0600, 'Grundwerte falsch angelegt');
+    check(preg_match('/^[a-f0-9]{64}$/D', $g['encryption_key']) === 1 && !isset($g['launcher_key']) && (fileperms(Suite::$data . '/grundwerte.json') & 0777) === 0600, 'Grundwerte falsch angelegt');
     Suite::ensureGrundwerte();
     check(Suite::grundwerte() === $g, 'Grundwerte beim zweiten Mal ersetzt');
+    // Ältere Grundwerte enthalten noch den früheren Starter-Schlüssel der Kasse: wird nicht mehr genutzt, darf aber nicht stören.
+    $datei = Suite::$data . '/grundwerte.json';
+    $alt = (string)file_get_contents($datei);
+    file_put_contents($datei, json_encode($g + ['launcher_key' => str_repeat('f', 64)]));
+    check(Suite::baseConfig()->get('app', 'launcher_key') === null, 'Alter Starter-Schlüssel der Kasse wird noch übernommen');
+    file_put_contents($datei, $alt);
     $base = Suite::baseConfig();
     check($base->get('app', 'base_url') === 'https://kasse.example.org' && $base->get('app', 'state_dir') === Suite::$data, 'Adresse oder Datenordner falsch');
     check($base->get('fhir', 'launch_urls') === ['https://t2med.example.org/aps/fhir/api/r4'] && $base->get('invoice_export', 'ziel') === 'steuerbuero', 'Verbindungen nicht übernommen');

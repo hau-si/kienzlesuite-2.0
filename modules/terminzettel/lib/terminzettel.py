@@ -172,7 +172,7 @@ def load_config(path: str, overlay: str | None = WEB_OVERLAY) -> dict[str, Any]:
 
 
 def apply_basis(cfg: dict[str, Any], path: str | None = None) -> None:
-    """Bondrucker laut Verwaltung → Drucker (Zuordnung „Bondrucker“), von der Einstellungsseite in basis.json abgelegt."""
+    """Bondrucker laut Praxis → Drucker (Zuordnung „Bondrucker“), von der Einstellungsseite in basis.json abgelegt."""
     try:
         with open(path or BASIS, "rb") as fh:
             data = json.loads(fh.read(65537).decode("utf-8"))
@@ -999,7 +999,7 @@ def send_cups(payload: bytes, cfg: dict[str, Any], *, copies: int = 1) -> None:
     """ESC/POS-Daten roh an die Warteschlange des Bondruckers (lp, als Modul-Benutzer)."""
     queue = str(cfg.get("output", {}).get("queue", ""))
     if not queue:
-        raise TicketError("Kein Bondrucker zugeordnet. Bitte unter Verwaltung → Drucker bei „Wofür welcher Drucker?“ den Bondrucker wählen.")
+        raise TicketError("Kein Bondrucker zugeordnet. Bitte unter Praxis → Drucker bei „Wofür welcher Drucker?“ den Bondrucker wählen.")
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,39}", queue) or queue.casefold() == "terminzettel":
         raise TicketError("Ungültige Zielwarteschlange.")
     if type(copies) is not int or not 1 <= copies <= 99:
@@ -1012,7 +1012,7 @@ def send_cups(payload: bytes, cfg: dict[str, Any], *, copies: int = 1) -> None:
     except (OSError, subprocess.TimeoutExpired):
         raise TicketError("Der Druckauftrag konnte nicht abgegeben werden. Bitte den Drucker prüfen.") from None
     if proc.returncode != 0:
-        raise TicketError("Der Bondrucker hat den Druckauftrag abgelehnt. Bitte unter Verwaltung → Drucker prüfen.")
+        raise TicketError("Der Bondrucker hat den Druckauftrag abgelehnt. Bitte unter Praxis → Drucker prüfen.")
 
 
 def main() -> int:

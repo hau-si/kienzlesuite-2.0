@@ -273,7 +273,7 @@
     Object.keys(D.sprachen).forEach(function (k) { if (k !== 'de') wahl.appendChild(new Option(D.sprachen[k], k)); });
     var los = el('button', 'secondary', 'Übersetzen in …'); los.type = 'button';
     var stand = el('p', 'muted klein-text');
-    if (!D.uebersetzung) { los.disabled = true; stand.textContent = 'Dafür unter Verwaltung → Verbindungen → „Übersetzung (DeepL)“ den Schlüssel der DeepL API Free eintragen.'; }
+    if (!D.uebersetzung) { los.disabled = true; stand.textContent = 'Dafür unter Praxis → Verbindungen → „Übersetzung (DeepL)“ den Schlüssel der DeepL API Free eintragen.'; }
     else stand.textContent = 'Übersetzt mit DeepL (nur der Vorlagentext, keine Patientendaten). Eine vorhandene Fassung dieser Sprache wird erneuert und wieder auf „nicht freigegeben“ gesetzt.';
     los.addEventListener('click', function () {
       if (geaendert) { stand.textContent = 'Bitte zuerst speichern.'; return; }

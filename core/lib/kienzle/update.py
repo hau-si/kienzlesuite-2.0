@@ -265,7 +265,7 @@ def fetch_release(part: str, version: str, current: str | None, work: Path) -> b
     elif allow_unsigned(entry['prerelease']):
         signed = False
     else:
-        raise Fehler('Release ist nicht signiert. Unsignierte Versionen nur nach ausdrücklicher Freigabe (Verwaltung → Updates → Signaturprüfung).')
+        raise Fehler('Release ist nicht signiert. Unsignierte Versionen nur nach ausdrücklicher Freigabe (Betrieb → Updates → Signaturprüfung).')
     manifest = release.parse_manifest(manifest_raw, part)
     if manifest['version'] != version or (manifest['channel'] == 'beta' and channel() != 'beta'):
         raise Fehler('Manifest passt nicht zur angeforderten Version bzw. zum Kanal.')

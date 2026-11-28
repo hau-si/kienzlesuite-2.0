@@ -13,7 +13,7 @@ function base(): Config {
     $v = Config::parse(file_get_contents(dirname(__DIR__) . '/config/kienzle-kasse.example.toml'));
     $v['app']['state_dir'] = sys_get_temp_dir() . '/ks-settings-' . bin2hex(random_bytes(6));
     mkdir($v['app']['state_dir'], 0700);
-    $v['app']['launcher_key'] = str_repeat('a', 64); $v['app']['encryption_key'] = str_repeat('b', 64);
+    $v['app']['encryption_key'] = str_repeat('b', 64);
     $v['invoice_inbox']['key'] = str_repeat('e', 64);
     return new Config($v);
 }

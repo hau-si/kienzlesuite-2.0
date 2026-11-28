@@ -5,7 +5,7 @@
 [module]
 id = "fax"
 name = "Fax"
-version = "0.1.0-beta.15"
+version = "0.1.0-beta.16"
 core_api = "2"
 description = "Papierloses Fax: am PC auf einen Faxdrucker drucken, Empfänger wählen, senden; Sendeprotokoll, Fehlerberichte, Faxeingang. Braucht das Modul Telefon (Telefonanlage); eine Praxis nur mit Fax richtet dort nur die Faxleitung ein."
 requires = ["telefon"]
@@ -24,7 +24,7 @@ entry = "public/index.php"
 einstellungen = "/einstellungen"
 uploads = true
 
-# Ordner „ablage“ als Windows-Freigabe „Fax-Ausgang“ (aus, bis ein Admin sie unter Verwaltung → Drucker einschaltet): Dateien dort hineinziehen,
+# Ordner „ablage“ als Windows-Freigabe „Fax-Ausgang“ (aus, bis ein Admin sie unter Praxis → Drucker einschaltet): Dateien dort hineinziehen,
 # das Modul übernimmt sie sofort in „Fax senden“ (Quelle NAS).
 [[fileshare]]
 id = "ablage"
@@ -45,7 +45,7 @@ id = "telefonbuch"
 label = "Fax: Telefonbuch bearbeiten"
 
 # Faxdrucker: ein Drucker „vFax“; weitere (vFax2, vFaxLabor …) trägt der Admin in den Einstellungen des Moduls ein. Das Modul schreibt die
-# Namen nach drucker.json, die Basis legt sie beim Abgleichen an (Verwaltung → Drucker → „Virtuelle Drucker der Module abgleichen“).
+# Namen nach drucker.json, die Basis legt sie beim Abgleichen an (Praxis → Drucker → „Virtuelle Drucker der Module abgleichen“).
 [printer_list]
 prefix = "vFax"
 default = ["vFax"]

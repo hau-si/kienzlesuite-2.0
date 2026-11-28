@@ -14,7 +14,7 @@ final class NoNetwork extends HttpClient {
 }
 function config(string $state, bool $practice = true): Config {
     $v = Config::parse(file_get_contents(dirname(__DIR__) . '/config/kienzle-kasse.example.toml'));
-    $v['app']['state_dir'] = $state; $v['app']['launcher_key'] = str_repeat('a', 64); $v['app']['encryption_key'] = str_repeat('b', 64);
+    $v['app']['state_dir'] = $state; $v['app']['encryption_key'] = str_repeat('b', 64);
     $v['sumup'] = ['mode' => 'mock']; $v['fhir'] = ['mode' => 'mock', 'entry_code' => 'ZAHLUNG'];
     if ($practice) $v['practice'] = ['name' => 'Praxis Beispiel', 'street' => 'Musterstraße 1', 'city' => '12345 Musterstadt'];
     return new Config($v);

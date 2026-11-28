@@ -114,13 +114,12 @@
 
   // Arbeitsplatz-Starter (T2med → Modul): Der Starter öffnet https://<server>/#launch=<einmaliger Code>[&m=<Modul>].
   // Ohne Anmeldung den Code bis nach der Anmeldung im Tab merken, danach an das Modul weitergeben
-  // (data-starter-map: Modul → Pfad; ohne &m der Kassen-Starter data-starter).
+  // (data-starter-map: Modul → Pfad).
   (function starter() {
-    const alt = document.body && document.body.dataset.starter;
     let karte = {};
     try { karte = JSON.parse((document.body && document.body.dataset.starterMap) || '{}') || {}; } catch (e) { karte = {}; }
-    if (!alt && !Object.keys(karte).length) return;
-    const gueltig = h => /^#launch=[0-9a-f]{64}(&m=[a-z][a-z0-9-]{1,28})?$/.test(h);
+    if (!Object.keys(karte).length) return;
+    const gueltig = h => /^#launch=[0-9a-f]{64}&m=[a-z][a-z0-9-]{1,28}$/.test(h);
     let hash = gueltig(location.hash) ? location.hash : '';
     if (hash) history.replaceState(null, '', location.pathname + location.search);
     const login = location.pathname === '/anmelden' || location.pathname.startsWith('/anmelden/') || location.pathname === '/konto/otp';
@@ -131,7 +130,7 @@
     } catch (e) { /* ohne sessionStorage: nur direkte Weitergabe */ }
     if (!gueltig(hash)) return;
     const teile = hash.split('&m=');
-    const ziel = teile[1] ? (Object.prototype.hasOwnProperty.call(karte, teile[1]) ? karte[teile[1]] : '') : alt;
+    const ziel = Object.prototype.hasOwnProperty.call(karte, teile[1]) ? karte[teile[1]] : '';
     if (ziel) location.replace(ziel + '/' + teile[0]);
   })();
 })();

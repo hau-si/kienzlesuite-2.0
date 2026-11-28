@@ -1,5 +1,9 @@
 # Beispielmodul – Release-Notizen
 
+## 0.2.1-beta.1
+
+- PPD des Beispiel-Druckers: Hersteller und Modellname „Praxisherz“ statt „Kienzle-Suite“. Mit Tests geprüft, nicht auf der VM.
+
 ## 0.2.0
 
 - Zweiter virtueller Drucker „Beispiel-PDF“ als IPP-Everywhere-Drucker (`command`, Basis 0.10.0).

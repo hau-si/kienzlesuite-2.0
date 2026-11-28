@@ -10,7 +10,7 @@ header("Content-Security-Policy: default-src 'none'; script-src 'self'; style-sr
 $receipt = null; $error = '';
 try {
     if ($_SERVER['REQUEST_METHOD'] !== 'GET') throw new Problem('GET erforderlich.', 405);
-    if (!Suite::can('kassieren')) throw new Problem('Für die Kasse fehlt das Recht „Kassieren“.', 403);
+    if (!Suite::can('kassieren')) throw new Problem('Für die Kasse fehlt das Recht „Kartenzahlung und Barzahlung aus T2med“.', 403);
     $app = ks_app();
     $browser = $app->browser($_COOKIE['ks_browser'] ?? null);
     $visit = $app->visit($browser, App::string($_GET, 'v', 32));

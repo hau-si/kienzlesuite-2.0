@@ -55,12 +55,12 @@ die Basis eine API-Version, gegen die Module geprüft werden.
 | Webinterface und Anmeldung | eine Anmeldung für alle Module, Menü aus den installierten Modulen |
 | Benutzer, Rollen, Rechte | Admin und Mitarbeiter; Rechte kommen aus den Modulen (Kästchen) |
 | Admin-Zugang | Passwort **und** OTP (TOTP, RFC 6238), Wiederherstellungscodes |
-| Arbeitsplätze (PCs) | CA-Zertifikat zum Herunterladen; Starter-Paket und Drucker-Einrichtung je Arbeitsplatz kommen aus dem SumUp-Modul |
+| Arbeitsplätze (PCs) | CA-Zertifikat zum Herunterladen; ein Paket je PC aus der Basis (Einrichten → Arbeitsplätze) richtet den Praxisherz-Agent ein: Starter für alle Module, Zertifikat, virtuelle Drucker; von Hand als Notweg |
 | Firewall und Netzwerk | nftables, nur Praxisnetz/VPN; Ports kommen aus den Modulen |
 | Zertifikat und Zugang | lokale Zertifizierungsstelle auf dem Server (siehe unten), ein Zugang über Port 443 (nginx) mit Pfaden je Modul |
 | Einrichtungs-Überblick | eigener Überblick der Basis, darunter die Überblicke der Module |
 | Updates | je Modul, Kanal stabil/beta, Sicherung vor dem Update, Rücksprung |
-| Module | installieren, aktualisieren, entfernen über Verwaltung → Module (root-Dienst `kienzle-module`, Basis 0.16.0) |
+| Module | installieren, aktualisieren, entfernen über Betrieb → Module (root-Dienst `kienzle-module`, Basis 0.16.0) |
 | Netzwerkspeicher | gemeinsamer Dienst für SMB-Ziele (aus der Rechnungsablage der SumUp-Suite) |
 | Backup | verschlüsselte Sicherung aller Module auf den Netzwerkspeicher; Export aller Einstellungen als passwortverschlüsselte Datei |
 | CUPS, Samba, Protokolle | gemeinsame Dienste; Basis installiert und verwaltet Drucker, Module drucken darauf und melden eigene virtuelle Drucker an |
@@ -93,7 +93,7 @@ entry = "public/index.php"
 
 [[rights]]
 id = "paid"
-label = "Bezahlt-Liste abhaken"
+label = "Kasse: T2med-Rechnungen in den Vorgängen abhaken"
 
 [backup]
 paths = ["/var/lib/kienzle/kasse"]
@@ -157,7 +157,7 @@ Basis zentral. Ein Zugang, den nur ein Modul nutzt, bleibt im Modul.**
   - Die CA hat eine **Namensbeschränkung** auf die Namen und privaten Netze der Praxis; selbst mit gestohlenem Schlüssel
     lassen sich keine Zertifikate für fremde Seiten ausstellen.
   - Das Server-Zertifikat gilt höchstens 825 Tage (Vorgabe von macOS/iOS) und wird automatisch erneuert.
-  - Arbeitsplätze vertrauen der CA einmal (Download mit Fingerabdruck, später über den Starter). Starter pinnen die
+  - Arbeitsplätze vertrauen der CA einmal (über das Paket des Praxisherz-Agent oder von Hand per Download mit Fingerabdruck). Starter pinnen die
     CA statt des Server-Zertifikats.
   - Die CA ist Teil der Sicherung.
 - **Drucken:** CUPS und Samba installiert und konfiguriert die Basis aus festen Vorlagen. Samba nur als Druckserver,
@@ -218,7 +218,7 @@ Grundsatz: **so wenig Daten wie möglich, so wenig Rechte wie möglich, nichts a
 - Mitarbeiter mit eigenen Konten und Rechten je Modul, ohne Zugriff auf Schlüssel und Einstellungen.
 - **Eine Anmeldung (SSO) für alle Module:** Module haben keine eigene Anmeldung; Schnittstelle in `docs/MODUL-SCHNITTSTELLE.md`.
   Dienste mit eigener Anmeldung (Telefonanlage, NAS, …) melden über die Basis als **OpenID-Connect-Anbieter** an
-  (seit Basis 0.11.0, Verwaltung → Dienste): Code-Ablauf mit PKCE, ID-Token ES256, nur eingetragene Dienste und
+  (seit Basis 0.11.0, Praxis → Dienste): Code-Ablauf mit PKCE, ID-Token ES256, nur eingetragene Dienste und
   Weiterleitungsadressen, Zugang je Dienst auf Admins oder auf Benutzer eines Moduls beschränkbar.
 - Admin-Rechte je Modul: wer die Kasse verwaltet, sieht nicht automatisch Arbeitszeiten und umgekehrt.
 - Kienzlezeit kennt den passwortlosen Mitarbeiter-Login per RFID-Karte am Terminal. Dieser bleibt auf
@@ -316,7 +316,7 @@ Löschen der Sicherung durch einen Angreifer wird durch die NAS-Schnappschüsse 
    Zertifikat, Firewall, Updater, Netzwerkspeicher aus der Rechnungsablage, Backup neu, Installer mit CUPS und Samba,
    Druckerverwaltung, Einrichtungs-Überblick der Basis. Meilensteine: `docs/PLAN.md`.
 2. SumUp und Terminzettel als erste Module umstellen (`module.toml`, eigener Benutzer, eigener Datenordner,
-   Einrichtungs-Überblick je Modul, Arbeitsplatz-Starter im SumUp-Modul). Übernahme bestehender Installationen per Migration.
+   Einrichtungs-Überblick je Modul; der Arbeitsplatz-Starter war zuerst im SumUp-Modul geplant und ist heute zentral in der Basis). Übernahme bestehender Installationen per Migration.
 3. Fax, Telefon und Kienzlezeit als Module aufnehmen – nach Abstimmung mit Thomas.
 
 ## Hinweise zur Integration von Kienzlezeit

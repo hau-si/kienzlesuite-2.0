@@ -6,7 +6,7 @@ $k = Suite::modul();
 if (!Suite::can('kassieren')) {
     http_response_code(403);
     header('Content-Type: text/plain; charset=utf-8');
-    exit("Für die Kasse fehlt das Recht „Kassieren“. Bitte den Admin fragen (Verwaltung → Benutzer von Praxisherz).\n");
+    exit("Für die Kasse fehlt das Recht „Kartenzahlung und Barzahlung aus T2med“. Bitte den Admin fragen (Praxis → Benutzer und Gruppen von Praxisherz).\n");
 }
 header('Cache-Control: no-store');
 header('Referrer-Policy: no-referrer');

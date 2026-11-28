@@ -133,13 +133,14 @@ final class Starter {
     private static function readme(string $system, string $url, array $schemas, bool $drucker = false): string {
         $nl = $system === 'windows' ? "\r\n" : "\n";
         $steps = match ($system) {
-            'windows' => ["Diese ZIP-Datei mit Rechtsklick → „Alle extrahieren …“ entpacken (nicht direkt aus der ZIP starten).", "Im entpackten Ordner „install-windows.cmd“ doppelklicken. Meldet Windows „Der Computer wurde durch Windows geschützt“: „Weitere Informationen“ → „Trotzdem ausführen“.", "Die Frage nach Administratorrechten mit „Ja“ bestätigen (das Fenster kann hinter anderen liegen).", "„Arbeitsplatz eingerichtet“ erscheint. Der Ordner kann danach gelöscht werden; Starter, Zertifikat und Drucker hält der Praxisherz-Agent ab jetzt selbst aktuell."],
+            'windows' => ["Diese ZIP-Datei mit Rechtsklick → „Alle extrahieren …“ entpacken (nicht direkt aus der ZIP starten).", "Im entpackten Ordner „install-windows.cmd“ doppelklicken. Meldet Windows „Der Computer wurde durch Windows geschützt“: „Weitere Informationen“ → „Trotzdem ausführen“.", "Die Frage nach Administratorrechten mit „Ja“ bestätigen (das Fenster kann hinter anderen liegen).", "„Arbeitsplatz eingerichtet“ erscheint. Der Ordner kann danach gelöscht werden; Starter, Zertifikat und Drucker hält der Praxisherz-Agent ab jetzt selbst aktuell.",
+                "Nur falls die Drucker nicht erscheinen (Notweg): „install-drucker.ps1“ mit Rechtsklick → „Mit PowerShell ausführen“ als Administrator starten; es richtet die Drucker aus „drucker.txt“ von Hand ein."],
             'macos' => ["Die ZIP-Datei doppelklicken (entpackt in „Downloads“).", "Im entpackten Ordner „install-macos.command“ mit Rechtsklick → „Öffnen“ starten und „Öffnen“ bestätigen.", "Für das Zertifikat das Mac-Anmeldepasswort eingeben.", "„Praxisherz-Starter eingerichtet“ erscheint. Der Ordner kann danach gelöscht werden."],
             default => ["Die ZIP-Datei entpacken (unzip praxisherz-starter-linux.zip -d praxisherz-starter).", "Im Terminal im entpackten Ordner:  bash install-linux.sh", "Das Zertifikat server.crt im Browser als vertrauenswürdig importieren."],
         };
         $text = 'Praxisherz-Starter – Einrichtung des Arbeitsplatzes' . $nl . $nl;
         foreach ($steps as $i => $s) $text .= ($i + 1) . '. ' . $s . $nl;
-        return $text . $nl . 'In T2med als Eintrag „Programm/URL“ je Modul: ' . implode(', ', array_map(fn($s) => $s . '://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}', $schemas)) . $nl
+        return $text . $nl . 'In T2med unter „Drittanbieter-Zugriffe verwalten → Neue URL hinzufügen“ je Modul: ' . implode(', ', array_map(fn($s) => $s . '://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}', $schemas)) . $nl
             . 'Server: ' . $url . $nl . 'Diese Dateien enthalten den Starter-Schlüssel der Praxis. Nicht weitergeben, nach der Einrichtung löschen.' . $nl;
     }
 }

@@ -43,9 +43,8 @@ function test_server(): void {
     check(str_contains(implode("\n", $env->audit->recent()), 'servername kienzle.praxis.internal'), 'nicht protokolliert');
     $h = (new Browser($env))->get('/hilfe/arbeitsplatz');
     check($h->status === 200 && str_contains($h->body, 'id="zertifikat"') && str_contains($h->body, '192.0.2.5   kienzle.example.org'), 'Hilfe ohne Anmeldung');
-    // Starter der Kasse: nur wenn ein installiertes Modul einen Starter hat, mit Verweis auf dessen Einstellungen
-    $starter = $env->modules->starterPath();
-    check(($starter !== '') === str_contains($h->body, 'id="paket"'), 'Hilfe Arbeitsplätze: Starter-Hinweis');
+    // Paket des Praxisherz-Agent: nur wenn ein installiertes Modul aus T2med gestartet wird
+    check((bool)$env->modules->starters() === str_contains($h->body, 'id="paket"'), 'Hilfe Arbeitsplätze: Paket-Hinweis');
     $json = json_decode((string)shell_exec(escapeshellarg(dirname(__DIR__, 2) . '/core/bin/kienzle-modul-pruefen') . ' --alle --json ' . escapeshellarg(dirname(__DIR__, 2) . '/modules')), true);
     $kasse = array_values(array_filter($json['modules'], fn($x) => $x['module']['id'] === 'kasse'))[0];
     $env->modules = \Kienzle\Core\Modules::fromArray([$kasse]);

@@ -54,7 +54,7 @@ final class App {
                 throw new Problem("Die von t2med übergebene FHIR-Adresse ist nicht freigegeben.\n" .
                     'Von t2med (fhirBasisUrl): ' . self::diagnosticAddress($url) . "\n" .
                     'Im Server erlaubt (launch_urls): ' . implode(', ', $shown) . "\n" .
-                    'Bitte unter Verwaltung → Verbindungen von Praxisherz bei T2med „Erlaubte fhirBasisUrl aus T2med“ prüfen. Gemeint ist die FHIR-Adresse, nicht die Adresse der Zahlungswebseite.');
+                    'Bitte unter Praxis → Verbindungen von Praxisherz bei T2med „Erlaubte fhirBasisUrl aus T2med“ prüfen. Gemeint ist die FHIR-Adresse, nicht die Adresse der Zahlungswebseite.');
             }
         }
         $patient = $this->fhir->patient($context, $token);
@@ -420,9 +420,9 @@ final class App {
                 }
                 if ($amount <= 0 || $amount > $max) throw new Problem('Bitte Leistungen oder einen zulässigen Betrag auswählen.');
                 $hasGoae = count(array_filter($items, static fn($s) => ($s['goae_code'] ?? '') !== ''));
-                if ($hasGoae && !$this->config->practiceReady()) throw new Problem('Für GOÄ-Belege bitte zuerst Praxisname und Anschrift in den Einstellungen eintragen.');
+                if ($hasGoae && !$this->config->practiceReady()) throw new Problem('Für GOÄ-Belege bitte zuerst Praxisname und Anschrift in Praxisherz unter Praxis → Praxis eintragen.');
                 $invoice = null;
-                if ($method === 'cash' && !$this->config->practiceReady()) throw new Problem('Für Barzahlungen wird eine Rechnung erstellt. Bitte zuerst Praxisname und Anschrift in den Einstellungen eintragen.', 409);
+                if ($method === 'cash' && !$this->config->practiceReady()) throw new Problem('Für Barzahlungen wird eine Rechnung erstellt. Bitte zuerst Praxisname und Anschrift in Praxisherz unter Praxis → Praxis eintragen.', 409);
                 if ($this->config->practiceReady()) {
                     $practice = [];
                     foreach (['name','street','city','contact'] as $key) $practice[$key] = $this->config->get('practice', $key, '');
@@ -434,8 +434,8 @@ final class App {
                         JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
                 }
                 $id = self::id();
-                if ($method === 'transfer' && !$this->bank->ready()) throw new Problem('Für Überweisungen bitte zuerst die Kontodaten unter Einstellungen → Überweisung eintragen.', 409);
-                if ($method === 'transfer' && !$invoice) throw new Problem('Für Überweisungen wird eine Rechnung erstellt. Bitte zuerst Praxisname und Anschrift in den Einstellungen eintragen.', 409);
+                if ($method === 'transfer' && !$this->bank->ready()) throw new Problem('Für Überweisungen bitte zuerst die Kontodaten in Praxisherz unter Praxis → Praxis eintragen.', 409);
+                if ($method === 'transfer' && !$invoice) throw new Problem('Für Überweisungen wird eine Rechnung erstellt. Bitte zuerst Praxisname und Anschrift in Praxisherz unter Praxis → Praxis eintragen.', 409);
                 $this->dropOpenTransfers($visit['id']);
                 if ($method === 'transfer') {
                     $this->db->query('INSERT INTO payments(id,visit_id,request_id,request_hash,reference,reader_id,amount_cents,services_json,payment_status,created_at,invoice_json,payment_method) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
@@ -493,8 +493,8 @@ final class App {
             $t2med = !empty($source['inbox_id']);
             if ($t2med && !isset(array_column($this->openInvoices($fresh), null, 'id')[$source['inbox_id']])) throw new Problem('Diese Rechnung ist nicht mehr offen. Bitte Seite neu laden.', 409);
             if ($t2med && $method === 'transfer') throw new Problem('Bei T2med-Rechnungen steht der Überweisungs-QR-Code bereits auf der Rechnung. Hier gibt es nur Karte oder Bar.', 409);
-            if ($method === 'transfer' && !$this->bank->ready()) throw new Problem('Für Überweisungen bitte zuerst die Kontodaten unter Einstellungen → Überweisung eintragen.', 409);
-            if (!$t2med && !$source['invoice_json']) throw new Problem('Für Bar und Überweisung wird eine Rechnung erstellt. Bitte zuerst Praxisname und Anschrift in den Einstellungen eintragen.', 409);
+            if ($method === 'transfer' && !$this->bank->ready()) throw new Problem('Für Überweisungen bitte zuerst die Kontodaten in Praxisherz unter Praxis → Praxis eintragen.', 409);
+            if (!$t2med && !$source['invoice_json']) throw new Problem('Für Bar und Überweisung wird eine Rechnung erstellt. Bitte zuerst Praxisname und Anschrift in Praxisherz unter Praxis → Praxis eintragen.', 409);
             $payment = $this->db->transaction(function () use ($source, $fresh, $request, $method): array {
                 $this->dropOpenTransfers($fresh['id']);
                 $new = self::id(); $hash = hash('sha256', json_encode(['switch', $source['id'], $method], JSON_THROW_ON_ERROR));
@@ -853,7 +853,7 @@ final class App {
     }
     /** Bon mit Kontodaten und QR-Code für eine noch offene Überweisung. */
     private function transferNote(array $payment): string {
-        if (!$this->bank->ready()) throw new Problem('Die Kontodaten fehlen (Einstellungen → Überweisung).', 409);
+        if (!$this->bank->ready()) throw new Problem('Die Kontodaten fehlen (Praxisherz: Praxis → Praxis).', 409);
         $info = $this->bank->info((int)$payment['amount_cents'], (string)($payment['t2med_invoice'] ?: $payment['reference']));
         $practice = [];
         if ($this->config->practiceReady()) foreach (['name', 'street', 'city', 'contact'] as $key) $practice[$key] = $this->config->get('practice', $key, '');

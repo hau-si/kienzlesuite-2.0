@@ -1,5 +1,16 @@
 # Basis – Release-Notizen
 
+## 0.22.0-beta.48
+
+- **Alte Verweise aufgeräumt (Wunsch des Nutzers): Der Praxisherz-Agent ist der Hauptweg, Handanleitungen bleiben eingeklappt als Notweg.**
+- Einrichtungs-Überblick: Die drei Handpunkte am PC („Zertifizierungsstelle eingerichtet“, „Virtuelle Drucker eingerichtet“, „Arbeitsplatz-Starter der Module neu installiert“) sind ein Punkt „Praxisherz-Agent auf allen Arbeitsplätzen installiert (Starter, Zertifikat, Drucker)“ mit der Zahl der angemeldeten Arbeitsplätze. Ohne Modul mit T2med-Start bleibt nur der Punkt zum Zertifikat. Ein früher bestätigter Starter-Punkt gilt weiter als erledigt.
+- Seite Einrichtung, Arbeitsplätze, Servername, Installer und Anleitung im Paket (LIESMICH) verweisen auf das Paket bzw. den Agent; LIESMICH nennt `install-drucker.ps1` als Notweg, falls die Drucker fehlen, und den T2med-Menüpunkt „Drittanbieter-Zugriffe verwalten → Neue URL hinzufügen“.
+- Menüwege in Texten wie in der Seitenleiste: „Einrichten → Server/Arbeitsplätze“, „Praxis → Praxis/Benutzer und Gruppen/Drucker/Verbindungen/Dienste“, „Betrieb → Sicherung/Updates/Module/Sicherheit“, „Startseite → Einrichtung“ statt „Verwaltung → …“.
+- Entfernt: Weiterleitung des alten Kasse-Starters ohne Modulangabe (`data-starter`, `Modules::starterPath`; alle Module senden `&m=`), Symbol des nicht mehr vorhandenen Menüpunkts `/verwaltung/arbeitsplaetze`, Stil für den alten Abmelden-Link in der Leiste (`core.css?v=42`, `core.js?v=8`).
+- Start-ISO heißt jetzt `praxisherz-start.iso`, vorbelegter Servername in Doku und Kommentaren `praxisherz`. Video: Titelbild mit Herz statt „K“.
+- Doku (README, ARCHITEKTUR, INSTALLATION, VM-TEST mit neuem Abschnitt zum Agent, MODULE-TOML, MODUL-SCHNITTSTELLE) auf den aktuellen Stand; Bildschirmfotos neu erzeugt.
+- Mit Tests geprüft. Nicht auf der VM, nicht unter Windows geprüft.
+
 ## 0.22.0-beta.47
 
 - **Fehler behoben (Nutzer-Meldung): Webinterface ließ sich nach dem Update auf beta.46 nicht anpassen.** nginx lehnte die Konfiguration ab („fastcgi_busy_buffers_size must be less than the size of all fastcgi_buffers minus one buffer“), weil beta.46 in der Anmeldeprüfung `/_auth/` nur `fastcgi_buffer_size 32k` vergrößert hatte. Jetzt passen die Puffer zusammen (`fastcgi_buffers 8 32k`). Die alte Konfiguration blieb bis dahin aktiv; Module, die die Personenliste brauchen (QM: Vorlegen), gehen erst mit diesem Stand.

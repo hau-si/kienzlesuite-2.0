@@ -151,8 +151,8 @@ function render(data) {
     if (section.id === 'fhir') {
       // Die T2med-Verbindung gehört von Praxisherz: Stand zeigen und direkt zur Einrichtung verlinken.
       const ok = !!(data.connections && data.connections.t2med);
-      const note = el('p', ok ? 'Die T2med-Verbindung Praxisherz ist eingerichtet. ' : 'Die T2med-Verbindung Praxisherz ist noch nicht eingerichtet. ', ok ? 'notice' : 'inline-error');
-      note.append(el('a', ok ? 'Verbindung prüfen (Verwaltung → Verbindungen)' : 'Jetzt in Praxisherz einrichten (Verwaltung → Verbindungen)', null, {href: '/verwaltung/verbindungen'}));
+      const note = el('p', ok ? 'Die T2med-Verbindung von Praxisherz ist eingerichtet. ' : 'Die T2med-Verbindung von Praxisherz ist noch nicht eingerichtet. ', ok ? 'notice' : 'inline-error');
+      note.append(el('a', ok ? 'Verbindung prüfen (Praxis → Verbindungen)' : 'Jetzt in Praxisherz einrichten (Praxis → Verbindungen)', null, {href: '/verwaltung/verbindungen'}));
       form.prepend(note);
       form.append(t2medSetupHelp());
     }
@@ -184,11 +184,13 @@ function renderPrinterHelp(cfg, info) {
   if (!info.enabled) return;
   printerFold(cfg.box, !!(info.queue && info.queue.ours));
   if (!info.queue) {
-    box.append(el('p', 'Der Drucker „' + cfg.queue + '“ fehlt in Praxisherz. Unter Verwaltung → Drucker „Virtuelle Drucker abgleichen“ wählen; legt Praxisherz ihn dann nicht an, das Modul unter Verwaltung → Module neu installieren.', 'inline-error'));
+    box.append(el('p', 'Der Drucker „' + cfg.queue + '“ fehlt in Praxisherz. Unter Praxis → Drucker „Virtuelle Drucker abgleichen“ wählen; legt Praxisherz ihn dann nicht an, das Modul unter Betrieb → Module neu installieren.', 'inline-error'));
     return;
   }
   if (!info.queue.ours) { box.append(el('p', 'Ein anderer Drucker heißt bereits „' + cfg.queue + '“. Bitte diesen umbenennen oder entfernen.', 'inline-error')); return; }
   box.append(el('p', 'Eingerichtet (' + info.queue.state + '), per IPP freigegeben. ' + cfg.use, 'notice'));
+  box.append(agentNote('Diesen Drucker richtet der Praxisherz-Agent auf jedem Windows-PC selbst ein'));
+  const how = handweg();
   const ol = el('ol', null, 'steps');
   ol.append(el('li', 'Windows: Drucker hinzufügen → „Freigegebenen Drucker über den Namen auswählen“: ' + info.url + ' – Treiber „Microsoft IPP Class Driver“, Papier A4. ' + ippIpNote(info.url, info.ips)));
   const driver = el('li', 'Windows 11: Fehlt der Treiber „Microsoft IPP Class Driver“ oder akzeptiert Windows die Adresse nicht, PowerShell als Administrator öffnen und ausführen:');
@@ -196,7 +198,20 @@ function renderPrinterHelp(cfg, info) {
   ol.append(driver);
   ol.append(el('li', 'Druckereigenschaften lassen sich nicht öffnen („Das Handle ist ungültig“) oder der Druck bleibt aus: Die Windows-Einrichtung ist veraltet, z. B. nach Neueinrichtung des Servers. Drucker entfernen und mit dem PowerShell-Skript oben neu einrichten (es startet den Druckspooler neu und entfernt den alten Drucker). Eine Meldung beim Löschen alter Anschlüsse („Anschluss unbekannt“) ist harmlos. Möglichst die IP-Adresse statt des Namens verwenden.'));
   const mac = el('li'); mac.append(document.createTextNode('Mac: „' + cfg.queue + '“ hinzufügen, als Treiber die Datei '), el('a', cfg.ppd, null, {href: BASE + 'assets/' + cfg.ppd, download: cfg.ppd}), document.createTextNode(' wählen.'));
-  ol.append(mac); box.append(ol);
+  ol.append(mac); how.append(ol); box.append(how);
+}
+
+// Ein Satz zum Praxisherz-Agent mit Verweis auf Einrichten → Arbeitsplätze von Praxisherz.
+function agentNote(text) {
+  const p = el('p', text + ' (');
+  p.append(el('a', 'Einrichten → Arbeitsplätze', null, {href: '/hilfe/arbeitsplatz', target: '_top'}), ').');
+  return p;
+}
+// Notweg ohne Agent: dezent eingeklappt (details.how aus dem Stil von Praxisherz).
+function handweg() {
+  const d = el('details', null, 'how');
+  d.append(el('summary', 'Von Hand einrichten (ohne Agent, Mac/Linux oder wenn etwas schiefgeht)'));
+  return d;
 }
 
 // Karte als Ausklappzeile (nur wo das HTML sie so anlegt, z. B. „vBriefversand“): fertig = zugeklappt mit „erledigt“, sonst offen mit „fehlt“.
@@ -302,16 +317,18 @@ function badge(tab, count) { const b = $('badge-' + tab); if (!b) return; b.hidd
 const GUIDE_URL = BASE + 'hilfe/t2med';
 /** Anleitung für T2med: Drittanbieter-Zugriff mit Menüleisten-Button (Aufruf-Adresse zum Kopieren). */
 function t2medSetupHelp() {
-  const d = el('details', null, 'tz-how'); d.append(el('summary', 'In T2med einrichten: Button „Kartenzahlung“ in der Funktionsleiste'));
+  const d = el('details', null, 'how'); d.append(el('summary', 'In T2med einrichten: Button „Kartenzahlung“ in der Funktionsleiste'));
   const ol = el('ol');
   ol.append(el('li', 'In T2med in der Suche „Drittanbieter-Zugriffe verwalten“ öffnen (fehlt die Funktion, muss ein Admin sie für den Benutzer erst freischalten) und den Eintrag mit dem Stift bearbeiten.'));
   const li = el('li', 'Als Adresse eintragen (genau so, mit den Platzhaltern) und eine Bezeichnung vergeben, z. B. „Kartenzahlung“:'); li.append(el('br'), el('code', 'praxisherz-kasse://?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}', 'code-copy')); ol.append(li);
   ol.append(el('li', 'Auf Plus klicken, oben rechts mit dem Häkchen speichern und in der Liste davor auf „aktualisieren“ (Pfeile) klicken.'));
   ol.append(el('li', 'Dann „Funktionsleisten verwalten“: Konfiguration anlegen oder bearbeiten (Name, Benutzer, Benutzergruppe, Station), „Aktion hinzufügen“, die Aktion unter der vergebenen Bezeichnung suchen, Farbe und Kürzel oder Icon wählen und bestätigen.'));
-  ol.append(el('li', 'Der Starter-Aufruf funktioniert erst, wenn auf dem Arbeitsplatz das Starter-Paket installiert ist (Suite: Verwaltung → Arbeitsplätze).'));
-  ol.append(el('li', 'Die FHIR-Adresse, die T2med beim Aufruf mitgibt, muss in Praxisherz unter Verwaltung → Verbindungen → T2med bei „Erlaubte fhirBasisUrl aus T2med“ stehen (die Adresse des FHIR-Servers gilt immer als erlaubt). Bei einer Fehlermeldung zeigt die Seite die tatsächlichen Werte.'));
+  ol.append(el('li', 'Der Starter-Aufruf funktioniert erst, wenn auf dem Arbeitsplatz der Praxisherz-Agent installiert ist (Einrichten → Arbeitsplätze).'));
+  ol.append(el('li', 'Die FHIR-Adresse, die T2med beim Aufruf mitgibt, muss in Praxisherz unter Praxis → Verbindungen → T2med bei „Erlaubte fhirBasisUrl aus T2med“ stehen (die Adresse des FHIR-Servers gilt immer als erlaubt). Bei einer Fehlermeldung zeigt die Seite die tatsächlichen Werte.'));
   const guide = el('li'); guide.append('Mit Bildern: ', el('a', 'Anleitung „T2med einrichten“', null, {href: GUIDE_URL, target: '_blank', rel: 'noopener'})); ol.append(guide);
-  d.append(ol); return d;
+  d.append(ol);
+  d.append(el('p', 'Alle Aufrufadressen stehen gesammelt unter Praxis → Verbindungen → T2med.', 'muted'));
+  return d;
 }
 
 /** Überblick der einmaligen Schritte in der Reihenfolge, in der sie nötig sind (wie die Einrichtung der Basis); liefert die Zahl offener Pflichtpunkte. */
@@ -320,17 +337,15 @@ function renderChecklist(data) {
   const invoiceQueue = !!(data.invoice_printer && data.invoice_printer.queue);
   const letterQueue = !!(data.letter_printer && data.letter_printer.queue && data.letter_printer.enabled);
   // Punkte der Kasse kommen vom Server (dieselben wie im Einrichtungs-Überblick von Praxisherz), schon in der nötigen Reihenfolge.
+  const agentPrinters = [...(invoiceQueue ? ['vKasse'] : []), ...(letterQueue ? ['vBriefversand'] : [])];
   const own = (data.setup || []).map(i => ({optional: !!i.optional, ort: /Starter/.test(i.title) ? 'pc' : 'web', done: i.state === 'done', error: i.state === 'error', label: i.title, card: (i.link || '').split('#')[1] || 's-checklist', detail: i.hint}));
   const web = own.filter(i => i.ort === 'web'), pc = own.filter(i => i.ort === 'pc');
   const items = [
     ...web,
-    {ort: 'pc', info: true, label: 'Zertifikat von Praxisherz einrichten (einmal je PC, siehe Arbeitsplatz einrichten von Praxisherz)', card: 's-clients', href: '/hilfe/arbeitsplatz', hrefLabel: 'Anleitung'},
-    {ort: 'pc', info: true, label: 'Starter auf den Kassen-PCs installieren (ein Paket für alle Module)', card: 's-clients', href: '/hilfe/arbeitsplatz#paket', hrefLabel: 'Seite „Arbeitsplätze“ von Praxisherz'},
+    {ort: 'pc', info: true, label: 'Praxisherz-Agent auf den Kassen-PCs installieren (Einrichten → Arbeitsplätze) – richtet Starter, Zertifikat' + (agentPrinters.length ? ' und ' + (agentPrinters.length > 1 ? 'die Drucker ' : 'den Drucker ') + agentPrinters.join('/') : '') + ' ein', card: 's-clients', href: '/hilfe/arbeitsplatz#paket', hrefLabel: 'Seite öffnen', note: 'Ohne Agent (Mac/Linux oder wenn etwas schiefgeht): „Von Hand einrichten“ bei den Druckerkarten und auf der Seite Arbeitsplätze.'},
     ...pc,
-    ...(invoiceQueue ? [{ort: 'pc', info: true, label: 'Drucker „vKasse“ am Arbeitsplatz installieren (Windows: IPP-Drucker hinzufügen, Papier A4)', card: 'invoice-printer-help', detail: (data.invoice_printer && data.invoice_printer.url) || ''}] : []),
-    ...(letterQueue ? [{ort: 'pc', info: true, label: 'Drucker „vBriefversand“ am Arbeitsplatz installieren (für den Sammelversand per Post; wie „vKasse“, Papier A4)', card: 'letter-printer-help', detail: (data.letter_printer && data.letter_printer.url) || ''}] : []),
     {ort: 't2med', info: true, label: 'Drittanbieter-Zugriff mit Funktionsleisten-Button „Kartenzahlung“ anlegen (Aufruf-Adresse steht bei der T2med-Anbindung)', card: 's-fhir', href: GUIDE_URL, hrefLabel: 'Anleitung mit Bildern'},
-    ...(invoiceQueue ? [{ort: 't2med', info: true, label: 'Rechnungen in T2med auf den zuvor installierten Drucker „vKasse“ drucken', card: 'invoice-printer-help'}] : []),
+    ...(invoiceQueue ? [{ort: 't2med', info: true, label: 'Rechnungen in T2med auf den Drucker „vKasse“ drucken (richtet der Agent am PC ein)', card: 'invoice-printer-help'}] : []),
   ];
   const list = $('checklist'); list.replaceChildren();
   const required = items.filter(i => !i.optional && !i.info);
@@ -347,6 +362,7 @@ function renderChecklist(data) {
     text.append(' ', el('span', PLACES[item.ort], 'tag'));
     if (item.optional) text.append(' ', el('span', 'optional', 'tag opt'));
     if (item.detail) { text.append(el('br'), el('small', item.detail, 'mono')); }
+    if (item.note) text.append(el('br'), el('small', item.note, 'muted'));
     li.append(text);
     ol.append(li);
   }

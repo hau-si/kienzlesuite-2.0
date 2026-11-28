@@ -4,7 +4,7 @@
 [module]
 id = "beispiel"
 name = "Beispielmodul"
-version = "0.2.0"
+version = "0.2.1-beta.1"
 core_api = "1"
 description = "Zeigt alle Felder der Modul-Beschreibung; nur für Tests."
 

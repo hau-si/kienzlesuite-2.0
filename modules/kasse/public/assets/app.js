@@ -92,7 +92,7 @@ function updateTotal() {
   // Barzahlung braucht kein freies Terminal, aber Praxisdaten für die Rechnung.
   $('pay').disabled = busy || (!cash && !!state.reader_payment) || ((cash || transfer) && !state.local_receipts) || !(sum > 0 && sum <= state.max_amount_cents);
   $('pay-method-note').hidden = !((cash || transfer) && !state.local_receipts);
-  $('pay-method-note').textContent = 'Für Bar und Überweisung bitte zuerst Praxisname und Anschrift unter Einstellungen eintragen.';
+  $('pay-method-note').textContent = 'Für Bar und Überweisung bitte zuerst Praxisname und Anschrift in Praxisherz unter Praxis → Praxis eintragen.';
   document.querySelectorAll('.invoice-pay').forEach(b => b.disabled = busy || !!state.reader_payment);
   document.querySelectorAll('.invoice-go').forEach(b => b.disabled = busy || (!!state.reader_payment && !!document.querySelector('input[name^="inv-method-"][value="card"]:checked')));
 }
@@ -325,7 +325,7 @@ function renderVatOption() {
   const tax=state.tax||{small_business:false,rate:1900}, rate=(tax.rate/100).toLocaleString('de-DE');
   $('service-vat-label').textContent='mit '+rate+' % MwSt. (im Preis enthalten)';
   $('service-vat').disabled=tax.small_business; $('service-vat-note').hidden=!tax.small_business;
-  $('service-vat-note').textContent='Kleinunternehmerregelung ist eingeschaltet: Rechnungen werden ohne MwSt. erstellt (Einstellungen → Umsatzsteuer).';
+  $('service-vat-note').textContent='Kleinunternehmerregelung ist eingeschaltet: Rechnungen werden ohne MwSt. erstellt (Praxisherz: Praxis → Praxis).';
 }
 // ---- GOÄ-Rechner: Einfachsatz + Endbetrag → Faktor und Preis -------------------------
 function goaeResult(text, level) { const r=$('goae-result'); r.hidden=!text; r.textContent=text||''; r.className='goae-result'+(level?' '+level:''); }
@@ -463,7 +463,7 @@ function renderPrintBox() {
   const parts = [];
   if (s.t2med_possible && (state.invoices || []).length) parts.push('T2med-Rechnung → ' + s.office_label + (s.t2med_auto ? ' (immer, auch bei „Später“)' : ''));
   if (s.app_possible) parts.push('Rechnung aus der Leistungsauswahl → ' + (s.app_target === 'office' ? s.office_label : s.receipt_label));
-  if (!parts.length) parts.push(s.office ? 'T2med-Rechnungen → ' + s.office_label : 'Für App-Rechnungen Praxisdaten in den Einstellungen eintragen.');
+  if (!parts.length) parts.push(s.office ? 'T2med-Rechnungen → ' + s.office_label : 'Für App-Rechnungen Praxisname und Anschrift in Praxisherz unter Praxis → Praxis eintragen.');
   $('print-targets').textContent = parts.join(' · ');
   $('target-office').disabled = !s.office; $('target-receipt').disabled = !s.receipt;
   $('target-office-label').textContent = s.office ? s.office_label : 'Praxisdrucker (nicht eingerichtet)';

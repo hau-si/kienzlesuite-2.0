@@ -5,7 +5,7 @@ use KienzleKasse\Suite;
 if (!Suite::settingsRights()) {
     http_response_code(403);
     header('Content-Type: text/plain; charset=utf-8');
-    exit("Für die Einstellungen der Kasse fehlt das Recht. Bitte den Admin fragen (Verwaltung → Benutzer von Praxisherz).\n");
+    exit("Für die Einstellungen der Kasse fehlt das Recht. Bitte den Admin fragen (Praxis → Benutzer und Gruppen von Praxisherz).\n");
 }
 header('Cache-Control: no-store');
 header('Referrer-Policy: no-referrer');
@@ -25,9 +25,9 @@ ob_start();
 <div id="tab-panels"></div>
 <div id="sections" hidden></div>
 <section class="card settings-card" id="s-checklist"><details class="fold" id="checklist-fold" open><summary><h2>Einrichtung – Überblick</h2><span class="tag" id="checklist-tag"></span></summary><p class="muted">Diese Schritte sind nur einmal nötig, geordnet nach dem Ort, an dem sie erledigt werden. Ein Klick auf einen Punkt öffnet die passende Einstellung.</p><div id="checklist"></div></details></section>
-<section class="card settings-card" id="s-clients"><h2>Arbeitsplätze: Starter</h2>
-<p>Der Starter, mit dem T2med die Kasse öffnet, wird für alle Module gemeinsam in Praxisherz eingerichtet: ein Paket je Arbeitsplatz, ein Schlüssel. Das Zertifikat von Praxisherz vorher einmal einrichten.</p>
-<p class="row-buttons"><a class="button primary" href="/hilfe/arbeitsplatz#paket" target="_top">Paket für Arbeitsplätze</a> <a class="button secondary" href="/hilfe/arbeitsplatz" target="_top">Arbeitsplatz einrichten</a></p>
+<section class="card settings-card" id="s-clients"><h2>Arbeitsplätze: Praxisherz-Agent</h2>
+<p>Den Starter, mit dem T2med die Kasse öffnet, das Zertifikat von Praxisherz und die Drucker „vKasse“ und „vBriefversand“ richtet der Praxisherz-Agent auf jedem Windows-PC selbst ein (<a href="/hilfe/arbeitsplatz" target="_top">Einrichten → Arbeitsplätze</a>). Ein Paket für alle Module.</p>
+<p class="row-buttons"><a class="button primary" href="/hilfe/arbeitsplatz#paket" target="_top">Paket für Arbeitsplätze</a></p>
 </section>
 <section class="card settings-card" id="invoice-printer-help" hidden><h2>Drucker „vKasse“</h2>
 <div id="invoice-printer-status"></div>
@@ -40,7 +40,7 @@ ob_start();
 <div class="row-buttons"><button id="inbox-load" class="secondary" type="button">Aktualisieren</button></div>
 <div id="inbox-box"><p class="muted">Wird geladen …</p></div></section>
 <section class="card settings-card" id="s-audit"><h2>Sicherheitsprotokoll</h2>
-<p class="muted">Änderungen an dieser Einstellungsseite mit Zeit, Adresse des Geräts und Benutzer – nie mit Passwörtern oder Werten. Anmeldungen protokolliert Praxisherz (Verwaltung → Protokoll).</p>
+<p class="muted">Änderungen an dieser Einstellungsseite mit Zeit, Adresse des Geräts und Benutzer – nie mit Passwörtern oder Werten. Anmeldungen protokolliert Praxisherz (Betrieb → Sicherheit, Protokoll).</p>
 <div class="row-buttons"><button id="audit-load" class="secondary" type="button">Letzte Vorgänge anzeigen</button></div>
 <pre id="audit-list" class="audit-list" hidden></pre></section>
 <p class="settings-foot"><a href="<?= $base ?>">Zur Kasse</a> · <a href="/">Zu Praxisherz</a></p>

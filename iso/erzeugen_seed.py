@@ -36,7 +36,7 @@ def erzeugen(ziel: Path) -> None:
         raise SystemExit('Platzhalter in der Vorlage nicht ersetzt.')
     ziel.mkdir(parents=True, exist_ok=True)
     (ziel / 'user-data').write_text(text, encoding='utf-8')
-    (ziel / 'meta-data').write_text('instance-id: kienzle-suite-installer\n', encoding='utf-8')
+    (ziel / 'meta-data').write_text('instance-id: praxisherz-installer\n', encoding='utf-8')
 
 
 if __name__ == '__main__':

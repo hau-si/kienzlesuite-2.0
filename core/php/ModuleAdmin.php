@@ -3,7 +3,7 @@ declare(strict_types=1);
 namespace Kienzle\Core;
 
 /**
- * Module installieren, aktualisieren, entfernen (Verwaltung → Module). Ausgeführt wird nur vom root-Dienst
+ * Module installieren, aktualisieren, entfernen (Betrieb → Module). Ausgeführt wird nur vom root-Dienst
  * kienzle-module (core/lib/kienzle/module.py); hier werden Status gelesen und Anfragen abgelegt. Die Prüfungen
  * hier sind ein Vorfilter, maßgeblich ist der Dienst.
  */

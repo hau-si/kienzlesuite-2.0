@@ -13,7 +13,7 @@ function problem(callable $fn, string $message, int $http): Problem {
 function config(string $state, array $tax = []): Config {
     $v = Config::parse(file_get_contents(dirname(__DIR__) . '/config/kienzle-kasse.example.toml'));
     $v['app']['state_dir'] = $state;
-    $v['app']['launcher_key'] = str_repeat('a', 64); $v['app']['encryption_key'] = str_repeat('b', 64);
+    $v['app']['encryption_key'] = str_repeat('b', 64);
     $v['sumup'] = ['mode' => 'mock']; $v['fhir'] = ['mode' => 'mock', 'entry_code' => 'ZAHLUNG'];
     $v['practice'] = ['name' => 'Praxis Beispiel', 'street' => 'Musterstraße 1', 'city' => '12345 Musterstadt'];
     if ($tax) $v['tax'] = $tax;

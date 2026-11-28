@@ -42,7 +42,7 @@ final class Pad {
         if ($zipBytes === '') throw new \InvalidArgumentException('Bitte zuerst die ZIP-Datei auswählen.');
         if (strlen($zipBytes) > self::MAX_ZIP) throw new \InvalidArgumentException('Die Datei ist zu groß (höchstens 8 MB). Bitte die ZIP-Datei „signoPAD-API Linux“ von signotec verwenden.');
         if (strncmp($zipBytes, "PK\x03\x04", 4) !== 0) throw new \InvalidArgumentException('Das ist keine ZIP-Datei. Bitte die Datei „signoPAD-API_Linux_….zip“ von signotec auswählen.');
-        if (!class_exists(\ZipArchive::class)) throw new \RuntimeException('Die PHP-Erweiterung zip fehlt (Paket php-zip). Bitte das Modul unter Verwaltung → Module aktualisieren.');
+        if (!class_exists(\ZipArchive::class)) throw new \RuntimeException('Die PHP-Erweiterung zip fehlt (Paket php-zip). Bitte das Modul unter Betrieb → Module aktualisieren.');
         if (!is_dir(Speicher::$data) && !mkdir(Speicher::$data, 0700, true) && !is_dir(Speicher::$data)) throw new \RuntimeException('Datenordner nicht anlegbar.');
         $tmp = tempnam(Speicher::$data, 'zip');
         if ($tmp === false || file_put_contents($tmp, $zipBytes) === false) throw new \RuntimeException('Zwischendatei nicht schreibbar.');

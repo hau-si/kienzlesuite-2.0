@@ -729,7 +729,7 @@ def install(mid: str, version: str | None = None) -> str:
         shutil.rmtree(work, ignore_errors=True)
     cleanup(mid)
     log(f'{mid}: {new} {"aktualisiert" if have else "installiert"}.')
-    return f'{m["module"]["name"]} {new} ' + ('aktualisiert, Dienste neu gestartet.' if have else 'installiert. Rechte vergeben unter Verwaltung → Benutzer.')
+    return f'{m["module"]["name"]} {new} ' + ('aktualisiert, Dienste neu gestartet.' if have else 'installiert. Rechte vergeben unter Praxis → Benutzer und Gruppen.')
 
 
 def _remove(mid: str, m: dict | None, delete_data: bool, run_hook: bool = True) -> None:

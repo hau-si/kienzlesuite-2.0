@@ -7,10 +7,8 @@ final class Config {
         foreach (['app', 'sumup', 'fhir'] as $section) {
             if (!isset($values[$section])) throw new \RuntimeException("Konfiguration: Abschnitt $section fehlt.");
         }
-        foreach (['launcher_key', 'encryption_key'] as $key) {
-            if (!preg_match('/^[a-f0-9]{64}$/D', (string)$this->get('app', $key))) {
-                throw new \RuntimeException("Konfiguration: $key muss 32 zufällige Bytes als Hex enthalten.");
-            }
+        if (!preg_match('/^[a-f0-9]{64}$/D', (string)$this->get('app', 'encryption_key'))) {
+            throw new \RuntimeException('Konfiguration: encryption_key muss 32 zufällige Bytes als Hex enthalten.');
         }
         foreach (['sumup', 'fhir'] as $section) {
             if (!in_array($this->get($section, 'mode'), ['mock', 'live'], true)) throw new \RuntimeException('Ungültiger Betriebsmodus.');
@@ -100,7 +98,7 @@ final class Config {
         if (!is_bool($this->get('invoice_inbox', 'enabled', false))) throw new \RuntimeException('invoice_inbox.enabled muss true oder false sein.');
         if ($this->get('invoice_inbox', 'enabled', false)) {
             if (!preg_match('/^[a-f0-9]{64}$/D', (string)$this->get('invoice_inbox', 'key'))) throw new \RuntimeException('invoice_inbox.key muss 32 zufällige Bytes als Hex enthalten.');
-            if ($this->get('invoice_inbox', 'key') === $this->get('app', 'launcher_key')) throw new \RuntimeException('invoice_inbox.key darf nicht dem Starter-Schlüssel entsprechen.');
+            if ($this->get('invoice_inbox', 'key') === $this->get('app', 'encryption_key')) throw new \RuntimeException('invoice_inbox.key darf nicht dem Verschlüsselungsschlüssel entsprechen.');
         }
         foreach (T2medInvoice::LABEL_KEYS as $key) {
             $list = $this->get('invoice_inbox', $key, []);
@@ -116,7 +114,7 @@ final class Config {
             if (!$this->get('invoice_inbox', 'enabled', false) && !$this->get('invoice_export', 'app_invoices', false) && !$this->get('invoice_export', 'letter', false)) throw new \RuntimeException('Ablage der Rechnungs-PDF benötigt den Rechnungseingang oder invoice_export.app_invoices = true.');
             // Ziel des Netzwerkspeichers von Praxisherz (Verbindung „ablage“); die Zugangsdaten kennt nur die Basis.
             $target = $this->get('invoice_export', 'ziel', '');
-            if (!is_string($target) || !preg_match('/^[a-z][a-z0-9-]{1,30}$/D', $target)) throw new \RuntimeException('Für die Ablage zuerst unter Verwaltung → Verbindungen einen Netzwerkspeicher einrichten und hier als Ziel wählen.');
+            if (!is_string($target) || !preg_match('/^[a-z][a-z0-9-]{1,30}$/D', $target)) throw new \RuntimeException('Für die Ablage zuerst unter Praxis → Verbindungen einen Netzwerkspeicher einrichten und hier als Ziel wählen.');
             $dir = $this->get('invoice_export', 'directory', '');
             if (!is_string($dir) || !preg_match('~^[A-Za-z0-9 _.{}/-]{0,200}$~D', $dir) || preg_match('~(^|/)\.\.?(/|$)~', $dir)) throw new \RuntimeException('invoice_export.directory: nur Buchstaben, Ziffern, Leerzeichen, _ . - / sowie {jahr} und {monat}.');
             if (!in_array($this->get('invoice_export', 'when', 'paid'), ['paid', 'received'], true)) throw new \RuntimeException('invoice_export.when muss paid oder received sein.');

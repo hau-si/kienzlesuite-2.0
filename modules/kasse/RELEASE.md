@@ -1,5 +1,12 @@
 # Modul „Kasse“ (sumup) – Release-Notizen
 
+## 2.3.4-beta.67
+
+- **Einrichtung über den Praxisherz-Agent:** Der Einrichtungs-Überblick nennt statt der früheren Einzelschritte (Zertifikat, Starter, Drucker „vKasse“/„vBriefversand“ am PC) nur noch einen Punkt: Praxisherz-Agent auf den Kassen-PCs installieren (Einrichten → Arbeitsplätze); er richtet Starter, Zertifikat und die Drucker selbst ein. Ob die Drucker auf dem Server bereitstehen, zeigt der Überblick weiter.
+- Karten „Drucker vKasse“ und „Drucker vBriefversand“: ein Satz zum Agent, die Anleitung für Windows (IPP, PowerShell), Mac und Fehlerfälle steht als Notweg eingeklappt unter „Von Hand einrichten“ (Stil von Praxisherz). Die Karte „Arbeitsplätze“ und die T2med-Anleitung nennen den Agent; die T2med-Anleitung verweist auf die gesammelten Aufrufadressen unter Praxis → Verbindungen → T2med.
+- Menüwege in allen Hinweisen und Fehlermeldungen wie in Praxisherz heute (Praxis → Praxis/Drucker/Verbindungen/Benutzer und Gruppen, Betrieb → Module, Einrichten → Arbeitsplätze); Praxisname, Anschrift, Kontodaten und Umsatzsteuer verweisen auf Praxis → Praxis. Rechte heißen in Meldungen wie in der Rechte-Übersicht.
+- Aufgeräumt: der nicht mehr genutzte eigene Starter-Schlüssel der Kasse (`launcher_key`; vorhandene Grundwerte damit laden weiter), ungenutzte Hilfetexte und Stilregeln aus der alten Gestaltung. Mit Tests geprüft, nicht auf der VM und nicht im Browser.
+
 ## 2.3.4-beta.66
 
 - Hinweise auf die frühere Aufrufadresse `kienzle-kasse://` und die alte Einrichtung entfernt. Mit Tests geprüft.

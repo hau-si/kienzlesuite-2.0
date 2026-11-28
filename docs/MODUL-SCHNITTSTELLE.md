@@ -27,7 +27,7 @@ und für dieses Modul Admin ist oder mindestens ein Recht hat. Ein Basis-Admin h
 | `X-Kienzle-Csrf` | `KIENZLE_CSRF` | CSRF-Marke dieser Sitzung für dieses Modul (64 Hexzeichen) |
 | `X-Kienzle-Bestaetigt` | `KIENZLE_BESTAETIGT` | Unix-Zeit der letzten Bestätigung mit Passwort+OTP oder Passkey |
 | `X-Kienzle-Menue` | `KIENZLE_MENUE` | Menü der Seitenleiste (URL-kodiertes JSON: apps, ids, admin, login), nur Anwendungen mit Zugang, ohne Zähler und ohne Sitzungs-Marke; im PHP-Helfer `menue()` bzw. `rahmen()` |
-| `X-Kienzle-Drucker` | `KIENZLE_DRUCKER` | Zuordnung der Drucker aus Verwaltung → Drucker (URL-kodiertes JSON: buero, bon); im PHP-Helfer `druckerRollen()` |
+| `X-Kienzle-Drucker` | `KIENZLE_DRUCKER` | Zuordnung der Drucker aus Praxis → Drucker (URL-kodiertes JSON: buero, bon); im PHP-Helfer `druckerRollen()` |
 | `X-Kienzle-Praxis` | `KIENZLE_PRAXIS` | Praxisname und Anschrift (URL-kodiertes JSON: name, street, city, contact); im PHP-Helfer `praxis()` |
 | `X-Kienzle-Pfad` | `KIENZLE_PFAD` | Webpfad des Moduls, z. B. `/kasse` |
 | `X-Kienzle-Personen` | `KIENZLE_PERSONEN` | nur mit `[web] personen = true` (core_api 2): aktive Konten mit Zugang zu diesem Modul (URL-kodiertes JSON: `l` Anmeldename, `n` Name, `g` Gruppen, `a` Modul-Admin, `r` Rechte im Modul); im PHP-Helfer `personen()`, 30 Sekunden zwischengespeichert |
@@ -94,7 +94,7 @@ dazu die folgenden Abschnitte.
 
 ## Zentrale Verbindungen
 
-Angemeldet in `[[connections]]` (`docs/MODULE-TOML.md`), eingetragen vom Admin unter **Verwaltung → Verbindungen**.
+Angemeldet in `[[connections]]` (`docs/MODULE-TOML.md`), eingetragen vom Admin unter **Praxis → Verbindungen**.
 Die Basis schreibt sie nach `/etc/kienzle/verbindungen/module/<id>.json` (root:ks-<id>, 0640), nur mit den angemeldeten
 Verbindungen. Ändert der Admin etwas, wird die Datei neu geschrieben; Module lesen sie bei Bedarf neu.
 
@@ -150,7 +150,7 @@ $apiKey = $k->entschluesseln($gespeichert, 'letterxpress');
 
 ## Drucken
 
-Drucker richtet nur die Basis ein (Verwaltung → Drucker, root-Dienst `kienzle-drucker`); kein Modul ist Mitglied der
+Drucker richtet nur die Basis ein (Praxis → Drucker, root-Dienst `kienzle-drucker`); kein Modul ist Mitglied der
 Gruppe `lpadmin`. Die eingerichteten Warteschlangen stehen in `/var/lib/kienzle/drucker/status.json` (für alle lesbar).
 
 ```php
@@ -185,7 +185,7 @@ Ein PHP-Modul kann eine Seite in den Rahmen von Praxisherz setzen (Seitenleiste,
 `roh` lässt den Inhalt unverändert (sonst setzt die Basis Überschrift und Karten), `kopf` hängt Stylesheets und Skripte des Moduls an
 (Inhalt der Seite bekommt `<main class="modul">`). Das Menü kommt mit der ohnehin laufenden Anmelde-Prüfung (Kopfzeile `X-Kienzle-Menue`),
 es entsteht also keine zusätzliche Anfrage. Die Sitzungs-Marke der Basis erhält das Modul nicht: Abmelden führt deshalb über „Mein Konto“.
-Schlanke Seiten (z. B. die Kassieren-Ansicht in T2med) bleiben ohne Rahmen.
+Schlanke Seiten (z. B. die in die Kasse-Startseite eingebettete Kassenansicht) bleiben ohne Rahmen.
 
 ## Patientenübergabe zwischen Modulen
 

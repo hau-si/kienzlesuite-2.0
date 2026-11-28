@@ -9,7 +9,7 @@ function rejectedProblem(callable $fn, string $message): Problem { try { $fn(); 
 function configuration(bool $live = false): Config {
     $v = Config::parse(file_get_contents(dirname(__DIR__).'/config/kienzle-kasse.example.toml'));
     $v['app']['state_dir'] = sys_get_temp_dir().'/kienzle-kasse-test-'.bin2hex(random_bytes(6));
-    $v['app']['launcher_key'] = str_repeat('a',64); $v['app']['encryption_key'] = str_repeat('b',64);
+    $v['app']['encryption_key'] = str_repeat('b',64);
     if ($live) {
         $v['sumup'] = ['mode'=>'live','api_key'=>'sumup-secret','affiliate_key'=>'affiliate-secret','app_id'=>'test.app','merchant_code'=>'MTEST','reader_id'=>'reader-test'];
         $v['fhir'] = ['mode'=>'live','base_url'=>'https://t2med.test/aps/fhir/api/r4','launch_urls'=>['https://t2med.test/aps/fhir/api/r4'],'api_key'=>'fhir-secret','entry_code'=>'ZAHLUNG','ca_file'=>''];

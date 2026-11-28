@@ -1,4 +1,4 @@
-# Praxisherz: neue Servernamen aus Verwaltung → Server übernehmen (Anfragedatei von ks-core).
+# Praxisherz: neue Servernamen aus Einrichten → Server übernehmen (Anfragedatei von ks-core).
 [Unit]
 Description=Praxisherz Servername (Anfragen)
 

@@ -86,7 +86,7 @@ if ((is_executable('/usr/bin/tesseract') || is_executable('/usr/local/bin/tesser
 // --- Ganzer Weg: abgelehnt → gemerkt → von Hand übernommen -----------------------------------------------------------------
 $values = Config::parse(file_get_contents(dirname(__DIR__) . '/config/kienzle-kasse.example.toml'));
 $values['app']['state_dir'] = $dir . '/state'; mkdir($values['app']['state_dir'], 0700);
-$values['app']['launcher_key'] = str_repeat('a', 64); $values['app']['encryption_key'] = str_repeat('b', 64);
+$values['app']['encryption_key'] = str_repeat('b', 64);
 $values['invoice_inbox'] = ['enabled' => true, 'key' => str_repeat('c', 64), 'max_age_days' => 14];
 $app = new App(new Config($values)); $app->db->migrate();
 rejects(fn() => $app->inboxReceive($pdf), 'Abgelehnte Rechnung angenommen');

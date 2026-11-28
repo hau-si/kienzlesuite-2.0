@@ -8,7 +8,6 @@ timezone = "Europe/Berlin"
 session_hours = 8
 max_amount_cents = 100000
 development = false
-launcher_key = "INSTALLER_GENERIERT_DIESEN_WERT"
 encryption_key = "INSTALLER_GENERIERT_DIESEN_WERT"
 
 [sumup]

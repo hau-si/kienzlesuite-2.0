@@ -45,7 +45,7 @@ class Uebersetzung {
      */
     public function texte(array $texte, string $sprache): array {
         if (!isset(self::ZIEL[$sprache])) throw new \InvalidArgumentException('Diese Sprache wird nicht angeboten.');
-        if (!$this->bereit()) throw new \RuntimeException('Die Übersetzung ist nicht eingerichtet (Verwaltung → Verbindungen → Übersetzung (DeepL)).');
+        if (!$this->bereit()) throw new \RuntimeException('Die Übersetzung ist nicht eingerichtet (Praxis → Verbindungen → Übersetzung (DeepL)).');
         $aus = $texte;
         $offen = [];
         foreach ($texte as $i => $t) if (trim($t) !== '') $offen[$i] = self::schuetzen($t);
@@ -57,7 +57,7 @@ class Uebersetzung {
             $liste = is_array($a['body']['translations'] ?? null) ? $a['body']['translations'] : null;
             if ($a['status'] !== 200 || $liste === null || count($liste) !== count($teil)) {
                 throw new \RuntimeException(match (true) {
-                    $a['status'] === 403 => 'DeepL lehnt den Schlüssel ab. Bitte unter Verwaltung → Verbindungen prüfen.',
+                    $a['status'] === 403 => 'DeepL lehnt den Schlüssel ab. Bitte unter Praxis → Verbindungen prüfen.',
                     $a['status'] === 456 => 'Das Zeichenkontingent bei DeepL ist für diesen Monat aufgebraucht.',
                     $a['status'] === 429 => 'DeepL ist gerade ausgelastet. Bitte in einer Minute noch einmal versuchen.',
                     default => 'DeepL hat nicht wie erwartet geantwortet (HTTP ' . $a['status'] . ').',

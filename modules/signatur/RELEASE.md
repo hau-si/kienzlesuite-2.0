@@ -1,5 +1,9 @@
 # Release-Notizen Signatur
 
+## 0.1.0-beta.51
+
+- Menüwege in Meldungen nach der neuen Seitenleiste (Praxis → Verbindungen, Betrieb → Module), ungenutzte Stilregeln entfernt. Mit Tests geprüft, nicht auf der VM.
+
 ## 0.1.0-beta.50
 
 - Hinweise auf die früheren Aufrufadressen `kienzle-signatur://` entfernt (nur noch `praxisherz-signatur://`). Mit Tests geprüft.

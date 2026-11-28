@@ -759,7 +759,7 @@ def network() -> dict:
 
 
 def network_conf(n: dict) -> str:
-    head = '# Praxisherz: von kienzle-drucker erzeugt (Verwaltung → Drucker → Windows-Netz), nicht von Hand ändern.\n'
+    head = '# Praxisherz: von kienzle-drucker erzeugt (Praxis → Drucker → Windows-Netz), nicht von Hand ändern.\n'
     return head + f'   workgroup = {n["arbeitsgruppe"].upper()}\n   server role = standalone server\n'
 
 

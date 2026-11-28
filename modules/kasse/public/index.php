@@ -3,8 +3,8 @@ declare(strict_types=1);
 /**
  * Einstieg des Moduls „Kasse“ (nginx → php-fpm als ks-kasse). Alle Adressen unter /kasse/ kommen hier an;
  * die Basis hat die Anmeldung vorher geprüft (auth_request) und Benutzer, Rolle und Rechte als KIENZLE_* übergeben.
- * Ausnahme: POST /api.php des Arbeitsplatz-Starters (KIENZLE_OEFFENTLICH=starter), ohne Anmeldung von Praxisherz;
- * der Starter weist sich mit dem Starter-Schlüssel aus.
+ * Ausnahme: POST /starter/kasse des Arbeitsplatz-Starters (KIENZLE_OEFFENTLICH=starter), ohne Anmeldung von Praxisherz;
+ * den Starter-Schlüssel prüft die Basis vorher (Einrichten → Arbeitsplätze).
  */
 require_once dirname(__DIR__) . '/src/bootstrap.php';
 use KienzleKasse\Suite;

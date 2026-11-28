@@ -111,7 +111,7 @@ final class Ansicht {
         $o .= '</section>';
         if ($cfg['fax']['leitung'] !== '') {
             $o .= '<section class="card"><h2>Fax</h2><p>Faxnummer ' . $h($cfg['fax']['nummer']) . ' · '
-                . ($faxBereit ? self::tag('ok', 'Modul Fax verbunden') : self::tag('warn', 'Modul Fax fehlt (Verwaltung → Module)')) . '</p></section>';
+                . ($faxBereit ? self::tag('ok', 'Modul Fax verbunden') : self::tag('warn', 'Modul Fax fehlt (Betrieb → Module)')) . '</p></section>';
         }
         return $o . '</div>';
     }
@@ -620,9 +620,10 @@ final class Ansicht {
         $zustand = $st['anzahl'] > 0 ? self::tag('ok', number_format($st['anzahl'], 0, ',', '.') . ' Patienten') : self::tag('opt', 'nicht geladen');
         $i = '<p class="muted">Namen der Anrufer am Telefon und in „Anrufe“, Patientensuche oben auf jeder Seite, „Akte öffnen“ in T2med am eigenen PC (Praxisherz-Agent). '
             . 'Das Verzeichnis enthält Name, Geburtsdatum, Telefonnummern und Patientennummer und bleibt auf diesem Server.</p>';
-        if (!$t2med['eingerichtet']) $i .= '<p class="fehler">Zuerst in der Basis die Verbindung zu T2med einrichten: Verwaltung → Verbindungen → T2med.</p>';
-        $i .= '<h3>Laden und aktualisieren</h3><ol class="tf-schritte"><li>In T2med unter Drittanbieter einen Eintrag (Programm/URL) anlegen:<br><code>praxisherz-telefonverzeichnis://?kontextId=${kontextId}&amp;fhirBasisUrl=${fhirBasisUrl}&amp;oAuthToken=${oAuthToken}</code></li>'
-            . '<li>Der Arbeitsplatz braucht den Praxisherz-Agent bzw. Starter (Einrichten → Arbeitsplätze; nach dem Update der Basis kommt der neue Aufruf von selbst).</li>'
+        if (!$t2med['eingerichtet']) $i .= '<p class="fehler">Zuerst in der Basis die Verbindung zu T2med einrichten: <a href="/verwaltung/verbindungen">Praxis → Verbindungen</a> → T2med.</p>';
+        $i .= '<h3>Laden und aktualisieren</h3><ol class="tf-schritte"><li>In T2med unter Drittanbieter einen Eintrag (Programm/URL) anlegen. Alle Aufrufadressen stehen gesammelt unter <a href="/verwaltung/verbindungen#t2med">Praxis → Verbindungen → T2med</a>.'
+            . '<details class="how"><summary>Adresse für diesen Eintrag</summary><code>praxisherz-telefonverzeichnis://?kontextId=${kontextId}&amp;fhirBasisUrl=${fhirBasisUrl}&amp;oAuthToken=${oAuthToken}</code></details></li>'
+            . '<li>Der Arbeitsplatz braucht den Praxisherz-Agent (<a href="/hilfe/arbeitsplatz">Einrichten → Arbeitsplätze</a>).</li>'
             . '<li>In T2med den Eintrag aufrufen: Praxisherz öffnet sich und lädt das Verzeichnis (Fortschritt oben auf der Seite). Bei neuen Patienten oder geänderten Nummern einfach wiederholen.</li></ol>';
         if ($t2med['eingerichtet'] && ($t2med['ohne_schluessel'] ?? false)) $i .= '<p class="fehler">' . $h(T2med::OHNE_SCHLUESSEL) . '</p>';
         $i .= '<p>' . ($st['zeit'] > 0 ? 'Zuletzt geladen: ' . $h(date('d.m.Y H:i', $st['zeit'])) . '. ' : '') . ($laeuft ? self::tag('warn', 'Laden läuft (' . (int)$laeuft['anzahl'] . ' bisher)') : '') . '</p>';
@@ -695,7 +696,7 @@ final class Ansicht {
                 . '<fieldset><legend>Fax</legend>' . self::auswahl('fax_leitung', 'Leitung für Fax', $leitungen, (string)$f['leitung'])
                 . self::feld('fax_nummer', 'Faxnummer (wie der Anbieter sie schickt)', (string)$f['nummer'], 'z. B. 4930123459')
                 . self::feld('fax_kennung', 'Absendernummer für Faxe', (string)$f['kennung'], 'Leer = Faxnummer.')
-                . self::feld('fax_name', 'Faxkennung (Absenderkennung im Faxkopf, Anzeige beim Empfänger)', (string)$f['name'], 'Leer = Praxisname aus Verwaltung → Praxis. Bis 60 Zeichen; als Kopfzeile jeder Seite. Im Faxprotokoll (Stationskennung) sind technisch nur 20 Zeichen möglich, dort steht die gekürzte Form.') . '</fieldset>'
+                . self::feld('fax_name', 'Faxkennung (Absenderkennung im Faxkopf, Anzeige beim Empfänger)', (string)$f['name'], 'Leer = Praxisname aus Praxis → Praxis. Bis 60 Zeichen; als Kopfzeile jeder Seite. Im Faxprotokoll (Stationskennung) sind technisch nur 20 Zeichen möglich, dort steht die gekürzte Form.') . '</fieldset>'
                 . '<fieldset><legend>Überlauf (sipgate trunking, erprobt)</legend>' . self::auswahl('ueb_leitung', 'Leitung für den Überlauf', $leitungen, (string)$u['leitung'])
                 . self::feld('ueb_nummer', 'Rufnummer des Überlaufs', (string)$u['nummer']) . '</fieldset>';
             $zweck = $t['leitung_ein'] !== '' || $f['leitung'] !== '';
@@ -772,7 +773,7 @@ final class Ansicht {
             $form = self::haken('aktiv', 'Telefone mit eingetragener MAC-Adresse automatisch einrichten (Snom)', (bool)$pv['aktiv'], 'Schaltet den Einrichtungsdienst (Port 8780) ein: Telefone mit eingetragener MAC-Adresse und der richtigen Adresse holen sich Benutzer, Passwort, Server und Namen selbst. Aus = Dienst liefert nichts und alle Einstellungsdateien werden gelöscht.');
             $inhalt = '<p class="muted">Ein Snom-Telefon holt sich beim Start seine Zugangsdaten (Benutzer, Passwort, Server, Anzeigename) selbst. Dazu trägst du oben bei jedem Telefon die MAC-Adresse ein '
                 . '(steht auf dem Gerät und im Webmenü des Telefons) und gibst dem Telefon einmal die Adresse unten. Der Dienst ist nur aus den Praxisnetzen erreichbar: '
-                . 'Dazu den Port <code>8780</code> (TCP) unter Verwaltung → Firewall für das Praxisnetz freigeben, nie für das Internet.</p>'
+                . 'Dazu den Port <code>8780</code> (TCP) unter Betrieb → Sicherheit → Firewall für das Praxisnetz freigeben, nie für das Internet.</p>'
                 . self::formular($csrf, 'prov-speichern', $form, 'Speichern', 'tf-form tf-schmal');
             if ($pv['aktiv']) {
                 $inhalt .= '<div class="card"><h3>Adresse für die Telefone</h3><p><code>' . $h($adresse) . '</code></p>'
@@ -796,7 +797,7 @@ final class Ansicht {
                 . self::feld('extern', 'Öffentliche Adresse (nur bei Bedarf)', (string)$nz['extern'], 'Für Anbieter, die ohne sie keinen Ton haben (z. B. praxis.example.org).', 'text', '',
                 'Name oder Adresse, unter der die Anlage aus dem Internet erreichbar ist. Nur nötig, wenn der Anbieter sonst keinen Ton liefert (Telefonanlage hinter einem Router mit Adressumsetzung). Im Praxisnetz allein leer lassen.');
             $o .= self::fold('netz', 'Netz', $nz['lokal'] !== '' ? self::tag('ok', $nz['lokal']) : self::tag('warn', 'offen'), self::formular($csrf, 'netz-speichern', $form, 'Netz speichern')
-                . '<p class="muted">Firewall: Unter Verwaltung → Firewall die Einträge „Telefon: …“ freischalten (Telefone 5060/UDP aus dem Praxisnetz, Anbieter 5070/UDP und Sprache 12000–12999/UDP von überall).</p>');
+                . '<p class="muted">Firewall: Unter Betrieb → Sicherheit → Firewall die Einträge „Telefon: …“ freischalten (Telefone 5060/UDP aus dem Praxisnetz, Anbieter 5070/UDP und Sprache 12000–12999/UDP von überall).</p>');
             $o .= self::verzeichnisFold($csrf, self::$t2med);
         }
         return $o . '</div>';

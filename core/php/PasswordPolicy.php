@@ -2,7 +2,7 @@
 declare(strict_types=1);
 namespace Kienzle\Core;
 
-/** Passwortregeln, die ein Admin unter Verwaltung → Sicherheit einstellt (in `settings` gespeichert), samt Warnungen bei zu lockeren Werten. */
+/** Passwortregeln, die ein Admin unter Betrieb → Sicherheit einstellt (in `settings` gespeichert), samt Warnungen bei zu lockeren Werten. */
 final class PasswordPolicy {
     public const DEFAULTS = ['min' => 10, 'klassen' => 1, 'staerke' => 0, 'schwach' => true, 'login' => true];
     public const STAERKE = ['Keine Mindeststärke', 'Mindestens „schwach“ (Stufe 1)', 'Mindestens „mittel“ (Stufe 2)', 'Mindestens „gut“ (Stufe 3)', 'Nur „sehr gut“ (Stufe 4)'];

@@ -30,7 +30,7 @@ final class LdFakeExport extends InvoiceExport {
 function values(bool $letter, bool $inbox = false, string $mode = 'test'): array {
     $v = Config::parse(file_get_contents(dirname(__DIR__) . '/config/kienzle-kasse.example.toml'));
     $v['app']['state_dir'] = sys_get_temp_dir() . '/ks-ld-' . bin2hex(random_bytes(6));
-    $v['app']['launcher_key'] = str_repeat('a', 64); $v['app']['encryption_key'] = str_repeat('b', 64);
+    $v['app']['encryption_key'] = str_repeat('b', 64);
     $v['invoice_inbox'] = ['enabled' => $inbox, 'key' => str_repeat('c', 64), 'max_age_days' => 14];
     if ($letter) $v['letterxpress'] = ['enabled' => true, 'username' => 'praxis-test', 'api_key' => 'lxp-secret-key', 'mode' => $mode];
     return $v;

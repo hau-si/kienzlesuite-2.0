@@ -178,7 +178,7 @@ final class Fax {
      * erst in staging/ und gehen dann atomar nach queue/. Danach werden die Quelldateien gelöscht. Liefert die Anzahl der Aufträge.
      */
     public static function sendenAuswahl(array $schluessel, array $empfaenger, string $aufloesung, bool $ecm, bool $einzeln, string $benutzer): int {
-        if (!self::austauschBereit()) throw new \RuntimeException('Das Modul Telefon fehlt oder ist noch nicht verbunden (Verwaltung → Module).');
+        if (!self::austauschBereit()) throw new \RuntimeException('Das Modul Telefon fehlt oder ist noch nicht verbunden (Betrieb → Module).');
         $schluessel = array_values(array_unique(array_filter(array_map('strval', $schluessel), fn($x) => $x !== '')));
         if (!$schluessel) throw new \InvalidArgumentException('Bitte mindestens ein Dokument auswählen.');
         if (count($schluessel) > self::MAX_DOKUMENTE) throw new \InvalidArgumentException('Höchstens ' . self::MAX_DOKUMENTE . ' Dokumente auf einmal.');
@@ -1174,7 +1174,7 @@ final class Fax {
             ['title' => 'Modul Telefon verbunden (Faxleitung)', 'state' => $telefonDa ? 'done' : 'error',
                 'hint' => $telefonDa ? '' : 'Das Modul Telefon installieren und dort unter Einstellungen → Rufnummern die Faxleitung wählen.', 'link' => '/fax/'],
             ['title' => 'Faxdrucker an den Arbeitsplätzen eingerichtet', 'state' => is_file(self::$data . '/.drucker-genutzt') ? 'done' : 'open',
-                'hint' => 'Verwaltung → Drucker: den Faxdrucker (Name vFax) an den PCs einrichten und einmal etwas darauf drucken.', 'link' => '/fax/'],
+                'hint' => 'Der Praxisherz-Agent an den PCs (Einrichten → Arbeitsplätze) richtet die Faxdrucker ein; danach einmal etwas auf einen Faxdrucker (z. B. vFax) drucken.', 'link' => '/fax/'],
         ];
     }
 }

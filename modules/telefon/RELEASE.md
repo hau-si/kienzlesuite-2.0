@@ -1,5 +1,10 @@
 # Release-Notizen Telefon
 
+## 0.1.0-beta.31
+
+- T2med-Telefonverzeichnis: Verweis auf die gesammelten Aufrufadressen (Praxis → Verbindungen → T2med), die Adresse für den Eintrag steht eingeklappt darunter; nur noch der Praxisherz-Agent als Voraussetzung am PC (ohne alten Starter-Hinweis).
+- Menüwege nach der neuen Seitenleiste (Praxis → Verbindungen/Praxis, Betrieb → Module, Betrieb → Sicherheit → Firewall), ungenutzte Stilregel entfernt. Mit Tests geprüft, nicht auf der VM.
+
 ## 0.1.0-beta.30
 
 - Texte ohne „Kienzle“ (Modulbeschreibung, Sprachmenü-Hinweis, Kennung der Telefon-Einrichtung). Mit Tests geprüft, nicht auf der VM.

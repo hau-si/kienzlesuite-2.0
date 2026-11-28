@@ -9,7 +9,7 @@ header('X-Content-Type-Options: nosniff');
 header("Content-Security-Policy: default-src 'none'; frame-ancestors 'self'");
 try {
     if ($_SERVER['REQUEST_METHOD'] !== 'GET') throw new Problem('GET erforderlich.', 405);
-    if (!Suite::can('kassieren')) throw new Problem('Für die Kasse fehlt das Recht „Kassieren“.', 403);
+    if (!Suite::can('kassieren')) throw new Problem('Für die Kasse fehlt das Recht „Kartenzahlung und Barzahlung aus T2med“.', 403);
     $app = ks_app();
     $pdf = isset($_GET['s']) ? $app->stornoPdf(App::string($_GET, 's', 32)) : $app->processedPdf(App::string($_GET, 'p', 32));
     header('Content-Type: application/pdf');

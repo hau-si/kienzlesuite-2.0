@@ -21,7 +21,7 @@ function invoiceText(string $number = 'RE2026-0042', string $total = '42,50', st
 function configuration(bool $live = false): Config {
     $v = Config::parse(file_get_contents(dirname(__DIR__) . '/config/kienzle-kasse.example.toml'));
     $v['app']['state_dir'] = sys_get_temp_dir() . '/ks-t2med-invoice-' . bin2hex(random_bytes(6));
-    $v['app']['launcher_key'] = str_repeat('a', 64); $v['app']['encryption_key'] = str_repeat('b', 64);
+    $v['app']['encryption_key'] = str_repeat('b', 64);
     $v['invoice_inbox'] = ['enabled' => true, 'key' => str_repeat('c', 64), 'max_age_days' => 14];
     if ($live) {
         $v['sumup'] = ['mode' => 'live', 'api_key' => 'sumup-secret', 'affiliate_key' => 'affiliate-secret', 'app_id' => 'test.app', 'merchant_code' => 'MTEST', 'reader_id' => 'reader-test'];
@@ -219,7 +219,7 @@ try {
     // Deaktivierter Eingang.
     $off = Config::parse(file_get_contents(dirname(__DIR__) . '/config/kienzle-kasse.example.toml'));
     $off['app']['state_dir'] = sys_get_temp_dir() . '/ks-t2med-invoice-off-' . bin2hex(random_bytes(6)); $dirs[] = $off['app']['state_dir'];
-    $off['app']['launcher_key'] = str_repeat('a', 64); $off['app']['encryption_key'] = str_repeat('b', 64);
+    $off['app']['encryption_key'] = str_repeat('b', 64);
     $offApp = new App(new Config($off)); $offApp->db->migrate();
     rejects(fn() => $offApp->storeInvoice($parsed), 'Deaktivierter Eingang nimmt Rechnung an', 404);
 

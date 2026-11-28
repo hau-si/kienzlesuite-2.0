@@ -41,7 +41,7 @@ class ReceiptMailer {
         $raw = rtrim(strtr(base64_encode($mail->getSentMIMEMessage()), '+/', '-_'), '=');
         $token = $this->googlePost('https://oauth2.googleapis.com/token', http_build_query(['client_id' => $this->config->get('mail', 'client_id'), 'client_secret' => $this->config->get('mail', 'client_secret'),
             'refresh_token' => $this->config->get('mail', 'refresh_token'), 'grant_type' => 'refresh_token']), ['Content-Type: application/x-www-form-urlencoded']);
-        if (!is_string($token['access_token'] ?? null) || $token['access_token'] === '') throw new Problem('Google hat die Anmeldung der Gmail-Verbindung abgelehnt. Bitte unter Verwaltung → Verbindungen neu anmelden.', 502);
+        if (!is_string($token['access_token'] ?? null) || $token['access_token'] === '') throw new Problem('Google hat die Anmeldung der Gmail-Verbindung abgelehnt. Bitte unter Praxis → Verbindungen neu anmelden.', 502);
         $this->googlePost('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', json_encode(['raw' => $raw], JSON_THROW_ON_ERROR), ['Authorization: Bearer ' . $token['access_token'], 'Content-Type: application/json']);
     }
     protected function googlePost(string $url, string $body, array $headers): array {
@@ -49,7 +49,7 @@ class ReceiptMailer {
         curl_setopt_array($curl, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => $body, CURLOPT_HTTPHEADER => array_merge(['Accept: application/json'], $headers), CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 20, CURLOPT_FOLLOWLOCATION => false, CURLOPT_PROTOCOLS => CURLPROTO_HTTPS, CURLOPT_SSL_VERIFYPEER => true, CURLOPT_SSL_VERIFYHOST => 2]);
         $out = curl_exec($curl); $status = (int)curl_getinfo($curl, CURLINFO_RESPONSE_CODE); curl_close($curl);
-        if ($out === false || $status < 200 || $status >= 300) throw new Problem('Gmail hat den Versand nicht bestätigt (HTTP ' . $status . '). Verbindung unter Verwaltung → Verbindungen prüfen, bevor erneut gesendet wird.', 502);
+        if ($out === false || $status < 200 || $status >= 300) throw new Problem('Gmail hat den Versand nicht bestätigt (HTTP ' . $status . '). Verbindung unter Praxis → Verbindungen prüfen, bevor erneut gesendet wird.', 502);
         $json = json_decode((string)$out, true);
         return is_array($json) ? $json : [];
     }

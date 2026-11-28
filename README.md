@@ -1,15 +1,17 @@
 # Praxisherz – freie Software für die Arztpraxis
 
 Praxis-Appliance für Hausarztpraxen mit T2med: **eine Basis**, einmal auf einer VM installiert, und **Module**, die
-einzeln dazukommen – Kasse (SumUp), Terminzettel, Signatur, später Fax, Telefon und Kienzlezeit. Verwaltung komplett im
+einzeln dazukommen – Kasse (SumUp), Terminzettel, Signatur, Qualitätsmanagement, Fax und Telefon. Verwaltung komplett im
 Webinterface; Firewall, Benutzer, Admin-Zugang mit OTP, Updates und verschlüsselte Sicherung gibt es nur einmal, in der Basis.
 
-Stand (24.11.2026): **Basis 0.21.4-beta.58** mit den Modulen
-- **Kasse** 2.3.4-beta.30: SumUp-Kartenzahlung, Rechnungseingang aus T2med (jetzt mit Nachbearbeitung nicht erkannter Rechnungen anhand von Bildausschnitten), Überweisung mit QR-Code, Startseite mit freier Eingabe, Vorgänge mit Excel-Export, Post per Letterxpress.
-- **Terminzettel** 1.3.0-beta.10: T2med-Termine auf dem Bondrucker, mit Praxislogo (links, Mitte oder rechts), Kalender-QR und neu einem Absage-QR (vorbereitete E-Mail).
-- **Signatur** 0.1.0-beta.4: Vorlagen und Vorgänge für Unterschriften am signotec-Pad (Pad-Dienst und Rückschreiben nach T2med noch nicht gebaut).
+Stand (28.11.2026, Zweig `beta`): **Basis 0.22.0-beta.48** mit den Modulen
+- **Kasse** 2.3.4-beta.67: SumUp-Kartenzahlung, Rechnungseingang aus T2med (mit Nachbearbeitung nicht erkannter Rechnungen), Überweisung mit QR-Code, IGeL und GOÄ, Vorgänge mit Excel-Export, Post per Letterxpress.
+- **Terminzettel** 1.3.0-beta.25: T2med-Termine auf dem Bondrucker, mit Praxislogo, Kalender-QR und Absage-QR.
+- **Signatur** 0.1.0-beta.51: Verträge, Aufklärungen und Datenschutz am signotec-Pad unterschreiben lassen, als PDF in die T2med-Akte.
+- **Qualitätsmanagement** 0.1.0-beta.1: QM-Handbuch mit Lesebestätigung und Wiedervorlage.
+- **Telefon** 0.1.0-beta.31 und **Fax** 0.1.0-beta.16: Telefonanlage mit Sprachmenü und Rufgruppen, papierloses Fax (übernommen von Kienzlefon und Kienzlefax).
 
-Installierbar nur auf einer Test-VM ([docs/VM-TEST.md](docs/VM-TEST.md)); Fax, Telefon und Kienzlezeit sind geplant ([docs/PLAN.md](docs/PLAN.md)).
+Installierbar bisher nur auf einer Test-VM ([docs/VM-TEST.md](docs/VM-TEST.md)).
 
 ![Basis und Module](docs/architektur-whiteboard.png)
 
@@ -21,7 +23,7 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 
 ![Anmeldung](docs/screenshots/anmelden.png)
 
-**Übersicht und Menü:** Die Seitenleiste von Praxisherz führt zu den Anwendungen und zur Verwaltung; oben steht „Mein Konto“ mit dem Anmeldenamen. Die Anwendungen lassen sich per Ziehen sortieren, die Gruppen einklappen (gemerkt im Browser). Auch die Seiten der Module erscheinen im selben Rahmen.
+**Übersicht und Menü:** Die Seitenleiste von Praxisherz führt zu den Anwendungen und (für Admins) zu Einrichten, Praxis und Betrieb; oben steht „Mein Konto“ mit dem Anmeldenamen. Die Anwendungen lassen sich per Ziehen sortieren, die Gruppen einklappen (gemerkt im Browser). Auch die Seiten der Module erscheinen im selben Rahmen.
 
 ![Start](docs/screenshots/start.png)
 
@@ -29,7 +31,7 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 
 ![Mein Konto](docs/screenshots/konto.png)
 
-**Benutzer und Gruppen:** Jeder Benutzer hat ein Konto für die ganze Suite. Gruppen (voreingestellt: Admin, Arzt, MFA = Medizinische Fachangestellte) sind dauerhafte Rollen mit Rechten je Modul; beim Benutzer lassen sich einzelne Rechte abweichend erlauben oder entziehen. Die Module melden ihre Rechte selbst an.
+**Benutzer und Gruppen:** Jeder Benutzer hat ein Konto für ganz Praxisherz. Gruppen (voreingestellt: Admin, Arzt, MFA = Medizinische Fachangestellte) sind dauerhafte Rollen mit Rechten je Modul; beim Benutzer lassen sich einzelne Rechte abweichend erlauben oder entziehen. Die Module melden ihre Rechte selbst an.
 
 ![Benutzer](docs/screenshots/benutzer.png)
 
@@ -39,7 +41,7 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 
 ![Einrichtung](docs/screenshots/einrichtung.png)
 
-**Arbeitsplatz-Starter:** Ein Programm je PC und ein Schlüssel für alle Module; T2med startet damit Kasse und Signatur mit dem aktuellen Patienten.
+**Arbeitsplätze:** Ein Paket je PC richtet den Praxisherz-Agent ein: Er öffnet die Module aus T2med mit dem aktuellen Patienten, richtet Zertifikat und virtuelle Drucker ein, öffnet Akten per „Akte öffnen“ und hält sich selbst aktuell. Wer keinen Agent nutzt (Mac, Linux), findet jeden Schritt eingeklappt auch zum Einrichten von Hand.
 
 ![Starter](docs/screenshots/starter.png)
 
@@ -47,7 +49,7 @@ Alle Bilder zeigen erfundene Beispieldaten (Praxis Beispiel, example.org); neu e
 
 ![Verbindungen](docs/screenshots/verbindungen.png)
 
-**Kasse – Startseite:** Links die Rechnungen aus T2med mit Filter (offen, zurückgestellt, überwiesen), Namenssuche und Marken; die neueste ist vorgewählt, Karte ist vorbelegt, ein Klick kassiert. „Zurückstellen“ blendet eine Rechnung aus der Liste aus, ohne sie zu drucken. Rechts die Kasse für freie Eingabe, IGeL und GOÄ (Suche nach Ziffer oder Namen, auch ohne T2med-Rechnung) in zwei Spalten ohne Scrollen. Aus T2med startet die Kasse weiterhin schlank ohne Menü.
+**Kasse – Startseite:** Links die Rechnungen aus T2med mit Filter (offen, zurückgestellt, überwiesen), Namenssuche und Marken; die neueste ist vorgewählt, Karte ist vorbelegt, ein Klick kassiert. „Zurückstellen“ blendet eine Rechnung aus der Liste aus, ohne sie zu drucken. Rechts die Kasse für freie Eingabe, IGeL und GOÄ (Suche nach Ziffer oder Namen, auch ohne T2med-Rechnung) in zwei Spalten ohne Scrollen. Aus T2med öffnet sich dieselbe Startseite mit dem Patienten in der Patientenkarte.
 
 ![Kasse](docs/screenshots/kasse-start.png)
 

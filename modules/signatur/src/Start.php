@@ -18,7 +18,7 @@ final class Start {
         $url = (string)($eingabe['fhir_base_url'] ?? '');
         if (!preg_match('/^[A-Za-z0-9._-]{1,128}$/D', $kontext)) throw new \InvalidArgumentException('Ungültiger T2med-Kontext.');
         if ($token === '' || strlen($token) > 16000) throw new \InvalidArgumentException('T2med hat kein Zugriffstoken übergeben.');
-        if (!$fhir->erlaubt($url)) throw new \InvalidArgumentException('Die von T2med übergebene FHIR-Adresse ist in Praxisherz nicht freigegeben (Verwaltung → Verbindungen → T2med).');
+        if (!$fhir->erlaubt($url)) throw new \InvalidArgumentException('Die von T2med übergebene FHIR-Adresse ist in Praxisherz nicht freigegeben (Praxis → Verbindungen → T2med).');
         if (!preg_match('/^[A-Za-z0-9.-]{1,100}(:\d{1,5})?$/D', $host)) throw new \InvalidArgumentException('Ungültiger Servername.');
         $patient = $fhir->patient($kontext, $token);
         $code = bin2hex(random_bytes(32));

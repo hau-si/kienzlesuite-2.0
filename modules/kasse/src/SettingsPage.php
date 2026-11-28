@@ -77,7 +77,7 @@ final class SettingsPage {
         if (in_array($action, ['get'], true)) return;
         foreach ($rights as $right) if (in_array($action, self::RIGHTS[$right][1] ?? [], true)) return;
         $this->audit->write('verweigert', $action . ' ' . $this->who());
-        throw new Problem('Dafür fehlt das Recht. Bitte den Admin fragen (Verwaltung → Benutzer von Praxisherz).', 403);
+        throw new Problem('Dafür fehlt das Recht. Bitte den Admin fragen (Praxis → Benutzer und Gruppen von Praxisherz).', 403);
     }
 
     /** Mitarbeiter sehen nur Modus, Version und die freigegebenen Bereiche – keine Einstellungen, Schlüssel oder Zugangsdaten. */
@@ -106,7 +106,7 @@ final class SettingsPage {
         $config = Settings::save($this->db, $this->base, $section, $values);
         Module::refreshOverview($config);
         $message = 'Gespeichert. Gilt ab sofort für alle Arbeitsplätze.';
-        if ($section === 'invoice_inbox' && $config->get('invoice_inbox', 'enabled', false)) $message .= ' Der Drucker „vKasse“ steht in Praxisherz bereit (Verwaltung → Drucker).';
+        if ($section === 'invoice_inbox' && $config->get('invoice_inbox', 'enabled', false)) $message .= ' Der Drucker „vKasse“ steht in Praxisherz bereit (Praxis → Drucker); auf den Windows-PCs richtet ihn der Praxisherz-Agent ein.';
         return $this->view() + ['message' => $message];
     }
 

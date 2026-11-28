@@ -5,7 +5,7 @@ namespace KienzleTerminzettel;
 /**
  * Einstellungsseite des Moduls terminzettel: Layout des Bons mit Vorschau. Anmeldung, Rolle und Rechte kommen von der
  * Basis (KienzleModul). Gespeichert werden die Formularwerte (werte.json) und das daraus gebildete Layout für den
- * Druckdienst (layout.json); der Bondrucker kommt aus Verwaltung → Drucker und wird als basis.json abgelegt.
+ * Druckdienst (layout.json); der Bondrucker kommt aus Praxis → Drucker und wird als basis.json abgelegt.
  */
 final class Seite {
     public static string $data = '/var/lib/kienzle/terminzettel';
@@ -177,16 +177,16 @@ final class Seite {
             ['title' => 'Benötigte Hardware: Bondrucker', 'optional' => true, 'state' => 'open',
                 'hint' => 'Empfohlen: Epson TM-m30III (Bondrucker für Terminliste und Kasse).', 'link' => ''],
             ['title' => 'Bondrucker für den Terminzettel zugeordnet', 'optional' => true, 'state' => $bon !== '' ? 'done' : 'open',
-                'hint' => 'Verwaltung → Drucker → „Wofür welcher Drucker?“ (Bondrucker wählen)', 'link' => '/terminzettel/'],
+                'hint' => 'Praxis → Drucker → „Wofür welcher Drucker?“ (Bondrucker wählen)', 'link' => '/terminzettel/'],
             ['title' => 'Terminzettel: Praxisname im Kopf', 'state' => $name ? 'done' : 'open', 'optional' => true,
                 'hint' => 'Einstellungen → Kopf: Praxisname, Adresse und Logo für den Bon', 'link' => '/terminzettel/#kopf'],
             ['title' => 'Terminzettel aus T2med am Bondrucker angekommen', 'optional' => true, 'state' => $angekommen ? 'done' : 'open',
-                'hint' => 'Am Arbeitsplatz den Drucker „vTermine“ einrichten (Anleitung: Arbeitsplatz einrichten → Virtuelle Drucker) und in T2med unter Einstellungen → Kalender → Terminliste (DIN A6) wählen; dann einen Terminzettel drucken',
+                'hint' => 'Praxisherz-Agent auf den PCs installieren (Einrichten → Arbeitsplätze), er richtet „vTermine“ ein; in T2med unter Einstellungen → Kalender → Terminliste (DIN A6) wählen; dann einen Terminzettel drucken',
                 'link' => '/terminzettel/#drucker'],
         ];
     }
 
-    /** Papierbreite des Bondruckers in mm (58 oder 80) laut Basis (Verwaltung → Drucker), aus basis.json. */
+    /** Papierbreite des Bondruckers in mm (58 oder 80) laut Basis (Praxis → Drucker), aus basis.json. */
     public static function bonBreite(): int {
         $d = json_decode((string)@file_get_contents(self::$data . '/basis.json'), true);
         return is_array($d) && ($d['bonbreite'] ?? null) === 80 ? 80 : 58;
@@ -325,7 +325,7 @@ final class Seite {
     /** Testdruck mit Beispieldaten auf den zugeordneten Bondrucker. */
     public static function testdruck(\KienzleModul $k, array $values): string {
         $queue = $k->druckerRollen()['bon'];
-        if ($queue === '') throw new \InvalidArgumentException('Kein Bondrucker zugeordnet: Verwaltung → Drucker → „Wofür welcher Drucker?“.');
+        if ($queue === '') throw new \InvalidArgumentException('Kein Bondrucker zugeordnet: Praxis → Drucker → „Wofür welcher Drucker?“.');
         $bytes = self::beispiel(self::overlay($values), 'escpos')['data'];
         return $k->drucken($queue, $bytes, 'Terminzettel Test', ['raw']);
     }

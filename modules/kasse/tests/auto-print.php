@@ -44,7 +44,7 @@ final class PrintHttp extends HttpClient {
 function values(string $model = 'tm-m10', string $transport = 'samba'): array {
     $v = Config::parse(file_get_contents(dirname(__DIR__) . '/config/kienzle-kasse.example.toml'));
     $v['app']['state_dir'] = sys_get_temp_dir() . '/ks-print-' . bin2hex(random_bytes(6));
-    $v['app']['launcher_key'] = str_repeat('a', 64); $v['app']['encryption_key'] = str_repeat('b', 64);
+    $v['app']['encryption_key'] = str_repeat('b', 64);
     $v['sumup'] = ['mode' => 'live', 'api_key' => 'k', 'affiliate_key' => 'a', 'app_id' => 'test.app', 'merchant_code' => 'MTEST', 'reader_id' => 'reader-test'];
     $v['fhir'] = ['mode' => 'live', 'base_url' => 'https://t2med.test/aps/fhir/api/r4', 'launch_urls' => ['https://t2med.test/aps/fhir/api/r4'], 'api_key' => 'f', 'entry_code' => 'ZAHLUNG', 'ca_file' => ''];
     $v['invoice_inbox'] = ['enabled' => true, 'key' => str_repeat('c', 64), 'max_age_days' => 14];

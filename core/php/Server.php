@@ -3,7 +3,7 @@ declare(strict_types=1);
 namespace Kienzle\Core;
 
 /**
- * Servernamen und Praxisname (Verwaltung → Server). Übernommen werden sie vom root-Dienst kienzle-servername
+ * Servernamen und Praxisname (Einrichten → Server). Übernommen werden sie vom root-Dienst kienzle-servername
  * (core/lib/kienzle/servername.py): core.json, Server-Zertifikat, nginx. Hier nur Vorprüfung und Anfrage.
  */
 final class Server {

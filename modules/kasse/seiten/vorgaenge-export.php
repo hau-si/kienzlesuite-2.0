@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Excel-Liste der Vorgänge (Tag, Woche, Monat, Jahr). Recht „Excel-Listen“ (export).
+// Excel-Liste der Vorgänge (Tag, Woche, Monat, Jahr). Recht „Excel-Export der Vorgänge“ (export).
 use KienzleKasse\{App, Problem, Suite, Vorgaenge};
 
 header('Cache-Control: no-store');
@@ -10,7 +10,7 @@ try {
     if ($_SERVER['REQUEST_METHOD'] !== 'GET') throw new Problem('GET erforderlich.', 405);
     $site = $_SERVER['HTTP_SEC_FETCH_SITE'] ?? '';
     if ($site !== '' && $site !== 'same-origin' && $site !== 'none') throw new Problem('Unzulässiger Ursprung.', 403);
-    if (!Suite::can('export')) throw new Problem('Für die Excel-Liste fehlt das Recht „Excel-Listen“. Bitte den Admin fragen.', 403);
+    if (!Suite::can('export')) throw new Problem('Für die Excel-Liste fehlt das Recht „Excel-Export der Vorgänge“. Bitte den Admin fragen.', 403);
     $app = ks_app();
     if (in_array($_GET['art'] ?? '', ['monat', 'jahr'], true) && !Suite::can('periods')) throw new Problem('Für die Monats- und Jahresansicht fehlt das Recht.', 403);
     $v = new Vorgaenge($app->db, $app->config);

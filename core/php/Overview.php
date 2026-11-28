@@ -3,7 +3,7 @@ declare(strict_types=1);
 namespace Kienzle\Core;
 
 /**
- * Einrichtungs-Überblick (Verwaltung → Einrichtung): zuerst die Punkte der Basis, darunter die der Module.
+ * Einrichtungs-Überblick (Startseite → Einrichtung): zuerst die Punkte der Basis, darunter die der Module.
  * Die Überblicke der Module sammelt der root-Dienst kienzle-ueberblick (Haken laufen als Modul-Benutzer);
  * hier werden nur deren geprüfte Ergebnisse gelesen. Punkte, die sich nicht prüfen lassen, bestätigt ein Admin von Hand.
  */
@@ -12,8 +12,8 @@ final class Overview {
     public const MANUAL = ['ca' => 'Zertifizierungsstelle auf allen Arbeitsplätzen eingerichtet', 'codes' => 'Wiederherstellungscodes der Admins ausgedruckt und verwahrt',
         'name' => 'Servername auf den Arbeitsplätzen bekannt (Router/DNS oder hosts-Datei)',
         'anmeldung' => 'Praxisherz unter dem neuen Namen geöffnet und neu angemeldet', 'passkeys' => 'Passkeys unter dem neuen Namen neu angelegt (oder keine vorhanden)',
-        'drucker' => 'Virtuelle Drucker der Module auf den Arbeitsplätzen eingerichtet',
-        'starter' => 'Arbeitsplatz-Starter der Module auf den Arbeitsplätzen neu installiert (Verknüpfungen enthalten den Servernamen)',
+        // Ein Punkt für das Paket je PC: Der Praxisherz-Agent richtet Starter, Zertifikat und virtuelle Drucker ein (früher drei Handpunkte).
+        'starter' => 'Praxisherz-Agent auf allen Arbeitsplätzen installiert (Starter, Zertifikat, Drucker)',
         'dienste' => 'Dienste mit Anmeldung über Praxisherz (OIDC) auf den neuen Namen umgestellt'];
     /** Gruppen der Basis-Liste in der Reihenfolge der Anzeige. */
     public const GROUPS = ['zugang' => 'Zugang und Konten', 'name' => 'Servername und Arbeitsplätze', 'sicherung' => 'Datensicherung', 'betrieb' => 'Schutz und Updates'];
@@ -61,10 +61,11 @@ final class Overview {
 
     /**
      * Servername (oder Adresse) wurde geändert: Alles, was an den Namen gebunden ist, gilt wieder als offen und wird rot angezeigt,
-     * bis es erneut bestätigt ist. Bei einer neuen Zertifizierungsstelle muss sie auch auf den Arbeitsplätzen neu eingespielt werden.
+     * bis es erneut bestätigt ist. Bei einer neuen Zertifizierungsstelle muss sie auch auf den Arbeitsplätzen neu eingespielt werden
+     * (ohne Module von Hand; mit Paket über den Punkt „Praxisherz-Agent“, der ohnehin wieder offen ist).
      */
     public function nameChanged(bool $newCa): void {
-        $keys = ['name', 'anmeldung', 'passkeys', 'drucker', 'starter', 'dienste'] + ($newCa ? [9 => 'ca'] : []);
+        $keys = ['name', 'anmeldung', 'passkeys', 'starter', 'dienste'] + ($newCa ? [9 => 'ca'] : []);
         $m = $this->manual();
         $a = $this->again();
         foreach ($keys as $k) { unset($m[$k]); $a[$k] = time(); }
@@ -107,11 +108,10 @@ final class Overview {
         'Wiederherstellungscodes der Admins ausgedruckt' => ['web', false, 'zugang'],
         'Servername festgelegt' => ['web', false, 'name'],
         'Servername auf den Arbeitsplätzen' => ['pc', false, 'name'],
-        'Zertifizierungsstelle auf allen Arbeitsplätzen' => ['pc', false, 'name'],
         'Praxisherz unter dem neuen Namen' => ['pc', false, 'name'],
         'Passkeys unter dem neuen Namen' => ['pc', true, 'name'],
-        'Virtuelle Drucker der Module' => ['pc', false, 'name'],
-        'Arbeitsplatz-Starter' => ['pc', false, 'name'],
+        'Zertifizierungsstelle auf allen Arbeitsplätzen' => ['pc', false, 'name'],
+        'Praxisherz-Agent auf allen Arbeitsplätzen' => ['pc', false, 'name'],
         'Dienste mit Anmeldung' => ['web', false, 'name'],
         'Netzwerkspeicher eingetragen' => ['web', true, 'sicherung'],
         'Datensicherung eingerichtet' => ['web', false, 'sicherung'],
@@ -159,17 +159,18 @@ final class Overview {
         $out[] = self::item('Mindestens zwei Admins (Vertretung)', count($admins) >= 2 ? 'done' : 'open', 'Fällt ein Admin aus, kommt sonst nur noch die Konsole weiter.', '/verwaltung/benutzer');
         $out[] = self::item('Wiederherstellungscodes für jeden Admin', $admins && count($codes) === count($admins) ? 'done' : 'open', 'Unter „Mein Konto“ neu erzeugen', '/konto');
         $out[] = self::item(self::MANUAL['codes'], isset($manual['codes']) ? 'done' : 'open', 'Auf Papier ausdrucken und sicher verwahren; danach hier bestätigen', '/verwaltung/einrichtung', 'codes');
-        $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['ca'], isset($manual['ca']) ? 'done' : 'open', 'Datei ca.crt als vertrauenswürdige Stammzertifizierungsstelle eintragen – Anleitung für Windows, Mac, iPhone und Android', '/hilfe/arbeitsplatz#zertifikat', 'ca');
         $out[] = self::item(self::MANUAL['anmeldung'], isset($manual['anmeldung']) ? 'done' : 'open', 'Praxisherz unter dem Namen aus „Server“ öffnen, dort neu anmelden', '/verwaltung/server', 'anmeldung');
         $out[] = self::item(self::MANUAL['passkeys'], isset($manual['passkeys']) ? 'done' : 'open', 'Unter „Mein Konto“ neu anlegen; sie gelten nur für den Namen, unter dem sie angelegt wurden', '/konto', 'passkeys');
         $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['name'], isset($manual['name']) ? 'done' : 'open', 'Einmal im Router bzw. DNS eintragen – oder auf jedem PC in der Datei hosts', '/hilfe/arbeitsplatz#name', 'name');
-        if (array_filter($this->modules->all(), fn($m) => !empty($m['printers']))) {
-            $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['drucker'], isset($manual['drucker']) ? 'done' : 'open', 'Auf jedem PC, von dem T2med druckt, die virtuellen Drucker (z. B. Terminzettel, vKasse) hinzufügen – Anleitung unter „Arbeitsplatz einrichten“', '/hilfe/arbeitsplatz#drucker', 'drucker');
-        }
-        $starterId = array_key_first(array_filter($this->modules->all(), fn($m) => !empty($m['starters'])));
-        if ($starterId !== null) {
-            $starterLink = '/hilfe/arbeitsplatz#paket';
-            $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['starter'], isset($manual['starter']) ? 'done' : 'open', 'Unter Verwaltung → Arbeitsplätze das Paket neu laden und auf jedem Arbeitsplatz ausführen', $starterLink, 'starter');
+        // Mit Modulen, die aus T2med starten, bringt das Paket je PC (Praxisherz-Agent) Zertifikat, Starter und Drucker mit; sonst bleibt nur das Zertifikat von Hand.
+        // Die Zahl der angemeldeten Agenten hilft beim Bestätigen.
+        if (!$this->modules->starters()) {
+            $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['ca'], isset($manual['ca']) ? 'done' : 'open', 'Datei ca.crt als vertrauenswürdige Stammzertifizierungsstelle eintragen – Anleitung für Windows, Mac, iPhone und Android', '/hilfe/arbeitsplatz#zertifikat', 'ca');
+        } else {
+            try { $agenten = (int)($this->db->one('SELECT COUNT(*) AS n FROM arbeitsplaetze')['n'] ?? 0); } catch (\Throwable) { $agenten = 0; }
+            $out[] = ['ort' => 'pc'] + self::item(self::MANUAL['starter'], isset($manual['starter']) ? 'done' : 'open',
+                'Unter Einrichten → Arbeitsplätze das Paket laden und auf jedem PC einmal ausführen' . ($agenten ? ' – angemeldet: ' . $agenten . ' Arbeitsplatz' . ($agenten === 1 ? '' : 'e') : '')
+                . '. Ohne Agent (Mac, Linux, Tablet) stehen Zertifikat und Drucker dort unter „Von Hand einrichten“', '/hilfe/arbeitsplatz#paket', 'starter');
         }
         if ((int)($this->db->one('SELECT COUNT(*) AS n FROM oidc_clients')['n'] ?? 0) > 0) {
             $out[] = self::item(self::MANUAL['dienste'], isset($manual['dienste']) ? 'done' : 'open', 'Die Anmelde-Adresse (Issuer) heißt jetzt https://' . ($this->config?->hostnames[0] ?? '') . '; in den angebundenen Diensten (Modulen) ändern', '/verwaltung/module', 'dienste');

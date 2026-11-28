@@ -59,7 +59,7 @@ final class Ansicht {
         if ($d['meldung']) $o .= '<p class="ok" role="status">' . fx_h($d['meldung']) . '</p>';
         if ($d['fehler']) $o .= '<p class="fehler" role="alert">' . fx_h($d['fehler']) . '</p>';
         if (!$d['telefon'] && in_array($route, ['/', '/eingang'], true)) {
-            $o .= '<p class="fehler">Das Modul <strong>Telefon</strong> fehlt oder ist noch nicht verbunden. Ohne es kann Praxisherz keine Faxe senden oder empfangen (Verwaltung → Module).</p>';
+            $o .= '<p class="fehler">Das Modul <strong>Telefon</strong> fehlt oder ist noch nicht verbunden. Ohne es kann Praxisherz keine Faxe senden oder empfangen (Betrieb → Module).</p>';
         }
         return $o . match ($route) {
             '/' => self::senden($d), '/eingang' => self::eingang($d), '/protokoll' => self::berichte($d, 'protokoll'), '/fehler' => self::berichte($d, 'fehler'),
@@ -262,7 +262,9 @@ final class Ansicht {
             return '<div class="fx-tage"><label>' . fx_h($l) . '<input type="number" name="' . $n . '" min="1" max="3650" value="' . ($v > 0 ? $v : 90) . '"' . ($v === 0 ? ' disabled' : '') . '></label>'
                 . '<label class="check"><input type="checkbox" name="' . $n . '_unbegrenzt" value="1" data-schalter="' . $n . '"' . ($v === 0 ? ' checked' : '') . '> unbegrenzt</label></div>';
         };
-        $o = '<section class="card"><h2>Faxdrucker</h2><p class="muted">An den PCs einmal einrichten (Verwaltung → Drucker zeigt die Adresse). Jeder Drucker kann eine <strong>feste Faxnummer</strong> bekommen: '
+        $o = '<section class="card"><h2>Faxdrucker</h2><p>Diese Drucker richtet der Praxisherz-Agent auf jedem Windows-PC selbst ein (<a href="/hilfe/arbeitsplatz">Einrichten → Arbeitsplätze</a>).</p>'
+            . '<details class="how"><summary>Von Hand einrichten (ohne Agent, Mac/Linux oder wenn etwas schiefgeht)</summary><p>Die Adresse jedes Faxdruckers steht unter <a href="/verwaltung/drucker">Praxis → Drucker</a>. Am PC einen Drucker über diese Adresse hinzufügen (Windows: „Freigegebenen Drucker über den Namen auswählen“, Treiber „Microsoft IPP Class Driver“). Voraussetzung: Die Firewall (Betrieb → Sicherheit) lässt Drucken (IPP, Port 631) aus dem Praxisnetz zu.</p></details>'
+            . '<p class="muted">Jeder Drucker kann eine <strong>feste Faxnummer</strong> bekommen: '
             . 'Dokumente von diesem Drucker tragen die Nummer schon als Empfänger ein; mit „sofort senden“ gehen sie ohne Rückfrage hinaus. Namen beginnen mit <code>' . fx_h(Fax::VORSATZ) . '</code>.</p>'
             . '<form method="post" class="fx-form">' . self::csrf($d['csrf']) . '<input type="hidden" name="aktion" value="drucker-speichern"><table class="fx-tabelle fx-drucker"><tr><th>Name</th><th>Bezeichnung</th><th>Feste Faxnummer</th><th>Sofort senden</th></tr>';
         $zeilen = $d['drucker'];
@@ -274,13 +276,13 @@ final class Ansicht {
                 . '<td><input type="checkbox" name="drucker[' . $i . '][sofort]" value="1"' . ($x['sofort'] ? ' checked' : '') . ' aria-label="Sofort senden"></td></tr>';
         }
         $o .= '</table><p class="muted klein">Einen Drucker entfernen: Namen löschen. Zum Hinzufügen eine leere Zeile ausfüllen (höchstens ' . Fax::MAX_DRUCKER . ').</p>'
-            . '<p class="fx-hinweis"><strong>Nach jeder Änderung der Druckerliste:</strong> Verwaltung → Drucker → „Virtuelle Drucker der Module abgleichen“ (oder das Modul Fax unter Verwaltung → Module neu installieren bzw. aktualisieren). '
-            . 'Erst danach erscheinen neue Drucker, und entfernte verschwinden. Am PC neue Drucker einmal hinzufügen.</p>'
+            . '<p class="fx-hinweis"><strong>Nach jeder Änderung der Druckerliste:</strong> <a href="/verwaltung/drucker">Praxis → Drucker</a> → „Virtuelle Drucker der Module abgleichen“ (oder das Modul Fax unter Betrieb → Module neu installieren bzw. aktualisieren). '
+            . 'Erst danach erscheinen neue Drucker, und entfernte verschwinden. Der Praxisherz-Agent übernimmt neue Drucker an den PCs selbst.</p>'
             . '<button class="primary" type="submit">Druckerliste speichern</button></form></section>';
 
         $o .= '<section class="card"><h2>Netzwerkspeicher (NAS)</h2>';
         if (!$d['nasZiele']) {
-            $o .= '<p class="muted">Dafür braucht Praxisherz einen Netzwerkspeicher: Verwaltung → Verbindungen → Netzwerkspeicher einrichten und für das Modul Fax freigeben. Danach lässt sich hier der Export und ein Lauschordner einstellen.</p></section>';
+            $o .= '<p class="muted">Dafür braucht Praxisherz einen Netzwerkspeicher: Praxis → Verbindungen → Netzwerkspeicher einrichten und für das Modul Fax freigeben. Danach lässt sich hier der Export und ein Lauschordner einstellen.</p></section>';
         } else {
             $opt = static function (array $ziele, string $gewaehlt): string {
                 $r = '<option value="">– aus –</option>';
@@ -302,7 +304,7 @@ final class Ansicht {
         $bereit = (bool)($d['nachrichten']['mail'] ?? false);
         $o .= '<section class="card"><h2>Benachrichtigung bei Faxeingang</h2><p class="muted">Bei neuen Faxen eine kurze E-Mail an diese Adressen schicken (höchstens fünf, durch Komma getrennt; leer = aus). '
             . 'Die E-Mail nennt nur Anzahl und Seiten, nie Absender oder Inhalt, und geht über die E-Mail-Verbindung der Basis.</p>'
-            . ($bereit ? '' : '<p class="fx-hinweis">Dafür muss unter Verwaltung → Verbindungen → E-Mail-Versand eingerichtet sein.</p>')
+            . ($bereit ? '' : '<p class="fx-hinweis">Dafür muss unter Praxis → Verbindungen → E-Mail-Versand eingerichtet sein.</p>')
             . '<form method="post" class="fx-form fx-schmal">' . self::csrf($d['csrf']) . '<input type="hidden" name="aktion" value="benachrichtigung-speichern">'
             . '<label>E-Mail-Adressen<input name="mail_eingang" maxlength="400" value="' . fx_h(implode(', ', $e['mail_eingang'])) . '" placeholder="empfang@example.org"></label>'
             . '<button class="primary" type="submit">Speichern</button></form></section>';
@@ -319,7 +321,7 @@ final class Ansicht {
             . $tage('drucker_tage', 'Gedruckte, nicht gesendete Dokumente (Tage)', $e['drucker_tage']) . '<button class="primary" type="submit">Speichern</button></form></section>';
 
         $o .= '<section class="card"><h2>Faxleitung und Absenderkennung</h2><p>Leitung, Faxnummer und die <strong>Faxkennung</strong> (Name im Kopf jeder gesendeten Faxseite, beim Empfänger zu sehen) stellt das Modul '
-            . '<a href="/telefon/einstellungen#rufnummern">Telefon</a> ein: Einstellungen → Rufnummern → Fax. Bleibt die Faxkennung dort leer, gilt der Praxisname aus Verwaltung → Praxis'
+            . '<a href="/telefon/einstellungen#rufnummern">Telefon</a> ein: Einstellungen → Rufnummern → Fax. Bleibt die Faxkennung dort leer, gilt der Praxisname aus Praxis → Praxis'
             . ($d['praxisname'] !== '' ? ' (aktuell „' . fx_h($d['praxisname']) . '“)' : '') . ', gekürzt auf 20 Zeichen ohne Umlaute.</p></section>';
         return $o;
     }

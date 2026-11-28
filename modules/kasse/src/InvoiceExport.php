@@ -49,9 +49,9 @@ class InvoiceExport {
     public function check(): string {
         if (!$this->enabled()) throw new Problem('Ablage im Netzwerkordner ist deaktiviert.', 409);
         $targets = Suite::targets();
-        if (!isset($targets[$this->target()])) throw new Problem('Das gewählte Ziel gibt es nicht (mehr). Bitte unter Verwaltung → Verbindungen prüfen und hier neu wählen.', 409);
+        if (!isset($targets[$this->target()])) throw new Problem('Das gewählte Ziel gibt es nicht (mehr). Bitte unter Praxis → Verbindungen prüfen und hier neu wählen.', 409);
         $this->deliver("Praxisherz Kasse: Verbindungstest\n", 'praxisherz-kasse-verbindungstest.txt', '');
-        return 'Testdatei an „' . $targets[$this->target()] . '“ übergeben. Ob sie angekommen ist, zeigt Verwaltung → Verbindungen der Basis.';
+        return 'Testdatei an „' . $targets[$this->target()] . '“ übergeben. Ob sie angekommen ist, zeigt Praxis → Verbindungen von Praxisherz.';
     }
 
     /** Auftrag abgeben (in Tests ersetzbar). */

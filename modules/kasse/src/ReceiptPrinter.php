@@ -5,7 +5,7 @@ namespace KienzleKasse;
 class ReceiptPrinter {
     public function __construct(private Config $config) {}
     public function prepare(string $source): string {
-        if (!extension_loaded('gd')) throw new Problem('Druckaufbereitung fehlt. Bitte das Modul unter Verwaltung → Module neu installieren (Paket php-gd).', 503);
+        if (!extension_loaded('gd')) throw new Problem('Druckaufbereitung fehlt. Bitte das Modul unter Betrieb → Module neu installieren (Paket php-gd).', 503);
         return self::escpos(ReceiptPdf::raster($source, $this->width()), $this->config->get('printing', 'cut', true));
     }
     /** Epson GS ( L: Grafik in Streifen speichern (112) und drucken (50). */

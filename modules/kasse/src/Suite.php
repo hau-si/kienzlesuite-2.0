@@ -6,7 +6,7 @@ namespace KienzleKasse;
  * Anbindung an Praxisherz 2.0 (docs/MODUL-SCHNITTSTELLE.md der Basis):
  * - Anmeldung, Rolle und Rechte kommen von der Basis (nginx → KIENZLE_* in $_SERVER), keine eigene Anmeldung.
  * - T2med (FHIR), E-Mail und Netzwerkspeicher sind zentrale Verbindungen der Basis; das Modul liest nur seine eigene Datei.
- * - Grundwerte (Starter-Schlüssel, Schlüssel der Einstellungen) liegen im eigenen Datenordner (grundwerte.json, 0600),
+ * - Grundwerte (Schlüssel der Einstellungen und des Rechnungseingangs) liegen im eigenen Datenordner (grundwerte.json, 0600),
  *   angelegt vom Haken bin/install.
  * Daraus entsteht die Config der Kasse; die Einstellungen der
  * Weboberfläche (Settings) liegen weiter verschlüsselt in der Datenbank darüber.
@@ -74,7 +74,7 @@ final class Suite {
     /** Grundwerte aus dem Datenordner (angelegt von bin/install). */
     public static function grundwerte(): array {
         $g = json_decode((string)@file_get_contents(self::$data . '/grundwerte.json'), true);
-        if (!is_array($g)) throw new \RuntimeException('Grundwerte des Moduls fehlen. Bitte das Modul unter Verwaltung → Module neu installieren.');
+        if (!is_array($g)) throw new \RuntimeException('Grundwerte des Moduls fehlen. Bitte das Modul unter Betrieb → Module neu installieren.');
         return $g;
     }
 
@@ -82,7 +82,7 @@ final class Suite {
     public static function ensureGrundwerte(): void {
         $file = self::$data . '/grundwerte.json';
         if (is_file($file)) return;
-        $g = ['launcher_key' => bin2hex(random_bytes(32)), 'encryption_key' => bin2hex(random_bytes(32)), 'invoice_key' => bin2hex(random_bytes(32))];
+        $g = ['encryption_key' => bin2hex(random_bytes(32)), 'invoice_key' => bin2hex(random_bytes(32))];
         $tmp = $file . '.neu';
         if (file_put_contents($tmp, json_encode($g, JSON_PRETTY_PRINT) . "\n") === false) throw new \RuntimeException('Grundwerte nicht schreibbar.');
         chmod($tmp, 0600);
@@ -90,7 +90,7 @@ final class Suite {
     }
 
     /**
-     * Praxisname, Anschrift und die Zuordnung der Drucker gehören der Basis (Verwaltung → Praxis bzw. Drucker).
+     * Praxisname, Anschrift und die Zuordnung der Drucker gehören der Basis (Praxis → Praxis bzw. Drucker).
      * Bei jeder angemeldeten Anfrage wird die mitgelieferte Fassung als basis.json übernommen, damit auch der Starter
      * (ohne Anmeldung) sie nutzen kann.
      */
@@ -119,10 +119,10 @@ final class Suite {
         return $out;
     }
 
-    /** Papierbreite des Bondruckers in mm (58 oder 80), zentral unter Verwaltung → Drucker. */
+    /** Papierbreite des Bondruckers in mm (58 oder 80), zentral unter Praxis → Drucker. */
     public static function bonBreite(): int { return (self::basis()['bonbreite'] ?? null) === 80 ? 80 : 58; }
 
-    /** @return array{buero:string,bon:string} Warteschlangen laut Verwaltung → Drucker (leer = nicht zugeordnet). */
+    /** @return array{buero:string,bon:string} Warteschlangen laut Praxis → Drucker (leer = nicht zugeordnet). */
     public static function druckerRollen(): array {
         $d = self::basis()['drucker'] ?? [];
         $out = [];
@@ -138,15 +138,14 @@ final class Suite {
         $v['app']['port'] = 443;
         $v['app']['state_dir'] = self::$data;
         $v['app']['development'] = false;
-        $v['app']['launcher_key'] = (string)$g['launcher_key'];
         $v['app']['encryption_key'] = (string)$g['encryption_key'];
         $v['invoice_inbox']['key'] = (string)$g['invoice_key'];
         // Bondrucker-Breite kommt aus der Basis, nicht mehr aus den Einstellungen der Kasse.
         $v['printing']['model'] = self::bonBreite() === 80 ? 'tm-m30iii' : 'tm-m10';
         $v['printing']['width_dots'] = Config::PRINTER_MODELS[$v['printing']['model']]['width_dots'];
-        // Drucker richtet die Basis ein (Verwaltung → Drucker); das Modul druckt nur auf deren Warteschlangen.
+        // Drucker richtet die Basis ein (Praxis → Drucker); das Modul druckt nur auf deren Warteschlangen.
         foreach (self::praxis() as $k => $val) $v['practice'][$k] = $val;
-        // Kontodaten und Steuerangaben gehören ebenfalls der Basis (Verwaltung → Praxis).
+        // Kontodaten und Steuerangaben gehören ebenfalls der Basis (Praxis → Praxis).
         try {
             $st = self::modul()->stammdaten();
             foreach (['holder', 'iban', 'bic', 'bank_name'] as $f) $v['bank'][$f] = $st[$f];

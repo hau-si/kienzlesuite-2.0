@@ -31,7 +31,7 @@ final class T2medInvoice {
         foreach (['/usr/bin/pdftotext', '/usr/local/bin/pdftotext', '/opt/homebrew/bin/pdftotext'] as $path) {
             if (is_executable($path)) { $binary = $path; break; }
         }
-        if (!$binary) throw new Problem('pdftotext fehlt. Bitte das Modul unter Verwaltung → Module neu installieren (Paket poppler-utils).', 503);
+        if (!$binary) throw new Problem('pdftotext fehlt. Bitte das Modul unter Betrieb → Module neu installieren (Paket poppler-utils).', 503);
         $first = null; $text = '';
         // 1. Spaltenlayout, 2. Lesereihenfolge (andere Vorlagen), 3. Texterkennung (Bild-PDF).
         foreach (['layout' => ['-layout'], 'raw' => []] as $source => $flags) {
@@ -48,7 +48,7 @@ final class T2medInvoice {
         if (!self::needsOcr($first, $labels)) throw $error;
         $ocr = self::ocr($pdf);
         if ($ocr === null) {
-            if (trim($first) === '') throw new Problem('Die Rechnung enthält keinen Text und die Texterkennung ist nicht eingerichtet. Bitte das Modul unter Verwaltung → Module neu installieren (Pakete tesseract-ocr, tesseract-ocr-deu).', 422);
+            if (trim($first) === '') throw new Problem('Die Rechnung enthält keinen Text und die Texterkennung ist nicht eingerichtet. Bitte das Modul unter Betrieb → Module neu installieren (Pakete tesseract-ocr, tesseract-ocr-deu).', 422);
             throw $error;
         }
         self::$lastText = $ocr; self::$lastSource = 'Texterkennung';

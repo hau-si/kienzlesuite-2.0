@@ -8,7 +8,7 @@ namespace KienzleKasse;
  */
 final class Settings {
     /** Fehlt der T2med-API-Schlüssel, gibt es keinen Ersatz (der Schlüssel gehört der Praxis und steht nie im Quelltext). */
-    public const T2MED_OHNE_SCHLUESSEL = 'Kein T2med-API-Schlüssel eingetragen. Bitte unter Verwaltung → Verbindungen → T2med den API-Schlüssel der Praxis eintragen.';
+    public const T2MED_OHNE_SCHLUESSEL = 'Kein T2med-API-Schlüssel eingetragen. Bitte unter Praxis → Verbindungen → T2med von Praxisherz den API-Schlüssel der Praxis eintragen.';
     private const ROW = 'config_overrides';
 
     /** Felder je Abschnitt: Typ, Beschriftung, Auswahl, Hilfetext. */
@@ -26,35 +26,35 @@ final class Settings {
         ]],
         'fhir' => ['label' => 'T2med-Anbindung', 'fields' => [
             'mode' => ['type' => 'choice', 'label' => 'Anbindung', 'choices' => ['mock' => 'Testmodus (Testpatient, keine Akteneinträge)', 'live' => 'Live (echte Patientenakte)'],
-                'help' => 'Adresse, Schlüssel und Zertifikat von T2med stehen zentral unter Verwaltung → Verbindungen von Praxisherz.'],
+                'help' => 'Adresse, Schlüssel und Zertifikat von T2med stehen zentral unter Praxis → Verbindungen → T2med von Praxisherz.'],
             'entry_code' => ['type' => 'string', 'label' => 'Aktenkürzel', 'default' => 'ZAHLUNG'],
         ]],
-        'practice' => ['label' => 'Belege (Praxisname und Anschrift: Verwaltung → Praxis)', 'fields' => [
+        'practice' => ['label' => 'Belege (Praxisname und Anschrift: Praxis → Praxis von Praxisherz)', 'fields' => [
             'append_sumup_receipt' => ['type' => 'bool', 'label' => 'Originalen SumUp-Beleg statt lokaler Zahlungsbestätigung anhängen'],
         ]],
         'numbers' => ['label' => 'Rechnungsnummern (in der App erzeugte Rechnungen und Stornos)', 'fields' => [
             'igel_format' => ['type' => 'string', 'label' => 'Format der Rechnungsnummer für IGeL-Leistungen', 'default' => 'IGEL-{JJJJ}-{NNNN}', 'help' => 'Platzhalter: {JJJJ} Jahr, {JJ} Jahr zweistellig, {MM} Monat, {NNNN} laufende Nummer (Anzahl der N = Mindeststellen). Beispiel: IGEL-{JJJJ}-{NNNN} ergibt IGEL-2026-0001. Enthält das Format das Jahr, beginnt die Zählung jedes Jahr neu. Vergebene Nummern werden nie wieder verwendet. Gilt für Karte, Bar und Überweisung; T2med-Rechnungen behalten ihre T2med-Nummer.'],
             'storno_format' => ['type' => 'string', 'label' => 'Format der Nummer einer Stornorechnung', 'default' => 'STORNO-{JJJJ}-{NNNN}', 'help' => 'Jede Stornierung bekommt eine eigene neue Nummer; die stornierte Rechnung bleibt für die Buchhaltung erhalten.'],
         ]],
-        'bank' => ['label' => 'Überweisung (Kontodaten: Verwaltung → Praxis)', 'fields' => [
+        'bank' => ['label' => 'Überweisung (Kontodaten: Praxis → Praxis von Praxisherz)', 'fields' => [
             'purpose' => ['type' => 'string', 'label' => 'Verwendungszweck', 'default' => 'Rechnung {nummer}', 'optional' => true],
         ]],
-        'tax' => ['label' => 'Umsatzsteuer (Steuernummer und Kleinunternehmerregelung: Verwaltung → Praxis)', 'fields' => [
+        'tax' => ['label' => 'Umsatzsteuer (Steuernummer und Kleinunternehmerregelung: Praxis → Praxis von Praxisherz)', 'fields' => [
             'rate' => ['type' => 'percent', 'label' => 'MwSt.-Satz in Prozent', 'default' => 1900],
             'manual_vat' => ['type' => 'bool', 'label' => '„Sonstiger Betrag“ mit MwSt. berechnen', 'default' => false],
             'exempt_note' => ['type' => 'text', 'label' => 'Hinweis bei Positionen ohne MwSt. (optional)', 'default' => ''],
             'small_business_note' => ['type' => 'text', 'label' => 'Hinweis bei Kleinunternehmerregelung', 'default' => 'Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.'],
         ]],
         'mail' => ['label' => 'E-Mail-Versand', 'fields' => [
-            'enabled' => ['type' => 'bool', 'label' => 'Belege per E-Mail senden', 'help' => 'Server, Zugang und Absender stehen zentral unter Verwaltung → Verbindungen von Praxisherz.'],
+            'enabled' => ['type' => 'bool', 'label' => 'Belege per E-Mail senden', 'help' => 'Server, Zugang und Absender stehen zentral unter Praxis → Verbindungen von Praxisherz.'],
             'from_name' => ['type' => 'string', 'label' => 'Absendername (z. B. Praxisname)', 'optional' => true],
         ]],
-        'printing' => ['label' => 'Bondrucker (welcher Drucker und welche Papierbreite: Verwaltung → Drucker → Wofür welcher Drucker?)', 'fields' => [
+        'printing' => ['label' => 'Bondrucker (welcher Drucker und welche Papierbreite: Praxis → Drucker → Wofür welcher Drucker?)', 'fields' => [
             'enabled' => ['type' => 'bool', 'label' => 'Bondrucker verwenden („Beleg drucken“)'],
             'cut' => ['type' => 'bool', 'label' => 'Bon schneiden', 'default' => true],
             'cash_receipt_auto' => ['type' => 'bool', 'label' => 'Quittung automatisch drucken bei Barzahlung', 'default' => false],
         ]],
-        'office_printing' => ['label' => 'Praxisdrucker A4 (welcher Drucker: Verwaltung → Drucker → Wofür welcher Drucker?)', 'fields' => [
+        'office_printing' => ['label' => 'Praxisdrucker A4 (welcher Drucker: Praxis → Drucker → Wofür welcher Drucker?)', 'fields' => [
             'enabled' => ['type' => 'bool', 'label' => 'Praxisdrucker für Rechnungen verwenden'],
             'media' => ['type' => 'choice', 'label' => 'Papier', 'choices' => ['A4' => 'A4', 'Letter' => 'Letter']],
             'duplex' => ['type' => 'bool', 'label' => 'Beidseitig drucken'],
@@ -71,7 +71,7 @@ final class Settings {
             'label_patient' => ['type' => 'list', 'label' => 'Eigene Textschnipsel vor Patient und Geburtsdatum', 'optional' => true],
         ]],
         'letterxpress' => ['label' => 'Letterxpress (Rechnung per Post)', 'fields' => [
-            'enabled' => ['type' => 'bool', 'label' => 'Rechnungen per Post über Letterxpress versenden', 'help' => 'Benutzername, API-Key und Test/Live stehen zentral unter Verwaltung → Verbindungen von Praxisherz (Letterxpress).'],
+            'enabled' => ['type' => 'bool', 'label' => 'Rechnungen per Post über Letterxpress versenden', 'help' => 'Benutzername, API-Key und Test/Live stehen zentral unter Praxis → Verbindungen von Praxisherz (Letterxpress).'],
             'color' => ['type' => 'choice', 'label' => 'Druck', 'default' => '1', 'choices' => ['1' => 'Schwarz-Weiß', '4' => 'Farbe']],
             'duplex' => ['type' => 'bool', 'label' => 'Beidseitig drucken', 'default' => false],
             'shipping' => ['type' => 'choice', 'label' => 'Versandart', 'default' => 'auto', 'choices' => ['auto' => 'Automatisch (Inland oder Ausland) – fehleranfällig', 'national' => 'Nur Inland (empfohlen)', 'international' => 'Ausland']],
@@ -79,7 +79,7 @@ final class Settings {
         ]],
         'invoice_export' => ['label' => 'Ablage im Netzwerkordner', 'fields' => [
             'enabled' => ['type' => 'bool', 'label' => 'Rechnungen als PDF in einen Netzwerkordner kopieren'],
-            'ziel' => ['type' => 'target', 'label' => 'Ziel im Netzwerkspeicher', 'help' => 'Ziele und Zugangsdaten stehen zentral unter Verwaltung → Verbindungen von Praxisherz.'],
+            'ziel' => ['type' => 'target', 'label' => 'Ziel im Netzwerkspeicher', 'help' => 'Ziele und Zugangsdaten stehen zentral unter Praxis → Verbindungen von Praxisherz.'],
             'directory' => ['type' => 'string', 'label' => 'Unterordner ({jahr} und {monat} möglich)', 'default' => 'Rechnungen/{jahr}/{monat}'],
             'app_invoices' => ['type' => 'bool', 'label' => 'Auch in der App erzeugte Rechnungen ablegen'],
             'when' => ['type' => 'choice', 'label' => 'T2med-Rechnungen ablegen', 'choices' => ['paid' => 'nur per Karte bezahlte', 'received' => 'jede gedruckte']],
@@ -161,8 +161,8 @@ final class Settings {
                 'int' => $raw === '' || $raw === null ? null : (is_numeric($raw) && (string)(int)$raw === trim((string)$raw) ? (int)$raw : throw new Problem($field['label'] . ': ganze Zahl erwartet.', 422)),
                 'money' => is_numeric($raw) && (int)$raw > 0 ? (int)round((float)$raw * 100) : throw new Problem($field['label'] . ': Betrag erwartet.', 422),
                 'choice' => isset($field['choices'][$raw]) ? $raw : throw new Problem($field['label'] . ': ungültige Auswahl.', 422),
-                'queue' => isset(self::queues()[$raw]) ? $raw : throw new Problem($field['label'] . ': Bitte einen Drucker aus Verwaltung → Drucker wählen.', 422),
-                'target' => isset(Suite::targets()[$raw]) ? $raw : throw new Problem($field['label'] . ': Bitte ein Ziel aus Verwaltung → Verbindungen wählen.', 422),
+                'queue' => isset(self::queues()[$raw]) ? $raw : throw new Problem($field['label'] . ': Bitte einen Drucker aus Praxis → Drucker wählen.', 422),
+                'target' => isset(Suite::targets()[$raw]) ? $raw : throw new Problem($field['label'] . ': Bitte ein Ziel aus Praxis → Verbindungen wählen.', 422),
                 'list' => array_values(array_filter(array_map(fn($line) => rtrim(trim($line), '/'), preg_split('/[\r\n,]+/', (string)$raw)))),
                 'secret' => trim((string)$raw) === '' ? $current->get($section, $key, '') : trim((string)$raw),
                 'text' => self::text($field['label'], $raw),
@@ -172,11 +172,11 @@ final class Settings {
             if ($values[$key] === null) unset($values[$key]);
         }
         if ($section === 'fhir' && ($values['mode'] ?? '') === 'live' && !Suite::connected('t2med')) {
-            throw new Problem('Für den Live-Betrieb zuerst unter Verwaltung → Verbindungen die T2med-Verbindung einrichten.', 422);
+            throw new Problem('Für den Live-Betrieb zuerst unter Praxis → Verbindungen die T2med-Verbindung einrichten.', 422);
         }
         if ($section === 'fhir' && ($values['mode'] ?? '') === 'live' && (string)(Suite::modul()->verbindung('t2med')['api_key'] ?? '') === '') throw new Problem(self::T2MED_OHNE_SCHLUESSEL, 422);
         if ($section === 'mail' && ($values['enabled'] ?? false) && !Suite::connected('mail')) {
-            throw new Problem('Für den E-Mail-Versand zuerst unter Verwaltung → Verbindungen den E-Mail-Versand einrichten.', 422);
+            throw new Problem('Für den E-Mail-Versand zuerst unter Praxis → Verbindungen den E-Mail-Versand einrichten.', 422);
         }
         $overrides[$section] = $values;
         // Abhängigkeiten, die sonst eine Speicherung blockieren würden.
