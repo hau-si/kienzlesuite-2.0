@@ -1,6 +1,6 @@
 # Basis – Release-Notizen
 
-## 0.22.0-beta.52
+## 0.22.0-beta.55
 
 - **Neu: Praxis → Öffnungszeiten** (Wunsch des Nutzers: zentrale Verwaltung in der Basis, Entwurf B mit dem Feiertagsteil aus A).
   - Links ein Monatskalender (geschlossen rot, Feiertag gelb, Sonderöffnung blau; Tag anklicken öffnet den Eintrag oder legt eine Schließung an) und „Als Nächstes“, rechts das Bearbeiten: Art (Urlaub, Fortbildung, Geschlossen, Sonderöffnung), Von/Bis, Bezeichnung, **Vertretung je Zeitraum** (mehrere Zeilen, auch je Tag eine andere Praxis), zusätzlicher Hinweis, „Wo erscheint es?“ (Homepage, Telefonansage) und die fertige Ansage („So hört es der Anrufer“) sowie der Satz für die Homepage.
@@ -11,6 +11,21 @@
 - **Neue Verbindung `zeiten`** für Module (`[[connections]] id = "zeiten"`, Aufbau in `docs/MODUL-SCHNITTSTELLE.md`): Die Basis rechnet Wochenzeiten, kommende Schließungen und die gewählten Feiertage der nächsten drei Jahre mit fertigen Texten aus und lässt sie vom Dienst `kienzle-verbindungen` an die Module verteilen (nach jeder Änderung, sonst beim ersten Öffnen der Seite an einem neuen Tag). Erste Nutzer: Homepage und Telefon.
 - Google-Unternehmenseintrag ist noch nicht angebunden (geplant als zweiter Schritt unter Praxis → Verbindungen).
 - Geprüft mit Tests (`tests/php/zeiten.php`, `tests/core/test_zeiten.py`); **nicht auf der VM und nicht im echten Browser geprüft.**
+
+## 0.22.0-beta.54
+
+- Ende-zu-Ende-Prüfung mit echtem nginx (`tests/integration/nginx.sh`, Container Ubuntu 26.04 auf GitHub) auf den heutigen Stand gebracht: Sie erwartete auf der Update-Seite und der Modulseite noch Texte einer älteren Gestaltung. Seit dem Test der Start-ISO war der Container-Lauf vorher abgebrochen, deshalb fiel das nicht auf. Am Programm ändert sich nichts.
+- Die Prüfung läuft nur unter Ubuntu 26.04 (Installer); hier nicht ausführbar, das Ergebnis zeigt der Lauf auf GitHub.
+
+## 0.22.0-beta.53
+
+- Prüfung auf GitHub: Nach beta.52 lief der Ubuntu-26.04-Container weiter und scheiterte an zwei Tests des Sprachmenüs (Kokoro-Installer prüft `ensurepip`). Das Paket `python3-venv` steht jetzt in der Paketliste des Containers. Am Programm ändert sich nichts.
+- Lokal mit allen Tests geprüft; ob der Container-Lauf ganz grün wird, zeigt der nächste Lauf auf GitHub.
+
+## 0.22.0-beta.52
+
+- Prüfung auf GitHub: Der Testlauf im Ubuntu-26.04-Container brach seit dem Test der Start-ISO ab („No module named 'yaml'“). Das Paket `python3-yaml` steht jetzt in der Paketliste beider Testläufe. Am Programm selbst ändert sich nichts.
+- Lokal mit allen Tests geprüft; ob der Container-Lauf auf GitHub grün wird, zeigt der nächste Lauf.
 
 ## 0.22.0-beta.51
 

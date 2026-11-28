@@ -6,7 +6,7 @@
 - Neuer Dienst `kienzle-homepage-zeiten` (.path auf die Verbindungsdatei): Ändert sich etwas in der Basis, wird sofort übertragen (nur bei neuem Stand).
 - Das Plugin „Praxisherz-Hinweise“ bleibt unverändert (0.2.0); automatische Mitteilungen tragen Nummern ab 900000000.
 - Die eigene Liste der Vertretungspraxen im Modul bleibt für eigene Mitteilungen bestehen; die automatischen nutzen die Liste der Basis.
-- Braucht Basis 0.22.0-beta.52. Geprüft mit Tests (inkl. Übertragung an das nachgebaute WordPress); **nicht mit echtem WordPress und nicht auf der VM geprüft.**
+- Braucht Basis 0.22.0-beta.55. Geprüft mit Tests (inkl. Übertragung an das nachgebaute WordPress); **nicht mit echtem WordPress und nicht auf der VM geprüft.**
 
 ## 0.1.0-beta.2
 

@@ -3,8 +3,8 @@
 
 [module]
 id = "qm"
-name = "Qualitätsmanagement"
-version = "0.1.0-beta.1"
+name = "QM"
+version = "0.1.0-beta.2"
 core_api = "2"
 description = "QM-Handbuch: Dokumente schreiben, vidieren, den Mitarbeitenden zur Kenntnis vorlegen und das Lesen bestätigen lassen. Ordner, Tags, Suche, Wiedervorlage, Import von Word-Dateien (QEP)."
 

@@ -124,7 +124,7 @@ $id = $u->create("dora", "", true); $u->setPassword($id, "Sonnen-Uhr-Garten-3");
 code=$(php -r 'require "/opt/kienzle/core/current/php/bootstrap.php"; echo Kienzle\Core\Totp::code("JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP", Kienzle\Core\Totp::step());')
 [ "$(code -c "$T/dora" -b "$T/dora" -H "Origin: https://$host" -d login=dora -d 'password=Sonnen-Uhr-Garten-3' "https://$host/anmelden")" = "303 https://$host/anmelden/code" ] || fail 'Admin-Anmeldung'
 [ "$(code -c "$T/dora" -b "$T/dora" -H "Origin: https://$host" -d "code=$code" "https://$host/anmelden/code")" = "303 https://$host/" ] || fail 'Admin-Code'
-c -b "$T/dora" "https://$host/verwaltung/updates" | grep -q 'Installiert: <strong>Basis' || fail 'Update-Seite'
+c -b "$T/dora" "https://$host/verwaltung/updates" | grep -q 'Installiert: Basis ' || fail 'Update-Seite'
 c -b "$T/dora" "https://$host/verwaltung/firewall" | grep -q 'Freigegebene Netze' || fail 'Firewall-Seite'
 c -b "$T/dora" "https://$host/verwaltung/verbindungen" | grep -q 'T2med (FHIR)' || fail 'Verbindungsseite'
 c -b "$T/dora" "https://$host/verwaltung/einrichtung" | grep -q 'Admin mit Authenticator-App' || fail 'Einrichtungsseite'
@@ -173,7 +173,7 @@ cmp -s "$T/ansicht/etc/kienzle/ca/ca.crt" /etc/kienzle/ca/ca.crt || fail 'CA feh
 sicher '{"action":"blatt-gedruckt"}'
 [ ! -e /var/lib/kienzle/sicherung/blatt.html ] || fail 'Blatt nicht gelöscht'
 
-echo '== Servername ändern (Verwaltung → Server)'
+echo '== Servername ändern (Einrichten → Server)'
 [ -f /etc/systemd/system/kienzle-servername.path ] || fail 'kienzle-servername.path fehlt'
 c -b "$T/dora" -H "Origin: https://$host" "https://$host/verwaltung/server" | grep -q 'Name des Servers' || fail 'Seite Server'
 runuser -u ks-core -- sh -c "umask 077; printf '%s' '{\"namen\":[\"$host\",\"kienzle.praxis.internal\",\"10.11.12.13\"],\"praxis\":\"Praxis Test\"}' > /var/lib/kienzle/core/anfragen/servername.json"
@@ -269,7 +269,7 @@ r=$(c -b "$T/bert" -H "Origin: https://$host" -H "X-Kienzle-Csrf: $kcsrf" -H 'Co
 python3 -c 'import json,sys; u=json.loads(sys.argv[1])["url"]; sys.exit(0 if u.startswith("https://"+sys.argv[2]+"/kasse/#launch=") else 1)' "$r" "$host" || fail "Testpatient in der Kasse: $r"
 [ "$(c -b "$T/bert" -o /dev/null -w '%{http_code}' "https://$host/kasse/settings.php")" = 403 ] || fail 'Einstellungen ohne Recht'
 lpstat -v vKasse 2>/dev/null | grep -q 'ipp://localhost:471' || echo 'Hinweis: Drucker „vKasse“ im Container nicht angelegt.'
-c -b "$T/dora" "https://$host/verwaltung/module" | grep -q 'Kasse <span class="tag">2.' || fail 'Seite Module'
+c -b "$T/dora" "https://$host/verwaltung/module" | grep -q '<p class="mod-name">Kasse</p><p class="muted mod-sub">Version 2\.' || fail 'Seite Module'
 /opt/kienzle/core/current/bin/kienzle-module entfernen kasse > /dev/null || fail 'Kasse entfernen'
 [ ! -e /opt/kienzle/kasse ] && [ -d /var/lib/kienzle/kasse ] || fail 'Entfernen: Programm noch da oder Daten weg'
 pkill -u ks-kasse -f php-fpm || true

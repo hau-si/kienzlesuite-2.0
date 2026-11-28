@@ -88,7 +88,7 @@ final class Ansicht {
         $faellig = (self::$r['vidieren'] || self::$r['schreiben']) ? Dokumente::faellig() : [];
         $entw = self::$r['schreiben'] ? Dokumente::entwuerfe() : [];
         $heute = date('Y-m-d');
-        $o = '<div class="qm">' . self::seitenkopf('start', 'Qualitätsmanagement', 'Guten Tag' . ($vorname !== '' ? ', ' . $vorname : '')) . $meldung;
+        $o = '<div class="qm">' . self::seitenkopf('start', 'QM', 'Guten Tag' . ($vorname !== '' ? ', ' . $vorname : '')) . $meldung;
         $o .= '<div class="qm-zahlen"><a class="card qm-zahl" href="#mappe"><span class="muted">Für mich zu lesen</span><strong>' . count($mappe) . '</strong></a>';
         if (self::$r['vidieren']) $o .= '<a class="card qm-zahl" href="#vidieren"><span class="muted">Von mir zu vidieren</span><strong>' . count($vid) . '</strong></a>';
         if ($faellig || self::$r['vidieren']) $o .= '<a class="card qm-zahl" href="' . qm_h(self::u('/handbuch', ['zustand' => 'faellig'])) . '"><span class="muted">Prüfung fällig</span><strong' . ($faellig ? ' class="qm-rot"' : '') . '>' . count($faellig) . '</strong></a>';
@@ -141,7 +141,7 @@ final class Ansicht {
         $filter = ['ordner' => $ordnerId ?: '', 'tag' => (string)($f['tag'] ?? ''), 'zustand' => (string)($f['zustand'] ?? ''), 'q' => (string)($f['q'] ?? ''), 'text' => !empty($f['text']) ? '1' : ''];
         $titel = 'Handbuch';
         foreach ($baum as $b) if ($b['id'] === $ordnerId) $titel = $b['name'];
-        $o = '<div class="qm">' . self::seitenkopf('handbuch', 'Qualitätsmanagement', $titel) . $meldung . '<div class="qm-drei">';
+        $o = '<div class="qm">' . self::seitenkopf('handbuch', 'QM', $titel) . $meldung . '<div class="qm-drei">';
 
         // Ordner und Tags
         $o .= '<aside class="card qm-baum"><h2>Ordner</h2><nav aria-label="Ordner"><a class="qm-ordner' . ($ordnerId === 0 ? ' aktiv' : '') . '" href="' . qm_h(self::u('/handbuch', array_merge($filter, ['ordner' => '']))) . '">Alle Dokumente</a>';
@@ -467,7 +467,7 @@ final class Ansicht {
 
     public static function neu(int $ordner, string $meldung): string {
         $baum = Dokumente::ordnerBaum();
-        $o = '<div class="qm">' . self::seitenkopf('neu', 'Qualitätsmanagement', 'Neues Dokument') . $meldung . '<form method="post" class="card qm-neu">' . self::csrfFeld() . '<input type="hidden" name="aktion" value="anlegen">'
+        $o = '<div class="qm">' . self::seitenkopf('neu', 'QM', 'Neues Dokument') . $meldung . '<form method="post" class="card qm-neu">' . self::csrfFeld() . '<input type="hidden" name="aktion" value="anlegen">'
             . '<div class="qm-felder"><label>Titel<input name="titel" maxlength="150" placeholder="z. B. Blutentnahme und Probenversand" data-geruest-titel></label><label>Ordner' . self::ordnerWahl($baum, 'ordner', $ordner ?: null, 'ohne Ordner') . '</label>'
             . '<label>Tags <small>mit Komma getrennt</small><input name="tags" maxlength="400" placeholder="z. B. Labor, Einarbeitung"></label><label>Prüfen alle<select name="pruef_monate"><option value="12">12 Monate</option><option value="24">24 Monate</option><option value="36">36 Monate</option><option value="6">6 Monate</option><option value="0">keine Wiedervorlage</option></select></label></div>'
             . '<fieldset><legend>Beginnen mit</legend><label class="check"><input type="radio" name="geruest" value="" checked> Leeres Dokument</label>';
@@ -478,7 +478,7 @@ final class Ansicht {
 
     public static function import(string $meldung): string {
         $baum = Dokumente::ordnerBaum();
-        $o = '<div class="qm">' . self::seitenkopf('import', 'Qualitätsmanagement', 'Musterdokumente übernehmen') . $meldung
+        $o = '<div class="qm">' . self::seitenkopf('import', 'QM', 'Musterdokumente übernehmen') . $meldung
             . '<div class="qm-zwei"><section class="card"><h2>Word-Dateien übernehmen (z. B. QEP)</h2>'
             . '<p>Die Musterdokumente aus QEP („Qualität und Entwicklung in Praxen“ der KBV) und andere Word-Dateien (.docx) werden als <strong>Entwürfe</strong> angelegt: anpassen, dann vidieren. '
             . 'Überschriften, Listen, Tabellen, Fettdruck, Links und Bilder werden übernommen; Kopf- und Fußzeilen nicht.</p>'

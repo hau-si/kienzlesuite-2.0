@@ -1,4 +1,8 @@
-# Release-Notizen Qualitätsmanagement
+# Release-Notizen QM
+
+## 0.1.0-beta.2
+
+- Sichtbarer Name jetzt „QM“ (Wunsch des Nutzers): Seitenleiste, Modulverwaltung, Seitentitel und Kopfzeile der Seiten. Webpfad `/qm` und Rechte bleiben gleich. Mit Tests geprüft, nicht auf der VM.
 
 ## 0.1.0-beta.1
 

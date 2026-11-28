@@ -474,7 +474,7 @@ main.modul { max-width: 940px; }
 .pk-weg { background: #fff; border: 1px solid #e6cfc6; color: #99412b; }
 .patient-karte [hidden] { display: none !important; }
 @media (max-width: 640px) { .patient-karte { flex-wrap: wrap; } .pk-knoepfe { width: 100%; justify-content: flex-start; } }
-/* Praxis → Öffnungszeiten (Basis beta.52, Entwurf B mit Feiertagsteil aus A) */
+/* Praxis → Öffnungszeiten (Basis beta.55, Entwurf B mit Feiertagsteil aus A) */
 .zt-kopf { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; }
 .zt-kopf a.button:last-child { margin-left: auto; }
 .zt-grid { display: grid; grid-template-columns: minmax(280px, 340px) 1fr; gap: 18px; align-items: start; }

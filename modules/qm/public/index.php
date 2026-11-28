@@ -211,7 +211,7 @@ try {
         '/import' => Ansicht::import($meldung),
         'dokument' => Ansicht::dokument($dok, $_GET, $meldung, $r['vorlegen'] ? $k->personen() : []),
     };
-    echo $k->rahmen('Qualitätsmanagement', $inhalt, ['roh' => true, 'kopf' => Ansicht::kopf($base, $k->csrf())]);
+    echo $k->rahmen('QM', $inhalt, ['roh' => true, 'kopf' => Ansicht::kopf($base, $k->csrf())]);
 } catch (Throwable $e) {
     error_log('qm: ' . get_class($e) . ': ' . $e->getMessage());
     http_response_code(500);
